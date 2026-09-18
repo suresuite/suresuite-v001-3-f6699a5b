@@ -5,6 +5,23 @@
 // name, type, unit, CSV header, constraint and substitution below is authored in
 // supabase/contract/*.yaml and read from there — never typed into a page.
 
+/**
+ * A foreign key, as the introspector reports it (D57).
+ *
+ * It was declared `string | null` here while `refColumn()` emitted this
+ * object — the generator and its own type disagreed from the day WP 5.2h
+ * wrote them, and sixty-one TS2322 errors went unseen because nothing in
+ * this repository typechecked. The OBJECT is kept and the type corrected,
+ * not the reverse: a reference page wants to say WHICH table a column
+ * points at, and a stringified key cannot be linked to.
+ */
+export type RefReference = {
+  schema: string;
+  table: string;
+  columns: string[];
+  onDelete: string | null;
+};
+
 export type RefSubstitution = {
   when: string;
   value: string;
@@ -24,7 +41,7 @@ export type RefColumn = {
   meaning: string;
   primaryKey: boolean;
   unique: boolean;
-  references: string | null;
+  references: RefReference | null;
   substitutions: RefSubstitution[];
   engineChain: string | null;
   engineLevel: string | null;
@@ -102,7 +119,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -239,7 +256,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -438,7 +455,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": null
+          "onDelete": null
         },
         "substitutions": [],
         "engineChain": null,
@@ -769,7 +786,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -827,7 +844,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -1042,7 +1059,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -1191,7 +1208,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -1269,7 +1286,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -1402,7 +1419,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -1748,7 +1765,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -1940,7 +1957,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -1963,7 +1980,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -1986,7 +2003,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -2119,7 +2136,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -2508,7 +2525,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -2657,7 +2674,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -3090,7 +3107,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -3314,7 +3331,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -3398,7 +3415,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -3533,7 +3550,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -3615,7 +3632,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -3654,7 +3671,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": null
+          "onDelete": null
         },
         "substitutions": [],
         "engineChain": null,
@@ -3869,7 +3886,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": null
+          "onDelete": null
         },
         "substitutions": [],
         "engineChain": null,
@@ -3924,7 +3941,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -4038,7 +4055,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -4061,7 +4078,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -4287,7 +4304,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -4310,7 +4327,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -4520,7 +4537,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -4543,7 +4560,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -4872,7 +4889,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -5054,7 +5071,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -5327,7 +5344,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -5405,7 +5422,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -6853,7 +6870,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -6876,7 +6893,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "key"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -6991,7 +7008,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -7014,7 +7031,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -7144,7 +7161,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -7270,7 +7287,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -7458,7 +7475,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -7958,7 +7975,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -8296,7 +8313,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -8377,7 +8394,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -8448,7 +8465,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": null
+          "onDelete": null
         },
         "substitutions": [],
         "engineChain": null,
@@ -8635,7 +8652,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -8658,7 +8675,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -8697,7 +8714,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -8827,7 +8844,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "key"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -9257,7 +9274,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -9494,7 +9511,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "key"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -9587,7 +9604,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -9775,7 +9792,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -10020,7 +10037,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": null
+          "onDelete": null
         },
         "substitutions": [],
         "engineChain": null,
@@ -10674,7 +10691,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -10946,7 +10963,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -10999,7 +11016,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -11045,7 +11062,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -11068,7 +11085,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "SET NULL"
+          "onDelete": "SET NULL"
         },
         "substitutions": [],
         "engineChain": null,
@@ -11170,7 +11187,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "id"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,
@@ -11193,7 +11210,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           "columns": [
             "key"
           ],
-          "on_delete": "CASCADE"
+          "onDelete": "CASCADE"
         },
         "substitutions": [],
         "engineChain": null,

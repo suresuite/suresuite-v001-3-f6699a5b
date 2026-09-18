@@ -794,7 +794,17 @@ function refColumn(c) {
     meaning: String(c.meaning ?? "").replace(/\s+/g, " ").trim(),
     primaryKey: Boolean(c.primary_key),
     unique: Boolean(c.unique),
-    references: c.references ?? null,
+    // Re-keyed rather than passed through: the introspector's `on_delete` is
+    // snake_case like the SQL it read, and every other field on this type is
+    // camelCase like the TypeScript that reads it. One shape, stated once.
+    references: c.references
+      ? {
+          schema: c.references.schema,
+          table: c.references.table,
+          columns: c.references.columns,
+          onDelete: c.references.on_delete ?? null,
+        }
+      : null,
     substitutions: (c.substitutions ?? []).map((x) => ({
       when: String(x.when ?? "").replace(/\s+/g, " ").trim(),
       value: String(x.value ?? "").replace(/\s+/g, " ").trim(),
@@ -840,6 +850,23 @@ export function renderReferenceModule(contract) {
     "// name, type, unit, CSV header, constraint and substitution below is authored in",
     "// supabase/contract/*.yaml and read from there — never typed into a page.",
     "",
+    "/**",
+    " * A foreign key, as the introspector reports it (D57).",
+    " *",
+    " * It was declared `string | null` here while `refColumn()` emitted this",
+    " * object — the generator and its own type disagreed from the day WP 5.2h",
+    " * wrote them, and sixty-one TS2322 errors went unseen because nothing in",
+    " * this repository typechecked. The OBJECT is kept and the type corrected,",
+    " * not the reverse: a reference page wants to say WHICH table a column",
+    " * points at, and a stringified key cannot be linked to.",
+    " */",
+    "export type RefReference = {",
+    "  schema: string;",
+    "  table: string;",
+    "  columns: string[];",
+    "  onDelete: string | null;",
+    "};",
+    "",
     "export type RefSubstitution = {",
     "  when: string;",
     "  value: string;",
@@ -859,7 +886,7 @@ export function renderReferenceModule(contract) {
     "  meaning: string;",
     "  primaryKey: boolean;",
     "  unique: boolean;",
-    "  references: string | null;",
+    "  references: RefReference | null;",
     "  substitutions: RefSubstitution[];",
     "  engineChain: string | null;",
     "  engineLevel: string | null;",

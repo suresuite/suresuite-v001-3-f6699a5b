@@ -243,7 +243,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D54 | **The data-plane audit rule is scoped to the CONTRACT, so every DEFERRED tier-2/3/4 table is unaudited and no gate says so.** `dataPlaneAudit.test.ts` requires the three `audit_tier_write` triggers on every tier-2/3/4 table *in the contract*; a table with no sidecar is outside the contract, therefore outside the rule, therefore its writes are unattributable with nothing to notice. `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain` sat in that gap from WP 2.3 until WP 3.2 described them — and describing them is what turned the gate red, in the same session, which is the gate working and is only possible for a table somebody had already chosen to describe. **MEASURED, 2026-09-17 (§15 run `35229431958`): 0 of the 6 tables WP 4.2 owns carry an `audit_tier_write` trigger — and `contract:check` R11 puts the number for the whole class at 42 of 42 deferred tables unaudited.** | `dataPlaneAudit.test.ts`'s "in the contract" qualifier; `coverage.yaml`; `contract:check` R11 | WP 4.2 ✅ *(the RULE, which is what this row asked for: a deferral must SAY whether the table is audited, and it lives in `contract:check` R11 — where R1 already reads the same file — rather than in a comment. Each `coverage.yaml` group now carries an `audited:` map naming every table in it; R11 fails when a table is missing from the map AND when the declaration disagrees with the triggers the migrations create, read from the same `auditedTables()` R9 uses. Mutation-tested both ways. **It is deliberately NOT a gate on BEING audited** — 42 of 42 are unaudited, so requiring `true` would be red on arrival and unlandable, the same reasoning that made WP 4.1's writer list a ratchet. The rule requires the SENTENCE: `false` now has to be typed by a person, beside the package that owns fixing it, and R11 prints the count on every run so it cannot quietly grow. **The 42 remain unaudited and that is the open half**, owned per group by WP 4.2's successors — 6 here, 9 WP 4.4, 10 WP 6.1, 17 WP 5.2)*
 | D55 | **The three item-master CSVs are parsed server-side but land nothing** — `materials`, `products` and `suppliers` still go from the browser to `bulk_upsert_*` without a tier-0 record or a run, so `no-tier-skip` (I2) is PARTIAL rather than met after WP 3.2. They were left out deliberately and the reason is not laziness: `bulk_upsert_*` already UPSERTS on a natural key and validates its enums in SQL, and routing them through a landing whose promotion is an INSERT would have been a regression dressed as progress. WP 3.3 makes promotion an upsert, which is the moment this becomes cheap | the `item-master` branch of `UploadWizard.tsx` (deleted by WP 3.3); `ingestSpec.generated.ts` now carries all three | WP 3.3 ✅ *(`20260916000020` — the three sidecars declare `ingest_dataset`, the branch that called `bulk_upsert_*` is DELETED not flagged off, and `ingestSpecParity.test.ts` fails if it returns. It cost MORE than the handoff said: the sidecars carried a `csv_header` on every item-master column and an `ingest.rule` on none, so 22 rules had to be authored from each field's own `validate` sentence and from `ITEM_MASTER_ENUMS`, which already mirrors the write-RPCs' CHECKs. The GENERALITY held, which is the claim worth testing: an item master's key is a composite PRIMARY KEY rather than an index this package made, and it has no `plant_name`, and `ingest_apply_run` promotes into it through the same statement a lane uses because it reads the key from the catalog and derives the server-set columns from the target's shape — `supabase/rehearsal/090`. So `no-tier-skip` (I2) is met for every CSV the contract describes; what remains outside is D56's group)* |
 | D56 | **The node list and the two deep-tier network CSVs land nothing either** — `node_list`, `network_nodes` and `network_edges` are parsed server-side now but still go straight to tier 2 through their bulk RPCs, because there was no contract to validate them against and no decision about what tier they are. **THE DECISION IS MADE AND IT IS WP 4.2'S: `network_nodes` IS BOTH, SO THE ANSWER IS A SPLIT AND NOT A TIER — AND THE SPLIT IS DEFERRED TO WP 4.3 WITH A REASON RATHER THAN TAKEN HERE.** The table carries seven columns a user uploaded (`name`, `country`, `industry`, `revenue`, `lat`, `long`, `is_seed`, plus `uid`/`depth`) and eight an analysis wrote (`prominence`, `prominence_updated_at`, the five centralities, `network_metrics_updated_at`). `node_list` is the same shape (`is_critical_node`, `critical_node_score`, `prediction_timestamp` written by an analysis; `longitude`/`latitude` written by `geocode-locations`). That is D19 stated precisely, in one table, and it is why "what tier is it" has no answer while the table is one thing. **Why the split is not taken in WP 4.2**: (1) the computed half has nowhere to go until the analyzers write `analysis_results`, which is WP 4.3's dual-write — splitting first would mean a migration that moves columns no writer targets yet, and §11 says do not migrate a reader here; (2) the input half cannot become a described tier-2 table until it has a natural key, and **it does not have one — D72**; (3) describing the input half makes WP 4.1's coverage rule fold it into `hash_network` the moment the sidecar exists, which is a SECOND `schema_version` bump, and §16 · WP 4.1 · C is what one of those costs on a day D70's proposal count is not zero. **The blast radius, enumerated so WP 4.3 inherits it rather than rediscovering it** — writers of the input half: `UploadWizard.tsx:1024` (`bulk_insert_network_nodes`), `:1079` (`bulk_insert_network_edges`), `combine-project/index.ts:468,477` (`refresh_node_list_for_project`); `bulk_insert_network_summary` exists and **has no caller at all**. Writers of the computed half: `calculate-network-science-metrics/index.ts:132` (the five centralities + `prominence`), `calculate-node-prominence/index.ts:111` (`prominence`), `geocode-locations/index.ts:245,292` (`node_list` lat/long). Readers of both halves as one row: `ProjectDataViewer.tsx` and `FirmLevelNetwork.tsx` (`prominence`), `DataManager.tsx` (`is_critical_node`, `critical_node_score`), `MapView.tsx` (`node_list` coordinates), `verifiableExports.ts`. All four bulk RPCs remain tier-2-skipping and unaudited | `UploadWizard.tsx:373,400,409`; `coverage.yaml` WP 4.2 group; the writers and readers enumerated in this row | WP 4.2 ✅ *(the DECISION and its blast radius, which is what three packages deferred)* · WP 4.3 *(executes the split, with D72 first)* |
-| D57 | **`reference.generated.ts` does not typecheck, and has not since WP 5.2h.** `RefColumn.references` is declared `string \| null` and the generator emits the introspected object `{table, columns, on_delete}` — 40+ TS2322 errors under `tsc --noEmit`. Nothing catches it: `npm run build` is Vite, which does not typecheck, and `contract:generate -- --check` compares text rather than types. Pre-existing on `main` at `087f2e6`, measured with and without WP 3.2's diff | `generate.mjs`'s `RefColumn` type vs `refColumn()`'s output | WP 5.2 |
+| D57 | **`reference.generated.ts` does not typecheck, and has not since WP 5.2h.** `RefColumn.references` is declared `string \| null` and the generator emits the introspected object `{table, columns, on_delete}` — **61 TS2322 errors** under `tsc -p tsconfig.app.json --noEmit` (this row said "40+", which was an estimate; the number was measured in Phase 5 and is 61 of 89, the other 28 being nine unrelated surfaces). Nothing catches it: `npm run build` is Vite, which does not typecheck; `contract:generate -- --check` compares text rather than types; **and a bare `tsc --noEmit` at the root passes VACUOUSLY** — `tsconfig.json` is `"files": []` plus project references, so it checks the empty set and exits 0. Pre-existing on `main` at `087f2e6`, measured with and without WP 3.2's diff | `generate.mjs`'s `RefColumn` type vs `refColumn()`'s output | **Phase 5 ✅** — the TYPE corrected, not the emitter (a reference page wants the target table's name, which a stringified key cannot give), `on_delete` re-keyed to `onDelete`, and `npm run typecheck` added as a ratchet over `tsconfig.app.json` with a non-vacuity guard. Teeth proved by reverting the type: 61 errors, exit 1 |
 | D58 | **`multi_tier_supply_chain` is a live tier-2 table with no reader and no writer.** `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every other occurrence is a migration — created 2025-08-20 and carried through every RLS rewrite since, most recently `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. WP 3.2 described it rather than deferring it a third time, because a deferral is a promise that somebody will look and the looking is now done. Dropping it is not the noticing package's call: §15 counts its rows now, so whoever decides is deciding against a number — and the number, measured 2026-09-16 (§15 run `35144057908`), is **0 rows across 0 projects**. It is not a table whose data nobody reads; it is a table with no data, no reader and no writer | `supabase/contract/multi_tier_supply_chain.contract.yaml`'s table note; §15's every-project sweep | WP 6.2 |
 | D59 | **A CHECK written INLINE on a column is invisible to the artifact, so the rehearsed database does not have it and the generated page does not publish it.** `introspect.mjs` reads a column's type, its NOT NULL and its DEFAULT and drops the rest; only a NAMED, table-level `ADD CONSTRAINT … CHECK` is recorded. The artifact holds **24 CHECK constraints across 15 tables** while the migrations contain **253 `CHECK (` occurrences** — most of that gap is repetition across shadowed definitions, but `ingest_files` alone loses three real ones (`source_kind`'s vocabulary, `byte_size >= 0`, and the SHA-256 shape). Two consequences, and the second is worse: `contract:rehearse` builds a database with no such constraint, so an assertion that a bad value is REFUSED passes when it is run against the migration and fails when it is run against the artifact; and `docs/data/tables/*.md` renders a table's CHECK list, so a rule that rejects a user's upload appears in no document (§5 T1). **Found by the third rehearsal mode on WP 3.2's own branch** — green fresh and green over production's shape, red against its own artifact, which is precisely the case the WP 3.1 follow-up added that mode for. Same family as D49 (a column rename not followed into indexes) and D52 (a table rename not followed into foreign keys): the introspector is incomplete about DEPENDENT objects, one kind at a time. WP 3.2 walks around it — `20260916000014` writes every CHECK as a named table-level constraint — rather than relying on it being fixed | `introspect.mjs`'s `CREATE TABLE` column parser vs `20260916000013_ingest_files_tier0.sql:36,45,49` | WP 6.2 ✅ *(slice 9 — `parseColumn` extracts every inline `CHECK`, `liftImplicitConstraints` names it the way PostgreSQL does (`<table>_<column>_check`) so a later `DROP CONSTRAINT` matches it, `DROP COLUMN` takes it with the column, and a column RENAME rewrites it. 24 CHECKs → 84. The measured gap was never 253: that count includes every shadowed re-declaration and every policy's `WITH CHECK`. The honest figure is **65 inline column CHECKs in CREATE TABLE statements plus one on an ADD COLUMN**, and what reached the artifact is 60 of them — the other five are superseded by name. `introspectorDependents.test.ts` + `supabase/rehearsal/180` §1–§2)* |
 | **D60** | **The introspector drops `NULLS NOT DISTINCT` from a `CREATE UNIQUE INDEX`, so the rehearsed database's constraint is WEAKER than the migration's.** `introspect.mjs`'s index parser reads the column list and any `WHERE`, and keeps nothing in between — and the clause sits exactly there. `rehearsal-schema.mjs`'s `emitIndexes` then rebuilds the index from the artifact WITHOUT it. The consequence is not cosmetic and it is not symmetrical: PostgreSQL's default makes NULLs distinct, so the rebuilt index constrains every row EXCEPT the ones whose key column is null, and `ON CONFLICT` infers from the same index and INSERTS a duplicate rather than updating. An assertion that a null-bearing duplicate is refused therefore PASSES in the fresh modes, where the migration itself runs, and FAILS against the artifact — which is the case the WP 3.1 follow-up added the third rehearsal mode for. Found by WP 3.3, whose seven natural-key indexes are all `NULLS NOT DISTINCT` (three of the seven keys contain a nullable column — see D5), so the defect was between the migration and every gate that reads the artifact. Same family as D49 (a column rename not followed into indexes), D52 (a table rename not followed into foreign keys) and D59 (an inline CHECK never recorded): the introspector is incomplete about DEPENDENT detail, one kind at a time — and unlike D59 this one could not be walked around, because there is no other way to spell the clause | `introspect.mjs`'s `CREATE INDEX` parser; `rehearsal-schema.mjs`'s `emitIndexes` | WP 3.3 ✅ *(both sides fixed; the artifact records `nulls_not_distinct`, `verify-introspection.mjs` checks all seven, and `supabase/rehearsal/080` section 0a asserts `pg_index.indnullsnotdistinct` on the index THE DATABASE ARRIVED WITH rather than on one the file creates itself — which is what lets the third mode see it)* |
@@ -1903,12 +1903,27 @@ internal-only.
 **Gap check** — diff the §6.3 inventory against the live schema and `App.tsx`; a
 table or route with no page and no internal-only justification is a finding.
 
-**D57 — `reference.generated.ts` does not typecheck**, and has not since WP 5.2h
-emitted it: `RefColumn.references` is declared `string | null` and the generator
-writes the introspected object. Forty-odd TS2322 errors that nothing sees, because
-`npm run build` is Vite and `contract:generate -- --check` compares text rather
-than types. One line of the type or one line of `refColumn()` — but decide which,
-because the page may want the target table's name.
+**D57 — `reference.generated.ts` does not typecheck** ✅ *(closed in Phase 5)*. It
+had not since WP 5.2h emitted it: `RefColumn.references` was declared
+`string | null` and the generator wrote the introspected object. The estimate in
+this paragraph was "forty-odd"; the measured number is **61** of 89 errors in the
+project. The TYPE was corrected rather than the emitter — a reference page wants
+to name the table a column points at, and a stringified key cannot be linked to —
+and `on_delete` re-keyed to `onDelete` so the emitted shape and the declared one
+agree field for field.
+
+**The second half is the point, and it was the harder half.** Nothing in this
+repository typechecked. `npm run build` is Vite; `contract:generate -- --check`
+compares text; `package.json` had no typecheck script; **and a bare `tsc --noEmit`
+at the root passes vacuously**, because `tsconfig.json` is `"files": []` plus two
+project references and therefore checks nothing. `npm run typecheck` pins
+`tsconfig.app.json`, refuses to report success from a program that does not
+contain `src/main.tsx` and at least 50 files under `src/`, and ratchets against
+`scripts/typecheck-baseline.json` — 28 pre-existing errors in twelve files, each
+with a named owner, a list that may shrink and may not grow. It runs in
+`npm run lint` and in `data-contract.yml`. Teeth proved by reverting the type
+fix: 61 new errors, exit 1; by pointing it at the root tsconfig: exit 2; and by
+inflating one baseline number: exit 1.
 
 ### WP 5.3 — The anchor sees the graph; the column drop is BLOCKED and counted ✅ *(D75 closed; D88 found — done `20260917000009`)*
 
@@ -10607,3 +10622,81 @@ duplicate row.
    migration and still nobody's yet.
 
 **Still open in WP 6.2:** D18, D34, D51, D58, D66, D87, D94, D95, D96, D99.
+
+### D57 — the type, and the gate that would have caught it · 2026-09-18 · no migration
+
+**What slice 13 promised.** Nothing about D57; its gap check pointed at the six
+remaining WP 6.4 tables. This is taken as Phase 5's opening move because every
+page WP 5.2b–g writes reads `reference.generated.ts`, and writing sixty-six
+pages against a module whose declared type is wrong is sixty-six chances to
+build on the wrong shape.
+
+**The fix is one line of type and one of the emitter.** `RefColumn.references`
+said `string | null`; `refColumn()` wrote `{schema, table, columns, on_delete}`.
+§12 left the choice open — "the page may want the target table's name" — and it
+does: a reference page saying *"points at `projects`"* is worth more than one
+saying *"has a foreign key"*, and a stringified key cannot be linked to. So the
+TYPE moved. `on_delete` became `onDelete` in the same breath, because every
+other field on that type is camelCase and a single snake_case straggler is the
+next person's five minutes.
+
+**THE NUMBER WAS AN ESTIMATE AND IT WAS LOW.** §4 and §12 both said "40+". The
+measurement is **61**, out of 89 in the project. §4's row now carries 61 and
+says it was measured rather than estimated.
+
+**── THE PART WORTH READING: THE GATE THAT COULD NOT FAIL ──**
+
+§12 named three reasons nothing caught this — Vite does not typecheck,
+`contract:generate -- --check` compares text, and `package.json` has no
+typecheck script. There is a fourth, and it is the one that matters, because it
+is the one that would have defeated the obvious fix:
+
+    $ npx tsc --noEmit
+    $ echo $?
+    0
+
+`tsconfig.json` is `"files": []` with two project references and nothing else.
+`tsc --noEmit` there typechecks **the empty set** and exits 0 — with 89 real
+errors in the tree. Adding `"typecheck": "tsc --noEmit"` to `package.json` would
+have shipped a gate that is green for the same reason a broken smoke alarm is
+quiet, and three packages from now somebody would have cited it.
+
+So `scripts/typecheck.mjs` pins `tsconfig.app.json` (the project with
+`"include": ["src"]`) and **proves the program is non-empty before it believes a
+clean result**: it asks tsc which files it loaded and refuses to pass unless
+`src/main.tsx` is among them and at least 50 files under `src/` are. That
+assertion cannot be satisfied by a config that checks nothing, which is the
+whole difference between this and the one-liner.
+
+**A ratchet, not a gate, and for the reason §4 D85 gives.** 28 errors predate
+Phase 5 in nine surfaces nothing here wrote — mostly the generated Supabase
+client not knowing `ingest_runs` or `project_erp_links`, plus the `Provenance`
+union D91 lives next to, plus WP 6.4's `target_type` discriminator showing up as
+a type error on the same defect its sidecar describes as a missing CHECK. A gate
+red on arrival is a gate people route around, which is exactly what
+`npm run lint` became. `scripts/typecheck-baseline.json` holds them one file at a
+time with a named owner each; it may shrink and may not grow, and **one fewer
+than the baseline claims also fails**, so it cannot record debt already paid.
+
+**Mutation-tested three ways, because a gate nobody has watched fail is a
+claim.** Reverting the type in the generated file → 61 new errors, exit 1.
+Pointing `PROJECT` at the root `tsconfig.json` → the non-vacuity guard fires,
+exit 2 (and that is the mutation that matters: the naive gate passes here).
+Inflating one baseline count from 7 to 9 → the shrink rule fires, exit 1.
+
+**Verified:** `npm run typecheck` ✓ (28 of 28 held) · `contract:generate` clean
+and the artifact committed · 412 tests ✓ · `check:docs` ✓ · `contract:check` ✓ ·
+eslint 336/116 and `audit:ui` 8, unchanged.
+
+**Gap check.** Two findings, neither changing a later package:
+
+1. **`npm run lint` cannot pass and Phase 5's exit criteria ask it to.** It runs
+   four gates now and reports each; eslint (336 errors) and `audit:ui` (8) have
+   been red since long before this phase and are nobody's in it. "Lint at
+   baseline, all gates ran" is the honest statement and the one §16 has used
+   since WP 6.2 slice 6. Recorded here so a later session does not read Phase
+   5's exit list as a claim that it went green.
+2. **The four unused `@ts-expect-error` directives are in gate suites**, and
+   deleting them is a change to four files whose job is to be trustworthy, for
+   no behavioural reason. They are baselined with that stated rather than
+   quietly swept.

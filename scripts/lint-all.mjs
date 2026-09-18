@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `npm run lint` — all three gates, every time, reporting all three.
+ * `npm run lint` — every gate, every time, reporting every one.
  *
  * ── WHAT THIS REPLACED, AND WHY IT MATTERED (§4 D85) ───────────────────────
  *
@@ -15,7 +15,7 @@
  *
  * THE FIX IS NOT `;`. D85's own note warns against that, and rightly:
  * `a; b; c` reports the exit code of `c` alone, so a red eslint would start
- * passing — a gate turned off in the name of fixing it. This runs all three,
+ * passing — a gate turned off in the name of fixing it. This runs all of them,
  * prints each one's own output verbatim, and exits non-zero if ANY failed.
  * Strictly more information, identical verdict.
  *
@@ -34,6 +34,12 @@ const GATES = [
   { name: "eslint", cmd: "npx", args: ["eslint", "."] },
   { name: "audit:ui", cmd: "node", args: ["scripts/audit-adaptive-ui.mjs"] },
   { name: "check:docs", cmd: "node", args: ["scripts/check-docs-single-source.mjs"] },
+  // Added with D57's fix. It is a RATCHET against a committed baseline, so
+  // unlike eslint it is GREEN today and a contributor who breaks a type sees
+  // it here rather than in a reviewer's terminal. Nothing in this repository
+  // typechecked before it: Vite does not, and a bare `tsc --noEmit` at the
+  // root passes on the empty set — see scripts/typecheck.mjs.
+  { name: "typecheck", cmd: "node", args: ["scripts/typecheck.mjs"] },
 ];
 
 const rule = (label) => `\n== ${label} ${"=".repeat(Math.max(0, 60 - label.length))}\n`;
@@ -65,8 +71,8 @@ const failed = results.filter((r) => !r.ok);
 if (failed.length) {
   process.stdout.write(
     `\n${failed.length} of ${results.length} gates failed: ${failed.map((r) => r.name).join(", ")}.\n` +
-      `All three RAN, which is the point of §4 D85 — a red eslint no longer hides\n` +
-      `the other two, and "lint at baseline" now means all three were looked at.\n`,
+      `All of them RAN, which is the point of §4 D85 — a red eslint no longer hides\n` +
+      `the rest, and "lint at baseline" now means every one was looked at.\n`,
   );
   process.exit(1);
 }
