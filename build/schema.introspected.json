@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 328,
-  "migrations_applied": 320,
+  "migrations_found": 329,
+  "migrations_applied": 321,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260918000001_org_row_uuid_only.sql",
+  "last_migration": "20260918000002_actor_on_three_definer_writers.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -21354,7 +21354,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260716000001_apply_policy_bundle.sql"
+      "defined_by": "20260918000002_actor_on_three_definer_writers.sql"
     },
     {
       "name": "apply_validation_to_scenario",
@@ -21420,7 +21420,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260728000001_cartographer_product_level.sql"
+      "defined_by": "20260918000002_actor_on_three_definer_writers.sql"
     },
     {
       "name": "assign_material_supplier",
@@ -21452,7 +21452,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260728000001_cartographer_product_level.sql"
+      "defined_by": "20260918000002_actor_on_three_definer_writers.sql"
     },
     {
       "name": "audit_tier_write",

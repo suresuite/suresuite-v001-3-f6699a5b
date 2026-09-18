@@ -245,9 +245,19 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
    *   bulk_insert_tier3_suppliers · combine_project_into_supply_chain
    *   delete_project · delete_project_dataset
    */
+  // WP 6.2 slice 11 · SIXTEEN → THIRTEEN. `apply_policy_bundle`,
+  // `assign_bom_line` and `assign_outbound_customer` left this list because
+  // `20260918000002` gave each the one line it was missing — every one of the
+  // three already TOOK `p_user_id` and simply never told the trigger, which is
+  // `assign_material_supplier`'s shape before `20260916000021`.
+  //
+  // THE TEN THAT REMAIN ARE A DIFFERENT SIZE, AND SAYING SO IS THE POINT OF A
+  // RATCHET. None of them takes an actor parameter at all, so closing one
+  // changes a signature AND every caller — a migration plus a client change,
+  // not one line. They are listed here rather than split into a second list
+  // because the invariant does not care why a row is unattributed.
   const UNATTRIBUTED = [
-    "analysis_mark_critical_nodes", "apply_policy_bundle", "assign_bom_line",
-    "assign_outbound_customer",
+    "analysis_mark_critical_nodes",
     "bulk_upsert_materials", "bulk_upsert_policy_overrides", "bulk_upsert_products",
     "bulk_upsert_suppliers", "clear_policy_preset",
     "create_default_policy_defaults", "delete_policy_override",
@@ -268,6 +278,40 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
   const VIA_SHARED_PREAMBLE = new Set([
     "analysis_mark_critical_nodes", "etl_replace_supply_chain", "mrp_apply_staged_products",
   ]);
+
+  /**
+   * How many places the application can reach this RPC — `src/` and
+   * `supabase/functions/`, excluding this test, the generated modules and the
+   * agent eval harnesses, none of which is a caller a user can reach.
+   *
+   * IT COUNTS THE NAME AS A WHOLE STRING LITERAL, NOT `rpc('<name>')`, AND THE
+   * FIRST DRAFT COUNTED THE LATTER. `useItemMasters.tsx` dispatches through
+   * `sb.rpc(UPSERT_RPC[table], …)` against a lookup table whose VALUES are the
+   * RPC names, so a `rpc(` regex reported `bulk_upsert_materials` and
+   * `bulk_upsert_products` as having no caller at all while the upload path
+   * calls both. A name in quotes is a call or a dispatch entry; a name in prose
+   * or in backticks inside a comment is neither, and single/double quotes
+   * separate the two without a parser.
+   */
+  const callSites = (name: string) => {
+    const roots = [join(ROOT, "src"), join(ROOT, "supabase", "functions")];
+    const re = new RegExp(`(['"])${name}\\1`);
+    let n = 0;
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        if (e.isDirectory()) {
+          if (e.name === "node_modules" || e.name === "__tests__" || e.name === "eval" || e.name === "generated") continue;
+          walk(full);
+          continue;
+        }
+        if (!/\.(ts|tsx|js|jsx)$/.test(e.name)) continue;
+        for (const line of readFileSync(full, "utf8").split("\n")) if (re.test(line)) n++;
+      }
+    };
+    for (const r of roots) walk(r);
+    return n;
+  };
 
   const writers = () => {
     const tier = new Set(tieredTables().map(([t]) => t));
@@ -341,11 +385,54 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
     expect(stale, `no longer unattributed — remove from UNATTRIBUTED`).toEqual([]);
   });
 
-  it("the two that DO name their actor still do", () => {
-    // `assign_material_supplier` (WP 3.3) and `snapshot_dataset` (WP 4.1) are
-    // the whole of the attributed SQL surface. A regression in either is the
-    // invariant going backwards.
-    for (const name of ["assign_material_supplier", "snapshot_dataset"]) {
+  it("the remaining debt is sized by COUNTING call sites, not by remembering a number", () => {
+    // §4 D71 and D78 both carry a figure for how many of the unattributed
+    // writers have a live caller — "seventeen", then "six". **Both were wrong
+    // when WP 6.2 slice 11 measured them**: TWELVE of the thirteen were
+    // reachable, and NINE of the ten left after that slice still are — only
+    // `create_default_policy_defaults` has no caller anywhere.
+    // A budget figure in prose goes stale the moment a caller is added or
+    // removed and nothing notices, which is the same failure the two orphan
+    // tables were (D3, D4). So it is derived here instead.
+    //
+    // This is not a ratchet — the count may move in either direction. It fails
+    // when the PROSE stops matching, which is what makes editing one without
+    // the other impossible.
+    const live = UNATTRIBUTED.filter((n) => !VIA_SHARED_PREAMBLE.has(n))
+      .filter((n) => callSites(n) > 0);
+    expect(
+      live.length,
+      `${live.length} of the ${UNATTRIBUTED.length - VIA_SHARED_PREAMBLE.size} genuinely ` +
+        `unattributed writers are reachable from the application: ${live.join(", ")}. ` +
+        `§4 D71's "re-budget for it" line must state this number. Update BOTH.`,
+    ).toBe(9);
+  });
+
+  it("every name still on the ratchet takes NO actor parameter — the three that did are gone", () => {
+    // What made slice 11's three cheap was that the actor was already a
+    // parameter: one line, no signature change, no client change. Every name
+    // left needs a signature change AND every caller updated, and a reader who
+    // cannot tell those apart will budget the remaining ten as ten one-liners.
+    const withActor = UNATTRIBUTED
+      .filter((n) => !VIA_SHARED_PREAMBLE.has(n))
+      .filter((n) => /\b(p_|_)(user_id|actor_user_id|user_email)\b/.test(fn(n)?.sql?.split("AS")[0] ?? ""));
+    expect(
+      withActor,
+      `these still take an actor and do not pass it on — that is the ONE-LINE ` +
+        `shape (assign_material_supplier, WP 3.3; the three in 20260918000002). ` +
+        `Close them before the ten that need a signature change.`,
+    ).toEqual([]);
+  });
+
+  it("the FIVE that now name their actor still do", () => {
+    // `assign_material_supplier` (WP 3.3), `snapshot_dataset` (WP 4.1) and the
+    // three WP 6.2 slice 11 closed. A regression in any is the invariant going
+    // backwards, and `supabase/rehearsal/200` proves the three against a real
+    // database with the GUC poisoned first.
+    for (const name of [
+      "assign_material_supplier", "snapshot_dataset",
+      "apply_policy_bundle", "assign_bom_line", "assign_outbound_customer",
+    ]) {
       expect(fn(name).sql, `${name} stopped setting the actor GUC`).toMatch(
         /set_config\s*\(\s*'app\.current_user_id'/i,
       );
