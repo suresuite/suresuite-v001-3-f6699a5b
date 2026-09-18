@@ -151,6 +151,28 @@ class OutboundArc:
 
 
 @dataclass
+class CustomerRow:
+    """``customers`` row — the table the mapper never read (§4 D69).
+
+    ``ProjectData.customers`` is a list of IDS and stays that way: the id set is
+    the union of this table and the customer ids found on outbound arcs, and a
+    customer can legitimately appear only on an arc. This carries the ATTRIBUTES
+    for the ids the table does describe, so the two are additive rather than one
+    replacing the other.
+
+    ``sla_fill_floor_pct`` is deliberately absent: the column exists on the table
+    and ``Customer`` has no field for it, so there is nothing to carry it into.
+    Mapping a per-customer floor onto P-C.2's per-SEGMENT ``sla_tiers`` needs a
+    rule for what happens when two customers in one segment disagree, and
+    inventing that rule is not a reader change (§16).
+    """
+    id: str
+    name: Optional[str] = None
+    segment: Optional[str] = None
+    priority_weight: Optional[float] = None
+
+
+@dataclass
 class ScenarioSettings:
     horizon_days: int = 1092          # ~156 weeks
     warmup_mode: str = "auto"         # auto | manual
@@ -178,6 +200,9 @@ class ProjectData:
     bom: list[BomArc] = field(default_factory=list)
     outbound: list[OutboundArc] = field(default_factory=list)
     customers: list[str] = field(default_factory=list)
+    # The ATTRIBUTES of the customers the `customers` table describes. Additive
+    # to `customers` above, which remains the id list — see `CustomerRow` (D69).
+    customer_rows: list[CustomerRow] = field(default_factory=list)
     policies: dict[str, Any] = field(default_factory=dict)   # {"default": {...}, "node:<id>": {...}}
     scenario: ScenarioSettings = field(default_factory=ScenarioSettings)
     project_model: Optional[str] = None  # projects.supply_chain_model
@@ -516,7 +541,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
     out_price_num: dict[str, float] = {}
     out_price_den: dict[str, float] = {}
     out_demand: dict[str, float] = {}
-    customers: set[str] = set(data.customers)
+    customers: set[str] = set(data.customers) | {c.id for c in data.customer_rows if c.id}
     cust_share: dict[tuple[str, str], float] = {}  # (product, customer) → weekly volume
     for o in data.outbound:
         customers.add(o.customer_id)
@@ -649,7 +674,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
     network = Network(
         suppliers=suppliers, materials=materials, products=products,
         bom=bom, supplier_links=links,
-        customers=[Customer(id=c, name=c) for c in sorted(customers)],
+        customers=_build_customers(customers, data.customer_rows, w),
         customer_links=[
             CustomerLink(product_id=pid, customer_id=cid, share=share)
             for (pid, cid), share in sorted(cust_share.items()) if pid in prod_ids
@@ -830,6 +855,71 @@ _FULFILLMENT_DEFAULT_ONLY = frozenset({
     "lost_sales_cost_per_unit", "allocation", "tier_overrides",
     "service_level_alpha", "service_level_beta", "price",
 })
+
+
+def _build_customers(
+    ids: set[str], rows: list[CustomerRow], w: list[MappingWarning],
+) -> list[Customer]:
+    """Customer entities, with the attributes the `customers` table carries.
+
+    ── WHAT THIS USED TO BE, AND WHY IT MATTERED (§4 D69) ────────────────────
+
+        customers=[Customer(id=c, name=c) for c in sorted(customers)]
+
+    The mapper never read the `customers` table. Every customer therefore
+    arrived with the entity DEFAULTS — `segment="default"` and
+    `priority_weight=1.0` — and two P-C.2 features were inert on every project:
+
+      · `priority_weight` — `p_c2_customer_allocation` falls back to
+        `Customer.priority_weight` when its `priority_weights` param does not
+        name a customer, so the fallback was always 1.0 and the `priority`
+        ordering could not order anything.
+      · `segment` — worse, because it is silent in a second way. Every customer
+        was in the segment `"default"`, so `sla_tiers`, which is keyed BY
+        SEGMENT, matched nothing and every fill floor was 0.0. The engine
+        already warned about this (`unknown_sla_segment` in P-C.2's
+        feasibility), and the warning named the symptom while nothing named the
+        cause: the segments it compared against were a constant.
+
+    A user filling in a customer's priority or segment changed nothing, on every
+    project, with no error. That is T1 — a displayed field that resolves to
+    nothing — reaching all the way into the results.
+
+    An id can legitimately have no row: the id set is the union of this table and
+    the customer ids found on outbound arcs. Those keep the entity defaults, and
+    say so, rather than being dropped.
+    """
+    by_id = {c.id: c for c in rows if c.id}
+    unmatched = sorted(set(by_id) - ids)
+    if unmatched:
+        w.append(MappingWarning(
+            "info", "customers", "customer_id",
+            f"{len(unmatched)} customer row(s) describe ids that appear on no outbound "
+            f"arc, so they have no demand to allocate: {unmatched[:5]}"))
+    out: list[Customer] = []
+    defaulted: list[str] = []
+    for cid in sorted(ids):
+        row = by_id.get(cid)
+        if row is None:
+            defaulted.append(cid)
+            out.append(Customer(id=cid, name=cid))
+            continue
+        kwargs: dict[str, Any] = {"id": cid, "name": row.name or cid}
+        # Only override an entity default when the table actually says something.
+        # A NULL column is not a value, and writing `segment=None` would fail the
+        # entity's own validation rather than fall back to "default".
+        if row.segment:
+            kwargs["segment"] = row.segment
+        if row.priority_weight is not None:
+            kwargs["priority_weight"] = float(row.priority_weight)
+        out.append(Customer(**kwargs))
+    if defaulted:
+        w.append(MappingWarning(
+            "info", "customers", "segment",
+            f"{len(defaulted)} customer(s) have no row in the `customers` table, so they "
+            f"keep the engine defaults (segment=default, priority_weight=1.0): "
+            f"{defaulted[:5]}"))
+    return out
 
 
 def _map_policies(

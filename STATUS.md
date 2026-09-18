@@ -3,11 +3,51 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–4**
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–5** · PR [#223](https://github.com/suresuite/suresuite-v001-3-f6699a5b/pull/223) open
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 5) — The customers table reaches the engine · no migration
+
+**D69 closed — the first slice whose fix is in `scsim`, not `src/`.** A user
+fills in a customer's priority or segment and nothing changes, on every project,
+with no error.
+
+The recorded half (`priority_weight`) was right. **The unrecorded half is worse**:
+`sla_tiers` guarantees a fill floor *per segment*, every customer was in
+`"default"`, so no tier ever matched and every floor was 0.0. The engine already
+warned about it (`unknown_sla_segment`) — the warning named the symptom while
+nothing named the cause, because the segments it compared against were a
+constant.
+
+The table was not merely unmapped, it was **never fetched** — so the fix spans
+the worker's request, the DTO and the mapper.
+
+⚠️ **Not verified locally, and CI is the verifier.** `scsim` imports `pydantic`
+and the egress proxy denies PyPI (D87's limit), so no Python here can be
+executed. `sim-worker/tests/test_customer_attributes.py` has six assertions and
+`scsim-tests.yml` runs it on this push. **Watch that check on PR #223.**
+Ruff did catch one real bug pre-push (`F821` — the row block landed in the wrong
+function).
+
+**Needs a session that can run Python — D94.** The structural root is that
+`P-C.2` reads two `Customer` attributes it never *declares*: its
+`data_requirements` names one field. That silence is why D69 survived adoption —
+the sidecar could say `consumed_by: null` unchallenged and every registry-derived
+tool was blind. The sidecar also gave a **false reason** ("none of the `P-C.x`
+policies is implemented"; `customer_allocation` is `status: implemented`).
+I wrote the declaration and **reverted it**: `registry.generated.json` is
+gated by `gen_frontend_registry.py --check`, regenerating needs pydantic, so
+landing it would have shipped a knowingly-red gate.
+
+**Needs a product decision.** No surface in this app writes `customers`. Two of
+its columns now reach the engine and decide who is served when supply is short —
+and they can only be set by hand in the database.
+
+**Verified:** `contract:check` ✓ · `check:docs` ✓ · 375 tests ✓ · build ✓ ·
+eslint 336/116 and `audit:ui` 8, both unchanged. Python: **CI only**.
 
 ### WP 6.2 (slice 4) — A saved sourcing choice survives a reload · no migration
 
