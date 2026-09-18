@@ -224,6 +224,12 @@ export function buildContract({ introspected, registry, sidecars }) {
       indexes: t.indexes,
       columns,
       note: doc.note ?? null,
+      // WP 4.2's OPEN ENUM of analysis kinds, with each kind's analyzer, code
+      // version and parameter schema. Carried into the contract (and from there
+      // into the manual) because it is the catalog of what an analysis IS, and
+      // `single-source` (I1) says that is authored once — which it is, in the
+      // sidecar, because a CHECK constraining the shape cannot hold a catalog.
+      analysis_kinds: doc.analysis_kinds ?? null,
     };
   }
 
@@ -899,6 +905,18 @@ export function renderReferenceModule(contract) {
           serverSet: t.ingest_dataset.server_set ?? [],
         }
       : null,
+    // WP 5.2e — WP 5.1's lineage, at TABLE grain only.
+    //
+    // THE THREE GRADES ARE NEVER BLURRED and only one of them is carried here.
+    // `table` means "this page reads this table by this path"; `column` is a
+    // stronger claim about one column; `shell` is auth/session plumbing that
+    // ≥80% of pages import and is EXPLICITLY NOT LINEAGE. D82 is what happens
+    // when the two are mixed — a 404 page reported as a surface for user data.
+    // The manual renders `table` entries, and it renders them as "this screen
+    // reads this table", which is exactly the claim the grade supports.
+    surfaces: (t.surfaces ?? [])
+      .filter((x) => x.grain === "table" && x.confirmed)
+      .map((x) => ({ page: x.page, via: x.via, evidence: x.evidence })),
     governance: t.governance
       ? {
           read: t.governance.read ?? null,
@@ -988,6 +1006,14 @@ export function renderReferenceModule(contract) {
     "  naturalKey: string[];",
     "  naturalKeyIntended: string[] | null;",
     "  checks: { name: string; definition: string }[];",
+    "  /**",
+    "   * Which screens read this table, at TABLE grain, human-confirmed (WP 5.1).",
+    "   *",
+    "   * `column`-grain and `shell`-grain entries are deliberately NOT here:",
+    "   * a shell entry is auth plumbing that almost every page imports and is",
+    "   * not lineage at all, and presenting one as a data surface is §4 D82.",
+    "   */",
+    "  surfaces: { page: string; via: string; evidence: string }[];",
     "  /** The CSV origin, where the table has one. `null` means it has none. */",
     "  ingestDataset: { wizardId: string; factClass: string; serverSet: string[] } | null;",
     "  governance: {",
@@ -1180,6 +1206,28 @@ export function renderIngestSpecModule(contract) {
  * WP 6.1's own opening sentence is the reason: "~120 hand-written chains are
  * true on the day they are typed", which is D21 and D22 stated as a rule.
  */
+export function renderAnalysisKinds(contract) {
+  const kinds = [];
+  for (const t of Object.values(contract.tables)) {
+    for (const [kind, k] of Object.entries(t.analysis_kinds ?? {})) {
+      kinds.push({
+        kind,
+        computedBy: k.computed_by,
+        codeVersion: k.code_version ?? null,
+        entityType: k.entity_type,
+        note: String(k.note ?? "").replace(/\s+/g, " ").trim() || null,
+        params: Object.entries(k.params ?? {}).map(([name, p]) => ({
+          name,
+          type: p.type,
+          default: p.default ?? null,
+          meaning: String(p.meaning ?? "").replace(/\s+/g, " ").trim(),
+        })),
+      });
+    }
+  }
+  return kinds.sort((a, b) => a.kind.localeCompare(b.kind));
+}
+
 export function renderPolicyModule(contract, registry) {
   const { chains, order, orderSource } = deriveChains(ROOT, contract, registry);
   const broken = chains.filter((c) => c.breaks.length);
@@ -1238,6 +1286,26 @@ export function renderPolicyModule(contract, registry) {
     "",
     "/** How many chains break, by shape. A page renders the number, never types it. */",
     `export const BREAKS_BY_CLASS: Record<string, string[]> = ${JSON.stringify(byClass, null, 2)};`,
+    "",
+    "/**",
+    " * WP 4.2's OPEN ENUM of analysis kinds, from the sidecar that declares it.",
+    " *",
+    " * The catalog is a data fact, so it is authored once — in",
+    " * `analysis_runs.contract.yaml` — rather than in a CHECK constraint, which",
+    " * could only constrain the shape. §4 D79 is what the alternative costs: a",
+    " * kind was declared here with a parameter no code takes, and §11's \"four",
+    " * analyzers\" turned out to be three.",
+    " */",
+    "export type AnalysisKind = {",
+    "  kind: string;",
+    "  computedBy: string;",
+    "  codeVersion: string | null;",
+    "  entityType: string;",
+    "  note: string | null;",
+    "  params: { name: string; type: string; default: unknown; meaning: string }[];",
+    "};",
+    "",
+    `export const ANALYSIS_KINDS: AnalysisKind[] = ${JSON.stringify(renderAnalysisKinds(contract), null, 2)};`,
     "",
     `export const CHAIN_COUNT = ${chains.length};`,
     `export const BROKEN_COUNT = ${broken.length};`,

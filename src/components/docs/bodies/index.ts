@@ -56,6 +56,17 @@ import VerifyYourInputs from "./VerifyYourInputs";
 import DataTrustReport from "./DataTrustReport";
 import ModelValidation from "./ModelValidation";
 
+// 8 · Networks, 9 · Project Intelligence (WP 5.2e)
+import ProductLevelNetwork from "./ProductLevelNetwork";
+import ProcessLevelNetwork from "./ProcessLevelNetwork";
+import FirmLevelNetwork from "./FirmLevelNetwork";
+import InteractiveNetworkSpace from "./InteractiveNetworkSpace";
+import NetworkScienceMetrics from "./NetworkScienceMetrics";
+import AiAssistant from "./AiAssistant";
+import PlansAndProposals from "./PlansAndProposals";
+import ProjectMemory from "./ProjectMemory";
+import ModelsBudgetsLimits from "./ModelsBudgetsLimits";
+
 export const DOC_BODIES: Record<string, ComponentType> = {
   // 1 · Overview & architecture
   "what-suresuite-is": WhatSureSuiteIs,
@@ -100,6 +111,19 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   "verify-your-inputs": VerifyYourInputs,
   "data-trust-report": DataTrustReport,
   "model-validation": ModelValidation,
+
+  // 8 · Networks
+  "product-level-network": ProductLevelNetwork,
+  "process-level-network": ProcessLevelNetwork,
+  "firm-level-network": FirmLevelNetwork,
+  "interactive-network-space": InteractiveNetworkSpace,
+  "network-science-metrics": NetworkScienceMetrics,
+
+  // 9 · Project Intelligence
+  "ai-assistant": AiAssistant,
+  "plans-and-proposals": PlansAndProposals,
+  "project-memory": ProjectMemory,
+  "models-budgets-limits": ModelsBudgetsLimits,
 
   // 15 · Reference
   "all-tables": AllTables,

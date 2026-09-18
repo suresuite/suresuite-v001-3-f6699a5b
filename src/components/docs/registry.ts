@@ -239,11 +239,11 @@ export const DOC_GROUPS: DocGroup[] = [
     group: "Networks",
     blurb: "Seeing the chain's structure, and what the structure implies.",
     pages: [
-      { ...planned("5.2e"), slug: "product-level-network", title: "Product-Level Network", summary: "Supplier to material to product to customer.", keywords: "product level network graph view material product flow" },
-      { ...planned("5.2e"), slug: "process-level-network", title: "Process-Level Network", summary: "The shop-floor view, level by level.", keywords: "process level network shop floor bom levels" },
-      { ...planned("5.2e"), slug: "firm-level-network", title: "Firm-Level Network", summary: "The deep-tier firm graph.", keywords: "firm level network deep tier firms suppliers graph" },
-      { ...planned("5.2e"), slug: "interactive-network-space", title: "Interactive Network Space", summary: "Exploring the chain without a fixed layout.", keywords: "interactive network space explore layout canvas" },
-      { ...planned("5.2e"), slug: "network-science-metrics", title: "Network science metrics", summary: "Centrality, prominence and critical-node prediction — what each means.", keywords: "centrality degree betweenness eigenvector prominence critical node nexus material" },
+      { ...live, slug: "product-level-network", title: "Product-Level Network", summary: "Supplier to material to product to customer.", keywords: "product level network graph view material product flow" },
+      { ...live, slug: "process-level-network", title: "Process-Level Network", summary: "The shop-floor view, level by level.", keywords: "process level network shop floor bom levels" },
+      { ...live, slug: "firm-level-network", title: "Firm-Level Network", summary: "The deep-tier firm graph.", keywords: "firm level network deep tier firms suppliers graph" },
+      { ...live, slug: "interactive-network-space", title: "Interactive Network Space", summary: "Exploring the chain without a fixed layout.", keywords: "interactive network space explore layout canvas" },
+      { ...live, slug: "network-science-metrics", title: "Network science metrics", summary: "Centrality, prominence and critical-node prediction — what each means.", keywords: "centrality degree betweenness eigenvector prominence critical node nexus material" },
     ],
   },
   {
@@ -251,10 +251,10 @@ export const DOC_GROUPS: DocGroup[] = [
     group: "Project Intelligence",
     blurb: "The assistant, what it can see, and what it is allowed to change.",
     pages: [
-      { ...planned("5.2e"), slug: "ai-assistant", title: "The AI assistant", summary: "What it can see and what it can do.", keywords: "ai assistant chat threads messages folders intelligence" },
-      { ...planned("5.2e"), slug: "plans-and-proposals", title: "Plans and proposals", summary: "Review before apply — nothing changes without your say.", keywords: "plans proposals review apply approve changes" },
-      { ...planned("5.2e"), slug: "project-memory", title: "Project memory", summary: "What the assistant remembers between conversations.", keywords: "project memory context recall persistence" },
-      { ...planned("5.2e"), slug: "models-budgets-limits", title: "Models, budgets and limits", summary: "Which models run, what they cost, and who may use them.", keywords: "ai models budgets usage logs permissions limits spend" },
+      { ...live, slug: "ai-assistant", title: "The AI assistant", summary: "What it can see and what it can do.", keywords: "ai assistant chat threads messages folders intelligence" },
+      { ...live, slug: "plans-and-proposals", title: "Plans and proposals", summary: "Review before apply — nothing changes without your say.", keywords: "plans proposals review apply approve changes" },
+      { ...live, slug: "project-memory", title: "Project memory", summary: "What the assistant remembers between conversations.", keywords: "project memory context recall persistence" },
+      { ...live, slug: "models-budgets-limits", title: "Models, budgets and limits", summary: "Which models run, what they cost, and who may use them.", keywords: "ai models budgets usage logs permissions limits spend" },
     ],
   },
   {

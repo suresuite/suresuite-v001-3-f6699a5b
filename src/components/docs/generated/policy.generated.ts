@@ -1373,5 +1373,91 @@ export const BREAKS_BY_CLASS: Record<string, string[]> = {
   ]
 };
 
+/**
+ * WP 4.2's OPEN ENUM of analysis kinds, from the sidecar that declares it.
+ *
+ * The catalog is a data fact, so it is authored once — in
+ * `analysis_runs.contract.yaml` — rather than in a CHECK constraint, which
+ * could only constrain the shape. §4 D79 is what the alternative costs: a
+ * kind was declared here with a parameter no code takes, and §11's "four
+ * analyzers" turned out to be three.
+ */
+export type AnalysisKind = {
+  kind: string;
+  computedBy: string;
+  codeVersion: string | null;
+  entityType: string;
+  note: string | null;
+  params: { name: string; type: string; default: unknown; meaning: string }[];
+};
+
+export const ANALYSIS_KINDS: AnalysisKind[] = [
+  {
+    "kind": "combine_etl",
+    "computedBy": "combine-project (migrated in WP 4.3, as §11 names it)",
+    "codeVersion": "combine_etl@wp43.1",
+    "entityType": "project",
+    "note": "REGISTERED BUT NEVER SKIPPED. `combine_etl`'s output is rows in `supply_chain_data`, not entries in `analysis_results`, so \"already computed\" means \"those rows are still there\" — which the store cannot see, and a row deleted by hand would make a hit skip an ETL the project needs. WP 4.3 records the run for its identity; WP 4.4 owns staleness and is the package that may turn a hit into a skip.",
+    "params": []
+  },
+  {
+    "kind": "critical_nodes",
+    "computedBy": "predict-critical-nodes (migrated in WP 4.3)",
+    "codeVersion": "critical_nodes@wp43.1",
+    "entityType": "supply_chain_row",
+    "note": "NO `topology_digest`, and the absence is a statement: this analyzer reads `supply_chain_data`, which is `combine-project`'s output over the eleven tier-2 tables `current_graph_hash` already covers. Its inputs ARE in the anchor. The `threshold` parameter this block used to declare DOES NOT EXIST — `predictCriticalNodes` takes no threshold and the entry was authored from the plan rather than from the code. Removed in WP 4.3 rather than carried: an undeclared default is `declared-fallback` (I6) broken, and a DECLARED parameter that no code reads is the same defect pointing the other way.",
+    "params": [
+      {
+        "name": "plant_name",
+        "type": "string",
+        "default": null,
+        "meaning": "The plant filter the request carried, or null for every row of the project. It is part of the key because two plants of one project are two different analyses over two different row sets. NOTE that `plant_name` is NOT project-scoped, which is why the function derives the project from the rows it loaded and refuses a set spanning two."
+      }
+    ]
+  },
+  {
+    "kind": "network_metrics",
+    "computedBy": "calculate-network-science-metrics (migrated in WP 4.3)",
+    "codeVersion": "network_metrics@wp43.1",
+    "entityType": "node",
+    "note": null,
+    "params": [
+      {
+        "name": "weighted",
+        "type": "boolean",
+        "default": true,
+        "meaning": "Weight edges by `relative_revenue` rather than treating the graph as unweighted."
+      },
+      {
+        "name": "topology_digest",
+        "type": "string",
+        "default": null,
+        "meaning": "`public.network_topology_hash(project)` — a digest of the six columns `get_network_nodes_for_prominence` and `get_network_edges_for_prominence` return. IT IS AN INPUT TRAVELLING IN A PARAMETER AND THAT IS DECLARED HERE RATHER THAN HIDDEN: `current_graph_hash` covers eleven tier-2 tables and NOT `network_nodes`/`network_edges`, so without this the key cannot tell two different graphs apart and a re-uploaded network is served the previous graph's centralities as a hit. It belongs in `hash_network`; moving it there is a `schema_version` bump and a bump is unsafe until D70 lands, so WP 4.4 moves it and deletes this entry."
+      }
+    ]
+  },
+  {
+    "kind": "prominence",
+    "computedBy": "calculate-node-prominence (migrated in WP 4.3)",
+    "codeVersion": "prominence@wp43.1",
+    "entityType": "node",
+    "note": null,
+    "params": [
+      {
+        "name": "config",
+        "type": "object",
+        "default": null,
+        "meaning": "The caller's `ProminenceConfig` — the four weights and the two caps. It is part of the key because two configs produce two different scores over one graph. `null` means the analyzer's `defaultConfig`, which the function fills in before the digest is taken, so a stored run always records the config it actually used rather than the word \"default\"."
+      },
+      {
+        "name": "topology_digest",
+        "type": "string",
+        "default": null,
+        "meaning": "See `network_metrics.topology_digest` — the same digest, for the same reason."
+      }
+    ]
+  }
+];
+
 export const CHAIN_COUNT = 38;
 export const BROKEN_COUNT = 11;

@@ -66,6 +66,14 @@ export type RefTable = {
   naturalKey: string[];
   naturalKeyIntended: string[] | null;
   checks: { name: string; definition: string }[];
+  /**
+   * Which screens read this table, at TABLE grain, human-confirmed (WP 5.1).
+   *
+   * `column`-grain and `shell`-grain entries are deliberately NOT here:
+   * a shell entry is auth plumbing that almost every page imports and is
+   * not lineage at all, and presenting one as a data surface is §4 D82.
+   */
+  surfaces: { page: string; via: string; evidence: string }[];
   /** The CSV origin, where the table has one. `null` means it has none. */
   ingestDataset: { wizardId: string; factClass: string; serverSet: string[] } | null;
   governance: {
@@ -105,6 +113,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": null,
@@ -298,6 +307,18 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "ProductLevelNetwork.tsx",
+        "via": "rpc project_freshness",
+        "evidence": "src/pages/ProductLevelNetwork.tsx:237"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "rpc project_freshness",
+        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -719,6 +740,18 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DeveloperApi.tsx",
+        "via": "rpc list_api_keys",
+        "evidence": "src/pages/DeveloperApi.tsx:261"
+      },
+      {
+        "page": "Profile.tsx",
+        "via": "rpc change_own_password",
+        "evidence": "src/pages/Profile.tsx:110"
+      }
+    ],
     "governance": {
       "read": null,
       "write": "super_admin",
@@ -1158,6 +1191,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": null,
@@ -1476,6 +1510,28 @@ export const REFERENCE_TABLES: RefTable[] = [
         "plant_name"
       ]
     },
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc get_project_dataset_status",
+        "evidence": "src/pages/DataManager.tsx:429"
+      },
+      {
+        "page": "ProcessLevelNetwork.tsx",
+        "via": "table read",
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:1189"
+      },
+      {
+        "page": "ProjectPolicies.tsx",
+        "via": "table read",
+        "evidence": "src/lib/policies/projectLanes.ts:48"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "table read",
+        "evidence": "src/lib/policies/projectLanes.ts:48"
+      }
+    ],
     "governance": {
       "read": null,
       "write": "data_editing",
@@ -1806,6 +1862,23 @@ export const REFERENCE_TABLES: RefTable[] = [
         "plant_name"
       ]
     },
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc get_project_dataset_status",
+        "evidence": "src/pages/DataManager.tsx:429"
+      },
+      {
+        "page": "ProjectPolicies.tsx",
+        "via": "rpc ensure_item_masters",
+        "evidence": "src/hooks/useItemMasters.tsx:194"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "rpc ensure_item_masters",
+        "evidence": "src/hooks/useItemMasters.tsx:194"
+      }
+    ],
     "governance": {
       "read": null,
       "write": "data_editing",
@@ -2101,6 +2174,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": "super_admin",
@@ -2295,6 +2369,7 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": "project_member",
       "write": "project_modeler_or_admin",
@@ -2509,6 +2584,33 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc record_model_validation",
+        "evidence": "src/hooks/useModelValidation.tsx:398"
+      },
+      {
+        "page": "DeveloperApi.tsx",
+        "via": "rpc list_dataset_versions",
+        "evidence": "src/pages/DeveloperApi.tsx:311"
+      },
+      {
+        "page": "ProductLevelNetwork.tsx",
+        "via": "rpc project_freshness",
+        "evidence": "src/pages/ProductLevelNetwork.tsx:237"
+      },
+      {
+        "page": "ProjectPolicies.tsx",
+        "via": "rpc record_model_validation",
+        "evidence": "src/hooks/useModelValidation.tsx:398"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "rpc record_model_validation",
+        "evidence": "src/hooks/useModelValidation.tsx:398"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -2789,6 +2891,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": null,
@@ -3048,6 +3151,7 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": "project_member",
       "write": "project_member",
@@ -3293,6 +3397,7 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": "project_member",
       "write": "project_member",
@@ -3629,6 +3734,7 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": "project_member",
       "write": "project_member",
@@ -3850,6 +3956,7 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": "project_member",
       "write": "project_member",
@@ -4119,6 +4226,7 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": "project_member",
       "write": "project_member",
@@ -4498,6 +4606,23 @@ export const REFERENCE_TABLES: RefTable[] = [
         "plant_name"
       ]
     },
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc get_project_dataset_status",
+        "evidence": "src/pages/DataManager.tsx:429"
+      },
+      {
+        "page": "ProjectPolicies.tsx",
+        "via": "rpc ensure_item_masters",
+        "evidence": "src/hooks/useItemMasters.tsx:194"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "rpc ensure_item_masters",
+        "evidence": "src/hooks/useItemMasters.tsx:194"
+      }
+    ],
     "governance": {
       "read": null,
       "write": "data_editing",
@@ -4932,6 +5057,13 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "table read",
+        "evidence": "src/hooks/useIngestRun.tsx:62"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -5245,6 +5377,18 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "table read",
+        "evidence": "src/hooks/useErpConnections.tsx:65"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "table read",
+        "evidence": "src/components/trust/TrustReportPanel.tsx:36"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -5860,6 +6004,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": null,
@@ -6221,6 +6366,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": null,
@@ -6558,6 +6704,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": null,
@@ -7070,6 +7217,13 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "table read",
+        "evidence": "src/hooks/useIngestRun.tsx:63"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -7370,6 +7524,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "project_id"
       ]
     },
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": "data_editing",
@@ -7841,6 +7996,23 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc delete_project_dataset",
+        "evidence": "src/pages/DataManager.tsx:712"
+      },
+      {
+        "page": "ProjectPolicies.tsx",
+        "via": "rpc get_project_datasets",
+        "evidence": "src/lib/policies/projectLanes.ts:82"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "rpc get_project_datasets",
+        "evidence": "src/lib/policies/projectLanes.ts:82"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -8086,6 +8258,18 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc get_project_dataset_status",
+        "evidence": "src/pages/DataManager.tsx:429"
+      },
+      {
+        "page": "ProductLevelNetwork.tsx",
+        "via": "rpc get_network_metrics_for_materials",
+        "evidence": "src/pages/ProductLevelNetwork.tsx:251"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -8473,6 +8657,23 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc get_project_dataset_status",
+        "evidence": "src/pages/DataManager.tsx:429"
+      },
+      {
+        "page": "ProductLevelNetwork.tsx",
+        "via": "rpc project_freshness",
+        "evidence": "src/pages/ProductLevelNetwork.tsx:237"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "rpc project_freshness",
+        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -9215,6 +9416,23 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc get_deep_tier_datasets",
+        "evidence": "src/components/ProjectDataViewer.tsx:110"
+      },
+      {
+        "page": "ProductLevelNetwork.tsx",
+        "via": "rpc project_freshness",
+        "evidence": "src/pages/ProductLevelNetwork.tsx:237"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "rpc project_freshness",
+        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -9554,6 +9772,28 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc get_node_list",
+        "evidence": "src/pages/DataManager.tsx:441"
+      },
+      {
+        "page": "FirmLevelNetwork.tsx",
+        "via": "rpc get_node_list",
+        "evidence": "src/components/MapView.tsx:355"
+      },
+      {
+        "page": "ProductLevelNetwork.tsx",
+        "via": "rpc project_freshness",
+        "evidence": "src/pages/ProductLevelNetwork.tsx:237"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "rpc project_freshness",
+        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -10033,6 +10273,7 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": "super_admin",
@@ -10203,6 +10444,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": "super_admin",
@@ -10372,6 +10614,13 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DeveloperApi.tsx",
+        "via": "rpc list_api_keys",
+        "evidence": "src/pages/DeveloperApi.tsx:261"
+      }
+    ],
     "governance": {
       "read": null,
       "write": "super_admin",
@@ -10609,6 +10858,23 @@ export const REFERENCE_TABLES: RefTable[] = [
         "plant_name"
       ]
     },
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc get_project_dataset_status",
+        "evidence": "src/pages/DataManager.tsx:429"
+      },
+      {
+        "page": "ProjectPolicies.tsx",
+        "via": "rpc ensure_item_masters",
+        "evidence": "src/hooks/useItemMasters.tsx:194"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "rpc ensure_item_masters",
+        "evidence": "src/hooks/useItemMasters.tsx:194"
+      }
+    ],
     "governance": {
       "read": null,
       "write": "data_editing",
@@ -10986,6 +11252,23 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "ProjectIntelligence.tsx",
+        "via": "table read",
+        "evidence": "src/hooks/usePolicies.tsx:141"
+      },
+      {
+        "page": "ProjectPolicies.tsx",
+        "via": "table read",
+        "evidence": "src/hooks/usePolicies.tsx:141"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "table read",
+        "evidence": "src/hooks/usePolicies.tsx:141"
+      }
+    ],
     "governance": {
       "read": null,
       "write": "data_editing",
@@ -11381,6 +11664,28 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "ProductLevelNetwork.tsx",
+        "via": "rpc project_freshness",
+        "evidence": "src/pages/ProductLevelNetwork.tsx:237"
+      },
+      {
+        "page": "ProjectIntelligence.tsx",
+        "via": "table read",
+        "evidence": "src/hooks/usePolicies.tsx:142"
+      },
+      {
+        "page": "ProjectPolicies.tsx",
+        "via": "table read",
+        "evidence": "src/hooks/usePolicies.tsx:142"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "table read",
+        "evidence": "src/hooks/usePolicies.tsx:142"
+      }
+    ],
     "governance": {
       "read": null,
       "write": "data_editing",
@@ -11650,6 +11955,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "project_id"
       ]
     },
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": "data_editing",
@@ -12205,6 +12511,13 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "table read",
+        "evidence": "src/hooks/useErpConnections.tsx:57"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -12607,6 +12920,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": null,
@@ -12855,6 +13169,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": "super_admin",
@@ -13026,6 +13341,53 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc list_projects",
+        "evidence": "src/pages/DataManager.tsx:199"
+      },
+      {
+        "page": "DeveloperApi.tsx",
+        "via": "rpc list_projects",
+        "evidence": "src/pages/DeveloperApi.tsx:263"
+      },
+      {
+        "page": "FirmLevelNetwork.tsx",
+        "via": "rpc list_projects",
+        "evidence": "src/pages/FirmLevelNetwork.tsx:244"
+      },
+      {
+        "page": "InteractiveNetworkSpace.tsx",
+        "via": "rpc list_projects",
+        "evidence": "src/pages/InteractiveNetworkSpace.tsx:353"
+      },
+      {
+        "page": "ProcessLevelNetwork.tsx",
+        "via": "rpc list_projects",
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:255"
+      },
+      {
+        "page": "ProductLevelNetwork.tsx",
+        "via": "rpc list_projects",
+        "evidence": "src/pages/ProductLevelNetwork.tsx:206"
+      },
+      {
+        "page": "ProjectIntelligence.tsx",
+        "via": "rpc list_projects",
+        "evidence": "src/pages/ProjectIntelligence.tsx:187"
+      },
+      {
+        "page": "ProjectPolicies.tsx",
+        "via": "rpc list_projects",
+        "evidence": "src/hooks/useProjects.ts:24"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "rpc list_projects",
+        "evidence": "src/hooks/useProjects.ts:24"
+      }
+    ],
     "governance": {
       "read": null,
       "write": "data_editing",
@@ -13559,6 +13921,18 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "FirmLevelNetwork.tsx",
+        "via": "table read",
+        "evidence": "src/pages/FirmLevelNetwork.tsx:303"
+      },
+      {
+        "page": "ProductLevelNetwork.tsx",
+        "via": "table read",
+        "evidence": "src/pages/ProductLevelNetwork.tsx:521"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -13810,6 +14184,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": "super_admin",
@@ -13973,6 +14348,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "project_id"
       ]
     },
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": "data_editing",
@@ -14318,6 +14694,38 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc combine_project_into_supply_chain",
+        "evidence": "src/pages/DataManager.tsx:650"
+      },
+      {
+        "page": "FirmLevelNetwork.tsx",
+        "via": "rpc get_prediction_stats",
+        "evidence": "src/components/MLPrediction.tsx:54"
+      },
+      {
+        "page": "ProcessLevelNetwork.tsx",
+        "via": "rpc get_prediction_stats",
+        "evidence": "src/components/MLPrediction.tsx:54"
+      },
+      {
+        "page": "ProductLevelNetwork.tsx",
+        "via": "rpc project_freshness",
+        "evidence": "src/pages/ProductLevelNetwork.tsx:237"
+      },
+      {
+        "page": "ProjectPolicies.tsx",
+        "via": "rpc assign_material_supplier",
+        "evidence": "src/components/policies/StagePolicyTable.tsx:224"
+      },
+      {
+        "page": "SimulationLab.tsx",
+        "via": "rpc assign_material_supplier",
+        "evidence": "src/components/sim/PreRunValidationPanel.tsx:70"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -14875,6 +15283,28 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc combine_project_into_supply_chain",
+        "evidence": "src/pages/DataManager.tsx:650"
+      },
+      {
+        "page": "InteractiveNetworkSpace.tsx",
+        "via": "table read",
+        "evidence": "src/pages/InteractiveNetworkSpace.tsx:369"
+      },
+      {
+        "page": "ProcessLevelNetwork.tsx",
+        "via": "table read",
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:1190"
+      },
+      {
+        "page": "ProjectPolicies.tsx",
+        "via": "rpc get_supply_chain_data_multi_tier",
+        "evidence": "src/hooks/useProjectContext.tsx:49"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,
@@ -15275,6 +15705,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "plant_name"
       ]
     },
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": null,
@@ -15685,6 +16116,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "plant_name"
       ]
     },
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": null,
@@ -16077,6 +16509,7 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": "super_admin",
@@ -16320,6 +16753,7 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [],
     "ingestDataset": null,
+    "surfaces": [],
     "governance": {
       "read": null,
       "write": "super_admin",

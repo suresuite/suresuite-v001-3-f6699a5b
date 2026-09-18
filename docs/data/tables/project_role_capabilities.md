@@ -161,6 +161,6 @@ When it was last changed. Server-stamped.
 
 ---
 
-*Generated from data contract `80ec518bc194`, engine `0.2.3`,
+*Generated from data contract `8226e23dbd7f`, engine `0.2.3`,
 sidecar `supabase/contract/project_role_capabilities.contract.yaml`, table created by `20260915000005_project_membership_and_delegation.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
