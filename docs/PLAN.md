@@ -10662,3 +10662,96 @@ fix work.
 
 **Still open in WP 6.3:** D39, D88, the result-binding group (I8), and the
 untested constant this slice introduces.
+
+### WP 5.2 (slice 15) — The manual had no front door · 2026-09-18 · no migration
+
+**What the previous package promised.** WP 5.2a closed with the manual restored
+at `/docs`, the fifteen-section tree complete, and sections 1, 2 and 15 written
+— 14 of 80 pages. §17 records it as ✅ and §6.5 states the argument for the
+whole exercise: the architecture is a selling point, "a prospective customer, a
+researcher and a new modeller all ask the same opening question", and answering
+it should not require an account. `App.tsx` carries that reasoning verbatim in
+the comment above the route: *"Public on purpose."*
+
+**What this slice found: it was public and unreachable.** No page of this
+product linked to `/docs`. Not the landing page's nav, not its mobile drawer,
+not its footer, not `/about`'s nav or footer. The fifteen in-app references to
+`/docs/*` are all to the three real `.md` files under `public/docs/` — the CSV
+and location upload guides and the Nexus Node note — and not one of them is to
+the manual. The only routes into
+eighty pages written for people who do not yet have an account were typing the
+address and following a `/help` link from a site that has been archived.
+
+**The failure mode is the reason this is a drift-log entry and not a chore.**
+Every gate the manual has was green throughout. `registry.test.ts` asserts the
+tree is well-formed, every live page has a body, no slug collides, no
+cross-reference dangles — 29 assertions, all true, all of them about the inside
+of a room nobody could find the door to. The gap between "the route resolves"
+and "a reader can get there" is invisible to every test that starts by
+importing the registry. It is the same shape as D45's before-and-after (the
+audit rule was *claimed* until a rehearsal made one write and read the row
+back): a property asserted about the artifact rather than about the path a
+person takes to it.
+
+**What shipped.**
+
+1. **`/docs` is in the public nav.** Landing (desktop row, mobile drawer,
+   footer) and About (nav, footer), beside About rather than behind the login —
+   the people §6.5 names arrive before they have an account.
+2. **A documentation band on the landing page**, after the video and before the
+   funding strip, with four cards into live pages. Placed before the ask to
+   sign up, which is §6.5's argument stated as a layout decision.
+3. **`/docs` opens on a front door** (`DocsHome.tsx`) instead of on the first
+   article. The index route used to render `DEFAULT_SLUG`, so a reader who had
+   not yet decided to read anything landed mid-manual with fifteen collapsed
+   sections beside them. The new page is derived ENTIRELY from `registry.ts` —
+   every title, blurb, count and link — so it cannot fall behind the nav.
+4. **It publishes the manual's own blind spot (T3).** The section list shows
+   *n of m written* per section, and the header counts 80 mapped against 14
+   written. A front door listing only the finished sections would be the
+   tidier, dishonest version: the reader could not tell a feature this product
+   does not have from a page we have not written, which is the distinction
+   `registry.ts` was built around in the first place.
+5. **The manual wears the public site's chrome.** `DocsLayout` gains the logo
+   bar (back to `/`, About, and log-in — or "Open app" for a reader who already
+   has a session) and the slim footer both public pages end on. A reader
+   arriving from a search result was previously in a room with no doors: no way
+   to the product, no way to sign in.
+6. **`docsEntryPoints.test.ts` is the gate**, and it exists because this defect
+   is silent in the ordinary way: a link is one attribute, removing it breaks
+   no build, no type and no render, and the orphaned page goes on rendering
+   perfectly for anyone who already knows the address.
+
+**One assertion was wrong first, and the mutation is what said so.** The
+phone-nav check sliced the landing source from `"Mobile nav drawer"` to the end
+of the file. Deleting the drawer's link left it GREEN — it was matching the
+footer's link, forty lines further down, so the assertion was true of the file
+rather than of the drawer. Bounded at `<main` and re-mutated red. That is
+§16 · WP 4.1 · E in a different language: a check that passes for the wrong
+reason is worth less than no check, because it also reports that the thing is
+covered. All four assertions are now mutation-proved (drawer link removed,
+footer link removed, a card pointed at a planned page, the index route reverted
+to `DocPage`).
+
+**Verified:** `npm test` 420 green, 30 files ✓ · eslint clean on all six touched
+files ✓ · `audit:ui` mobile-floor findings unchanged at 8 — the two this slice
+introduced (`h-10` CTAs with no 44px floor) were fixed to `h-11 md:h-10` before
+the count was taken ✓ · `check:docs` passes ✓ · `npm run build` ✓, and `/docs`
+now loads `DocsHome` (5.2 kB) rather than `DocPage` (364 kB, which carries every
+body and both generated modules) — the front door is cheaper than the article it
+replaced ✓ · rendered against a real build at 1440px and 390px: the front door,
+an article, and the landing band ✓ · no migration in this push, so the three
+verification-trigger doors (§4 D31) are untouched ✓.
+
+**What this slice does NOT change.** No page was written; the manual is still 14
+of 80 and sections 3–14 are still owed by WP 5.2b…5.2g. Nothing in the data
+layer moved. D88 is unmoved.
+
+**Gap check — what the next reader should know.** The four cards on the landing
+page and the four on the front door are chosen editorially and pinned by the
+test to being LIVE pages; when WP 5.2b…5.2g write sections 3–14 they should be
+revisited, not because they will break (the test fails if they do) but because
+"Known limits" is the right fourth card only while there is nothing better. And
+the manual is still absent from the app's own shell: a signed-in user on
+`/policies` has no link to the page that explains the grid they are looking at.
+That is a different surface with a different owner, and it is not this slice's.

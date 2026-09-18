@@ -31,6 +31,8 @@ import {
   Share2,
   Menu,
   X,
+  BookOpen,
+  Rocket,
 } from 'lucide-react';
 
 // Canonical micro-label style — the only uppercase label treatment on this page.
@@ -104,6 +106,36 @@ const LENSES = [
     color: '#14b8c4',
     title: 'Process level',
     body: 'The steps that make each product — where capacity and lead time really bind.',
+  },
+];
+
+// The four doors into the manual, chosen for the four questions a reader
+// arrives with rather than for the manual's own section order. Slugs are live
+// pages — `docsEntryPoints.test.ts` fails if one stops being one.
+const DOC_ENTRIES = [
+  {
+    slug: 'what-suresuite-is',
+    icon: BookOpen,
+    title: 'What SuReSuite is',
+    body: 'The tool in one page — the problem it solves and what it produces.',
+  },
+  {
+    slug: 'how-suresuite-is-designed',
+    icon: Layers,
+    title: 'How it is designed',
+    body: 'The six tiers your data travels, and the three laws that govern them.',
+  },
+  {
+    slug: 'your-first-project',
+    icon: Rocket,
+    title: 'Your first project',
+    body: 'End to end: create, upload, verify, set policies, simulate, read results.',
+  },
+  {
+    slug: 'known-limits',
+    icon: ShieldCheck,
+    title: 'Known limits',
+    body: 'What this tool does not model, stated before you rely on it.',
   },
 ];
 
@@ -293,6 +325,12 @@ export default function Landing() {
             <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
               <Link to="/about">About</Link>
             </Button>
+            {/* The manual is public and needs no account (PLAN.md §6.5), so it
+                belongs in the same row as About rather than behind the login —
+                the people it is written for arrive before they have one. */}
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
+              <Link to="/docs">Docs</Link>
+            </Button>
             <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
               <a href="#video">Demo</a>
             </Button>
@@ -328,6 +366,13 @@ export default function Landing() {
               className="flex min-h-11 items-center border-b border-[--hair-rule] text-sm font-medium"
             >
               About
+            </Link>
+            <Link
+              to="/docs"
+              onClick={() => setMobileNavOpen(false)}
+              className="flex min-h-11 items-center border-b border-[--hair-rule] text-sm font-medium"
+            >
+              Docs
             </Link>
             <a
               href="#video"
@@ -527,6 +572,54 @@ export default function Landing() {
                   allowFullScreen
                 />
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Documentation — the manual, in public.
+            Placed after the video because the two answer the same question at
+            different depths: the video is two minutes, this is the whole
+            method. Both sit before the ask to sign up, which is the argument of
+            PLAN.md §6.5 — a prospective user, a researcher and a new modeller
+            all want to know how the thing is put together BEFORE they have an
+            account, and making them create one first answers a different
+            question than the one they asked. */}
+        <section id="docs" className="border-b border-[--hair-rule]">
+          <div className="mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 py-[clamp(48px,12vw,96px)] md:px-6">
+            <div className="max-w-2xl">
+              <span className={KICKER}>Documentation</span>
+              <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold tracking-tight">
+                Read how it works —{' '}
+                <span className="font-serif italic font-medium">before you sign up.</span>
+              </h2>
+              <p className="mt-4 text-base text-muted-foreground">
+                The manual is open to everyone: the architecture, the data model, every unit and
+                convention, and a page that states plainly what this tool does not model. No
+                account, no sales call.
+              </p>
+            </div>
+
+            <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {DOC_ENTRIES.map((d) => (
+                <Link
+                  key={d.slug}
+                  to={`/docs/${d.slug}`}
+                  className="group rounded-sm border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-muted/40"
+                >
+                  <d.icon className="h-4 w-4 text-primary" />
+                  <h3 className="mt-2.5 text-sm font-semibold group-hover:text-primary">{d.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{d.body}</p>
+                </Link>
+              ))}
+            </div>
+
+            <div className="mt-8">
+              <Button asChild variant="outline" size="lg" className="group h-11 rounded-sm">
+                <Link to="/docs">
+                  Open the documentation
+                  <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+              </Button>
             </div>
           </div>
         </section>
@@ -809,6 +902,8 @@ export default function Landing() {
           <span>© {new Date().getFullYear()} SuReSuite</span>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <a href="#video" className="hover:text-foreground md:hidden">Demo</a>
+            <Link to="/docs" className="hover:text-foreground">Docs</Link>
+            <Link to="/about" className="hover:text-foreground">About</Link>
             <Link to="/auth" className="hover:text-foreground">Sign in</Link>
           </div>
         </div>
