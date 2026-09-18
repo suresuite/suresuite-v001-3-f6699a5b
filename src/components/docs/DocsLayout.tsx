@@ -14,6 +14,8 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/useAuth";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import {
   Search, ChevronRight, ArrowLeft, ArrowRight, X,
   PanelLeftClose, PanelLeftOpen, BookText,
@@ -267,12 +269,101 @@ function NavTree({ activeSlug, onNavigate }: { activeSlug: string; onNavigate: (
   );
 }
 
+/**
+ * The public site's own top bar, above the manual's.
+ *
+ * /docs is a public address reached from the same nav as /about and /, so it
+ * wears the same chrome: a reader who followed "Docs" from the landing page
+ * should not feel they have been handed off to a different product, and a
+ * reader who arrived from a search result needs a way INTO the product that a
+ * bare docs toolbar never gave them.
+ *
+ * Deliberately NOT sticky, unlike the landing page's. The manual's own toolbar
+ * carries the search box and is sticky at top-0, and two stacked sticky bars
+ * would cost 7rem of a phone screen on every scroll. This one scrolls away;
+ * the one that does the work stays.
+ *
+ * The right-hand pair depends on who is reading. Signed out, it is the public
+ * site's "Log in / Get started". Signed in, offering "Get started" to someone
+ * with an account would be a dead end, so it becomes the way back to their
+ * workspace. While the session is still resolving it renders neither rather
+ * than guessing and swapping under the reader's cursor.
+ */
+function PublicBar() {
+  const { user, loading } = useAuth();
+  const { homePath } = useCapabilities();
+
+  return (
+    <div className="border-b border-[--hair-rule] bg-background">
+      <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-3 px-4 md:h-16 md:px-6">
+        <Link to="/" className="flex items-center" aria-label="SuReSuite home">
+          <img
+            src="/logo-mark.png"
+            alt="SuReSuite — Supply Chain Resilience Suite"
+            className="h-[19px] w-auto object-contain md:hidden"
+          />
+          <img
+            src="/logo-lockup.png"
+            alt="SuReSuite — Supply Chain Resilience Suite"
+            className="hidden h-[58px] object-contain md:block"
+          />
+        </Link>
+        <nav className="flex items-center gap-1 whitespace-nowrap md:gap-2">
+          <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
+            <Link to="/about">About</Link>
+          </Button>
+          <Button asChild variant="secondary" size="sm" className="hidden md:inline-flex md:h-8">
+            <Link to="/docs">Docs</Link>
+          </Button>
+          {!loading &&
+            (user ? (
+              <Button asChild size="sm" className="h-11 whitespace-nowrap md:h-8">
+                <Link to={homePath}>Open app</Link>
+              </Button>
+            ) : (
+              <>
+                <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
+                  <Link to="/auth">Log in</Link>
+                </Button>
+                <Button asChild size="sm" className="h-11 whitespace-nowrap md:h-8">
+                  <Link to="/auth">Get started</Link>
+                </Button>
+              </>
+            ))}
+        </nav>
+      </div>
+    </div>
+  );
+}
+
+/** The slim footer Landing and About both end on. Same reason as PublicBar. */
+function PublicFooter() {
+  return (
+    <footer className="border-t border-[--hair-rule]">
+      <div className="pb-safe mx-auto flex min-h-14 max-w-[1400px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3.5 text-xs text-muted-foreground md:px-6">
+        <span>© {new Date().getFullYear()} SuReSuite</span>
+        <div className="flex flex-wrap items-center gap-4">
+          <Link to="/about" className="hover:text-foreground">About</Link>
+          <Link to="/auth" className="hover:text-foreground">Sign in</Link>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 export default function DocsLayout() {
   const location = useLocation();
   // Read from the path, not from useParams: this is the PARENT of the
   // `:slug` route, and a parent match does not carry its child's params.
   // DocPage — the child — reads the param the ordinary way.
-  const slug = location.pathname.replace(/^\/docs\/?/, "").split("/")[0] || DEFAULT_SLUG;
+  const rawSlug = location.pathname.replace(/^\/docs\/?/, "").split("/")[0];
+  // `/docs` itself is the front door (DocsHome), not the first article. Kept as
+  // a separate flag rather than a slug of its own: the breadcrumb, the pager
+  // and the nav highlight are all statements about an ARTICLE, and the home
+  // page is not one. `slug` keeps its DEFAULT_SLUG fallback for everything that
+  // still needs a page in hand.
+  const isHome = !rawSlug;
+  const slug = rawSlug || DEFAULT_SLUG;
   const page = getPage(slug);
   const contentRef = useRef<HTMLDivElement>(null);
   const { headings, activeId } = useHeadings(contentRef, slug);
@@ -302,12 +393,18 @@ export default function DocsLayout() {
     window.scrollTo({ top: 0 });
   }, [location.pathname]);
 
-  const related = (page?.related ?? [])
+  // Empty on the front door. `page` is DEFAULT_SLUG's there, and its related
+  // list is a statement about THAT article — printing it under "Related
+  // articles" beside a table of contents claims a relationship to a page the
+  // reader is not on.
+  const related = (isHome ? [] : (page?.related ?? []))
     .map((s) => getPage(s))
     .filter((p): p is NonNullable<typeof p> => Boolean(p));
 
   return (
     <div className="flex min-h-[calc(100dvh-2.5rem)] flex-col bg-background text-foreground">
+      <PublicBar />
+
       {/* Top bar */}
       <header className="sticky top-0 z-30 h-12 border-b bg-background/95 backdrop-blur flex items-center gap-3 px-4">
         <Button
@@ -340,7 +437,7 @@ export default function DocsLayout() {
           )}
         >
           <div className="lg:sticky lg:top-[4.5rem] lg:max-h-[calc(100vh-5rem)] lg:overflow-auto">
-            <NavTree activeSlug={slug} onNavigate={() => setNavOpen(false)} />
+            <NavTree activeSlug={isHome ? "" : slug} onNavigate={() => setNavOpen(false)} />
           </div>
         </aside>
 
@@ -350,17 +447,19 @@ export default function DocsLayout() {
           {/* §4: the skin's chrome budget has no band for a breadcrumb, and
               the group is already the doc's own section head. Desktop keeps
               it — this is additive below `md`, not a deletion. */}
-          <nav className="hidden md:flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
-            <Link to="/docs" className="hover:text-foreground">Home</Link>
-            {page && (
-              <>
-                <ChevronRight className="h-3.5 w-3.5" />
-                <span>{page.group}</span>
-                <ChevronRight className="h-3.5 w-3.5" />
-                <span className="text-foreground font-medium">{page.title}</span>
-              </>
-            )}
-          </nav>
+          {!isHome && (
+            <nav className="hidden md:flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
+              <Link to="/docs" className="hover:text-foreground">Home</Link>
+              {page && (
+                <>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <span>{page.group}</span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <span className="text-foreground font-medium">{page.title}</span>
+                </>
+              )}
+            </nav>
+          )}
 
           <div ref={contentRef} style={{ zoom: FONT_STEPS[fontStep] }} className="m-cq space-y-6">
             <Outlet />
@@ -368,8 +467,15 @@ export default function DocsLayout() {
 
           {/* Prev / next pager */}
           {/* The pager is the last band on a page with no tab bar under it,
-              so it carries the device inset itself (v2 §5.2). */}
-          <div className="pb-safe mt-12 grid grid-cols-1 gap-3 border-t border-[--hair-rule] pt-6 sm:grid-cols-2">
+              so it carries the device inset itself (v2 §5.2). Absent on the
+              front door: "previous" from a table of contents means nothing,
+              and DocsHome ends on its own list of where to go next. */}
+          <div
+            className={cn(
+              "pb-safe mt-12 grid grid-cols-1 gap-3 border-t border-[--hair-rule] pt-6 sm:grid-cols-2",
+              isHome && "hidden",
+            )}
+          >
             {prev ? (
               <Link
                 to={`/docs/${prev.slug}`}
@@ -441,6 +547,8 @@ export default function DocsLayout() {
           </div>
         </aside>
       </div>
+
+      <PublicFooter />
     </div>
   );
 }

@@ -45,6 +45,7 @@ const Forbidden = lazy(() => import('./pages/Forbidden'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const About = lazy(() => import('./pages/About'));
 const DocsLayout = lazy(() => import('./components/docs/DocsLayout'));
+const DocsHome = lazy(() => import('./components/docs/DocsHome'));
 const DocPage = lazy(() => import('./components/docs/DocPage'));
 const HelpSlugRedirect = lazy(() => import('./components/docs/legacyRedirects'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -228,7 +229,12 @@ function App() {
                     slug ending `.md` would be shadowed by that directory. The
                     registry test asserts none is. */}
                 <Route path="/docs" element={<DocsLayout />}>
-                  <Route index element={<DocPage />} />
+                  {/* The index is the manual's front door, not its first
+                      article: /docs is linked from the public top bar next to
+                      /about, so it is reached by people deciding whether to
+                      read anything at all. DocsHome answers that; DocPage
+                      still serves every :slug, the first article among them. */}
+                  <Route index element={<DocsHome />} />
                   <Route path=":slug" element={<DocPage />} />
                 </Route>
                 <Route path="/help" element={<Navigate to="/docs" replace />} />
