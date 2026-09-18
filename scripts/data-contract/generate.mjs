@@ -37,7 +37,7 @@ import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { load } from "js-yaml";
-import { deriveChains, deriveStressTests } from "./chains.mjs";
+import { deriveChains, deriveStressTests, deriveApiRoutes } from "./chains.mjs";
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const INTROSPECTED = join(ROOT, "build", "schema.introspected.json");
@@ -926,6 +926,25 @@ export function renderReferenceModule(contract) {
           rlsEnabled: Boolean(t.governance.rls_enabled),
         }
       : null,
+    // WP 5.2g — what row-level security actually IS on this table, in three
+    // states rather than two.
+    //
+    // "RLS: enabled" reads as an assurance it does not give. WP 2.4 executed
+    // the migration against a real PostgreSQL and found the inherited claim
+    // wrong in BOTH directions: RLS is enabled on all three item masters, AND
+    // both policies on each are `USING (true)`, so enabling it buys nothing.
+    // `determinate: false` is the third state — the static replay could not
+    // settle the question, which is a different answer from "off" and the
+    // manual renders it as one.
+    rls: {
+      enabled: Boolean(t.rls?.enabled),
+      determinate: Boolean(t.rls?.determinate),
+      policies: (t.rls?.policies ?? []).length,
+      // A policy whose USING clause is the literal `true` restricts nothing.
+      // Counted rather than judged, so a page can say "two of two" instead of
+      // "permissive", which is a word a reader has to take on trust.
+      unrestricted: (t.rls?.policies ?? []).filter((p) => String(p.using ?? "").trim() === "true").length,
+    },
     columns: t.columns.map(refColumn),
   }));
 
@@ -1016,6 +1035,12 @@ export function renderReferenceModule(contract) {
     "  surfaces: { page: string; via: string; evidence: string }[];",
     "  /** The CSV origin, where the table has one. `null` means it has none. */",
     "  ingestDataset: { wizardId: string; factClass: string; serverSet: string[] } | null;",
+    "  /**",
+    "   * Row-level security, in THREE states. `determinate: false` means the",
+    "   * static replay could not settle it — which is not the same answer as",
+    "   * `enabled: false`, and WP 2.4 is why the difference is carried.",
+    "   */",
+    "  rls: { enabled: boolean; determinate: boolean; policies: number; unrestricted: number };",
     "  governance: {",
     "    read: string | null;",
     "    write: string | null;",
@@ -1322,6 +1347,19 @@ export function renderPolicyModule(contract, registry) {
     "export type StressTest = { id: string; description: string; runnable: boolean };",
     "",
     `export const STRESS_TESTS: StressTest[] = ${JSON.stringify(deriveStressTests(ROOT), null, 2)};`,
+    "",
+    "/**",
+    " * The public API's routes, read from the dispatcher's own table.",
+    " *",
+    " * §6.3 marks this section G. The data contract describes TABLES and not an",
+    " * HTTP surface, so the nearest declaration is the `routes` literal the",
+    " * dispatcher itself matches against — which means a route added, removed",
+    " * or re-scoped changes the manual with nobody editing a page. Another",
+    " * instance of §4 D90's weakest door, and the page says so.",
+    " */",
+    "export type ApiRoute = { method: string; path: string; scope: string; handler: string };",
+    "",
+    `export const API_ROUTES: ApiRoute[] = ${JSON.stringify(deriveApiRoutes(ROOT), null, 2)};`,
     "",
     `export const CHAIN_COUNT = ${chains.length};`,
     `export const BROKEN_COUNT = ${broken.length};`,

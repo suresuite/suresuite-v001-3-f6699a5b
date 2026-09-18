@@ -90,6 +90,22 @@ import PerItemTimeSeries from "./PerItemTimeSeries";
 import PerformanceAndCaching from "./PerformanceAndCaching";
 import ReportsAndFiles from "./ReportsAndFiles";
 
+// 10 · Connectors, 13 · Access & administration, 14 · Developer API (WP 5.2g)
+import ConnectingErp from "./ConnectingErp";
+import ReviewingASync from "./ReviewingASync";
+import CsvVsConnector from "./CsvVsConnector";
+import OrganizationsAndMembers from "./OrganizationsAndMembers";
+import RolesAndCapabilities from "./RolesAndCapabilities";
+import ProjectAccess from "./ProjectAccess";
+import WhoCanSeeYourData from "./WhoCanSeeYourData";
+import AuditLog from "./AuditLog";
+import AdminScreens from "./AdminScreens";
+import AccountAndPassword from "./AccountAndPassword";
+import GettingAnApiKey from "./GettingAnApiKey";
+import EndpointsAndSchemas from "./EndpointsAndSchemas";
+import RateLimitsAndIdempotency from "./RateLimitsAndIdempotency";
+import RequestLog from "./RequestLog";
+
 export const DOC_BODIES: Record<string, ComponentType> = {
   // 1 · Overview & architecture
   "what-suresuite-is": WhatSureSuiteIs,
@@ -163,6 +179,11 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   "project-memory": ProjectMemory,
   "models-budgets-limits": ModelsBudgetsLimits,
 
+  // 10 · Connectors
+  "connecting-erp": ConnectingErp,
+  "reviewing-a-sync": ReviewingASync,
+  "csv-vs-connector": CsvVsConnector,
+
   // 11 · Results & statistics
   "reading-your-results": ReadingYourResults,
   "kpis-and-resilience-index": KpisAndResilienceIndex,
@@ -174,6 +195,21 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   "verifiable-exports": VerifiableExports,
   "reproducibility-record": ReproducibilityRecord,
   "exporting-and-deleting": ExportingAndDeleting,
+
+  // 13 · Access & administration
+  "organizations-and-members": OrganizationsAndMembers,
+  "roles-and-capabilities": RolesAndCapabilities,
+  "project-access": ProjectAccess,
+  "who-can-see-your-data": WhoCanSeeYourData,
+  "audit-log": AuditLog,
+  "admin-screens": AdminScreens,
+  "account-and-password": AccountAndPassword,
+
+  // 14 · Developer API
+  "getting-an-api-key": GettingAnApiKey,
+  "endpoints-and-schemas": EndpointsAndSchemas,
+  "rate-limits-and-idempotency": RateLimitsAndIdempotency,
+  "request-log": RequestLog,
 
   // 15 · Reference
   "all-tables": AllTables,

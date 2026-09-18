@@ -188,3 +188,50 @@ export function deriveStressTests(root) {
   }
   return tests;
 }
+
+/**
+ * The public API's routes, read from the function that serves them — WP 5.2g.
+ *
+ * §6.3 marks "Endpoints & schemas" as **G**, generated from the contract. The
+ * data contract does not describe the HTTP surface — it describes tables — so
+ * the nearest thing to a declaration is the `routes` table inside
+ * `supabase/functions/api/index.ts`, which is what the dispatcher itself reads.
+ * Generating from it means a route added, removed or re-scoped changes the
+ * manual with nobody editing a page, and an endpoint list that silently drifts
+ * from the server is the exact defect §4 D21 and D22 are.
+ *
+ * It is a parse of a TypeScript literal, which is the same weak door
+ * `deriveStressTests` uses, for the same reason: no stronger declaration
+ * exists. The page's footer says so. A version prefix is not in the literal —
+ * the dispatcher strips `/v1` before matching — so the prefix is added here,
+ * once, next to the fact that it is added.
+ */
+export function deriveApiRoutes(root) {
+  const src = readFileSync(join(root, "supabase", "functions", "api", "index.ts"), "utf8");
+  const block = /const routes:\s*Route\[\]\s*=\s*\[([\s\S]*?)\n\];/.exec(src);
+  if (!block) {
+    throw new Error(
+      "chains: the `routes` table was not found in supabase/functions/api/index.ts. " +
+        "Fix the scan rather than shipping an endpoint list the server does not serve.",
+    );
+  }
+  const row =
+    /method:\s*"(\w+)",\s*pattern:\s*new RegExp\(`\^([^`]*)\$`\),\s*scope:\s*"([^"]+)",\s*handler:\s*(\w+)/g;
+  const routes = [];
+  let m;
+  while ((m = row.exec(block[1]))) {
+    routes.push({
+      method: m[1],
+      // `(${UUID})` is a capture group for an id. Rendered as `{id}`, which is
+      // what a reader types, rather than as the regular expression the server
+      // matches with.
+      path: `/v1${m[2].replace(/\(\$\{UUID\}\)/g, "{id}")}`,
+      scope: m[3],
+      handler: m[4],
+    });
+  }
+  if (routes.length < 10) {
+    throw new Error(`chains: parsed ${routes.length} API routes; the dispatcher declares more`);
+  }
+  return routes;
+}

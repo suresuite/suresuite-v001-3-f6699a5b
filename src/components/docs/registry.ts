@@ -262,9 +262,9 @@ export const DOC_GROUPS: DocGroup[] = [
     group: "Connectors",
     blurb: "Getting data in from a system you already run.",
     pages: [
-      { ...planned("5.2g"), slug: "connecting-erp", title: "Connecting an ERP / MRP system", summary: "Linking a project to a system of record.", keywords: "erp mrp connector link integration orbit oauth" },
-      { ...planned("5.2g"), slug: "reviewing-a-sync", title: "Reviewing and applying a sync", summary: "Seeing what changed before it lands.", keywords: "sync runs staged review apply diff promote" },
-      { ...planned("5.2g"), slug: "csv-vs-connector", title: "CSV or connector — which to use", summary: "The trade-off, stated plainly.", keywords: "csv connector choice comparison upload integration" },
+      { ...live, slug: "connecting-erp", title: "Connecting an ERP / MRP system", summary: "Linking a project to a system of record.", keywords: "erp mrp connector link integration orbit oauth" },
+      { ...live, slug: "reviewing-a-sync", title: "Reviewing and applying a sync", summary: "Seeing what changed before it lands.", keywords: "sync runs staged review apply diff promote" },
+      { ...live, slug: "csv-vs-connector", title: "CSV or connector — which to use", summary: "The trade-off, stated plainly.", keywords: "csv connector choice comparison upload integration" },
     ],
   },
   {
@@ -294,13 +294,13 @@ export const DOC_GROUPS: DocGroup[] = [
     group: "Access & administration",
     blurb: "Who can see what, and who decided that.",
     pages: [
-      { ...planned("5.2g"), slug: "organizations-and-members", table: "organizations", title: "Organizations and members", summary: "The tenant boundary and who sits inside it.", keywords: "organizations members tenant org boundary invite", source: "contract" },
-      { ...planned("5.2g"), slug: "roles-and-capabilities", title: "Roles and capabilities", summary: "What a role may do, and where that is decided.", keywords: "roles capabilities permissions grants catalog" },
-      { ...planned("5.2g"), slug: "project-access", title: "Project access", summary: "Membership of a single project, as distinct from the organization.", keywords: "project access members project role delegation" },
-      { ...planned("5.2g"), slug: "who-can-see-your-data", title: "Who can see your data", summary: "The honest answer, including the parts that are not you.", keywords: "privacy visibility access rls isolation support staff" },
-      { ...planned("5.2g"), slug: "audit-log", title: "Audit log", summary: "What is recorded, and what is not yet.", keywords: "audit log admin actions history record actor" },
-      { ...planned("5.2g"), slug: "admin-screens", title: "Admin screens", summary: "The administrative surfaces and what each controls.", keywords: "admin users roles organizations projects models usage screens" },
-      { ...planned("5.2g"), slug: "account-and-password", title: "Account & password", summary: "Managing your own sign-in.", keywords: "account password profile sign in credentials" },
+      { ...live, slug: "organizations-and-members", table: "organizations", title: "Organizations and members", summary: "The tenant boundary and who sits inside it.", keywords: "organizations members tenant org boundary invite", source: "contract" },
+      { ...live, slug: "roles-and-capabilities", title: "Roles and capabilities", summary: "What a role may do, and where that is decided.", keywords: "roles capabilities permissions grants catalog" },
+      { ...live, slug: "project-access", title: "Project access", summary: "Membership of a single project, as distinct from the organization.", keywords: "project access members project role delegation" },
+      { ...live, slug: "who-can-see-your-data", title: "Who can see your data", summary: "The honest answer, including the parts that are not you.", keywords: "privacy visibility access rls isolation support staff" },
+      { ...live, slug: "audit-log", title: "Audit log", summary: "What is recorded, and what is not yet.", keywords: "audit log admin actions history record actor" },
+      { ...live, slug: "admin-screens", title: "Admin screens", summary: "The administrative surfaces and what each controls.", keywords: "admin users roles organizations projects models usage screens" },
+      { ...live, slug: "account-and-password", title: "Account & password", summary: "Managing your own sign-in.", keywords: "account password profile sign in credentials" },
     ],
   },
   {
@@ -308,10 +308,10 @@ export const DOC_GROUPS: DocGroup[] = [
     group: "Developer API",
     blurb: "Driving the platform from your own code.",
     pages: [
-      { ...planned("5.2g"), slug: "getting-an-api-key", title: "Getting an API key", summary: "Issuing, scoping and revoking a key.", keywords: "api key developer token issue revoke scope" },
-      { ...planned("5.2g"), slug: "endpoints-and-schemas", title: "Endpoints & schemas", summary: "Every endpoint and the shape it expects.", keywords: "api endpoints schemas request response openapi", source: "contract" },
-      { ...planned("5.2g"), slug: "rate-limits-and-idempotency", title: "Rate limits & idempotency", summary: "How often you may call, and how to retry safely.", keywords: "rate limits idempotency retry throttle keys" },
-      { ...planned("5.2g"), slug: "request-log", title: "Request log", summary: "What your key did, and when.", keywords: "request log api history calls audit" },
+      { ...live, slug: "getting-an-api-key", title: "Getting an API key", summary: "Issuing, scoping and revoking a key.", keywords: "api key developer token issue revoke scope" },
+      { ...live, slug: "endpoints-and-schemas", title: "Endpoints & schemas", summary: "Every endpoint and the shape it expects.", keywords: "api endpoints schemas request response openapi", source: "contract" },
+      { ...live, slug: "rate-limits-and-idempotency", title: "Rate limits & idempotency", summary: "How often you may call, and how to retry safely.", keywords: "rate limits idempotency retry throttle keys" },
+      { ...live, slug: "request-log", title: "Request log", summary: "What your key did, and when.", keywords: "request log api history calls audit" },
     ],
   },
   {

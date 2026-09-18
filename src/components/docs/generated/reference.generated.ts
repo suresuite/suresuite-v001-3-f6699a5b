@@ -76,6 +76,12 @@ export type RefTable = {
   surfaces: { page: string; via: string; evidence: string }[];
   /** The CSV origin, where the table has one. `null` means it has none. */
   ingestDataset: { wizardId: string; factClass: string; serverSet: string[] } | null;
+  /**
+   * Row-level security, in THREE states. `determinate: false` means the
+   * static replay could not settle it — which is not the same answer as
+   * `enabled: false`, and WP 2.4 is why the difference is carried.
+   */
+  rls: { enabled: boolean; determinate: boolean; policies: number; unrestricted: number };
   governance: {
     read: string | null;
     write: string | null;
@@ -120,6 +126,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "viewer",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -325,6 +337,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "viewer",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -758,6 +776,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "viewer",
       "audited": false,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 1
     },
     "columns": [
       {
@@ -1199,6 +1223,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": false,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -1538,6 +1568,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 4,
+      "unrestricted": 2
     },
     "columns": [
       {
@@ -1886,6 +1922,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": true,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 4,
+      "unrestricted": 2
+    },
     "columns": [
       {
         "name": "id",
@@ -2182,6 +2224,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": false,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 1
+    },
     "columns": [
       {
         "name": "key",
@@ -2376,6 +2424,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -2617,6 +2671,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "viewer",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 2
     },
     "columns": [
       {
@@ -2899,6 +2959,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": false,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -3159,6 +3225,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": true,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -3404,6 +3476,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -3742,6 +3820,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": true,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -3963,6 +4047,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -4233,6 +4323,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -4629,6 +4725,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 4,
+      "unrestricted": 2
     },
     "columns": [
       {
@@ -5071,6 +5173,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": true,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -5395,6 +5503,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -6012,6 +6126,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": false,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -6374,6 +6494,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": false,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -6711,6 +6837,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": false,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -7231,6 +7363,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": true,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -7531,6 +7669,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": false
+    },
+    "rls": {
+      "enabled": false,
+      "determinate": false,
+      "policies": 0,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -8020,6 +8164,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": true,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -8276,6 +8426,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "viewer",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 4,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -8680,6 +8836,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "viewer",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 4,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -9440,6 +9602,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": true,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 4,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -9800,6 +9968,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "viewer",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 4,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -10281,6 +10455,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": false,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "org_id",
@@ -10451,6 +10631,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "viewer",
       "audited": false,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -10627,6 +10813,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "viewer",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -10881,6 +11073,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 4,
+      "unrestricted": 2
     },
     "columns": [
       {
@@ -11275,6 +11473,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 5,
+      "unrestricted": 2
     },
     "columns": [
       {
@@ -11693,6 +11897,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": true,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 5,
+      "unrestricted": 2
+    },
     "columns": [
       {
         "name": "id",
@@ -11962,6 +12172,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": false
+    },
+    "rls": {
+      "enabled": false,
+      "determinate": false,
+      "policies": 0,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -12525,6 +12741,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": false,
       "rlsEnabled": false
     },
+    "rls": {
+      "enabled": true,
+      "determinate": false,
+      "policies": 1,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -12928,6 +13150,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": false,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "project_id",
@@ -13177,6 +13405,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": false,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 1
+    },
     "columns": [
       {
         "name": "project_role",
@@ -13394,6 +13628,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": false,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 4,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -13940,6 +14180,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": false,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 1
+    },
     "columns": [
       {
         "name": "id",
@@ -14192,6 +14438,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": false,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 1
+    },
     "columns": [
       {
         "name": "role",
@@ -14355,6 +14607,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": false
+    },
+    "rls": {
+      "enabled": false,
+      "determinate": false,
+      "policies": 0,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -14732,6 +14990,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "viewer",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 4,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -15312,6 +15576,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": true,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 4,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -15712,6 +15982,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "editor",
       "audited": true,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
     },
     "columns": [
       {
@@ -16124,6 +16400,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": true,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "id",
@@ -16517,6 +16799,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "audited": false,
       "rlsEnabled": true
     },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
+    },
     "columns": [
       {
         "name": "user_id",
@@ -16760,6 +17048,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "minProjectRole": "viewer",
       "audited": false,
       "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 2,
+      "unrestricted": 0
     },
     "columns": [
       {

@@ -1511,5 +1511,133 @@ export const STRESS_TESTS: StressTest[] = [
   }
 ];
 
+/**
+ * The public API's routes, read from the dispatcher's own table.
+ *
+ * §6.3 marks this section G. The data contract describes TABLES and not an
+ * HTTP surface, so the nearest declaration is the `routes` literal the
+ * dispatcher itself matches against — which means a route added, removed
+ * or re-scoped changes the manual with nobody editing a page. Another
+ * instance of §4 D90's weakest door, and the page says so.
+ */
+export type ApiRoute = { method: string; path: string; scope: string; handler: string };
+
+export const API_ROUTES: ApiRoute[] = [
+  {
+    "method": "GET",
+    "path": "/v1/projects",
+    "scope": "read:data",
+    "handler": "listProjects"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/projects/{id}",
+    "scope": "read:data",
+    "handler": "getProject"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/projects/{id}/datasets:freeze",
+    "scope": "write:data",
+    "handler": "freezeDataset"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/projects/{id}/dataset-versions",
+    "scope": "read:data",
+    "handler": "listDatasetVersions"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/projects/{id}/policy-catalog",
+    "scope": "read:policies",
+    "handler": "getPolicyCatalog"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/projects/{id}/policies",
+    "scope": "read:policies",
+    "handler": "getPolicies"
+  },
+  {
+    "method": "PUT",
+    "path": "/v1/projects/{id}/policies",
+    "scope": "write:policies",
+    "handler": "putPolicies"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/projects/{id}/policy-versions",
+    "scope": "write:policies",
+    "handler": "snapshotPolicyVersion"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/projects/{id}/policy-versions",
+    "scope": "read:policies",
+    "handler": "listPolicyVersions"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/projects/{id}/scenarios",
+    "scope": "read:runs",
+    "handler": "listScenarios"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/projects/{id}/scenarios",
+    "scope": "write:runs",
+    "handler": "createScenario"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/projects/{id}/runs",
+    "scope": "write:runs",
+    "handler": "createRun"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/runs/{id}",
+    "scope": "read:runs",
+    "handler": "getRun"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/runs/{id}/replications",
+    "scope": "read:runs",
+    "handler": "getRunReplications"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/runs/{id}:cancel",
+    "scope": "write:runs",
+    "handler": "cancelRun"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/runs/{id}:add-reps",
+    "scope": "write:runs",
+    "handler": "addRunReps"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/runs/{id}/validation",
+    "scope": "read:runs",
+    "handler": "getRunValidation"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/keys",
+    "scope": "admin:keys",
+    "handler": "listKeys"
+  },
+  {
+    "method": "POST",
+    "path": "/v1/keys/{id}:revoke",
+    "scope": "admin:keys",
+    "handler": "revokeKey"
+  }
+];
+
 export const CHAIN_COUNT = 38;
 export const BROKEN_COUNT = 11;
