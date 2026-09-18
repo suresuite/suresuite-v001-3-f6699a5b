@@ -62,7 +62,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "entity_type",
       "entity_id"
     ],
-    "checks": [],
+    "checks": [
+      {
+        "name": "analysis_results_entity_type_check",
+        "definition": "CHECK (entity_type ~ '^[a-z][a-z0-9_]*$')"
+      }
+    ],
     "columns": [
       {
         "name": "id",
@@ -190,7 +195,16 @@ export const REFERENCE_TABLES: RefTable[] = [
       "params_hash",
       "code_version"
     ],
-    "checks": [],
+    "checks": [
+      {
+        "name": "analysis_runs_analysis_kind_check",
+        "definition": "CHECK (analysis_kind ~ '^[a-z][a-z0-9_]*$')"
+      },
+      {
+        "name": "analysis_runs_status_check",
+        "definition": "CHECK (status IN ('running','succeeded','failed'))"
+      }
+    ],
     "columns": [
       {
         "name": "id",
@@ -1422,7 +1436,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "key"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "capabilities_kind_check",
+        "definition": "CHECK (kind IN ('page','feature'))"
+      }
+    ],
     "columns": [
       {
         "name": "key",
@@ -1881,6 +1900,10 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": null,
         "definition": "CHECK (grantor_user_id <> grantee_user_id)"
+      },
+      {
+        "name": "delegation_grants_project_role_check",
+        "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))"
       }
     ],
     "columns": [
@@ -2370,7 +2393,20 @@ export const REFERENCE_TABLES: RefTable[] = [
       "id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "ingest_files_source_kind_check",
+        "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))"
+      },
+      {
+        "name": "ingest_files_byte_size_check",
+        "definition": "CHECK (byte_size >= 0)"
+      },
+      {
+        "name": "ingest_files_content_sha256_check",
+        "definition": "CHECK (content_sha256 ~ '^[0-9a-f]{64}$')"
+      }
+    ],
     "columns": [
       {
         "name": "id",
@@ -2575,6 +2611,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [
+      {
+        "name": "erp_sync_runs_triggered_by_check",
+        "definition": "CHECK (triggered_by IN ('manual', 'scheduled'))"
+      },
+      {
+        "name": "erp_sync_runs_status_check",
+        "definition": "CHECK (status IN ('running', 'staged', 'applied', 'failed', 'skipped'))"
+      },
       {
         "name": "ingest_runs_source_kind_check",
         "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))"
@@ -2991,6 +3035,10 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [
       {
+        "name": "erp_staged_bom_lines_diff_state_check",
+        "definition": "CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))"
+      },
+      {
         "name": "ingest_staged_bom_lines_source_kind_check",
         "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))"
       },
@@ -3236,6 +3284,10 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [
       {
+        "name": "erp_staged_bom_versions_diff_state_check",
+        "definition": "CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))"
+      },
+      {
         "name": "ingest_staged_bom_versions_source_kind_check",
         "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))"
       },
@@ -3464,6 +3516,10 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [
+      {
+        "name": "erp_staged_products_diff_state_check",
+        "definition": "CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))"
+      },
       {
         "name": "ingest_staged_products_source_kind_check",
         "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))"
@@ -5938,7 +5994,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "organization_members_org_role_check",
+        "definition": "CHECK (org_role IN ('owner','admin','member'))"
+      }
+    ],
     "columns": [
       {
         "name": "id",
@@ -6054,7 +6115,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "slug"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "organizations_status_check",
+        "definition": "CHECK (status IN ('active','suspended'))"
+      }
+    ],
     "columns": [
       {
         "name": "id",
@@ -6734,6 +6800,10 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [
       {
+        "name": "policy_overrides_scope_check",
+        "definition": "CHECK (scope IN ('node','edge'))"
+      },
+      {
         "name": "policy_overrides_family_chk",
         "definition": "CHECK (family IN ('sourcing','inventory','transport','fulfillment','production','recovery','demand'))"
       }
@@ -7306,7 +7376,16 @@ export const REFERENCE_TABLES: RefTable[] = [
       "id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "project_erp_links_status_check",
+        "definition": "CHECK (status IN ('active', 'needs_attention', 'revoked'))"
+      },
+      {
+        "name": "project_erp_links_auto_apply_threshold_pct_check",
+        "definition": "CHECK (auto_apply_threshold_pct >= 0 AND auto_apply_threshold_pct <= 100)"
+      }
+    ],
     "columns": [
       {
         "name": "id",
@@ -7575,7 +7654,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "user_id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "project_members_project_role_check",
+        "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))"
+      }
+    ],
     "columns": [
       {
         "name": "project_id",
@@ -7746,7 +7830,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "capability_key"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "project_role_capabilities_project_role_check",
+        "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))"
+      }
+    ],
     "columns": [
       {
         "name": "project_role",
@@ -7864,6 +7953,10 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "chk_supply_chain_model",
         "definition": "CHECK (supply_chain_model IN ('Make-To-Stock','Make-To-Order'))"
+      },
+      {
+        "name": "projects_data_type_check",
+        "definition": "CHECK (data_type IN ('curated', 'uncurated'))"
       }
     ],
     "columns": [
@@ -8404,7 +8497,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "capability_key"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "role_capabilities_role_check",
+        "definition": "CHECK (role IN ('super_admin','admin','modeler','user'))"
+      }
+    ],
     "columns": [
       {
         "name": "role",

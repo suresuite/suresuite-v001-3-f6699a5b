@@ -117,8 +117,12 @@ BEGIN
     VALUES (v_proj, 'D53', v_user, 'P', 'D53 Org', v_org);
 
   -- NO ACTION: an ingest run's actor cannot be deleted out from under it.
+  -- `triggered_by` is HOW the run started, not WHO started it — the who is
+  -- `triggered_by_user_id`, which is the column this section is about. An email
+  -- here fails `CHECK (triggered_by IN ('manual','scheduled'))`, which §4 D59
+  -- kept out of the rehearsed database until now.
   INSERT INTO public.ingest_runs (project_id, source_kind, triggered_by, triggered_by_user_id)
-    VALUES (v_proj, 'csv', 'd53@example.invalid', v_user2);
+    VALUES (v_proj, 'csv', 'manual', v_user2);
 
   v_refused := false;
   BEGIN

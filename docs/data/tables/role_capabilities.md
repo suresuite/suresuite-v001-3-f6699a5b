@@ -21,6 +21,13 @@ WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from w
 
 ## Constraints
 
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `role_capabilities_role_check` | `CHECK (role IN ('super_admin','admin','modeler','user'))` | `20260711000002_unified_access_control.sql` |
+
 | Constraint | Kind | Definition |
 |---|---|---|
 | — | PRIMARY KEY | `PRIMARY KEY (role, capability_key)` |
@@ -153,6 +160,6 @@ When it was last changed. Server-stamped.
 
 ---
 
-*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
+*Generated from data contract `81c7c8c0e8bb`, engine `0.2.3`,
 sidecar `supabase/contract/role_capabilities.contract.yaml`, table created by `20260711000002_unified_access_control.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -22,6 +22,15 @@ TIER 0, CREATED IN PHASE 3 / WP 3.1, AND NOTHING WRITES IT YET. PLAN.md §2 list
 
 ## Constraints
 
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `ingest_files_source_kind_check` | `CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))` | `20260916000013_ingest_files_tier0.sql` |
+| `ingest_files_byte_size_check` | `CHECK (byte_size >= 0)` | `20260916000013_ingest_files_tier0.sql` |
+| `ingest_files_content_sha256_check` | `CHECK (content_sha256 ~ '^[0-9a-f]{64}$')` | `20260916000013_ingest_files_tier0.sql` |
+
 | Constraint | Kind | Definition |
 |---|---|---|
 | — | UNIQUE | `UNIQUE (storage_bucket, storage_path)` |
@@ -259,6 +268,6 @@ When the bytes were received. Server-stamped, never the client's clock.
 
 ---
 
-*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
+*Generated from data contract `81c7c8c0e8bb`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_files.contract.yaml`, table created by `20260916000013_ingest_files_tier0.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

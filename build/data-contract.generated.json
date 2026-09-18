@@ -6,7 +6,7 @@
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
       "migrations_found": 328,
-      "migrations_applied": 325,
+      "migrations_applied": 323,
       "last_migration": "20260918000001_org_row_uuid_only.sql"
     },
     "sidecars": 43,
@@ -19,7 +19,7 @@
     "tables_in_schema": 81,
     "tables_covered": 43,
     "columns_covered": 536,
-    "check_constraints": 19,
+    "check_constraints": 41,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -90,6 +90,16 @@
             "id"
           ],
           "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "analysis_results_entity_type_check",
+          "kind": "CHECK",
+          "columns": [
+            "entity_type"
+          ],
+          "definition": "CHECK (entity_type ~ '^[a-z][a-z0-9_]*$')",
           "implicit": true,
           "added_by": "20260917000006_analysis_store.sql"
         }
@@ -391,6 +401,26 @@
             "id"
           ],
           "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "analysis_runs_analysis_kind_check",
+          "kind": "CHECK",
+          "columns": [
+            "analysis_kind"
+          ],
+          "definition": "CHECK (analysis_kind ~ '^[a-z][a-z0-9_]*$')",
+          "implicit": true,
+          "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "analysis_runs_status_check",
+          "kind": "CHECK",
+          "columns": [
+            "status"
+          ],
+          "definition": "CHECK (status IN ('running','succeeded','failed'))",
           "implicit": true,
           "added_by": "20260917000006_analysis_store.sql"
         }
@@ -3476,6 +3506,16 @@
           "definition": "PRIMARY KEY (key)",
           "implicit": true,
           "added_by": "20260711000002_unified_access_control.sql"
+        },
+        {
+          "name": "capabilities_kind_check",
+          "kind": "CHECK",
+          "columns": [
+            "kind"
+          ],
+          "definition": "CHECK (kind IN ('page','feature'))",
+          "implicit": true,
+          "added_by": "20260711000002_unified_access_control.sql"
         }
       ],
       "indexes": [],
@@ -4579,6 +4619,16 @@
             "id"
           ],
           "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "delegation_grants_project_role_check",
+          "kind": "CHECK",
+          "columns": [
+            "project_role"
+          ],
+          "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))",
           "implicit": true,
           "added_by": "20260915000005_project_membership_and_delegation.sql"
         }
@@ -5760,6 +5810,36 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "ingest_files_source_kind_check",
+          "kind": "CHECK",
+          "columns": [
+            "source_kind"
+          ],
+          "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))",
+          "implicit": true,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "ingest_files_byte_size_check",
+          "kind": "CHECK",
+          "columns": [
+            "byte_size"
+          ],
+          "definition": "CHECK (byte_size >= 0)",
+          "implicit": true,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
+        },
+        {
+          "name": "ingest_files_content_sha256_check",
+          "kind": "CHECK",
+          "columns": [
+            "content_sha256"
+          ],
+          "definition": "CHECK (content_sha256 ~ '^[0-9a-f]{64}$')",
+          "implicit": true,
+          "added_by": "20260916000013_ingest_files_tier0.sql"
         }
       ],
       "indexes": [
@@ -6230,6 +6310,26 @@
             "id"
           ],
           "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "erp_sync_runs_triggered_by_check",
+          "kind": "CHECK",
+          "columns": [
+            "triggered_by"
+          ],
+          "definition": "CHECK (triggered_by IN ('manual', 'scheduled'))",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "erp_sync_runs_status_check",
+          "kind": "CHECK",
+          "columns": [
+            "status"
+          ],
+          "definition": "CHECK (status IN ('running', 'staged', 'applied', 'failed', 'skipped'))",
           "implicit": true,
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
         },
@@ -7110,6 +7210,16 @@
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
         },
         {
+          "name": "erp_staged_bom_lines_diff_state_check",
+          "kind": "CHECK",
+          "columns": [
+            "diff_state"
+          ],
+          "definition": "CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
           "name": "ingest_staged_bom_lines_source_kind_check",
           "kind": "CHECK",
           "columns": [],
@@ -7616,6 +7726,16 @@
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
         },
         {
+          "name": "erp_staged_bom_versions_diff_state_check",
+          "kind": "CHECK",
+          "columns": [
+            "diff_state"
+          ],
+          "definition": "CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
           "name": "ingest_staged_bom_versions_source_kind_check",
           "kind": "CHECK",
           "columns": [],
@@ -8087,6 +8207,16 @@
             "id"
           ],
           "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "erp_staged_products_diff_state_check",
+          "kind": "CHECK",
+          "columns": [
+            "diff_state"
+          ],
+          "definition": "CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))",
           "implicit": true,
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
         },
@@ -13692,6 +13822,16 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "organization_members_org_role_check",
+          "kind": "CHECK",
+          "columns": [
+            "org_role"
+          ],
+          "definition": "CHECK (org_role IN ('owner','admin','member'))",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
         }
       ],
       "indexes": [],
@@ -13960,6 +14100,16 @@
             "slug"
           ],
           "definition": "UNIQUE (slug)",
+          "implicit": true,
+          "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "organizations_status_check",
+          "kind": "CHECK",
+          "columns": [
+            "status"
+          ],
+          "definition": "CHECK (status IN ('active','suspended'))",
           "implicit": true,
           "added_by": "20260709000002_super_admin_phase1.sql"
         }
@@ -15647,6 +15797,16 @@
           "added_by": "20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql"
         },
         {
+          "name": "policy_overrides_scope_check",
+          "kind": "CHECK",
+          "columns": [
+            "scope"
+          ],
+          "definition": "CHECK (scope IN ('node','edge'))",
+          "implicit": true,
+          "added_by": "20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql"
+        },
+        {
           "name": "policy_overrides_family_chk",
           "kind": "CHECK",
           "columns": [],
@@ -16980,6 +17140,26 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "project_erp_links_status_check",
+          "kind": "CHECK",
+          "columns": [
+            "status"
+          ],
+          "definition": "CHECK (status IN ('active', 'needs_attention', 'revoked'))",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
+        },
+        {
+          "name": "project_erp_links_auto_apply_threshold_pct_check",
+          "kind": "CHECK",
+          "columns": [
+            "auto_apply_threshold_pct"
+          ],
+          "definition": "CHECK (auto_apply_threshold_pct >= 0 AND auto_apply_threshold_pct <= 100)",
+          "implicit": true,
+          "added_by": "20260829120000_erp_connector_phase1_2.sql"
         }
       ],
       "indexes": [
@@ -17533,6 +17713,16 @@
           ],
           "definition": "PRIMARY KEY (project_id, user_id)",
           "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "project_members_project_role_check",
+          "kind": "CHECK",
+          "columns": [
+            "project_role"
+          ],
+          "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))",
+          "implicit": true,
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
         }
       ],
       "indexes": [],
@@ -17870,6 +18060,16 @@
             "capability_key"
           ],
           "definition": "PRIMARY KEY (project_role, capability_key)",
+          "added_by": "20260915000005_project_membership_and_delegation.sql"
+        },
+        {
+          "name": "project_role_capabilities_project_role_check",
+          "kind": "CHECK",
+          "columns": [
+            "project_role"
+          ],
+          "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))",
+          "implicit": true,
           "added_by": "20260915000005_project_membership_and_delegation.sql"
         }
       ],
@@ -18219,6 +18419,16 @@
           ],
           "definition": "UNIQUE (modeler_id, plant_name, name)",
           "added_by": "20250821120000_e54ca01d-5de5-4f4a-b9cc-510a6225c6c0.sql"
+        },
+        {
+          "name": "projects_data_type_check",
+          "kind": "CHECK",
+          "columns": [
+            "data_type"
+          ],
+          "definition": "CHECK (data_type IN ('curated', 'uncurated'))",
+          "implicit": true,
+          "added_by": "20250923120308_4bbb560c-69c8-415c-970c-48b6ff7ce13a.sql"
         }
       ],
       "indexes": [
@@ -19416,6 +19626,16 @@
           ],
           "definition": "PRIMARY KEY (role, capability_key)",
           "added_by": "20260711000002_unified_access_control.sql"
+        },
+        {
+          "name": "role_capabilities_role_check",
+          "kind": "CHECK",
+          "columns": [
+            "role"
+          ],
+          "definition": "CHECK (role IN ('super_admin','admin','modeler','user'))",
+          "implicit": true,
+          "added_by": "20260711000002_unified_access_control.sql"
         }
       ],
       "indexes": [],
@@ -20286,7 +20506,7 @@
           "name": "idx_supply_chain_data_plant",
           "unique": false,
           "columns": [
-            "plant"
+            "plant_name"
           ],
           "nulls_not_distinct": false,
           "predicate": null,
@@ -20336,7 +20556,7 @@
           "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
-          "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
+          "added_by": "20250909153231_00d6f1a2-b407-4464-9884-b98cda90556f.sql"
         },
         {
           "name": "idx_supply_chain_data_from_to_locations",
@@ -20349,7 +20569,7 @@
           "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
-          "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
+          "added_by": "20250909153231_00d6f1a2-b407-4464-9884-b98cda90556f.sql"
         },
         {
           "name": "idx_supply_chain_data_zero_flow_filtered",
@@ -21253,40 +21473,6 @@
           "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
         },
         {
-          "name": "idx_supply_chain_data_multi_tier_material_id",
-          "unique": false,
-          "columns": [
-            "material_id"
-          ],
-          "nulls_not_distinct": false,
-          "predicate": null,
-          "partial": false,
-          "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
-        },
-        {
-          "name": "idx_supply_chain_data_multi_tier_higher_level_component_id",
-          "unique": false,
-          "columns": [
-            "higher_level_component_id"
-          ],
-          "nulls_not_distinct": false,
-          "predicate": null,
-          "partial": false,
-          "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
-        },
-        {
-          "name": "idx_supply_chain_data_multi_tier_project_level",
-          "unique": false,
-          "columns": [
-            "project_id",
-            "level"
-          ],
-          "nulls_not_distinct": false,
-          "predicate": null,
-          "partial": false,
-          "added_by": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql"
-        },
-        {
           "name": "idx_supply_chain_data_multi_tier_from_location",
           "unique": false,
           "columns": [
@@ -21302,6 +21488,18 @@
           "unique": false,
           "columns": [
             "to_location"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250909153231_00d6f1a2-b407-4464-9884-b98cda90556f.sql"
+        },
+        {
+          "name": "idx_supply_chain_data_multi_tier_project_level",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "level"
           ],
           "nulls_not_distinct": false,
           "predicate": null,
@@ -23652,5 +23850,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "7bd2a0fd8e4f"
+  "contract_version": "81c7c8c0e8bb"
 }

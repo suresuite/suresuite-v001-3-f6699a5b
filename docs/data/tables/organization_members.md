@@ -22,6 +22,13 @@ Backfilled once by `20260709000002` from `approved_users`, mapping the `admin` a
 
 ## Constraints
 
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `organization_members_org_role_check` | `CHECK (org_role IN ('owner','admin','member'))` | `20260709000002_super_admin_phase1.sql` |
+
 | Constraint | Kind | Definition |
 |---|---|---|
 | — | UNIQUE | `UNIQUE(org_id, user_id)` |
@@ -146,6 +153,6 @@ When the membership was created. Server-stamped.
 
 ---
 
-*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
+*Generated from data contract `81c7c8c0e8bb`, engine `0.2.3`,
 sidecar `supabase/contract/organization_members.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

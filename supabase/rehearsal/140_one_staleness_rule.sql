@@ -110,8 +110,13 @@ BEGIN
   INSERT INTO public.proposals
     (id, project_id, agent_id, artifact_type, title, payload, provenance, grounding, idempotency_key, status, expires_at)
   VALUES
+    -- `provenance` is TEXT from a fixed vocabulary, not jsonb; it was given
+    -- `'{}'::jsonb` because the column next to it is. `CHECK (provenance IN
+    -- ('deterministic','llm_drafted','user_supplied'))` has been inline on the
+    -- column since `20260715000001` and would have said so on the first run —
+    -- §4 D59 kept it out of every rehearsed database.
     (v_prop, v_project, 'policy-configurator', 'policy_bundle_diff', 'WP44 grounded proposal',
-     '{}'::jsonb, '{}'::jsonb, jsonb_build_object('graph_hash', v_h0), 'wp44-grounded', 'proposed',
+     '{}'::jsonb, 'deterministic', jsonb_build_object('graph_hash', v_h0), 'wp44-grounded', 'proposed',
      now() + interval '30 days');
 
   -- Move the project. Any tier-2 edit does it; this is a user changing a cost.
@@ -184,7 +189,7 @@ BEGIN
     (id, project_id, agent_id, artifact_type, title, payload, provenance, grounding, idempotency_key, status, expires_at)
   VALUES
     (v_ttl, v_project, 'policy-configurator', 'policy_bundle_diff', 'WP44 expired proposal',
-     '{}'::jsonb, '{}'::jsonb, jsonb_build_object('graph_hash', v_h0), 'wp44-ttl', 'proposed',
+     '{}'::jsonb, 'deterministic', jsonb_build_object('graph_hash', v_h0), 'wp44-ttl', 'proposed',
      now() - interval '1 day');
 
   PERFORM public.list_agent_proposals(v_project);
