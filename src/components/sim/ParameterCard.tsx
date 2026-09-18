@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 import { FROZEN_CELL_ON_TINT } from "@/components/shared";
 import { DAYS_PER_UNIT, UNIT_LABEL_PLURAL, type TimeUnit } from "@/hooks/useTimeUnit";
 
@@ -103,6 +104,51 @@ function Switch({
   );
 }
 
+/** The number control keeps its own display text, separate from the
+ *  committed numeric value: a controlled input tied directly to a `number`
+ *  can't represent "currently empty" or "mid-edit" (e.g. "-", "12."), so
+ *  clearing the field would otherwise snap back to the last value on every
+ *  keystroke. Valid numbers still propagate to onChange live, same as before —
+ *  only the empty/invalid display state is now possible while typing. */
+function NumberField({
+  control,
+}: {
+  control: Extract<FieldControl, { kind: "number" }>;
+}) {
+  const [text, setText] = useState(String(control.value));
+
+  // Resync when the committed value changes from outside this input (e.g.
+  // switching scenario, or a programmatic patch elsewhere).
+  useEffect(() => {
+    setText(String(control.value));
+  }, [control.value]);
+
+  return (
+    <input
+      type="number"
+      min={control.min}
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setText(raw); // always reflect what the user typed, including ""
+        const v = parseFloat(raw);
+        if (raw !== "" && Number.isFinite(v)) control.onChange(v);
+      }}
+      onBlur={() => {
+        // Left empty or invalid on blur: fall back to the last committed
+        // value instead of leaving the field blank.
+        const v = parseFloat(text);
+        if (text === "" || !Number.isFinite(v)) {
+          setText(String(control.value));
+        }
+        control.onCommit?.();
+      }}
+      className="h-7 min-h-11 rounded-sm border border-[#d4d4d8] px-[9px] text-[13px] tabular-nums text-[#18181b] focus:border-foreground focus:outline-none md:min-h-0"
+      style={{ width: control.width ?? 76 }}
+    />
+  );
+}
+
 export function ParameterCard({ group, footer }: { group: ParamGroup; footer?: string }) {
   return (
     <section className="flex h-full flex-col overflow-hidden rounded-sm border border-[--hair-rule] bg-white">
@@ -162,18 +208,19 @@ export function ParameterCard({ group, footer }: { group: ParamGroup; footer?: s
                 {/* fixed height so switch rows share the rhythm of input rows */}
                 <td className={cn(TD, "h-[38px] whitespace-nowrap", prov?.row)}>
                   {f.control.kind === "number" ? (
-                    <input
-                      type="number"
-                      min={f.control.min}
-                      value={f.control.value}
-                      onChange={(e) => {
-                        const v = parseFloat(e.target.value);
-                        if (Number.isFinite(v)) (f.control as { onChange: (n: number) => void }).onChange(v);
-                      }}
-                      onBlur={f.control.onCommit}
-                      className="h-7 min-h-11 rounded-sm border border-[#d4d4d8] px-[9px] text-[13px] tabular-nums text-[#18181b] focus:border-foreground focus:outline-none md:min-h-0"
-                      style={{ width: f.control.width ?? 76 }}
-                    />
+                    // <input
+                    //   type="number"
+                    //   min={f.control.min}
+                    //   value={f.control.value}
+                    //   onChange={(e) => {
+                    //     const v = parseFloat(e.target.value);
+                    //     if (Number.isFinite(v)) (f.control as { onChange: (n: number) => void }).onChange(v);
+                    //   }}
+                    //   onBlur={f.control.onCommit}
+                    //   className="h-7 min-h-11 rounded-sm border border-[#d4d4d8] px-[9px] text-[13px] tabular-nums text-[#18181b] focus:border-foreground focus:outline-none md:min-h-0"
+                    //   style={{ width: f.control.width ?? 76 }}
+                    // />
+                    <NumberField control={f.control} />
                   ) : f.control.kind === "segmented" ? (
                     <Segmented
                       value={f.control.value}

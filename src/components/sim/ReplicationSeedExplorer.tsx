@@ -63,6 +63,14 @@ function meanCI(values: number[], confidence: number) {
   return { mean: m, half: (z * Math.sqrt(variance)) / Math.sqrt(n), n };
 }
 
+function nameForSeriesKey(key: string): string {
+  if (key === "mean") return "Mean";
+  if (key === "upper") return "Upper (95% CI)";
+  if (key === "lower") return "Lower (95% CI)";
+  const m = /^s(-?\d+)$/.exec(key);
+  return m ? `Seed ${m[1]}` : key;
+}
+
 interface SeedSelectorProps {
   reps: Replication[];
   value: number | null; // seed_used, or null = all reps
@@ -113,6 +121,11 @@ export function ReplicationSeedExplorer({
   const [seed, setSeed] = useState<number | null>(null);
   const [isolate, setIsolate] = useState(false);
 
+  // The selected series' own unit decides percent display — reused for the
+  // y-axis and tooltip below. Computed here (not from the later `meta` const)
+  // because `data`'s useMemo factory runs before `meta` is declared.
+  const isPercent = REPLICATION_SERIES.find((s) => s.key === seriesKey)?.unit === "fraction";
+
   const withSeries = useMemo(
     () =>
       reps.filter(
@@ -136,16 +149,22 @@ export function ReplicationSeedExplorer({
     const shown = withSeries.slice(0, 10);
     if (selected && !shown.includes(selected)) shown.push(selected);
     const n = Math.min(...shown.map((r) => r.time_series[seriesKey].length));
+    const scale = isPercent ? 100 : 1;
     return Array.from({ length: n }, (_, week) => {
       const vals = withSeries.map((r) => r.time_series[seriesKey][week]);
       const { mean, half } = meanCI(vals, confidence);
-      const row: Record<string, number> = { week, mean, lower: mean - half, upper: mean + half };
+      const row: Record<string, number> = {
+        week,
+        mean: mean * scale,
+        lower: (mean - half) * scale,
+        upper: (mean + half) * scale,
+      };      
       shown.forEach((r) => {
-        row[`s${r.seed_used}`] = r.time_series[seriesKey][week];
+        row[`s${r.seed_used}`] = r.time_series[seriesKey][week] * scale;
       });
       return row;
     });
-  }, [withSeries, selected, seriesKey, confidence]);
+  }, [withSeries, selected, seriesKey, confidence, isPercent]);
 
   const shownReps = useMemo(() => {
     const shown = withSeries.slice(0, 10);
@@ -206,8 +225,20 @@ export function ReplicationSeedExplorer({
             <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
               <CartesianGrid strokeOpacity={0.15} />
               <XAxis dataKey="week" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} width={44} domain={["auto", "auto"]} />
-              <RTooltip contentStyle={{ fontSize: 11 }} />
+              <YAxis
+                tick={{ fontSize: 10 }}
+                width={44}
+                domain={["auto", "auto"]}
+                tickFormatter={(v) => (isPercent ? `${v}%` : v)}
+              />
+              <RTooltip
+                contentStyle={{ fontSize: 11 }}
+                labelFormatter={(week) => `Week ${week}`}
+                formatter={(value: number, key: string) => [
+                  isPercent ? `${Number(value).toFixed(2)}%` : Number(value).toFixed(3),
+                  nameForSeriesKey(key),
+                ]}
+              />
               {warmupWeeks != null && warmupWeeks > 0 && (
                 <ReferenceLine
                   x={warmupWeeks}
