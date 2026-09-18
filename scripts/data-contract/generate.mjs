@@ -37,7 +37,7 @@ import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { load } from "js-yaml";
-import { deriveChains } from "./chains.mjs";
+import { deriveChains, deriveStressTests } from "./chains.mjs";
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const INTROSPECTED = join(ROOT, "build", "schema.introspected.json");
@@ -1306,6 +1306,22 @@ export function renderPolicyModule(contract, registry) {
     "};",
     "",
     `export const ANALYSIS_KINDS: AnalysisKind[] = ${JSON.stringify(renderAnalysisKinds(contract), null, 2)};`,
+    "",
+    "/**",
+    " * The stress-test battery, READ FROM THE ENGINE SOURCE.",
+    " *",
+    " * This is §4 D90's weakest door — a text scan over a Python literal — and",
+    " * the page that renders it says so. The battery is not in",
+    " * `registry_export.py`, which is where a declaration belongs; until it is,",
+    " * a scan that goes red when the literal moves beats a hand copy that goes",
+    " * quietly wrong (§4 D22, and the archived copy already had).",
+    " *",
+    " * `runnable` is derived from a `_run_battery(..., \"ST-n\", ...)` call site,",
+    " * not from the module docstring that claims the same thing.",
+    " */",
+    "export type StressTest = { id: string; description: string; runnable: boolean };",
+    "",
+    `export const STRESS_TESTS: StressTest[] = ${JSON.stringify(deriveStressTests(ROOT), null, 2)};`,
     "",
     `export const CHAIN_COUNT = ${chains.length};`,
     `export const BROKEN_COUNT = ${broken.length};`,

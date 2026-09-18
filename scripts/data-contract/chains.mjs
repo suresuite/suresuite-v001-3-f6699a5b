@@ -127,3 +127,64 @@ export function deriveChains(root, contract, registry) {
     cleanup();
   }
 }
+
+/**
+ * The stress-test battery, read from the engine rather than mined from the
+ * archive — WP 5.2d.
+ *
+ * ── WHY THIS IS A TEXT SCAN, AND WHY THAT IS SAID OUT LOUD ────────────────
+ *
+ * §6.6 lists "the ST-1…ST-7 stress-test descriptions" as narrative worth mining
+ * from the archived manual. Mining is what produced §4 D22: a hand copy that
+ * drifted from the engine within a quarter. The archived copy already carries
+ * statuses the engine does not ("planned · M7" against seven entries), so the
+ * copy was the wrong source before anybody read it.
+ *
+ * The right source is `registry_export.py`, which is the single source of truth
+ * for what the engine declares (§3, blueprint §6.2) — and `ST_DEFINITIONS` is
+ * NOT in it. Regenerating that export needs `pydantic` and a session that can
+ * reach PyPI, which §4 D94 records as unavailable here.
+ *
+ * So this parses the Python dict literal directly. That is exactly the weakest
+ * of §4 D90's three doors — "a quoted string in a Python file is the only
+ * evidence" — and the page says so in its footer rather than presenting it as
+ * generated from a contract. It is still strictly better than the alternative:
+ * a scan goes red when the literal moves, and a mined copy goes quietly wrong.
+ *
+ * WHICH ONES RUN is derived, not read: a test is runnable when a function in
+ * the same module calls `_run_battery(..., "ST-n", ...)`. The docstring claims
+ * the same thing and a docstring is prose.
+ */
+export function deriveStressTests(root) {
+  const src = readFileSync(join(root, "scsim", "scsim", "stress", "battery.py"), "utf8");
+  const block = /ST_DEFINITIONS:\s*dict\[str,\s*str\]\s*=\s*\{([\s\S]*?)\n\}/.exec(src);
+  if (!block) {
+    throw new Error(
+      "chains: ST_DEFINITIONS not found in scsim/scsim/stress/battery.py. The " +
+        "literal has moved or been renamed — fix the scan rather than shipping " +
+        "an empty stress-test page.",
+    );
+  }
+  const tests = [];
+  const entry = /"(ST-\d+)":\s*"((?:[^"\\]|\\.)*)"/g;
+  let m;
+  while ((m = entry.exec(block[1]))) {
+    const id = m[1];
+    // A call site, not a docstring: `_run_battery(scenario, "ST-1", cells)`.
+    const runnable = new RegExp(`_run_battery\\([^)]*["']${id}["']`).test(src);
+    // The engine author's ✅ shorthand for "this one is implemented" is
+    // stripped, and only that: `runnable` above carries the same fact, derived
+    // from a call site rather than from a glyph, so nothing is lost. It goes
+    // because the mobile UI spec (§3.5) forbids emoji in product copy and this
+    // string IS product copy the moment the manual renders it — the audit
+    // flagged the generated module on the commit that first embedded it. The
+    // mathematical marks in these descriptions (×, Δ, φ, ∩) stay: they are
+    // functional notation, not decoration.
+    const description = m[2].replace(/\\"/g, '"').replace(/\s*[\u{2705}\u{274C}\u{FE0F}]/gu, "");
+    tests.push({ id, description, runnable });
+  }
+  if (tests.length < 5) {
+    throw new Error(`chains: parsed ${tests.length} stress tests; the battery declares more than that`);
+  }
+  return tests;
+}

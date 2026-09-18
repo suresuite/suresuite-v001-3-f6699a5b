@@ -1459,5 +1459,57 @@ export const ANALYSIS_KINDS: AnalysisKind[] = [
   }
 ];
 
+/**
+ * The stress-test battery, READ FROM THE ENGINE SOURCE.
+ *
+ * This is §4 D90's weakest door — a text scan over a Python literal — and
+ * the page that renders it says so. The battery is not in
+ * `registry_export.py`, which is where a declaration belongs; until it is,
+ * a scan that goes red when the literal moves beats a hand copy that goes
+ * quietly wrong (§4 D22, and the archived copy already had).
+ *
+ * `runnable` is derived from a `_run_battery(..., "ST-n", ...)` call site,
+ * not from the module docstring that claims the same thing.
+ */
+export type StressTest = { id: string; description: string; runnable: boolean };
+
+export const STRESS_TESTS: StressTest[] = [
+  {
+    "id": "ST-1",
+    "description": "Supplier outage sweep (manuscript): each supplier × LT-extension × Δt {5,8,10}.",
+    "runnable": true
+  },
+  {
+    "id": "ST-2",
+    "description": "Supplier capacity-cut sweep: each supplier × φ {0.75,0.5,0.25,0} × {4,8} wks.",
+    "runnable": true
+  },
+  {
+    "id": "ST-3",
+    "description": "Material shortage sweep (M7: material-scoped capacity).",
+    "runnable": false
+  },
+  {
+    "id": "ST-4",
+    "description": "Edge/lane shock (M7: edge split).",
+    "runnable": false
+  },
+  {
+    "id": "ST-5",
+    "description": "Demand surge (M7: demand-side events).",
+    "runnable": false
+  },
+  {
+    "id": "ST-6",
+    "description": "Compound: ST-1 ∩ ST-5 (M7).",
+    "runnable": false
+  },
+  {
+    "id": "ST-7",
+    "description": "Nexus-node attack: top-k ML-critical (M7; ml-service integration).",
+    "runnable": false
+  }
+];
+
 export const CHAIN_COUNT = 38;
 export const BROKEN_COUNT = 11;

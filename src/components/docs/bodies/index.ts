@@ -76,6 +76,20 @@ import VerifiableExports from "./VerifiableExports";
 import ReproducibilityRecord from "./ReproducibilityRecord";
 import ExportingAndDeleting from "./ExportingAndDeleting";
 
+// 7 · Experiments & scenarios, 11 · Results & statistics (WP 5.2d)
+import SimulationLab from "./SimulationLab";
+import Scenarios from "./Scenarios";
+import Disruptions from "./Disruptions";
+import RecoveryPlaybooks from "./RecoveryPlaybooks";
+import ExperimentsAndComparison from "./ExperimentsAndComparison";
+import SeedsReplicationsConfidence from "./SeedsReplicationsConfidence";
+import StressTests from "./StressTests";
+import ReadingYourResults from "./ReadingYourResults";
+import KpisAndResilienceIndex from "./KpisAndResilienceIndex";
+import PerItemTimeSeries from "./PerItemTimeSeries";
+import PerformanceAndCaching from "./PerformanceAndCaching";
+import ReportsAndFiles from "./ReportsAndFiles";
+
 export const DOC_BODIES: Record<string, ComponentType> = {
   // 1 · Overview & architecture
   "what-suresuite-is": WhatSureSuiteIs,
@@ -127,6 +141,15 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   "data-trust-report": DataTrustReport,
   "model-validation": ModelValidation,
 
+  // 7 · Experiments & scenarios
+  "simulation-lab": SimulationLab,
+  scenarios: Scenarios,
+  disruptions: Disruptions,
+  "recovery-playbooks": RecoveryPlaybooks,
+  "experiments-and-comparison": ExperimentsAndComparison,
+  "seeds-replications-confidence": SeedsReplicationsConfidence,
+  "stress-tests": StressTests,
+
   // 8 · Networks
   "product-level-network": ProductLevelNetwork,
   "process-level-network": ProcessLevelNetwork,
@@ -139,6 +162,13 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   "plans-and-proposals": PlansAndProposals,
   "project-memory": ProjectMemory,
   "models-budgets-limits": ModelsBudgetsLimits,
+
+  // 11 · Results & statistics
+  "reading-your-results": ReadingYourResults,
+  "kpis-and-resilience-index": KpisAndResilienceIndex,
+  "per-item-time-series": PerItemTimeSeries,
+  "performance-and-caching": PerformanceAndCaching,
+  "reports-and-files": ReportsAndFiles,
 
   // 12 · Exports & reproducibility
   "verifiable-exports": VerifiableExports,
