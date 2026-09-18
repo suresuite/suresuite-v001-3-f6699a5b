@@ -277,6 +277,10 @@ export default function About() {
             <Button asChild variant="secondary" size="sm" className="hidden md:inline-flex">
               <Link to="/about">About</Link>
             </Button>
+            {/* Same row as About on every public page — see Landing.tsx. */}
+            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+              <Link to="/docs">Docs</Link>
+            </Button>
             <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
               <Link to="/#video">Demo</Link>
             </Button>
@@ -429,6 +433,9 @@ export default function About() {
           <div className="flex flex-wrap items-center gap-4">
             <Link to="/#video" className="hover:text-foreground md:hidden">
               Demo
+            </Link>
+            <Link to="/docs" className="hover:text-foreground">
+              Docs
             </Link>
             <Link to="/auth" className="hover:text-foreground">
               Sign in
