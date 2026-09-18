@@ -2850,7 +2850,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain`. When this moves a multi-tier ANALYSIS is stale; no simulation changes.",
+        "meaning": "SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers`, `multi_tier_supply_chain`, and since `schema_version` 3 the deep-tier topology itself: the six columns the two prominence RPCs return from `network_nodes` and `network_edges`. When this moves a multi-tier or deep-tier ANALYSIS is stale; no simulation changes.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -14972,7 +14972,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
-        "computedBy": null
+        "computedBy": "predict-critical-nodes"
       },
       {
         "name": "critical_node_score",
@@ -14996,7 +14996,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "level",
-        "computedBy": null
+        "computedBy": "predict-critical-nodes"
       },
       {
         "name": "prediction_timestamp",
@@ -15020,7 +15020,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
-        "computedBy": null
+        "computedBy": "predict-critical-nodes"
       },
       {
         "name": "uploaded_by",
@@ -15243,7 +15243,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
-        "computedBy": null
+        "computedBy": "analysis_mark_critical_nodes"
       },
       {
         "name": "computed_at",
@@ -15267,7 +15267,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
-        "computedBy": null
+        "computedBy": "analysis_mark_critical_nodes"
       }
     ]
   },

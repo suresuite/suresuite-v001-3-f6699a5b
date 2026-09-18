@@ -83,7 +83,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `author_email` | — | `text` | — | — | The author's email, denormalized so the version survives the user record. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the version was frozen. Server-set. |
 | `hash_inputs` | — | `text` | — | — | SHA-256 over the `inputs` domain of the snapshot — the tier-2 tables a SIMULATION reads. When this moves, a run stamped with the old composite cannot be reproduced. |
-| `hash_network` | — | `text` | — | — | SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain`. When this moves a multi-tier ANALYSIS is stale; no simulation changes. |
+| `hash_network` | — | `text` | — | — | SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers`, `multi_tier_supply_chain`, and since `schema_version` 3 the deep-tier topology itself: the six columns the two prominence RPCs return from `network_nodes` and `network_edges`. When this moves a multi-tier or deep-tier ANALYSIS is stale; no simulation changes. |
 
 ## Each column in full
 
@@ -256,7 +256,7 @@ is about the column and not only about the table.
 
 ### `hash_network`
 
-SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain`. When this moves a multi-tier ANALYSIS is stale; no simulation changes.
+SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers`, `multi_tier_supply_chain`, and since `schema_version` 3 the deep-tier topology itself: the six columns the two prominence RPCs return from `network_nodes` and `network_edges`. When this moves a multi-tier or deep-tier ANALYSIS is stale; no simulation changes.
 
 | | |
 |---|---|
@@ -273,7 +273,7 @@ SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers` and `
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
-> All three source tables hold ZERO rows in production (§15), so this column is the digest of an empty domain on every project today and the half is UNEXERCISED outside `supabase/rehearsal/110`. A green test on it is not a working path. NULL before WP 4.1, and not backfillable, for the same reason as `hash_inputs`.
+> THIS TEXT SAID THREE TABLES UNTIL WP 5.2f, AND `20260917000009` HAD ADDED TWO MORE. WP 5.3 folded the deep-tier topology in to close §4 D75 — a re-uploaded network was being served the previous graph's centralities as a cache hit, because the anchor could not see the tables the two centrality analyzers read. The sidecar was not updated with the migration, and the manual renders this sentence, so the drift would have been published. The original three source tables hold ZERO rows in production (§15); the two deep-tier tables do not, so the domain is no longer the digest of an empty set on every project. NULL before WP 4.1, and not backfillable, for the same reason as `hash_inputs`.
 
 ## Indexes
 
@@ -283,6 +283,6 @@ is about the column and not only about the table.
 
 ---
 
-*Generated from data contract `8226e23dbd7f`, engine `0.2.3`,
+*Generated from data contract `de7031e73047`, engine `0.2.3`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

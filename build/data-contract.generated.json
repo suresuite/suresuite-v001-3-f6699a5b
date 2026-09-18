@@ -4686,7 +4686,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain`. When this moves a multi-tier ANALYSIS is stale; no simulation changes.",
+          "meaning": "SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers`, `multi_tier_supply_chain`, and since `schema_version` 3 the deep-tier topology itself: the six columns the two prominence RPCs return from `network_nodes` and `network_edges`. When this moves a multi-tier or deep-tier ANALYSIS is stale; no simulation changes.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -4710,7 +4710,7 @@
             }
           ],
           "resolution": null,
-          "note": "All three source tables hold ZERO rows in production (§15), so this column is the digest of an empty domain on every project today and the half is UNEXERCISED outside `supabase/rehearsal/110`. A green test on it is not a working path. NULL before WP 4.1, and not backfillable, for the same reason as `hash_inputs`.",
+          "note": "THIS TEXT SAID THREE TABLES UNTIL WP 5.2f, AND `20260917000009` HAD ADDED TWO MORE. WP 5.3 folded the deep-tier topology in to close §4 D75 — a re-uploaded network was being served the previous graph's centralities as a cache hit, because the anchor could not see the tables the two centrality analyzers read. The sidecar was not updated with the migration, and the manual renders this sentence, so the drift would have been published. The original three source tables hold ZERO rows in production (§15); the two deep-tier tables do not, so the domain is no longer the digest of an empty set on every project. NULL before WP 4.1, and not backfillable, for the same reason as `hash_inputs`.",
           "engine_requirement": null
         }
       ],
@@ -23695,7 +23695,7 @@
           "normalize_at_promotion": null,
           "meaning": "Whether an analyzer flagged this edge's node as critical. An analysis result stored on an entity row — exactly the smearing D19 names.",
           "grain": "metadata",
-          "computed_by": null,
+          "computed_by": "predict-critical-nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -23727,7 +23727,7 @@
           "normalize_at_promotion": null,
           "meaning": "The score behind `is_critical_node`.",
           "grain": "level",
-          "computed_by": null,
+          "computed_by": "predict-critical-nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -23759,7 +23759,7 @@
           "normalize_at_promotion": null,
           "meaning": "When the criticality prediction was made. The closest thing this table has to a version stamp, and it names no model and no input hash.",
           "grain": "metadata",
-          "computed_by": null,
+          "computed_by": "predict-critical-nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -24054,7 +24054,7 @@
           "normalize_at_promotion": null,
           "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
           "grain": "metadata",
-          "computed_by": null,
+          "computed_by": "analysis_mark_critical_nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -24086,7 +24086,7 @@
           "normalize_at_promotion": null,
           "meaning": "WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12).",
           "grain": "metadata",
-          "computed_by": null,
+          "computed_by": "analysis_mark_critical_nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -26707,5 +26707,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "8226e23dbd7f"
+  "contract_version": "de7031e73047"
 }

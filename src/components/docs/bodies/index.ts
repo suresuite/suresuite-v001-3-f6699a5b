@@ -67,6 +67,15 @@ import PlansAndProposals from "./PlansAndProposals";
 import ProjectMemory from "./ProjectMemory";
 import ModelsBudgetsLimits from "./ModelsBudgetsLimits";
 
+// 4 · Computed tables, 12 · Exports & reproducibility (WP 5.2f)
+import SupplyChainData from "./SupplyChainData";
+import MultiTierData from "./MultiTierData";
+import NetworkSummary from "./NetworkSummary";
+import DatasetVersions from "./DatasetVersions";
+import VerifiableExports from "./VerifiableExports";
+import ReproducibilityRecord from "./ReproducibilityRecord";
+import ExportingAndDeleting from "./ExportingAndDeleting";
+
 export const DOC_BODIES: Record<string, ComponentType> = {
   // 1 · Overview & architecture
   "what-suresuite-is": WhatSureSuiteIs,
@@ -96,6 +105,12 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   "multi-tier-suppliers": MultiTierSuppliers,
   "units-and-time-periods": UnitsAndTimePeriods,
 
+  // 4 · Computed tables
+  "supply-chain-data": SupplyChainData,
+  "multi-tier-data": MultiTierData,
+  "network-summary": NetworkSummary,
+  "dataset-versions": DatasetVersions,
+
   // 5 · Policies
   "how-policies-work": HowPoliciesWork,
   "supplier-stage": SupplierStage,
@@ -124,6 +139,11 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   "plans-and-proposals": PlansAndProposals,
   "project-memory": ProjectMemory,
   "models-budgets-limits": ModelsBudgetsLimits,
+
+  // 12 · Exports & reproducibility
+  "verifiable-exports": VerifiableExports,
+  "reproducibility-record": ReproducibilityRecord,
+  "exporting-and-deleting": ExportingAndDeleting,
 
   // 15 · Reference
   "all-tables": AllTables,

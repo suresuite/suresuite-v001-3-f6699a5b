@@ -255,6 +255,7 @@ fields:
       Whether an analyzer flagged this edge's node as critical. An analysis result
       stored on an entity row — exactly the smearing D19 names.
     grain: metadata
+    computed_by: "predict-critical-nodes"
     engine:
       consumed_by: null
       transform: null
@@ -278,6 +279,7 @@ fields:
     meaning: >-
       The score behind `is_critical_node`.
     grain: level
+    computed_by: "predict-critical-nodes"
     engine:
       consumed_by: null
       transform: null
@@ -299,6 +301,7 @@ fields:
       When the criticality prediction was made. The closest thing this table has
       to a version stamp, and it names no model and no input hash.
     grain: metadata
+    computed_by: "predict-critical-nodes"
     engine:
       consumed_by: null
       transform: null
@@ -485,6 +488,7 @@ fields:
       NULL is the honest record and not a silent default (`declared-fallback`, I6).
       This is the column invariant `input-hash` (I5) is about.
     grain: metadata
+    computed_by: "analysis_mark_critical_nodes"
     engine:
       consumed_by: null
       transform: null
@@ -506,6 +510,7 @@ fields:
       current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is
       precisely what that rule replaces (§4 D12).
     grain: metadata
+    computed_by: "analysis_mark_critical_nodes"
     engine:
       consumed_by: null
       transform: null

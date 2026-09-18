@@ -188,10 +188,10 @@ export const DOC_GROUPS: DocGroup[] = [
     group: "Computed tables",
     blurb: "What we build from your data. Always rebuildable, never edited by hand.",
     pages: [
-      { ...planned("5.2f"), slug: "supply-chain-data", table: "supply_chain_data", title: "Supply Chain Data", summary: "How sourcing shares and consumption rates are derived.", keywords: "supply chain data sourcing ratio weighted material consumption rate etl", source: "contract" },
-      { ...planned("5.2f"), slug: "multi-tier-data", table: "supply_chain_data_multi_tier", title: "Multi-Tier Data", summary: "How tiers are expanded into paths.", keywords: "multi tier data level path root expansion", source: "contract" },
-      { ...planned("5.2f"), slug: "network-summary", table: "network_summary", title: "Network Summary", summary: "Cartographer output and the evidence behind it.", keywords: "network summary external evidence cartographer", source: "contract" },
-      { ...planned("5.2f"), slug: "dataset-versions", table: "dataset_versions", title: "Dataset Versions", summary: "The graph hash, the snapshot, and why a version changes.", keywords: "dataset versions graph hash snapshot trust anchor reproducibility", source: "contract" },
+      { ...live, slug: "supply-chain-data", table: "supply_chain_data", title: "Supply Chain Data", summary: "How sourcing shares and consumption rates are derived.", keywords: "supply chain data sourcing ratio weighted material consumption rate etl", source: "contract" },
+      { ...live, slug: "multi-tier-data", table: "supply_chain_data_multi_tier", title: "Multi-Tier Data", summary: "How tiers are expanded into paths.", keywords: "multi tier data level path root expansion", source: "contract" },
+      { ...live, slug: "network-summary", table: "network_summary", title: "Network Summary", summary: "Cartographer output and the evidence behind it.", keywords: "network summary external evidence cartographer", source: "contract" },
+      { ...live, slug: "dataset-versions", table: "dataset_versions", title: "Dataset Versions", summary: "The graph hash, the snapshot, and why a version changes.", keywords: "dataset versions graph hash snapshot trust anchor reproducibility", source: "contract" },
     ],
   },
   {
@@ -284,9 +284,9 @@ export const DOC_GROUPS: DocGroup[] = [
     group: "Exports & reproducibility",
     blurb: "Taking a figure out of the system with its provenance attached.",
     pages: [
-      { ...planned("5.2f"), slug: "verifiable-exports", title: "Verifiable exports", summary: "The workbooks, and what makes each one checkable.", keywords: "exports workbooks verifiable xlsx download provenance" },
-      { ...planned("5.2f"), slug: "reproducibility-record", title: "Reproducibility record", summary: "The stamp that lets someone else rerun what you ran.", keywords: "reproducibility record versions dataset policy scenario engine stamp" },
-      { ...planned("5.2f"), slug: "exporting-and-deleting", title: "Exporting and deleting your data", summary: "Getting everything out, and getting it removed.", keywords: "export delete data removal gdpr portability account" },
+      { ...live, slug: "verifiable-exports", title: "Verifiable exports", summary: "The workbooks, and what makes each one checkable.", keywords: "exports workbooks verifiable xlsx download provenance" },
+      { ...live, slug: "reproducibility-record", title: "Reproducibility record", summary: "The stamp that lets someone else rerun what you ran.", keywords: "reproducibility record versions dataset policy scenario engine stamp" },
+      { ...live, slug: "exporting-and-deleting", title: "Exporting and deleting your data", summary: "Getting everything out, and getting it removed.", keywords: "export delete data removal gdpr portability account" },
     ],
   },
   {
