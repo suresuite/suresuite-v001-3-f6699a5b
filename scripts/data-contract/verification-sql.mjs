@@ -194,6 +194,117 @@ async function schemaProbe() {
   return liveNames;
 }
 
+// ── D38: the declared exception, asked of PRODUCTION rather than of a rehearsal
+//
+// The Supabase database linter reports `v_admin_user_usage` as
+// `security_definer_view`, ERROR, EXTERNAL — and it is RIGHT that the view runs
+// as its owner. That is the one declared exception to D38: `approved_users` is
+// REVOKEd from `authenticated` (20250826015629), so `security_invoker = true`
+// raises "permission denied" for every reader including the super admins whose
+// two pages are its only consumers. `20260916000009` proved that by executing it.
+//
+// The exception is safe for exactly one reason: the view states its own
+// authorization, `WHERE public.current_is_super_admin()`, the same predicate
+// `ai_usage_logs`'s own policy enforces. Without that line an owner-run view
+// hands every user's month-to-date AI SPEND to anyone who can select from it.
+//
+// WHAT WAS MISSING IS THE HALF §15 EXISTS FOR. `supabase/rehearsal/030` asserts
+// both clauses — no seventh owner-view, and this one keeps its predicate — but
+// against a database built from the migrations ON THE BRANCH. Nothing had ever
+// asked PRODUCTION. The schema probe above compares relation NAMES, so a view
+// that exists under the right name with the wrong `reloptions`, or one replaced
+// from the SQL editor, is invisible to it. That is D45's lesson with a different
+// object in it: WP 2.3 claimed the data-plane audit worked on the strength of a
+// migration that landed, and §15 found zero rows. This is the same claim about
+// views, made against the database the linter is actually looking at.
+//
+// A GATE, not a report (D43): either half failing is a live disclosure of
+// per-person cost data, which is not a finding to read in a branch later.
+async function viewSecurity() {
+  section("D38 — every view runs as its caller, or is the declared exception");
+
+  // `pg_options_to_table` yields (option_name, option_value); a view with no
+  // reloptions at all yields no row, which is `security_invoker` OFF — Postgres
+  // defaults it off, which is the whole of why D38 was a class rather than a bug.
+  const res = await tryQ(`
+    select c.relname as view_name,
+           coalesce((select o.option_value = 'true'
+                       from pg_options_to_table(c.reloptions) o
+                      where o.option_name = 'security_invoker'), false) as security_invoker,
+           pg_get_viewdef(c.oid, true) like '%current_is_super_admin()%' as states_own_rule
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'v'
+    order by c.relname`);
+
+  if (res.error) {
+    out(`- **view security** — QUERY FAILED: \`${res.error.replace(/\n/g, " ").slice(0, 300)}\``);
+    gateFailures.push(
+      "the D38 view-security probe could not run, so nothing in this repository " +
+        "has checked production's views. PLAN.md §4 D38.",
+    );
+    return;
+  }
+
+  // The Management API renders a boolean as JSON `true` on some paths and as the
+  // string `"t"`/`"true"` on others; reading only one of the two would report
+  // every view as owner-run and fail this gate on all seven.
+  const truthy = (v) => v === true || v === "t" || v === "true";
+  const rows = res.rows.map((r) => ({
+    view_name: r.view_name,
+    security_invoker: truthy(r.security_invoker),
+    states_own_rule: truthy(r.states_own_rule),
+  }));
+
+  out(`- production's \`public\` schema holds **${rows.length} view${rows.length === 1 ? "" : "s"}**.`);
+  out(...table(rows.map((r) => ({
+    view: r.view_name,
+    runs_as: r.security_invoker ? "caller" : "OWNER",
+    states_own_rule: r.states_own_rule ? "yes" : "—",
+  }))));
+
+  const EXCEPTION = "v_admin_user_usage";
+
+  // 1 · a SEVENTH owner-view. The rehearsal fails on this against the branch;
+  //     this fails on it against the database, which is where a view created
+  //     outside a migration actually appears.
+  const ownerRun = rows.filter((r) => !r.security_invoker && r.view_name !== EXCEPTION);
+  if (ownerRun.length) {
+    gateFailures.push(
+      `${ownerRun.length} view(s) in production run as their OWNER and bypass their ` +
+        `base tables' RLS: ${ownerRun.map((r) => r.view_name).join(", ")}. Set ` +
+        `security_invoker = true in a migration, or — if the view cannot take it — ` +
+        `give it its own authorization predicate and declare it the way ` +
+        `20260916000009 declares v_admin_user_usage. PLAN.md §4 D38.`,
+    );
+  }
+
+  // 2 · the exception without the thing that makes it one.
+  const exc = rows.find((r) => r.view_name === EXCEPTION);
+  if (!exc) {
+    out(`- \`${EXCEPTION}\` is ABSENT from production — the schema probe above should already have failed this run.`);
+  } else if (!exc.security_invoker && !exc.states_own_rule) {
+    gateFailures.push(
+      `${EXCEPTION} runs as its OWNER in production and its definition does NOT ` +
+        `contain current_is_super_admin(). An owner-run view with no predicate of ` +
+        `its own returns every user's month-to-date AI requests, tokens and ` +
+        `cost_usd to any reader who can select from it — the disclosure ` +
+        `20260916000009 closed. Restore the WHERE clause. PLAN.md §4 D38.`,
+    );
+  } else if (exc.security_invoker) {
+    // Not a disclosure — the opposite failure, and it takes the admin area down
+    // rather than leaking from it. A gate because both admin pages break.
+    gateFailures.push(
+      `${EXCEPTION} carries security_invoker = true in production. approved_users ` +
+        `is REVOKEd from authenticated (20250826015629), so this view now raises ` +
+        `"permission denied for table approved_users" for EVERY reader — ` +
+        `AdminDashboard and AdminUsers are both broken. PLAN.md §4 D38.`,
+    );
+  } else {
+    out(`- \`${EXCEPTION}\` runs as its owner AND states its own rule — the declared exception is intact in production.`);
+  }
+}
+
 // ── D30: which of the two migrations actually ran? ─────────────────────────
 //
 // `20250913085427` creates the view/modify policy pair on `simulation_cache`,
@@ -1724,6 +1835,7 @@ async function main() {
   out(`- every statement is a \`select\`; \`assertReadOnly()\` refuses anything else.`);
 
   await schemaProbe();
+  await viewSecurity();
   await d30();
   await d29();
   await boundaryDecisions();
