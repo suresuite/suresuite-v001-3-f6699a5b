@@ -3,11 +3,50 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–9** · PR #223 MERGED · PR #223 merged as `f555409`
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–10** · PR #223 MERGED · PR #223 merged as `f555409`
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 10) — The last quarter of the dependent-object class · no migration
+
+**D59 closed. The artifact goes from 24 CHECK constraints to 84.**
+
+The count needed the usual sanity check: 255 `CHECK (` in the migrations is not
+231 missing constraints — most is repetition. The real loss is **64 inline
+column-level CHECKs across 20 migrations**, dropped because `parseColumn` read a
+type, a NOT NULL and a DEFAULT and nothing else.
+
+Lifted into named constraints rather than carried as a column flag — the same
+treatment PRIMARY KEY and UNIQUE already get, and for the same reason: a later
+`DROP CONSTRAINT` must be able to find it. `20260721000001` drops
+`ai_chat_events_event_kind_check` and re-adds a *wider* vocabulary; a
+flag-carried original would have survived its own removal.
+
+**⚠️ Making the constraints real immediately caught four rehearsals writing rows
+production would reject** — and one of them was mine (slice 8 put an email in an
+enum column). The worst is `140`: its column list and VALUES list had been
+misaligned since the file was written, so `'{}'::jsonb` was going into
+`proposals.provenance`, a text column with a three-value vocabulary. **Those
+assertions were being made against rows that could not exist.**
+
+**My own gate then found a gap in my own fix** — `ALTER TABLE … ADD COLUMN …
+CHECK` wasn't lifted, only `CREATE TABLE` was. Fixed; 83 → 84. Two other
+assertions of mine were wrong and I corrected the test, not the code (a lifted
+constraint keeps its original name through a table rename, faithfully — Postgres
+does the same).
+
+**The dependent-object class is now CLOSED**: D52, D53, D49, D59. Four defect
+rows, one root cause.
+
+**Verified:** all three rehearse modes green · `contract:check` ✓ · 390 tests ✓ ·
+build ✓ · eslint 336/116 and `audit:ui` 8, unchanged. Mutations: 2 red / 3 red.
+
+**Worth deciding:** WP 3.2's convention of writing every CHECK as a named
+table-level constraint exists *because* inline ones were invisible. They aren't
+now. That rule should be restated on its own merits or dropped — not left with an
+expired justification.
 
 ### WP 6.2 (slice 9) — The dependent-object class, fixed as a class · no migration
 

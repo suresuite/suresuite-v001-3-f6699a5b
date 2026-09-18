@@ -127,8 +127,8 @@ BEGIN
   -- Two files, neither owned by the reading admin. A roll-up that reports zero
   -- is the failure this assertion exists for.
   INSERT INTO public.user_files (user_id, org_id, kind, name, path, size_bytes, retained)
-  VALUES (v_other, v_org, 'report', 'a.xlsx', 'org/a/a.xlsx', 1000, true),
-         (v_other, v_org, 'report', 'b.xlsx', 'org/a/b.xlsx', 2000, false);
+  VALUES (v_other, v_org, 'report_xlsx', 'a.xlsx', 'org/a/a.xlsx', 1000, true),
+         (v_other, v_org, 'report_xlsx', 'b.xlsx', 'org/a/b.xlsx', 2000, false);
 
   PERFORM set_config('app.current_user_id', v_super::text, true);
   SET LOCAL ROLE authenticated;

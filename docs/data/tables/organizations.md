@@ -20,6 +20,15 @@ Created by `20260709000002_super_admin_phase1.sql`, which seeded one row per DIS
 | `id` | column PRIMARY KEY | `organizations_pkey` |
 | `slug` | column UNIQUE | `organizations_slug_key` |
 
+## Constraints
+
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `organizations_status_check` | `CHECK (status IN ('active','suspended'))` | `20260709000002_super_admin_phase1.sql` |
+
 ## Governance
 
 | | |
@@ -191,6 +200,6 @@ When the row was last modified. Server-stamped by DEFAULT only — no trigger ma
 
 ---
 
-*Generated from data contract `1e21e0fe7084`, engine `0.2.3`,
+*Generated from data contract `60c9c20a0864`, engine `0.2.3`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

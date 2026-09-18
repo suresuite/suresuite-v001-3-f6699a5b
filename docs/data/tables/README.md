@@ -58,4 +58,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `1e21e0fe7084`, engine `0.2.3`.*
+*Generated from data contract `60c9c20a0864`, engine `0.2.3`.*

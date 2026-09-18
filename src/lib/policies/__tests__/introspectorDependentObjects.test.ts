@@ -33,8 +33,9 @@ import { join } from "node:path";
 const ROOT = join(__dirname, "..", "..", "..", "..");
 
 type Index = { name: string; columns?: string[]; added_by?: string | null };
-type Col = { name: string };
-type Table = { name: string; columns?: Col[]; indexes?: Index[] };
+type Col = { name: string; check?: string | null };
+type Constraint = { kind: string; name?: string; definition?: string; implicit?: boolean; columns?: string[] };
+type Table = { name: string; columns?: Col[]; indexes?: Index[]; constraints?: Constraint[] };
 type Invalid = { table: string; index: string; missing_columns: string[] };
 
 const artifact = JSON.parse(
@@ -111,5 +112,95 @@ describe("WP 6.2 · D49 · an impossible index is dropped, and SAID", () => {
     const names = (t?.indexes ?? []).map((i) => i.name);
     expect(names).not.toContain("idx_supply_chain_data_multi_tier_material_id");
     expect(names).not.toContain("idx_supply_chain_data_multi_tier_higher_level_component_id");
+  });
+});
+
+/**
+ * §4 D59 — AN INLINE `CHECK` IS A CONSTRAINT, AND IT WAS READ BY NOTHING.
+ *
+ * The column parser read a type, a NOT NULL and a DEFAULT and dropped the rest,
+ * so only a NAMED table-level `ADD CONSTRAINT … CHECK` was recorded. 64 inline
+ * column-level CHECKs were not — `ingest_files` alone lost `source_kind`'s
+ * vocabulary, `byte_size >= 0` and the SHA-256 shape.
+ *
+ * ── WHAT MAKING IT REAL IMMEDIATELY CAUGHT ────────────────────────────────
+ *
+ * Four rehearsals started failing, because their fixtures had been writing rows
+ * production would reject and nothing had ever checked. `140` was inserting
+ * `'{}'::jsonb` into `proposals.provenance`, a TEXT column with a three-value
+ * vocabulary — the column list and the VALUES list had been misaligned since the
+ * file was written, and the row it created could never have existed. That is
+ * D59's stated harm exactly, arriving from the other direction: an assertion
+ * made against a database missing the constraint proves nothing about one that
+ * has it.
+ *
+ * ── WHY IT IS LIFTED AND NOT EMITTED FROM THE COLUMN ──────────────────────
+ *
+ * `liftImplicitConstraints` already materialises a column's PRIMARY KEY and
+ * UNIQUE as named constraints so a later `DROP CONSTRAINT` can find them. CHECK
+ * needed the same treatment and for the same reason: `20260721000001` drops
+ * `ai_chat_events_event_kind_check` and re-adds a WIDER vocabulary. Carried as a
+ * column flag, the original would have survived its own removal and the
+ * rehearsed database would enforce a rule production dropped.
+ */
+describe("WP 6.2 · D59 · an inline CHECK becomes a real constraint", () => {
+  const checks = artifact.tables.flatMap((t) =>
+    (t.constraints ?? []).filter((c) => c.kind === "CHECK").map((c) => ({ table: t.name, ...c })),
+  );
+
+  it("the artifact records far more CHECKs than the named-only 24", () => {
+    // 24 was every NAMED table-level `ADD CONSTRAINT … CHECK`. The inline ones
+    // were invisible. A bare count is a weak assertion, so the two below name
+    // specific constraints — this one only catches a wholesale regression.
+    expect(checks.length).toBeGreaterThan(60);
+  });
+
+  it("`ingest_files`'s three inline CHECKs are among them — D59 names these", () => {
+    const names = checks.filter((c) => c.table === "ingest_files").map((c) => c.name);
+    expect(names.length, "ingest_files has no CHECK constraints recorded").toBeGreaterThanOrEqual(3);
+  });
+
+  it("an inline CHECK is LIFTED, so a later DROP CONSTRAINT can remove it", () => {
+    // `ai_chat_events_event_kind_check` is created inline, dropped and re-added
+    // wider by 20260721000001, then dropped and re-added again by 20260723000001.
+    // Exactly one must survive, and it must be the LAST definition — not the
+    // inline original.
+    const t = artifact.tables.find((x) => x.name === "ai_chat_events")!;
+    const got = (t.constraints ?? []).filter((c) => c.name === "ai_chat_events_event_kind_check");
+    expect(got.length, "the constraint is recorded twice — the inline one survived its own DROP").toBe(1);
+    // The survivor must be the ADD CONSTRAINT, not the lift. `implicit` is the
+    // marker: a lifted inline check carries it, a named table-level one does not.
+    // Asserted this way rather than against the vocabulary's text, because the
+    // vocabulary is what keeps changing and the PROVENANCE is what must not.
+    expect(
+      got[0].implicit ?? false,
+      "the surviving definition is the inline original, so a rule production " +
+        "widened is still being enforced at its old, narrower vocabulary.",
+    ).toBe(false);
+  });
+
+  it("a dropped inline CHECK clears the column flag it was lifted from", () => {
+    // The symmetry `liftImplicitConstraints` already keeps for UNIQUE and
+    // PRIMARY KEY: leave the flag set and the generated page renders a rule that
+    // no longer exists (§5 T1).
+    for (const t of artifact.tables) {
+      for (const c of t.columns ?? []) {
+        if (!c.check) continue;
+        // Matched on COLUMNS, not on a computed name. A lifted constraint is
+        // named for the table as it was spelled when the lift happened, and
+        // Postgres does not rename constraints when a table is renamed — so
+        // `ingest_runs` still carries `erp_sync_runs_triggered_by_check`, which
+        // is faithful. Computing the name here asserted the rename had rewritten
+        // it, which would have been wrong about the database.
+        const lifted = (t.constraints ?? []).some(
+          (k) => k.kind === "CHECK" && k.implicit && (k.columns ?? []).includes(c.name),
+        );
+        expect(
+          lifted,
+          `${t.name}.${c.name} still carries an inline check but no constraint was ` +
+            `lifted from it — it was dropped, and the column flag was not cleared.`,
+        ).toBe(true);
+      }
+    }
   });
 });

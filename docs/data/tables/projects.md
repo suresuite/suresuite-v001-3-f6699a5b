@@ -32,6 +32,7 @@ partially or get corrected — the write fails.
 | Constraint | Rule | Added by |
 |---|---|---|
 | `chk_supply_chain_model` | `CHECK (supply_chain_model IN ('Make-To-Stock','Make-To-Order'))` | `20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql` |
+| `projects_data_type_check` | `CHECK (data_type IN ('curated', 'uncurated'))` | `20250923120308_4bbb560c-69c8-415c-970c-48b6ff7ce13a.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
@@ -444,6 +445,6 @@ The owning organization by uuid. This is what the public /v1 API authorizes on (
 
 ---
 
-*Generated from data contract `1e21e0fe7084`, engine `0.2.3`,
+*Generated from data contract `60c9c20a0864`, engine `0.2.3`,
 sidecar `supabase/contract/projects.contract.yaml`, table created by `20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

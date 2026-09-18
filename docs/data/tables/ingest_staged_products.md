@@ -26,6 +26,7 @@ partially or get corrected — the write fails.
 
 | Constraint | Rule | Added by |
 |---|---|---|
+| `erp_staged_products_diff_state_check` | `CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))` | `20260829120000_erp_connector_phase1_2.sql` |
 | `ingest_staged_products_source_kind_check` | `CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))` | `20260916000012_ingest_rename_and_widen.sql` |
 | `ingest_staged_products_fact_class_check` | `CHECK (fact_class IN ('master', 'transactional'))` | `20260916000012_ingest_rename_and_widen.sql` |
 
@@ -377,6 +378,6 @@ master or transactional. Master rows describe things that persist — an item, a
 
 ---
 
-*Generated from data contract `1e21e0fe7084`, engine `0.2.3`,
+*Generated from data contract `60c9c20a0864`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_staged_products.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

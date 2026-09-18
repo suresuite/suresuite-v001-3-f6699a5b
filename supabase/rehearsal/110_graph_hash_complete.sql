@@ -470,7 +470,7 @@ BEGIN
   -- `ingest_apply_run`: a second promotion path, per-row over PostgREST, with
   -- no actor and no role.
   INSERT INTO public.ingest_runs (id, project_id, source_kind, status, triggered_by)
-    VALUES ('00000000-0000-4000-8000-000000041206', v_project, 'api', 'staged', 'schedule');
+    VALUES ('00000000-0000-4000-8000-000000041206', v_project, 'api', 'staged', 'scheduled');
   INSERT INTO public.ingest_staged_products (ingest_run_id, external_id, sku, name, diff_state, raw, source_kind, fact_class)
     VALUES ('00000000-0000-4000-8000-000000041206', 'EXT-1', 'SKU-1', 'Widget', 'new', '{}'::jsonb, 'api', 'master'),
            ('00000000-0000-4000-8000-000000041206', 'EXT-2', 'SKU-2', 'Gadget', 'new', '{}'::jsonb, 'api', 'master'),

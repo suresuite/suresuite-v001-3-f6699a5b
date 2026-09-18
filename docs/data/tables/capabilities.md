@@ -19,6 +19,15 @@ THE CATALOG IS DUPLICATED IN TYPESCRIPT. `src/lib/capabilities.ts` carries the s
 |---|---|---|
 | `key` | column PRIMARY KEY | `capabilities_pkey` |
 
+## Constraints
+
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `capabilities_kind_check` | `CHECK (kind IN ('page','feature'))` | `20260711000002_unified_access_control.sql` |
+
 ## Governance
 
 | | |
@@ -169,6 +178,6 @@ When its metadata last changed. Server-stamped.
 
 ---
 
-*Generated from data contract `1e21e0fe7084`, engine `0.2.3`,
+*Generated from data contract `60c9c20a0864`, engine `0.2.3`,
 sidecar `supabase/contract/capabilities.contract.yaml`, table created by `20260711000002_unified_access_control.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

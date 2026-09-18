@@ -118,7 +118,7 @@ BEGIN
 
   -- NO ACTION: an ingest run's actor cannot be deleted out from under it.
   INSERT INTO public.ingest_runs (project_id, source_kind, triggered_by, triggered_by_user_id)
-    VALUES (v_proj, 'csv', 'd53@example.invalid', v_user2);
+    VALUES (v_proj, 'csv', 'manual', v_user2);
 
   v_refused := false;
   BEGIN

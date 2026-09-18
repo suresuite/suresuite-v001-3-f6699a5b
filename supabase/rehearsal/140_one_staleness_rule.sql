@@ -111,7 +111,10 @@ BEGIN
     (id, project_id, agent_id, artifact_type, title, payload, provenance, grounding, idempotency_key, status, expires_at)
   VALUES
     (v_prop, v_project, 'policy-configurator', 'policy_bundle_diff', 'WP44 grounded proposal',
-     '{}'::jsonb, '{}'::jsonb, jsonb_build_object('graph_hash', v_h0), 'wp44-grounded', 'proposed',
+     -- `provenance` is TEXT with a vocabulary, not jsonb. This fixture passed
+     -- `'{}'::jsonb` until WP 6.2 made the inline CHECK real (§4 D59) — the row
+     -- it wrote could never have existed in production.
+     '{}'::jsonb, 'deterministic', jsonb_build_object('graph_hash', v_h0), 'wp44-grounded', 'proposed',
      now() + interval '30 days');
 
   -- Move the project. Any tier-2 edit does it; this is a user changing a cost.
@@ -184,7 +187,7 @@ BEGIN
     (id, project_id, agent_id, artifact_type, title, payload, provenance, grounding, idempotency_key, status, expires_at)
   VALUES
     (v_ttl, v_project, 'policy-configurator', 'policy_bundle_diff', 'WP44 expired proposal',
-     '{}'::jsonb, '{}'::jsonb, jsonb_build_object('graph_hash', v_h0), 'wp44-ttl', 'proposed',
+     '{}'::jsonb, 'deterministic', jsonb_build_object('graph_hash', v_h0), 'wp44-ttl', 'proposed',
      now() - interval '1 day');
 
   PERFORM public.list_agent_proposals(v_project);

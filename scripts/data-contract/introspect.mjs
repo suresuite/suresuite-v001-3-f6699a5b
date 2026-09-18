@@ -89,6 +89,30 @@ function parseColumn(def, migration) {
   const defMatch = /\bDEFAULT\s+(.+?)(?=\s+(?:NOT\s+NULL|NULL|PRIMARY\s+KEY|UNIQUE|REFERENCES|CHECK|CONSTRAINT|GENERATED)\b|$)/is.exec(mods);
   const refMatch = /\bREFERENCES\s+([^\s(]+)\s*(?:\(([^)]*)\))?([^,]*)/i.exec(mods);
 
+  // ── AN INLINE CHECK IS A CONSTRAINT, AND IT WAS READ BY NOTHING (§4 D59) ──
+  //
+  // This parser read a column's type, its NOT NULL and its DEFAULT and dropped
+  // the rest, so only a NAMED table-level `ADD CONSTRAINT … CHECK` was ever
+  // recorded. **56 inline column-level CHECKs across 20 migrations were not** —
+  // `ingest_files` alone loses `source_kind`'s vocabulary, `byte_size >= 0` and
+  // the SHA-256 shape.
+  //
+  // Two consequences and the second is worse: `contract:rehearse` built a
+  // database without the constraint, so an assertion that a bad value is
+  // REFUSED passed against the migration and failed against the artifact; and
+  // `docs/data/tables/*.md` renders a table's CHECK list, so a rule that rejects
+  // a user's upload appeared in no document (§5 T1).
+  //
+  // Read with `parenBody`, not a regex: a CHECK body contains parentheses,
+  // quoted strings and `::casts`, and `CHECK (status IN ('a','b'))` defeats
+  // `/CHECK\s*\(([^)]*)\)/` on the first nested paren.
+  let inlineCheck = null;
+  const checkAt = /\bCHECK\s*(?=\()/i.exec(mods);
+  if (checkAt) {
+    const body = parenBody(mods, checkAt.index);
+    if (body) inlineCheck = squash(body.body);
+  }
+
   const isPk = /\bPRIMARY\s+KEY\b/i.test(mods);
   return {
     name: id.name,
@@ -100,6 +124,9 @@ function parseColumn(def, migration) {
     default: defMatch ? squash(defMatch[1]) : null,
     primary_key: isPk,
     unique: /\bUNIQUE\b/i.test(mods),
+    // The expression only. Postgres names an unnamed inline check
+    // `<table>_<column>_check`, which the base builder synthesizes.
+    check: inlineCheck,
     references: refMatch
       ? {
           // `schema` IS KEPT, and dropping it cost nine foreign keys (§4 D53).
@@ -584,6 +611,14 @@ function applyAlter(schema, t, action, migration, whole) {
     if (!col) return note(schema, migration, a, "ADD COLUMN that could not be parsed");
     if (t.columns.some((c) => c.name === col.name)) return; // IF NOT EXISTS
     t.columns.push(col);
+    // AND LIFT ITS MODIFIERS, exactly as a CREATE TABLE body does (§4 D59).
+    // `ADD COLUMN data_type text NOT NULL DEFAULT 'curated' CHECK (…)` carries
+    // the same inline constraints a column in a CREATE TABLE does, and lifting
+    // ran only for CREATE TABLE — so the check was recorded on the column and
+    // never became a constraint, which is the half of D59 the rehearsed database
+    // actually feels. Found by `introspectorDependentObjects.test.ts` asserting
+    // the column/constraint symmetry, on `projects.data_type`.
+    liftImplicitConstraints(t.name, [col], t.constraints, migration);
     return;
   }
   if ((m = /^DROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?/i.exec(a))) {
@@ -664,7 +699,11 @@ function applyAlter(schema, t, action, migration, whole) {
       // `natural_key_unique` would keep reporting a key that no longer exists.
       if (gone.implicit && gone.columns.length === 1) {
         const col = t.columns.find((c) => c.name === gone.columns[0]);
-        if (col) { if (gone.kind === "UNIQUE") col.unique = false; else col.primary_key = false; }
+        if (col) {
+          if (gone.kind === "UNIQUE") col.unique = false;
+          else if (gone.kind === "CHECK") col.check = null;
+          else col.primary_key = false;
+        }
       }
     }
     t.constraints = t.constraints.filter((c) => c.name !== id.name);
@@ -715,6 +754,23 @@ function liftImplicitConstraints(table, columns, constraints, migration) {
       constraints.push({
         name: `${table}_${c.name}_key`, kind: "UNIQUE", columns: [c.name],
         definition: `UNIQUE (${c.name})`, implicit: true, added_by: migration,
+      });
+    }
+    // AND AN INLINE CHECK, FOR THE SAME REASON (§4 D59). It was read by nothing
+    // at all before WP 6.2, so 64 constraints existed in production and in no
+    // rehearsed database — including `ingest_files`'s `source_kind` vocabulary,
+    // `byte_size >= 0` and the SHA-256 shape.
+    //
+    // Lifting it here rather than emitting it from the column is what makes a
+    // later DROP work: `20260721000001` does `DROP CONSTRAINT IF EXISTS
+    // ai_chat_events_event_kind_check` and re-adds a WIDER vocabulary. Carried
+    // as a column flag, the original would have survived its own removal and the
+    // rehearsed database would enforce a rule production dropped — the precise
+    // failure this function's own docstring describes for UNIQUE.
+    if (c.check) {
+      constraints.push({
+        name: `${table}_${c.name}_check`, kind: "CHECK", columns: [c.name],
+        definition: `CHECK (${c.check})`, implicit: true, added_by: migration,
       });
     }
   }
