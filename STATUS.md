@@ -3,11 +3,42 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–5** · PR [#223](https://github.com/suresuite/suresuite-v001-3-f6699a5b/pull/223) open
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–6** · PR [#223](https://github.com/suresuite/suresuite-v001-3-f6699a5b/pull/223) open
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 6) — All three gates, every time · no migration
+
+**D85 closed.** `npm run lint` was `eslint . && npm run audit:ui && npm run
+check:docs`, and eslint exits 1 on this repo — so two of three gates were
+**unreachable** from the command every contributor runs. Three work packages
+reported "lint at baseline" on the strength of a command that stopped at step one.
+
+**The recorded remedy was right to be refused.** D85 says flipping `&&` to `;`
+"turns a red gate into a redder one" and defers the fix. It's worse than that:
+`a; b; c` reports `c`'s exit code alone, so a red eslint would start **passing** —
+a gate switched off in the name of repairing it, looking like progress.
+
+`scripts/lint-all.mjs` runs all three, prints each one's output verbatim, exits
+non-zero if any failed. Same verdict, more information, and **no dependency on
+the eslint debt** — which is why it didn't have to wait for the package D85
+deferred it to.
+
+**The first run proved the point:** `audit:ui` is also failing. Two of three
+gates red, where the command used to stop at one and report that as the whole
+story.
+
+No CI risk — checked, not assumed: CI has never called `npm run lint`;
+`data-contract.yml` invokes each command directly for exactly this reason.
+
+**Left open deliberately:** `lint` still doesn't cover `npm test` or
+`contract:check`. Whether it should grow, or a `verify:local` should sit beside
+it, is a convention call rather than a defect — flagged for you.
+
+**Verified:** all three gates run and report · `contract:check` ✓ · 375 tests ✓ ·
+build ✓ · eslint 336/116 and `audit:ui` 8, both unchanged.
 
 ### WP 6.2 (slice 5) — The customers table reaches the engine · no migration
 
@@ -25,7 +56,13 @@ constant.
 The table was not merely unmapped, it was **never fetched** — so the fix spans
 the worker's request, the DTO and the mapper.
 
-⚠️ **Not verified locally, and CI is the verifier.** `scsim` imports `pydantic`
+✅ **VERIFIED — `8808612` is green on `scsim`, `sim-worker` and `grading`.** It took
+three pushes: E1 caught a spurious warning residue, then this package's own GHOST
+assertion caught an id-set widening that made it unfirable. Both were branching
+bugs, neither findable by reading. The third push carried a stub harness that
+runs `_build_customers` without `pydantic` — the transferable lesson.
+
+⚠️ **Not verified locally when first pushed, and CI was the verifier.** `scsim` imports `pydantic`
 and the egress proxy denies PyPI (D87's limit), so no Python here can be
 executed. `sim-worker/tests/test_customer_attributes.py` has six assertions and
 `scsim-tests.yml` runs it on this push. **Watch that check on PR #223.**
