@@ -229,8 +229,9 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D47 | **`organizations`' own read policy still uses the display name AND the slug as join keys.** D29 removed the text branch from `org_is_current_user_org`, which is the predicate 59 project-scoped policies call. The `orgs: members read own` policy is a different object and was not touched: it reads `id = get_current_user_org_id(get_current_user_id()) OR name = get_current_user_org() OR slug = get_current_user_org()`. `organizations.name` has no UNIQUE constraint, so the same collision D29 closes for projects is still open for the organization ROW — two tenants sharing a display name each read the other's organization record (name, slug, status, settings). §15 measures 0 collisions across 3 organizations and 14 of 14 accounts carrying `organization_id`, so it is latent and the same two-line shape as D29 was. Not folded into WP 3.0's migration because it is a different object with a different reader, and the package had already spent its evidence budget on the predicate. Found by WP 3.0's gap check. **CLOSED (WP 6.2), and the policy rewrite was only half of it.** `20260918000001` makes the read uuid-only, and `supabase/rehearsal/160` proves against a real database that the caller still reads their OWN row (§1, asserted first, because a fix that denies everything passes every other assertion in the file), that the same-named tenant does not (§2), that a RENAME still matches (§3, D13), and that the SLUG branch is gone too (§4) — that one is smaller and was still wrong, because `slug` IS unique but the comparison was the caller's NAME against another tenant's SLUG, so a tenant whose slug equalled another's name was readable by all of its members. **RED FIRST on §2 against the unmigrated database**, then mutation-tested three ways. **The second half is what made the rewrite safe to ship**: uuid-only is a new denial for any caller whose `approved_users.organization_id` is NULL, and D29's own note forbids adding a way to revoke access. §15 measured 14 of 14 accounts carrying it — **and nothing KEPT that true** (D96): the column is nullable, has no default, no trigger stamped it, and the backfill ran once. So the migration adds the trigger that fills it, which REFUSES TO GUESS when two organizations share the display name (§6): it leaves NULL, because stamping either would grant an account a tenant nobody put it in — this defect exactly, arriving through the write path instead of the read path. Same move as D61. **One mutation passed for the wrong reason and was redone**: renaming a trigger does not disable it (§16 · WP 4.1 · E, again) | `supabase/migrations/20260918000001_org_row_uuid_only.sql`; `supabase/rehearsal/160_org_row_uuid_only.sql`; §15 (0 collisions, 3 organizations) | **CLOSED (WP 6.2)** |
 | **D96** | **The uuid backfill was verified once and nothing kept it true — found while closing D47, and it is load-bearing for D29 too.** `approved_users.organization_id` is nullable, has no default, and until `20260918000001` no trigger stamped it. §15's 14-of-14 measurement is what let D29 remove the text branch from `org_is_current_user_org`, the predicate 59 project-scoped policies call — so from that migration onward **an account arriving without the uuid could read no project at all**, silently, with nothing in the system to say why. D47's trigger closes the write path for `approved_users`, which fixes the cause for both. **What is still not gated is the general shape**: a `NOT NULL` constraint would make it structural, and adding one needs a FRESH §15 read rather than the 2026-09-16 number — because the lesson this row exists to record is that a measurement is not an invariant, and reusing a stale one to prove it safe would be the same mistake twice. Two further reads are unowned: whether any path inserts `approved_users` bypassing the trigger (a `COPY`, a restore), and whether the same one-off-backfill shape exists on the other uuid columns D27 introduced | `approved_users.organization_id`'s nullability in `build/schema.introspected.json`; `supabase/migrations/20260918000001_org_row_uuid_only.sql` (the trigger); §15 run `35064364537` | WP 6.2 |
 | **D97** | **Two more migrations aborted in production and nothing has ever said so — found by closing D49, and they are D48's class rather than D49's.** `20250909153130` opens with `CREATE INDEX IF NOT EXISTS idx_supply_chain_data_multi_tier_material_id ON supply_chain_data_multi_tier(material_id)`, and that table has never had the column in any definition. `IF NOT EXISTS` guards the index NAME, so PostgreSQL raises 42703 and the file's transaction rolls back — its other four statements (two `supply_chain_data` indexes and a `get_integrated_process_network_data` redefinition) never ran either. `20250909153231`, 61 seconds later, re-issues exactly those four and omits the two impossible lines: a retry, the same signature as `20250820145017`/`145652`. `20250914113723` is the second: it indexes `simulation_jobs(job_id)` against a table whose live definition (`20250913085427`) has no such column — its own `CREATE TABLE IF NOT EXISTS` declaring one is a no-op — and **34 seconds later** `20250914113757` runs `ALTER TABLE simulation_jobs ADD COLUMN job_id TEXT`. Both were invisible because the abort detector keys ONLY on the corroboration test (which of two `CREATE TABLE`s the later INSERTs agree with), and a file that creates no table is invisible to it. Closed by recording a rejected statement as a second kind of abort — **and the ORDER between the two kinds is load-bearing**: read the rejected-statement evidence before the corroboration test has settled and `20260916000018`, the whole of `natural-key` (I4), is accused, because `inbound_logistics` still carries aborted `20250820145017`'s `plant_id` at that point | `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql`; `20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql`; `introspect.mjs`'s `schema.impossible` and `build()`'s abort fixed point | WP 6.2 ✅ *(slice 9)* |
+| **D99** | **The abort detector's first version could only see a `CREATE INDEX`, and D48 is the same mechanism on a second statement kind.** `schema.impossible` was built by slice 9 as a list precisely so a second detector could join it, and slice 10's is `firstNonDefaultAfterDefault`: an input parameter with no default that follows one with a default, which PostgreSQL refuses with 42P13. The class is not closed. `ADD CONSTRAINT … FOREIGN KEY` to a missing column, an `ALTER COLUMN TYPE` that cannot cast and a `CREATE POLICY` naming an absent column each abort their file and each is still recorded as applied; 16 historical definitions do not replay and nothing asks which of THEM sit in a file whose other statements the artifact believes. **Two of the rule's guards were removed rather than kept**: parenthesis depth and string-literal skipping, because a mutation deleting each produced a byte-identical artifact and a green suite — in a parameter DECLARATION a `DEFAULT` or `=` inside parentheses or quotes can only belong to a default expression, whose parameter is already defaulted, so neither guard could change an answer. Every line that remains has a mutation case | `scripts/data-contract/sql-lex.mjs` (`firstNonDefaultAfterDefault`); `introspect.mjs`'s `schema.impossible`; `src/lib/policies/__tests__/introspectorRejectedStatements.test.ts` | WP 6.2 *(partial — two detectors of an open class)* |
 | **D98** | **Three CHECK constraints production has were absent from every rehearsed database, and four rehearsal files were asserting over rows production would REFUSE.** D59 said an inline CHECK costs twice; this is the second cost, measured. With the CHECKs restored, `030` inserted `user_files.kind = 'report'` (the vocabulary is `report_xlsx`/`report_pdf`/`export_csv`/`upload`), `110` inserted `ingest_runs.triggered_by = 'schedule'` (`manual`/`scheduled`), `170` inserted an EMAIL into the same column — `triggered_by` is HOW a run started, not WHO started it — and `140` inserted `'{}'::jsonb` into `proposals.provenance`, which is TEXT from a fixed vocabulary and sits next to two jsonb columns. Every one of those rows is one production cannot hold, so every assertion downstream of them was made about a database that could not exist. **No live writer is affected** — `ingest_land_file` writes `'manual'` — so the fix is the four fixture rows, not the constraints. The class is not closed: nothing stops the next rehearsal from seeding a row a CHECK would refuse; what changed is that the rehearsed database now refuses it | `supabase/rehearsal/030`, `110`, `140`, `170` (the four inserts, each now carrying the reason above it) | WP 6.2 ✅ *(slice 9)* |
-| D48 | **A migration aborted in production in 2025 and nothing has ever said so.** `20250827170942` defines `create_disruption_scenario_v2(uuid, text, text, public.disruption_status, text, text[], jsonb, jsonb, jsonb, uuid, text)` with `p_user_id` and `p_user_email` — neither carrying a default — AFTER `p_status text DEFAULT 'draft'`. PostgreSQL rejects that at CREATE time (`42P13: input parameters after one with a default value must also have defaults`), so that statement and everything after it in the file never ran. The introspector records the overload from the file regardless, because a static replay cannot execute a definition to find out it is invalid. Found by D31's rehearsal, whose replay of the artifact's own function list surfaced it as one of five historical definitions that do not apply. Same class as D30 and, like D30, the END STATE is probably fine — two later migrations define working overloads — but nothing has ever checked which of the three the callers reach. Found by WP 3.0's gap check | `20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql` (the `create_disruption_scenario_v2` definition); `scripts/data-contract/rehearsal-schema.mjs` replay output | WP 6.2 |
+| D48 | **A migration aborted in production in 2025 and nothing has ever said so — and it was THREE migrations, not one.** `20250827170942` defines `create_disruption_scenario_v2(uuid, text, text, public.disruption_status, text, text[], jsonb, jsonb, jsonb, uuid, text)` with `p_user_id` and `p_user_email` — neither carrying a default — AFTER `p_status text DEFAULT 'draft'`. PostgreSQL rejects that at CREATE time (`42P13`), so that statement and everything after it in the file never ran. The introspector records the overload from the file regardless, because a static replay cannot execute a definition to find out it is invalid. **The row's cited sibling `20250827190942` DOES NOT EXIST.** The retry is `20250827171106`, **84 seconds** later, which re-issues the same four tables, triggers, policies and RPC and carries the literal comment `-- FIXED: Put all parameters with defaults at the end` — so the migration's own author knew, and only the contract did not. A whole-history scan then found two more: `20250904122241` and `20250904122347` each declare `get_network_nodes`, `get_network_edges` and `get_network_summary` with `p_user_id` after a defaulted `p_plant_name`, the second repeating the first's error exactly as `20250820145155` repeats `20250820145017`'s; `20250904124537` is the definition that works. **The END STATE is fine and the ATTRIBUTION was not**: aborting `20250827170942` re-homes all four `disruption_scenario_*` tables onto the retry, so a reader sent to a file that never ran is now sent to the one that did (§5 T1). **And the open half is answered.** There were never three overloads to choose between — one was a phantom. Of the two that exist, the single call site `DisruptionDialog.tsx:195` sends `p_disruption_start` and `p_disruption_end`, and PostgREST resolves an RPC by NAMED arguments, so it reaches `20250828005114`'s 13-parameter definition. `20250827171106`'s 11-parameter one is live and unreached; dropping it is a migration and is left to whoever wants it. Found by D31's rehearsal; the two extra files and the wrong citation found by WP 6.2 slice 10 | `20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql`; `20250904122241_b65404b9-d4ee-4c58-9518-7a1578f74af8.sql`; `20250904122347_a28da769-734c-4064-8f24-2b8d60ffffa4.sql`; `sql-lex.mjs`'s `firstNonDefaultAfterDefault` | WP 6.2 ✅ *(slice 10)* |
 | D49 | **The introspector records three indexes on columns the tables no longer have — and that is TWO defects with two different causes, not one.** `idx_supply_chain_data_plant` is recorded `ON supply_chain_data (plant)`, and `20250822025432` RENAMEd `plant` to `plant_name`; Postgres renames an index's column reference with the column, so production's index is on `plant_name` and the artifact's is on a column that does not exist. **That cause is right for exactly ONE of the three.** `supply_chain_data_multi_tier` has NEVER had `material_id` or `higher_level_component_id` in any definition — they are `bom_multi_level`'s columns — so no rename can have produced them. `CREATE INDEX IF NOT EXISTS` guards the index NAME, not the column: PostgreSQL raises 42703, and `20250909153130` therefore ABORTED in production, 61 seconds before `20250909153231` re-issued its other four statements without those two lines. That half is D97, and it is D48's class. The rename half is fixed by following a column RENAME into indexes, index predicates and constraints (`renameIdentifier` in `sql-lex.mjs`), which is the same fix as the `RENAME TO` branch that closed D52. `introspectorDependents.test.ts` gates both halves with no database; `supabase/rehearsal/180` §3 and §4 prove them against a real one. Found by D31's rehearsal; the second cause found by WP 6.2 slice 9 | `build/schema.introspected.json` `tables[].indexes`; `20250822025432_cf03eaa2-ae97-4310-80e9-085e3eb03487.sql` (the RENAME); `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` (the two impossible ones) | WP 6.2 ✅ *(slice 9)* |
 
 | D50 | **A rehearsal fixture with no shape to key on turned `main` red the day WP 3.0 merged, and stayed red.** `--fixtures` plants production's divergence from the contract BEFORE the branch's new migrations run. `fixtures/020_d1_zero_safety_stock.sql` planted the four `policy_overrides` rows carrying D1's frozen zero and `rehearsal/020_d1_unseeded.sql` asserted that a migration had removed them — a migration that, once merged, is in the BASE and never runs again. The pair could only ever pass on WP 3.0's own branch. `data-contract.yml` runs the rehearsal both ways on every push, so the `migrations run` job failed on run `35077191060` (the WP 3.0 merge) and would have failed on every pull request after it, including this one — WP 3.0's own `base branch is green` job makes that a blocker rather than a nuisance. **CLOSED by WP 3.1**: both WP 3.0 fixtures and the assertion that depended on one are deleted (their subjects are settled — 477 → 0 frozen zeros, 2 → 0 untracked relations), and `fixtures/README.md` states the rule that was missing: a fixture must be SHAPE-conditional so it no-ops once its migration is in the base, and a fixture whose precondition is data rather than shape cannot be written | `supabase/rehearsal/fixtures/README.md`; the deleted `fixtures/020_d1_zero_safety_stock.sql` + `rehearsal/020_d1_unseeded.sql`; CI run `35077191060`, job `migrations run` | WP 3.1 ✅ |
@@ -2021,7 +2022,7 @@ against the grid's `field` id, which reported `materials.cost` as invisible whil
 it is on screen as `material_cost`). That is D82 and D83's lesson arriving a
 package later, in a package whose entire output is a list.
 
-### WP 6.2 — Fix the divergences *(D17, D18, D34, D47, D48, D49, D53, D58, D59, D66, D69, D71, D97, D98; D16 closed in WP 0.1)*
+### WP 6.2 — Fix the divergences *(D17, D18, D34, D47, D48, D49, D53, D58, D59, D66, D69, D71, D97, D98, D99; D16 closed in WP 0.1)*
 
 **RE-BUDGET FOR D71.** WP 4.1's gap check measured the class D36 was one slice of: 26
 `SECURITY DEFINER` functions write a tier-2/3/4 table and two set `app.current_user_id`.
@@ -2066,11 +2067,17 @@ gate could see, and each is small:
 - **D47** — `org_is_current_user_org` is uuid-only since WP 3.0, but the
   `organizations` table's own read policy still ORs the display NAME and the
   SLUG. Two lines, the same shape D29 was, on a different object.
-- **D48** — `20250827190942`'s sibling `20250827170942` carries a
-  `create_disruption_scenario_v2` overload Postgres cannot create (42P13), so
-  that migration aborted in production and nobody has ever known. Establish
-  which of the three overloads the callers actually reach, then delete the
-  other two or fix the broken definition.
+- **D48 — CLOSED in slice 10, and it was three migrations rather than one.**
+  `20250827170942` carries a `create_disruption_scenario_v2` overload Postgres
+  cannot create (42P13), so it aborted in production. **The sibling this bullet
+  cited, `20250827190942`, does not exist** — the retry is `20250827171106`,
+  84 seconds later, carrying `-- FIXED: Put all parameters with defaults at the
+  end`. A whole-history scan found `20250904122241` and `20250904122347` doing
+  the same to three network RPCs. "Which of the three overloads the callers
+  reach" had a false premise: one of the three was a phantom, and of the two
+  real ones the single call site reaches `20250828005114`'s by NAMED argument.
+  Deleting the unreached 11-parameter overload is a migration and is left
+  unforced.
 - **D49 — CLOSED in slice 9.** The introspector's ALTER handling does not follow a column RENAME
   into the indexes that reference it, so the artifact describes three indexes
   production cannot have. **The recorded cause was right for ONE of the three.**
@@ -10066,3 +10073,126 @@ them, which is the right way round.
    out of seventeen carried one, which is a rate, not an accident.
 
 **Still open in WP 6.2:** D18, D34, D48, D51, D58, D66, D71, D87, D94, D95, D96.
+
+### WP 6.2 (slice 10) — D48, and the two migrations nobody counted · 2026-09-18 · no migration
+
+**What slice 9 promised.** Its gap check, finding 1: *"D48 is now one loop away
+— it is a migration that aborts on 42P13, the same shape as D97, and the
+rehearsal already prints that error."* That was right about the mechanism and
+wrong about the number.
+
+**The defect row cited a migration that does not exist.** D48 named
+`20250827190942` as the sibling of `20250827170942`. There is no such file. The
+retry is **`20250827171106`, 84 seconds later**, and it is not an inference: it
+re-issues the same four tables, three trigger functions, eight triggers, eight
+policies and the RPC, and its copy of the RPC opens with
+
+    -- FIXED: Put all parameters with defaults at the end
+
+**The migration's author knew the file had failed. The contract never did**, for
+thirteen months.
+
+**And it was three files, not one.** Scanning every `CREATE FUNCTION` in the
+history for an input parameter with no default after one with a default found
+`20250904122241` and `20250904122347`, each declaring `get_network_nodes`,
+`get_network_edges` and `get_network_summary` with `p_user_id` after a defaulted
+`p_plant_name`. The second repeats the first's error exactly as `20250820145155`
+repeats `20250820145017`'s — §4 already documents that pattern, on a different
+pair. `20250904124537` is the definition that works.
+
+**The blast radius, measured before believing it.** Aborting all three removes
+**exactly one object**: the phantom `create_disruption_scenario_v2` overload.
+No table, no policy, no index, no enum, no view and no other function changes —
+because every statement in the three files is re-issued by its retry. What DOES
+change is attribution: all four `disruption_scenario_*` tables now record
+`created_by` as `20250827171106`. Every generated page named a file that never
+ran as the place to go and read (§5 T1).
+
+**D48's open half, answered.** *"Nothing has ever checked which of the three
+overloads the callers actually reach."* There were never three to choose
+between — one was a phantom. There is exactly one call site,
+`DisruptionDialog.tsx:195`, and it sends `p_disruption_start` and
+`p_disruption_end`; PostgREST resolves an RPC by NAMED arguments, so it reaches
+`20250828005114`'s 13-parameter definition. `20250827171106`'s 11-parameter one
+is live and unreached. Dropping it is a migration and a product decision, so it
+is recorded and left.
+
+**── THE PART WORTH READING: THREE MUTATIONS THAT SURVIVED ─────────────────**
+
+The rule started with three guards. Two of them were removed, because a mutation
+deleting each produced a **byte-identical artifact and a green suite**:
+
+- **parenthesis depth**, so a `DEFAULT` inside `numeric(16, 6)` or
+  `concat(a, b)` would not count;
+- **string-literal skipping**, so the `=` in `text DEFAULT 'a=b'` would not.
+
+Neither can change an answer, and the reason is structural rather than lucky: in
+a parameter DECLARATION a `DEFAULT` or an `=` appears either at the top level as
+the default marker, or inside the default EXPRESSION that follows one — and in
+the second case the parameter already carries a default, which is the only thing
+the rule asks. **A guard that cannot change an answer is not defence; it is a
+line no test can justify**, and writing a test that "covers" it would have been
+a green assertion asserting nothing.
+
+The third survivor was a test's fault, not the code's. The word-boundary check
+has two halves — the character BEFORE `DEFAULT` and the one after — and both of
+the cases written for it (`p_defaulted_at`, `is_default`) are caught by the
+preceding-character half, because in each the keyword follows an underscore.
+Only a name that STARTS with it (`default_mode`, `defaults`) reaches the
+boundary. With those added, every remaining line of the rule has a mutation that
+kills it: the `= expr` spelling, each half of the boundary, and the
+OUT/VARIADIC exemption.
+
+**The exemption is deliberately a refusal to judge.** PostgreSQL exempts OUT
+parameters from the rule. This repository has none, and a rule that guessed at a
+shape it has never seen would be a false accusation with a migration's blast
+radius — which is exactly what slice 9's first draft did to `20260916000018`.
+
+**A fourth mistake, in the rehearsal.** `190` §4 asserts that the three network
+RPCs put their defaulted `p_plant_name` last, and its first draft read
+`proargnames[array_length(proargnames, 1)]`. **`proargnames` carries the
+`RETURNS TABLE` column names after the input parameters**, so it indexed past
+the arguments into the result columns and accused three correct functions.
+`pronargs` is the count that stops at the inputs. Red first, for the wrong
+reason, and the wrong reason was worth the ten minutes.
+
+**Mutation-tested, nine ways.** Five against the rule (detector disabled → 5
+red; the ordering inverted → 4 red; `= expr` dropped → 1; each boundary half →
+1; the exemption dropped → 1), and five against `rehearsal/190` on a live
+database (the phantom overload restored → §1; the caller's overload replaced by
+a 13-argument decoy with different NAMES, so the count stays 2 → §2, which
+`DROP` alone could not reach because §1 fires first; a disruption table renamed
+away → §3; an illegal network ordering restored → §4).
+
+**`190` needs no base-detection branch, and that is the point.** `170` and `180`
+assert that something IS present, so a base built from the base branch's
+artifact legitimately lacks it and they must skip. Every section here asserts an
+ABSENCE or a count that a stale base FAILS — the right way round. §4 says so in
+place.
+
+**Verified:** all three rehearse modes green (18 assertion files) · the replay's
+42P13 error is GONE, 17 historical non-replaying definitions down to 16 ·
+`contract:check` ✓ · 407 tests ✓ (was 392) · `build` ✓ · eslint 336/116 and
+`audit:ui` 8, unchanged.
+
+**Gap check.** Three findings:
+
+1. **D99 — the rejected-statement class has two detectors and at least three
+   more members.** `ADD CONSTRAINT … FOREIGN KEY` to a column that does not
+   exist, an `ALTER COLUMN … TYPE` that cannot cast (§4 already documents
+   `20250820145017` failing exactly that way, found by corroboration rather than
+   by rejection), and a `CREATE POLICY` naming an absent column. Each aborts its
+   file; each is recorded as applied.
+2. **Sixteen historical definitions still do not replay, and nothing asks which
+   FILE each one is in.** The rehearsal prints them and calls them "reported,
+   not fatal". Three are `syntax error at or near "DEFAULT"` — a different
+   error from 42P13 and possibly a different abort. A line that names the
+   migration rather than the offset in a concatenated replay file would turn
+   sixteen anonymous errors into sixteen answerable questions.
+3. **The unreached overload is dead surface with a live GRANT.**
+   `20260610000001_grant_disruption_rpc.sql` grants `create_disruption_scenario_v2`
+   to the anon role. Whether it grants one overload or both, and whether an
+   unreachable 11-parameter RPC should be callable at all, belongs with WP 6.4's
+   decision plane — the disruption tables are eleven of its own.
+
+**Still open in WP 6.2:** D18, D34, D51, D58, D66, D71, D87, D94, D95, D96, D99.

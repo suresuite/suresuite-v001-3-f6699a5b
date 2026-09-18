@@ -3,11 +3,87 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/phases-6-7-completion-buvlel` · **Started from:** `f555409` (PR #223 merged) · **5 packages closed + WP 6.2 slices 1–9** · no PR open
+**Branch:** `claude/phases-6-7-completion-buvlel` · **Started from:** `a6a80ff` (PR #224 merged) · **5 packages closed + WP 6.2 slices 1–10** · no PR open
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 10) — D48, and the two migrations nobody counted · no migration
+
+**D48 closed; D99 opened as the class it belongs to.** Slice 9 built
+`schema.impossible` as a list so a second detector could join it. This is that
+detector: a `CREATE FUNCTION` whose input parameters put a defaulted one before
+a plain one, which PostgreSQL refuses with 42P13.
+
+⚠️ **The defect row cited a migration that does not exist.** D48 named
+`20250827190942`. There is no such file. The retry is **`20250827171106`, 84
+seconds later**, and it re-issues the same four tables, three trigger functions,
+eight triggers, eight policies and the RPC — with its copy opening
+`-- FIXED: Put all parameters with defaults at the end`. The author knew the
+file had failed. The contract did not, for thirteen months.
+
+**And it was three files.** `20250904122241` and `20250904122347` each declare
+three network RPCs with `p_user_id` after a defaulted `p_plant_name`; the second
+repeats the first's error exactly as `20250820145155` repeats `20250820145017`'s.
+
+**Blast radius, measured before believing it: exactly one object.** The phantom
+`create_disruption_scenario_v2` overload. No table, policy, index, enum, view or
+other function moves, because every statement is re-issued by its retry. What
+changes is attribution — all four `disruption_scenario_*` tables now record
+`created_by` as the migration that actually ran, instead of sending readers to
+one that never did (§5 T1).
+
+**D48's open half, answered.** "Which of the three overloads the callers reach"
+had a false premise: one was a phantom. The single call site
+(`DisruptionDialog.tsx:195`) sends `p_disruption_start`/`p_disruption_end`, and
+PostgREST resolves by NAMED argument, so it reaches `20250828005114`'s
+13-parameter definition. The 11-parameter one is live and unreached; dropping it
+is a migration, so it is recorded and left.
+
+⚠️ **Three mutations survived, and two of them were the code's fault.** The rule
+started with a paren-depth guard and a string-literal skip; deleting each gave a
+byte-identical artifact and a green suite. Neither can change an answer — in a
+parameter declaration a `DEFAULT` or `=` inside parens or quotes belongs to a
+default expression, whose parameter is already defaulted. **Both were removed.**
+A guard that cannot change an answer is not defence; it is a line no test can
+justify, and "covering" it would have been a green assertion asserting nothing.
+
+The third survivor was the test's fault: the word-boundary check has two halves
+and both cases written for it (`p_defaulted_at`, `is_default`) were caught by
+the *preceding-character* half. Only a name that STARTS with the keyword
+(`default_mode`) reaches the boundary. Added — now every remaining line of the
+rule has a mutation that kills it.
+
+**A fourth mistake, in the rehearsal.** `190` §4's first draft read
+`proargnames[array_length(proargnames, 1)]` — but `proargnames` carries the
+`RETURNS TABLE` column names after the inputs, so it indexed into the result
+columns and accused three correct functions. `pronargs` stops at the inputs.
+
+**Nine mutations, all caught after that.** Five against the rule, five against
+`rehearsal/190` on a live database — including a 13-argument decoy with
+different parameter NAMES, because a plain `DROP` is caught by §1 before §2 can
+speak.
+
+**Verified:** three rehearse modes green (18 assertion files) · the replay's
+42P13 error is GONE (17 non-replaying historical definitions → 16) ·
+`contract:check` ✓ · 407 tests ✓ (was 392) · `build` ✓ · eslint 336/116 and
+`audit:ui` 8, unchanged.
+
+**Noted for whoever takes it:** 16 historical definitions still do not replay and
+nothing says which FILE each is in — three are `syntax error at or near
+"DEFAULT"`, a different error from 42P13 and possibly a different abort. Naming
+the migration instead of an offset in a concatenated replay file would turn 16
+anonymous errors into 16 answerable questions.
+
+### CI note — `data contract` red on `main` at `a6a80ff` was NOT the merge
+
+Every job of every workflow on that commit reports `runner_id: 0` and no runner
+name, finishing in 2–4 seconds, including `adaptive UI audit`, whose known-red
+mode takes a minute. Job logs 404 because nothing was written. No runner was
+ever allocated. Re-run requested; the tree at `a6a80ff` is byte-identical to the
+one verified locally, where `contract:check`, 407 tests, `build` and all three
+rehearse modes are green.
 
 ### WP 6.2 (slice 9) — One parser, four defects, two aborted migrations · no migration
 

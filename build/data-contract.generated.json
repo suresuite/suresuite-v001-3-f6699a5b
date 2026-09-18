@@ -6,7 +6,7 @@
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
       "migrations_found": 328,
-      "migrations_applied": 323,
+      "migrations_applied": 320,
       "last_migration": "20260918000001_org_row_uuid_only.sql"
     },
     "sidecars": 43,
@@ -23850,5 +23850,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "81c7c8c0e8bb"
+  "contract_version": "3bcc7398c83d"
 }
