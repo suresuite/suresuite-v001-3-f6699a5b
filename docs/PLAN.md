@@ -258,7 +258,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D94** | **`P-C.2` reads two `Customer` attributes it does not DECLARE, and that silence is why D69 survived adoption.** The registry export is the single source of truth for policy schemas (§3, §6.2), and `p_c2_customer_allocation`'s `data_requirements` names exactly one field: `outbound_logistics.volume`. Its code reads `Customer.priority_weight` and `Customer.segment` on every run. Three things followed from the gap, and each one is a gate that could not fire: the `customers` sidecar recorded `consumed_by: null` for both columns with nothing to contradict it; `project_map` omitted the table with no requirement naming what it failed to supply; and every tool deriving "what the engine reads" from the registry — the data contract, WP 6.1's resolution-chain door 1 — was blind to them. **The sidecar also gave a FALSE REASON for the blank**, twice: "`scsim` has no customer-priority concept today … none of [the `P-C.x` policies] is implemented". `customer_allocation` is `status: implemented` in the registry export. The conclusion was right and the cause was wrong, and the wrong cause sent the next reader to the blueprint's catalog instead of to `project_map.py`. **The declaration was written and then REVERTED in the same session**: `registry.generated.json` is committed and `gen_frontend_registry.py --check` gates it, regenerating needs `pydantic`, and PyPI is denied here — so landing the source change would have shipped a knowingly-red gate. It needs a session that can run Python. **Once declared, the gate it enables is the valuable part**: an implemented policy's declared data requirement may not have `consumed_by: null` in the sidecar, which is the inverse of the rule `contract:generate` already enforces. A second, separable gap: no surface in this product WRITES `customers`, so the two columns that now reach the engine can only be set by hand in the database | `scsim/scsim/policies/improvisation/p_c2_customer_allocation.py`'s `data_requirements` against its `_matrices` (`m.cust_priority`, `m.cust_segment`); `supabase/contract/customers.contract.yaml` | WP 6.2 |
 | **D95** | **`customers.sla_fill_floor_pct` has no engine field to reach, and it was given `priority_weight`'s reason rather than its own.** Both columns carried the same sidecar note — "none of the `P-C.x` policies is implemented" — and only this one's conclusion survives D94's correction. `P-C.2` IS implemented and it DOES guarantee fill floors, through `sla_tiers`, which is keyed **by segment**. This column is per **customer**, and `scsim`'s `Customer` entity has no field for it at all, so there is nothing to carry it into. Carrying it would mean deciding what happens when two customers in one segment declare different floors, and inventing that rule is an engine change, not the reader change D69 was. Left undeclared on purpose, with the real reason recorded in place of the borrowed one | `supabase/contract/customers.contract.yaml` (`sla_fill_floor_pct`'s note) against `scsim/scsim/entities/network.py`'s `Customer` | WP 6.2 |
 | **D70** | **A `schema_version` bump EXPIRES stored proposals, one-way, from a READ, and nothing says so.** `expire_agent_proposals` UPDATEs `proposals.status` to `expired` with `status_reason = 'grounding_drift'` for every row in `draft`, `proposed` or **`approved`** whose `grounding->>'graph_hash'` differs from `current_graph_hash(project)`, and `list_agent_proposals` calls it — so the first page load after a deploy that moves the hash writes the change, and the predicate is one-way: nothing un-expires a proposal when the hash comes back. That is correct as a staleness rule and dangerous as an undocumented consequence of a migration. **WP 4.1 is the first bump and it costs nothing — §15 measured 0 live proposals grounded on a `graph_hash`** — which is a fact about adoption, not about the mechanism. The next bump lands on whatever is there | `20260715000001_agent_proposals.sql:245-256` (the UPDATE and its predicate); the call at `list_agent_proposals` | WP 4.4 ✅ *(`20260917000008` splits the two reasons the old function conflated. TTL STAYS A PERSISTED WRITE — time only moves forwards, so `expired` is a record of something that happened, and removing it would over-correct D70 into a second defect. DRIFT becomes `proposal_grounding_state`, a PostgREST computed column over the one rule, so a project that drifts and drifts back leaves the proposal exactly as it was. `supabase/rehearsal/140` §2 is the RED assertion — it LISTS proposals after moving the hash and fails on `main` with the row rewritten — and §3 is the half no source read can settle: it moves the project BACK and asserts the state returns to `fresh` with the status untouched. Mutation-tested by restoring the drift predicate. **WHAT IT DOES NOT DO IS REPAIR THE DAMAGE ALREADY DONE, and the file says so rather than pretending**: a drifted row was `draft`, `proposed` or `approved`, `expired` overwrote it, and `status_reason = 'grounding_drift'` records only WHY — the prior status is not recoverable from the row. That is what one-way means, stated as a consequence. §15 counts the affected rows in this package's after-run)* |
-| **D71** | **D36 was one slice of a class, and the class is 26 functions rather than six.** D36 counted the SERVICE-ROLE PostgREST writers, because that is where WP 2.3 looked. WP 3.3 then found `assign_material_supplier` — a `SECURITY DEFINER` SQL function that had taken the actor as a parameter all along and never told the trigger — and D36's own evidence says it "was never in the list of six because nothing had looked at it". WP 4.1 found a second the same way, `snapshot_dataset`, which has recorded `actor_known: false` on every dataset version ever frozen beside an `author_user_id` the caller supplied. **So the gap check measured the whole class: 26 `SECURITY DEFINER` functions write a tier-2/3/4 table, TWO set `app.current_user_id`, SIXTEEN of the rest already TAKE an actor parameter, and SEVENTEEN have a live caller in `src/` or `supabase/functions/`.** **AND THOSE FIGURES OVER-COUNT, WHICH WP 4.3 FOUND AND D78 RECORDS: TEN of the 26 attribute through `set_current_user_context`, whose body is `set_config('app.current_user_id', user_id::text, true)` and has been since 2025-08-20.** The scan that produced the number is textual and cannot follow a call — the same limitation `VIA_SHARED_PREAMBLE` was written for one package earlier. Corrected figures after WP 4.3 described four more tables and widened the scan: **31 writers, 15 of them attributing, 16 not.** The invariant is still not met and the remaining work is still WP 6.2's; what changed is that six of the sixteen, not seventeen of twenty-four, are the live ones to budget for. Every one is the one-line fix D36 correctly says is NOT one for a PostgREST call, because a `SECURITY DEFINER` function runs in a transaction it controls. **The consequence for the invariant is the point: `audit-actor` (G4) is NOT met after `20260917000003`**, and closing D36 must not be reported as though it were | the 26 function bodies, enumerated by `dataPlaneAudit.test.ts`'s `UNATTRIBUTED` list; `assign_material_supplier` and `snapshot_dataset` are the two that do set it | WP 6.2 *(`20260917000002`–`20260917000003` closed the two they rewrote and left a RATCHET rather than a gate, because a gate would be red on arrival and unlandable: `dataPlaneAudit.test.ts` fails when a 27th appears and when a name that is now attributed is left on the list, so the number can shrink and cannot grow. Mutation-tested both ways. **re-budget for it, and the budget has been WRONG TWICE** — D71 said seventeen live, D78 corrected that to six, and WP 6.2 slice 11 MEASURED it: twelve of the thirteen were reachable from the application. **Slice 11 closed the three that cost one line** (`20260918000002`): `apply_policy_bundle`, `assign_bom_line` and `assign_outbound_customer` had each taken `p_user_id` since the day they were written and never passed it on — `assign_material_supplier`'s shape three more times — so no signature and no caller changed. `supabase/rehearsal/200` proves all three with `app.current_user_id` POISONED with a stranger's id first, and §4 of it pins the `IF p_user_id IS NOT NULL` guard, without which a `DEFAULT NULL` parameter would BLANK an actor the caller's transaction had already set. **TEN remain and every one is a different size**: none takes an actor parameter at all, so each needs a signature change AND every caller updated. Nine of the ten are reachable; `create_default_policy_defaults` has no caller anywhere. That figure is no longer prose — `dataPlaneAudit.test.ts` derives it by counting the name as a whole string literal across `src/` and `supabase/functions/`, and fails when this row stops matching. **It counts a literal rather than `rpc('<name>')` because `useItemMasters.tsx` dispatches through `sb.rpc(UPSERT_RPC[table], …)`, and the first draft reported the upload path's two item-master RPCs as having no caller at all)* |
+| **D71** | **D36 was one slice of a class, and the class is 26 functions rather than six.** D36 counted the SERVICE-ROLE PostgREST writers, because that is where WP 2.3 looked. WP 3.3 then found `assign_material_supplier` — a `SECURITY DEFINER` SQL function that had taken the actor as a parameter all along and never told the trigger — and D36's own evidence says it "was never in the list of six because nothing had looked at it". WP 4.1 found a second the same way, `snapshot_dataset`, which has recorded `actor_known: false` on every dataset version ever frozen beside an `author_user_id` the caller supplied. **So the gap check measured the whole class: 26 `SECURITY DEFINER` functions write a tier-2/3/4 table, TWO set `app.current_user_id`, SIXTEEN of the rest already TAKE an actor parameter, and SEVENTEEN have a live caller in `src/` or `supabase/functions/`.** **AND THOSE FIGURES OVER-COUNT, WHICH WP 4.3 FOUND AND D78 RECORDS: TEN of the 26 attribute through `set_current_user_context`, whose body is `set_config('app.current_user_id', user_id::text, true)` and has been since 2025-08-20.** The scan that produced the number is textual and cannot follow a call — the same limitation `VIA_SHARED_PREAMBLE` was written for one package earlier. Corrected figures after WP 4.3 described four more tables and widened the scan: **31 writers, 15 of them attributing, 16 not.** The invariant is still not met and the remaining work is still WP 6.2's; what changed is that six of the sixteen, not seventeen of twenty-four, are the live ones to budget for. Every one is the one-line fix D36 correctly says is NOT one for a PostgREST call, because a `SECURITY DEFINER` function runs in a transaction it controls. **The consequence for the invariant is the point: `audit-actor` (G4) is NOT met after `20260917000003`**, and closing D36 must not be reported as though it were | the 26 function bodies, enumerated by `dataPlaneAudit.test.ts`'s `UNATTRIBUTED` list; `assign_material_supplier` and `snapshot_dataset` are the two that do set it | WP 6.2 ✅ *(slices 11+12 — `20260918000002` and `20260918000003`. `20260917000002`–`20260917000003` closed the two they rewrote and left a RATCHET rather than a gate, because a gate would be red on arrival and unlandable: `dataPlaneAudit.test.ts` fails when a 27th appears and when a name that is now attributed is left on the list, so the number can shrink and cannot grow. Mutation-tested both ways. **re-budget for it, and the budget has been WRONG TWICE** — D71 said seventeen live, D78 corrected that to six, and WP 6.2 slice 11 MEASURED it: twelve of the thirteen were reachable from the application. **Slice 11 closed the three that cost one line** (`20260918000002`): `apply_policy_bundle`, `assign_bom_line` and `assign_outbound_customer` had each taken `p_user_id` since the day they were written and never passed it on — `assign_material_supplier`'s shape three more times — so no signature and no caller changed. `supabase/rehearsal/200` proves all three with `app.current_user_id` POISONED with a stranger's id first, and §4 of it pins the `IF p_user_id IS NOT NULL` guard, without which a `DEFAULT NULL` parameter would BLANK an actor the caller's transaction had already set. **TEN remain and every one is a different size**: none takes an actor parameter at all, so each needs a signature change AND every caller updated. Nine of the ten are reachable; `create_default_policy_defaults` has no caller anywhere. That figure is no longer prose — `dataPlaneAudit.test.ts` derives it by counting the name as a whole string literal across `src/` and `supabase/functions/`, and fails when this row stops matching. **It counts a literal rather than `rpc('<name>')` because `useItemMasters.tsx` dispatches through `sb.rpc(UPSERT_RPC[table], …)`, and the first draft reported the upload path's two item-master RPCs as having no caller at all. **SLICE 12 CLOSED THE REST IN ONE MIGRATION, AND IT WAS NINE RATHER THAN TEN.** `20260918000003` appends `_actor_user_id uuid DEFAULT NULL` to nine functions, so every existing caller kept working with no change and no actor — exactly the old behaviour — and eleven client call sites now pass it. `CREATE OR REPLACE` cannot change a parameter count, so each is a DROP and CREATE, which takes the function's grants with it: `supabase/rehearsal/210` §2 checks every role back as an EXPLICIT grantee in `proacl`. **The TENTH was never this class**: `create_default_policy_defaults` `RETURNS trigger` and runs `FOR EACH ROW` on `projects`, and PostgreSQL refuses a trigger function with declared arguments — a trigger fires inside someone else's statement, so the actor is that statement's to set. Slice 11's note that it was "reachable from nothing" was wrong for the same reason: a trigger is wired by `EXECUTE FUNCTION`, not called by name. **The list is now a GATE rather than a ratchet** — four names remain and none is debt: three attribute through `assert_writer_may_act`, one is that trigger, and `dataPlaneAudit.test.ts` fails if a name sits on it without one of those two justifications)* |
 
 | **D72** | **`calculate-network-science-metrics` upserts `network_nodes` on a unique constraint that does not exist, so the statement fails every time it runs and the function logs the error and carries on.** `calculate-network-science-metrics/index.ts:114-115` calls `.upsert(upsertRows, { onConflict: 'project_id,uid' })` on the fallback path — the one that derives a graph from `supply_chain_data` when the network tables are empty and has to create the node rows before metrics can be stored against them. **`network_nodes` has no unique index on `(project_id, uid)`**: its only uniqueness is the surrogate `network_nodes_pkey` on `id`. PostgREST passes `on_conflict` through to `ON CONFLICT (project_id, uid)`, which PostgreSQL rejects with `42P10` *there is no unique or exclusion constraint matching the ON CONFLICT specification* — **verified against a real PostgreSQL 16, not read off the source**. The handler is `console.error(...)` with no throw and no early return, so the function proceeds to its per-node `.update()` loop, which matches zero rows because the nodes were never created, and then reports success. A project whose nodes exist only via that fallback gets NO metrics and NO error anybody sees. **This is D5's class arriving in the deferred group**, and the reason `natural-key` (I4) being MET does not cover it is that I4 and `contract:check` R5 are scoped to tier-2 tables IN THE CONTRACT — `network_nodes` is deferred, so R5 has never looked at it, which is D54's qualifier doing damage in a second place. **Found by WP 4.2 enumerating D56's blast radius**: the split cannot give the input half a natural key it does not have | `calculate-network-science-metrics/index.ts:114-115` against `network_nodes`'s indexes (`network_nodes_pkey` only) | WP 4.3 ✅ *(`20260917000007` creates `network_nodes_natural_key` on `(project_id, uid)`, `NULLS NOT DISTINCT`, and `supabase/rehearsal/130` §11 issues the exact statement the analyzer issues — `ON CONFLICT (project_id, uid) DO UPDATE` — rather than looking the index up in a catalog, because an index can exist and still not be inferrable. It also asserts the row was UPDATED and not inserted, and that a duplicate is refused. NO DEDUP MIGRATION WAS NEEDED and the reason is that the measurement already existed in this row: the first draft of `20260917000007`'s header deferred the index on the ground that nothing had counted the duplicates, and §15 run `35233002946` had counted them. Verifying a precondition rather than inheriting it is the whole of the difference. Original note follows: the key must land BEFORE the input half can be described, and landing it follows the dedup-then-index shape the natural-key package already proved — deduplicate on `(project_id, uid)` first, then create the unique index, `NULLS NOT DISTINCT` if either column is nullable (see D5 for why a plain index constrains nothing when a key column is nullable). **MEASURED, 2026-09-17 (§15 run `35233002946`, every project): 1 385 rows, `rows_a_unique_index_would_reject` = 0 across 0 duplicated keys, `null_uid` = 0** — so the fix is ONE `CREATE UNIQUE INDEX`, with no dedup migration and no rows to lose, which is cheaper than D5's seven lanes and should be re-budgeted as such. `NULLS NOT DISTINCT` is still the right spelling: `uid` is NULLABLE, and nullability is a schema property a later `ALTER` can change, which is the half D5 says nobody writes down)* |
 | **D73** | **The introspected artifact parsed `COMMENT ON FUNCTION` and threw it away, so a base rebuilt from the artifact had functions with no documentation — and only `--since HEAD` could see it.** `introspect.mjs:460-465` matched `COMMENT ON (TABLE\|COLUMN\|VIEW\|FUNCTION\|…)` and recorded the text for TABLE alone; every other target fell through the same `return`. Function records carried no `comment` field, `rehearsal-schema.mjs`'s `emitFunctions` had nothing to emit, and the reconstructed base silently lost it. **This is D52's class exactly** — the artifact disagreeing with what the migration did — and it has D52's signature too: `contract:rehearse` and `--fixtures` were both GREEN, because they build the base from the BASE branch's artifact and then RUN the migration, so the comment is applied by the statement itself. Only the third mode, which executes the artifact THIS branch wrote, meets the shape `main` gets after the merge. **Found by WP 4.2's rehearsal §8**, which asserts that `should_recalculate_network_metrics` carries a comment naming D12: green in two modes, red in the third with "Comment is: (none)". A second, quieter half came with it — a `CREATE OR REPLACE FUNCTION` rebuilt the record from scratch and would have dropped a comment an EARLIER migration had set, although PostgreSQL preserves it across a replace; the artifact now carries it forward | `introspect.mjs:460-465` (the discarding `return`); `rehearsal-schema.mjs`'s `emitFunctions`; `supabase/rehearsal/120` §8 is the assertion that caught it | WP 4.2 ✅ *(the introspector records the comment against the signature when the statement spells the arguments and against the bare name otherwise; the emitter writes every `COMMENT ON FUNCTION` AFTER all bodies, because a comment may live in a different migration from its `CREATE` and so cannot be replayed from the defining file the way the body is. 16 functions carry one today. All three modes green)* |
@@ -2024,11 +2024,18 @@ package later, in a package whose entire output is a list.
 
 ### WP 6.2 — Fix the divergences *(D17, D18, D34, D47, D48, D49, D53, D58, D59, D66, D69, D71, D97, D98, D99; D16 closed in WP 0.1)*
 
-**D71 is PARTLY CLOSED and the remainder is re-sized.** Slice 11 took the three
-of sixteen that cost one line each — they already took `p_user_id` and never
-passed it to the trigger. Ten remain, nine of them reachable, and every one needs
-a signature change plus every caller updated. The ratchet now proves that split
-rather than stating it: a name left on it must take NO actor parameter.
+**D71 is CLOSED (slices 11 + 12).** Slice 11 took the three of sixteen that cost
+one line each — they already took `p_user_id` and never passed it to the trigger.
+Slice 12 took the nine that took no actor at all, in ONE migration, plus the
+eleven client call sites. The tenth was never this class: it is a trigger
+function, and PostgreSQL refuses declared arguments on one. **The list has become
+a gate**: four names remain, three attributing through a shared preamble and one
+a trigger, and a name may only sit on it with one of those two justifications.
+
+**What remains is adoption at ONE edge.** `supabase/functions/api/index.ts` makes
+three of these calls with no actor, because its principal is an API KEY and
+carries no user uuid — the same wall `snapshot_dataset` already hits there, and
+it answers to D28 / WP 7.1 rather than to this package.
 
 **RE-BUDGET FOR D71.** WP 4.1's gap check measured the class D36 was one slice of: 26
 `SECURITY DEFINER` functions write a tier-2/3/4 table and two set `app.current_user_id`.
@@ -10312,3 +10319,111 @@ all three rehearse modes green (19 assertion files) · `contract:check` ✓ ·
 
 **Still open in WP 6.2:** D18, D34, D51, D58, D66, D71 *(ten writers)*, D87,
 D94, D95, D96, D99.
+
+### WP 6.2 (slice 12) — The remaining nine, in one migration · 2026-09-18 · `20260918000003`
+
+**What slice 11 promised.** Its gap check, finding 1: *"The ten that remain are
+one migration, not ten. Each needs the same change … Doing them one at a time
+would cost ten migrations and ten rehearsals for one invariant."* That was right
+about the shape and wrong about the number.
+
+**IT WAS NINE, AND THE TENTH IS A CATEGORY ERROR.**
+`create_default_policy_defaults` sat on the ratchet beside the others and
+`RETURNS trigger` — it runs `FOR EACH ROW` on `projects`. PostgreSQL REFUSES a
+trigger function with declared arguments, so the change was not merely
+unnecessary for it but impossible; the generator asserted on `RETURNS trigger`
+and stopped. Nor is it needed: a trigger fires INSIDE someone else's statement,
+so `app.current_user_id` already holds whatever that statement set, and naming
+the actor is the caller's job.
+
+**Slice 11 also called it "reachable from nothing", and that was wrong for a
+related reason**: the call-site counter looks for RPC names, and a trigger is
+wired by `EXECUTE FUNCTION` rather than called by name. `20260609040000`
+attaches it. Corrected here and in §4.
+
+**The migration.** `_actor_user_id uuid DEFAULT NULL` is APPENDED to nine
+functions, so every existing caller keeps working with no change and no actor —
+exactly the old behaviour — and nothing regresses by omission. That is what
+makes a nine-function migration safe to land at once rather than as nine slices.
+
+**DROP AND CREATE, NOT CREATE OR REPLACE, AND THAT IS THE RISK IT CARRIES.**
+`CREATE OR REPLACE FUNCTION` cannot change a parameter count; it creates a second
+overload. Two overloads differing only by a trailing defaulted parameter make
+every unqualified `GRANT EXECUTE ON FUNCTION public.<name>` ambiguous and every
+PostgREST call a coin toss. So each is dropped and recreated — **and DROP takes a
+function's grants with it.** The artifact records functions and not privileges,
+so a grant that fails to come back is invisible to every static gate here and
+surfaces as the anon role silently losing an RPC.
+
+**── THE PART WORTH READING: THE GRANT ASSERTION COULD NOT FAIL ────────────**
+
+`rehearsal/210` §2 was written first as
+`has_function_privilege('anon', …, 'EXECUTE')`. The mutation that removed `anon`
+from a GRANT came back **GREEN**.
+
+The reason is that **PostgreSQL grants EXECUTE on a new function to PUBLIC by
+default**, so every role already has it and the question answers itself. Which
+means something worth writing down: **the explicit grants on these nine are
+belt-and-braces today.** Losing one would not break anything *while PUBLIC keeps
+EXECUTE* — and three migrations already `REVOKE ... FROM PUBLIC` for other
+functions (`get_my_profile`, `update_own_profile`, `change_own_password`), so the
+day that pattern reaches one of these, the explicit grant becomes the only thing
+keeping the anon role able to call it.
+
+The assertion is now about `proacl`: each role must appear as an EXPLICIT
+grantee, via `aclexplode`, with `grantee <> 0` — which is exactly what the
+migration writes and exactly what DROP removes. Both grant mutations are caught
+by it.
+
+**The bodies were copied mechanically, as in slice 11**, and the diff against
+each original was checked to be the appended parameter and the inserted block and
+nothing else. A `CREATE OR REPLACE` that silently drops a line of an existing
+function is a regression no gate here would catch, because the artifact would
+record the new body and agree with itself.
+
+**The callers.** Eleven client call sites now pass the actor — eight in
+`usePolicies.tsx`, two in `useItemMasters.tsx`, one in each of two `agent-apply`
+modules. **Ten `useCallback` dependency arrays gained `user?.id` with them**, and
+that was not lint appeasement: without it the callback closes over the user from
+first render, so a session change would attribute a write to the previous person.
+eslint found it; the baseline is 336/116 either side.
+
+**THREE CALL SITES PASS NOTHING, DELIBERATELY.**
+`supabase/functions/api/index.ts` has an API KEY as its principal — `keyId`,
+`orgId`, `scopes` — and no user uuid, because a key is issued to an organization
+rather than a person. `snapshot_dataset` already faces this there and does the
+same: `p_user_id: null` with the key named in `p_user_email`. Passing a
+fabricated uuid would make `actor_known` TRUE about somebody who did not act,
+which is worse than recording that the actor is unknown. Making an API key
+nameable in the audit plane is D28's question and WP 7.1's to answer.
+
+**The list is now a GATE.** Sixteen names became four, and none of the four is
+debt — three attribute through `assert_writer_may_act` and one is the trigger.
+`dataPlaneAudit.test.ts` fails if a name sits on the list without one of those
+two justifications, and separately if the trigger function stops returning
+`trigger`. There is no backlog left to park a new writer beside.
+
+**Verified:** red first (`210` §1 names all nine with the migration removed) ·
+all three rehearse modes green (20 assertion files) · `contract:check` ✓ ·
+410 tests ✓ (was 409) · `build` ✓ · eslint 336/116 and `audit:ui` 8, unchanged.
+
+**Gap check.** Three findings:
+
+1. **`audit-actor` (G4) is met in the SQL plane and NOT at the API edge**, and
+   the two should not be reported as one. Every `SECURITY DEFINER` writer now
+   names an actor when its caller supplies one; the API surface structurally
+   cannot supply one. That is a bounded, named exception rather than a backlog,
+   and it is the second thing in this plan (with D28's client-asserted identity)
+   that answers to WP 7.1.
+2. **A grant assertion that asks `has_function_privilege` can never fail in this
+   database.** §2 here was caught by a mutation, but nothing stops the next one
+   being written the same way. The general rule — privileges are asserted
+   against `proacl`, never against the effective privilege — belongs wherever
+   rehearsals are described.
+3. **Nothing gates the client side.** Eleven call sites pass the actor because
+   this slice edited them; a twelfth added tomorrow would compile, run, and
+   write an unattributed row. The function-side gate cannot see it. A lint rule
+   or a scan asserting that every `.rpc()` naming one of the fourteen passes
+   `_actor_user_id` would close the loop, and it is not written.
+
+**Still open in WP 6.2:** D18, D34, D51, D58, D66, D87, D94, D95, D96, D99.

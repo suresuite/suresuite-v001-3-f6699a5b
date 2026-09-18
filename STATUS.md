@@ -3,11 +3,59 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/phases-6-7-completion-buvlel` · **Started from:** `a6a80ff` (PR #224 merged) · **5 packages closed + WP 6.2 slices 1–11** · no PR open
+**Branch:** `claude/phases-6-7-completion-buvlel` · **Started from:** `a6a80ff` (PR #224 merged) · **5 packages closed + WP 6.2 slices 1–12** · no PR open
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 12) — The remaining nine, in one migration · `20260918000003`
+
+**D71 CLOSED. `audit-actor` (G4) is met in the SQL plane** — every
+`SECURITY DEFINER` writer now names an actor when its caller supplies one.
+
+Slice 11's gap check said the remaining ten were one migration, not ten. **It was
+nine**: `create_default_policy_defaults` `RETURNS trigger` and PostgreSQL refuses
+a trigger function with declared arguments — and does not need one, because a
+trigger fires inside someone else's statement where the GUC is already set.
+Slice 11's note that it was "reachable from nothing" was wrong for the same
+reason: a trigger is wired by `EXECUTE FUNCTION`, not called by name.
+
+`_actor_user_id uuid DEFAULT NULL` is appended, so every existing caller kept
+working with no change and no actor. Eleven client call sites now pass it.
+
+⚠️ **The grant assertion could not fail, and finding out why was the slice.**
+`rehearsal/210` §2 first asked `has_function_privilege('anon', …)`. The mutation
+removing `anon` from a GRANT came back GREEN — **PostgreSQL grants EXECUTE to
+PUBLIC by default**, so the question answers itself. Which means the explicit
+grants on these nine are belt-and-braces *today*, over a default that three
+migrations already revoke for other functions. The assertion now checks
+`proacl` via `aclexplode` for an EXPLICIT grantee — what the migration writes and
+what DROP removes. Both grant mutations are caught.
+
+**Why DROP and CREATE at all:** `CREATE OR REPLACE` cannot change a parameter
+count, and two overloads differing by a trailing defaulted parameter make every
+unqualified GRANT ambiguous and every PostgREST call a coin toss.
+
+⚠️ **Ten `useCallback` dependency arrays gained `user?.id`, and that was not lint
+appeasement** — without it the callback closes over the user from first render,
+so a session change would attribute a write to the previous person.
+
+**Three call sites pass nothing, deliberately.** `supabase/functions/api/index.ts`
+has an API KEY as its principal and no user uuid. Passing a fabricated one would
+make `actor_known` TRUE about somebody who did not act. That is D28 / WP 7.1.
+
+**The list is now a GATE, not a ratchet.** Sixteen names became four and none is
+debt: three attribute through `assert_writer_may_act`, one is the trigger. The
+test fails if a name sits there without one of those justifications.
+
+**Verified:** red first · three rehearse modes green (20 assertion files) ·
+`contract:check` ✓ · 410 tests ✓ · `build` ✓ · eslint 336/116 and `audit:ui` 8,
+unchanged.
+
+**Noted for whoever takes it:** nothing gates the CLIENT side. A twelfth call
+site added tomorrow would compile, run and write an unattributed row, and the
+function-side gate cannot see it.
 
 ### WP 6.2 (slice 11) — Three writers that already took the actor · `20260918000002`
 

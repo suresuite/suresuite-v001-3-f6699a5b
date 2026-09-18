@@ -245,36 +245,46 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
    *   bulk_insert_tier3_suppliers · combine_project_into_supply_chain
    *   delete_project · delete_project_dataset
    */
-  // WP 6.2 slice 11 · SIXTEEN → THIRTEEN. `apply_policy_bundle`,
-  // `assign_bom_line` and `assign_outbound_customer` left this list because
-  // `20260918000002` gave each the one line it was missing — every one of the
-  // three already TOOK `p_user_id` and simply never told the trigger, which is
-  // `assign_material_supplier`'s shape before `20260916000021`.
+  // WP 6.2 slices 11 + 12 · SIXTEEN → FOUR, AND THE FOUR ARE NOT DEBT.
   //
-  // THE TEN THAT REMAIN ARE A DIFFERENT SIZE, AND SAYING SO IS THE POINT OF A
-  // RATCHET. None of them takes an actor parameter at all, so closing one
-  // changes a signature AND every caller — a migration plus a client change,
-  // not one line. They are listed here rather than split into a second list
-  // because the invariant does not care why a row is unattributed.
+  // Slice 11 closed the three that already took `p_user_id` and never passed it
+  // on (`20260918000002`). Slice 12 closed the nine that took no actor at all,
+  // in ONE migration (`20260918000003`): `_actor_user_id uuid DEFAULT NULL`
+  // appended, so every existing caller kept working unchanged, plus the eleven
+  // client call sites that now pass it.
+  //
+  // WHAT IS LEFT IS NOT WORK, AND THAT IS THE WHOLE POINT OF KEEPING THE LIST:
+  //
+  //   · three attribute through `assert_writer_may_act` and are here only
+  //     because a text scan cannot follow a call (VIA_SHARED_PREAMBLE);
+  //   · one is a TRIGGER function (TRIGGER_FUNCTIONS).
+  //
+  // So the ratchet has become a GATE. `no NEW tier-2/3/4 writer may be added
+  // without setting app.current_user_id` no longer tolerates a backlog, because
+  // there is none.
   const UNATTRIBUTED = [
-    "analysis_mark_critical_nodes",
-    "bulk_upsert_materials", "bulk_upsert_policy_overrides", "bulk_upsert_products",
-    "bulk_upsert_suppliers", "clear_policy_preset",
-    "create_default_policy_defaults", "delete_policy_override",
-    "ensure_item_masters", "etl_replace_supply_chain",
-    "mrp_apply_staged_products", "restore_policy_version", "save_policy_defaults",
+    "analysis_mark_critical_nodes", "create_default_policy_defaults",
+    "etl_replace_supply_chain", "mrp_apply_staged_products",
   ];
 
   /**
-   * Three of the names above DO set the GUC — through
-   * `assert_writer_may_act`, which WP 4.1 wrote so three RPCs share one
-   * preamble instead of three copies of it. They stay on the list because a
-   * text scan cannot follow a call, and quietly special-casing them here would
-   * make the ratchet lie about its own method. The rehearsal is what proves
-   * those three: `supabase/rehearsal/110` §7 performs each write and reads the
-   * audit row back, with the GUC deliberately POISONED first so a row naming
-   * the right actor can only have come from the RPC.
+   * `create_default_policy_defaults` CANNOT take the actor and does not need to.
+   *
+   * It `RETURNS trigger` and runs `FOR EACH ROW` on `projects`
+   * (`20260609040000`). PostgreSQL REFUSES a trigger function with declared
+   * arguments, so slice 12's change is not merely unnecessary for it — it is
+   * impossible; the generator asserted on `RETURNS trigger` and stopped.
+   *
+   * Nor is it needed: a trigger fires INSIDE someone else's statement, so
+   * `app.current_user_id` already holds whatever that statement established.
+   * Naming the actor is the caller's job and never the trigger's.
+   *
+   * Slice 11 also called this one "reachable from nothing", which was wrong for
+   * a related reason: the call-site counter looks for RPC names, and a trigger
+   * is wired by `EXECUTE FUNCTION` rather than called by name.
    */
+  const TRIGGER_FUNCTIONS = new Set(["create_default_policy_defaults"]);
+
   const VIA_SHARED_PREAMBLE = new Set([
     "analysis_mark_critical_nodes", "etl_replace_supply_chain", "mrp_apply_staged_products",
   ]);
@@ -385,53 +395,63 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
     expect(stale, `no longer unattributed — remove from UNATTRIBUTED`).toEqual([]);
   });
 
-  it("the remaining debt is sized by COUNTING call sites, not by remembering a number", () => {
-    // §4 D71 and D78 both carry a figure for how many of the unattributed
-    // writers have a live caller — "seventeen", then "six". **Both were wrong
-    // when WP 6.2 slice 11 measured them**: TWELVE of the thirteen were
-    // reachable, and NINE of the ten left after that slice still are — only
-    // `create_default_policy_defaults` has no caller anywhere.
-    // A budget figure in prose goes stale the moment a caller is added or
-    // removed and nothing notices, which is the same failure the two orphan
-    // tables were (D3, D4). So it is derived here instead.
+  it("there is no remaining one-line or signature-change debt — the class is closed", () => {
+    // §4 D71 carried a budget figure twice — "seventeen live", then "six" — and
+    // both were wrong when slice 11 measured them (twelve of thirteen were
+    // reachable). A number in prose goes stale the moment a caller moves and
+    // nothing notices, which is the defect the two orphan tables were (D3, D4).
     //
-    // This is not a ratchet — the count may move in either direction. It fails
-    // when the PROSE stops matching, which is what makes editing one without
-    // the other impossible.
-    const live = UNATTRIBUTED.filter((n) => !VIA_SHARED_PREAMBLE.has(n))
-      .filter((n) => callSites(n) > 0);
+    // It is now ZERO, and derived rather than remembered: every name left on the
+    // list is either attributing through a shared preamble or a trigger
+    // function, and both are justified above rather than owed.
+    const owed = UNATTRIBUTED.filter(
+      (n) => !VIA_SHARED_PREAMBLE.has(n) && !TRIGGER_FUNCTIONS.has(n),
+    );
     expect(
-      live.length,
-      `${live.length} of the ${UNATTRIBUTED.length - VIA_SHARED_PREAMBLE.size} genuinely ` +
-        `unattributed writers are reachable from the application: ${live.join(", ")}. ` +
-        `§4 D71's "re-budget for it" line must state this number. Update BOTH.`,
-    ).toBe(9);
-  });
-
-  it("every name still on the ratchet takes NO actor parameter — the three that did are gone", () => {
-    // What made slice 11's three cheap was that the actor was already a
-    // parameter: one line, no signature change, no client change. Every name
-    // left needs a signature change AND every caller updated, and a reader who
-    // cannot tell those apart will budget the remaining ten as ten one-liners.
-    const withActor = UNATTRIBUTED
-      .filter((n) => !VIA_SHARED_PREAMBLE.has(n))
-      .filter((n) => /\b(p_|_)(user_id|actor_user_id|user_email)\b/.test(fn(n)?.sql?.split("AS")[0] ?? ""));
-    expect(
-      withActor,
-      `these still take an actor and do not pass it on — that is the ONE-LINE ` +
-        `shape (assign_material_supplier, WP 3.3; the three in 20260918000002). ` +
-        `Close them before the ten that need a signature change.`,
+      owed,
+      `these SECURITY DEFINER writers still name no actor and have no reason not ` +
+        `to. \`audit-actor\` (G4) is not met while this list is non-empty, and §4 ` +
+        `D71 must state the same count.`,
     ).toEqual([]);
   });
 
-  it("the FIVE that now name their actor still do", () => {
-    // `assign_material_supplier` (WP 3.3), `snapshot_dataset` (WP 4.1) and the
-    // three WP 6.2 slice 11 closed. A regression in any is the invariant going
-    // backwards, and `supabase/rehearsal/200` proves the three against a real
-    // database with the GUC poisoned first.
+  it("a name may only sit on the list for a REASON, not as a backlog", () => {
+    // The list is no longer a ratchet, so the way it could rot is a future name
+    // being parked on it. Every entry must be in one of the two justified
+    // categories — which is the assertion above stated from the other side, and
+    // it is what stops the next writer being added to the list instead of fixed.
+    const unjustified = UNATTRIBUTED.filter(
+      (n) => !VIA_SHARED_PREAMBLE.has(n) && !TRIGGER_FUNCTIONS.has(n),
+    );
+    expect(unjustified).toEqual([]);
+    expect(
+      [...VIA_SHARED_PREAMBLE, ...TRIGGER_FUNCTIONS].every((n) => UNATTRIBUTED.includes(n)),
+      "a justification names a function that is no longer on the list — delete the justification too",
+    ).toBe(true);
+  });
+
+  it("the trigger function is still a trigger function", () => {
+    // Its exemption rests entirely on that. If it ever becomes an ordinary
+    // SECURITY DEFINER RPC, it owes the actor like every other one.
+    const def = fn("create_default_policy_defaults");
+    expect(def, "create_default_policy_defaults is gone — remove it from TRIGGER_FUNCTIONS").toBeDefined();
+    expect(
+      /RETURNS\s+trigger/i.test(def!.sql),
+      "it no longer RETURNS trigger, so the exemption above no longer applies",
+    ).toBe(true);
+  });
+
+  it("the FOURTEEN that name their actor still do", () => {
+    // `assign_material_supplier` (WP 3.3), `snapshot_dataset` (WP 4.1), the
+    // three slice 11 closed and the nine slice 12 closed. A regression in any is
+    // the invariant going backwards, and `supabase/rehearsal/200` and `/210`
+    // prove them against a real database with the GUC poisoned first.
     for (const name of [
       "assign_material_supplier", "snapshot_dataset",
       "apply_policy_bundle", "assign_bom_line", "assign_outbound_customer",
+      "bulk_upsert_materials", "bulk_upsert_policy_overrides", "bulk_upsert_products",
+      "bulk_upsert_suppliers", "clear_policy_preset", "delete_policy_override",
+      "ensure_item_masters", "restore_policy_version", "save_policy_defaults",
     ]) {
       expect(fn(name).sql, `${name} stopped setting the actor GUC`).toMatch(
         /set_config\s*\(\s*'app\.current_user_id'/i,

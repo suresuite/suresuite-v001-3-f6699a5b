@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 329,
-  "migrations_applied": 321,
+  "migrations_found": 330,
+  "migrations_applied": 322,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260918000002_actor_on_three_definer_writers.sql",
+  "last_migration": "20260918000003_actor_on_the_remaining_nine.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -21722,55 +21722,59 @@
     },
     {
       "name": "bulk_upsert_materials",
-      "signature": "bulk_upsert_materials(uuid, jsonb)",
+      "signature": "bulk_upsert_materials(uuid, jsonb, uuid)",
       "args": [
         "p_project_id uuid",
-        "p_rows jsonb"
+        "p_rows jsonb",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260702000001_item_master_write_rpcs.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "bulk_upsert_policy_overrides",
-      "signature": "bulk_upsert_policy_overrides(uuid, jsonb)",
+      "signature": "bulk_upsert_policy_overrides(uuid, jsonb, uuid)",
       "args": [
         "p_project_id uuid",
-        "p_rows jsonb"
+        "p_rows jsonb",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": "WP 4.4 · takes an optional per-row `seeded` boolean and stamps ",
-      "defined_by": "20260917000008_one_staleness_rule.sql"
+      "comment": null,
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "bulk_upsert_products",
-      "signature": "bulk_upsert_products(uuid, jsonb)",
+      "signature": "bulk_upsert_products(uuid, jsonb, uuid)",
       "args": [
         "p_project_id uuid",
-        "p_rows jsonb"
+        "p_rows jsonb",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260712000001_product_demand_bounds.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "bulk_upsert_suppliers",
-      "signature": "bulk_upsert_suppliers(uuid, jsonb)",
+      "signature": "bulk_upsert_suppliers(uuid, jsonb, uuid)",
       "args": [
         "p_project_id uuid",
-        "p_rows jsonb"
+        "p_rows jsonb",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260702000001_item_master_write_rpcs.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "capabilities_for_user",
@@ -21847,15 +21851,16 @@
     },
     {
       "name": "clear_policy_preset",
-      "signature": "clear_policy_preset(uuid)",
+      "signature": "clear_policy_preset(uuid, uuid)",
       "args": [
-        "p_project_id uuid"
+        "p_project_id uuid",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260609040000_consolidated_safe.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "combine_project_into_supply_chain",
@@ -22273,18 +22278,19 @@
     },
     {
       "name": "delete_policy_override",
-      "signature": "delete_policy_override(uuid, text, text, text)",
+      "signature": "delete_policy_override(uuid, text, text, text, uuid)",
       "args": [
         "p_project_id uuid",
         "p_scope text",
         "p_target_key text",
-        "p_family text"
+        "p_family text",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260609040000_consolidated_safe.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "delete_policy_version",
@@ -22417,15 +22423,16 @@
     },
     {
       "name": "ensure_item_masters",
-      "signature": "ensure_item_masters(uuid)",
+      "signature": "ensure_item_masters(uuid, uuid)",
       "args": [
-        "p_project_id uuid"
+        "p_project_id uuid",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260614000001_item_master.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "etl_replace_supply_chain",
@@ -23741,15 +23748,16 @@
     },
     {
       "name": "restore_policy_version",
-      "signature": "restore_policy_version(uuid)",
+      "signature": "restore_policy_version(uuid, uuid)",
       "args": [
-        "p_version_id uuid"
+        "p_version_id uuid",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260612000001_policy_version_snapshots.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "review_agent_proposal",
@@ -23823,20 +23831,21 @@
     },
     {
       "name": "save_policy_defaults",
-      "signature": "save_policy_defaults(uuid, text, jsonb, text, text, timestamptz)",
+      "signature": "save_policy_defaults(uuid, text, jsonb, text, text, timestamptz, uuid)",
       "args": [
         "p_project_id uuid",
         "p_family text",
         "p_value jsonb",
         "p_strategy text DEFAULT NULL",
         "p_active_preset text DEFAULT NULL",
-        "p_preset_applied_at timestamptz DEFAULT NULL"
+        "p_preset_applied_at timestamptz DEFAULT NULL",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260609040000_consolidated_safe.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "save_project_memory",
