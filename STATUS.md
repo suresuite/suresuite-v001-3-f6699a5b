@@ -3,11 +3,88 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–8** · PR [#223](https://github.com/suresuite/suresuite-v001-3-f6699a5b/pull/223) open
+**Branch:** `claude/phases-6-7-completion-buvlel` · **Started from:** `f555409` (PR #223 merged) · **5 packages closed + WP 6.2 slices 1–9** · no PR open
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 9) — One parser, four defects, two aborted migrations · no migration
+
+**D49, D59, D97 and D98 closed.** Slice 8's gap check and §13 both said the same
+thing — the introspector is incomplete about DEPENDENT objects one kind at a
+time, fix them together — and taking that at face value is what found the rest.
+
+**D59.** `parseColumn` dropped every `CHECK` written inline on a column.
+**24 recorded CHECKs became 84**, and `ingest_files` publishes its three rules —
+the source-kind vocabulary, `byte_size >= 0`, the SHA-256 shape — for the first
+time (§5 T1). The stated gap of "253 vs 24" does not survive counting: 253 is
+every `CHECK (` in the directory, shadowed re-declarations and policy `WITH CHECK`
+included. The honest figure is 65 inline column CHECKs plus one on an ADD COLUMN.
+
+⚠️ **The naming was the fix, not a detail.** PostgreSQL calls an unnamed column
+CHECK `<table>_<column>_check`. Recording `name: null` is honest about the
+migration text and wrong about the database: five migrations widen
+`ai_chat_events.event_kind` by DROP-and-ADD of that exact name, and a constraint
+with no name matches no DROP — so the artifact kept the NARROWEST vocabulary
+beside the widest. The base build failing on a duplicate name was the lucky
+outcome.
+
+**D98 — D59's second stated cost, measured.** Restoring the CHECKs turned four
+rehearsal files red. Each had seeded a row production cannot hold: `user_files.kind
+= 'report'`, `ingest_runs.triggered_by = 'schedule'`, an **email** in the same
+column (`170`, whose whole subject is the column next to it), and `'{}'::jsonb`
+in `proposals.provenance`, which is TEXT. No live writer is affected —
+`ingest_land_file` writes `'manual'` — so the four fixture rows were fixed and the
+constraints left alone.
+
+**D49 was two defects.** Its row named three indexes and one cause; the cause is
+right for ONE. `supply_chain_data_multi_tier` has never had `material_id` or
+`higher_level_component_id`, so no rename produced them — `CREATE INDEX IF NOT
+EXISTS` guards the NAME, not the column, and PostgreSQL raises 42703.
+
+**D97 — two migrations aborted in production and nothing has ever said so.**
+`20250909153130` died on that index; `20250909153231`, **61 seconds later**,
+re-issues its other four statements without the two impossible lines. Teaching
+the replay that a rejected statement aborts its file found a second:
+`20250914113723` indexes `simulation_jobs(job_id)`, and **34 seconds later**
+`20250914113757` adds the column. Both were invisible because the abort detector
+keys only on the corroboration test, which a file that creates no table cannot
+trip.
+
+⚠️ **The order between the two kinds of evidence nearly cost `natural-key` (I4).**
+The first draft read rejected statements from the FIRST replay and accused
+`20260916000018` — WP 3.3's seven unique indexes — because `inbound_logistics`
+still carried aborted `20250820145017`'s `plant_id` at that point. The index was
+right; the schema it was judged against never existed. R5 is a `fail`, so that
+would have gone red on `main` for a reason nobody could read. The gate now
+asserts by name that it is NOT accused.
+
+**And the gate made the same mistake twice, in itself** — first judging history
+against the final schema (accusing a pre-rename index), then against every column
+a table ever had without following the table RENAME (accusing
+`ingest_runs(link_id)`). That second one is D52 reappearing inside the gate for
+D49. A rule about dependent objects is itself a dependent object.
+
+**Nine mutations, all caught.** Five against the introspector (rename stops
+following; inline CHECKs dropped; rejection detector disabled; the two abort kinds
+out of order; `name: null` instead of the auto-name). Four against
+`rehearsal/180` on a live database (one CHECK removed → raises, not skips; all
+three removed → skips and says so while §3/§4 still run; a CHECK replaced by a
+tautology → §2 catches it; each bad index put back → §3/§4 raise).
+
+**The skip in `180` §1 is safe for the reason slice 8's was not**:
+`introspectorDependents.test.ts` was written, run red, and mutation-tested BEFORE
+the rehearsal existed.
+
+**Verified:** all three rehearse modes green (17 assertion files) ·
+`contract:check` ✓ · 392 tests ✓ (was 380) · `build` ✓ · eslint 336/116 and
+`audit:ui` 8, unchanged.
+
+**Noted for whoever takes it:** D48 is now one loop away — it is a migration that
+aborts on 42P13, the same shape as D97, and the rehearsal already prints that
+error. Seventeen historical definitions do not replay and nothing asks which of
+them sit in a file whose other statements the artifact believes.
 
 ### WP 6.2 (slice 8) — Nine foreign keys that never existed · no migration
 

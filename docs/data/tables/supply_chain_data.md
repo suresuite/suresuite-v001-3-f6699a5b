@@ -440,12 +440,12 @@ WP 4.3 · when the run that wrote the criticality columns finished. It is proven
 | Index | Columns | Unique | Added by |
 |---|---|---|---|
 | `idx_supply_chain_data_uploaded_by` | `uploaded_by` | no | `20250816052311_4c23d5ab-f132-41b1-8924-47d1d14f5a27.sql` |
-| `idx_supply_chain_data_plant` | `plant` | no | `20250816052311_4c23d5ab-f132-41b1-8924-47d1d14f5a27.sql` |
+| `idx_supply_chain_data_plant` | `plant_name` | no | `20250816052311_4c23d5ab-f132-41b1-8924-47d1d14f5a27.sql` |
 | `idx_supply_chain_data_project_id` | `project_id` | no | `20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql` |
 | `idx_supply_chain_data_data_source` | `data_source` | no | `20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql` |
 | `idx_scd_project_id` | `project_id` | no | `20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql` |
-| `idx_supply_chain_data_project_data_source` | `project_id`, `data_source` | no | `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` |
-| `idx_supply_chain_data_from_to_locations` | `project_id`, `from_location`, `to_location` | no | `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` |
+| `idx_supply_chain_data_project_data_source` | `project_id`, `data_source` | no | `20250909153231_00d6f1a2-b407-4464-9884-b98cda90556f.sql` |
+| `idx_supply_chain_data_from_to_locations` | `project_id`, `from_location`, `to_location` | no | `20250909153231_00d6f1a2-b407-4464-9884-b98cda90556f.sql` |
 | `idx_supply_chain_data_zero_flow_filtered` | `is_zero_flow_filtered` | no | `20250925150727_13bdb56c-13dc-4bfe-94b7-eb51f213f2e3.sql` |
 | `idx_scd_project_from` | `project_id`, `data_source`, `from_location` | no | `20260712110000_network_metrics_check_performance.sql` |
 | `idx_scd_project_to` | `project_id`, `data_source`, `to_location` | no | `20260712110000_network_metrics_check_performance.sql` |
@@ -453,6 +453,6 @@ WP 4.3 · when the run that wrote the criticality columns finished. It is proven
 
 ---
 
-*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
+*Generated from data contract `81c7c8c0e8bb`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data.contract.yaml`, table created by `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

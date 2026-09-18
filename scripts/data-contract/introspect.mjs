@@ -24,7 +24,7 @@
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { splitStatements, splitTopLevel, parenBody, readQualifiedName, squash } from "./sql-lex.mjs";
+import { splitStatements, splitTopLevel, parenBody, readQualifiedName, renameIdentifier, squash } from "./sql-lex.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MIGRATIONS = join(ROOT, "supabase", "migrations");
@@ -48,6 +48,7 @@ class Schema {
     this.dropped = [];            // tables dropped after creation
     this.phantom = new Map();     // referenced by DDL, created by no migration
     this.dynamic = [];            // plpgsql this pass could not EVALUATE — see below
+    this.impossible = [];         // statements PostgreSQL would REJECT — see CREATE INDEX
   }
 
   table(name) { return this.tables.get(name); }
@@ -92,6 +93,18 @@ function parseColumn(def, migration) {
   const isPk = /\bPRIMARY\s+KEY\b/i.test(mods);
   return {
     name: id.name,
+    // §4 D59 — A CHECK WRITTEN INLINE ON A COLUMN IS STILL A CONSTRAINT.
+    // This parser read the type, the NOT NULL and the DEFAULT and dropped the
+    // rest, so 65 inline CHECKs across the migration history were recorded
+    // nowhere. It cost twice: `rehearsal-schema.mjs` rebuilds constraints FROM
+    // this artifact, so the rehearsed database did not refuse a value production
+    // refuses — an assertion that a bad value is rejected passed against the
+    // migration and failed against the artifact; and `generate.mjs` renders a
+    // table's CHECK list, so a rule that rejects a user's upload appeared in no
+    // document (§5 T1). `20260916000014` walks around it for NEW migrations by
+    // writing every CHECK table-level; that is a convention, not a gate, and it
+    // does nothing for the 65 already written.
+    checks: inlineChecks(mods),
     quoted: id.quoted,
     type: normalizeType(type),
     type_raw: type,
@@ -134,6 +147,60 @@ function normalizeType(t) {
   const base = s.replace(/\(.*$/, "").replace(/\[\s*\]$/, "").trim();
   if (alias[base]) s = s.replace(base, alias[base]);
   return s;
+}
+
+/**
+ * The inline CHECKs on one column definition, in source order.
+ *
+ * `CHECK (...)` and `CONSTRAINT <name> CHECK (...)` both count; the name is
+ * kept when the migration gave one and left null when it did not, because
+ * Postgres invents the same name from the same table and column either way.
+ */
+function inlineChecks(mods) {
+  const out = [];
+  let depth = 0;
+  let i = 0;
+  while (i < mods.length) {
+    const c = mods[i];
+    if (c === "'") { i = skipQuoted(mods, i, "'"); continue; }
+    if (c === '"') { i = skipQuoted(mods, i, '"'); continue; }
+    if (c === "(") { depth++; i++; continue; }
+    if (c === ")") { depth--; i++; continue; }
+    if (depth === 0 && /^[A-Za-z_]/.test(c) && !/[A-Za-z0-9_$]/.test(mods[i - 1] ?? " ")) {
+      const named = /^CONSTRAINT\s+/i.exec(mods.slice(i));
+      let at = i;
+      let name = null;
+      if (named) {
+        const id = readQualifiedName(mods, i + named[0].length);
+        if (id && /^\s*CHECK\b/i.test(mods.slice(id.end))) { name = id.name; at = id.end; }
+      }
+      const kw = /^\s*CHECK\b/i.exec(mods.slice(at));
+      if (kw) {
+        const body = parenBody(mods, at + kw[0].length);
+        if (body) {
+          out.push({ name, definition: `CHECK (${squash(body.body)})` });
+          i = body.end + 1;
+          continue;
+        }
+      }
+      const word = /^[A-Za-z_][A-Za-z_0-9$]*/.exec(mods.slice(i));
+      i += word ? word[0].length : 1;
+      continue;
+    }
+    i++;
+  }
+  return out;
+}
+
+/** Index one past the closing `q` of the literal or quoted identifier at `i`. */
+function skipQuoted(s, i, q) {
+  i++;
+  while (i < s.length) {
+    if (s[i] === q) { if (s[i + 1] === q) { i += 2; continue; } return i + 1; }
+    if (q === "'" && s[i] === "\\") { i += 2; continue; }
+    i++;
+  }
+  return s.length;
 }
 
 function parseTableConstraint(def, migration) {
@@ -305,6 +372,36 @@ function apply(schema, stmt, migration, guarded = false) {
     const tail = cols ? after.slice(cols.end + 1) : "";
     const nullsNotDistinct = /^\s*NULLS\s+NOT\s+DISTINCT\b/i.test(tail);
     if (name && t.indexes.some((i) => i.name === name)) return; // IF NOT EXISTS
+    // AN INDEX ON A COLUMN THE TABLE DOES NOT HAVE IS NOT AN INDEX; IT IS AN
+    // ERROR, AND EVERY STATEMENT AFTER IT IN THE FILE NEVER RAN.
+    //
+    // `IF NOT EXISTS` guards the index NAME, not the column: Postgres raises
+    // 42703 and the migration's transaction rolls back. §4 D49 recorded three
+    // such indexes as one defect with one cause (a column rename the
+    // introspector did not follow), and that cause is right for exactly ONE of
+    // them. `supply_chain_data_multi_tier` has never had `material_id` or
+    // `higher_level_component_id` in any definition — they are
+    // `bom_multi_level`'s columns — so `20250909153130` ABORTED in production,
+    // and `20250909153231` is its retry with those two lines removed. Same
+    // class as D48, found the same way: by a static replay recording a
+    // statement that cannot have run.
+    //
+    // Recorded, not applied. `build()` treats the file as aborted and replays
+    // without it, which is the only state the database can ever have been in.
+    const bare = (cols ? splitTopLevel(cols.body).map((c) => squash(c)) : [])
+      .filter((c) => /^[a-z_][a-z0-9_]*$/.test(c));
+    const missing = bare.filter((c) => !t.columns.some((col) => col.name === c));
+    if (missing.length) {
+      schema.impossible.push({
+        migration,
+        statement: s.slice(0, 220),
+        table: t.name,
+        why:
+          `CREATE INDEX names ${missing.join(", ")}, which ${t.name} does not have. ` +
+          "Postgres raises 42703 and the file's transaction rolls back.",
+      });
+      return;
+    }
     t.indexes.push({
       name,
       unique,
@@ -510,12 +607,31 @@ function applyAlter(schema, t, action, migration, whole) {
     const col = parseColumn(a.slice(m[0].length), migration);
     if (!col) return note(schema, migration, a, "ADD COLUMN that could not be parsed");
     if (t.columns.some((c) => c.name === col.name)) return; // IF NOT EXISTS
+    // An inline CHECK arrives on an ADD COLUMN too (§4 D59): `20250923120308`
+    // adds `data_type text NOT NULL DEFAULT 'curated' CHECK (data_type IN (...))`.
+    for (const chk of col.checks ?? []) {
+      t.constraints.push({
+        name: chk.name ?? autoCheckName(t.name, col.name, t.constraints),
+        kind: "CHECK", columns: [col.name],
+        definition: chk.definition, implicit: true, added_by: migration,
+      });
+    }
+    delete col.checks;
     t.columns.push(col);
     return;
   }
   if ((m = /^DROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?/i.exec(a))) {
     const id = readQualifiedName(a, m[0].length);
-    if (id) t.columns = t.columns.filter((c) => c.name !== id.name);
+    if (id) {
+      t.columns = t.columns.filter((c) => c.name !== id.name);
+      // Postgres drops a column's CHECK with the column. Now that an inline
+      // CHECK is recorded at all (§4 D59), leaving it behind would describe a
+      // constraint on a column that no longer exists — D49's defect, arrived at
+      // from the other direction.
+      t.constraints = t.constraints.filter(
+        (c) => !(c.kind === "CHECK" && c.implicit && c.columns?.length === 1 && c.columns[0] === id.name),
+      );
+    }
     return;
   }
   if ((m = /^RENAME\s+COLUMN\s+/i.exec(a)) || (m = /^RENAME\s+(?!TO|CONSTRAINT)/i.exec(a))) {
@@ -523,7 +639,10 @@ function applyAlter(schema, t, action, migration, whole) {
     const toAt = /\bTO\s+/i.exec(a.slice(from.end));
     const to = toAt && readQualifiedName(a, from.end + toAt.index + toAt[0].length);
     const col = from && t.columns.find((c) => c.name === from.name);
-    if (col && to) { col.name = to.name; col.quoted = to.quoted; col.renamed_by = migration; }
+    if (col && to) {
+      col.name = to.name; col.quoted = to.quoted; col.renamed_by = migration;
+      renameInDependents(t, from.name, to.name);
+    }
     return;
   }
   if ((m = /^RENAME\s+TO\s+/i.exec(a))) {
@@ -603,6 +722,35 @@ function applyAlter(schema, t, action, migration, whole) {
   note(schema, migration, a, "ALTER TABLE action not recognised");
 }
 
+/**
+ * A column RENAME, followed into every dependent object on the same table.
+ *
+ * §4 D49: `20250822025432` renames `supply_chain_data.plant` to `plant_name`.
+ * Postgres rewrites the index entry with the column, so production's index is
+ * on `plant_name`; the artifact kept `plant`, and `rehearsal-schema.mjs` then
+ * SKIPPED the index with a warning — on every rehearsal this repository has
+ * run. Three indexes were wrong that way, across two tables.
+ *
+ * This is the same fix as the `RENAME TO` branch above, which follows a TABLE
+ * rename into foreign keys (D52). Both exist because the artifact records
+ * dependents by NAME while Postgres tracks them by OID.
+ */
+function renameInDependents(t, from, to) {
+  for (const idx of t.indexes) {
+    idx.columns = (idx.columns ?? []).map((c) => renameIdentifier(c, from, to));
+    if (idx.predicate) idx.predicate = renameIdentifier(idx.predicate, from, to);
+  }
+  for (const c of t.constraints) {
+    // A FOREIGN KEY's definition names the TARGET table's columns as well as
+    // this one's, and this rewrite cannot tell them apart — so it is left to
+    // the column-level `references`, which is keyed by column and unambiguous.
+    if (c.kind === "FOREIGN KEY") continue;
+    c.columns = (c.columns ?? []).map((x) => (x === from ? to : x));
+    if (typeof c.definition === "string") c.definition = renameIdentifier(c.definition, from, to);
+    if (c.name === `${t.name}_${from}_key`) c.name = `${t.name}_${to}_key`;
+  }
+}
+
 /** `DROP TABLE x CASCADE` removes FKs pointing at x, but NOT the columns. */
 function dropDependentFks(schema, gone, migration) {
   for (const t of schema.tables.values()) {
@@ -641,6 +789,37 @@ function liftImplicitConstraints(table, columns, constraints, migration) {
         definition: `UNIQUE (${c.name})`, implicit: true, added_by: migration,
       });
     }
+    for (const chk of c.checks ?? []) {
+      // `columns` carries the column the CHECK was written ON, which is what a
+      // later DROP COLUMN needs in order to take the constraint with it.
+      constraints.push({
+        name: chk.name ?? autoCheckName(table, c.name, constraints),
+        kind: "CHECK", columns: [c.name],
+        definition: chk.definition, implicit: true, added_by: migration,
+      });
+    }
+  }
+}
+
+/**
+ * The name PostgreSQL invents for an unnamed column CHECK: `<table>_<column>_check`,
+ * then `_check1`, `_check2` when that is taken.
+ *
+ * NOT COSMETIC, AND THE FIRST DRAFT LEFT IT null. `ai_chat_events.event_kind`
+ * carries an inline CHECK from `20260715000002`, and FIVE later migrations
+ * widen its vocabulary with `DROP CONSTRAINT IF EXISTS
+ * ai_chat_events_event_kind_check` followed by an `ADD CONSTRAINT` of the same
+ * name. A constraint recorded with no name matches no DROP, so the artifact
+ * kept the ORIGINAL, NARROWEST version alongside the final one — and the base
+ * build failed on the duplicate name, which is the lucky outcome. The unlucky
+ * one is a rehearsed database that refuses values production accepts.
+ */
+function autoCheckName(table, column, constraints) {
+  const base = `${table}_${column}_check`;
+  if (!constraints.some((c) => c.name === base)) return base;
+  for (let n = 1; ; n++) {
+    const tried = `${base}${n}`;
+    if (!constraints.some((c) => c.name === tried)) return tried;
   }
 }
 
@@ -657,6 +836,7 @@ function parseBody(body, migration, table) {
   const pk = constraints.find((c) => c.kind === "PRIMARY KEY");
   if (pk) for (const c of columns) if (pk.columns.includes(c.name)) c.nullable = false;
   liftImplicitConstraints(table, columns, constraints, migration);
+  for (const c of columns) delete c.checks;
   return { columns, constraints };
 }
 
@@ -935,18 +1115,51 @@ function build() {
   // is a byte-for-byte retry of `20250820145017` and fails for the same reason.
   // Each round adopts at most the files the writers contradict, so it terminates.
   const aborted = new Set();
+  const why = new Map();          // migration -> the reason it aborted
   let schema = replay(files);
   let adopted = resolveShadowed(schema, writeSites);
-  for (let round = 0; round < 20; round++) {
-    const fresh = [...new Set(adopted.map((a) => a.over))].filter((m) => !aborted.has(m));
-    if (fresh.length === 0) break;
-    for (const m of fresh) aborted.add(m);
+
+  // TWO KINDS OF ABORT, AND THE ORDER BETWEEN THEM IS LOAD-BEARING.
+  //
+  // (a) The corroboration test: of two CREATE TABLEs for one table, the later
+  //     INSERTs agree with one and contradict the other.
+  // (b) A statement PostgreSQL REJECTS — today, a CREATE INDEX on a column the
+  //     table does not have (42703). `IF NOT EXISTS` guards the index name, not
+  //     the column, so the file's transaction rolls back and nothing in it ran.
+  //
+  // (b) MUST NOT BE READ BEFORE (a) HAS SETTLED, and the first draft of this
+  // did, which is how it accused `20260916000018` — WP 3.3's seven unique
+  // indexes, the whole of `natural-key` (I4) — of aborting. It reads
+  // `inbound_logistics(plant_name, …)`, and in a replay where `20250820145017`
+  // has not yet been excluded `inbound_logistics` still carries that file's
+  // `plant_id`. The index was right; the schema it was judged against was the
+  // one that never existed. Settle (a) first, then judge (b) against the
+  // corrected shape, and re-settle (a) in case excluding a file moved it.
+  for (let outer = 0; outer < 20; outer++) {
+    let moved = false;
+    for (let round = 0; round < 20; round++) {
+      const fresh = [...new Set(adopted.map((a) => a.over))].filter((m) => !aborted.has(m));
+      if (fresh.length === 0) break;
+      for (const m of fresh) {
+        aborted.add(m);
+        why.set(m, "a later migration's CREATE TABLE is corroborated by every subsequent INSERT while this one's is contradicted — so this file's transaction rolled back and none of its statements took effect");
+      }
+      moved = true;
+      schema = replay(files, aborted);
+      adopted = resolveShadowed(schema, writeSites);
+    }
+    const rejected = [...new Set(schema.impossible.map((i) => i.migration))].filter((m) => !aborted.has(m));
+    if (rejected.length === 0) { if (!moved) break; continue; }
+    for (const m of rejected) {
+      aborted.add(m);
+      why.set(m, schema.impossible.find((i) => i.migration === m).why + " Nothing else in the file ran either.");
+    }
     schema = replay(files, aborted);
     adopted = resolveShadowed(schema, writeSites);
   }
   schema.aborted_migrations = [...aborted].sort().map((m) => ({
     migration: m,
-    why: "a later migration's CREATE TABLE is corroborated by every subsequent INSERT while this one's is contradicted — so this file's transaction rolled back and none of its statements took effect",
+    why: why.get(m),
     tables_it_claimed: tablesClaimedBy(files, m),
   }));
 

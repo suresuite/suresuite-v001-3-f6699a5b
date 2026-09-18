@@ -198,3 +198,53 @@ export function readQualifiedName(s, from = 0) {
 
 /** Collapse whitespace so a definition can be compared or printed on one line. */
 export const squash = (s) => s.replace(/\s+/g, " ").trim();
+
+/**
+ * Rewrite every occurrence of the identifier `from` as `to`, leaving string
+ * literals, dollar-quoted bodies and function names alone.
+ *
+ * A column RENAME in Postgres follows the column by OID into every dependent
+ * object — indexes, CHECK expressions, index predicates — without any of them
+ * being restated. The artifact records those by NAME, so unless they are
+ * rewritten here it describes objects the database cannot have. That is §4 D49
+ * (three indexes on `supply_chain_data`/`supply_chain_data_multi_tier`) and the
+ * same shape as D52, which followed a TABLE rename into foreign keys.
+ *
+ * Deliberately narrow: an identifier immediately followed by `(` is a function
+ * call, not a column, and is left as it is.
+ */
+export function renameIdentifier(sql, from, to) {
+  if (typeof sql !== "string" || !from || from === to) return sql;
+  const lower = from.toLowerCase();
+  const rendered = /^[a-z_][a-z0-9_]*$/.test(to) ? to : `"${to.replace(/"/g, '""')}"`;
+  let out = "";
+  let i = 0;
+  while (i < sql.length) {
+    const c = sql[i];
+    if (c === "'") { const e = scanSingleQuoted(sql, i); out += sql.slice(i, e); i = e; continue; }
+    if (c === '"') {
+      const e = scanDoubleQuoted(sql, i);
+      const inner = sql.slice(i + 1, e - 1).replace(/""/g, '"');
+      out += inner === from ? rendered : sql.slice(i, e);
+      i = e;
+      continue;
+    }
+    const tag = dollarTagAt(sql, i);
+    if (tag) {
+      const close = sql.indexOf(tag, i + tag.length);
+      const e = close === -1 ? sql.length : close + tag.length;
+      out += sql.slice(i, e); i = e; continue;
+    }
+    const word = /^[A-Za-z_][A-Za-z_0-9$]*/.exec(sql.slice(i));
+    if (word) {
+      const after = sql.slice(i + word[0].length);
+      const isCall = /^\s*\(/.test(after);
+      out += !isCall && word[0].toLowerCase() === lower ? rendered : word[0];
+      i += word[0].length;
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
