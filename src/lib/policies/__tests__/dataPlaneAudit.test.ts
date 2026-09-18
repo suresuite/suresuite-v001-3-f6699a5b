@@ -323,6 +323,60 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
     return n;
   };
 
+  it("every function the ARTIFACT records is visible to this scan (D100)", () => {
+    // THE SCAN CAN ONLY JUDGE WHAT IT CAN SEE, and for a year it could not see
+    // five live functions. `live-sql.mjs` keys its function map by NAME and its
+    // `DROP FUNCTION` branch deleted the name outright — so a DROP naming ONE
+    // overload's signature removed every overload from the map.
+    //
+    // `create_disruption_scenario_v2` writes four tier-4 tables and was
+    // invisible here; `get_network_nodes`, `_edges` and `_summary` were too.
+    // Both `create_disruption_scenario_v2` overloads happen to attribute, so the
+    // invariant did not move — but "happens to" is not a gate, and this is.
+    //
+    // `net.http_post` is excluded because it is not in `public`: the map is the
+    // public surface, and a wrapper around a pg_net extension function is not
+    // this contract's to describe.
+    const art = JSON.parse(
+      readFileSync(join(ROOT, "build", "schema.introspected.json"), "utf8"),
+    ) as { functions: { name: string }[] };
+    const seen = live().functions;
+    const missing = [...new Set(art.functions.map((f) => f.name))]
+      .filter((n) => n !== "http_post")
+      .filter((n) => !seen.has(n))
+      .sort();
+    expect(
+      missing,
+      "these functions exist in the introspected schema and are invisible to every " +
+        "rule scoped to `liveDefinitions()` — the writer scan below included.",
+    ).toEqual([]);
+  });
+
+  it("the overloaded names are known, and collapsing them is a STATED limit", () => {
+    // The half of D100 that is NOT fixed: the map still holds one body per name,
+    // so for an overloaded name a rule reads the last CREATE and no other. Nine
+    // names carry more than one live overload. Pinned so the number cannot grow
+    // quietly, and so a future rule that needs per-overload bodies has a count
+    // to argue with rather than a comment claiming the repo never overloads.
+    const art = JSON.parse(
+      readFileSync(join(ROOT, "build", "schema.introspected.json"), "utf8"),
+    ) as { functions: { name: string }[] };
+    const counts = new Map<string, number>();
+    for (const f of art.functions) counts.set(f.name, (counts.get(f.name) ?? 0) + 1);
+    const overloaded = [...counts.entries()].filter(([, n]) => n > 1).map(([n]) => n).sort();
+    expect(overloaded).toEqual([
+      "analysis_mark_critical_nodes",
+      "capabilities_for_user",
+      "create_disruption_scenario_v2",
+      "create_project",
+      "get_project_dataset_status",
+      "get_supply_chain_data_multi_tier",
+      "refresh_node_list_for_project",
+      "update_project",
+      "update_project_completion_status",
+    ]);
+  });
+
   const writers = () => {
     const tier = new Set(tieredTables().map(([t]) => t));
     const out: Array<{ name: string; guc: boolean; actor: boolean }> = [];

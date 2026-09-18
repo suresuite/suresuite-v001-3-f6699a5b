@@ -1,0 +1,218 @@
+# AUTHORED — the data contract's sidecar for `disruption_scenario_profiles`.
+table: disruption_scenario_profiles
+tier: '4'
+schema_name: public
+grain: >-
+  One disruption profile for one project — the HEADER of the normalised
+  disruption model. What it hits lives in `_targets`, what it does in
+  `_effects`, and how it is simulated in `_settings`; all three cascade from
+  this row.
+owner: policy-ui
+
+natural_key_unique:
+  - source: PRIMARY KEY constraint
+    columns: [id]
+    name: null
+
+governance:
+  read: project_member
+  write: project_member
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    Tier 4 — the DECISION plane. Audited from WP 6.4. The three child tables
+    cascade from this row's id, so a DELETE here is four tables' worth of
+    decision disappearing on one statement — which is exactly why the audit row
+    naming the actor matters more here than on a table that loses one row.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. The natural key is below; this is what the child rows
+      reference.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this row belongs to.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  plant_name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The plant this scenario belongs to, by display name. A project has one
+      plant_name, so this is a denormalised copy of `projects.plant_name` rather
+      than a second identity.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  scenario_name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      What the person called this profile. Not unique — two profiles may share a
+      name, and the surrogate id is the key.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  status:
+    type: public.disruption_status
+    unit: null
+    unit_source: none
+    meaning: >-
+      `draft`, `active` or `archived`, as the `disruption_status` enum. CHECKed
+      by the type rather than by a constraint, so an unknown value is refused at
+      cast time.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  description:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Free text the person wrote. Never parsed.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  tags:
+    type: text[]
+    unit: null
+    unit_source: none
+    meaning: >-
+      Free-form labels. No vocabulary and no validation — a tag is whatever was
+      typed.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  organization:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid-
+      identity` (G1) says a displayable name is never a join key: nothing joins
+      on this, and `organization_id` is the identity. Kept because the rows
+      exist.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_by:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user who created the row, as a uuid. Client-asserted — this
+      application authenticates against `approved_users` rather than Supabase
+      Auth (D28) — so it names who the client said acted, which is why the audit
+      row added by WP 6.4 is the record that matters.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was created. Server-stamped, never the client's clock.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it was last changed. Server-stamped by the `update_*_updated_at`
+      trigger.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  disruption_start:
+    type: date
+    unit: date
+    unit_source: fixed
+    meaning: >-
+      First day the disruption applies, inclusive. NULLABLE and unconstrained
+      against `disruption_end`: nothing stops an end before a start.
+    grain: event
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Reaches no engine field. The profile group is read by the disruption RPCs
+      and the scenario runner, not by `project_map.py`. NULLABLE and
+      unconstrained against `disruption_end`: nothing stops an end before a
+      start, and nothing stops a window outside the simulated horizon.
+  disruption_end:
+    type: date
+    unit: date
+    unit_source: fixed
+    meaning: >-
+      Last day the disruption applies, inclusive. See `disruption_start` — the
+      pair has no CHECK.
+    grain: event
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Reaches no engine field. See `disruption_start` — the pair has no CHECK in
+      either direction.
+
+note: >-
+  CREATED BY `20250827171106`, NOT BY `20250827170942`. The earlier file appears
+  to create this table and could not have: it declares
+  `create_disruption_scenario_v2` with `p_user_id` after a defaulted parameter,
+  which PostgreSQL refuses with 42P13, so the whole transaction rolled back. The
+  retry 84 seconds later carries the comment `-- FIXED: Put all parameters with
+  defaults at the end`. See §4 D48; the contract said the wrong origin until
+  WP 6.2 slice 10.

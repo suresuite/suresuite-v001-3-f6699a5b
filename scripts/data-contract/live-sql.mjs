@@ -33,6 +33,32 @@ const unquote = (s) => s.replace(/^"(.*)"$/, "$1");
 const bare = (s) => unquote(s).replace(/^public\./i, "");
 
 /**
+ * The comma-separated argument TYPES of the first `(...)` in `tail`, normalised,
+ * or null when there is no argument list at all.
+ *
+ * Deliberately crude — it compares two spellings of the same signature from the
+ * same repository, not arbitrary SQL — and it takes the LAST word of each
+ * argument so `p_user_id uuid` and `uuid` compare equal.
+ */
+function argTypesOf(tail) {
+  const open = tail.indexOf("(");
+  if (open === -1) return null;
+  let depth = 0, close = -1;
+  for (let i = open; i < tail.length; i++) {
+    if (tail[i] === "(") depth++;
+    else if (tail[i] === ")") { depth--; if (depth === 0) { close = i; break; } }
+  }
+  if (close === -1) return null;
+  const body = tail.slice(open + 1, close).trim();
+  if (!body) return "";
+  return body
+    .split(",")
+    .map((a) => squash(a).replace(/\bDEFAULT\b[\s\S]*$/i, "").trim().split(/\s+/).pop())
+    .map((t) => (t ?? "").toLowerCase().replace(/^public\./, ""))
+    .join(",");
+}
+
+/**
  * Replay every migration in filename order and return the definitions that
  * survive.
  *
@@ -48,7 +74,21 @@ export function liveDefinitions() {
   const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort();
 
   const policies = new Map();   // "table::policy name" -> record
-  const functions = new Map();  // "name" (args ignored: this repo never overloads) -> record
+  // "name" -> record. ARGS ARE STILL IGNORED IN THE KEY, and the comment that
+  // used to sit here said "this repo never overloads". **It does, nine times**
+  // (§4 D100): `create_project` carries six live overloads, `update_project`
+  // five, and `create_disruption_scenario_v2` two. So this map holds ONE body
+  // per name — the last CREATE wins — and a rule scoped to it reads that body
+  // and no other.
+  //
+  // What is fixed below is the worse half. A `DROP FUNCTION` naming a SPECIFIC
+  // signature used to delete the name outright, so five live functions vanished
+  // from this map altogether: `create_disruption_scenario_v2` — which writes
+  // four tier-4 tables — plus `get_network_nodes`, `_edges` and `_summary`, and
+  // `http_post`. Every rule scoped to these functions was blind to them,
+  // `dataPlaneAudit.test.ts`'s writer scan included. That is D78's shape on a
+  // different axis: the scan could not see what it was not looking at.
+  const functions = new Map();
   // TRIGGERS are replayed here and NOWHERE ELSE. `introspect.mjs` has
   // `CREATE TRIGGER` on its ignore list by design — it builds a COLUMN schema —
   // so "does this table have an audit trigger?" had no source in the contract at
@@ -76,7 +116,18 @@ export function liveDefinitions() {
         const name = bare(m[1]);
         functions.set(name, { name, migration: file, sql: raw });
       } else if ((m = /^DROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_."]+)/i.exec(head))) {
-        functions.delete(bare(m[1]));
+        // A DROP that names an argument list removes ONE overload. Deleting the
+        // whole name here is what made five live functions invisible (D100), so
+        // a signature-qualified DROP only removes the stored record when that
+        // record is the overload being dropped. An unqualified DROP still
+        // removes the name, because PostgreSQL only accepts one when the name
+        // is unambiguous.
+        const name = bare(m[1]);
+        const held = functions.get(name);
+        const dropArgs = argTypesOf(head.slice(m[0].length));
+        if (!held || dropArgs === null || argTypesOf(held.sql.slice(held.sql.toLowerCase().indexOf(name) + name.length)) === dropArgs) {
+          functions.delete(name);
+        }
       } else if ((m = /^CREATE\s+(?:OR\s+REPLACE\s+)?(?:CONSTRAINT\s+)?TRIGGER\s+("[^"]*"|[a-zA-Z0-9_]+)\s+(?:BEFORE|AFTER|INSTEAD\s+OF)\s+[\s\S]*?\sON\s+([a-zA-Z0-9_."]+)/i.exec(head))) {
         const table = bare(m[2]), name = unquote(m[1]);
         triggers.set(`${table}::${name}`, { table, name, migration: file, sql: raw });

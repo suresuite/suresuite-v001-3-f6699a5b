@@ -1,0 +1,146 @@
+# AUTHORED — the data contract's sidecar for `disruption_scenario_settings`.
+table: disruption_scenario_settings
+tier: '4'
+schema_name: public
+grain: >-
+  One simulation setting for one profile, as a key and a JSONB value. HOW the
+  disruption is simulated, as against what it hits (`_targets`) and what it does
+  (`_effects`).
+owner: policy-ui
+
+natural_key_unique:
+  - source: PRIMARY KEY constraint
+    columns: [id]
+    name: null
+  - source: UNIQUE constraint
+    columns: [profile_id, key]
+    name: null
+
+governance:
+  read: project_member
+  write: project_member
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    Tier 4 — the DECISION plane. Audited from WP 6.4. The only table in this
+    group with a real natural key: `(profile_id, key)` is UNIQUE, so a setting
+    is upsertable and the other four are insert-only by shape.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. The natural key is below; this is what the child rows
+      reference.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  profile_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The profile this setting belongs to. ON DELETE CASCADE.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  key:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The setting's name. FREE TEXT with no vocabulary: nothing declares which
+      keys are meaningful, so an unread key and a misspelt one are
+      indistinguishable.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  value:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      The setting's value, as JSONB so a key may hold a scalar, a list or an
+      object. NOT NULL — a setting always has a value, and absence is expressed
+      by the row not existing.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  organization:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid-
+      identity` (G1) says a displayable name is never a join key: nothing joins
+      on this, and `organization_id` is the identity. Kept because the rows
+      exist.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_by:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user who created the row, as a uuid. Client-asserted — this
+      application authenticates against `approved_users` rather than Supabase
+      Auth (D28) — so it names who the client said acted, which is why the audit
+      row added by WP 6.4 is the record that matters.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was created. Server-stamped, never the client's clock.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it was last changed. Server-stamped by the `update_*_updated_at`
+      trigger.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  `key` HAS NO DECLARED VOCABULARY, and that is the gap this sidecar can name
+  but not close. `natural_key` (I4) is satisfied — `(profile_id, key)` is
+  unique — but uniqueness over an open set means a typo creates a new setting
+  rather than failing. The `analysis_kinds` block on `analysis_runs` is the
+  pattern for declaring such a vocabulary in the contract; nothing has done it
+  here because no code reads a fixed list of keys yet.

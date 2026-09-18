@@ -5,11 +5,11 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 330,
-      "migrations_applied": 322,
-      "last_migration": "20260918000003_actor_on_the_remaining_nine.sql"
+      "migrations_found": 331,
+      "migrations_applied": 323,
+      "last_migration": "20260918000004_disruption_plane_audited.sql"
     },
-    "sidecars": 43,
+    "sidecars": 48,
     "registry": {
       "engine_version": "0.2.3",
       "policies": 23
@@ -17,8 +17,8 @@
   },
   "counts": {
     "tables_in_schema": 81,
-    "tables_covered": 43,
-    "columns_covered": 536,
+    "tables_covered": 48,
+    "columns_covered": 590,
     "check_constraints": 41,
     "engine_requirements": 7,
     "orphans": 0,
@@ -4950,6 +4950,2170 @@
         }
       ],
       "note": "Expiry and revocation are both applied inside `effective_project_role()` rather than by each caller, so \"did you remember to check expires_at\" is not a question any future reader has to answer. Verified against a live PostgreSQL in WP 2.2: a grant exceeding the grantor's level is rejected, one with no expiry is rejected, and a grant whose expiry passes stops granting (PLAN.md §16)."
+    },
+    "disruption_scenario_effects": {
+      "table": "disruption_scenario_effects",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "One effect for one profile: WHAT the disruption does to whatever it hits. A capacity reduction or a time delay, with a magnitude and the unit that magnitude is in.",
+      "owner": "policy-ui",
+      "created_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+      "sidecar": "supabase/contract/disruption_scenario_effects.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "disruption_scenario_effects_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": "project_member",
+        "write": "project_member",
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Tier 4 — the DECISION plane. Audited from WP 6.4."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Scenario effects: organization access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Scenario effects: project access modify",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_effects.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "disruption_scenario_effects_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_dscenario_effects_profile_type",
+          "unique": false,
+          "columns": [
+            "profile_id",
+            "effect_type"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+        },
+        {
+          "name": "idx_dse_profile_id",
+          "unique": false,
+          "columns": [
+            "profile_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate key. The natural key is below; this is what the child rows reference.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "profile_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "disruption_scenario_profiles",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The profile this effect belongs to. ON DELETE CASCADE.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "effect_type",
+          "type": "public.disruption_effect_type",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "`capacity_reduction` or `time_delay`, as the `disruption_effect_type` enum. It decides which units `unit` may legally carry, and `validate_disruption_effect` enforces that on write.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "magnitude",
+          "type": "numeric",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": "column",
+          "unit_source": "column",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How much. Its meaning depends entirely on `effect_type` and `unit`: a capacity reduction is a percentage, a time delay a count of time. NOT NULL, so an effect always states a size.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Reaches no engine field directly: the scenario runner reads it with `effect_type` and `unit`, which together decide what the number means. `validate_disruption_effect` is what keeps the three consistent on write, and it is the only such trigger in this group.",
+          "engine_requirement": null
+        },
+        {
+          "name": "unit",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The unit `magnitude` is in. A TEXT column rather than the canonical `UNIT_DAYS` vocabulary that governs tier-2 lead times, because a decision's unit is whatever the person chose and is converted where it is read — `normalize-at-promotion` (I3) governs observations, not decisions.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": false,
+          "default": "'default_org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid- identity` (G1) says a displayable name is never a join key: nothing joins on this, and `organization_id` is the identity. Kept because the rows exist.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user who created the row, as a uuid. Client-asserted — this application authenticates against `approved_users` rather than Supabase Auth (D28) — so it names who the client said acted, which is why the audit row added by WP 6.4 is the record that matters.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row was created. Server-stamped, never the client's clock.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was last changed. Server-stamped by the `update_*_updated_at` trigger.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "THE ONLY TABLE IN THIS GROUP WHOSE PAYLOAD IS VALIDATED. `validate_disruption_effect` fires BEFORE INSERT OR UPDATE and checks `magnitude` and `unit` against `effect_type` — so an effect cannot carry a unit its type does not admit. `_targets` has the same discriminator shape and no such trigger, which is worth noticing when reading the two side by side."
+    },
+    "disruption_scenario_profiles": {
+      "table": "disruption_scenario_profiles",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "One disruption profile for one project — the HEADER of the normalised disruption model. What it hits lives in `_targets`, what it does in `_effects`, and how it is simulated in `_settings`; all three cascade from this row.",
+      "owner": "policy-ui",
+      "created_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+      "sidecar": "supabase/contract/disruption_scenario_profiles.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "disruption_scenario_profiles_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": "project_member",
+        "write": "project_member",
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Tier 4 — the DECISION plane. Audited from WP 6.4. The three child tables cascade from this row's id, so a DELETE here is four tables' worth of decision disappearing on one statement — which is exactly why the audit row naming the actor matters more here than on a table that loses one row."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Scenario profiles: organization access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Scenario profiles: project access modify",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenario_profiles.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "disruption_scenario_profiles_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+        },
+        {
+          "name": "disruption_scenario_profiles_project_id_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE",
+          "added_by": "20250921204842_ddde4ac4-a0c0-4ed1-a49f-cbd3856a799a.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_dscenario_profiles_project_plant_status",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "plant_name",
+            "status"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+        },
+        {
+          "name": "idx_disruption_scenario_profiles_project_id",
+          "unique": false,
+          "columns": [
+            "project_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate key. The natural key is below; this is what the child rows reference.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project this row belongs to.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The plant this scenario belongs to, by display name. A project has one plant_name, so this is a denormalised copy of `projects.plant_name` rather than a second identity.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "scenario_name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What the person called this profile. Not unique — two profiles may share a name, and the surrogate id is the key.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "status",
+          "type": "public.disruption_status",
+          "nullable": false,
+          "default": "'draft'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "`draft`, `active` or `archived`, as the `disruption_status` enum. CHECKed by the type rather than by a constraint, so an unknown value is refused at cast time.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Free text the person wrote. Never parsed.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "tags",
+          "type": "text[]",
+          "nullable": true,
+          "default": "'{}'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Free-form labels. No vocabulary and no validation — a tag is whatever was typed.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": false,
+          "default": "'default_org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid- identity` (G1) says a displayable name is never a join key: nothing joins on this, and `organization_id` is the identity. Kept because the rows exist.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user who created the row, as a uuid. Client-asserted — this application authenticates against `approved_users` rather than Supabase Auth (D28) — so it names who the client said acted, which is why the audit row added by WP 6.4 is the record that matters.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row was created. Server-stamped, never the client's clock.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was last changed. Server-stamped by the `update_*_updated_at` trigger.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "disruption_start",
+          "type": "date",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250828005114_4c7e88dc-9c73-4538-ab14-fe93b22d07dc.sql",
+          "unit": "date",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "First day the disruption applies, inclusive. NULLABLE and unconstrained against `disruption_end`: nothing stops an end before a start.",
+          "grain": "event",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Reaches no engine field. The profile group is read by the disruption RPCs and the scenario runner, not by `project_map.py`. NULLABLE and unconstrained against `disruption_end`: nothing stops an end before a start, and nothing stops a window outside the simulated horizon.",
+          "engine_requirement": null
+        },
+        {
+          "name": "disruption_end",
+          "type": "date",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250828005114_4c7e88dc-9c73-4538-ab14-fe93b22d07dc.sql",
+          "unit": "date",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Last day the disruption applies, inclusive. See `disruption_start` — the pair has no CHECK.",
+          "grain": "event",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Reaches no engine field. See `disruption_start` — the pair has no CHECK in either direction.",
+          "engine_requirement": null
+        }
+      ],
+      "note": "CREATED BY `20250827171106`, NOT BY `20250827170942`. The earlier file appears to create this table and could not have: it declares `create_disruption_scenario_v2` with `p_user_id` after a defaulted parameter, which PostgreSQL refuses with 42P13, so the whole transaction rolled back. The retry 84 seconds later carries the comment `-- FIXED: Put all parameters with defaults at the end`. See §4 D48; the contract said the wrong origin until WP 6.2 slice 10."
+    },
+    "disruption_scenario_settings": {
+      "table": "disruption_scenario_settings",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "One simulation setting for one profile, as a key and a JSONB value. HOW the disruption is simulated, as against what it hits (`_targets`) and what it does (`_effects`).",
+      "owner": "policy-ui",
+      "created_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+      "sidecar": "supabase/contract/disruption_scenario_settings.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "profile_id",
+            "key"
+          ],
+          "name": "disruption_setting_unique"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "disruption_scenario_settings_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": "project_member",
+        "write": "project_member",
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Tier 4 — the DECISION plane. Audited from WP 6.4. The only table in this group with a real natural key: `(profile_id, key)` is UNIQUE, so a setting is upsertable and the other four are insert-only by shape."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Scenario settings: organization access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Scenario settings: project access modify",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_settings.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "disruption_setting_unique",
+          "kind": "UNIQUE",
+          "columns": [
+            "profile_id",
+            "key"
+          ],
+          "definition": "UNIQUE (profile_id, key)",
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+        },
+        {
+          "name": "disruption_scenario_settings_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_dscenario_settings_profile_key",
+          "unique": false,
+          "columns": [
+            "profile_id",
+            "key"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+        },
+        {
+          "name": "idx_dss_profile_id",
+          "unique": false,
+          "columns": [
+            "profile_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate key. The natural key is below; this is what the child rows reference.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "profile_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "disruption_scenario_profiles",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The profile this setting belongs to. ON DELETE CASCADE.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "key",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The setting's name. FREE TEXT with no vocabulary: nothing declares which keys are meaningful, so an unread key and a misspelt one are indistinguishable.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "value",
+          "type": "jsonb",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The setting's value, as JSONB so a key may hold a scalar, a list or an object. NOT NULL — a setting always has a value, and absence is expressed by the row not existing.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": false,
+          "default": "'default_org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid- identity` (G1) says a displayable name is never a join key: nothing joins on this, and `organization_id` is the identity. Kept because the rows exist.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user who created the row, as a uuid. Client-asserted — this application authenticates against `approved_users` rather than Supabase Auth (D28) — so it names who the client said acted, which is why the audit row added by WP 6.4 is the record that matters.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row was created. Server-stamped, never the client's clock.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was last changed. Server-stamped by the `update_*_updated_at` trigger.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "`key` HAS NO DECLARED VOCABULARY, and that is the gap this sidecar can name but not close. `natural_key` (I4) is satisfied — `(profile_id, key)` is unique — but uniqueness over an open set means a typo creates a new setting rather than failing. The `analysis_kinds` block on `analysis_runs` is the pattern for declaring such a vocabulary in the contract; nothing has done it here because no code reads a fixed list of keys yet."
+    },
+    "disruption_scenario_targets": {
+      "table": "disruption_scenario_targets",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "One target set for one profile: WHAT the disruption hits. Either a list of nodes or a list of edges, decided by `target_type`.",
+      "owner": "policy-ui",
+      "created_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+      "sidecar": "supabase/contract/disruption_scenario_targets.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "disruption_scenario_targets_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": "project_member",
+        "write": "project_member",
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Tier 4 — the DECISION plane. Audited from WP 6.4. Reached only through its profile: `profile_id` is NOT NULL and CASCADEs, so this table has no rows of its own to govern separately."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Scenario targets: organization access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Scenario targets: project access modify",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.disruption_scenario_profiles sp JOIN public.projects p ON p.id = sp.project_id WHERE sp.id = disruption_scenario_targets.profile_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR ( SELECT g.user_role FROM public.get_current_approved_user() g LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "disruption_scenario_targets_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_dscenario_targets_profile_type",
+          "unique": false,
+          "columns": [
+            "profile_id",
+            "target_type"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+        },
+        {
+          "name": "idx_dst_profile_id",
+          "unique": false,
+          "columns": [
+            "profile_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20250908075907_36523d34-2b67-4f34-a20b-7076c1698395.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate key. The natural key is below; this is what the child rows reference.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "profile_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "disruption_scenario_profiles",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The profile this target belongs to. ON DELETE CASCADE — deleting a profile deletes its targets.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "target_type",
+          "type": "public.disruption_target_type",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "`node` or `edge`, as the `disruption_target_type` enum. It decides WHICH of the three columns below is meaningful, and nothing enforces that the other two are empty.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "node_ids",
+          "type": "text[]",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The nodes hit, by display id, when `target_type` is `node`. An array rather than a row per node, so a target is one statement and one audit row.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "edge_list",
+          "type": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The edges hit, as `[{from_node, to_node}]`, when `target_type` is `edge`. JSONB with no schema check — a malformed entry is stored and fails at read.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "selector",
+          "type": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "An optional saved query describing the target set instead of enumerating it. Nothing evaluates it today; it is stored for a feature that has not landed.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": false,
+          "default": "'default_org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid- identity` (G1) says a displayable name is never a join key: nothing joins on this, and `organization_id` is the identity. Kept because the rows exist.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user who created the row, as a uuid. Client-asserted — this application authenticates against `approved_users` rather than Supabase Auth (D28) — so it names who the client said acted, which is why the audit row added by WP 6.4 is the record that matters.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row was created. Server-stamped, never the client's clock.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was last changed. Server-stamped by the `update_*_updated_at` trigger.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "`target_type` DISCRIMINATES AND NOTHING ENFORCES IT. A `node` target with an `edge_list`, or an `edge` target with `node_ids`, is storable — the enum constrains the discriminator and no CHECK constrains the payload columns against it. `validate_disruption_effect` does this job for `_effects`; nothing does it here."
+    },
+    "disruption_scenarios": {
+      "table": "disruption_scenarios",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "One disruption applied to one node of one project: a capacity cut, a delay, or both. The ORIGINAL disruption shape, superseded in design by the `disruption_scenario_*` profile/target/effect/setting split but never migrated — both are live and neither reads the other.",
+      "owner": "policy-ui",
+      "created_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+      "sidecar": "supabase/contract/disruption_scenarios.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "disruption_scenarios_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": "project_member",
+        "write": "project_member",
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Tier 4 — the DECISION plane. These rows are what a person chose, as against the dataset they chose it over and the result it produced, which is why `result-binding` (I8) needs all three. Audited from WP 6.4: the three statement-grain triggers land with this sidecar, because `dataPlaneAudit.test.ts` scopes its rule to tables IN the contract and a deferred table's writes are unaudited with nothing to notice (D54)."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Disruption scenarios: organization access view",
+            "command": "SELECT",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "Disruption scenarios: project access modify",
+            "command": "ALL",
+            "roles": [],
+            "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = disruption_scenarios.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = get_current_user_id() OR ( SELECT user_role FROM get_current_approved_user() LIMIT 1 ) = 'admin') )",
+            "added_by": "20260915000004_org_identity_dual_read.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "disruption_scenarios_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate key. The natural key is below; this is what the child rows reference.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project this row belongs to.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "plant_name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The plant this scenario belongs to, by display name. A project has one plant_name, so this is a denormalised copy of `projects.plant_name` rather than a second identity.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "node_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The node the disruption is applied to, by its display id — the same string the network pages use. Not a uuid and not a foreign key: a scenario may name a node that no longer exists in the graph, and deleting it silently would lose the decision.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "scenario_name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What the person called this scenario. Not unique — see `natural_key_unique` below, which is the surrogate id and nothing else.",
+          "grain": "identifier",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "capacity_reduction_percent",
+          "type": "numeric",
+          "nullable": true,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+          "unit": "percent",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How much of the node's capacity the scenario removes. A PERCENT, not a fraction: the column name says so and the default of 0 means 'no reduction'.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Reaches no engine field. `project_map.py` builds the engine's world from the tier-2 tables and the policy bundle; a disruption is applied by the SIMULATOR at run time from `sim_payload`, not by the mapper from this column. So the value a person types here is read by the scenario runner and by nothing the data contract traces (§5 T1: the number has a source, and that source is this row).",
+          "engine_requirement": null
+        },
+        {
+          "name": "time_delay_days",
+          "type": "numeric",
+          "nullable": true,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+          "unit": "days",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Additional delay the scenario imposes at this node. DAYS, and it is NOT normalised at promotion the way a tier-2 lead time is — this is a decision the user typed, not an observation, so it is stored as entered and converted where it is read.",
+          "grain": "level",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": "Reaches no engine field, for the same reason as `capacity_reduction_percent`. Note the unit is in the COLUMN NAME rather than in a unit column — the opposite of the tier-2 convention `lead_time`/`lead_time_unit` that `normalize-at-promotion` (I3) governs. That is defensible for a decision (there is one unit and it cannot vary) and it is worth stating, because a reader who has learned the tier-2 rule will look for the companion column.",
+          "engine_requirement": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Free text the person wrote. Never parsed.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user who created the row, as a uuid. Client-asserted — this application authenticates against `approved_users` rather than Supabase Auth (D28) — so it names who the client said acted, which is why the audit row added by WP 6.4 is the record that matters.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "organization",
+          "type": "text",
+          "nullable": false,
+          "default": "'default_org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid- identity` (G1) says a displayable name is never a join key: nothing joins on this, and `organization_id` is the identity. Kept because the rows exist.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row was created. Server-stamped, never the client's clock.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20250826180749_e9181074-55e6-4724-98c3-3c4b648aa891.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was last changed. Server-stamped by the `update_*_updated_at` trigger.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "sim_payload",
+          "type": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000003_disruption_bridge.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The scenario as the simulator receives it, frozen at save time. A denormalised copy of the columns above plus whatever the caller added; nothing reads it back into the columns, so a divergence between the two is possible and unnoticed.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "from_network",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000003_disruption_bridge.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Whether the scenario was created by clicking a node on a network page (true) or entered by hand. Defaults true, so a row written by any other path claims a provenance it may not have.",
+          "grain": "metadata",
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": "TWO DISRUPTION MODELS ARE LIVE AT ONCE AND NEITHER READS THE OTHER. This table is the 2025-08-26 shape — one row per node, capacity and delay inline. The `disruption_scenario_profiles`/`_targets`/`_effects`/`_settings` group is the 2025-08-27 redesign that normalises the same idea. Nothing migrated the rows and nothing deprecates either, so a project can hold disruptions in both and a reader of one sees half the picture. Naming that is this sidecar's job; deciding it is not, and it belongs with WP 6.4's gap check."
     },
     "inbound_logistics": {
       "table": "inbound_logistics",
@@ -23850,5 +26014,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "4211665e245a"
+  "contract_version": "ae0c31529221"
 }

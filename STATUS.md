@@ -3,11 +3,64 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/phases-6-7-completion-buvlel` · **Started from:** `a6a80ff` (PR #224 merged) · **5 packages closed + WP 6.2 slices 1–12** · no PR open
+**Branch:** `claude/phases-6-7-completion-buvlel` · **Started from:** `8493fb0` (PR #225 merged) · **5 packages closed + WP 6.2 slices 1–12 + WP 6.4 slice 13** · no PR open
 
 ---
 
 ## Closed this run
+
+### WP 6.4 (slice 13) — The disruption plane, described and audited · `20260918000004`
+
+**Five of WP 6.4's eleven tables described, governed and audited.**
+43 → 48 described · 38 → 33 deferred · 22 → 27 audited by trigger.
+
+Writing the sidecars is where the reading happens, and four things came out that
+no gate would have asked:
+
+- **Two disruption models are live at once and neither reads the other** — the
+  2025-08-26 single-row shape and the 2025-08-27 normalised redesign. Nothing
+  migrated the rows, nothing deprecates either.
+- `_targets` has a discriminator (`target_type`) and NO validation; `_effects`
+  has the same shape *and* a trigger that enforces it.
+- `_settings.key` is free text with no vocabulary — unique over an open set, so
+  a typo creates a setting rather than failing.
+- `time_delay_days` carries its unit in the column NAME, the opposite of the
+  tier-2 convention a reader will have learned.
+
+**The rehearsal proves the cascade, which is what the package buys.** Deleting
+one profile cascades into three child tables — one statement, four tables — and
+until these sidecars existed three of the four were deferred and therefore
+unaudited, so the cascade recorded a quarter of what it did.
+
+⚠️ **D100 — the writer scan was answering about 253 of 257 functions.**
+Applying WP 4.3's lesson on purpose (which writers did describing these bring
+into scope?) found that `create_disruption_scenario_v2` — which writes four of
+these tables — is not in `liveDefinitions().functions` at all. That map is keyed
+by NAME, justified by a comment reading *"this repo never overloads"*. **The repo
+overloads nine names**; `create_project` has six. And its `DROP FUNCTION` branch
+deleted the whole name whatever signature the statement gave, so five
+signature-qualified drops removed five live functions from every rule scoped to
+that map. The invariant does not move — all of them attribute or are read-only —
+but "happens to" is not a gate. Fixed, and gated by name; the collapsing half is
+stated rather than fixed and pinned so the count cannot grow quietly.
+
+⚠️ **A rehearsal assertion failed for its own reason first** — it compared
+`action = 'DELETE'` and the trigger writes `lower(TG_OP)`.
+
+**Four mutations, all caught**, and the third was redone: row grain is caught by
+PostgreSQL itself, which left the statement-grain assertion unproven, so a fourth
+added a SECOND statement-grain trigger on the same event.
+
+**Verified:** three rehearse modes green (21 assertion files) · `contract:check` ✓
+(R1 48/33/81, R9 27 audited) · 412 tests ✓ · `build` ✓ · eslint 336/116 and
+`audit:ui` 8, unchanged.
+
+**Needs a decision:** the two live disruption models. This slice can name that
+both exist; deprecating either is a product call and a migration.
+
+**Noted for whoever takes it:** WP 6.4's remaining six are the harder six —
+`scenarios` alone has 24 client `from()` call sites, so describing them brings a
+much larger writer surface into the audit rule than the disruption group did.
 
 ### WP 6.2 (slice 12) — The remaining nine, in one migration · `20260918000003`
 

@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-43 of 81 tables are covered,
-536 columns in all. A table that is not here is listed
+48 of 81 tables are covered,
+590 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -22,6 +22,11 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`customers`](customers.md) | 2 | `data-ingestion` | 8 | One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows. |
 | [`dataset_versions`](dataset_versions.md) | 3 | `platform` | 10 | One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot. |
 | [`delegation_grants`](delegation_grants.md) | G | `platform` | 9 | One temporary, subtractive grant of project access from one person to another. `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the grantor holds, and it always ends. |
+| [`disruption_scenario_effects`](disruption_scenario_effects.md) | 4 | `policy-ui` | 9 | One effect for one profile: WHAT the disruption does to whatever it hits. A capacity reduction or a time delay, with a magnitude and the unit that magnitude is in. |
+| [`disruption_scenario_profiles`](disruption_scenario_profiles.md) | 4 | `policy-ui` | 13 | One disruption profile for one project — the HEADER of the normalised disruption model. What it hits lives in `_targets`, what it does in `_effects`, and how it is simulated in `_settings`; all three cascade from this row. |
+| [`disruption_scenario_settings`](disruption_scenario_settings.md) | 4 | `policy-ui` | 8 | One simulation setting for one profile, as a key and a JSONB value. HOW the disruption is simulated, as against what it hits (`_targets`) and what it does (`_effects`). |
+| [`disruption_scenario_targets`](disruption_scenario_targets.md) | 4 | `policy-ui` | 10 | One target set for one profile: WHAT the disruption hits. Either a list of nodes or a list of edges, decided by `target_type`. |
+| [`disruption_scenarios`](disruption_scenarios.md) | 4 | `policy-ui` | 14 | One disruption applied to one node of one project: a capacity cut, a delay, or both. The ORIGINAL disruption shape, superseded in design by the `disruption_scenario_*` profile/target/effect/setting split but never migrated — both are live and neither reads the other. |
 | [`inbound_logistics`](inbound_logistics.md) | 2 | `data-ingestion` | 14 | One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed). |
 | [`ingest_files`](ingest_files.md) | 0 | `data-ingestion` | 11 | One file as received, in one run: the manifest for bytes held in storage — where they are, how many there were, and the SHA-256 of exactly the sequence received. Write-once: the row records an event that has already happened and cannot be edited into a different one. |
 | [`ingest_runs`](ingest_runs.md) | 1 | `data-ingestion` | 23 | One ingestion attempt, from any source — a connector sync, a CSV upload or an API push — with the counts and the mapping report it produced. The unit a person reviews and approves: staged rows belong to a run, and promotion is a decision about a run rather than about a row. |
@@ -58,4 +63,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `4211665e245a`, engine `0.2.3`.*
+*Generated from data contract `ae0c31529221`, engine `0.2.3`.*

@@ -1,0 +1,170 @@
+# AUTHORED — the data contract's sidecar for `disruption_scenario_targets`.
+table: disruption_scenario_targets
+tier: '4'
+schema_name: public
+grain: >-
+  One target set for one profile: WHAT the disruption hits. Either a list of
+  nodes or a list of edges, decided by `target_type`.
+owner: policy-ui
+
+natural_key_unique:
+  - source: PRIMARY KEY constraint
+    columns: [id]
+    name: null
+
+governance:
+  read: project_member
+  write: project_member
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    Tier 4 — the DECISION plane. Audited from WP 6.4. Reached only through its
+    profile: `profile_id` is NOT NULL and CASCADEs, so this table has no rows of
+    its own to govern separately.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. The natural key is below; this is what the child rows
+      reference.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  profile_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The profile this target belongs to. ON DELETE CASCADE — deleting a profile
+      deletes its targets.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  target_type:
+    type: public.disruption_target_type
+    unit: null
+    unit_source: none
+    meaning: >-
+      `node` or `edge`, as the `disruption_target_type` enum. It decides WHICH
+      of the three columns below is meaningful, and nothing enforces that the
+      other two are empty.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  node_ids:
+    type: text[]
+    unit: null
+    unit_source: none
+    meaning: >-
+      The nodes hit, by display id, when `target_type` is `node`. An array
+      rather than a row per node, so a target is one statement and one audit
+      row.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  edge_list:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      The edges hit, as `[{from_node, to_node}]`, when `target_type` is `edge`.
+      JSONB with no schema check — a malformed entry is stored and fails at
+      read.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  selector:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      An optional saved query describing the target set instead of enumerating
+      it. Nothing evaluates it today; it is stored for a feature that has not
+      landed.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  organization:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid-
+      identity` (G1) says a displayable name is never a join key: nothing joins
+      on this, and `organization_id` is the identity. Kept because the rows
+      exist.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_by:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user who created the row, as a uuid. Client-asserted — this
+      application authenticates against `approved_users` rather than Supabase
+      Auth (D28) — so it names who the client said acted, which is why the audit
+      row added by WP 6.4 is the record that matters.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was created. Server-stamped, never the client's clock.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it was last changed. Server-stamped by the `update_*_updated_at`
+      trigger.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  `target_type` DISCRIMINATES AND NOTHING ENFORCES IT. A `node` target with an
+  `edge_list`, or an `edge` target with `node_ids`, is storable — the enum
+  constrains the discriminator and no CHECK constrains the payload columns
+  against it. `validate_disruption_effect` does this job for `_effects`;
+  nothing does it here.
