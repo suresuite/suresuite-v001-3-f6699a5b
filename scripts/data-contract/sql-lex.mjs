@@ -248,3 +248,56 @@ export function renameIdentifier(sql, from, to) {
   }
   return out;
 }
+
+/** Index one past the closing `q` of the literal or quoted identifier at `i`. */
+export function skipQuoted(s, i, q) {
+  i++;
+  while (i < s.length) {
+    if (s[i] === q) { if (s[i + 1] === q) { i += 2; continue; } return i + 1; }
+    if (q === "'" && s[i] === "\\") { i += 2; continue; }
+    i++;
+  }
+  return s.length;
+}
+
+/**
+ * The first input parameter with no default that FOLLOWS one with a default,
+ * or null when the list is legal.
+ *
+ * `DEFAULT expr` and `= expr` are the two spellings, and this scans for either
+ * ANYWHERE in the parameter's text.
+ *
+ * **Neither parenthesis depth nor string literals are tracked, and the first
+ * two drafts tracked both.** Each was removed because a mutation deleting it
+ * SURVIVED — byte-identical artifact, green suite — and the reason is
+ * structural rather than accidental: in a parameter DECLARATION, a `DEFAULT`
+ * or an `=` can only appear at the top level as the default marker, or inside
+ * the default EXPRESSION that follows one. Either way the parameter carries a
+ * default, which is the only thing this asks. A guard that cannot change an
+ * answer is not defence; it is a line no test can justify.
+ *
+ * What DOES change the answer is the word boundary, and both halves of it have
+ * a case in `introspectorRejectedStatements.test.ts`.
+ *
+ * OUT parameters are exempt from the rule in PostgreSQL. This repository has
+ * none, and rather than guess at one it has never seen, an OUT or VARIADIC
+ * parameter makes this decline to judge the whole list.
+ */
+export function firstNonDefaultAfterDefault(argList) {
+  let defaulted = null;
+  for (const a of argList) {
+    if (/^\s*(OUT|INOUT|VARIADIC)\b/i.test(a)) return null;   // not judged — see above
+    let hasDefault = false;
+    for (let i = 0; i < a.length && !hasDefault; i++) {
+      // `p_defaulted_at timestamptz` and `is_default boolean` are parameter
+      // NAMES, not defaults. The word boundary rejects the suffix and the
+      // preceding-character test rejects the prefix; both are needed, and the
+      // test file has a case for each.
+      if (a[i] === "=") hasDefault = true;
+      else if (/^DEFAULT\b/i.test(a.slice(i)) && !/[A-Za-z0-9_$]/.test(a[i - 1] ?? " ")) hasDefault = true;
+    }
+    if (hasDefault) { defaulted = a; continue; }
+    if (defaulted) return { defaulted, after: a };
+  }
+  return null;
+}

@@ -1,22 +1,22 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 328,
-  "migrations_applied": 323,
+  "migrations_found": 330,
+  "migrations_applied": 322,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260918000001_org_row_uuid_only.sql",
+  "last_migration": "20260918000003_actor_on_the_remaining_nine.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 274,
-    "shadowed_definitions": 8,
+    "functions": 273,
+    "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
     "dynamic_ddl_statements": 36,
     "rls_indeterminate_tables": 4,
     "orphans": 0,
-    "aborted_migrations": 5
+    "aborted_migrations": 8
   },
   "tables": [
     {
@@ -5328,7 +5328,7 @@
     {
       "name": "disruption_scenario_effects",
       "schema": "public",
-      "created_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql",
+      "created_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
       "columns": [
         {
           "name": "id",
@@ -5340,7 +5340,7 @@
           "primary_key": true,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "profile_id",
@@ -5359,7 +5359,7 @@
             ],
             "on_delete": "CASCADE"
           },
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "effect_type",
@@ -5371,7 +5371,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "magnitude",
@@ -5383,7 +5383,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "unit",
@@ -5395,7 +5395,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "organization",
@@ -5407,7 +5407,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "created_by",
@@ -5419,7 +5419,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "created_at",
@@ -5431,7 +5431,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "updated_at",
@@ -5443,7 +5443,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         }
       ],
       "constraints": [
@@ -5455,7 +5455,7 @@
           ],
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         }
       ],
       "indexes": [
@@ -5469,7 +5469,7 @@
           "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "idx_dse_profile_id",
@@ -5521,7 +5521,7 @@
     {
       "name": "disruption_scenario_profiles",
       "schema": "public",
-      "created_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql",
+      "created_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
       "columns": [
         {
           "name": "id",
@@ -5533,7 +5533,7 @@
           "primary_key": true,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "project_id",
@@ -5545,7 +5545,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "plant_name",
@@ -5557,7 +5557,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "scenario_name",
@@ -5569,7 +5569,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "status",
@@ -5581,7 +5581,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "description",
@@ -5593,7 +5593,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "tags",
@@ -5605,7 +5605,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "organization",
@@ -5617,7 +5617,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "created_by",
@@ -5629,7 +5629,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "created_at",
@@ -5641,7 +5641,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "updated_at",
@@ -5653,7 +5653,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "disruption_start",
@@ -5689,7 +5689,7 @@
           ],
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "disruption_scenario_profiles_project_id_fkey",
@@ -5713,7 +5713,7 @@
           "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "idx_disruption_scenario_profiles_project_id",
@@ -5765,7 +5765,7 @@
     {
       "name": "disruption_scenario_settings",
       "schema": "public",
-      "created_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql",
+      "created_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
       "columns": [
         {
           "name": "id",
@@ -5777,7 +5777,7 @@
           "primary_key": true,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "profile_id",
@@ -5796,7 +5796,7 @@
             ],
             "on_delete": "CASCADE"
           },
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "key",
@@ -5808,7 +5808,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "value",
@@ -5820,7 +5820,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "organization",
@@ -5832,7 +5832,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "created_by",
@@ -5844,7 +5844,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "created_at",
@@ -5856,7 +5856,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "updated_at",
@@ -5868,7 +5868,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         }
       ],
       "constraints": [
@@ -5880,7 +5880,7 @@
             "key"
           ],
           "definition": "UNIQUE (profile_id, key)",
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "disruption_scenario_settings_pkey",
@@ -5890,7 +5890,7 @@
           ],
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         }
       ],
       "indexes": [
@@ -5904,7 +5904,7 @@
           "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "idx_dss_profile_id",
@@ -5964,7 +5964,7 @@
     {
       "name": "disruption_scenario_targets",
       "schema": "public",
-      "created_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql",
+      "created_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
       "columns": [
         {
           "name": "id",
@@ -5976,7 +5976,7 @@
           "primary_key": true,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "profile_id",
@@ -5995,7 +5995,7 @@
             ],
             "on_delete": "CASCADE"
           },
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "target_type",
@@ -6007,7 +6007,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "node_ids",
@@ -6019,7 +6019,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "edge_list",
@@ -6031,7 +6031,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "selector",
@@ -6043,7 +6043,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "organization",
@@ -6055,7 +6055,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "created_by",
@@ -6067,7 +6067,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "created_at",
@@ -6079,7 +6079,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "updated_at",
@@ -6091,7 +6091,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         }
       ],
       "constraints": [
@@ -6103,7 +6103,7 @@
           ],
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         }
       ],
       "indexes": [
@@ -6117,7 +6117,7 @@
           "nulls_not_distinct": false,
           "predicate": null,
           "partial": false,
-          "added_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+          "added_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
         },
         {
           "name": "idx_dst_profile_id",
@@ -20649,7 +20649,7 @@
         "capacity_reduction",
         "time_delay"
       ],
-      "defined_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+      "defined_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
     },
     "disruption_status": {
       "values": [
@@ -20657,14 +20657,14 @@
         "active",
         "archived"
       ],
-      "defined_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+      "defined_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
     },
     "disruption_target_type": {
       "values": [
         "node",
         "edge"
       ],
-      "defined_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
+      "defined_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
     }
   },
   "functions": [
@@ -21354,7 +21354,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260716000001_apply_policy_bundle.sql"
+      "defined_by": "20260918000002_actor_on_three_definer_writers.sql"
     },
     {
       "name": "apply_validation_to_scenario",
@@ -21420,7 +21420,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260728000001_cartographer_product_level.sql"
+      "defined_by": "20260918000002_actor_on_three_definer_writers.sql"
     },
     {
       "name": "assign_material_supplier",
@@ -21452,7 +21452,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260728000001_cartographer_product_level.sql"
+      "defined_by": "20260918000002_actor_on_three_definer_writers.sql"
     },
     {
       "name": "audit_tier_write",
@@ -21722,55 +21722,59 @@
     },
     {
       "name": "bulk_upsert_materials",
-      "signature": "bulk_upsert_materials(uuid, jsonb)",
+      "signature": "bulk_upsert_materials(uuid, jsonb, uuid)",
       "args": [
         "p_project_id uuid",
-        "p_rows jsonb"
+        "p_rows jsonb",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260702000001_item_master_write_rpcs.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "bulk_upsert_policy_overrides",
-      "signature": "bulk_upsert_policy_overrides(uuid, jsonb)",
+      "signature": "bulk_upsert_policy_overrides(uuid, jsonb, uuid)",
       "args": [
         "p_project_id uuid",
-        "p_rows jsonb"
+        "p_rows jsonb",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": "WP 4.4 · takes an optional per-row `seeded` boolean and stamps ",
-      "defined_by": "20260917000008_one_staleness_rule.sql"
+      "comment": null,
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "bulk_upsert_products",
-      "signature": "bulk_upsert_products(uuid, jsonb)",
+      "signature": "bulk_upsert_products(uuid, jsonb, uuid)",
       "args": [
         "p_project_id uuid",
-        "p_rows jsonb"
+        "p_rows jsonb",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260712000001_product_demand_bounds.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "bulk_upsert_suppliers",
-      "signature": "bulk_upsert_suppliers(uuid, jsonb)",
+      "signature": "bulk_upsert_suppliers(uuid, jsonb, uuid)",
       "args": [
         "p_project_id uuid",
-        "p_rows jsonb"
+        "p_rows jsonb",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260702000001_item_master_write_rpcs.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "capabilities_for_user",
@@ -21847,15 +21851,16 @@
     },
     {
       "name": "clear_policy_preset",
-      "signature": "clear_policy_preset(uuid)",
+      "signature": "clear_policy_preset(uuid, uuid)",
       "args": [
-        "p_project_id uuid"
+        "p_project_id uuid",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260609040000_consolidated_safe.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "combine_project_into_supply_chain",
@@ -21939,28 +21944,6 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260609040000_consolidated_safe.sql"
-    },
-    {
-      "name": "create_disruption_scenario_v2",
-      "signature": "create_disruption_scenario_v2(uuid, text, text, public.disruption_status, text, text[], jsonb, jsonb, jsonb, uuid, text)",
-      "args": [
-        "p_project_id uuid",
-        "p_plant_name text",
-        "p_scenario_name text",
-        "p_status public.disruption_status DEFAULT 'draft'",
-        "p_description text DEFAULT NULL",
-        "p_tags text[] DEFAULT '{}'",
-        "p_targets jsonb DEFAULT NULL",
-        "p_effects jsonb DEFAULT NULL",
-        "p_settings jsonb DEFAULT NULL",
-        "p_user_id uuid",
-        "p_user_email text"
-      ],
-      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql"
     },
     {
       "name": "create_disruption_scenario_v2",
@@ -22295,18 +22278,19 @@
     },
     {
       "name": "delete_policy_override",
-      "signature": "delete_policy_override(uuid, text, text, text)",
+      "signature": "delete_policy_override(uuid, text, text, text, uuid)",
       "args": [
         "p_project_id uuid",
         "p_scope text",
         "p_target_key text",
-        "p_family text"
+        "p_family text",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260609040000_consolidated_safe.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "delete_policy_version",
@@ -22439,15 +22423,16 @@
     },
     {
       "name": "ensure_item_masters",
-      "signature": "ensure_item_masters(uuid)",
+      "signature": "ensure_item_masters(uuid, uuid)",
       "args": [
-        "p_project_id uuid"
+        "p_project_id uuid",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260614000001_item_master.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "etl_replace_supply_chain",
@@ -23763,15 +23748,16 @@
     },
     {
       "name": "restore_policy_version",
-      "signature": "restore_policy_version(uuid)",
+      "signature": "restore_policy_version(uuid, uuid)",
       "args": [
-        "p_version_id uuid"
+        "p_version_id uuid",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260612000001_policy_version_snapshots.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "review_agent_proposal",
@@ -23845,20 +23831,21 @@
     },
     {
       "name": "save_policy_defaults",
-      "signature": "save_policy_defaults(uuid, text, jsonb, text, text, timestamptz)",
+      "signature": "save_policy_defaults(uuid, text, jsonb, text, text, timestamptz, uuid)",
       "args": [
         "p_project_id uuid",
         "p_family text",
         "p_value jsonb",
         "p_strategy text DEFAULT NULL",
         "p_active_preset text DEFAULT NULL",
-        "p_preset_applied_at timestamptz DEFAULT NULL"
+        "p_preset_applied_at timestamptz DEFAULT NULL",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260609040000_consolidated_safe.sql"
+      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
     },
     {
       "name": "save_project_memory",
@@ -24515,6 +24502,26 @@
       ]
     },
     {
+      "migration": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql",
+      "why": "CREATE FUNCTION create_disruption_scenario_v2(uuid, text, text, public.disruption_status, text, text[], jsonb, jsonb, jsonb, uuid, text) declares \"p_user_id uuid\" with no default after \"p_settings jsonb DEFAULT NULL\", which has one. PostgreSQL raises 42P13 and the file's transaction rolls back. Nothing else in the file ran either.",
+      "tables_it_claimed": [
+        "disruption_scenario_effects",
+        "disruption_scenario_profiles",
+        "disruption_scenario_settings",
+        "disruption_scenario_targets"
+      ]
+    },
+    {
+      "migration": "20250904122241_b65404b9-d4ee-4c58-9518-7a1578f74af8.sql",
+      "why": "CREATE FUNCTION get_network_nodes(uuid, text, uuid, text) declares \"p_user_id uuid\" with no default after \"p_plant_name text DEFAULT NULL\", which has one. PostgreSQL raises 42P13 and the file's transaction rolls back. Nothing else in the file ran either.",
+      "tables_it_claimed": []
+    },
+    {
+      "migration": "20250904122347_a28da769-734c-4064-8f24-2b8d60ffffa4.sql",
+      "why": "CREATE FUNCTION get_network_nodes(uuid, text, uuid, text) declares \"p_user_id uuid\" with no default after \"p_plant_name text DEFAULT NULL\", which has one. PostgreSQL raises 42P13 and the file's transaction rolls back. Nothing else in the file ran either.",
+      "tables_it_claimed": []
+    },
+    {
       "migration": "20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql",
       "why": "CREATE INDEX names material_id, which supply_chain_data_multi_tier does not have. Postgres raises 42703 and the file's transaction rolls back. Nothing else in the file ran either.",
       "tables_it_claimed": []
@@ -24530,42 +24537,6 @@
     }
   ],
   "shadowed": [
-    {
-      "table": "disruption_scenario_profiles",
-      "migration": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
-      "created_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql",
-      "if_not_exists": true,
-      "differs": false,
-      "diff": [],
-      "note": "NO-OP: identical re-declaration"
-    },
-    {
-      "table": "disruption_scenario_targets",
-      "migration": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
-      "created_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql",
-      "if_not_exists": true,
-      "differs": false,
-      "diff": [],
-      "note": "NO-OP: identical re-declaration"
-    },
-    {
-      "table": "disruption_scenario_effects",
-      "migration": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
-      "created_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql",
-      "if_not_exists": true,
-      "differs": false,
-      "diff": [],
-      "note": "NO-OP: identical re-declaration"
-    },
-    {
-      "table": "disruption_scenario_settings",
-      "migration": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
-      "created_by": "20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql",
-      "if_not_exists": true,
-      "differs": false,
-      "diff": [],
-      "note": "NO-OP: identical re-declaration"
-    },
     {
       "table": "scenario_templates",
       "migration": "20260609040000_consolidated_safe.sql",

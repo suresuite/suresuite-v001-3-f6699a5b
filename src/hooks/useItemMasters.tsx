@@ -193,6 +193,9 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
     // economics survive re-uploads).
     const { error: ensureErr } = await sb.rpc("ensure_item_masters", {
       p_project_id: projectId,
+      // D71 · the actor, so the rows this materializes carry one. DEFAULT NULL
+      // on the RPC, so omitting it is exactly the old behaviour.
+      _actor_user_id: user?.id ?? null,
     });
     if (ensureErr) console.error("ensure_item_masters failed", ensureErr);
     await Promise.all([
@@ -202,7 +205,7 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
       loadLogistics(),
     ]);
     setLoading(false);
-  }, [projectId, loadTable, loadLogistics]);
+  }, [projectId, loadTable, loadLogistics, user?.id]);
 
   useEffect(() => {
     void reload();
@@ -244,6 +247,7 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
         const { error: err } = await sb.rpc(UPSERT_RPC[table], {
           p_project_id: projectId,
           p_rows: batch,
+          _actor_user_id: user?.id ?? null,   // D71
         });
         if (err) {
           console.error(`${UPSERT_RPC[table]} failed`, err);
@@ -252,7 +256,7 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
       }
       await loadTable(table);
     },
-    [projectId, loadTable],
+    [projectId, loadTable, user?.id],
   );
 
   const derived: DerivedEconomics = useMemo(

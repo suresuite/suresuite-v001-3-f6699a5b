@@ -24,7 +24,10 @@
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { splitStatements, splitTopLevel, parenBody, readQualifiedName, renameIdentifier, squash } from "./sql-lex.mjs";
+import {
+  splitStatements, splitTopLevel, parenBody, readQualifiedName, renameIdentifier, squash,
+  firstNonDefaultAfterDefault, skipQuoted,
+} from "./sql-lex.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MIGRATIONS = join(ROOT, "supabase", "migrations");
@@ -190,17 +193,6 @@ function inlineChecks(mods) {
     i++;
   }
   return out;
-}
-
-/** Index one past the closing `q` of the literal or quoted identifier at `i`. */
-function skipQuoted(s, i, q) {
-  i++;
-  while (i < s.length) {
-    if (s[i] === q) { if (s[i + 1] === q) { i += 2; continue; } return i + 1; }
-    if (q === "'" && s[i] === "\\") { i += 2; continue; }
-    i++;
-  }
-  return s.length;
 }
 
 function parseTableConstraint(def, migration) {
@@ -464,6 +456,32 @@ function apply(schema, stmt, migration, guarded = false) {
     const argList = args ? splitTopLevel(args.body).map((a) => squash(a)).filter(Boolean) : [];
     const returns = /\bRETURNS\s+((?:SETOF\s+|TABLE\s*\(.*?\)|[\w."\[\] ]+))/is.exec(s.slice(args?.end ?? id.end));
     const sig = `${id.name}(${argList.map(argType).join(", ")})`;
+
+    // A NON-DEFAULTED PARAMETER AFTER A DEFAULTED ONE IS NOT A FUNCTION; IT IS
+    // AN ERROR, AND EVERY STATEMENT AFTER IT IN THE FILE NEVER RAN.
+    //
+    // PostgreSQL raises 42P13 at CREATE time ("input parameters after one with
+    // a default value must also have defaults"), so the file's transaction rolls
+    // back. This is §4 D48, and it is the same mechanism as D97 on a second
+    // statement kind — which is the whole reason `schema.impossible` is a list
+    // rather than a special case for indexes.
+    //
+    // The evidence that this is what happened is not inference: the retry
+    // `20250827171106`, 84 seconds later, opens its own copy with
+    // `-- FIXED: Put all parameters with defaults at the end`.
+    const bad = firstNonDefaultAfterDefault(argList);
+    if (bad) {
+      schema.impossible.push({
+        migration,
+        statement: s.slice(0, 220),
+        function: sig,
+        why:
+          `CREATE FUNCTION ${sig} declares "${bad.after}" with no default after ` +
+          `"${bad.defaulted}", which has one. PostgreSQL raises 42P13 and the ` +
+          "file's transaction rolls back.",
+      });
+      return;
+    }
     schema.functions.set(sig, {
       name: id.name,
       signature: sig,
@@ -1123,9 +1141,11 @@ function build() {
   //
   // (a) The corroboration test: of two CREATE TABLEs for one table, the later
   //     INSERTs agree with one and contradict the other.
-  // (b) A statement PostgreSQL REJECTS — today, a CREATE INDEX on a column the
-  //     table does not have (42703). `IF NOT EXISTS` guards the index name, not
-  //     the column, so the file's transaction rolls back and nothing in it ran.
+  // (b) A statement PostgreSQL REJECTS: a CREATE INDEX on a column the table
+  //     does not have (42703 — `IF NOT EXISTS` guards the index NAME, not the
+  //     column), or a CREATE FUNCTION whose input parameters put a defaulted one
+  //     before a plain one (42P13). Either way the file's transaction rolls back
+  //     and nothing in it ran.
   //
   // (b) MUST NOT BE READ BEFORE (a) HAS SETTLED, and the first draft of this
   // did, which is how it accused `20260916000018` — WP 3.3's seven unique
