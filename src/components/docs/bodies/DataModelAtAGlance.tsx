@@ -123,7 +123,7 @@ export default function DataModelAtAGlance() {
                 {group.tables.length} {group.tables.length === 1 ? "table" : "tables"}
               </span>
             </div>
-            <p className="mb-3 text-sm leading-relaxed text-muted-foreground">{group.why}</p>
+            <p className="mb-3 text-sm leading-relaxed text-muted-foreground"><Prose text={group.why} /></p>
             <ul className="flex flex-wrap gap-1.5">
               {group.tables.map((t) => (
                 <li key={t.table}>

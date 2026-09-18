@@ -121,6 +121,14 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # D57 — nothing in this repository typechecked. Vite does not, and a bare
+      # `tsc --noEmit` at the root passes on the empty set, so a generator
+      # emitting an object into a `string | null` field went unseen for a
+      # package and a half. A RATCHET against scripts/typecheck-baseline.json:
+      # green today, red on the next new type error.
+      - name: TypeScript typechecks (ratchet)
+        run: npm run typecheck
+
       # ── and the composite ─────────────────────────────────────────────────
       #
       # `contract:check` re-runs the four contract gates above and adds WP 1.4's

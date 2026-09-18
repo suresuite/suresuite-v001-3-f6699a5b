@@ -566,6 +566,7 @@ fields:
       read with the run, the input hash and the code version that
       produced it. WP 5.3 drops the column once every reader has moved.
     grain: level
+    computed_by: "calculate-node-prominence (and calculate-network-science-metrics)"
     engine:
       consumed_by: null
       transform: null
@@ -590,6 +591,7 @@ fields:
       `computed_at` and `computed_from_hash` say the same thing and
       more. Dropped with the column in WP 5.3.
     grain: metadata
+    computed_by: "calculate-node-prominence (and calculate-network-science-metrics)"
     engine:
       consumed_by: null
       transform: null
@@ -614,6 +616,7 @@ fields:
       ANALYSIS OUTPUT — `calculate-network-science-metrics`. Dual-
       written into `analysis_results` since WP 4.3.
     grain: level
+    computed_by: "calculate-network-science-metrics"
     engine:
       consumed_by: null
       transform: null
@@ -637,6 +640,7 @@ fields:
       ANALYSIS OUTPUT — degree weighted by `relative_revenue`. Dual-
       written since WP 4.3.
     grain: level
+    computed_by: "calculate-network-science-metrics"
     engine:
       consumed_by: null
       transform: null
@@ -659,6 +663,7 @@ fields:
     meaning: >-
       ANALYSIS OUTPUT — dual-written since WP 4.3.
     grain: level
+    computed_by: "calculate-network-science-metrics"
     engine:
       consumed_by: null
       transform: null
@@ -681,6 +686,7 @@ fields:
     meaning: >-
       ANALYSIS OUTPUT — dual-written since WP 4.3.
     grain: level
+    computed_by: "calculate-network-science-metrics"
     engine:
       consumed_by: null
       transform: null
@@ -703,6 +709,7 @@ fields:
     meaning: >-
       ANALYSIS OUTPUT — dual-written since WP 4.3.
     grain: level
+    computed_by: "calculate-network-science-metrics"
     engine:
       consumed_by: null
       transform: null
@@ -726,6 +733,7 @@ fields:
       When the five centralities were last written. Superseded by
       `computed_at`; dropped with the columns in WP 5.3.
     grain: metadata
+    computed_by: "calculate-network-science-metrics"
     engine:
       consumed_by: null
       transform: null
@@ -753,6 +761,7 @@ fields:
       reportable state and not a silent default (`declared-fallback`,
       I6). This is the column invariant `input-hash` (I5) is about.
     grain: metadata
+    computed_by: "analysis_apply_node_metrics"
     engine:
       consumed_by: null
       transform: null
@@ -777,6 +786,7 @@ fields:
       current_graph_hash()`, which is WP 4.4's one rule, and a timestamp
       comparison is the thing that rule replaces (§4 D12).
     grain: metadata
+    computed_by: "analysis_apply_node_metrics"
     engine:
       consumed_by: null
       transform: null

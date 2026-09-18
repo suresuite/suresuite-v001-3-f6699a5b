@@ -271,6 +271,7 @@ fields:
       `computed_from_hash` on this row describes the CRITICALITY columns
       only. Named for WP 4.4.
     grain: level
+    computed_by: "geocode-locations"
     engine:
       consumed_by: null
       transform: null
@@ -293,6 +294,7 @@ fields:
     meaning: >-
       ANALYSIS OUTPUT — see `longitude`.
     grain: level
+    computed_by: "geocode-locations"
     engine:
       consumed_by: null
       transform: null
@@ -319,6 +321,7 @@ fields:
       older destination and §15 has never measured whether anything
       still fills them.
     grain: level
+    computed_by: "predict-critical-nodes"
     engine:
       consumed_by: null
       transform: null
@@ -342,6 +345,7 @@ fields:
       ANALYSIS OUTPUT — the prediction score. See `is_critical_node` on
       which destination is live.
     grain: level
+    computed_by: "predict-critical-nodes"
     engine:
       consumed_by: null
       transform: null
@@ -365,6 +369,7 @@ fields:
       When the prediction columns were last written. Superseded by
       `computed_at`.
     grain: metadata
+    computed_by: "predict-critical-nodes"
     engine:
       consumed_by: null
       transform: null
@@ -492,6 +497,7 @@ fields:
       reportable state and not a silent default (`declared-fallback`,
       I6). This is the column invariant `input-hash` (I5) is about.
     grain: metadata
+    computed_by: "analysis_mark_critical_nodes"
     engine:
       consumed_by: null
       transform: null
@@ -516,6 +522,7 @@ fields:
       current_graph_hash()`, which is WP 4.4's one rule, and a timestamp
       comparison is the thing that rule replaces (§4 D12).
     grain: metadata
+    computed_by: "analysis_mark_critical_nodes"
     engine:
       consumed_by: null
       transform: null

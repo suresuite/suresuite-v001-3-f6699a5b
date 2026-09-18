@@ -28,6 +28,20 @@ import UnitsAndConventions from "./UnitsAndConventions";
 import Glossary from "./Glossary";
 import FieldIndex from "./FieldIndex";
 
+// 3 · Input tables (WP 5.2b)
+import InboundLogistics from "./InboundLogistics";
+import OutboundLogistics from "./OutboundLogistics";
+import BomSingleLevel from "./BomSingleLevel";
+import BomMultiLevel from "./BomMultiLevel";
+import Materials from "./Materials";
+import Products from "./Products";
+import Suppliers from "./Suppliers";
+import NodeList from "./NodeList";
+import DeepTierNodes from "./DeepTierNodes";
+import DeepTierEdges from "./DeepTierEdges";
+import MultiTierSuppliers from "./MultiTierSuppliers";
+import UnitsAndTimePeriods from "./UnitsAndTimePeriods";
+
 export const DOC_BODIES: Record<string, ComponentType> = {
   // 1 · Overview & architecture
   "what-suresuite-is": WhatSureSuiteIs,
@@ -42,6 +56,20 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   "your-first-project": YourFirstProject,
   projects: Projects,
   "uploading-data": UploadingData,
+
+  // 3 · Input tables
+  "inbound-logistics": InboundLogistics,
+  "outbound-logistics": OutboundLogistics,
+  "bom-single-level": BomSingleLevel,
+  "bom-multi-level": BomMultiLevel,
+  materials: Materials,
+  products: Products,
+  suppliers: Suppliers,
+  "node-list": NodeList,
+  "deep-tier-nodes": DeepTierNodes,
+  "deep-tier-edges": DeepTierEdges,
+  "multi-tier-suppliers": MultiTierSuppliers,
+  "units-and-time-periods": UnitsAndTimePeriods,
 
   // 15 · Reference
   "all-tables": AllTables,

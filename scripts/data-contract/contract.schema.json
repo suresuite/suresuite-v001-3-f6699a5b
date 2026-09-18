@@ -311,6 +311,16 @@
             "metadata"
           ]
         },
+        "computed_by": {
+          "type": "string",
+          "minLength": 3,
+          "description": "WP 5.2b · the analyzer or function that WRITES this column, where the column is an analysis OUTPUT rather than something a person supplied. Absent means it is not one. Declared here because \"which columns are computed\" is a data fact, and `single-source` (I1) says a data fact is authored exactly once: it was authored twice — as prose in each field's `note`, and as a literal Set named COMPUTED_COLUMNS inside graphHashCoverage.test.ts. Two lists that must agree with nothing comparing them is D21 and D22's shape, and the manual could not tell a reader which half of `network_nodes` they uploaded without becoming a third.",
+          "examples": [
+            "calculate-network-science-metrics",
+            "predict-critical-nodes",
+            "geocode-locations"
+          ]
+        },
         "engine": {
           "type": "object",
           "required": [
