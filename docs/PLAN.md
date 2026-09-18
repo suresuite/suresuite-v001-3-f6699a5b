@@ -9695,5 +9695,26 @@ the engine and decide who is served when supply is short, and they can only be
 set by hand in the database. The sidecar's closing line said the missing writer
 was tidiness; it is now binding, and it says so.
 
+**CI caught what the session could not run, on the first push, and the catch was
+a real one.** `scsim`'s `test_e1_fully_specified_project_has_no_silent_fallbacks`
+— the engine-retirement gate E1 (§3) — failed: 222 passed, 1 failed. The first
+draft emitted its "these customers kept the engine defaults" note whenever ANY
+customer fell back, including when the table supplied no rows at all, and E1's
+rule is that a fully-specified project maps with no residue.
+
+E1 was right and the note was wrong. A project with no customer master data IS
+fully specified: the table is optional and, per D94, nothing in the product
+writes it — so every project in existence would have carried that note from this
+commit onward. The note now fires only on PARTIAL coverage, where the table
+describes some of a project's customers and not the rest, which is a gap in data
+somebody is actively maintaining rather than a baseline nobody chose. Pinned
+both ways in `test_customer_attributes.py`: silent when the table is absent,
+reported when coverage is partial.
+
+Worth recording as a pattern rather than an incident: **the unverifiable change
+was caught by an existing gate within four minutes of the push**, and the gate's
+verdict was correct against the draft's reasoning. The `scsim` suite is the
+verifier a work-package session cannot be.
+
 **Still open in WP 6.2:** D18, D34, D47, D48, D49, D51, D53, D58, D59, D66, D71,
 D85, D87, D94, D95.

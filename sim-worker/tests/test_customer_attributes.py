@@ -107,11 +107,36 @@ def test_a_customer_with_no_row_keeps_the_engine_defaults():
 
 def test_no_customers_table_at_all_behaves_as_before():
     """The pre-fix behaviour, kept as the floor: absent rows change nothing."""
-    cust = _by_id(from_project_data(_data(None)))
+    result = from_project_data(_data(None))
+    cust = _by_id(result)
 
     assert set(cust) == {"C1", "C2"}
     assert all(c.segment == "default" for c in cust.values())
     assert all(c.priority_weight == pytest.approx(1.0) for c in cust.values())
+
+    # AND IT IS SILENT, which the E1 engine-retirement gate is what settled.
+    # The first draft warned whenever any customer fell back, including when the
+    # table supplied nothing — and `test_e1_fully_specified_project_has_no_silent
+    # _fallbacks` failed, correctly: a project with no customer master data is
+    # fully specified, the table is optional, and nothing in the product writes
+    # it today (§4 D94), so every project would have carried that note.
+    assert not [wd for wd in result.warning_dicts if wd["entity"] == "customers"]
+
+
+def test_partial_coverage_IS_reported():
+    """The case the note is actually for: the table describes some and not others.
+
+    A gap in data somebody is actively maintaining is worth saying; an empty
+    table is the documented baseline, not a fallback anybody chose.
+    """
+    result = from_project_data(_data([
+        {"customer_id": "C1", "segment": "gold", "priority_weight": 3.5},
+    ]))
+
+    notes = [wd for wd in result.warning_dicts if wd["entity"] == "customers"]
+    assert notes, "partial coverage of the customers table is reported by nothing"
+    assert all(wd["level"] == "info" for wd in notes)
+    assert any("C2" in wd["reason"] for wd in notes)
 
 
 def test_a_null_column_falls_back_rather_than_failing_validation():

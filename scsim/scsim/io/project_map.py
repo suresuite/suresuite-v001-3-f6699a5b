@@ -913,12 +913,24 @@ def _build_customers(
         if row.priority_weight is not None:
             kwargs["priority_weight"] = float(row.priority_weight)
         out.append(Customer(**kwargs))
-    if defaulted:
+    # ONLY WHEN THE COVERAGE IS PARTIAL, and the E1 gate is what settled that.
+    #
+    # The first draft warned whenever any customer fell back, including when the
+    # table supplied NO rows at all — and `test_e1_fully_specified_project_has_no
+    # _silent_fallbacks` failed, correctly. E1's rule is that a fully-specified
+    # project maps with no residue, and a project with no customer master data is
+    # fully specified: the table is optional, and today nothing in the product
+    # writes it (§4 D94), so EVERY project would have carried this note.
+    #
+    # What is worth saying is that the table describes SOME of these customers
+    # and not the rest — that is a gap in data somebody is actively maintaining.
+    # An empty table is the documented baseline, not a fallback anybody chose.
+    if defaulted and by_id:
         w.append(MappingWarning(
             "info", "customers", "segment",
-            f"{len(defaulted)} customer(s) have no row in the `customers` table, so they "
-            f"keep the engine defaults (segment=default, priority_weight=1.0): "
-            f"{defaulted[:5]}"))
+            f"the `customers` table describes {len(by_id)} customer(s) but not "
+            f"{len(defaulted)} other(s), which keep the engine defaults "
+            f"(segment=default, priority_weight=1.0): {defaulted[:5]}"))
     return out
 
 
