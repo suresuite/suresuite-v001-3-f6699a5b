@@ -163,6 +163,11 @@ export function buildContract({ introspected, registry, sidecars }) {
         normalize_at_promotion: f.normalize_at_promotion ?? null,
         meaning: f.meaning,
         grain: f.grain,
+        // WP 5.2b (I1) — the analyzer that writes this column, where one does.
+        // "Which columns are computed" was a data fact authored twice: as prose
+        // in each field's `note`, and as a literal Set in graphHashCoverage's
+        // test. Authored once, here, and read by both.
+        computed_by: f.computed_by ?? null,
         engine: f.engine,
         substitutions: f.substitutions,
         ingest: f.ingest,
@@ -815,6 +820,51 @@ function refColumn(c) {
     // registry (I6). Never paraphrased here.
     engineChain: c.engine_requirement?.chain ?? null,
     engineLevel: c.engine_requirement?.level ?? null,
+
+    // ── WP 5.2b's additions ────────────────────────────────────────────────
+    //
+    // §6.3 section 3 gives every uploaded column an "If you leave it blank"
+    // line, and PLAN.md §5.3 T1 says every such line resolves to data, a named
+    // rule or an explicit default — there is no fourth option. That answer was
+    // in the contract already and not in this module, so the pages could not
+    // reach it without typing it, which is D21. Four ordered sources, each
+    // labelled at the point of display so the reader knows WHICH answered:
+    //
+    //   1. `blank: "reject"`     the row does not land at all
+    //   2. `substitutions[]`     a named substitution, with its provenance
+    //   3. `engineMissingDefault` the engine's declared fallback (I6)
+    //   4. `engineTransform`     what the engine does with a NULL it is given
+    //
+    // A column none of the four answers is a BLIND SPOT, and the page says so
+    // (T3) rather than guessing.
+    /** What the parser does with an empty cell: "reject" or "null". */
+    blank: c.ingest?.rule?.kind ? (c.ingest.rule.blank ?? null) : null,
+    /** The engine field this reaches, e.g. `project_map.py::… -> Material.cost`. */
+    engineField: c.engine?.consumed_by ?? null,
+    /** What the engine uses when this is absent. */
+    engineMissingDefault: c.engine?.missing_default ?? null,
+    /** What the engine does to the value it is given, NULL included. */
+    engineTransform: c.engine?.transform ?? null,
+    /** The sibling column that names this one's unit, where there is one (I3). */
+    unitColumn: c.unit_column ?? null,
+    /** How the promotion canonicalises it, where it does (I3). */
+    normalizeAtPromotion: c.normalize_at_promotion
+      ? {
+          conversion: c.normalize_at_promotion.conversion,
+          canonical: c.normalize_at_promotion.canonical,
+        }
+      : null,
+    /** identifier · level · rate · metadata — what KIND of quantity this is. */
+    quantityGrain: c.grain ?? null,
+    /**
+     * The analyzer that WROTE this column, where it is an analysis output.
+     *
+     * `null` means a person supplied it. Two of section 3's pages document a
+     * table that is BOTH halves at once (§4 D56) and cannot say which is which
+     * without this; the alternative was a column list typed into a page, which
+     * is D21 exactly.
+     */
+    computedBy: c.computed_by ?? null,
   };
 }
 
@@ -831,6 +881,26 @@ export function renderReferenceModule(contract) {
     checks: t.constraints
       .filter((c) => c.kind === "CHECK")
       .map((c) => ({ name: c.name, definition: c.definition })),
+    // WP 5.2b: whether the table has a CSV origin at all, and under which
+    // wizard. Four of §6.3 section 3's eleven tables have NONE — they reach
+    // their tables through bulk RPCs rather than `ingest_land_file` (§4 D56) —
+    // and a page that did not know the difference would invent an upload path.
+    ingestDataset: t.ingest_dataset
+      ? {
+          wizardId: t.ingest_dataset.wizard_id,
+          factClass: t.ingest_dataset.fact_class,
+          serverSet: t.ingest_dataset.server_set ?? [],
+        }
+      : null,
+    governance: t.governance
+      ? {
+          read: t.governance.read ?? null,
+          write: t.governance.write ?? null,
+          minProjectRole: t.governance.min_project_role ?? null,
+          audited: Boolean(t.governance.audited),
+          rlsEnabled: Boolean(t.governance.rls_enabled),
+        }
+      : null,
     columns: t.columns.map(refColumn),
   }));
 
@@ -890,6 +960,16 @@ export function renderReferenceModule(contract) {
     "  substitutions: RefSubstitution[];",
     "  engineChain: string | null;",
     "  engineLevel: string | null;",
+    "  /** What an empty cell does: \"reject\" the row, or store `null`. */",
+    "  blank: \"reject\" | \"null\" | null;",
+    "  engineField: string | null;",
+    "  engineMissingDefault: string | null;",
+    "  engineTransform: string | null;",
+    "  unitColumn: string | null;",
+    "  normalizeAtPromotion: { conversion: string; canonical: string } | null;",
+    "  quantityGrain: string | null;",
+    "  /** The analyzer that wrote it. `null` means a person supplied it. */",
+    "  computedBy: string | null;",
     "};",
     "",
     "export type RefTable = {",
@@ -901,6 +981,15 @@ export function renderReferenceModule(contract) {
     "  naturalKey: string[];",
     "  naturalKeyIntended: string[] | null;",
     "  checks: { name: string; definition: string }[];",
+    "  /** The CSV origin, where the table has one. `null` means it has none. */",
+    "  ingestDataset: { wizardId: string; factClass: string; serverSet: string[] } | null;",
+    "  governance: {",
+    "    read: string | null;",
+    "    write: string | null;",
+    "    minProjectRole: string | null;",
+    "    audited: boolean;",
+    "    rlsEnabled: boolean;",
+    "  } | null;",
     "  columns: RefColumn[];",
     "};",
     "",

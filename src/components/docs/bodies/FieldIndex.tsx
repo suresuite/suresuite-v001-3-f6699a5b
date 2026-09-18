@@ -9,7 +9,7 @@ import { Link } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { PageTitle, Section, P, Key, Provenance, Term, DocLink } from "@/components/docs/prose";
+import { PageTitle, Section, P, Key, Prose, Provenance, Term, DocLink } from "@/components/docs/prose";
 import { REFERENCE_TABLES, REFERENCE_COLUMN_COUNT } from "@/components/docs/generated/reference.generated";
 
 type Entry = {
@@ -147,7 +147,7 @@ export default function FieldIndex() {
                     <td className="p-3 font-mono text-[12px] text-muted-foreground">{e.table}</td>
                     <td className="whitespace-nowrap p-3 text-[12px] text-muted-foreground">
                       <span className="font-mono">{e.type}</span>
-                      {e.unit && <span className="mt-0.5 block">in {e.unit}</span>}
+                      {e.unit && <span className="mt-0.5 block">in <Prose text={e.unit} /></span>}
                     </td>
                     <td className="whitespace-nowrap p-3 text-right">
                       {!e.uploaded && (

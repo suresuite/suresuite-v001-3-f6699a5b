@@ -95,16 +95,28 @@ describe("pages and their bodies", () => {
     }
   });
 
-  it("ships sections 1, 2 and 15 in full — WP 5.2a's and WP 5.2h's scope", () => {
-    for (const g of DOC_GROUPS.filter((x) => x.section <= 2 || x.section === 15)) {
-      for (const p of g.pages) {
-        expect(p.status, `${g.group} / ${p.title}`).toBe("live");
+  // Sections whose every page is written, and the package that finished each.
+  // A sub-package adds its row when it ships; it is here so that flipping a
+  // `status` without writing a body, or the reverse, cannot pass unnoticed —
+  // and so that "section 3 is done" is a thing the suite knows rather than a
+  // thing a §16 entry claims.
+  const COMPLETE_SECTIONS: { section: number; wp: string; pages: number }[] = [
+    { section: 1, wp: "5.2a", pages: 7 },
+    { section: 2, wp: "5.2a", pages: 3 },
+    { section: 3, wp: "5.2b", pages: 12 },
+    { section: 15, wp: "5.2h", pages: 4 },
+  ];
+
+  it("ships every section a package has finished, in full", () => {
+    for (const { section, wp, pages } of COMPLETE_SECTIONS) {
+      const g = DOC_GROUPS.find((x) => x.section === section);
+      expect(g, `section ${section} is missing`).toBeDefined();
+      expect(g!.pages, `WP ${wp} claims ${pages} pages in section ${section}`).toHaveLength(pages);
+      for (const p of g!.pages) {
+        expect(p.status, `WP ${wp} · ${g!.group} / ${p.title}`).toBe("live");
       }
     }
-    // 10 from WP 5.2a + 4 from WP 5.2h. A later package raises this as it
-    // ships; it is here so that flipping a `status` without writing a body,
-    // or the reverse, cannot pass unnoticed.
-    expect(live).toHaveLength(14);
+    expect(live).toHaveLength(COMPLETE_SECTIONS.reduce((n, s) => n + s.pages, 0));
   });
 
   it("gives every page a summary — it is what a stub and a search hit show", () => {

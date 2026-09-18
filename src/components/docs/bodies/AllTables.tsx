@@ -45,7 +45,7 @@ function ColumnRow({ table, c }: { table: string; c: RefColumn }) {
       </th>
       <td className="whitespace-nowrap p-3 text-[12px] text-muted-foreground">
         <span className="font-mono">{c.type}</span>
-        {c.unit && <span className="mt-0.5 block">in {c.unit}</span>}
+        {c.unit && <span className="mt-0.5 block">in <Prose text={c.unit} /></span>}
       </td>
       <td className="p-3 text-sm leading-relaxed text-muted-foreground">
         {c.meaning ? <Prose text={c.meaning} /> : "—"}
@@ -198,7 +198,7 @@ export default function AllTables() {
                 {g.tables.length} {g.tables.length === 1 ? "table" : "tables"}
               </span>
             </div>
-            <p className="mb-3 text-sm leading-relaxed text-muted-foreground">{g.why}</p>
+            <p className="mb-3 text-sm leading-relaxed text-muted-foreground"><Prose text={g.why} /></p>
             <ul className="flex flex-wrap gap-1.5">
               {g.tables.map((t) => (
                 <li key={t.table}>

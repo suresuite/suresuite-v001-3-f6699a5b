@@ -13,7 +13,7 @@
 
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { PageTitle, Section, P, Key, Callout, Defs, Provenance, Term, DocLink } from "@/components/docs/prose";
+import { PageTitle, Section, P, Key, Callout, Defs, Prose, Provenance, Term, DocLink } from "@/components/docs/prose";
 import { UNIT_DAYS } from "../../../../supabase/functions/_shared/grading";
 import { REFERENCE_TABLES } from "@/components/docs/generated/reference.generated";
 
@@ -175,7 +175,7 @@ export default function UnitsAndConventions() {
                     <span className="font-mono text-[12px] text-foreground">{u.column}</span>
                   </th>
                   <td className="p-3 font-mono text-[12px] text-muted-foreground">{u.table}</td>
-                  <td className="p-3 text-[12px] text-muted-foreground">{u.unit}</td>
+                  <td className="p-3 text-[12px] text-muted-foreground"><Prose text={u.unit} /></td>
                 </tr>
               ))}
             </tbody>

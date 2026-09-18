@@ -45,6 +45,16 @@ export type RefColumn = {
   substitutions: RefSubstitution[];
   engineChain: string | null;
   engineLevel: string | null;
+  /** What an empty cell does: "reject" the row, or store `null`. */
+  blank: "reject" | "null" | null;
+  engineField: string | null;
+  engineMissingDefault: string | null;
+  engineTransform: string | null;
+  unitColumn: string | null;
+  normalizeAtPromotion: { conversion: string; canonical: string } | null;
+  quantityGrain: string | null;
+  /** The analyzer that wrote it. `null` means a person supplied it. */
+  computedBy: string | null;
 };
 
 export type RefTable = {
@@ -56,6 +66,15 @@ export type RefTable = {
   naturalKey: string[];
   naturalKeyIntended: string[] | null;
   checks: { name: string; definition: string }[];
+  /** The CSV origin, where the table has one. `null` means it has none. */
+  ingestDataset: { wizardId: string; factClass: string; serverSet: string[] } | null;
+  governance: {
+    read: string | null;
+    write: string | null;
+    minProjectRole: string | null;
+    audited: boolean;
+    rlsEnabled: boolean;
+  } | null;
   columns: RefColumn[];
 };
 
@@ -85,6 +104,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (entity_type ~ '^[a-z][a-z0-9_]*$')"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -100,7 +127,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "run_id",
@@ -123,7 +158,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "entity_type",
@@ -139,7 +182,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "entity_id",
@@ -155,7 +206,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "metrics",
@@ -171,7 +230,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -187,7 +254,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -222,6 +297,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (status IN ('running','succeeded','failed'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -237,7 +320,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -260,7 +351,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "analysis_kind",
@@ -276,7 +375,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "input_hash",
@@ -292,7 +399,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "params_hash",
@@ -308,7 +423,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "code_version",
@@ -324,7 +447,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "params",
@@ -340,7 +471,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "status",
@@ -356,7 +495,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "started_at",
@@ -372,7 +519,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "finished_at",
@@ -388,7 +543,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "duration_ms",
@@ -404,7 +567,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "row_counts",
@@ -420,7 +591,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "warnings",
@@ -436,7 +615,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "actor_user_id",
@@ -459,7 +646,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -475,7 +670,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -491,7 +694,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -507,6 +718,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": "super_admin",
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -522,7 +741,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "name",
@@ -538,7 +765,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "email",
@@ -554,7 +789,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "password_hash",
@@ -570,7 +813,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "role",
@@ -593,7 +844,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -609,7 +868,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -625,7 +892,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -648,7 +923,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "display_name",
@@ -664,7 +947,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "avatar_url",
@@ -680,7 +971,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "phone",
@@ -696,7 +995,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "password_changed_at",
@@ -712,7 +1019,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "password_expires_at",
@@ -735,7 +1050,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "force_password_change",
@@ -751,7 +1074,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "is_active",
@@ -767,7 +1098,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "organization_id",
@@ -790,7 +1129,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       }
     ]
   },
@@ -810,6 +1157,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (plane IN ('admin','data','access'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "owner",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -825,7 +1180,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "actor_user_id",
@@ -848,7 +1211,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "action",
@@ -864,7 +1235,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "target_type",
@@ -880,7 +1259,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "target_id",
@@ -896,7 +1283,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "before",
@@ -912,7 +1307,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "after",
@@ -928,7 +1331,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "ip",
@@ -944,7 +1355,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "user_agent",
@@ -960,7 +1379,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -976,7 +1403,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "plane",
@@ -999,7 +1434,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -1025,6 +1468,21 @@ export const REFERENCE_TABLES: RefTable[] = [
       "level"
     ],
     "checks": [],
+    "ingestDataset": {
+      "wizardId": "bom_multi_level",
+      "factClass": "master",
+      "serverSet": [
+        "project_id",
+        "plant_name"
+      ]
+    },
+    "governance": {
+      "read": null,
+      "write": "data_editing",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -1040,7 +1498,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -1063,7 +1529,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "datamap.py::rows -> per-project fetch",
+        "engineMissingDefault": null,
+        "engineTransform": "filter, never read as a value",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -1086,7 +1560,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "material_id",
@@ -1102,7 +1584,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_bom -> BomArc.material_id after collapsing",
+        "engineMissingDefault": null,
+        "engineTransform": "str(); multi-level rows are folded into product->material arcs",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "level",
@@ -1118,7 +1608,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_bom -> collapse order",
+        "engineMissingDefault": null,
+        "engineTransform": "int()",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "higher_level_component_id",
@@ -1134,7 +1632,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_bom -> collapse parent",
+        "engineMissingDefault": null,
+        "engineTransform": "str(); NULL means 'the product'",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "consumption_rate",
@@ -1157,7 +1663,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_bom -> BomArc.consumption_rate",
+        "engineMissingDefault": "1.0",
+        "engineTransform": "float(); multiplied down the tree when collapsing; a falsy value becomes 1.0",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -1173,7 +1687,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -1189,7 +1711,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -1212,7 +1742,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_row_id",
@@ -1228,7 +1766,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       }
     ]
   },
@@ -1252,6 +1798,21 @@ export const REFERENCE_TABLES: RefTable[] = [
       "material_id"
     ],
     "checks": [],
+    "ingestDataset": {
+      "wizardId": "bom_single_level",
+      "factClass": "master",
+      "serverSet": [
+        "project_id",
+        "plant_name"
+      ]
+    },
+    "governance": {
+      "read": null,
+      "write": "data_editing",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -1267,7 +1828,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -1290,7 +1859,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "datamap.py::rows -> per-project fetch",
+        "engineMissingDefault": null,
+        "engineTransform": "filter, never read as a value",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -1313,7 +1890,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "product_id",
@@ -1329,7 +1914,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_bom -> BomArc.product_id",
+        "engineMissingDefault": null,
+        "engineTransform": "str()",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "material_id",
@@ -1345,7 +1938,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_bom -> BomArc.material_id",
+        "engineMissingDefault": null,
+        "engineTransform": "str()",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "consumption_rate",
@@ -1368,7 +1969,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_bom -> BomArc.consumption_rate",
+        "engineMissingDefault": "1.0",
+        "engineTransform": "float(); a falsy value becomes 1.0",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -1384,7 +1993,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -1400,7 +2017,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -1423,7 +2048,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_row_id",
@@ -1439,7 +2072,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       }
     ]
   },
@@ -1459,6 +2100,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (kind IN ('page','feature'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": "super_admin",
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "key",
@@ -1474,7 +2123,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "kind",
@@ -1490,7 +2147,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "label",
@@ -1506,7 +2171,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "description",
@@ -1522,7 +2195,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "sort_order",
@@ -1538,7 +2219,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -1554,7 +2243,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -1570,7 +2267,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -1589,6 +2294,14 @@ export const REFERENCE_TABLES: RefTable[] = [
       "customer_id"
     ],
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": "project_member",
+      "write": "project_modeler_or_admin",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "project_id",
@@ -1604,7 +2317,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "customer_id",
@@ -1620,7 +2341,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "name",
@@ -1636,7 +2365,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "segment",
@@ -1652,7 +2389,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "priority_weight",
@@ -1668,7 +2413,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "P-C.2 customer_allocation — Customer.priority_weight, the fallback ordering under the `priority` rule wherever the `priority_weights` param does not name the customer",
+        "engineMissingDefault": "1.0 (Customer.priority_weight's own default) — every customer equal, so the `priority` rule cannot order anything",
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "sla_fill_floor_pct",
@@ -1684,7 +2437,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -1700,7 +2461,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -1716,7 +2485,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -1731,6 +2508,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -1746,7 +2531,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -1769,7 +2562,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "sim-command -> run binding",
+        "engineMissingDefault": null,
+        "engineTransform": "filter, never read as a value",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "label",
@@ -1785,7 +2586,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "snapshot",
@@ -1801,7 +2610,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "sim-command -> the dataset a run is pinned to",
+        "engineMissingDefault": null,
+        "engineTransform": "built by _build_dataset_snapshot from the project's tier-2 tables",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "graph_hash",
@@ -1817,7 +2634,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "sim-command and the run-identity reuse check -> simulation_runs.graph_hash",
+        "engineMissingDefault": null,
+        "engineTransform": "hashed from the snapshot by _build_dataset_snapshot",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "author_user_id",
@@ -1833,7 +2658,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "author_email",
@@ -1849,7 +2682,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -1865,7 +2706,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "hash_inputs",
@@ -1881,7 +2730,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "current_hash_inputs() -> staleness display; not read by the engine",
+        "engineMissingDefault": null,
+        "engineTransform": "sha256 over snapshot->'inputs', computed inside snapshot_dataset",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "hash_network",
@@ -1897,7 +2754,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "current_hash_network() -> staleness display; not read by the engine",
+        "engineMissingDefault": null,
+        "engineTransform": "sha256 over snapshot->'network', computed inside snapshot_dataset",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -1923,6 +2788,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "owner",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -1938,7 +2811,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -1961,7 +2842,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "grantor_user_id",
@@ -1984,7 +2873,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "grantee_user_id",
@@ -2007,7 +2904,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_role",
@@ -2023,7 +2928,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "expires_at",
@@ -2039,7 +2952,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "rationale",
@@ -2055,7 +2976,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "revoked_at",
@@ -2071,7 +3000,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -2087,7 +3024,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -2102,6 +3047,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": "project_member",
+      "write": "project_member",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -2117,7 +3070,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "profile_id",
@@ -2140,7 +3101,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "effect_type",
@@ -2156,7 +3125,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "magnitude",
@@ -2172,7 +3149,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "unit",
@@ -2188,7 +3173,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -2204,7 +3197,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_by",
@@ -2220,7 +3221,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -2236,7 +3245,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -2252,7 +3269,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -2267,6 +3292,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": "project_member",
+      "write": "project_member",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -2282,7 +3315,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -2298,7 +3339,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -2314,7 +3363,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "scenario_name",
@@ -2330,7 +3387,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "status",
@@ -2346,7 +3411,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "description",
@@ -2362,7 +3435,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "tags",
@@ -2378,7 +3459,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -2394,7 +3483,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_by",
@@ -2410,7 +3507,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -2426,7 +3531,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -2442,7 +3555,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "disruption_start",
@@ -2458,7 +3579,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "event",
+        "computedBy": null
       },
       {
         "name": "disruption_end",
@@ -2474,7 +3603,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "event",
+        "computedBy": null
       }
     ]
   },
@@ -2491,6 +3628,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": "project_member",
+      "write": "project_member",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -2506,7 +3651,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "profile_id",
@@ -2529,7 +3682,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "key",
@@ -2545,7 +3706,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "value",
@@ -2561,7 +3730,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -2577,7 +3754,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_by",
@@ -2593,7 +3778,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -2609,7 +3802,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -2625,7 +3826,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -2640,6 +3849,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": "project_member",
+      "write": "project_member",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -2655,7 +3872,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "profile_id",
@@ -2678,7 +3903,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "target_type",
@@ -2694,7 +3927,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "node_ids",
@@ -2710,7 +3951,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "edge_list",
@@ -2726,7 +3975,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "selector",
@@ -2742,7 +3999,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -2758,7 +4023,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_by",
@@ -2774,7 +4047,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -2790,7 +4071,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -2806,7 +4095,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -2821,6 +4118,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": "project_member",
+      "write": "project_member",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -2836,7 +4141,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -2852,7 +4165,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -2868,7 +4189,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "node_id",
@@ -2884,7 +4213,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "scenario_name",
@@ -2900,7 +4237,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "capacity_reduction_percent",
@@ -2916,7 +4261,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "time_delay_days",
@@ -2932,7 +4285,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "description",
@@ -2948,7 +4309,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_by",
@@ -2964,7 +4333,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -2980,7 +4357,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -2996,7 +4381,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -3012,7 +4405,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "sim_payload",
@@ -3028,7 +4429,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "from_network",
@@ -3044,7 +4453,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -3073,6 +4490,21 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (lead_time_unit IS NULL OR public.unit_days(lead_time_unit) IS NOT NULL)"
       }
     ],
+    "ingestDataset": {
+      "wizardId": "inbound_logistics",
+      "factClass": "transactional",
+      "serverSet": [
+        "project_id",
+        "plant_name"
+      ]
+    },
+    "governance": {
+      "read": null,
+      "write": "data_editing",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -3088,7 +4520,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -3111,7 +4551,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "datamap.py::rows -> per-project fetch",
+        "engineMissingDefault": null,
+        "engineTransform": "filter, never read as a value",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -3134,7 +4582,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "supplier_id",
@@ -3150,7 +4606,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_supply -> SupplierLink.supplier_id",
+        "engineMissingDefault": null,
+        "engineTransform": "str(); no trimming (D8)",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "material_id",
@@ -3166,7 +4630,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_supply -> SupplierLink.material_id",
+        "engineMissingDefault": null,
+        "engineTransform": "str(); arcs whose material is not in the BOM are dropped",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "volume",
@@ -3182,7 +4654,18 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_supply -> supply-share weighting",
+        "engineMissingDefault": "0 (the arc carries no share)",
+        "engineTransform": "rateToWeekly(volume, time_unit) — normalized to weeks",
+        "unitColumn": "time_unit",
+        "normalizeAtPromotion": {
+          "conversion": "rate",
+          "canonical": "week"
+        },
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "time_unit",
@@ -3205,7 +4688,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_duration_to_weeks (via UNIT_DAYS)",
+        "engineMissingDefault": "weekly",
+        "engineTransform": "looked up in the one unit table",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "lead_time",
@@ -3228,7 +4719,18 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": "constant 2 (warn)",
-        "engineLevel": "recommended"
+        "engineLevel": "recommended",
+        "blank": "reject",
+        "engineField": "project_map.py::_map_supply -> SupplierLink.lead_time_weeks",
+        "engineMissingDefault": "2 weeks, with a `warn` MappingWarning",
+        "engineTransform": "_duration_to_weeks(lead_time, lead_time_unit), then round and clamp to [1, 51]",
+        "unitColumn": "lead_time_unit",
+        "normalizeAtPromotion": {
+          "conversion": "duration",
+          "canonical": "week"
+        },
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "unit_price",
@@ -3257,7 +4759,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": "constant 1 (warn)",
-        "engineLevel": "recommended"
+        "engineLevel": "recommended",
+        "blank": "reject",
+        "engineField": "project_map.py::_map_supply -> SupplierLink.cost",
+        "engineMissingDefault": "1.0, with a `warn` MappingWarning",
+        "engineTransform": "float(); a value <= 0 is replaced, not rejected",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -3273,7 +4783,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -3289,7 +4807,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "lead_time_unit",
@@ -3312,7 +4838,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_supply -> _duration_to_weeks(arc.lead_time, arc.lead_time_unit)",
+        "engineMissingDefault": "weeks",
+        "engineTransform": "looked up in the one unit table; an unknown value falls to a 7-day basis",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -3335,7 +4869,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_row_id",
@@ -3351,7 +4893,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       }
     ]
   },
@@ -3381,6 +4931,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (content_sha256 ~ '^[0-9a-f]{64}$')"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -3396,7 +4954,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -3419,7 +4985,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_kind",
@@ -3435,7 +5009,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "original_filename",
@@ -3451,7 +5033,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "storage_bucket",
@@ -3467,7 +5057,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "storage_path",
@@ -3483,7 +5081,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "content_type",
@@ -3499,7 +5105,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "byte_size",
@@ -3515,7 +5129,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "content_sha256",
@@ -3531,7 +5153,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "uploaded_by",
@@ -3554,7 +5184,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "received_at",
@@ -3570,7 +5208,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -3598,6 +5244,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -3613,7 +5267,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "link_id",
@@ -3636,7 +5298,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "triggered_by",
@@ -3652,7 +5322,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "triggered_by_user_id",
@@ -3675,7 +5353,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "status",
@@ -3691,7 +5377,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "rows_fetched",
@@ -3707,7 +5401,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "rows_new",
@@ -3723,7 +5425,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "rows_changed",
@@ -3739,7 +5449,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "rows_unchanged",
@@ -3755,7 +5473,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "rows_removed",
@@ -3771,7 +5497,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "mapping_warnings",
@@ -3787,7 +5521,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "fields_mapped",
@@ -3803,7 +5545,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "fields_defaulted",
@@ -3819,7 +5569,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "fields_failed",
@@ -3835,7 +5593,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "diff_summary",
@@ -3851,7 +5617,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "applied_at",
@@ -3867,7 +5641,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "applied_by_user_id",
@@ -3890,7 +5672,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "error_detail",
@@ -3906,7 +5696,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -3922,7 +5720,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -3945,7 +5751,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_kind",
@@ -3961,7 +5775,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "rows_held",
@@ -3977,7 +5799,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "rows_superseded",
@@ -3993,7 +5823,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -4021,6 +5859,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (fact_class IN ('master', 'transactional'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "editor",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -4036,7 +5882,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -4059,7 +5913,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "link_id",
@@ -4082,7 +5944,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "external_id",
@@ -4098,7 +5968,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "external_bom_version_id",
@@ -4114,7 +5992,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "external_component_product_id",
@@ -4130,7 +6016,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "quantity_per_unit",
@@ -4146,7 +6040,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "scrap_factor",
@@ -4162,7 +6064,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "raw",
@@ -4178,7 +6088,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "diff_state",
@@ -4194,7 +6112,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "staged_at",
@@ -4210,7 +6136,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "source_kind",
@@ -4226,7 +6160,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "fact_class",
@@ -4242,7 +6184,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       }
     ]
   },
@@ -4270,6 +6220,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (fact_class IN ('master', 'transactional'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "editor",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -4285,7 +6243,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -4308,7 +6274,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "link_id",
@@ -4331,7 +6305,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "external_id",
@@ -4347,7 +6329,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "external_product_id",
@@ -4363,7 +6353,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "version",
@@ -4379,7 +6377,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "is_active",
@@ -4395,7 +6401,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "raw",
@@ -4411,7 +6425,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "diff_state",
@@ -4427,7 +6449,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "staged_at",
@@ -4443,7 +6473,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "source_kind",
@@ -4459,7 +6497,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "fact_class",
@@ -4475,7 +6521,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       }
     ]
   },
@@ -4503,6 +6557,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (fact_class IN ('master', 'transactional'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "editor",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -4518,7 +6580,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -4541,7 +6611,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "link_id",
@@ -4564,7 +6642,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "external_id",
@@ -4580,7 +6666,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "sku",
@@ -4596,7 +6690,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "name",
@@ -4612,7 +6714,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "product_type",
@@ -4628,7 +6738,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "unit_of_measure",
@@ -4644,7 +6762,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "lead_time_days",
@@ -4660,7 +6786,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "moq",
@@ -4676,7 +6810,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "unit_cost",
@@ -4692,7 +6834,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "supplier_name",
@@ -4708,7 +6858,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "supplier_number",
@@ -4724,7 +6882,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "cycle_time_seconds",
@@ -4740,7 +6906,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "raw",
@@ -4756,7 +6930,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "diff_state",
@@ -4772,7 +6954,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "staged_at",
@@ -4788,7 +6978,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "source_kind",
@@ -4804,7 +7002,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "fact_class",
@@ -4820,7 +7026,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       }
     ]
   },
@@ -4855,6 +7069,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -4870,7 +7092,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -4893,7 +7123,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_kind",
@@ -4909,7 +7147,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "fact_class",
@@ -4925,7 +7171,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "target_table",
@@ -4941,7 +7195,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_row_number",
@@ -4957,7 +7219,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "raw",
@@ -4973,7 +7243,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "parsed",
@@ -4989,7 +7267,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "findings",
@@ -5005,7 +7291,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "diff_state",
@@ -5021,7 +7315,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "staged_at",
@@ -5037,7 +7339,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -5053,6 +7363,20 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": {
+      "wizardId": "item_master_materials",
+      "factClass": "master",
+      "serverSet": [
+        "project_id"
+      ]
+    },
+    "governance": {
+      "read": null,
+      "write": "data_editing",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": false
+    },
     "columns": [
       {
         "name": "project_id",
@@ -5075,7 +7399,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "datamap.py::rows -> per-project fetch",
+        "engineMissingDefault": null,
+        "engineTransform": "filter, never read as a value",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "material_id",
@@ -5091,7 +7423,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_materials -> MaterialRow.id",
+        "engineMissingDefault": null,
+        "engineTransform": "str()",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "name",
@@ -5114,7 +7454,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_materials -> Material.name",
+        "engineMissingDefault": "the material_id itself",
+        "engineTransform": "str(name or material_id)",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "cost",
@@ -5137,7 +7485,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": "cheapest_inbound_price (info) → constant 1 (warn)",
-        "engineLevel": "required"
+        "engineLevel": "required",
+        "blank": "null",
+        "engineField": "project_map.py::_map_materials -> Material.cost",
+        "engineMissingDefault": "the cheapest inbound unit_price for this material, floored at 1.0",
+        "engineTransform": "float() when > 0",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "holding_cost_pct",
@@ -5160,7 +7516,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_materials -> Material.holding_cost_rate",
+        "engineMissingDefault": "the project's inventory policy bundle value (0.2 in the shipped default)",
+        "engineTransform": "falls back to the inventory policy bundle's holding_cost_pct when NULL",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "moq",
@@ -5183,7 +7547,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_supply -> SupplierLink.moq",
+        "engineMissingDefault": "0.0 (no minimum)",
+        "engineTransform": "float(moq) when truthy, else 0.0 — applied per (supplier, material) link",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "initial_on_hand",
@@ -5199,7 +7571,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_materials -> Material.initial_on_hand",
+        "engineMissingDefault": "the engine's own opening-stock rule",
+        "engineTransform": "float() when not None; None is passed through as None, not as zero",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "lead_time_dist",
@@ -5222,7 +7602,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_supply -> SupplierLink.lead_time_dist",
+        "engineMissingDefault": "deterministic",
+        "engineTransform": "LeadTimeDist(value) when set, else LeadTimeDist.DETERMINISTIC",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "lead_time_cv",
@@ -5245,7 +7633,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_supply -> SupplierLink.lead_time_cv",
+        "engineMissingDefault": "0.0 — no variability, so no sampling",
+        "engineTransform": "float() when truthy, else 0.0",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -5261,7 +7657,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -5277,7 +7681,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "source_system",
@@ -5293,7 +7705,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "source_external_id",
@@ -5309,7 +7729,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "source_synced_at",
@@ -5325,7 +7753,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -5348,7 +7784,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_row_id",
@@ -5364,7 +7808,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       }
     ]
   },
@@ -5388,6 +7840,14 @@ export const REFERENCE_TABLES: RefTable[] = [
       "to_firm_id"
     ],
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -5403,7 +7863,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -5426,7 +7894,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -5442,7 +7918,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "from_firm_id",
@@ -5458,7 +7942,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "to_firm_id",
@@ -5474,7 +7966,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "to_firm_tier",
@@ -5490,7 +7990,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "to_firm_relationship",
@@ -5506,7 +8014,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -5522,7 +8038,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -5538,7 +8062,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -5553,6 +8085,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -5568,7 +8108,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -5584,7 +8132,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -5600,7 +8156,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -5616,7 +8180,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "created_by",
@@ -5632,7 +8204,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "uploaded_by",
@@ -5648,7 +8228,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -5664,7 +8252,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -5680,7 +8276,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "src_uid",
@@ -5696,7 +8300,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "dst_uid",
@@ -5712,7 +8324,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "relation_type",
@@ -5728,7 +8348,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "relative_revenue",
@@ -5744,7 +8372,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "relative_revenue_percentage",
@@ -5760,7 +8396,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "depth",
@@ -5776,7 +8420,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "direction",
@@ -5792,7 +8444,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       }
     ]
   },
@@ -5812,6 +8472,14 @@ export const REFERENCE_TABLES: RefTable[] = [
       "uid"
     ],
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -5827,7 +8495,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -5843,7 +8519,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -5859,7 +8543,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -5875,7 +8567,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "created_by",
@@ -5891,7 +8591,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "uploaded_by",
@@ -5907,7 +8615,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -5923,7 +8639,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -5939,7 +8663,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "uid",
@@ -5955,7 +8687,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "depth",
@@ -5971,7 +8711,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "name",
@@ -5987,7 +8735,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "country",
@@ -6003,7 +8759,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "industry",
@@ -6019,7 +8783,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "website",
@@ -6035,7 +8807,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "traded_as",
@@ -6051,7 +8831,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "number_of_employees",
@@ -6067,7 +8855,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "revenue",
@@ -6083,7 +8879,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "lat",
@@ -6099,7 +8903,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "long",
@@ -6115,7 +8927,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "is_seed",
@@ -6131,7 +8951,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "prominence",
@@ -6147,7 +8975,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "calculate-node-prominence (and calculate-network-science-metrics)"
       },
       {
         "name": "prominence_updated_at",
@@ -6163,7 +8999,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": "calculate-node-prominence (and calculate-network-science-metrics)"
       },
       {
         "name": "degree_centrality",
@@ -6179,7 +9023,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "calculate-network-science-metrics"
       },
       {
         "name": "weighted_degree_centrality",
@@ -6195,7 +9047,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "calculate-network-science-metrics"
       },
       {
         "name": "eigenvector_centrality",
@@ -6211,7 +9071,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "calculate-network-science-metrics"
       },
       {
         "name": "betweenness_centrality",
@@ -6227,7 +9095,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "calculate-network-science-metrics"
       },
       {
         "name": "closeness_centrality",
@@ -6243,7 +9119,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "calculate-network-science-metrics"
       },
       {
         "name": "network_metrics_updated_at",
@@ -6259,7 +9143,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": "calculate-network-science-metrics"
       },
       {
         "name": "computed_from_hash",
@@ -6275,7 +9167,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": "analysis_apply_node_metrics"
       },
       {
         "name": "computed_at",
@@ -6291,7 +9191,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": "analysis_apply_node_metrics"
       }
     ]
   },
@@ -6306,6 +9214,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -6321,7 +9237,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -6337,7 +9261,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -6353,7 +9285,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -6369,7 +9309,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "created_by",
@@ -6385,7 +9333,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "uploaded_by",
@@ -6401,7 +9357,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -6417,7 +9381,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -6433,7 +9405,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "nodes_count",
@@ -6449,7 +9429,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "combine-project"
       },
       {
         "name": "edges_count",
@@ -6465,7 +9453,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "combine-project"
       },
       {
         "name": "tiers_data",
@@ -6481,7 +9477,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "combine-project"
       },
       {
         "name": "computed_from_hash",
@@ -6497,7 +9501,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": "combine-project"
       },
       {
         "name": "computed_at",
@@ -6513,7 +9525,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": "combine-project"
       }
     ]
   },
@@ -6533,6 +9553,14 @@ export const REFERENCE_TABLES: RefTable[] = [
       "node_id"
     ],
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -6548,7 +9576,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -6564,7 +9600,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -6580,7 +9624,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "node_id",
@@ -6596,7 +9648,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "node_type",
@@ -6612,7 +9672,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "node_group",
@@ -6628,7 +9696,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "description_text",
@@ -6644,7 +9720,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "location_text",
@@ -6660,7 +9744,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "longitude",
@@ -6676,7 +9768,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "geocode-locations"
       },
       {
         "name": "latitude",
@@ -6692,7 +9792,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "geocode-locations"
       },
       {
         "name": "is_critical_node",
@@ -6708,7 +9816,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "predict-critical-nodes"
       },
       {
         "name": "critical_node_score",
@@ -6724,7 +9840,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "predict-critical-nodes"
       },
       {
         "name": "prediction_timestamp",
@@ -6740,7 +9864,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": "predict-critical-nodes"
       },
       {
         "name": "created_by",
@@ -6756,7 +9888,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -6772,7 +9912,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -6788,7 +9936,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -6804,7 +9960,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "computed_from_hash",
@@ -6820,7 +9984,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": "analysis_mark_critical_nodes"
       },
       {
         "name": "computed_at",
@@ -6836,7 +10008,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": "analysis_mark_critical_nodes"
       }
     ]
   },
@@ -6852,6 +10032,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": "super_admin",
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "org_id",
@@ -6874,7 +10062,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "capability_key",
@@ -6897,7 +10093,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "allowed",
@@ -6920,7 +10124,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -6936,7 +10148,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -6952,7 +10172,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -6974,6 +10202,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (org_role IN ('owner','admin','member'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": "super_admin",
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -6989,7 +10225,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "org_id",
@@ -7012,7 +10256,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "user_id",
@@ -7035,7 +10287,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "org_role",
@@ -7058,7 +10318,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "joined_at",
@@ -7074,7 +10342,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -7095,6 +10371,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (status IN ('active','suspended'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": "super_admin",
+      "minProjectRole": "viewer",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -7110,7 +10394,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "name",
@@ -7126,7 +10418,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "slug",
@@ -7142,7 +10442,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "owner_user_id",
@@ -7165,7 +10473,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "status",
@@ -7181,7 +10497,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "settings",
@@ -7197,7 +10521,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -7213,7 +10545,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -7229,7 +10569,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -7253,6 +10601,21 @@ export const REFERENCE_TABLES: RefTable[] = [
       "product_id"
     ],
     "checks": [],
+    "ingestDataset": {
+      "wizardId": "outbound_logistics",
+      "factClass": "transactional",
+      "serverSet": [
+        "project_id",
+        "plant_name"
+      ]
+    },
+    "governance": {
+      "read": null,
+      "write": "data_editing",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -7268,7 +10631,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -7291,7 +10662,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "datamap.py::rows -> per-project fetch",
+        "engineMissingDefault": null,
+        "engineTransform": "filter, never read as a value",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -7314,7 +10693,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "customer_id",
@@ -7330,7 +10717,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_demand -> customer node id",
+        "engineMissingDefault": null,
+        "engineTransform": "str(); no trimming (D8)",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "product_id",
@@ -7346,7 +10741,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_demand -> ProductRow lookup",
+        "engineMissingDefault": null,
+        "engineTransform": "str()",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "volume",
@@ -7362,7 +10765,18 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_demand -> demand mode when `products.demand_mean` is unset",
+        "engineMissingDefault": "0 (the arc carries no demand)",
+        "engineTransform": "rateToWeekly(volume, time_unit) — normalized to weeks",
+        "unitColumn": "time_unit",
+        "normalizeAtPromotion": {
+          "conversion": "rate",
+          "canonical": "week"
+        },
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "time_unit",
@@ -7385,7 +10799,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_duration_to_weeks (via UNIT_DAYS)",
+        "engineMissingDefault": "weekly",
+        "engineTransform": "looked up in the one unit table",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "expected_lead_time",
@@ -7401,7 +10823,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "unit_price",
@@ -7424,7 +10854,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_demand -> ProductRow.sell_price when the master is unset",
+        "engineMissingDefault": "the engine's ENGINE_DEFAULT_PRICE",
+        "engineTransform": "demand-weighted mean across this product's outbound arcs",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -7440,7 +10878,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -7456,7 +10902,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -7479,7 +10933,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_row_id",
@@ -7495,7 +10957,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       }
     ]
   },
@@ -7515,6 +10985,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (fulfillment_strategy IN ('make_to_stock','make_to_order','assemble_to_order','engineer_to_order','configure_to_order'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": "data_editing",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "project_id",
@@ -7530,7 +11008,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> the project's policy bundle",
+        "engineMissingDefault": null,
+        "engineTransform": "filter, never read as a value",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "sourcing",
@@ -7546,7 +11032,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> P-S.x sourcing plugins",
+        "engineMissingDefault": "{} — the engine's own defaults for every plugin in the family",
+        "engineTransform": "a JSON object of family parameters, mapped to engine plugins by activation rules",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "inventory",
@@ -7562,7 +11056,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> P-P.x / inventory_control plugins",
+        "engineMissingDefault": "{} — the engine's own defaults for every plugin in the family",
+        "engineTransform": "a JSON object of family parameters, mapped to engine plugins by activation rules",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "transport",
@@ -7578,7 +11080,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> no plugin — stored, not read",
+        "engineMissingDefault": "{} — the engine's own defaults for every plugin in the family",
+        "engineTransform": "a JSON object of family parameters, mapped to engine plugins by activation rules",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "fulfillment",
@@ -7594,7 +11104,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> customer_allocation and related P-C.x plugins",
+        "engineMissingDefault": "{} — the engine's own defaults for every plugin in the family",
+        "engineTransform": "a JSON object of family parameters, mapped to engine plugins by activation rules",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_by",
@@ -7610,7 +11128,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -7626,7 +11152,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -7642,7 +11176,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "production",
@@ -7658,7 +11200,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> P-P.x production plugins",
+        "engineMissingDefault": "{} — the engine's own defaults for every plugin in the family",
+        "engineTransform": "a JSON object of family parameters, mapped to engine plugins by activation rules",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "recovery",
@@ -7674,7 +11224,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> recovery_response_to_policy in engineBridge.json",
+        "engineMissingDefault": "{} — the engine's own defaults for every plugin in the family",
+        "engineTransform": "a JSON object of family parameters, mapped to engine plugins by activation rules",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "preset_id",
@@ -7690,7 +11248,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "demand",
@@ -7706,7 +11272,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> no plugin — stored, not read",
+        "engineMissingDefault": "{} — the engine's own defaults for every plugin in the family",
+        "engineTransform": "a JSON object of family parameters, mapped to engine plugins by activation rules",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "fulfillment_strategy",
@@ -7722,7 +11296,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_fulfillment_mode -> the per-product fallback",
+        "engineMissingDefault": "make_to_stock — the column default",
+        "engineTransform": "read when products.fulfillment_mode is NULL or unrecognised",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "active_preset",
@@ -7738,7 +11320,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "preset_applied_at",
@@ -7754,7 +11344,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -7782,6 +11380,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (family IN ('sourcing','inventory','transport','fulfillment','production','recovery','demand'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": "data_editing",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -7797,7 +11403,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -7813,7 +11427,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> per-project override fetch",
+        "engineMissingDefault": null,
+        "engineTransform": "filter, never read as a value",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "scope",
@@ -7829,7 +11451,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> override routing",
+        "engineMissingDefault": null,
+        "engineTransform": "matched against the stage the grid wrote it from",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "target_key",
@@ -7845,7 +11475,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> the node the patch applies to",
+        "engineMissingDefault": null,
+        "engineTransform": "parsed per scope",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "family",
@@ -7861,7 +11499,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> which bundle key to patch",
+        "engineMissingDefault": null,
+        "engineTransform": "matched against the bundle's family keys",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "patch",
@@ -7877,7 +11523,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "project_map.py::_map_policies -> merged over the family bundle",
+        "engineMissingDefault": "{} — nothing overridden",
+        "engineTransform": "shallow-merged over the project bundle's family object",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_by",
@@ -7893,7 +11547,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -7909,7 +11571,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -7925,7 +11595,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "seeded_from_hash",
@@ -7941,7 +11619,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -7957,6 +11643,20 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": {
+      "wizardId": "item_master_products",
+      "factClass": "master",
+      "serverSet": [
+        "project_id"
+      ]
+    },
+    "governance": {
+      "read": null,
+      "write": "data_editing",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": false
+    },
     "columns": [
       {
         "name": "project_id",
@@ -7979,7 +11679,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "datamap.py::rows -> per-project fetch",
+        "engineMissingDefault": null,
+        "engineTransform": "filter, never read as a value",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "product_id",
@@ -7995,7 +11703,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_products -> ProductRow.id",
+        "engineMissingDefault": null,
+        "engineTransform": "str()",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "name",
@@ -8018,7 +11734,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_products -> Product.name",
+        "engineMissingDefault": "the product_id itself",
+        "engineTransform": "str(name or product_id)",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "sell_price",
@@ -8041,7 +11765,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": "demand_weighted_outbound_price (info) → constant 1 (warn)",
-        "engineLevel": "required"
+        "engineLevel": "required",
+        "blank": "null",
+        "engineField": "project_map.py::_map_products -> Product.unit_price",
+        "engineMissingDefault": "the demand-weighted mean outbound unit_price, else ENGINE_DEFAULT_PRICE",
+        "engineTransform": "float() when > 0",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "production_capacity",
@@ -8064,7 +11796,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": "production_policy_capacity (info) → twice_demand_floor_1000 (warn)",
-        "engineLevel": "recommended"
+        "engineLevel": "recommended",
+        "blank": "null",
+        "engineField": "project_map.py::_map_products -> Product.production_capacity",
+        "engineMissingDefault": "max(2 x demand, 1000) — a value chosen so the constraint never binds",
+        "engineTransform": "float() when > 0",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "fulfillment_mode",
@@ -8087,7 +11827,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_fulfillment_mode -> Product fulfillment mode",
+        "engineMissingDefault": "the project's supply_chain_model",
+        "engineTransform": "resolved against the project's supply_chain_model; an unknown value warns rather than raising",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "demand_distribution",
@@ -8110,7 +11858,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_resolve_demand_kind -> demand kind",
+        "engineMissingDefault": "the scenario's demand_model",
+        "engineTransform": "resolved against the scenario's demand_model; unknown values fall back",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "demand_mean",
@@ -8133,7 +11889,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": "weekly_outbound_volume (info) → constant 0 (warn)",
-        "engineLevel": "required"
+        "engineLevel": "required",
+        "blank": "null",
+        "engineField": "project_map.py::_map_products -> demand_mode",
+        "engineMissingDefault": "the weekly-normalized outbound volume for this product",
+        "engineTransform": "float() when > 0; otherwise derived from the outbound arcs",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "demand_cv",
@@ -8156,7 +11920,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_products -> demand cv",
+        "engineMissingDefault": "the scenario-level demand_cv",
+        "engineTransform": "float() when not None, else the scenario's demand_cv",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -8172,7 +11944,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -8188,7 +11968,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "demand_min",
@@ -8217,7 +12005,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_products -> demand_min",
+        "engineMissingDefault": "mode x (1 - cv)",
+        "engineTransform": "float(); clamped to the mode with a warn when it exceeds it",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "demand_max",
@@ -8246,7 +12042,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_products -> demand_max",
+        "engineMissingDefault": "mode x (1 + cv)",
+        "engineTransform": "float(); clamped to the mode with a warn when it falls below it",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "source_system",
@@ -8262,7 +12066,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "source_external_id",
@@ -8278,7 +12090,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "source_synced_at",
@@ -8294,7 +12114,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -8317,7 +12145,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_row_id",
@@ -8333,7 +12169,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       }
     ]
   },
@@ -8360,6 +12204,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (auto_apply_threshold_pct >= 0 AND auto_apply_threshold_pct <= 100)"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "editor",
+      "audited": false,
+      "rlsEnabled": false
+    },
     "columns": [
       {
         "name": "id",
@@ -8375,7 +12227,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -8398,7 +12258,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "external_system",
@@ -8414,7 +12282,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "external_company_id",
@@ -8430,7 +12306,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "external_company_name",
@@ -8446,7 +12330,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "linked_by_user_id",
@@ -8469,7 +12361,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "external_oauth_token_ref",
@@ -8485,7 +12385,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "status",
@@ -8501,7 +12409,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "status_detail",
@@ -8517,7 +12433,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "last_verified_at",
@@ -8533,7 +12457,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "auto_apply_threshold_pct",
@@ -8549,7 +12481,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -8565,7 +12505,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "revoked_at",
@@ -8581,7 +12529,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "sync_schedule_cron",
@@ -8597,7 +12553,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "sync_enabled",
@@ -8613,7 +12577,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       }
     ]
   },
@@ -8634,6 +12606,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "owner",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "project_id",
@@ -8656,7 +12636,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "user_id",
@@ -8679,7 +12667,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_role",
@@ -8695,7 +12691,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "granted_by",
@@ -8718,7 +12722,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "expires_at",
@@ -8734,7 +12746,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "rationale",
@@ -8757,7 +12777,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -8773,7 +12801,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -8789,7 +12825,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -8810,6 +12854,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": "super_admin",
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "project_role",
@@ -8825,7 +12877,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "capability_key",
@@ -8848,7 +12908,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "allowed",
@@ -8871,7 +12939,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -8887,7 +12963,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -8903,7 +12987,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -8933,6 +13025,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (data_type IN ('curated', 'uncurated'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": "data_editing",
+      "minProjectRole": "editor",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -8948,7 +13048,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "name",
@@ -8964,7 +13072,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "modeler_id",
@@ -8987,7 +13103,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -9003,7 +13127,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "supply_chain_model",
@@ -9026,7 +13158,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "completed",
@@ -9042,7 +13182,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -9058,7 +13206,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -9074,7 +13230,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -9097,7 +13261,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "modeler_name",
@@ -9113,7 +13285,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "bom_level",
@@ -9136,7 +13316,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "simulation_start",
@@ -9152,7 +13340,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "simulation_end",
@@ -9168,7 +13364,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "plant_latitude",
@@ -9184,7 +13388,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "plant_longitude",
@@ -9200,7 +13412,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "plant_location_text",
@@ -9216,7 +13436,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "deep_tier_enabled",
@@ -9232,7 +13460,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "data_type",
@@ -9255,7 +13491,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "organization_id",
@@ -9278,7 +13522,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       }
     ]
   },
@@ -9306,6 +13558,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (risk_class IN ('Very Low', 'Low', 'Medium', 'High', 'Very High'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -9321,7 +13581,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "country",
@@ -9337,7 +13605,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "risk_class",
@@ -9360,7 +13636,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "source",
@@ -9376,7 +13660,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "vintage",
@@ -9392,7 +13684,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "licence",
@@ -9408,7 +13708,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "refreshed_at",
@@ -9424,7 +13732,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -9440,7 +13756,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -9456,7 +13780,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -9477,6 +13809,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (role IN ('super_admin','admin','modeler','user'))"
       }
     ],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": "super_admin",
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "role",
@@ -9492,7 +13832,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "capability_key",
@@ -9515,7 +13863,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "allowed",
@@ -9538,7 +13894,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -9554,7 +13918,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -9570,7 +13942,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -9586,6 +13966,20 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": {
+      "wizardId": "item_master_suppliers",
+      "factClass": "master",
+      "serverSet": [
+        "project_id"
+      ]
+    },
+    "governance": {
+      "read": null,
+      "write": "data_editing",
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": false
+    },
     "columns": [
       {
         "name": "project_id",
@@ -9608,7 +14002,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "datamap.py::rows -> per-project fetch",
+        "engineMissingDefault": null,
+        "engineTransform": "filter, never read as a value",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "supplier_id",
@@ -9624,7 +14026,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": "project_map.py::_map_suppliers -> Supplier.id",
+        "engineMissingDefault": null,
+        "engineTransform": "str()",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "name",
@@ -9647,7 +14057,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_suppliers -> Supplier.name",
+        "engineMissingDefault": "the supplier_id itself",
+        "engineTransform": "str(name or supplier_id)",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "capacity_per_week",
@@ -9670,7 +14088,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": "none — the absence is the value",
-        "engineLevel": "defaulted"
+        "engineLevel": "defaulted",
+        "blank": "null",
+        "engineField": "project_map.py::_map_supply -> per-supplier capacity",
+        "engineMissingDefault": "unlimited",
+        "engineTransform": "passed through as None when NULL; None means no capacity constraint",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "reliability_score",
@@ -9693,7 +14119,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": "project_map.py::_map_suppliers -> Supplier.reliability_score",
+        "engineMissingDefault": "1.0 (perfect reliability) — and the column is NOT NULL DEFAULT 1.0, so the default is the schema's, not the engine's",
+        "engineTransform": "float(value or 1.0)",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -9709,7 +14143,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -9725,7 +14167,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "source_system",
@@ -9741,7 +14191,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "source_external_id",
@@ -9757,7 +14215,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "source_synced_at",
@@ -9773,7 +14239,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -9796,7 +14270,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_row_id",
@@ -9812,7 +14294,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       }
     ]
   },
@@ -9827,6 +14317,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -9842,7 +14340,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "from_location",
@@ -9858,7 +14364,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "network pages and the analyzers; not read by the engine mapping",
+        "engineMissingDefault": null,
+        "engineTransform": "copied from the lane row's id column",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "to_location",
@@ -9874,7 +14388,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "network pages and the analyzers; not read by the engine mapping",
+        "engineMissingDefault": null,
+        "engineTransform": "copied from the lane row's id column",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -9890,7 +14412,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "network pages; per-plant filtering",
+        "engineMissingDefault": null,
+        "engineTransform": "copied from the lane row",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "weighted",
@@ -9906,7 +14436,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the analyzers and the policy grid's volume basis; not the engine mapping",
+        "engineMissingDefault": "0",
+        "engineTransform": "weeklyVolume(volume, time_unit) in _shared/laneVolumes.ts, over grading.ts's one unit table",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "material_consumption_rate",
@@ -9922,7 +14460,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the analyzers and the network pages; not the engine mapping",
+        "engineMissingDefault": null,
+        "engineTransform": "copied from bom consumption_rate, multiplied down multi-level chains",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "sourcing_ratio",
@@ -9938,7 +14484,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the policy grid's primary-source suggestion; the analyzers",
+        "engineMissingDefault": "0",
+        "engineTransform": "volumeShare(weeklyVolume(row), weeklyVolumeTotalsBy(...)) in _shared/laneVolumes.ts",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -9954,7 +14508,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -9970,7 +14532,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "is_critical_node",
@@ -9986,7 +14556,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "critical_node_score",
@@ -10002,7 +14580,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "prediction_timestamp",
@@ -10018,7 +14604,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "uploaded_by",
@@ -10041,7 +14635,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -10057,7 +14659,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -10073,7 +14683,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "datamap.py::rows -> per-project fetch",
+        "engineMissingDefault": null,
+        "engineTransform": "filter, never read as a value",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "data_source",
@@ -10089,7 +14707,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages, to colour and filter edges by origin",
+        "engineMissingDefault": null,
+        "engineTransform": "set by the ETL per lane",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "data_source_group",
@@ -10105,7 +14731,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages' filters",
+        "engineMissingDefault": null,
+        "engineTransform": "set by the ETL per lane",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "is_zero_flow_filtered",
@@ -10121,7 +14755,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages, to exclude dead edges from the drawn graph",
+        "engineMissingDefault": "false",
+        "engineTransform": "set by the ETL",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "zero_flow_filter_applied_at",
@@ -10137,7 +14779,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "zero_flow_filter_reason",
@@ -10153,7 +14803,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "computed_from_hash",
@@ -10169,7 +14827,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "computed_at",
@@ -10185,7 +14851,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -10200,6 +14874,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -10215,7 +14897,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -10231,7 +14921,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages' per-project fetch",
+        "engineMissingDefault": null,
+        "engineTransform": "filter, never read as a value",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -10247,7 +14945,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages; per-plant filtering",
+        "engineMissingDefault": null,
+        "engineTransform": "copied from the lane row",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "data_source",
@@ -10263,7 +14969,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages' filters",
+        "engineMissingDefault": null,
+        "engineTransform": "set by the ETL",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "from_location",
@@ -10279,7 +14993,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages",
+        "engineMissingDefault": null,
+        "engineTransform": "copied from the deep-tier row",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "to_location",
@@ -10295,7 +15017,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages",
+        "engineMissingDefault": null,
+        "engineTransform": "copied from the deep-tier row",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "material_consumption_rate",
@@ -10311,7 +15041,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages",
+        "engineMissingDefault": null,
+        "engineTransform": "carried through from the deep-tier BOM",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "sourcing_ratio",
@@ -10327,7 +15065,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages",
+        "engineMissingDefault": null,
+        "engineTransform": "volumeShare over weekly-normalized volumes (_shared/laneVolumes.ts)",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "weighted",
@@ -10343,7 +15089,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages",
+        "engineMissingDefault": null,
+        "engineTransform": "weeklyVolume(volume, time_unit) in _shared/laneVolumes.ts",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "level",
@@ -10359,7 +15113,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages' depth filter",
+        "engineMissingDefault": null,
+        "engineTransform": "int()",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "path_root",
@@ -10375,7 +15137,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": "the network pages, to group deep edges under their tier-1 supplier",
+        "engineMissingDefault": null,
+        "engineTransform": "set by the ETL while walking the chain",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "uploaded_by",
@@ -10391,7 +15161,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "organization",
@@ -10407,7 +15185,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -10423,7 +15209,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -10439,7 +15233,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -10465,6 +15267,21 @@ export const REFERENCE_TABLES: RefTable[] = [
       "material_id"
     ],
     "checks": [],
+    "ingestDataset": {
+      "wizardId": "tier2_suppliers",
+      "factClass": "transactional",
+      "serverSet": [
+        "project_id",
+        "plant_name"
+      ]
+    },
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -10480,7 +15297,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -10496,7 +15321,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -10512,7 +15345,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "supplier_id",
@@ -10528,7 +15369,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "upstream_supplier_id",
@@ -10544,7 +15393,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "material_id",
@@ -10560,7 +15417,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "relationship_type",
@@ -10576,7 +15441,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "volume",
@@ -10592,7 +15465,18 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": "time_unit",
+        "normalizeAtPromotion": {
+          "conversion": "rate",
+          "canonical": "week"
+        },
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "unit_price",
@@ -10608,7 +15492,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "lead_time",
@@ -10624,7 +15516,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "time_unit",
@@ -10640,7 +15540,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -10656,7 +15564,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -10672,7 +15588,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -10695,7 +15619,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_row_id",
@@ -10711,7 +15643,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       }
     ]
   },
@@ -10737,6 +15677,21 @@ export const REFERENCE_TABLES: RefTable[] = [
       "material_id"
     ],
     "checks": [],
+    "ingestDataset": {
+      "wizardId": "tier3_suppliers",
+      "factClass": "transactional",
+      "serverSet": [
+        "project_id",
+        "plant_name"
+      ]
+    },
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "editor",
+      "audited": true,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "id",
@@ -10752,7 +15707,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "project_id",
@@ -10768,7 +15731,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "plant_name",
@@ -10784,7 +15755,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "supplier_id",
@@ -10800,7 +15779,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "upstream_supplier_id",
@@ -10816,7 +15803,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "material_id",
@@ -10832,7 +15827,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "relationship_type",
@@ -10848,7 +15851,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "reject",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "volume",
@@ -10864,7 +15875,18 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": "time_unit",
+        "normalizeAtPromotion": {
+          "conversion": "rate",
+          "canonical": "week"
+        },
+        "quantityGrain": "rate",
+        "computedBy": null
       },
       {
         "name": "unit_price",
@@ -10880,7 +15902,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "lead_time",
@@ -10896,7 +15926,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "time_unit",
@@ -10912,7 +15950,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": "null",
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -10928,7 +15974,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -10944,7 +15998,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "ingest_run_id",
@@ -10967,7 +16029,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "source_row_id",
@@ -10983,7 +16053,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       }
     ]
   },
@@ -10998,6 +16076,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": "super_admin",
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "user_id",
@@ -11020,7 +16106,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "allowed_model_ids",
@@ -11043,7 +16137,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "default_model_id",
@@ -11066,7 +16168,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "fallback_model_id",
@@ -11089,7 +16199,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "temperature",
@@ -11105,7 +16223,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "max_context_override",
@@ -11121,7 +16247,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -11137,7 +16271,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -11153,7 +16295,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -11169,6 +16319,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     ],
     "naturalKeyIntended": null,
     "checks": [],
+    "ingestDataset": null,
+    "governance": {
+      "read": null,
+      "write": "super_admin",
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
     "columns": [
       {
         "name": "user_id",
@@ -11191,7 +16349,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "capability_key",
@@ -11214,7 +16380,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         },
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
       },
       {
         "name": "allowed",
@@ -11237,7 +16411,15 @@ export const REFERENCE_TABLES: RefTable[] = [
           }
         ],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "created_at",
@@ -11253,7 +16435,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       },
       {
         "name": "updated_at",
@@ -11269,7 +16459,15 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": null,
         "substitutions": [],
         "engineChain": null,
-        "engineLevel": null
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   }

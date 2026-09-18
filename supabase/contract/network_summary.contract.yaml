@@ -259,6 +259,7 @@ fields:
     meaning: >-
       ANALYSIS OUTPUT — the node count of the project's graph.
     grain: level
+    computed_by: "combine-project"
     engine:
       consumed_by: null
       transform: null
@@ -281,6 +282,7 @@ fields:
     meaning: >-
       ANALYSIS OUTPUT — the edge count of the project's graph.
     grain: level
+    computed_by: "combine-project"
     engine:
       consumed_by: null
       transform: null
@@ -303,6 +305,7 @@ fields:
     meaning: >-
       ANALYSIS OUTPUT — per-depth breakdown of the graph, as jsonb.
     grain: level
+    computed_by: "combine-project"
     engine:
       consumed_by: null
       transform: null
@@ -329,6 +332,7 @@ fields:
       reportable state and not a silent default (`declared-fallback`,
       I6). This is the column invariant `input-hash` (I5) is about.
     grain: metadata
+    computed_by: "combine-project"
     engine:
       consumed_by: null
       transform: null
@@ -353,6 +357,7 @@ fields:
       current_graph_hash()`, which is WP 4.4's one rule, and a timestamp
       comparison is the thing that rule replaces (§4 D12).
     grain: metadata
+    computed_by: "combine-project"
     engine:
       consumed_by: null
       transform: null

@@ -41,7 +41,7 @@ const MIGRATIONS_DIR = join(ROOT, "supabase", "migrations");
 const DATAMAP = join(ROOT, "sim-worker", "sim_worker", "datamap.py");
 const CONTRACT = JSON.parse(
   readFileSync(join(ROOT, "build", "data-contract.generated.json"), "utf8"),
-) as { tables: Record<string, { tier?: string; columns?: Array<{ name: string }> }> };
+) as { tables: Record<string, { tier?: string; columns?: Array<{ name: string; computed_by?: string | null }> }> };
 
 /** Every migration, newest last — so the last definition of a function wins. */
 const sql = readdirSync(MIGRATIONS_DIR)
@@ -97,16 +97,27 @@ const STILL_WHOLLY_OUT = ["node_list", "network_summary"];
  * Columns an analysis WRITES. No table may contribute one of these to the
  * snapshot, whatever tier it is labelled — this is the rule the table list above
  * used to stand in for.
+ *
+ * ── READ FROM THE CONTRACT SINCE WP 5.2b (I1) ─────────────────────────────
+ *
+ * This was a literal Set, and it was the SECOND authoring of a data fact: each
+ * of these columns also says "ANALYSIS OUTPUT" in its sidecar `meaning` and
+ * `note`. Two lists that must agree with nothing comparing them is what D21 and
+ * D22 are, and the manual needed a third to tell a reader which half of
+ * `network_nodes` they uploaded. So `computed_by` is now a declared field on the
+ * sidecar and every reader derives from it — this suite, and §6.3 section 3's
+ * pages.
+ *
+ * The set is asserted non-empty below: a contract that stopped declaring any
+ * computed column would make the loop that uses this vacuous, and a check that
+ * passes because it examines nothing is the trap D57 was.
  */
-const COMPUTED_COLUMNS = new Set([
-  "prominence", "prominence_updated_at", "network_metrics_updated_at",
-  "degree_centrality", "weighted_degree_centrality", "eigenvector_centrality",
-  "betweenness_centrality", "closeness_centrality",
-  "computed_from_hash", "computed_at",
-  "is_critical_node", "critical_node_score", "prediction_timestamp",
-  "nodes_count", "edges_count", "tiers_data",
-  "longitude", "latitude",   // geocode-locations writes these onto node_list
-]);
+const COMPUTED_COLUMNS = new Set(
+  Object.values(CONTRACT.tables)
+    .flatMap((t) => t.columns ?? [])
+    .filter((c) => c.computed_by)
+    .map((c) => c.name),
+);
 
 /** Split the snapshot into its two domains and read each table's hashed columns. */
 function snapshotDomains(): Record<"inputs" | "network", Record<string, Set<string>>> {
@@ -211,6 +222,13 @@ describe("the snapshot covers every tier-2 value column", () => {
   });
 
   it("hashes nothing that is not a column of the table it sits under", () => {
+    // The set is DERIVED now (see COMPUTED_COLUMNS). A contract that declared
+    // none would make the loop below examine nothing and pass — the vacuous
+    // gate D57 was. So the derivation is asserted before it is used.
+    expect(
+      COMPUTED_COLUMNS.size,
+      "no sidecar declares `computed_by`, so the loop below cannot fail",
+    ).toBeGreaterThanOrEqual(16);
     for (const [table, cols] of Object.entries(hashed)) {
       const known = new Set((CONTRACT.tables[table]?.columns ?? []).map((c) => c.name));
       expect([...cols].filter((c) => !known.has(c)), `${table} in the snapshot`).toEqual([]);
