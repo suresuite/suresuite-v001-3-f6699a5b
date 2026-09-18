@@ -92,6 +92,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "analysis_runs",
           "columns": [
             "id"
@@ -219,6 +220,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -417,6 +419,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -747,6 +750,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "organizations",
           "columns": [
             "id"
@@ -804,6 +808,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -1018,6 +1023,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -1166,6 +1172,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -1243,6 +1250,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -1375,6 +1383,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -1715,6 +1724,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -1902,6 +1912,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -1924,6 +1935,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -1946,6 +1958,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -2092,6 +2105,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -2315,6 +2329,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -2385,6 +2400,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -2519,6 +2535,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -2592,6 +2609,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "project_erp_links",
           "columns": [
             "id"
@@ -2630,6 +2648,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "auth",
           "table": "users",
           "columns": [
             "id"
@@ -2844,6 +2863,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "auth",
           "table": "users",
           "columns": [
             "id"
@@ -2898,6 +2918,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -3007,6 +3028,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -3029,6 +3051,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "project_erp_links",
           "columns": [
             "id"
@@ -3250,6 +3273,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -3272,6 +3296,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "project_erp_links",
           "columns": [
             "id"
@@ -3477,6 +3502,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -3499,6 +3525,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "project_erp_links",
           "columns": [
             "id"
@@ -3827,6 +3854,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -4008,6 +4036,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -4280,6 +4309,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -4357,6 +4387,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -5804,6 +5835,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "organizations",
           "columns": [
             "id"
@@ -5826,6 +5858,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "capabilities",
           "columns": [
             "key"
@@ -5935,6 +5968,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "organizations",
           "columns": [
             "id"
@@ -5957,6 +5991,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -6081,6 +6116,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -6206,6 +6242,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -6393,6 +6430,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -6888,6 +6926,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -7225,6 +7264,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -7296,6 +7336,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -7366,6 +7407,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "auth",
           "table": "users",
           "columns": [
             "id"
@@ -7547,6 +7589,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -7569,6 +7612,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -7607,6 +7651,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -7731,6 +7776,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "capabilities",
           "columns": [
             "key"
@@ -8156,6 +8202,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "organizations",
           "columns": [
             "id"
@@ -8387,6 +8434,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "capabilities",
           "columns": [
             "key"
@@ -8479,6 +8527,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -8666,6 +8715,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -8910,6 +8960,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -9563,6 +9614,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -9834,6 +9886,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -9886,6 +9939,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": true,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -9931,6 +9985,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ai_models",
           "columns": [
             "id"
@@ -9953,6 +10008,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ai_models",
           "columns": [
             "id"
@@ -10054,6 +10110,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -10076,6 +10133,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "capabilities",
           "columns": [
             "key"

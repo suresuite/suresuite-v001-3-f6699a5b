@@ -106,7 +106,7 @@ The project this analysis ran for. Referenced by uuid and never by a displayable
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260917000006_analysis_store.sql` |
-| References | `projects(id)` ON DELETE CASCADE |
+| References | `public.projects(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -277,7 +277,7 @@ WHO asked for this run. NOT NULL, so a run that cannot name its actor cannot exi
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260917000006_analysis_store.sql` |
-| References | `approved_users(id)` |
+| References | `public.approved_users(id)` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -319,6 +319,6 @@ Last lifecycle change. The IDENTITY columns are frozen by `analysis_runs_identit
 
 ---
 
-*Generated from data contract `79191f91f602`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/analysis_runs.contract.yaml`, table created by `20260917000006_analysis_store.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

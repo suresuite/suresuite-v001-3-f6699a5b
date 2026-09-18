@@ -277,7 +277,7 @@ The ingestion run that last wrote this row (WP 3.3), and through it the project,
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260916000019_promotion_upsert.sql` |
-| References | `ingest_runs(id)` ON DELETE SET NULL |
+| References | `public.ingest_runs(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -304,6 +304,6 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `79191f91f602`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/tier3_suppliers.contract.yaml`, table created by `20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

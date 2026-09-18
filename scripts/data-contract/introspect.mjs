@@ -102,6 +102,15 @@ function parseColumn(def, migration) {
     unique: /\bUNIQUE\b/i.test(mods),
     references: refMatch
       ? {
+          // `schema` IS KEPT, and dropping it cost nine foreign keys (§4 D53).
+          // `readQualifiedName` has always returned it; only `.name` was read,
+          // so `REFERENCES auth.users(id)` was recorded as `users`.
+          // `rehearsal-schema.mjs` then qualified the bare name to
+          // `public.users`, found no such table, and SKIPPED the key — on every
+          // rehearsal this repository has ever run. It is additive on purpose:
+          // `table` stays the bare name because the rename and drop trackers
+          // below compare against it.
+          schema: readQualifiedName(refMatch[1], 0)?.schema ?? null,
           table: readQualifiedName(refMatch[1], 0)?.name ?? squash(refMatch[1]),
           columns: refMatch[2] ? splitTopLevel(refMatch[2]).map((c) => readQualifiedName(c, 0)?.name ?? c) : [],
           on_delete: /\bON\s+DELETE\s+(CASCADE|RESTRICT|SET\s+NULL|SET\s+DEFAULT|NO\s+ACTION)/i.exec(refMatch[3])?.[1]?.toUpperCase().replace(/\s+/g, " ") ?? null,

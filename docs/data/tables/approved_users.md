@@ -357,7 +357,7 @@ The user's tenant, by uuid — the same organization `organization` names, and t
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260709000002_super_admin_phase1.sql` |
-| References | `organizations(id)` ON DELETE SET NULL |
+| References | `public.organizations(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -372,6 +372,6 @@ The user's tenant, by uuid — the same organization `organization` names, and t
 
 ---
 
-*Generated from data contract `79191f91f602`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/approved_users.contract.yaml`, table created by `20250815000000_approved_users_base.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

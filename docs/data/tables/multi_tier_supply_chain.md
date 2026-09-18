@@ -103,7 +103,7 @@ The project this edge belongs to, by uuid (G1).
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql` |
-| References | `projects(id)` ON DELETE CASCADE |
+| References | `public.projects(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | set by the writer from the project, never from a file |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -218,6 +218,6 @@ When the row was last written. Server-stamped by trigger.
 
 ---
 
-*Generated from data contract `79191f91f602`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/multi_tier_supply_chain.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

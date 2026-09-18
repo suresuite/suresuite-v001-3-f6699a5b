@@ -149,6 +149,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "analysis_runs",
             "columns": [
               "id"
@@ -464,6 +465,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -842,6 +844,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "approved_users",
             "columns": [
               "id"
@@ -1768,6 +1771,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "organizations",
             "columns": [
               "id"
@@ -1947,6 +1951,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "approved_users",
             "columns": [
               "id"
@@ -2490,6 +2495,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -2804,6 +2810,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -3082,6 +3089,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -3342,6 +3350,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -4180,6 +4189,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -4627,6 +4637,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -4664,6 +4675,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "approved_users",
             "columns": [
               "id"
@@ -4701,6 +4713,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "approved_users",
             "columns": [
               "id"
@@ -5110,6 +5123,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -5600,6 +5614,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -5811,6 +5826,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -6081,6 +6097,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "approved_users",
             "columns": [
               "id"
@@ -6298,6 +6315,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "project_erp_links",
             "columns": [
               "id"
@@ -6366,6 +6384,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "auth",
             "table": "users",
             "columns": [
               "id"
@@ -6791,6 +6810,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "auth",
             "table": "users",
             "columns": [
               "id"
@@ -6898,6 +6918,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -7156,6 +7177,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -7193,6 +7215,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "project_erp_links",
             "columns": [
               "id"
@@ -7660,6 +7683,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -7697,6 +7721,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "project_erp_links",
             "columns": [
               "id"
@@ -8133,6 +8158,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -8170,6 +8196,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "project_erp_links",
             "columns": [
               "id"
@@ -8878,6 +8905,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -9281,6 +9309,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -9895,6 +9924,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -10137,6 +10167,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -13410,6 +13441,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "organizations",
             "columns": [
               "id"
@@ -13447,6 +13479,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "capabilities",
             "columns": [
               "key"
@@ -13702,6 +13735,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "organizations",
             "columns": [
               "id"
@@ -13739,6 +13773,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "approved_users",
             "columns": [
               "id"
@@ -14032,6 +14067,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "approved_users",
             "columns": [
               "id"
@@ -14403,6 +14439,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -14800,6 +14837,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -16031,6 +16069,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -16790,6 +16829,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -16995,6 +17035,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -17125,6 +17166,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "auth",
             "table": "users",
             "columns": [
               "id"
@@ -17503,6 +17545,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -17540,6 +17583,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "approved_users",
             "columns": [
               "id"
@@ -17608,6 +17652,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "approved_users",
             "columns": [
               "id"
@@ -17869,6 +17914,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "capabilities",
             "columns": [
               "key"
@@ -18834,6 +18880,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "organizations",
             "columns": [
               "id"
@@ -19412,6 +19459,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "capabilities",
             "columns": [
               "key"
@@ -19620,6 +19668,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "projects",
             "columns": [
               "id"
@@ -20016,6 +20065,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -20731,6 +20781,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "approved_users",
             "columns": [
               "id"
@@ -22315,6 +22366,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -22942,6 +22994,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ingest_runs",
             "columns": [
               "id"
@@ -23079,6 +23132,7 @@
           "primary_key": true,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "approved_users",
             "columns": [
               "id"
@@ -23154,6 +23208,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ai_models",
             "columns": [
               "id"
@@ -23191,6 +23246,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "ai_models",
             "columns": [
               "id"
@@ -23422,6 +23478,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "approved_users",
             "columns": [
               "id"
@@ -23459,6 +23516,7 @@
           "primary_key": false,
           "unique": false,
           "references": {
+            "schema": "public",
             "table": "capabilities",
             "columns": [
               "key"
@@ -23594,5 +23652,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "79191f91f602"
+  "contract_version": "7bd2a0fd8e4f"
 }

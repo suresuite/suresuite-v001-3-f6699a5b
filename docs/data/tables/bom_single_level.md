@@ -122,7 +122,7 @@ The project this row belongs to. Every read is scoped by it.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql` |
-| References | `projects(id)` ON DELETE CASCADE |
+| References | `public.projects(id)` ON DELETE CASCADE |
 | Read by the engine | `datamap.py::rows -> per-project fetch` |
 | Transform | filter, never read as a value |
 | Validated at ingest | set from the selected project, never from the CSV |
@@ -252,7 +252,7 @@ The ingestion run that last wrote this row (WP 3.3), and through it the project,
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260916000019_promotion_upsert.sql` |
-| References | `ingest_runs(id)` ON DELETE SET NULL |
+| References | `public.ingest_runs(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -281,6 +281,6 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `79191f91f602`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/bom_single_level.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

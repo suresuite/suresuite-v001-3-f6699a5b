@@ -429,7 +429,7 @@ The owning organization by uuid. This is what the public /v1 API authorizes on (
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260709000002_super_admin_phase1.sql` |
-| References | `organizations(id)` ON DELETE SET NULL |
+| References | `public.organizations(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -444,6 +444,6 @@ The owning organization by uuid. This is what the public /v1 API authorizes on (
 
 ---
 
-*Generated from data contract `79191f91f602`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/projects.contract.yaml`, table created by `20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

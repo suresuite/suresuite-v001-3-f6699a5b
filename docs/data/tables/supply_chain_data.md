@@ -291,7 +291,7 @@ The user whose upload produced this edge. Referenced by the RLS policies.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20250816052311_4c23d5ab-f132-41b1-8924-47d1d14f5a27.sql` |
-| References | `approved_users(id)` |
+| References | `public.approved_users(id)` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -453,6 +453,6 @@ WP 4.3 · when the run that wrote the criticality columns finished. It is proven
 
 ---
 
-*Generated from data contract `79191f91f602`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data.contract.yaml`, table created by `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

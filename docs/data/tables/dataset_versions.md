@@ -115,7 +115,7 @@ The project this snapshot is of.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260703000001_dataset_versions.sql` |
-| References | `projects(id)` ON DELETE CASCADE |
+| References | `public.projects(id)` ON DELETE CASCADE |
 | Read by the engine | `sim-command -> run binding` |
 | Transform | filter, never read as a value |
 | Validated at ingest | — |
@@ -283,6 +283,6 @@ is about the column and not only about the table.
 
 ---
 
-*Generated from data contract `79191f91f602`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

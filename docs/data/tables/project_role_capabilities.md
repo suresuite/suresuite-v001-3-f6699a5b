@@ -96,7 +96,7 @@ The capability, FK to `capabilities.key`. CASCADEs, so retiring a capability can
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260915000005_project_membership_and_delegation.sql` |
-| References | `capabilities(key)` ON DELETE CASCADE |
+| References | `public.capabilities(key)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | must exist in capabilities |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -154,6 +154,6 @@ When it was last changed. Server-stamped.
 
 ---
 
-*Generated from data contract `79191f91f602`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/project_role_capabilities.contract.yaml`, table created by `20260915000005_project_membership_and_delegation.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

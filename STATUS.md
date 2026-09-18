@@ -3,11 +3,48 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–7** · PR [#223](https://github.com/suresuite/suresuite-v001-3-f6699a5b/pull/223) open
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–8** · PR [#223](https://github.com/suresuite/suresuite-v001-3-f6699a5b/pull/223) open
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 8) — Nine foreign keys that never existed · no migration
+
+**D53 closed.** The introspector read `REFERENCES auth.users(id)` and recorded
+the target as `users`, dropping the schema. The base builder qualified that bare
+name to `public.users`, found no such table, and **skipped the key — on every
+rehearsal this repository has ever run.** Production has all nine. So every
+assertion about what happens when a user row disappears was made against a
+database where nothing happened, because there was no constraint.
+
+Found because slice 7's own `--since HEAD` run printed the nine warnings. The
+instrument reported its own blind spot.
+
+Fixed additively (`references.schema` recorded; `table` stays bare because the
+rename/drop trackers compare against it). `rehearsal/170` proves the *semantics*:
+deleting a user an `ingest_runs` row names as its actor is REFUSED, while
+`scenarios.created_by` SET NULLs and the scenario survives.
+
+⚠️ **A mutation survived, and fixing that is the real story.** A fix to the
+*introspector* can't be proven by the plain rehearsal mode — that mode builds its
+base from the **base branch's** artifact, so the nine are legitimately absent
+until this merges. So `170` skips when all nine are missing. I justified that
+skip with "the static test catches the regression" — **and the static test didn't
+exist yet.** Reverting the introspector left `170` green in every mode.
+
+`introspectorRefSchema.test.ts` is now that gate: reads migrations + artifact, no
+database, no base to be stale. Catches both mutations.
+
+The lesson is narrower than "mutation-test everything," which the plan already
+says: **when a gate is justified by another gate, build the other one first.**
+
+**Verified:** all three rehearse modes green · `contract:check` ✓ · 380 tests ✓ ·
+build ✓ · eslint 336/116 and `audit:ui` 8, unchanged.
+
+**Noted for whoever takes it:** D49 is the same family (three indexes on renamed
+columns) and is now the fourth instance of "the introspector is incomplete about
+dependent objects" — D52, D59, D53, D49. That deserves one fix, not four.
 
 ### WP 6.2 (slice 7) — The organization row, by uuid · `20260918000001`
 
