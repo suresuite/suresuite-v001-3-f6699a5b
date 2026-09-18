@@ -195,16 +195,17 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D14 | No project-level delegation exists | no `project_members` table | WP 2.2 ✅ |
 | D15 | Audit covers admin plane only | `admin_audit_logs` | WP 2.3 ✅ *(the TABLE is general and the triggers exist; production still holds 18 rows, all `plane='admin'` — see D45)* |
 | D16 | Hardcoded constants render with "From project data" dot | was `StagePolicyTable.tsx:1194-1203` | WP 0.1 ✅ *(constants deleted; untracked ⇒ `default`; de-dup of the two copies remains 6.2)* |
-| D17 | NULL `capacity_per_week` (= unlimited) renders as `0`, no dot. **Measured, 2026-09-16 (§15): 60 of 60 suppliers** in the measured project have a NULL capacity, so the grid tells the user every single supplier has zero capacity | `resolveEffective.ts:135`; §15 | WP 6.2 |
+| D17 | NULL `capacity_per_week` (= unlimited) renders as `0`, no dot. **Measured, 2026-09-16 (§15): 60 of 60 suppliers** in the measured project have a NULL capacity, so the grid tells the user every single supplier has zero capacity. **CORRECTED WHILE FIXING IT (WP 6.2): the `0` is the MOBILE list's, not the desktop grid's**, and the distinction was worth an hour. `resolveCell` returns `cellValue ?? liveDefault` and `MobileStagePolicyList` renders that directly, so the mobile sheet read "Capacity 0" for all sixty. The desktop grid passed only `cellValue` to `NumCell`, so it rendered the "—" placeholder: not a claim that capacity is zero, but still nothing saying that blank means unlimited, and no dot either — `default`'s colour is null. Two different failures of the same declaration, and the SAME `?? 0` behind both. **CLOSED**: `columnSpecs.ts` declares `master.nullMeans` next to the pointer (`{ token: "∞", title }`), the resolver returns no substituted number and a `contract` provenance that HAS a colour, `NumCell` and `formatValue` render the declared token, and `columnNullMeans.test.ts` pins all three (mutation-tested: restore the `0` → red; make the dot invisible → red; drop the declaration → three red). Fixed ONCE rather than twice because the resolver was de-duplicated in the same commit | `resolveEffective.ts`'s `liveDefault` (the `?? 0`, now guarded by `nullMeans`); `supabase/migrations/20260614000001_item_master.sql:44` ("NULL = ∞"); §15 | **CLOSED (WP 6.2)** |
 | D18 | `material_price` displayed prominently; consumed nowhere in the engine | `columnSpecs.ts:133,350` | WP 6.2 |
 | D19 | **Analysis results smeared onto entity columns; no identity or version. MEASURED for the first time, 2026-09-17 (§15 run `35229431958`, every project): 5 261 rows across the four tables — `node_list` 1 747 (7 projects), `network_nodes` 1 385 (1 project), `network_edges` 2 129 (1 project), `network_summary` 0 — of which 1 385 carry at least one COMPUTED column and NONE carries an input hash**, because no tier-3 table has `computed_from_hash` yet. WP 4.1's probes did not touch these tables, so until now the defect had an adjective and no magnitude. The number that matters for WP 4.3 is the 1 385: every one is a row where a centrality sits beside a `country` a user typed, with nothing saying which inputs or which code produced it | `network_nodes.degree_centrality`; §15's WP 4.2 sweep | WP 4.2 ✅ *(the STORE — `analysis_runs` + `analysis_results`, `20260917000006`. A metric now belongs to a run, and therefore to an input hash and a code version)* · WP 4.3 *(the dual-write and `computed_from_hash`; the 1 385 is its before-number)* · WP 5.3 *(drops the entity columns, after every reader has moved)* |
 | D20 | **`projectLanes`'s fallback truncated at 10 000 rows silently.** Each of the four lane reads carried a bare `.limit(10000)` and returned the slice shaped exactly like a whole project, so every count computed from it — the data map's "k of n lanes priced", the Run & validate clearance, the exported BOM sheet — was a statement about data nobody knew was missing. **CLOSED by WP 3.1, and not by removing the bound**: without an explicit `.limit()` PostgREST applies its own `db-max-rows` and truncates anyway, which is the same defect with a smaller number. The ceiling is now one named constant (`LANE_ROW_CEILING`, equal to the grading gate's `GATE_ROW_CEILING`, so two reads of the same tables cannot disagree about what "complete" means), a lane that comes back AT it is named in `ProjectLanes.truncated`, and every surface that renders lane-derived numbers renders it — the policy grid, the data map, Run & validate, and a toast on the export path. §5 T2: at the point of display, not in a console warning. `laneTruncation.test.ts` fails if a bare numeric limit returns or if any of those surfaces stops rendering the notice | `projectLanes.ts`; `laneTruncation.ts`; `LaneTruncationNotice.tsx`; `laneTruncation.test.ts` | WP 3.1 ✅ |
 | **D21** | **User docs name fields the user never sees.** `products.csv` says `sell_price`/`demand_mean`/`demand_distribution`; the engine says `unit_price`/`demand_mode`/`demand_model`; the legacy docs showed the engine's names | `public/template/products.csv`; `item_master.sql:28-32`; `network.py:145,151,154` | WP 5.2b |
 | D22 | Legacy docs hand-copied the Pydantic models while `gen_docs.py` already renders them from the registry | archived `docBodies.tsx` `SIM_PARAM_GROUPS` | WP 0.3 ✅ |
-| **D23** | **A saved sourcing choice cannot survive a reload.** The row's own suggestion is read *before* the override bundle (`resolveEffective.ts:82`), so a persisted `primary_source`/`sourcing_firm` override is always shadowed by what `useStageRows` suggested; and `saveAll` drops an edit equal to the family default (`StagePolicyTable.tsx:694`), so un-checking a primary (`false` = the schema default) is never written at all. Found by WP 0.1's gap check | `resolveEffective.ts:82`; `StagePolicyTable.tsx:694`; `schemas.ts:81` | WP 6.2 |
-| D24 | `production_lead_time_mean_days` is a median of *inbound* lead times but is flagged `__from_data`, i.e. as an uploaded production lead time. Renders nowhere today (no grid column), so no dot lies yet — it would the moment a column is added. Found by WP 0.1's gap check | `useStageRows.tsx:420-425` | WP 6.2 |
+| **D23** | **A saved sourcing choice cannot survive a reload.** The row's own suggestion is read *before* the override bundle (`resolveEffective.ts:82`), so a persisted `primary_source`/`sourcing_firm` override is always shadowed by what `useStageRows` suggested; and `saveAll` drops an edit equal to the family default (`StagePolicyTable.tsx:694`), so un-checking a primary (`false` = the schema default) is never written at all. Found by WP 0.1's gap check. **CLOSED (WP 6.2), and the root cause was one step further back than this row says.** Both mechanisms are real and each alone loses the choice — confirmed against the code before either was touched. But the reason a SUGGESTION was sitting in the slot reserved for uploaded data is that `useStageRows` marked it `__from_data` via a `markFromData` helper, while the comment at BOTH call sites said these fields are "not `__from_data`". The intent was on the record and the code did the other thing, for three costs: the shadowing above; a green "From project data" dot for a value no upload contained (D16's shape); and `hasRealProjectData` counting a project with no uploads as having real data. **The fix:** routing decisions carry `__decided` only; `getEffectiveValue` resolves a `__decided` field against the raw override PATCHES (`savedOverrideValue`) rather than against `effectivePolicy`'s merged answer — which cannot tell "somebody saved `false`" from "nobody saved anything and the default is `false`" — and falls back to the suggestion, so a fresh row still shows one; `saveAll` no longer drops an edit equal to the default when the field is overridden or is a decision; and `prefillSourceFor` gains the `decision` source, which is now the ONLY thing keeping blueprint G16 satisfied. `savedRoutingSurvives.test.ts` proves the round trip — decide, persist, re-resolve — and FOUR of its nine assertions fail against the pre-fix tree, including the round trip itself | `src/lib/policies/resolveEffective.ts` (`savedOverrideValue`, and the `__decided` rung in `getEffectiveValue`); `src/hooks/useStageRows.tsx` (the routing decisions, no longer `__from_data`); `src/lib/policies/__tests__/savedRoutingSurvives.test.ts` | **CLOSED (WP 6.2)** |
+| D24 | `production_lead_time_mean_days` is a median of *inbound* lead times but is flagged `__from_data`, i.e. as an uploaded production lead time. Renders nowhere today (no grid column), so no dot lies yet — it would the moment a column is added. Found by WP 0.1's gap check. **CLOSED (WP 6.2), and the latency was CONFIRMED rather than inherited**: the plant spec declares no column, and `runPrefill` iterates the SPEC rather than the row's fields, so nothing renders it and nothing persists it either — the two ways it could have been live were both checked. Fixed while it was still cheap, because the day a column is added is the day the marker starts lying. The median is now passed as `resolveField`'s IMPUTED argument rather than its REAL one, which keeps the same precedence (this product's own median first, then the smart average), marks it "an estimate to verify", and rounds to 2dp as every other imputed value does. Same class as D23 and found beside it: a value the application COMPUTED wearing the marker that means an upload carried it | `src/hooks/useStageRows.tsx` (the plant stage's `production_lead_time_mean_days` call); `src/lib/policies/__tests__/savedRoutingSurvives.test.ts` | **CLOSED (WP 6.2)** |
 | D25 | `combine-project`'s core reads (`outbound_logistics`, `inbound_logistics`, both BOM tables) destructured only `{ data }` — the same swallow as D3 but on the ETL's own inputs, so a failed read produced a half-empty graph and reported success. Found by WP 0.2 while fixing D3 | `combine-project/index.ts:52-64,169-174,207-220` | WP 0.2 ✅ |
-| D26 | **Two copies of the D1 prefill rule.** `5c7129f` merged two independent WP 0.1 implementations: `resolveEffective.ts:isPrefillPersistable` (imported and called at `StagePolicyTable.tsx:865`) and `prefillSelect.ts:prefillSourceFor` (imported at `StagePolicyTable.tsx:53` and never called). Both are unit-tested, so both stay green while only one runs — an I1 violation, and the next edit to "the rule" has even odds of landing on the dead one. Found by the WP 1.1 precondition check | `resolveEffective.ts:214`, `prefillSelect.ts:33`, `StagePolicyTable.tsx:53,865` | WP 6.2 |
+| D26 | **Two copies of the D1 prefill rule.** `5c7129f` merged two independent WP 0.1 implementations: `resolveEffective.ts:isPrefillPersistable` (imported and called at `StagePolicyTable.tsx:865`) and `prefillSelect.ts:prefillSourceFor` (imported at `StagePolicyTable.tsx:53` and never called). Both are unit-tested, so both stay green while only one runs — an I1 violation, and the next edit to "the rule" has even odds of landing on the dead one. Found by the WP 1.1 precondition check. **CLOSED (WP 6.2), and it had already cost what it predicted — see D93.** `prefillSelect.ts` is deleted, its dead import removed from `StagePolicyTable`, and `prefillSourceFor` now lives beside `isPrefillPersistable` in `resolveEffective.ts` as one implementation. `oneResolver.test.ts` gates it two ways: exactly one module in `src/lib/policies` may define the predicate, and that predicate must still test `__imputed` BEFORE the draft — the order the two copies disagreed on. Mutation-tested | `src/lib/policies/resolveEffective.ts` (`prefillSourceFor`); `src/lib/policies/__tests__/oneResolver.test.ts` | **CLOSED (WP 6.2)** |
+| **D93** | **The two prefill rules had already drifted, and the green test belonged to the copy that never ran.** D26 recorded two implementations of the D1 rule and predicted that "the next edit to *the rule* has even odds of landing on the dead one". Deleting the dead one found that the drift had ALREADY happened, on a case both were tested for: **the user types a value over an imputed average.** `isPrefillPersistable` (live, `StagePolicyTable:866`) tests `__imputed` BEFORE the draft and refuses it; `prefillSelect.ts::prefillSourceFor` never tested `__imputed` at all and returned `"edit"`. `policyPrefill.test.ts` asserted the SECOND answer, in a test named *"does NOT persist an imputed average, but DOES persist an edit of one"*, and it passed for its whole life against a function no screen ever called. A green test for behaviour that has never run is worse than no test: it is a claim on the record that the product does something it does not do — and this one described the D1 defect's own shape (freezing an estimate as though it were data) as the intended behaviour. The live answer is kept, and not merely because it is incumbent: the prefill's job is to freeze what the DATA says, an imputed average is an estimate to verify whether or not somebody typed over it, and a manual save is a different path that still writes the user's value. The assertion is inverted in place with the reason written above it, so it is not mistaken for a test edited to pass. **A second difference was also latent**: the dead copy had a third source, `"decision"`, reading `__decided`. The live rule has none and does not need one — `useStageRows::markFromData` writes `__from_data.primary_source` whenever the field has a value, so the G16 routing decision persists through the same door as an uploaded column. Adding a `__decided` branch would make a field with NO value newly persistable, which is the other half of §4 D23 | `src/lib/policies/resolveEffective.ts` (`prefillSourceFor`'s `__imputed`-before-draft order); `src/lib/policies/__tests__/policyPrefill.test.ts` (the inverted assertion) | **CLOSED (WP 6.2)** — one rule, gated both ways |
 | **D27** | **The uuid org plane and the text org plane diverge on every project insert.** `set_project_defaults()` stamps `NEW.organization` (text) and never `NEW.organization_id`, so the one-time backfill in `20260709000002` is the only thing that ever set the uuid. Every project created since has `organization_id IS NULL` — visible through RLS, which compares text, and invisible to the public `/v1` API, which authorizes by uuid (`p.organization_id = p_org_id`). D13 records that two identities exist; this records that they already disagree, and that the disagreement grows by one row per project. Found after WP 1.4 while sizing WP 2.1 | `20250820170403_…sql:58-84`; `20260711000001_api_access_control.sql:401,415` | WP 2.1 ✅ |
 | **D28** | **Every policy in the schema is PERMISSIVE, so deny-all policies do not deny — and `anon` holds real grants behind them.** Postgres ORs permissive policies and no migration anywhere declares `RESTRICTIVE`. `approved_users` — the authentication table, holding `password_hash` — carries `FOR SELECT USING (true)` beside `FOR ALL TO authenticated, anon USING (false)`; the second was meant to supersede the first and instead ORs with it. **WP 2.4 measured the whole class rather than the one example.** 27 tables carry at least one policy with no predicate; 7 of those permit unconditional WRITES (`scenarios`, `simulation_runs`, `run_replications`, `run_item_series`, `experiments`, `policy_versions`, `dataset_versions`). The grants are real and are in the migrations, not merely Supabase defaults: `anon` has SELECT+INSERT+UPDATE+DELETE on `scenarios`, SELECT+INSERT+UPDATE on `simulation_runs`, `run_replications` and `run_item_series`, INSERT on `policy_versions` and `dataset_versions`, and SELECT on the four lane tables, the policy tables and the three item masters — the last three invisible to a static scan because `20260614000001` grants them inside `EXECUTE format(...)`. The anon key is hardcoded in the frontend bundle (`src/integrations/supabase/client.ts:6`), so `anon` is anyone who loads the site. **NOT closed, deliberately:** the application itself runs as `anon` with no `supabase.auth` session, so revoking breaks the product — it needs an auth model, which is a Phase 3 package and not a policy edit. Pinned instead by `governanceEnforcement.test.ts`, which fails if the set GROWS, and rendered on every generated page beside the intended capability. **ITS OWNER WAS A PHASE AND THE PHASE ENDED.** Until WP 3.4 this row's "Closed by" cell read the phase number, on the strength of the sentence above — and no package in that phase was ever written for it, so when the phase's last package shipped the owner became a finished phase. That is D41 exactly, standing in the blind spot of R8, the rule built to prevent D41: R8 matched `WP N.M`. R8 now reads phase-level owners, and refuses an owner the plan does not contain, and §14 gained `WP 7.1 — the authentication model` so this row has one that exists | `20260826015711_…sql` + `20250815225910_…sql` (`approved_users`); `20260614000001_item_master.sql:53-71` (the dynamic grants); `src/integrations/supabase/client.ts:6` | **WP 7.1** *(§14, deferred — the standing decision is unchanged: document, do not change)* |
 | D29 | **Two organizations may share a display name, and the text branch then admits one to the other.** `organizations.name` is NOT UNIQUE (only `slug` is), so `organization = get_current_user_org()` matched across tenants whenever two names collided. WP 2.1 preserved it deliberately — a uuid-first rule DENIES where the old one granted, and a package whose job is to stop revoking access must not add a new way to revoke it — and named its condition: §15 confirming the backfill. **§15 CONFIRMED IT, 2026-09-16 (run `35064364537`): 14 of 14 accounts carry `organization_id`, so every caller resolves on the uuid plane; 0 accounts carry the `default_org` text and 0 carry a blank one, so the ONE project without an `organization_id` (`4f314330-…`, "Demo Simulation Project", org text `default_org` matching none of the three organizations, modeler resolving to no account) was reachable by nobody anyway. Removing the branch revokes nothing — measured, not argued.** Closed by `20260916000011_org_identity_uuid_only.sql`: uuid only, signature unchanged so the 59 calling policies are untouched, `sameOrganization()` matched in TypeScript, `orgIdentity.test.ts`'s pinned truth-table case flipped to `false`, and `supabase/rehearsal/040` proves against a real database that a rename still matches and a shared display name does not. **The demo project's TENANCY is not resolved and a migration must not guess it — §16** | `org_is_current_user_org` in `20260916000011_org_identity_uuid_only.sql`; `organizations.name` has no UNIQUE constraint; §15 | WP 3.0 ✅ |
@@ -216,8 +217,8 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D35 | **Nothing stops a merge while `main`'s own gate is red, and nothing stops a stale branch from overwriting a newer file.** `data-contract.yml` detection WORKED — green at `d5c29ab` (#199), red at `3bf44aa` (#200), `53119da` (#201), `55249d0` (#202) — and **three further merges went in over an already-red `main`**, each inheriting the breakage. #200 also merged a branch whose `loudFailure.test.ts` predated `ff9aec1`, so an OLDER file won the merge: the fourth time a MERGE rather than a commit broke `main`. **PARTLY CLOSED, and the rest is not an engineering task. Measured 2026-09-16: a required status check IS NOT AVAILABLE on this repository** — private, owned by a personal account, and both `/branches/main/protection` and `/rulesets` answer `403 Upgrade to GitHub Pro or make this repository public`. So enforcement moved in-repo: `data-contract.yml` loses its `branches: [main]` push filter, so a head commit carries a `data contract` result however its pull request came to exist (an app-token PR raises no `pull_request` event, and a check that never ran is indistinguishable in the UI from one that passed); and a `base branch is green` job FAILS any pull request while the branch it would merge into is red. **What remains open is one repository SETTING, not a defect: nothing can hard-block the merge button on this plan. Treated like D28 — a standing constraint, documented, re-measured by §15's route whenever the plan changes** | `data-contract.yml` (`on: push` with no branch filter); `.github/scripts/base-is-green.mjs` | WP 3.0 ✅ *(in-repo half; the required-check half needs a plan change, §16)* |
 | D36 | **A trigger cannot attribute a service-role write, so six ingest/ETL paths audit WHAT but not WHO.** `audit_tier_write()` reads `get_current_user_id()`, which resolves only when the caller set `app.current_user_id`. The ingest edge functions (`ingest-bom-multi-level`, `ingest-inbound-logistics`, `ingest-outbound-logistics`, `erp-sync-orbit-mrp`) and the ETL (`combine-project`, `predict-critical-nodes`) write as the SERVICE ROLE with no session context, so their audit rows carry `actor_user_id: NULL` and record `actor_known: false` rather than inventing a WHO. The row still says what changed, when, and how many — which is worth having and is NOT attribution, and `audit-actor` (§2.1 G4) asks for attribution. Closing it is a one-line change in each of those six functions (call `set_current_user_context` as `delete-project` already does), which is their change to make rather than the audit's. **REASSIGNED from WP 3.1 to WP 3.3 by WP 3.1's gap check, and the reason is a fact WP 2.3 could not have known: WP 3.1 renames TIER-1 tables, and tier 1 has no audit triggers at all.** Nothing WP 3.1 touched can write a data-plane row, so it had no path to close. The connector's only tier-2 write is the promotion in `applyStagedRun`, and WP 3.3 is the package that makes promotion an audited upsert — the one place the plan already commits to getting an ingestion write's audit right. **And it is NOT a one-line change**: the session GUC `get_current_user_id()` reads is the same one the lane policies read, and `projectLanes.ts`'s own header records that it does not survive PostgREST connection pooling. Whoever closes this proves the context reaches the trigger before counting the line. WP 3.2 is expected to get its own new upload path right at birth — it is the one path in the system that knows who the user is — but the six existing functions are WP 3.3's | `audit_tier_write()` in `20260916000001_data_plane_audit.sql`; the six functions listed above | **WP 4.1 ✅ — CLOSED FOR ALL SIX, AND THE CLASS IT WAS A SLICE OF IS NOW MEASURED (D71).** The dividing line is not effort. It is whether the write happens in a transaction the writer CONTROLS. A `SECURITY DEFINER` SQL function already runs in one and can `set_config('app.current_user_id', …, true)` before it writes: `ingest_land_file` and `ingest_apply_run` do (`20260916000015`), and so does `assign_material_supplier` since `20260916000021` — which was never in the list of six because nothing had looked at it, and which writes THREE tier-2/3 tables from the /policies grid on every supplier assignment. `supabase/rehearsal/090` reads that audit row back, and a mutation removing the one line fires. **A PostgREST call cannot be closed that way and no line count changes it**: the GUC would have to survive into a different statement on a pooled connection, which `projectLanes.ts`'s header records that it does not. `combine-project`, `predict-critical-nodes`, `erp-sync-orbit-mrp` and the three legacy `ingest-*` functions each need their WRITE MOVED INTO an RPC taking the actor as a parameter — and that is WP 4.1's because it rewrites how derived rows are written anyway (`input-hash`), so those writes are moving once instead of twice. Until then they record `actor_known: false`, which is honest and is not attribution. Full history: §16 · Phase 3's last package, section I **Closed by `20260917000003`**: four RPCs — `ingest_legacy_upsert_lane` (the three lane writers, one function, the arbiter read from `pg_index` so the key is not spelled a fourth time), `mrp_apply_staged_products`, `etl_replace_supply_chain` and `analysis_mark_critical_nodes` — each taking the actor as a parameter through the shared `assert_writer_may_act` preamble, which refuses a NULL actor and sets the GUC LOCAL. It does NOT authorize: `20260917000003` refused below `editor` and `20260917000005` took that out, because an ORGANIZATION admin who is not a project member resolves to NULL from `effective_project_role` while `combine-project` has always permitted that user — a live narrowing no exit check asked for, and one more ad-hoc answer in the plane D66 is about. `supabase/rehearsal/110` §7 performs each write and READS THE AUDIT ROW BACK, with the GUC deliberately poisoned with a different user first — because the file is one transaction and the first draft of that section passed for the wrong reason: the mutation removing `set_config` left it GREEN. **Three things moved that are not the audit**: `no-tier-skip` (I2) stops being a property of three files and becomes a whitelist in a migration; `erp-sync-orbit-mrp` turns out to have been a SECOND promotion path — tier 1 → tier 2 without `ingest_apply_run`, per row — which nothing had named; and `predict-critical-nodes`'s per-row loop becomes one statement — §15 measured **2 575** unattributed `supply_chain_data` UPDATE rows, which is that loop, in the log WP 2.3 chose the statement grain to keep readable. Full history: §16 · Phase 3's last package, section I, and §16 · WP 4.1 · D |
 | **D37** | **WP 2.3 granted `anon` INSERT on the audit view, which bypasses the audit table's RLS — anonymous audit-log forgery.** `20260916000001:69` created the `admin_audit_logs` compatibility view and granted `SELECT, INSERT` to `authenticated, anon, service_role`; the grant it replaced (`20260709000002:253`) was `TO authenticated` alone. A Postgres view runs as its OWNER unless `security_invoker` is set, so a write through it does NOT pass the base table's policies — and `audit_logs` has two SELECT policies and no INSERT policy at all, RLS-denies-by-default being the enforcement WP 2.2 and 2.3 rely on. Reproduced on PostgreSQL 16: `SET ROLE anon; INSERT INTO admin_audit_logs (action, target_type) VALUES ('forged.by.anon', ...)` succeeds and lands in `audit_logs` with `plane='admin'`, while the same insert on the base table is denied. An anonymous caller could write the admin plane of the log whose purpose is to say who did what; fabricated history is worse than absent history because it is believed. Found by WP 2.4's security review, against WP 2.3's own change | `20260916000001_data_plane_audit.sql:69`; fixed by `20260916000002_audit_view_grant_fix.sql` | WP 2.4 ✅ |
-| D38 | **Six of the schema's seven views ran as their OWNER and could bypass their base tables' RLS wherever they are granted.** `security_invoker` defaults OFF in Postgres and no migration had ever set it; D37 was one instance of the class. **CLOSED per-view, one migration and one assertion each, and the sixth is the reason that mattered.** `sc_nodes`, `sc_edges`, `simulation_results_with_settings`, `simulation_result_scenarios` and `admin_org_file_usage` are now `security_invoker = true`. `admin_org_file_usage` needed `user_files_super_read` FIRST or the flip would have turned an org roll-up into the reading admin's OWN files under headings that say "org" — a wrong number with a confident label. **`v_admin_user_usage` CANNOT take the fix and the rehearsal is how we know**: it was written as one line like the others, executed, and returned `permission denied for table approved_users` — `20250826015629` REVOKEs that table from `authenticated`, so a caller-rights view raises for every reader including the super admins whose two pages are its only consumers. It keeps owner rights and states its own rule instead (`WHERE public.current_is_super_admin()`), which closes the same hole: it had been handing every user's month-to-date AI SPEND to anyone who could select from it. Recorded as a DECLARED exception — `supabase/rehearsal/030` fails if a seventh owner-view appears or if that predicate leaves the definition | `build/schema.introspected.json` `views[].security_invoker`; `supabase/migrations/20260916000005`–`20260916000010`; `supabase/rehearsal/030_view_security_invoker.sql` | WP 3.0 ✅ |
-| D39 | **A generated artifact that lives only on a feature branch cannot be regenerated by the package that merges first, so two individually green branches merge to a red `main`.** Three occurrences in one day: WP 2.2 restaled WP 5.2a's `dataModel.generated.ts`; WP 2.3 restaled WP 5.2h's `reference.generated.ts`; and #206 merged at `b17163c` while its own regeneration (`f838412`) was still unpushed, leaving `main` red on the generator sub-gate — `reference.generated.ts` there reports 256 columns and does not know `audit_logs`. `contract:check` on `pull_request` catches the result every time because it runs on the merge result, which is why all three were found; what it cannot see is the window between one PR's merge and another PR's regeneration, because neither branch is red alone. This is D35's second half in a different file. The candidate remedy is to stop committing branch-local generated modules and build them instead — a WP 5.3 decision, not a WP 2.4 one. Found by WP 2.4's base merge | `src/components/docs/generated/reference.generated.ts` vs `scripts/data-contract/generate.mjs`; `contract:check` sub-gate `generate.mjs --check` | WP 5.3 |
+| D38 | **Six of the schema's seven views ran as their OWNER and could bypass their base tables' RLS wherever they are granted.** `security_invoker` defaults OFF in Postgres and no migration had ever set it; D37 was one instance of the class. **CLOSED per-view, one migration and one assertion each, and the sixth is the reason that mattered.** `sc_nodes`, `sc_edges`, `simulation_results_with_settings`, `simulation_result_scenarios` and `admin_org_file_usage` are now `security_invoker = true`. `admin_org_file_usage` needed `user_files_super_read` FIRST or the flip would have turned an org roll-up into the reading admin's OWN files under headings that say "org" — a wrong number with a confident label. **`v_admin_user_usage` CANNOT take the fix and the rehearsal is how we know**: it was written as one line like the others, executed, and returned `permission denied for table approved_users` — `20250826015629` REVOKEs that table from `authenticated`, so a caller-rights view raises for every reader including the super admins whose two pages are its only consumers. It keeps owner rights and states its own rule instead (`WHERE public.current_is_super_admin()`), which closes the same hole: it had been handing every user's month-to-date AI SPEND to anyone who could select from it. Recorded as a DECLARED exception — `supabase/rehearsal/030` fails if a seventh owner-view appears or if that predicate leaves the definition. **AND THE REHEARSAL WAS ONLY EVER HALF THE CHECK**: it asserts both clauses against a database built from the migrations ON THE BRANCH, and until §15 grew a view probe nothing had asked PRODUCTION — the schema probe compares relation NAMES, so a view carrying the right name with the wrong `reloptions`, or one replaced from the SQL editor, was invisible to every gate in this repository. That is D45's lesson with a different object in it. The Supabase database linter reporting `security_definer_view` on this view is CORRECT and expected — it names the mechanism, not the defect — but a linter cannot see the predicate that makes the exception one, which is exactly what the probe reads. §15 now gates on both halves and on the inverse failure the flip would cause (`security_invoker = true` here raises for EVERY reader and takes both admin pages down) | `build/schema.introspected.json` `views[].security_invoker`; `supabase/migrations/20260916000005`–`20260916000010`; `supabase/rehearsal/030_view_security_invoker.sql`; `scripts/data-contract/verification-sql.mjs` `viewSecurity()` | WP 3.0 ✅ |
+| D39 | **A generated artifact that lives only on a feature branch cannot be regenerated by the package that merges first, so two individually green branches merge to a red `main`.** Three occurrences in one day: WP 2.2 restaled WP 5.2a's `dataModel.generated.ts`; WP 2.3 restaled WP 5.2h's `reference.generated.ts`; and #206 merged at `b17163c` while its own regeneration (`f838412`) was still unpushed, leaving `main` red on the generator sub-gate — `reference.generated.ts` there reports 256 columns and does not know `audit_logs`. `contract:check` on `pull_request` catches the result every time because it runs on the merge result, which is why all three were found; what it cannot see is the window between one PR's merge and another PR's regeneration, because neither branch is red alone. This is D35's second half in a different file. The candidate remedy is to stop committing branch-local generated modules and build them instead — a WP 5.3 decision, not a WP 2.4 one. Found by WP 2.4's base merge | `src/components/docs/generated/reference.generated.ts` vs `scripts/data-contract/generate.mjs`; `contract:check` sub-gate `generate.mjs --check` | WP 6.3 *(re-homed by `20260917000009`: D39 is about a generated artifact that lives only on a feature branch, and it waits on the package that finally drops the entity columns — which D88 moved there with its unblocking number)* |
 | **D40** | **The contract said twelve tables were unaudited on the day they started being audited, and the manual published it.** WP 2.3 created `audit_<table>_insert/update/delete` — three `AFTER … FOR EACH STATEMENT` triggers calling `audit_tier_write` — on twelve tier-2/3/4 tables. Not one of the twelve sidecars changed, so all twelve still declared `governance.audited: false`, and because the generator RENDERS that field, `docs/data/tables/inbound_logistics.md` published "Tier transitions audited: **no** — invariant `audit-actor` is not met here yet" about a table audited since the migration deployed. A false statement, generated and CI-gated, which is T5 working perfectly in the wrong direction. **It could drift because the field had no source:** `introspect.mjs` lists `CREATE TRIGGER` among the statements it skips — correctly, it builds a COLUMN schema — so the contract had no representation of a trigger at all and the boolean was maintained by hand. That is `single-source` (I1) violated in the field that records `audit-actor` (G4). `live-sql.mjs` now replays triggers as it already replays policies, and R9 compares the two in BOTH directions — the second of which caught `organizations` declaring `audited: true` with no trigger, where the claim is true by the other mechanism (`log_admin_action` inside its three admin RPCs), so R9 accepts a note that names an auditing function and verifies that function emits. Found by the Phase 2→3 assessment | `20260916000001_data_plane_audit.sql:175-339` (the 36 `audit_tier_write` triggers); `scripts/data-contract/introspect.mjs:455` (`CREATE TRIGGER` on the skip list); `scripts/data-contract/live-sql.mjs` (`auditedTables`) | Phase 2→3 assessment ✅ *(12 sidecars corrected, pages regenerated, `contract:check` R9, mutation-tested three ways)* |
 | **D41** | **Thirteen open defects and three invariants were owned by work packages that had already finished.** A defect assigned to WP 2.4 while WP 2.4 is open is work scheduled; the same row after WP 2.4 ships ✅ is work nobody will ever do again — and the two are textually identical. D29, D30, D31, D33, D35 and D38 all pointed at WP 2.4, which closed as Phase 2's exit; D34 pointed at WP 2.3, which shipped without touching it or mentioning it. Six further rows (D9, D10, D13, D14, D15, D22) were the same shape for the opposite reason: genuinely closed, but never marked ✅, so nothing could tell them from the orphans. CLAUDE.md's invariant table had three rows still reading "not yet — WP 2.1 / 2.2 / 2.3" for packages that had all shipped — in the document a new session reads FIRST. Found by the Phase 2→3 assessment | §4's own "Closed by" column; `CLAUDE.md`'s §2.1 gate table | Phase 2→3 assessment ✅ *(`contract:check` R8; six rows closed, seven reassigned, CLAUDE.md corrected)* |
 | **D42** | **§15 measures ONE project, the largest project is the machine-SEEDED one, and reading it alone says the data layer is clean when it is not.** §15's instruction — "run against one project" — was followed literally on its first execution: the runner picked the project with the most `inbound_logistics` rows and that is **`Project TRON - ver2`**, the project `seed-project.yml` creates through the app's own RPC lifecycle. It measures the SEEDER. Every counting defect returned zero on it: 0 duplicate keys in 560 rows, 0 untrimmed ids, 0 null numerics, 0 mixed `time_unit`, 0 unrecognized tokens. The same queries across all seven projects return **96 rows a unique index would reject, 376 null volumes, 414 null lead times and 27 unrecognized `time_unit` tokens**. A verification section whose single-project reading contradicts its own all-project reading is worse than no verification, because it produces a confident answer. §15 now sweeps every project and the report NAMES the project it measures, so a reader can tell a real dataset from a seeded one. Found by the Phase 2→3 assessment, on §15's first run | §15; `scripts/data-contract/verification-sql.mjs` | Phase 2→3 assessment ✅ |
@@ -225,21 +226,26 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | D44 | **WP 0.1 closed D1's write path and never cleaned what the path had already written.** §15 found **477 `policy_overrides` rows across 477 distinct targets** carrying the auto-seeded `safety_stock_days = 0`, overriding the engine's 7-day default — nothing distinguished one from a deliberate choice, so every simulation over those targets ran with zero safety stock. **CLOSED by `20260916000004_unseed_d1_zero_safety_stock.sql`, and it removes a KEY rather than a ROW.** One row carries a target's whole inventory patch, so a row-level delete would also discard the reorder point and the holding cost somebody actually chose; a row left with an empty patch overrides nothing and goes. Only exactly `0` is touched. The migration counts before and after, RAISEs if any remain, and writes its own `plane='data'` audit row naming the defect and the counts. **477 rows across 477 distinct targets is the signature of a loop, not of 477 decisions** — that, plus WP 0.1's documented mechanism, is the whole evidence for the predicate | §15 (`policy_overrides` where `family = 'inventory'` and `patch->>'safety_stock_days' = 0`); `supabase/rehearsal/020_d1_unseeded.sql` | WP 3.0 ✅ |
 | D45 | **The data-plane audit had never written a row in production.** `audit_logs` held 18 rows and every one was `plane = 'admin'`. Zero `data` rows meant the twelve tables × three triggers WP 2.3 installed had not been observed to fire even once, and `audit-actor` (G4) was claimed on the strength of a migration that landed rather than a row that appeared. `dataPlaneAudit.test.ts` reads the migration TEXT and passed throughout — a structural gate cannot tell a trigger that fires from a trigger that is merely declared. **CLOSED by `supabase/rehearsal/010_data_plane_audit_fires.sql`, which needed D31's database and could not have been written before it**: one tier-2 INSERT of three rows produces exactly ONE `plane='data'` row, at statement grain, naming the actor, with `rows_after: 3` and `tier: 2`; UPDATE and DELETE each produce exactly one; a statement matching no rows produces none. Mutation-tested by dropping a trigger. **Still open around it: D36** — six service-role paths cannot name an actor even when they do fire | `supabase/rehearsal/010_data_plane_audit_fires.sql`; `20260916000001_data_plane_audit.sql`; §15 (`select plane, count(*) from audit_logs`) | WP 3.0 ✅ |
 | D46 | **27 `time_unit` values in production are integers, and every one is silently read as weekly.** §15's unrecognized-token sweep returns `21`, `15`, `16`, `7`, `14`, `9`, `4` and twenty more — numbers, in a column whose vocabulary is `day`/`week`/`month`/`quarter`/`year`. They are almost certainly lead-time day counts that landed one column left, which is the D6 field-shift signature arriving by a different route than the quote character §15 looks for. `combine-project`'s resolver maps anything unrecognized to weekly without a finding, so a row saying `21` is computed as a weekly volume and displayed with no notice — a §5 T1 breach (a number whose source is a parse failure) and T2 (the substitution is invisible). The measured project shows none of this; it is the other six that carry it | §15's unrecognized-`time_unit` sweep; the recognized set is §15's own list, mirrored from `grading.ts::UNIT_DAYS` | WP 3.2 ✅ *(for NEW rows: `_shared/ingestValidate.ts` refuses a token `unit_days()` does not know, with a row-level finding, and lands NO value)* · **WP 3.3 ✅ for the READER** *(the decision, made rather than deferred: the row is NOT refused — blanking 88 rows in projects whose owners did not cause the defect and cannot fix it without re-uploading would destroy data to punish a parser that no longer exists — and the substitution is REPORTED. `resolveWeeklyVolume` returns the value AND the substitution; `unitSubstitutions` collapses them to one entry per token with a row count; `combine-project` pushes one warning per token. An ABSENT unit is deliberately not reported: "absent means weekly" is an EXPLICIT DEFAULT, which T1 permits — it forbids only a guess. **And the half that would have made the rest decorative**: `combine-project` has returned a `warnings` array since WP 0.2 and `DataManager` DISCARDED it, so T2's "visible at the point of display" was unreachable from the ETL alone. The page now renders them, and they do not auto-dismiss)* |
-| D47 | **`organizations`' own read policy still uses the display name AND the slug as join keys.** D29 removed the text branch from `org_is_current_user_org`, which is the predicate 59 project-scoped policies call. The `orgs: members read own` policy is a different object and was not touched: it reads `id = get_current_user_org_id(get_current_user_id()) OR name = get_current_user_org() OR slug = get_current_user_org()`. `organizations.name` has no UNIQUE constraint, so the same collision D29 closes for projects is still open for the organization ROW — two tenants sharing a display name each read the other's organization record (name, slug, status, settings). §15 measures 0 collisions across 3 organizations and 14 of 14 accounts carrying `organization_id`, so it is latent and the same two-line shape as D29 was. Not folded into WP 3.0's migration because it is a different object with a different reader, and the package had already spent its evidence budget on the predicate. Found by WP 3.0's gap check | `orgs: members read own` in `20260915000004_org_identity_dual_read.sql`; §15 (0 collisions, 3 organizations) | WP 6.2 |
-| D48 | **A migration aborted in production in 2025 and nothing has ever said so.** `20250827170942` defines `create_disruption_scenario_v2(uuid, text, text, public.disruption_status, text, text[], jsonb, jsonb, jsonb, uuid, text)` with `p_user_id` and `p_user_email` — neither carrying a default — AFTER `p_status text DEFAULT 'draft'`. PostgreSQL rejects that at CREATE time (`42P13: input parameters after one with a default value must also have defaults`), so that statement and everything after it in the file never ran. The introspector records the overload from the file regardless, because a static replay cannot execute a definition to find out it is invalid. Found by D31's rehearsal, whose replay of the artifact's own function list surfaced it as one of five historical definitions that do not apply. Same class as D30 and, like D30, the END STATE is probably fine — two later migrations define working overloads — but nothing has ever checked which of the three the callers reach. Found by WP 3.0's gap check | `20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql` (the `create_disruption_scenario_v2` definition); `scripts/data-contract/rehearsal-schema.mjs` replay output | WP 6.2 |
-| D49 | **The introspector records three indexes on columns the tables no longer have.** `idx_supply_chain_data_plant` is recorded `ON supply_chain_data (plant)`, and `20250822025432` RENAMEd `plant` to `plant_name`; Postgres renames an index's column reference with the column, so production's index is on `plant_name` and the artifact's is on a column that does not exist. `supply_chain_data_multi_tier` has two more (`material_id`, `higher_level_component_id`). The artifact is therefore wrong about three indexes, and the error is invisible to every gate that compares the artifact against the MIGRATIONS — because the migrations do say what the artifact says. Found by D31's rehearsal, which cannot apply them and skips each with a named warning. Low consequence today (an index is a performance fact, not an access one) and it is the introspector's ALTER-handling that is incomplete, which is the part worth fixing. Found by WP 3.0's gap check | `build/schema.introspected.json` `tables[].indexes`; `20250822025432_cf03eaa2-ae97-4310-80e9-085e3eb03487.sql` (the RENAME); `scripts/data-contract/rehearsal-schema.mjs` | WP 6.2 |
+| D47 | **`organizations`' own read policy still uses the display name AND the slug as join keys.** D29 removed the text branch from `org_is_current_user_org`, which is the predicate 59 project-scoped policies call. The `orgs: members read own` policy is a different object and was not touched: it reads `id = get_current_user_org_id(get_current_user_id()) OR name = get_current_user_org() OR slug = get_current_user_org()`. `organizations.name` has no UNIQUE constraint, so the same collision D29 closes for projects is still open for the organization ROW — two tenants sharing a display name each read the other's organization record (name, slug, status, settings). §15 measures 0 collisions across 3 organizations and 14 of 14 accounts carrying `organization_id`, so it is latent and the same two-line shape as D29 was. Not folded into WP 3.0's migration because it is a different object with a different reader, and the package had already spent its evidence budget on the predicate. Found by WP 3.0's gap check. **CLOSED (WP 6.2), and the policy rewrite was only half of it.** `20260918000001` makes the read uuid-only, and `supabase/rehearsal/160` proves against a real database that the caller still reads their OWN row (§1, asserted first, because a fix that denies everything passes every other assertion in the file), that the same-named tenant does not (§2), that a RENAME still matches (§3, D13), and that the SLUG branch is gone too (§4) — that one is smaller and was still wrong, because `slug` IS unique but the comparison was the caller's NAME against another tenant's SLUG, so a tenant whose slug equalled another's name was readable by all of its members. **RED FIRST on §2 against the unmigrated database**, then mutation-tested three ways. **The second half is what made the rewrite safe to ship**: uuid-only is a new denial for any caller whose `approved_users.organization_id` is NULL, and D29's own note forbids adding a way to revoke access. §15 measured 14 of 14 accounts carrying it — **and nothing KEPT that true** (D96): the column is nullable, has no default, no trigger stamped it, and the backfill ran once. So the migration adds the trigger that fills it, which REFUSES TO GUESS when two organizations share the display name (§6): it leaves NULL, because stamping either would grant an account a tenant nobody put it in — this defect exactly, arriving through the write path instead of the read path. Same move as D61. **One mutation passed for the wrong reason and was redone**: renaming a trigger does not disable it (§16 · WP 4.1 · E, again) | `supabase/migrations/20260918000001_org_row_uuid_only.sql`; `supabase/rehearsal/160_org_row_uuid_only.sql`; §15 (0 collisions, 3 organizations) | **CLOSED (WP 6.2)** |
+| **D96** | **The uuid backfill was verified once and nothing kept it true — found while closing D47, and it is load-bearing for D29 too.** `approved_users.organization_id` is nullable, has no default, and until `20260918000001` no trigger stamped it. §15's 14-of-14 measurement is what let D29 remove the text branch from `org_is_current_user_org`, the predicate 59 project-scoped policies call — so from that migration onward **an account arriving without the uuid could read no project at all**, silently, with nothing in the system to say why. D47's trigger closes the write path for `approved_users`, which fixes the cause for both. **What is still not gated is the general shape**: a `NOT NULL` constraint would make it structural, and adding one needs a FRESH §15 read rather than the 2026-09-16 number — because the lesson this row exists to record is that a measurement is not an invariant, and reusing a stale one to prove it safe would be the same mistake twice. Two further reads are unowned: whether any path inserts `approved_users` bypassing the trigger (a `COPY`, a restore), and whether the same one-off-backfill shape exists on the other uuid columns D27 introduced | `approved_users.organization_id`'s nullability in `build/schema.introspected.json`; `supabase/migrations/20260918000001_org_row_uuid_only.sql` (the trigger); §15 run `35064364537` | WP 6.2 |
+| **D97** | **Two more migrations aborted in production and nothing has ever said so — found by closing D49, and they are D48's class rather than D49's.** `20250909153130` opens with `CREATE INDEX IF NOT EXISTS idx_supply_chain_data_multi_tier_material_id ON supply_chain_data_multi_tier(material_id)`, and that table has never had the column in any definition. `IF NOT EXISTS` guards the index NAME, so PostgreSQL raises 42703 and the file's transaction rolls back — its other four statements (two `supply_chain_data` indexes and a `get_integrated_process_network_data` redefinition) never ran either. `20250909153231`, 61 seconds later, re-issues exactly those four and omits the two impossible lines: a retry, the same signature as `20250820145017`/`145652`. `20250914113723` is the second: it indexes `simulation_jobs(job_id)` against a table whose live definition (`20250913085427`) has no such column — its own `CREATE TABLE IF NOT EXISTS` declaring one is a no-op — and **34 seconds later** `20250914113757` runs `ALTER TABLE simulation_jobs ADD COLUMN job_id TEXT`. Both were invisible because the abort detector keys ONLY on the corroboration test (which of two `CREATE TABLE`s the later INSERTs agree with), and a file that creates no table is invisible to it. Closed by recording a rejected statement as a second kind of abort — **and the ORDER between the two kinds is load-bearing**: read the rejected-statement evidence before the corroboration test has settled and `20260916000018`, the whole of `natural-key` (I4), is accused, because `inbound_logistics` still carries aborted `20250820145017`'s `plant_id` at that point | `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql`; `20250914113723_c82f2d6b-60a9-4190-81ae-bc9a8c227c91.sql`; `introspect.mjs`'s `schema.impossible` and `build()`'s abort fixed point | WP 6.2 ✅ *(slice 9)* |
+| **D99** | **The abort detector's first version could only see a `CREATE INDEX`, and D48 is the same mechanism on a second statement kind.** `schema.impossible` was built by slice 9 as a list precisely so a second detector could join it, and slice 10's is `firstNonDefaultAfterDefault`: an input parameter with no default that follows one with a default, which PostgreSQL refuses with 42P13. The class is not closed. `ADD CONSTRAINT … FOREIGN KEY` to a missing column, an `ALTER COLUMN TYPE` that cannot cast and a `CREATE POLICY` naming an absent column each abort their file and each is still recorded as applied; 16 historical definitions do not replay and nothing asks which of THEM sit in a file whose other statements the artifact believes. **Two of the rule's guards were removed rather than kept**: parenthesis depth and string-literal skipping, because a mutation deleting each produced a byte-identical artifact and a green suite — in a parameter DECLARATION a `DEFAULT` or `=` inside parentheses or quotes can only belong to a default expression, whose parameter is already defaulted, so neither guard could change an answer. Every line that remains has a mutation case | `scripts/data-contract/sql-lex.mjs` (`firstNonDefaultAfterDefault`); `introspect.mjs`'s `schema.impossible`; `src/lib/policies/__tests__/introspectorRejectedStatements.test.ts` | WP 6.2 *(partial — two detectors of an open class)* |
+| **D100** | **`live-sql.mjs` says "this repo never overloads" and the repo overloads nine names — and a signature-qualified `DROP FUNCTION` deleted every overload from the live map.** The function map is keyed by NAME, with that claim as its justification. `create_project` carries SIX live overloads, `update_project` five, `create_disruption_scenario_v2` two. The keying alone means a rule reads the LAST `CREATE` and no other; the `DROP` branch was worse, deleting the whole name whatever signature the statement gave — so **five live functions were absent from the map entirely**: `create_disruption_scenario_v2`, which writes four tier-4 tables, plus `get_network_nodes`, `get_network_edges`, `get_network_summary` and `net.http_post`. Every rule scoped to `liveDefinitions().functions` was blind to them, `dataPlaneAudit.test.ts`'s writer scan included — so the answer to "does every `SECURITY DEFINER` writer name its actor" was being given about 253 of 257 functions. **The invariant does not move**: both `create_disruption_scenario_v2` overloads attribute through `set_current_user_context`, and the three network functions are read-only. But "happens to" is not a gate. Found by WP 6.4 describing the disruption plane and asking which writers it had brought into scope — WP 4.3's lesson, applied on purpose for the first time rather than after the fact | `scripts/data-contract/live-sql.mjs` (the `functions` map and its `DROP FUNCTION` branch); `20250902084748`–`20250902084844` (five signature-qualified drops) | WP 6.4 ✅ *(the DROP now compares signatures, so the map holds 257 of 257 and `dataPlaneAudit.test.ts` gates it by name. The COLLAPSING half is NOT fixed and is stated instead: one body per name, nine names affected, pinned by a second assertion so the number cannot grow quietly)* |
+| **D98** | **Three CHECK constraints production has were absent from every rehearsed database, and four rehearsal files were asserting over rows production would REFUSE.** D59 said an inline CHECK costs twice; this is the second cost, measured. With the CHECKs restored, `030` inserted `user_files.kind = 'report'` (the vocabulary is `report_xlsx`/`report_pdf`/`export_csv`/`upload`), `110` inserted `ingest_runs.triggered_by = 'schedule'` (`manual`/`scheduled`), `170` inserted an EMAIL into the same column — `triggered_by` is HOW a run started, not WHO started it — and `140` inserted `'{}'::jsonb` into `proposals.provenance`, which is TEXT from a fixed vocabulary and sits next to two jsonb columns. Every one of those rows is one production cannot hold, so every assertion downstream of them was made about a database that could not exist. **No live writer is affected** — `ingest_land_file` writes `'manual'` — so the fix is the four fixture rows, not the constraints. The class is not closed: nothing stops the next rehearsal from seeding a row a CHECK would refuse; what changed is that the rehearsed database now refuses it | `supabase/rehearsal/030`, `110`, `140`, `170` (the four inserts, each now carrying the reason above it) | WP 6.2 ✅ *(slice 9)* |
+| D48 | **A migration aborted in production in 2025 and nothing has ever said so — and it was THREE migrations, not one.** `20250827170942` defines `create_disruption_scenario_v2(uuid, text, text, public.disruption_status, text, text[], jsonb, jsonb, jsonb, uuid, text)` with `p_user_id` and `p_user_email` — neither carrying a default — AFTER `p_status text DEFAULT 'draft'`. PostgreSQL rejects that at CREATE time (`42P13`), so that statement and everything after it in the file never ran. The introspector records the overload from the file regardless, because a static replay cannot execute a definition to find out it is invalid. **The row's cited sibling `20250827190942` DOES NOT EXIST.** The retry is `20250827171106`, **84 seconds** later, which re-issues the same four tables, triggers, policies and RPC and carries the literal comment `-- FIXED: Put all parameters with defaults at the end` — so the migration's own author knew, and only the contract did not. A whole-history scan then found two more: `20250904122241` and `20250904122347` each declare `get_network_nodes`, `get_network_edges` and `get_network_summary` with `p_user_id` after a defaulted `p_plant_name`, the second repeating the first's error exactly as `20250820145155` repeats `20250820145017`'s; `20250904124537` is the definition that works. **The END STATE is fine and the ATTRIBUTION was not**: aborting `20250827170942` re-homes all four `disruption_scenario_*` tables onto the retry, so a reader sent to a file that never ran is now sent to the one that did (§5 T1). **And the open half is answered.** There were never three overloads to choose between — one was a phantom. Of the two that exist, the single call site `DisruptionDialog.tsx:195` sends `p_disruption_start` and `p_disruption_end`, and PostgREST resolves an RPC by NAMED arguments, so it reaches `20250828005114`'s 13-parameter definition. `20250827171106`'s 11-parameter one is live and unreached; dropping it is a migration and is left to whoever wants it. Found by D31's rehearsal; the two extra files and the wrong citation found by WP 6.2 slice 10 | `20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql`; `20250904122241_b65404b9-d4ee-4c58-9518-7a1578f74af8.sql`; `20250904122347_a28da769-734c-4064-8f24-2b8d60ffffa4.sql`; `sql-lex.mjs`'s `firstNonDefaultAfterDefault` | WP 6.2 ✅ *(slice 10)* |
+| D49 | **The introspector records three indexes on columns the tables no longer have — and that is TWO defects with two different causes, not one.** `idx_supply_chain_data_plant` is recorded `ON supply_chain_data (plant)`, and `20250822025432` RENAMEd `plant` to `plant_name`; Postgres renames an index's column reference with the column, so production's index is on `plant_name` and the artifact's is on a column that does not exist. **That cause is right for exactly ONE of the three.** `supply_chain_data_multi_tier` has NEVER had `material_id` or `higher_level_component_id` in any definition — they are `bom_multi_level`'s columns — so no rename can have produced them. `CREATE INDEX IF NOT EXISTS` guards the index NAME, not the column: PostgreSQL raises 42703, and `20250909153130` therefore ABORTED in production, 61 seconds before `20250909153231` re-issued its other four statements without those two lines. That half is D97, and it is D48's class. The rename half is fixed by following a column RENAME into indexes, index predicates and constraints (`renameIdentifier` in `sql-lex.mjs`), which is the same fix as the `RENAME TO` branch that closed D52. `introspectorDependents.test.ts` gates both halves with no database; `supabase/rehearsal/180` §3 and §4 prove them against a real one. Found by D31's rehearsal; the second cause found by WP 6.2 slice 9 | `build/schema.introspected.json` `tables[].indexes`; `20250822025432_cf03eaa2-ae97-4310-80e9-085e3eb03487.sql` (the RENAME); `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` (the two impossible ones) | WP 6.2 ✅ *(slice 9)* |
 
 | D50 | **A rehearsal fixture with no shape to key on turned `main` red the day WP 3.0 merged, and stayed red.** `--fixtures` plants production's divergence from the contract BEFORE the branch's new migrations run. `fixtures/020_d1_zero_safety_stock.sql` planted the four `policy_overrides` rows carrying D1's frozen zero and `rehearsal/020_d1_unseeded.sql` asserted that a migration had removed them — a migration that, once merged, is in the BASE and never runs again. The pair could only ever pass on WP 3.0's own branch. `data-contract.yml` runs the rehearsal both ways on every push, so the `migrations run` job failed on run `35077191060` (the WP 3.0 merge) and would have failed on every pull request after it, including this one — WP 3.0's own `base branch is green` job makes that a blocker rather than a nuisance. **CLOSED by WP 3.1**: both WP 3.0 fixtures and the assertion that depended on one are deleted (their subjects are settled — 477 → 0 frozen zeros, 2 → 0 untracked relations), and `fixtures/README.md` states the rule that was missing: a fixture must be SHAPE-conditional so it no-ops once its migration is in the base, and a fixture whose precondition is data rather than shape cannot be written | `supabase/rehearsal/fixtures/README.md`; the deleted `fixtures/020_d1_zero_safety_stock.sql` + `rehearsal/020_d1_unseeded.sql`; CI run `35077191060`, job `migrations run` | WP 3.1 ✅ |
 | D51 | **The contract published "RLS enabled, no policies" for three tables that each had one.** `20260829120000` creates the three `erp_staged_*` policies inside a `DO $$ … EXECUTE format('CREATE POLICY "%1$s: project access" ON public.%1$s …') $$` loop. The introspector skips DO blocks — correctly; it reads column schemas — and it compensates with an indeterminacy flag: a table whose RLS a dynamic block TOUCHES is recorded as `determinate: false`, which the generated page renders as "the migrations do not say" rather than as "off". The flag keys on table names MENTIONED in the dynamic SQL, and here the names are `%1$s` format placeholders, so it never fired. The three tables were recorded as determinately policy-less and their generated pages said so, for the whole of Phase 2 — the D40 shape (a published falsehood, CI-gated) in the other direction. WP 3.1 closes it FOR THESE TABLES by writing their policies as four literal statements, which is now the standing rule for this repository. **The flag's blind spot is not closed**: any policy built from a format placeholder is still invisible AND unflagged | `20260829120000_erp_connector_phase1_2.sql` (the `DO`/`EXECUTE format` loop); `introspect.mjs`'s `rls.determinate` marking; `20260916000012_ingest_rename_and_widen.sql` (the literal replacements) | WP 6.2 |
 | D52 | **A table rename did not follow the FOREIGN KEYS that pointed at the old name — and it was not harmless.** The introspector's `RENAME TO` moved the table in its own map and stopped there, so `ingest_staged_*.ingest_run_id` went on recording `REFERENCES erp_sync_runs` after WP 3.1's rename. `rehearsal-schema.mjs` SKIPS a reference to a table the artifact does not know — silently — so the base it built from that artifact had no `ON DELETE CASCADE` on the staging tables at all, while production's keys followed the rename the way Postgres always does, by OID. **`main`'s `data contract` went red on the merge commit** (run `35110653485`): `supabase/rehearsal/050` reported `3 staged row(s) survived the deletion of their run`. The assertion was right and the artifact was wrong, which is the only way round worth having. The row this replaces said the flag-clearing half was "harmless here… it will not be harmless the next time"; the next time was the next run. **CLOSED**: `RENAME TO` now rewrites every inbound `references.table` and FK definition, the skipped-FK case WARNS instead of vanishing, and CI runs the rehearsal a third way — `--since HEAD`, against the artifact the branch itself writes, which is the shape `main` meets after a merge | `introspect.mjs` (`RENAME TO` in `applyAlter`); `rehearsal-schema.mjs` (`emitConstraints`); CI run `35110653485` | WP 3.1 follow-up ✅ |
 
-| D53 | **Nine foreign keys have never existed in any rehearsed database, because the introspector drops the schema qualifier from `REFERENCES auth.users(id)`.** The artifact records the target as `users`, `rehearsal-schema.mjs` qualifies an unqualified name to `public.users`, no such table exists, and the key is skipped: `project_erp_links.linked_by_user_id`, `ingest_runs.triggered_by_user_id`, `ingest_runs.applied_by_user_id`, `scenarios.created_by`, `simulation_runs.created_by`, `policy_versions.created_by`, `policy_presets.owner_id`, `recovery_playbooks.created_by`, `experiments.created_by`. Production has all nine; every rehearsal has run without them, so no assertion about what happens when a user row disappears could ever have been trusted. Pre-existing and invisible until WP 3.1's follow-up made the skip WARN rather than vanish — which is how it was found, on the same run that closed D52. Same family as D49 and D52: the introspector's handling of a reference is incomplete in a way only the rehearsal can see | `introspect.mjs`'s `REFERENCES` parse (the qualifier is not kept); `rehearsal-schema.mjs` `emitConstraints`'s skip warning | WP 6.2 |
+| D53 | **Nine foreign keys have never existed in any rehearsed database, because the introspector drops the schema qualifier from `REFERENCES auth.users(id)`.** The artifact records the target as `users`, `rehearsal-schema.mjs` qualifies an unqualified name to `public.users`, no such table exists, and the key is skipped: `project_erp_links.linked_by_user_id`, `ingest_runs.triggered_by_user_id`, `ingest_runs.applied_by_user_id`, `scenarios.created_by`, `simulation_runs.created_by`, `policy_versions.created_by`, `policy_presets.owner_id`, `recovery_playbooks.created_by`, `experiments.created_by`. Production has all nine; every rehearsal has run without them, so no assertion about what happens when a user row disappears could ever have been trusted. Pre-existing and invisible until WP 3.1's follow-up made the skip WARN rather than vanish — which is how it was found, on the same run that closed D52. Same family as D49 and D52: the introspector's handling of a reference is incomplete in a way only the rehearsal can see. **CLOSED (WP 6.2).** `readQualifiedName` had always returned `{ schema, name }`; the introspector read only `.name`. The fix is additive — `references.schema` is recorded and `table` stays the bare name, because the rename and drop trackers in the same file compare against it. `rehearsal-schema.mjs` resolves the target from that schema, and `generate.mjs` renders the qualified name, so the published page no longer says a column references `users` when there is no `public.users`. All nine appear in `--since HEAD`: 9 references now record `schema: auth`, 106 `public`, 0 unqualified, and the nine skip-warnings are gone. **`supabase/rehearsal/170` proves the SEMANTICS, not just the existence** — deleting a user an `ingest_runs` row names as its actor is REFUSED (NO ACTION), and `scenarios.created_by` SET NULLs while the scenario survives. **THE GATE IS STATIC AND THAT IS THE INTERESTING PART**: a fix to the INTROSPECTOR cannot be proven by the plain rehearsal mode at all, because that mode builds its base from the BASE BRANCH's artifact — so the nine are legitimately absent until this merges, and `170` skips. A mutation test found what that skip costs: reverting the introspector left `170` GREEN in every mode. `introspectorRefSchema.test.ts` is the unconditional gate — it reads the migrations and the artifact, needs no database, and therefore has no base to be stale; it catches both the parse regression and a base builder that hard-codes `public.` again | `scripts/data-contract/introspect.mjs` (`references.schema`); `scripts/data-contract/rehearsal-schema.mjs`; `src/lib/policies/__tests__/introspectorRefSchema.test.ts`; `supabase/rehearsal/170_auth_user_foreign_keys.sql` | **CLOSED (WP 6.2)** |
 | D54 | **The data-plane audit rule is scoped to the CONTRACT, so every DEFERRED tier-2/3/4 table is unaudited and no gate says so.** `dataPlaneAudit.test.ts` requires the three `audit_tier_write` triggers on every tier-2/3/4 table *in the contract*; a table with no sidecar is outside the contract, therefore outside the rule, therefore its writes are unattributable with nothing to notice. `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain` sat in that gap from WP 2.3 until WP 3.2 described them — and describing them is what turned the gate red, in the same session, which is the gate working and is only possible for a table somebody had already chosen to describe. **MEASURED, 2026-09-17 (§15 run `35229431958`): 0 of the 6 tables WP 4.2 owns carry an `audit_tier_write` trigger — and `contract:check` R11 puts the number for the whole class at 42 of 42 deferred tables unaudited.** | `dataPlaneAudit.test.ts`'s "in the contract" qualifier; `coverage.yaml`; `contract:check` R11 | WP 4.2 ✅ *(the RULE, which is what this row asked for: a deferral must SAY whether the table is audited, and it lives in `contract:check` R11 — where R1 already reads the same file — rather than in a comment. Each `coverage.yaml` group now carries an `audited:` map naming every table in it; R11 fails when a table is missing from the map AND when the declaration disagrees with the triggers the migrations create, read from the same `auditedTables()` R9 uses. Mutation-tested both ways. **It is deliberately NOT a gate on BEING audited** — 42 of 42 are unaudited, so requiring `true` would be red on arrival and unlandable, the same reasoning that made WP 4.1's writer list a ratchet. The rule requires the SENTENCE: `false` now has to be typed by a person, beside the package that owns fixing it, and R11 prints the count on every run so it cannot quietly grow. **The 42 remain unaudited and that is the open half**, owned per group by WP 4.2's successors — 6 here, 9 WP 4.4, 10 WP 6.1, 17 WP 5.2)*
 | D55 | **The three item-master CSVs are parsed server-side but land nothing** — `materials`, `products` and `suppliers` still go from the browser to `bulk_upsert_*` without a tier-0 record or a run, so `no-tier-skip` (I2) is PARTIAL rather than met after WP 3.2. They were left out deliberately and the reason is not laziness: `bulk_upsert_*` already UPSERTS on a natural key and validates its enums in SQL, and routing them through a landing whose promotion is an INSERT would have been a regression dressed as progress. WP 3.3 makes promotion an upsert, which is the moment this becomes cheap | the `item-master` branch of `UploadWizard.tsx` (deleted by WP 3.3); `ingestSpec.generated.ts` now carries all three | WP 3.3 ✅ *(`20260916000020` — the three sidecars declare `ingest_dataset`, the branch that called `bulk_upsert_*` is DELETED not flagged off, and `ingestSpecParity.test.ts` fails if it returns. It cost MORE than the handoff said: the sidecars carried a `csv_header` on every item-master column and an `ingest.rule` on none, so 22 rules had to be authored from each field's own `validate` sentence and from `ITEM_MASTER_ENUMS`, which already mirrors the write-RPCs' CHECKs. The GENERALITY held, which is the claim worth testing: an item master's key is a composite PRIMARY KEY rather than an index this package made, and it has no `plant_name`, and `ingest_apply_run` promotes into it through the same statement a lane uses because it reads the key from the catalog and derives the server-set columns from the target's shape — `supabase/rehearsal/090`. So `no-tier-skip` (I2) is met for every CSV the contract describes; what remains outside is D56's group)* |
 | D56 | **The node list and the two deep-tier network CSVs land nothing either** — `node_list`, `network_nodes` and `network_edges` are parsed server-side now but still go straight to tier 2 through their bulk RPCs, because there was no contract to validate them against and no decision about what tier they are. **THE DECISION IS MADE AND IT IS WP 4.2'S: `network_nodes` IS BOTH, SO THE ANSWER IS A SPLIT AND NOT A TIER — AND THE SPLIT IS DEFERRED TO WP 4.3 WITH A REASON RATHER THAN TAKEN HERE.** The table carries seven columns a user uploaded (`name`, `country`, `industry`, `revenue`, `lat`, `long`, `is_seed`, plus `uid`/`depth`) and eight an analysis wrote (`prominence`, `prominence_updated_at`, the five centralities, `network_metrics_updated_at`). `node_list` is the same shape (`is_critical_node`, `critical_node_score`, `prediction_timestamp` written by an analysis; `longitude`/`latitude` written by `geocode-locations`). That is D19 stated precisely, in one table, and it is why "what tier is it" has no answer while the table is one thing. **Why the split is not taken in WP 4.2**: (1) the computed half has nowhere to go until the analyzers write `analysis_results`, which is WP 4.3's dual-write — splitting first would mean a migration that moves columns no writer targets yet, and §11 says do not migrate a reader here; (2) the input half cannot become a described tier-2 table until it has a natural key, and **it does not have one — D72**; (3) describing the input half makes WP 4.1's coverage rule fold it into `hash_network` the moment the sidecar exists, which is a SECOND `schema_version` bump, and §16 · WP 4.1 · C is what one of those costs on a day D70's proposal count is not zero. **The blast radius, enumerated so WP 4.3 inherits it rather than rediscovering it** — writers of the input half: `UploadWizard.tsx:1024` (`bulk_insert_network_nodes`), `:1079` (`bulk_insert_network_edges`), `combine-project/index.ts:468,477` (`refresh_node_list_for_project`); `bulk_insert_network_summary` exists and **has no caller at all**. Writers of the computed half: `calculate-network-science-metrics/index.ts:132` (the five centralities + `prominence`), `calculate-node-prominence/index.ts:111` (`prominence`), `geocode-locations/index.ts:245,292` (`node_list` lat/long). Readers of both halves as one row: `ProjectDataViewer.tsx` and `FirmLevelNetwork.tsx` (`prominence`), `DataManager.tsx` (`is_critical_node`, `critical_node_score`), `MapView.tsx` (`node_list` coordinates), `verifiableExports.ts`. All four bulk RPCs remain tier-2-skipping and unaudited | `UploadWizard.tsx:373,400,409`; `coverage.yaml` WP 4.2 group; the writers and readers enumerated in this row | WP 4.2 ✅ *(the DECISION and its blast radius, which is what three packages deferred)* · WP 4.3 *(executes the split, with D72 first)* |
 | D57 | **`reference.generated.ts` does not typecheck, and has not since WP 5.2h.** `RefColumn.references` is declared `string \| null` and the generator emits the introspected object `{table, columns, on_delete}` — 40+ TS2322 errors under `tsc --noEmit`. Nothing catches it: `npm run build` is Vite, which does not typecheck, and `contract:generate -- --check` compares text rather than types. Pre-existing on `main` at `087f2e6`, measured with and without WP 3.2's diff | `generate.mjs`'s `RefColumn` type vs `refColumn()`'s output | WP 5.2 |
 | D58 | **`multi_tier_supply_chain` is a live tier-2 table with no reader and no writer.** `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every other occurrence is a migration — created 2025-08-20 and carried through every RLS rewrite since, most recently `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. WP 3.2 described it rather than deferring it a third time, because a deferral is a promise that somebody will look and the looking is now done. Dropping it is not the noticing package's call: §15 counts its rows now, so whoever decides is deciding against a number — and the number, measured 2026-09-16 (§15 run `35144057908`), is **0 rows across 0 projects**. It is not a table whose data nobody reads; it is a table with no data, no reader and no writer | `supabase/contract/multi_tier_supply_chain.contract.yaml`'s table note; §15's every-project sweep | WP 6.2 |
-| D59 | **A CHECK written INLINE on a column is invisible to the artifact, so the rehearsed database does not have it and the generated page does not publish it.** `introspect.mjs` reads a column's type, its NOT NULL and its DEFAULT and drops the rest; only a NAMED, table-level `ADD CONSTRAINT … CHECK` is recorded. The artifact holds **24 CHECK constraints across 15 tables** while the migrations contain **253 `CHECK (` occurrences** — most of that gap is repetition across shadowed definitions, but `ingest_files` alone loses three real ones (`source_kind`'s vocabulary, `byte_size >= 0`, and the SHA-256 shape). Two consequences, and the second is worse: `contract:rehearse` builds a database with no such constraint, so an assertion that a bad value is REFUSED passes when it is run against the migration and fails when it is run against the artifact; and `docs/data/tables/*.md` renders a table's CHECK list, so a rule that rejects a user's upload appears in no document (§5 T1). **Found by the third rehearsal mode on WP 3.2's own branch** — green fresh and green over production's shape, red against its own artifact, which is precisely the case the WP 3.1 follow-up added that mode for. Same family as D49 (a column rename not followed into indexes) and D52 (a table rename not followed into foreign keys): the introspector is incomplete about DEPENDENT objects, one kind at a time. WP 3.2 walks around it — `20260916000014` writes every CHECK as a named table-level constraint — rather than relying on it being fixed | `introspect.mjs`'s `CREATE TABLE` column parser vs `20260916000013_ingest_files_tier0.sql:36,45,49` | WP 6.2 |
+| D59 | **A CHECK written INLINE on a column is invisible to the artifact, so the rehearsed database does not have it and the generated page does not publish it.** `introspect.mjs` reads a column's type, its NOT NULL and its DEFAULT and drops the rest; only a NAMED, table-level `ADD CONSTRAINT … CHECK` is recorded. The artifact holds **24 CHECK constraints across 15 tables** while the migrations contain **253 `CHECK (` occurrences** — most of that gap is repetition across shadowed definitions, but `ingest_files` alone loses three real ones (`source_kind`'s vocabulary, `byte_size >= 0`, and the SHA-256 shape). Two consequences, and the second is worse: `contract:rehearse` builds a database with no such constraint, so an assertion that a bad value is REFUSED passes when it is run against the migration and fails when it is run against the artifact; and `docs/data/tables/*.md` renders a table's CHECK list, so a rule that rejects a user's upload appears in no document (§5 T1). **Found by the third rehearsal mode on WP 3.2's own branch** — green fresh and green over production's shape, red against its own artifact, which is precisely the case the WP 3.1 follow-up added that mode for. Same family as D49 (a column rename not followed into indexes) and D52 (a table rename not followed into foreign keys): the introspector is incomplete about DEPENDENT objects, one kind at a time. WP 3.2 walks around it — `20260916000014` writes every CHECK as a named table-level constraint — rather than relying on it being fixed | `introspect.mjs`'s `CREATE TABLE` column parser vs `20260916000013_ingest_files_tier0.sql:36,45,49` | WP 6.2 ✅ *(slice 9 — `parseColumn` extracts every inline `CHECK`, `liftImplicitConstraints` names it the way PostgreSQL does (`<table>_<column>_check`) so a later `DROP CONSTRAINT` matches it, `DROP COLUMN` takes it with the column, and a column RENAME rewrites it. 24 CHECKs → 84. The measured gap was never 253: that count includes every shadowed re-declaration and every policy's `WITH CHECK`. The honest figure is **65 inline column CHECKs in CREATE TABLE statements plus one on an ADD COLUMN**, and what reached the artifact is 60 of them — the other five are superseded by name. `introspectorDependents.test.ts` + `supabase/rehearsal/180` §1–§2)* |
 | **D60** | **The introspector drops `NULLS NOT DISTINCT` from a `CREATE UNIQUE INDEX`, so the rehearsed database's constraint is WEAKER than the migration's.** `introspect.mjs`'s index parser reads the column list and any `WHERE`, and keeps nothing in between — and the clause sits exactly there. `rehearsal-schema.mjs`'s `emitIndexes` then rebuilds the index from the artifact WITHOUT it. The consequence is not cosmetic and it is not symmetrical: PostgreSQL's default makes NULLs distinct, so the rebuilt index constrains every row EXCEPT the ones whose key column is null, and `ON CONFLICT` infers from the same index and INSERTS a duplicate rather than updating. An assertion that a null-bearing duplicate is refused therefore PASSES in the fresh modes, where the migration itself runs, and FAILS against the artifact — which is the case the WP 3.1 follow-up added the third rehearsal mode for. Found by WP 3.3, whose seven natural-key indexes are all `NULLS NOT DISTINCT` (three of the seven keys contain a nullable column — see D5), so the defect was between the migration and every gate that reads the artifact. Same family as D49 (a column rename not followed into indexes), D52 (a table rename not followed into foreign keys) and D59 (an inline CHECK never recorded): the introspector is incomplete about DEPENDENT detail, one kind at a time — and unlike D59 this one could not be walked around, because there is no other way to spell the clause | `introspect.mjs`'s `CREATE INDEX` parser; `rehearsal-schema.mjs`'s `emitIndexes` | WP 3.3 ✅ *(both sides fixed; the artifact records `nulls_not_distinct`, `verify-introspection.mjs` checks all seven, and `supabase/rehearsal/080` section 0a asserts `pg_index.indnullsnotdistinct` on the index THE DATABASE ARRIVED WITH rather than on one the file creates itself — which is what lets the third mode see it)* |
 | **D61** | **`project_members` has had exactly one writer in its life and it ran once.** WP 2.2 created the table and backfilled it from `projects.modeler_id` inside `20260915000005` — "every project's modeler becomes its owner", which is the right rule — and then left nothing that keeps applying it. No trigger, no RPC, no application code inserts a member; `grep project_members` across `src/` and `supabase/functions/` returns documentation and tests. **So every project created after 2026-09-15 has no members at all**, and `effective_project_role` returns NULL for its own creator, which `project_role_rank` ranks 0 — below `viewer`. The defect was invisible while nothing read the resolver: `subtractive-delegation` (G3) is gated source-level only and no live code path had ever called it. WP 3.4 is the first package to make a decision on it, and landing §10's role gate on top of it would not have been a gate — it would have refused the promotion of every file in every project created since, including by the person who created it | `20260915000005_project_membership_and_delegation.sql:122-130` (the one-time backfill, and the rule it states) | WP 3.4 ✅ *(`project_owner_membership()` + an `AFTER INSERT` trigger on `projects`, plus the same backfill re-run `ON CONFLICT DO NOTHING` for the projects the first one could not see — it never demotes a member who has since been given a smaller role on purpose. `supabase/rehearsal/100` section 0 asserts it against a real database and is mutation-tested; the assertion had to be written `IS DISTINCT FROM` rather than `<>`, because `NULL <> 'owner'` is NULL and an IF treats that as false — the first version of the test could not fail)* |
 | **D62** | **`ingest_staged_rows.diff_state` is `NOT NULL DEFAULT 'new'` and no code path has ever written it.** `20260916000019` does not contain the string once. So every CSV row ever staged claims `new` — including the rows the upsert UPDATED — and a review screen reading the column renders "340 new" for 340 unchanged rows, confidently, with a number. **A default that is present and wrong is worse than a NULL**: a NULL is a question and this was an answer, and the column's own sidecar had reasoned its way into defending it ("every CSV row says `new` because that is what an uncompared row is"). The MRP side is not affected — `erp-sync-orbit-mrp` computes and writes `diff_state` on every row it stages, which is why the same default on the three connector staging tables is never the value that survives | `20260916000014_ingest_staged_rows.sql:64` + the CHECK at `:94-95`; `ingest_staged_rows.contract.yaml`'s `diff_state` note as it stood | WP 3.4 ✅ *(the DEFAULT and the NOT NULL both dropped, and existing rows set to NULL: not computed, never "new". `ingest_diff_run` computes it against the CURRENT tier-2 rows at landing, again when the review screen asks and again inside `ingest_apply_run` immediately before the upsert — so what a promotion reports is true at the moment it promotes, not at the moment somebody opened the screen. `rehearsal/100` §1 and the screen's own `diffLabel(null) === "not compared"`)* |
@@ -249,14 +255,33 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D66** | **`min_project_role` is declared on all 37 tables in the contract and read by nothing.** `declared-capability` (G2) is gated by `contract:validate`, which requires the `governance` block to EXIST; no policy, function or test compares a caller's `effective_project_role` against the value. Every RLS policy on the ingest tables routes through `has_project_access` instead — "the modeler, or a platform admin" — so the two live answers to "may this person touch this project" are a reachability test used by RLS and a membership rank used by nothing. WP 3.4 made the second one load-bearing for the first time (D65) and the mismatch surfaced immediately: an EDITOR who is not the project's modeler passes the promotion gate and fails the RLS predicate on the very staged rows they are promoting. Found by `supabase/rehearsal/100`'s first run, not by reading | the `governance` block of every `supabase/contract/*.contract.yaml`; `20260916000014_ingest_staged_rows.sql`'s policy | WP 6.2 *(the read gate in `ingest_diff_run` is the UNION of the two today and says so in a comment — the honest shape of a half-migrated governance plane, not belt and braces. Moving RLS onto `effective_project_role` is `min_project_role` finally being enforced rather than declared, and it is a per-table change with tests, the same shape as D38)* |
 | **D67** | **The snapshot missed two more things `datamap.py` reads, and D11 named only the third.** `lead_time_unit` — which the engine PROJECTS, with a comment in `datamap.py` naming D9, because PostgREST returns only what the projection names — was never hashed, so **14 days and 14 weeks were the same dataset** and two runs that resolve lead time differently carried one `graph_hash`. Same for `demand_min` / `demand_max`, added to `products` after v1 and read by `build_project_data`, so a triangular or uniform demand could be re-parameterized without moving the anchor. Neither is exotic: both are columns an earlier package ADDED and nobody re-mirrored into the snapshot, which is the rule failing rather than the author. **Found by writing the coverage rule down** — comparing `datamap.py`'s projections against the snapshot's column sets — not by reading the snapshot | `20260703000001_dataset_versions.sql:119-126` against `sim-worker/sim_worker/datamap.py:118,126,229` | WP 4.1 ✅ *(`20260917000002` hashes both, `supabase/rehearsal/110` §4 asserts each separately — days→weeks moves the hash, `demand_min`/`demand_max` moves it — and both mutations fire with their own message. The RULE is what closes the class: `graphHashCoverage.test.ts` reads the catalog AND `datamap.py` and fails when a tier-2 value column or a projected column is absent, so the next column added fails on the commit that adds it)* |
 | **D68** | **The snapshot's row orderings were not TOTAL, so the same data could hash two ways.** `jsonb_agg(... ORDER BY ...)` fixes an order only as far as the ORDER BY discriminates; v1 ordered `inbound` by `supplier_id, material_id, unit_price, volume` — no `plant_name` — so two rows in different plants that tie on all four come back in an unspecified order and produce two different `snapshot::text`, hence two different hashes, from one dataset. WP 3.3's unique indexes make it impossible WITHIN a plant and do nothing across plants, which is where the omission is. **A hash that is not a function of its input is not an identity**, and the failure is silent in both directions: a project reads dirty when nothing changed, or two runs on identical data are reported as different worlds | `20260703000001_dataset_versions.sql`'s six `ORDER BY` clauses | WP 4.1 ✅ *(every ordering in v2 is the table's own UNIQUE natural key — the one `ingest_target_natural_key` reads from `pg_index` — which is total by construction. It is the one place the fix is CHEAPER than the defect: there was nothing to add, only the right columns to order by)* |
-| **D69** | **`project_map.py` never loads the `customers` table, so `priority_weight` and `segment` are always the engine's defaults.** `project_map.py:458-461,574` synthesizes `Customer(id=c, name=c)` from the ids found in `outbound_logistics` and never reads `customers` at all — while `scsim`'s P-C.2 (`p_c2_customer_allocation`) reads `Customer.priority_weight` and `Customer.segment` to decide who gets served when supply is short. So a user who fills in a customer's priority changes nothing, silently, and the policy's `priority` and `segment` orderings are inert on every project. Six rows across five production projects carry values today. The table's own sidecar says "nothing reads this table at all", which is true and reads as a curiosity rather than as the defect it is. **Found by `20260917000002` deciding whether `customers` belongs in the hash** — it does, and asking why nobody read it is what turned it up | `scsim/scsim/io/project_map.py:458-461,574` against `scsim/scsim/policies/improvisation/p_c2_customer_allocation.py:113-126` | WP 6.2 *(a reader change in `project_map.py`, the same shape as the other divergences that package carries. snapshot v2 hashes the columns NOW so that the day the reader lands the anchor already covers them — the alternative is a second `schema_version` bump, and §16's entry for `20260917000002`, section C, is what one of those costs)* |
-| **D70** | **A `schema_version` bump EXPIRES stored proposals, one-way, from a READ, and nothing says so.** `expire_agent_proposals` UPDATEs `proposals.status` to `expired` with `status_reason = 'grounding_drift'` for every row in `draft`, `proposed` or **`approved`** whose `grounding->>'graph_hash'` differs from `current_graph_hash(project)`, and `list_agent_proposals` calls it — so the first page load after a deploy that moves the hash writes the change, and the predicate is one-way: nothing un-expires a proposal when the hash comes back. That is correct as a staleness rule and dangerous as an undocumented consequence of a migration. **WP 4.1 is the first bump and it costs nothing — §15 measured 0 live proposals grounded on a `graph_hash`** — which is a fact about adoption, not about the mechanism. The next bump lands on whatever is there | `20260715000001_agent_proposals.sql:245-256` (the UPDATE and its predicate); the call at `list_agent_proposals` | WP 4.4 *(its scope is "ONE staleness rule everywhere", so the rule that a hash change is a REVERSIBLE display state and never a persisted status write belongs there. Until then the mitigation is the measurement: §15 counts `live_grounded_on_graph_hash` before every bump)* |
-| **D71** | **D36 was one slice of a class, and the class is 26 functions rather than six.** D36 counted the SERVICE-ROLE PostgREST writers, because that is where WP 2.3 looked. WP 3.3 then found `assign_material_supplier` — a `SECURITY DEFINER` SQL function that had taken the actor as a parameter all along and never told the trigger — and D36's own evidence says it "was never in the list of six because nothing had looked at it". WP 4.1 found a second the same way, `snapshot_dataset`, which has recorded `actor_known: false` on every dataset version ever frozen beside an `author_user_id` the caller supplied. **So the gap check measured the whole class: 26 `SECURITY DEFINER` functions write a tier-2/3/4 table, TWO set `app.current_user_id`, SIXTEEN of the rest already TAKE an actor parameter, and SEVENTEEN have a live caller in `src/` or `supabase/functions/`.** Every one is the one-line fix D36 correctly says is NOT one for a PostgREST call, because a `SECURITY DEFINER` function runs in a transaction it controls. **The consequence for the invariant is the point: `audit-actor` (G4) is NOT met after `20260917000003`**, and closing D36 must not be reported as though it were | the 26 function bodies, enumerated by `dataPlaneAudit.test.ts`'s `UNATTRIBUTED` list; `assign_material_supplier` and `snapshot_dataset` are the two that do set it | WP 6.2 *(`20260917000002`–`20260917000003` closed the two they rewrote and left a RATCHET rather than a gate, because a gate would be red on arrival and unlandable: `dataPlaneAudit.test.ts` fails when a 27th appears and when a name that is now attributed is left on the list, so the number can shrink and cannot grow. Mutation-tested both ways. **re-budget for it** — 17 live functions, each needing one line and a rehearsal assertion that reads the row back)* |
+| **D69** | **`project_map.py` never loads the `customers` table, so `priority_weight` and `segment` are always the engine's defaults.** `project_map.py:458-461,574` synthesizes `Customer(id=c, name=c)` from the ids found in `outbound_logistics` and never reads `customers` at all — while `scsim`'s P-C.2 (`p_c2_customer_allocation`) reads `Customer.priority_weight` and `Customer.segment` to decide who gets served when supply is short. So a user who fills in a customer's priority changes nothing, silently, and the policy's `priority` and `segment` orderings are inert on every project. Six rows across five production projects carry values today. The table's own sidecar says "nothing reads this table at all", which is true and reads as a curiosity rather than as the defect it is. **Found by `20260917000002` deciding whether `customers` belongs in the hash** — it does, and asking why nobody read it is what turned it up. **CLOSED (WP 6.2), and the second half was worse and unrecorded.** `priority_weight` is the half this row names. `segment` is the other, and it fails in a way that hides itself: `P-C.2`'s `sla_tiers` guarantees a fill floor **per segment**, and the mapper gave every customer the entity default `"default"`, so no tier could ever match and every floor was 0.0. **The engine already warned about it** — `unknown_sla_segment` in P-C.2's own feasibility check — and the warning named the symptom while nothing named the cause, because the segments it compared against were a constant. **The fix spans three layers, because the table was not merely unmapped, it was never FETCHED**: `sim-worker`'s `load_project_data` did not request it and `build_project_data` had no parameter for it. `ProjectData` gains `customer_rows` (additive — `customers` stays the id list, because an id can legitimately come from an outbound arc with no row in the table), and `_build_customers` merges the two, overriding an entity default only where the table says something: a NULL column is not a value, and `Customer.segment` is typed `str`, so passing `None` would RAISE rather than fall back. An id with no row keeps the defaults and a warning says how many did. **VERIFIED IN CI, ON THE THIRD PUSH, AND THE TWO THAT FAILED ARE THE POINT.** No Python in this repository can be executed from a work-package session (`scsim` imports `pydantic`; the egress proxy denies PyPI — D87's limit), so `sim-worker/tests/test_customer_attributes.py` is the verifier and `scsim-tests.yml` runs it. `5ce985d` failed E1 (the residue); `64fe5d5` failed this package's own GHOST assertion (the id-set widening); **`8808612` is green on `scsim`, `sim-worker` and `grading`** — `browser-wheels` is D87 and red on `main` too. Both defects were in BRANCHING and neither was findable by reading, which is why the third push carried a stub harness (`Customer`/`MappingWarning` stubbed, no `pydantic`) that exercises `_build_customers` over the four cases that matter. **That harness is the transferable part**: a session that cannot run the engine can still run a function, and two pushes were spent learning it | `scsim/scsim/io/project_map.py` (`_build_customers`, `CustomerRow`); `sim-worker/sim_worker/datamap.py` (the fetch and the row build); `sim-worker/tests/test_customer_attributes.py` | **CLOSED (WP 6.2)** |
+| **D94** | **`P-C.2` reads two `Customer` attributes it does not DECLARE, and that silence is why D69 survived adoption.** The registry export is the single source of truth for policy schemas (§3, §6.2), and `p_c2_customer_allocation`'s `data_requirements` names exactly one field: `outbound_logistics.volume`. Its code reads `Customer.priority_weight` and `Customer.segment` on every run. Three things followed from the gap, and each one is a gate that could not fire: the `customers` sidecar recorded `consumed_by: null` for both columns with nothing to contradict it; `project_map` omitted the table with no requirement naming what it failed to supply; and every tool deriving "what the engine reads" from the registry — the data contract, WP 6.1's resolution-chain door 1 — was blind to them. **The sidecar also gave a FALSE REASON for the blank**, twice: "`scsim` has no customer-priority concept today … none of [the `P-C.x` policies] is implemented". `customer_allocation` is `status: implemented` in the registry export. The conclusion was right and the cause was wrong, and the wrong cause sent the next reader to the blueprint's catalog instead of to `project_map.py`. **The declaration was written and then REVERTED in the same session**: `registry.generated.json` is committed and `gen_frontend_registry.py --check` gates it, regenerating needs `pydantic`, and PyPI is denied here — so landing the source change would have shipped a knowingly-red gate. It needs a session that can run Python. **Once declared, the gate it enables is the valuable part**: an implemented policy's declared data requirement may not have `consumed_by: null` in the sidecar, which is the inverse of the rule `contract:generate` already enforces. A second, separable gap: no surface in this product WRITES `customers`, so the two columns that now reach the engine can only be set by hand in the database | `scsim/scsim/policies/improvisation/p_c2_customer_allocation.py`'s `data_requirements` against its `_matrices` (`m.cust_priority`, `m.cust_segment`); `supabase/contract/customers.contract.yaml` | WP 6.2 |
+| **D95** | **`customers.sla_fill_floor_pct` has no engine field to reach, and it was given `priority_weight`'s reason rather than its own.** Both columns carried the same sidecar note — "none of the `P-C.x` policies is implemented" — and only this one's conclusion survives D94's correction. `P-C.2` IS implemented and it DOES guarantee fill floors, through `sla_tiers`, which is keyed **by segment**. This column is per **customer**, and `scsim`'s `Customer` entity has no field for it at all, so there is nothing to carry it into. Carrying it would mean deciding what happens when two customers in one segment declare different floors, and inventing that rule is an engine change, not the reader change D69 was. Left undeclared on purpose, with the real reason recorded in place of the borrowed one | `supabase/contract/customers.contract.yaml` (`sla_fill_floor_pct`'s note) against `scsim/scsim/entities/network.py`'s `Customer` | WP 6.2 |
+| **D70** | **A `schema_version` bump EXPIRES stored proposals, one-way, from a READ, and nothing says so.** `expire_agent_proposals` UPDATEs `proposals.status` to `expired` with `status_reason = 'grounding_drift'` for every row in `draft`, `proposed` or **`approved`** whose `grounding->>'graph_hash'` differs from `current_graph_hash(project)`, and `list_agent_proposals` calls it — so the first page load after a deploy that moves the hash writes the change, and the predicate is one-way: nothing un-expires a proposal when the hash comes back. That is correct as a staleness rule and dangerous as an undocumented consequence of a migration. **WP 4.1 is the first bump and it costs nothing — §15 measured 0 live proposals grounded on a `graph_hash`** — which is a fact about adoption, not about the mechanism. The next bump lands on whatever is there | `20260715000001_agent_proposals.sql:245-256` (the UPDATE and its predicate); the call at `list_agent_proposals` | WP 4.4 ✅ *(`20260917000008` splits the two reasons the old function conflated. TTL STAYS A PERSISTED WRITE — time only moves forwards, so `expired` is a record of something that happened, and removing it would over-correct D70 into a second defect. DRIFT becomes `proposal_grounding_state`, a PostgREST computed column over the one rule, so a project that drifts and drifts back leaves the proposal exactly as it was. `supabase/rehearsal/140` §2 is the RED assertion — it LISTS proposals after moving the hash and fails on `main` with the row rewritten — and §3 is the half no source read can settle: it moves the project BACK and asserts the state returns to `fresh` with the status untouched. Mutation-tested by restoring the drift predicate. **WHAT IT DOES NOT DO IS REPAIR THE DAMAGE ALREADY DONE, and the file says so rather than pretending**: a drifted row was `draft`, `proposed` or `approved`, `expired` overwrote it, and `status_reason = 'grounding_drift'` records only WHY — the prior status is not recoverable from the row. That is what one-way means, stated as a consequence. §15 counts the affected rows in this package's after-run)* |
+| **D71** | **D36 was one slice of a class, and the class is 26 functions rather than six.** D36 counted the SERVICE-ROLE PostgREST writers, because that is where WP 2.3 looked. WP 3.3 then found `assign_material_supplier` — a `SECURITY DEFINER` SQL function that had taken the actor as a parameter all along and never told the trigger — and D36's own evidence says it "was never in the list of six because nothing had looked at it". WP 4.1 found a second the same way, `snapshot_dataset`, which has recorded `actor_known: false` on every dataset version ever frozen beside an `author_user_id` the caller supplied. **So the gap check measured the whole class: 26 `SECURITY DEFINER` functions write a tier-2/3/4 table, TWO set `app.current_user_id`, SIXTEEN of the rest already TAKE an actor parameter, and SEVENTEEN have a live caller in `src/` or `supabase/functions/`.** **AND THOSE FIGURES OVER-COUNT, WHICH WP 4.3 FOUND AND D78 RECORDS: TEN of the 26 attribute through `set_current_user_context`, whose body is `set_config('app.current_user_id', user_id::text, true)` and has been since 2025-08-20.** The scan that produced the number is textual and cannot follow a call — the same limitation `VIA_SHARED_PREAMBLE` was written for one package earlier. Corrected figures after WP 4.3 described four more tables and widened the scan: **31 writers, 15 of them attributing, 16 not.** The invariant is still not met and the remaining work is still WP 6.2's; what changed is that six of the sixteen, not seventeen of twenty-four, are the live ones to budget for. Every one is the one-line fix D36 correctly says is NOT one for a PostgREST call, because a `SECURITY DEFINER` function runs in a transaction it controls. **The consequence for the invariant is the point: `audit-actor` (G4) is NOT met after `20260917000003`**, and closing D36 must not be reported as though it were | the 26 function bodies, enumerated by `dataPlaneAudit.test.ts`'s `UNATTRIBUTED` list; `assign_material_supplier` and `snapshot_dataset` are the two that do set it | WP 6.2 ✅ *(slices 11+12 — `20260918000002` and `20260918000003`. `20260917000002`–`20260917000003` closed the two they rewrote and left a RATCHET rather than a gate, because a gate would be red on arrival and unlandable: `dataPlaneAudit.test.ts` fails when a 27th appears and when a name that is now attributed is left on the list, so the number can shrink and cannot grow. Mutation-tested both ways. **re-budget for it, and the budget has been WRONG TWICE** — D71 said seventeen live, D78 corrected that to six, and WP 6.2 slice 11 MEASURED it: twelve of the thirteen were reachable from the application. **Slice 11 closed the three that cost one line** (`20260918000002`): `apply_policy_bundle`, `assign_bom_line` and `assign_outbound_customer` had each taken `p_user_id` since the day they were written and never passed it on — `assign_material_supplier`'s shape three more times — so no signature and no caller changed. `supabase/rehearsal/200` proves all three with `app.current_user_id` POISONED with a stranger's id first, and §4 of it pins the `IF p_user_id IS NOT NULL` guard, without which a `DEFAULT NULL` parameter would BLANK an actor the caller's transaction had already set. **TEN remain and every one is a different size**: none takes an actor parameter at all, so each needs a signature change AND every caller updated. Nine of the ten are reachable; `create_default_policy_defaults` has no caller anywhere. That figure is no longer prose — `dataPlaneAudit.test.ts` derives it by counting the name as a whole string literal across `src/` and `supabase/functions/`, and fails when this row stops matching. **It counts a literal rather than `rpc('<name>')` because `useItemMasters.tsx` dispatches through `sb.rpc(UPSERT_RPC[table], …)`, and the first draft reported the upload path's two item-master RPCs as having no caller at all. **SLICE 12 CLOSED THE REST IN ONE MIGRATION, AND IT WAS NINE RATHER THAN TEN.** `20260918000003` appends `_actor_user_id uuid DEFAULT NULL` to nine functions, so every existing caller kept working with no change and no actor — exactly the old behaviour — and eleven client call sites now pass it. `CREATE OR REPLACE` cannot change a parameter count, so each is a DROP and CREATE, which takes the function's grants with it: `supabase/rehearsal/210` §2 checks every role back as an EXPLICIT grantee in `proacl`. **The TENTH was never this class**: `create_default_policy_defaults` `RETURNS trigger` and runs `FOR EACH ROW` on `projects`, and PostgreSQL refuses a trigger function with declared arguments — a trigger fires inside someone else's statement, so the actor is that statement's to set. Slice 11's note that it was "reachable from nothing" was wrong for the same reason: a trigger is wired by `EXECUTE FUNCTION`, not called by name. **The list is now a GATE rather than a ratchet** — four names remain and none is debt: three attribute through `assert_writer_may_act`, one is that trigger, and `dataPlaneAudit.test.ts` fails if a name sits on it without one of those two justifications)* |
 
-| **D72** | **`calculate-network-science-metrics` upserts `network_nodes` on a unique constraint that does not exist, so the statement fails every time it runs and the function logs the error and carries on.** `calculate-network-science-metrics/index.ts:114-115` calls `.upsert(upsertRows, { onConflict: 'project_id,uid' })` on the fallback path — the one that derives a graph from `supply_chain_data` when the network tables are empty and has to create the node rows before metrics can be stored against them. **`network_nodes` has no unique index on `(project_id, uid)`**: its only uniqueness is the surrogate `network_nodes_pkey` on `id`. PostgREST passes `on_conflict` through to `ON CONFLICT (project_id, uid)`, which PostgreSQL rejects with `42P10` *there is no unique or exclusion constraint matching the ON CONFLICT specification* — **verified against a real PostgreSQL 16, not read off the source**. The handler is `console.error(...)` with no throw and no early return, so the function proceeds to its per-node `.update()` loop, which matches zero rows because the nodes were never created, and then reports success. A project whose nodes exist only via that fallback gets NO metrics and NO error anybody sees. **This is D5's class arriving in the deferred group**, and the reason `natural-key` (I4) being MET does not cover it is that I4 and `contract:check` R5 are scoped to tier-2 tables IN THE CONTRACT — `network_nodes` is deferred, so R5 has never looked at it, which is D54's qualifier doing damage in a second place. **Found by WP 4.2 enumerating D56's blast radius**: the split cannot give the input half a natural key it does not have | `calculate-network-science-metrics/index.ts:114-115` against `network_nodes`'s indexes (`network_nodes_pkey` only) | WP 4.3 *(it owns the analyzer and the split D56 hands it; the key must land BEFORE the input half can be described, and landing it follows the dedup-then-index shape the natural-key package already proved — deduplicate on `(project_id, uid)` first, then create the unique index, `NULLS NOT DISTINCT` if either column is nullable (see D5 for why a plain index constrains nothing when a key column is nullable). **MEASURED, 2026-09-17 (§15 run `35233002946`, every project): 1 385 rows, `rows_a_unique_index_would_reject` = 0 across 0 duplicated keys, `null_uid` = 0** — so the fix is ONE `CREATE UNIQUE INDEX`, with no dedup migration and no rows to lose, which is cheaper than D5's seven lanes and should be re-budgeted as such. `NULLS NOT DISTINCT` is still the right spelling: `uid` is NULLABLE, and nullability is a schema property a later `ALTER` can change, which is the half D5 says nobody writes down)* |
+| **D72** | **`calculate-network-science-metrics` upserts `network_nodes` on a unique constraint that does not exist, so the statement fails every time it runs and the function logs the error and carries on.** `calculate-network-science-metrics/index.ts:114-115` calls `.upsert(upsertRows, { onConflict: 'project_id,uid' })` on the fallback path — the one that derives a graph from `supply_chain_data` when the network tables are empty and has to create the node rows before metrics can be stored against them. **`network_nodes` has no unique index on `(project_id, uid)`**: its only uniqueness is the surrogate `network_nodes_pkey` on `id`. PostgREST passes `on_conflict` through to `ON CONFLICT (project_id, uid)`, which PostgreSQL rejects with `42P10` *there is no unique or exclusion constraint matching the ON CONFLICT specification* — **verified against a real PostgreSQL 16, not read off the source**. The handler is `console.error(...)` with no throw and no early return, so the function proceeds to its per-node `.update()` loop, which matches zero rows because the nodes were never created, and then reports success. A project whose nodes exist only via that fallback gets NO metrics and NO error anybody sees. **This is D5's class arriving in the deferred group**, and the reason `natural-key` (I4) being MET does not cover it is that I4 and `contract:check` R5 are scoped to tier-2 tables IN THE CONTRACT — `network_nodes` is deferred, so R5 has never looked at it, which is D54's qualifier doing damage in a second place. **Found by WP 4.2 enumerating D56's blast radius**: the split cannot give the input half a natural key it does not have | `calculate-network-science-metrics/index.ts:114-115` against `network_nodes`'s indexes (`network_nodes_pkey` only) | WP 4.3 ✅ *(`20260917000007` creates `network_nodes_natural_key` on `(project_id, uid)`, `NULLS NOT DISTINCT`, and `supabase/rehearsal/130` §11 issues the exact statement the analyzer issues — `ON CONFLICT (project_id, uid) DO UPDATE` — rather than looking the index up in a catalog, because an index can exist and still not be inferrable. It also asserts the row was UPDATED and not inserted, and that a duplicate is refused. NO DEDUP MIGRATION WAS NEEDED and the reason is that the measurement already existed in this row: the first draft of `20260917000007`'s header deferred the index on the ground that nothing had counted the duplicates, and §15 run `35233002946` had counted them. Verifying a precondition rather than inheriting it is the whole of the difference. Original note follows: the key must land BEFORE the input half can be described, and landing it follows the dedup-then-index shape the natural-key package already proved — deduplicate on `(project_id, uid)` first, then create the unique index, `NULLS NOT DISTINCT` if either column is nullable (see D5 for why a plain index constrains nothing when a key column is nullable). **MEASURED, 2026-09-17 (§15 run `35233002946`, every project): 1 385 rows, `rows_a_unique_index_would_reject` = 0 across 0 duplicated keys, `null_uid` = 0** — so the fix is ONE `CREATE UNIQUE INDEX`, with no dedup migration and no rows to lose, which is cheaper than D5's seven lanes and should be re-budgeted as such. `NULLS NOT DISTINCT` is still the right spelling: `uid` is NULLABLE, and nullability is a schema property a later `ALTER` can change, which is the half D5 says nobody writes down)* |
 | **D73** | **The introspected artifact parsed `COMMENT ON FUNCTION` and threw it away, so a base rebuilt from the artifact had functions with no documentation — and only `--since HEAD` could see it.** `introspect.mjs:460-465` matched `COMMENT ON (TABLE\|COLUMN\|VIEW\|FUNCTION\|…)` and recorded the text for TABLE alone; every other target fell through the same `return`. Function records carried no `comment` field, `rehearsal-schema.mjs`'s `emitFunctions` had nothing to emit, and the reconstructed base silently lost it. **This is D52's class exactly** — the artifact disagreeing with what the migration did — and it has D52's signature too: `contract:rehearse` and `--fixtures` were both GREEN, because they build the base from the BASE branch's artifact and then RUN the migration, so the comment is applied by the statement itself. Only the third mode, which executes the artifact THIS branch wrote, meets the shape `main` gets after the merge. **Found by WP 4.2's rehearsal §8**, which asserts that `should_recalculate_network_metrics` carries a comment naming D12: green in two modes, red in the third with "Comment is: (none)". A second, quieter half came with it — a `CREATE OR REPLACE FUNCTION` rebuilt the record from scratch and would have dropped a comment an EARLIER migration had set, although PostgreSQL preserves it across a replace; the artifact now carries it forward | `introspect.mjs:460-465` (the discarding `return`); `rehearsal-schema.mjs`'s `emitFunctions`; `supabase/rehearsal/120` §8 is the assertion that caught it | WP 4.2 ✅ *(the introspector records the comment against the signature when the statement spells the arguments and against the bare name otherwise; the emitter writes every `COMMENT ON FUNCTION` AFTER all bodies, because a comment may live in a different migration from its `CREATE` and so cannot be replayed from the defining file the way the body is. 16 functions carry one today. All three modes green)* |
 | **D74** | **Eleven of thirteen generated table pages published the OPPOSITE of the truth about the natural key — the very invariant the pages exist to report.** `generate.mjs`'s `renderKeys` emitted, for every table carrying `natural_key_intended`, the sentence *"the key this table's grain implies and the database does NOT enforce today. A statement about what is missing, never a claim about what is there."* **Unconditionally.** It was accurate when WP 1.4 wrote it and WP 3.3 made it false the day it created the seven unique indexes: `natural_key_intended` deliberately STAYS on a table whose key has landed, because `contract:check` R5's second half compares the landed columns against it, so the field is load-bearing and only the prose was wrong. Measured from the generated contract: **11 tables landed and published as missing** (`inbound_logistics`, `outbound_logistics`, `bom_single_level`, `bom_multi_level`, `tier2_suppliers`, `tier3_suppliers`, `multi_tier_supply_chain`, `customers`, `delegation_grants`, and the two this package added), **2 genuinely missing** (`projects`, `risk_data`). **This is D40's class exactly** — a generated page stating a fact the schema had moved on from, GENERATED and CI-GATED so it would have stayed true-looking indefinitely (T5 working against the truth rather than for it), and a §5 T1 breach in the documentation a user consults to decide whether a re-upload will duplicate their rows. **Found by WP 4.2 reading the page its own new sidecar generated** and noticing it claimed the store's key was unenforced while `rehearsal/120` §9 was proving it enforced | `generate.mjs`'s `renderKeys`; the 13 pages under `docs/data/tables/` carrying `natural_key_intended` | WP 4.2 ✅ *(the sentence is now conditional on whether the intended columns match a LANDED unique index — it names the constraint and says a re-upload updates rather than duplicates, or keeps the old wording when the key really is missing. The field is untouched, so R5's comparison is untouched. `npm run contract:generate` rewrote all 13 pages)* |
-| **D75** | **The /policies plant grid writes a composite target key and all three engine readers looked up a bare one, so every per-row production override was stored and never read.** The plant stage keys each row `"<focal plant>::<product_id>"` (`columnSpecs.ts:231`, pushed at `StagePolicyTable.tsx:700`), which reaches the engine as the map key `node:<focal plant>::<product_id>`. All three readers asked for `node:<product_id>` — no plant component — so the lookup never matched, `_merged_policy` returned the project `default.production` block alone, **and the miss emitted nothing**: no `MappingWarning`, no note, no log line. The two fields the plant stage offers per row, `capacity_units_per_day` and `utilization_cap_pct`, were inert on every project. **The blueprint asserts the opposite** — G1 names capacity as one of only two per-node overrides that survive, citing `_SUPPORTED_OVERRIDE_FIELDS`, and the field-mapping contract repeats it; the claim was true of the intent and false of the code, which is why nobody re-read it. The same file already parsed the composite form correctly TWICE for other stages — `supplier::material` for P-S.2 and `<plant>::<product>` for P-P.9's priority fold — so the production family is the one that was left behind rather than a spelling nobody had met. **This is D69's class** (a UI-owned value that silently becomes an engine default), reached from the other end: D69 found a table nobody loaded, this found a key nobody matched. **Found by a user reporting that editing the focal plant's capacity changed nothing**, which is the symptom a silent fallback is guaranteed to produce and the reason `diff-before-decision`'s logic belongs on the mapping too | `src/lib/policies/columnSpecs.ts:231` against `scsim/scsim/io/project_map.py:296-299`, `sim-worker/sim_worker/engine.py:45-49` and `scsim/scsim/io/legacy_graph.py:43-46` — the three bare-key lookups | WP 6.2 ✅ *(a reader change in all three, the shape D69 is budgeted as: `_composite_patches` at `project_map.py:302` indexes composite patches by their target and the product loop merges them most-specific-last, `_production_policy` at `sim-worker/sim_worker/engine.py:52` and `_merged_production` at `legacy_graph.py:49` do the same for the two legacy paths. The precedence that made the report only half right is now VISIBLE rather than reordered: master `products.production_capacity` (units/week) still wins over the grid's line capacity (units/day) — the contract says it should — and shadowing it now emits an `info`, as does the `utilization_cap_pct` default of 85 that fired even when the policy row existed. **A generic guard came with it**, because a key spelling nobody matched should not need a user to report it: an override whose components name no supplier, material, product or customer now raises one `warn` naming the keys. Twelve tests across the three readers, each confirmed RED before the fix. **The preflight followed one commit later and is CLOSED**: `_shared/grading.ts` graded capacity from `defaults.production` alone, so for one commit it reported as defaulted exactly the value the engine had just started using — closed by `productionByProduct` + `policyCapacityById`, with the case pinned in the shared parity fixture so both suites assert it (§16 · F). **ONE follow-on remains and is logged in §16**: the plant stage's `inventory` columns are written under the same composite key with no per-product reader in any engine — a missing reader and a policy-catalog decision, not a key mismatch. **AND THE DEFECT WAS FIXED TWICE, INDEPENDENTLY, WITHIN HOURS** — `6c2aa36` (PR #220) added a `plant_scoped` branch to `_merged_policy` against the same call site, git's auto-merge kept one call site and left the other unreachable, and a branch carried 36 lines whose docstring described behaviour that never ran. Reconciled to one resolver, keeping what the second got right: the AMBIGUITY WARNING (two owners patching one target was a silent sorted-first pick here — the same silent substitution D75 is about) and the LAST-`::` split as a second, id-validated candidate for an owner whose own name contains the separator. §16 records why that is a process finding and not a merge accident)* |
+| **D75** | **`current_graph_hash` cannot see the inputs of the two analyses that key on it, so a re-uploaded network is served the previous graph's centralities as a CACHE HIT.** `_build_dataset_snapshot` hashes eleven tier-2 tables (`20260917000002_graph_hash_v2.sql`) and the two centrality analyzers read exactly `get_network_nodes_for_prominence` → `network_nodes(uid, revenue, name)` and `get_network_edges_for_prominence` → `network_edges(src_uid, dst_uid, relative_revenue)`. Neither table is in the snapshot — `graphHashCoverage.test.ts`'s `DERIVED_AND_OUT` keeps them out DELIBERATELY, which was right while nothing keyed on the anchor and became wrong the moment WP 4.2's store did. Change an edge weight and every centrality in the project changes while `input_hash` does not move: `analysis_get_or_start` reports `cache_hit: true` and hands back an answer computed against a world that no longer exists. That is `input-hash` (I5) and T4 broken in one request, and it is D19 rebuilt one layer up — a number nobody can attribute, now with a hash beside it. **Found by WP 4.3 before it built on the store**, and `supabase/rehearsal/130` §1 asserts BOTH halves against a real database: the anchor does not move when an edge changes, and the digest does | `20260917000002_graph_hash_v2.sql`'s `_build_dataset_snapshot` against `20250905151344_237ea916-c720-4461-8a70-ae509b4f72ee.sql`'s two RPCs | WP 5.3 ✅ *(`20260917000009` folds the deep-tier topology into `hash_network` — exactly the six columns the two prominence RPCs return, and not one column an analysis writes. `schema_version` 2 → 3, taken against §15 run `35280849096`: 0 live proposals grounded on a hash, 0 expired for drift, 0 runs and 0 results in the store, so it invalidated nothing that exists — and it is the first bump after D70, so even a non-zero count would have cost a badge rather than a rewritten row. **The fold is BY COLUMN, not by the tier change D56 and this row both assumed**, because that route is blocked (D88) — and the column rule is better anyway: `graphHashCoverage.test.ts` moves from "these four tables are excluded" to "no computed column is hashed", which is what the invariant actually says. `supabase/rehearsal/150` proves the `inputs` domain is byte-identical to v2's, that the merge did not replace a pre-existing block, and that no analysis output reached the snapshot; `130` §1 is inverted from WP 4.3's RED assertion to its opposite. Mutation-tested: folding `prominence` in turns two static assertions and §3 red. Original note follows.* **Re-homed by `20260917000008`**, which closed D70 — the reason the bump was unsafe — and then could not take the bump anyway, because that still requires §15 to count `live_grounded_on_graph_hash` first and a work-package session cannot reach the live database. WP 5.3 is the right home rather than the next one: it DROPS the computed columns from `network_nodes`, at which point the remainder is a tier-2 input table and folds into `hash_network` by the coverage rule instead of by a special case — D56 already assigns that tier change there, and this is the same change. **`20260917000007` MITIGATED it and did not close it**: `network_topology_hash()` digests the six columns those RPCs return and the analyzers carry it in `analysis_runs.params` as `topology_digest`, so the five-part key tells two graphs apart and a hit is sound again. It is an INPUT travelling in a PARAMETER and the sidecar's `analysis_kinds` block says so at the point it is used rather than in a migration comment. It is there because it moves no stored hash and bumps no `schema_version` — and a bump is what the correct fix costs, which D70 makes unsafe to spend today)* · and D70 — closed in `20260917000008` — is why this is now a measurement away rather than a risk)* |
+| **D76** | **The prominence auto-invoker fires FOR EACH ROW, so one upload of the 2 129 edges §15 measured fires 2 129 full recomputations of the same graph.** `trigger_auto_calculate_prominence_nodes` and `..._edges` (`20250906092127_6b2e4cc7-d38e-4fd0-9aba-0248954621f1.sql`) are row-level, and each firing `net.http_post`s to `calculate-node-prominence`, which reads the whole graph and rescores every node. **WP 4.2's store does not absorb it and the reason is worth stating**, because "the cache will catch the repeats" is the obvious wrong answer: the topology digest moves with every inserted row, so each of the 2 129 requests presents a DIFFERENT key and every one is a genuine cold miss. The store would faithfully record 2 129 runs of an analysis the user asked for once. **Nothing had named this trigger** — the WP 4.3 brief asks only about `auto_calculate_network_metrics_on_completion`, and this is the more expensive one by three orders of magnitude | `20250906092127_6b2e4cc7-d38e-4fd0-9aba-0248954621f1.sql:67-77` (the two `FOR EACH ROW` triggers) | WP 4.3 ✅ *(statement grain, the same fix `20260916000001` made to the audit triggers and for the same reason: a bulk insert is one statement. Four triggers rather than two, because transition tables cannot be shared across events. The UPDATE filter moved from a trigger column list into the body — PostgreSQL refuses `REFERENCING ... TABLE` alongside a column list — and became better on the way: it compares `to_jsonb(row) - <derived columns>`, so a column added to `network_nodes` next quarter is covered on the day it is added where the old list would silently have stopped noticing it)* |
+| **D77** | **The `pg_net` fallback catches the wrong SQLSTATE, so a notification that cannot be sent DESTROYS THE WRITE it was notifying about.** `auto_calculate_prominence_on_deep_tier_completion` wrapped `net.http_post` in `EXCEPTION WHEN undefined_function THEN` with an `extensions.http_post` fallback behind it. A database without `pg_net` does not raise `undefined_function` — it raises `invalid_schema_name` (3F000), because the SCHEMA is missing, not the function — so the handler never matched, the fallback was unreachable, and the exception propagated out of the trigger and aborted the INSERT. **Found by execution and not by reading**: `supabase/rehearsal/130` could not insert one `network_edges` row until it was fixed, because `rehearsal-schema.mjs` deliberately does not stub `pg_net` ("a migration that needs either is out of this rehearsal's reach and the failure should say so rather than pass on a fake"). Production has `pg_net`, so the live blast radius is zero today and the latent one is every environment that does not | `20250906093350_3dc9ce28-27a5-4caf-9ebc-50ae428be2a9.sql:44` (`EXCEPTION WHEN undefined_function`); `scripts/data-contract/rehearsal-schema.mjs:99` (the deliberate non-stub) | WP 4.3 ✅ *(both handlers widened to `OTHERS` and the inner one logs. A data write does not fail because an optional notification could not be delivered — the rows are written and the log says the analysis was not requested)* |
+| **D78** | **D71's headline number over-counts by ten, because the scan that produced it cannot follow a call.** `dataPlaneAudit.test.ts`'s writer scan tested a function body for `set_config('app.current_user_id'...)` or `assert_writer_may_act`. Ten `SECURITY DEFINER` writers do neither and attribute anyway, through `set_current_user_context(p_user_id, p_user_email)` — whose entire body is `set_config('app.current_user_id', user_id::text, true)` and has been since `20250820165722_f8ee2517-1470-4e38-a627-7e918c418d31.sql`. They have named their actor since 2025-08-20 and `UNATTRIBUTED` has listed them as debt: `bulk_insert_bom_multi_level`, `bulk_insert_bom_single_level`, `bulk_insert_inbound_logistics`, `bulk_insert_multi_tier_supply_chain`, `bulk_insert_outbound_logistics`, `bulk_insert_tier2_suppliers`, `bulk_insert_tier3_suppliers`, `combine_project_into_supply_chain`, `delete_project`, `delete_project_dataset`. **This is the same limitation `VIA_SHARED_PREAMBLE` was written for one package earlier, unnoticed because nothing had described a table whose writers used the OTHER helper.** Surfaced by WP 4.3 describing the four deep-tier tables, which brought five more writers into the scan's scope and made all five look new when none of them was | `dataPlaneAudit.test.ts`'s `writers()` predicate against `20250820165722_f8ee2517-1470-4e38-a627-7e918c418d31.sql:5-13` | WP 4.3 ✅ *(the scan now counts `set_current_user_context` as attributing and ten names leave `UNATTRIBUTED` — a ratchet that records debt already paid makes the next reader budget for work that does not exist, which is what its own third test exists to prevent. Widening a scan on a READING would make the ratchet lie about its method, so `supabase/rehearsal/130` §10 performs a `bulk_insert_network_nodes` with `app.current_user_id` POISONED first and reads the audit row back. **The invariant does not move**: 16 writers still do not attribute and `audit-actor` (G4) is still not met)* |
+| **D79** | **The analysis catalog declared a kind that is not an analysis and a parameter that no code takes.** `analysis_runs.contract.yaml`'s `analysis_kinds` block — authored by WP 4.2 from §11's prose, before anything had read the functions — listed `project_ai_health` with `entity_type: project` and a promise that WP 4.3 would migrate it. `project-ai-health` iterates `MODEL_REGISTRY` and probes the reachability of the configured AI providers: it takes no `project_id`, writes no table, is invoked by nothing in `src/`, and has no world it could hash. It is not an analysis and there is nothing to migrate. The same block declared a `threshold` parameter on `critical_nodes` that `predictCriticalNodes` does not take. **Both are D74's class pointing in the two opposite directions** — an undeclared default is `declared-fallback` (I6) broken, and a DECLARED parameter no code reads is the same defect with the sign flipped — and both were authored from the plan rather than from the code, which is the failure mode §4 exists to be the cure for | `supabase/functions/project-ai-health/index.ts:1-3` (the function's own description of itself) against `supabase/contract/analysis_runs.contract.yaml` | WP 4.3 ✅ *(both removed, each with a note saying what was there and why it is not; the remaining four kinds gain a `code_version` and their real parameters. §11's WP 4.3 is corrected in the same commit — it named "the four analyzers" and one of the four was never one)* |
+| **D80** | **The completion trigger has NEVER invoked an analysis — it computed an expensive answer and threw it away.** `auto_calculate_network_metrics_on_completion` fires on every `projects` UPDATE that flips `completed = true`. Inside, it called `should_recalculate_network_metrics`, read `needs_recalculation` into a record, and then — on the true branch — looked up the modeler's email, set the user context, and `RAISE LOG`-ged a line. There is no `net.http_post`, no `PERFORM`, no insert: nothing downstream of the check ever ran. **And `20260712110000` is the cost of not asking what it was for**: that migration exists ENTIRELY to make this check fast, because two of its queries were a seq-scan per node and a four-way cartesian product that exceeded the anon statement timeout on a real project (observed live on Project TRON - ver2). A whole performance migration was spent on the inputs to a log line | `20250925164454_6e5c1ace-b337-4746-9cd7-6b65e95fe3d1.sql`'s trigger body (the `IF should_calc.needs_recalculation THEN` branch, whose only statement is `RAISE LOG`); `20260712110000_network_metrics_check_performance.sql`'s own header | WP 4.4 ✅ *(it asks the one rule now, which costs a hash instead of a cartesian product, and the comment says what it is. Whether the trigger should EXIST is WP 5.3's with the rest of the invocation paths — deleting a live trigger is not a staleness package's call to make on its own)* |
+| **D81** | **The WP 4.4 brief named three ad-hoc staleness mechanisms and there were two; the third was a re-entry guard.** `docs/PLAN-PROMPTS.md` lists "`StagePolicyTable`'s `autoSeedMarkerRef` (a useRef)" among the mechanisms to delete. No such identifier exists. The nearest thing is `autoSeededRef`, and it is not a staleness mechanism at all — it is a `Set` of `${projectId}::${stageKey}` markers that stops the auto-seed effect re-entering when React re-runs it, and its own comment records the bug that made it a Set rather than a single slot. Deleting it would reintroduce that bug. The two REAL mechanisms were `should_recalculate_network_metrics` (timestamps) and the prominence-recalc trigger, which WP 4.3 had already made statement-level. **The preamble's first non-negotiable is to verify every precondition against the actual code**, and this is the second package in a row where an inherited "already verified" line was wrong — D72's count in WP 4.3 pointed the other way | `docs/PLAN-PROMPTS.md`'s WP 4.4 block against `src/components/policies/StagePolicyTable.tsx`'s `autoSeededRef` | WP 4.4 ✅ *(the prompt is corrected in the same commit; the guard is left alone)* |
+| **D82** | **Transitive reachability reports a 404 page as a surface for user data, and an explicit `select` list does not save it.** WP 5.1's first analyser run returned `approved_users` as read from FIFTEEN pages — including `NotFound.tsx`, `Forbidden.tsx` and `Landing.tsx` — because every page imports `useAuth`, which reads the table. That is TRUE about the import graph and useless as lineage: a 404 page is not where anybody sees a user's organization, and publishing it as a surface is "worse than none" stated precisely. **The second half is the one worth keeping**: the fix was a shell classifier keyed on module reach (a module ≥80% of pages import is shell by definition, whatever it is called), and applying it to TABLE grain alone left four of those pages still carrying COLUMN-grain lineage — because `useAuth` names `organization` in an explicit `select`, which had been treated as strong evidence without asking which module the select sat in. **Strong evidence about a shell module is still shell.** A rule keyed on the NAME `useAuth` would have missed the next one | `src/hooks/useAuth.tsx:82` against `scripts/data-contract/analyse-surfaces.mjs`'s shell pass | WP 5.1 ✅ *(28 entries are `grain: shell`, recorded rather than dropped — the page list stays complete and the reader is told which rows are plumbing. They do NOT satisfy R12's coverage half, so a page that reaches tables only through the shell must be declared in `pages_without_project_data` with a reason, which is where the seven live)* |
+| **D83** | **A bare column-name scan produced 979 field-page pairs and ZERO for the table the policy grid plainly renders.** The first field-grain heuristic matched each column name against the concatenated source of everything a page reaches. `suppliers` came back with nothing — its columns reach the screen through generated column specs rather than by name — while ubiquitous names like `id`, `name` and `status` matched almost everywhere. Noise in one direction and a hole in the other, from one heuristic, and every pair of it would have been published as lineage a reader could not check. **Column grain is now only what a `.from(t).select('a,b')` names**: 30 entries against 41 explicit select lists in `src/`, each with a `file:line` a reviewer opens. The columns rendered through generated specs have NO column-grain lineage and that absence is honest — the table-grain entry says the page reads the table, and nothing claims more | `scripts/data-contract/analyse-surfaces.mjs`'s `FROM_SELECT_RE` and the count in §16 | WP 5.1 ✅ *(and the limit is named for whoever wants field lineage on the policy grid: it needs the column specs resolved to their fields, which is WP 6.1's resolution-chain work — a chain you cannot write down is a bug, and this is one of the places that shows)* |
+| **D84** | **Two §15 gates were asserting premises that had expired, and both went red on the first run that measured a database the plan had moved on from.** `verification-sql.yml` failed on WP 5.1's push with two gate lines, and NEITHER was a defect in the database. **(a)** The WP 4.1 landed-probe counted `pg_proc` ROWS for nine function names — and `pg_proc` has one row PER OVERLOAD. WP 4.3 added a three-argument `analysis_mark_critical_nodes` beside the two-argument one, deliberately, to cover the window between a migration deploy and an edge-function deploy; the count went 9 → 10 and the gate reported "WP 4.1's migrations are NOT fully present in production", which also stamps EVERY count in the report as "a measurement of the PRE-migration database wearing an after-run's label". Three such deploy-window shims are live right now, so it would have recurred twice more. **(b)** The dirty-read probe asserted that "every stored version predates v2, so no stored `graph_hash` may still equal its project's current one". True on the day of the bump and false from the first version frozen after it: production holds 7 versions, 6 of them v1 (`hash_inputs IS NULL`) and one v2, and the ONE that matched was the v2 one — the anchor working, reported as "THE BUMP DID NOT TAKE" | `verification-sql.mjs`'s `wp41_functions` count and its dirty-read filter; §15 run `35280849096` | WP 5.1 ✅ *(`count(distinct p.proname)` for (a); for (b) the check is scoped to the rows its premise is about — a PRE-BUMP version still matching is the real defect, and post-bump matches are now reported as the correct outcome they are. **The class is what matters**: a probe that encodes "the world is currently in state X" is a gate with an expiry date nobody wrote down, and both of these passed for months before the state moved. §15 probes should assert a RELATION that stays true, not a snapshot)* |
+| **D85** | **`npm run lint` short-circuits before the UI audit, so a whole gate never runs locally.** The script is `eslint . && npm run audit:ui && npm run check:docs`, and `eslint .` exits 1 on this repository today — 336 errors on `main`, most of them `@typescript-eslint/no-explicit-any` and `ban-ts-comment` in edge functions. So `audit:ui` and `check:docs` are UNREACHABLE from `npm run lint` and have been for as long as eslint has been red. Three work packages in a row reported "lint at baseline" on the strength of a command that stopped at its first step. CI is unaffected — `ui-audit.yml` runs `audit:ui` directly, which is why the failure was visible there and nowhere else — but the local command every contributor runs is silently checking one of three things. **CLOSED (WP 6.2), and the fix is NOT the one this row warned against.** The note here says flipping `&&` to `;` "turns a red gate into a redder one" — it does worse than that: `a; b; c` reports the exit code of `c` alone, so a red eslint would start PASSING, which is a gate switched off in the name of repairing it. `scripts/lint-all.mjs` runs all three, prints each one's own output verbatim, and exits non-zero if ANY failed: strictly more information, identical verdict. It makes eslint pass at nothing and introduces no baseline threshold — the eslint debt is untouched and still belongs to whoever pays it down. **CI never ran `npm run lint` and still does not**: `data-contract.yml` invokes each command directly and its header comment explains why, so this changes the local command only and carries no CI risk. **And the first run proved the row's own point**: `audit:ui` is ALSO failing, and from `npm run lint` nobody could have seen it — two of three gates red, where the command used to stop at one. The non-obvious branch is covered too: a gate that cannot be STARTED (`spawnSync` sets `error`, leaves `status` null) reads as failure rather than success | `scripts/lint-all.mjs`; `package.json`'s `lint` script | **CLOSED (WP 6.2)** |
+| **D86** | **`main` went red on a gate this plan introduced, because the fix for it was pushed after the PR had already been merged.** PR #222 merged at `0ca07da`. Two commits pushed to the same branch afterwards — the §15 probe repair (D84) and the R12 lineage repair — were not in it, so `main`'s `contract:check` exits 1 with six R12 failures: PR #221's rewrite of `ProcessLevelNetwork.tsx` moved three table reads (`bom_multi_level` :1104, `supply_chain_data_multi_tier` :1105, `projects` :248) and the re-pointed evidence never landed. **The gate is behaving correctly and the base branch is broken by it**, which is a distinction worth keeping: R12 found a real staleness on the merge commit, and the repair simply missed the train. **The lesson is about CONCURRENCY, not about R12**: two agents on one plan, one branch merged by a third party mid-flight, and a gate keyed on line numbers in files the other agent rewrites. Any evidence-carrying gate has this property — §4's citations (R6) would have done the same | `origin/main` at `d51543d`: `npm run contract:check` exits 1 | *(fixed on `claude/busy-thompson-9p8zb9` and awaiting a merge — the repair is `node scripts/data-contract/analyse-surfaces.mjs && … --write && npm run contract:generate`, which is idempotent since the same session made it so)* |
+| **D87** | **The committed browser-engine wheels are stale against `scsim`, and the drift gate says so on `main`.** `scripts/build_engine_wheels.sh --check` fails: the wheel's `project_map.py` still calls `_policy(policies, "node", p_id, "production")` where the source now calls `_production_policy(policies, p_id)` — PR #221's plant-stage override work changed the Python and did not regenerate `public/engine/`. The wheels are committed on purpose so the Vercel build stays pure-Vite, so a stale wheel means **the browser engine runs different code from the worker engine**, which is `single-source` (I1) across a boundary no test crosses. Regeneration is one command and CI names it. **It could not be done from a work-package session**: `build_engine_wheels.sh` derives `engine_version` by importing `scsim`, that import needs `pydantic`, and the egress proxy denies PyPI — so a regeneration here writes `"engine_version": "unknown"` into a manifest whose own docstring says the version "is embedded in every result". A green check bought by regressing that field is the trade §5 exists to refuse | `scripts/build_engine_wheels.sh --check` against `scsim/scsim/io/project_map.py`; `public/engine/manifest.json` | WP 6.2 *(with the rest of PR #221's package; whoever runs it needs an environment with `pip install ./scsim` available, which CI has and a work-package session does not)* |
+| **D88** | **WP 5.3 cannot drop the entity columns, and the number is 8 577 of 8 577.** §11's WP 5.3 is "pages read `analysis_results`; drop entity columns", and §15 run `35280849096` measured what that would cost: `network_nodes` 1 385 rows, `node_list` 1 747, `supply_chain_data` 5 445, `network_summary` 0 — **every one of the 8 577 carrying `computed_from_hash IS NULL`** — against `analysis_runs` = 0 and `analysis_results` = 0. The store is EMPTY in production. So the migration has no source: switching a reader to `analysis_results` shows nothing for every project, and dropping the columns destroys 8 577 values with nothing to replace them. **Neither half of the package's name is executable today, and the reason is not a defect in the design**: WP 4.3 shipped the dual-write, and an analyzer fills the store only when somebody RUNS an analysis. The precondition is adoption, not code. **A backfill cannot substitute**: a row written before WP 4.3 has no input hash and one cannot be invented — inventing it is precisely the fabricated provenance `declared-fallback` (I6) forbids, and a `computed_from_hash` that is confidently wrong is worse than the NULL it replaced | §15 run `35280849096`, sections "WP 4.3 / 4.4 — provenance coverage" and "WP 4.2 — did the analysis store reach production" | WP 6.3 *(re-homed with the rest of the result-binding group. The unblocking condition is a NUMBER and belongs in §15's standing report rather than in a package's prose: `analysis_results` non-zero for a project, and `computed_from_hash IS NULL` falling. Until then the entity columns stay and the readers dual-read — prefer the store, fall back to the column, and say which at the point of display (T2))* |
+| **D89** | **The plant stage's `initial_on_hand` is master-backed by `products.initial_on_hand`, and `products` has no such column.** `columnSpecs.ts:216-218` declares `master: { table: "products", field: "initial_on_hand", idFrom: "product_id" }`. The `products` table has eighteen columns and that is not one of them — **`materials` does have it**, and the supplier stage uses it correctly fifty lines earlier (`:164-165`), which is what makes this a copy rather than a misunderstanding. The consequence is silent by construction: `masterValueFor` returns undefined for a column that does not exist, so the cell falls through the resolver to `derivedValueFor` and then to the policy bundle, and the user sees a number that came from the bundle while the column header says it is item-master data. **Found by WP 6.1's chain resolver, which could not write the chain down** — the DB hop has no target — and it is the only one of the nine breaks that is a pointer at nothing rather than a value nothing reads  **DISPLAY HALF CLOSED, WP 6.2**: the pointer is deleted, so the sheet no longer attributes the cell to the item master, and `masterPointersResolve.test.ts` is a GATE (empty on arrival, mutation-tested both ways) that fails the next copied pointer on the commit that writes it. **The field is still read by nothing** and stays on `resolutionChains.test.ts`'s ratchet: fixing the lie is not wiring the field. The second way out — add `products.initial_on_hand` — was NOT taken, and the reason is that it is not a one-sided cost: `scsim/scsim/core/context.py:150` builds on-hand from `net.materials` ONLY, so there is no finished-goods initial inventory in the strategic engine for the column to feed. Adding it is a schema change AND an engine capability, and it needs a human | `src/lib/policies/columnSpecs.ts` (the `plant` stage's `initial_on_hand`, pointer removed) against `products`'s introspected columns; `src/lib/policies/__tests__/masterPointersResolve.test.ts` | WP 6.2 *(the display lie is closed; the field's own fate is the finished-goods-inventory question above)* |
+| **D90** | **Nothing declares which policy-bundle keys the engine reads; `project_map.py` is the only evidence for nine of them.** WP 6.1 traced every grid field to the engine and found three doors: the registry's `data_requirements` (`table.column` the engine needs from the dataset), a policy's `params_schema` (80 declared parameters), and — for everything else — **a quoted string in `project_map.py`**. Door 3 is not a contract: it is a text scan over a Python file, it is the only proof those fields reach the engine at all, and `single-source` (I1) says a data fact is authored once, in a place a generator can read. §3's standing law says "the registry export is the single source of truth for policy schemas (§6.2)" — and these keys are outside it, so the law is true of the schemas that exist and silent about the ones that do not. **The measurement is the finding**: of 38 grid fields, the registry declares the engine hop for 29 and a string literal is the only evidence for the rest. **THE COUNT WAS WRONG AND D91 IS WHY** — door 3 also accepted a string literal that says the engine DROPS the field, so one of the nine was not reaching the engine at all. The finding stands and is if anything sharper: door 3 is not merely the weakest evidence, it was evidence in the wrong direction | `scsim/scsim/io/project_map.py` against `supabase/functions/_shared/registry.generated.json`'s `params_schema` blocks; `src/lib/policies/resolutionChains.ts`'s three doors | WP 6.2 *(the fix is in `scsim`, not here: a bundle key the engine reads belongs in a policy's `params_schema`, which `registry_export.py` already generates. Until then `resolutionChains.test.ts` accepts door 3 and SAYS it is the weakest of the three, so the next reader is not told these nine are as well-declared as the other 29)* |
+| **D91** | **WP 6.1's engine scan was wrong in BOTH directions, and the ratchet it produced was two names short.** Door 3 — "the field appears as a quoted key in `project_map.py`" — was the only evidence for nine grid fields, and WP 6.2 re-derived it against the whole engine tree. **Too loose**: `order_up_to` passed door 3 on `project_map.py:865`, a `MappingWarning` whose own text is "legacy absolute order_up_to replaced by coverage-based κ (≈8 weeks)" — the scan accepted the string that says the field is dropped as proof it is consumed, and both stages' `order_up_to` were reported as resolving. A door is now a dict READ (`.get("f")` / `["f"]`), never a mention. **Too narrow**: door 3 read `project_map.py` ALONE, so six of the nine breaks said "read by nothing" about fields that are read — `review_period_days` at `sim-worker/sim_worker/engine.py:323` and `order_up_to` at `:332` by the FROZEN legacy engine, and `primary_source`/`sourcing_firm` by the product itself, which `project_map.py:826` excludes on purpose ("firm-routing hints, never engine params"). **Every one of the nine still breaks** — what changed is the sentence, and `classifyBreak` now sorts them into five shapes with a different remedy each: `unread` (1 — `material_price`, §4 D18, the only one where "read by nothing" was literally true), `overridden` (2 — `reorder_point`, declared in the legacy `InventoryPolicy` schema at `policies.py:41` and consulted by NEITHER engine, because `sim-worker/sim_worker/engine.py:320` computes `RP = avg_lt · avg_d + ss` itself), `legacy-only` (4), `app-routing` (3), `no-target` (1 — D89). **The fifth over-claim this suite has caught in itself**, after 28→11, 11→9, 7→0 and WP 5.1's D82/D83 — and the cheapest check caught all five, which is the lesson worth keeping: a list produced by code is believed because code produced it | `src/lib/policies/resolutionChains.ts`'s `readsKey`/`classifyBreak` against `scsim/scsim/io/project_map.py:826,865`, `sim-worker/sim_worker/engine.py:320,323,332` and `sim-worker/sim_worker/policies.py:41` | **CLOSED (WP 6.2)** — the scan is corrected, the eleven are classified with `file:line` evidence apiece, and the ratchet records the growth as a correction rather than re-basing to hide it |
+| **D92** | **The Parameter Sheet promised a milestone that does not exist, for eight of the eleven.** `fieldStatus.ts::milestoneFor` returned the literal string `"engine catalog — planned"` for any policy family with no row in `PENDING_FAMILY_POLICY`, and every caller treated that string as a milestone — so `ParameterSheet.tsx:74` rendered, of `reorder_point`, **"stored only · activates with engine catalog — planned"**. Nothing is planned. `inventory` and `sourcing` are not in that table, and D91 establishes what those fields actually are: computed and never read, read only by the frozen engine, or read by nothing at all. None is waiting for a policy. The remaining branch said "stored only · not consumed yet", where the word *yet* carries the same promise more quietly. This is T2 at the point of display — the product was inventing a future to avoid saying a field does nothing — and it is `declared-fallback` (I6) pointing at the UI: a substitution absent from the contract may not exist in code, and "we will consume this later" is a substitution for an answer | `src/lib/policies/fieldStatus.ts::milestoneFor`; `src/components/policies/ParameterSheet.tsx:73-75` | **CLOSED (WP 6.2)** — `FieldEngineStatus` gains `stored-only`, `milestoneFor` returns `null` rather than a sentence, and the sheet says "stored only · no engine consumer, none planned" |
 
 ### 4.1 Code map — the data layer
 
@@ -313,7 +338,7 @@ only in `PROMPTS.md` or in a session transcript.
 | `resolveEffective.ts:82` | `dataRow[field]` is checked **before** the override bundle (D23) |
 | `resolveEffective.ts:103-193` | `resolveCell` — the canonical provenance logic |
 | `resolveEffective.ts:200-224` | `isPrefillPersistable` — the D1 rule: persist `__from_data` or an unsaved edit, never a default. **The live rule**; `prefillSelect.ts` is its unreachable twin (D26) |
-| `prefillSelect.ts:33,48` | `prefillSourceFor` / `isPrefillable` — a second, unreachable copy of the same rule (D26) |
+| `resolveEffective.ts` `prefillSourceFor` | the ONE prefill rule. `prefillSelect.ts` held a second, unreachable copy that disagreed with it; deleted in WP 6.2 (D26, D93), gated by `oneResolver.test.ts` |
 | `StagePolicyTable.tsx:1208-1276` | a **verbatim copy** of `resolveCell` (de-dup in WP 6.2) |
 | `StagePolicyTable.tsx:820-831` | `applyPrefill` — raises `applying` before the row loop, then `runPrefill` (`:833`) |
 | `StagePolicyTable.tsx:900-917` | the auto-seed effect; marker is a **Set** of `${projectId}::${stageKey}` |
@@ -1656,21 +1681,88 @@ the check had faithfully measured a mutant and would have reported it as the pro
     add is that a deferral must SAY whether the table is audited, so the coverage
     list stops silently deciding it.
 
-### WP 4.3 — Migrate the four analyzers (dual-write)
+### WP 4.3 — Migrate the analyzers (dual-write) ✅ *(D72, D76, D77, D78, D79 closed; D54's deep-tier group closed; D56 executed as far as it can be; D75 found and mitigated — done `20260917000007`)*
 
 `calculate-network-science-metrics`, `calculate-node-prominence`,
-`predict-critical-nodes`, `project-ai-health`, plus `combine-project` as
-`analysis_kind='combine_etl'`. Each writes **both** destinations and gains a
-`code_version`. Add `computed_from_hash` + `computed_at` to every T3 table.
+`predict-critical-nodes`, plus `combine-project` as `analysis_kind='combine_etl'`.
+Each writes **both** destinations and gains a `code_version`. Add
+`computed_from_hash` + `computed_at` to every T3 table.
+
+***`project-ai-health` WAS IN THIS LIST AND IS NOT AN ANALYZER.** It iterates
+`MODEL_REGISTRY` and probes whether the configured AI providers are reachable: no
+`project_id`, no table written, no caller in `src/`, and no world it could hash.
+WP 4.2 had already carried the error into the contract as an `analysis_kinds` row
+promising this package would migrate it. Corrected here — D79.*
 
 **Do not drop any entity column here** — WP 5.3 does that, after every reader has
-moved. Dropping early is what makes this irreversible.
-**Gap check** — field-by-field numeric comparison old vs new on a real project.
+moved. Dropping early is what makes this irreversible. **Nothing is dropped.**
 
-### WP 4.4 — Staleness, invalidation, and the Trust Report *(D70)*
+**THE PACKAGE CHANGED SHAPE BEFORE IT WROTE A LINE, AND D75 IS WHY.**
+`analysis_runs.input_hash` is `current_graph_hash`, which hashes eleven tier-2
+tables — and the two centrality analyzers read `network_nodes` and
+`network_edges`, neither of which is one of them. Keying their cache on that hash
+alone serves the PREVIOUS graph's centralities as a hit. The correct fix is to
+fold the topology into `hash_network`; that is a `schema_version` bump, and D70
+makes a bump unsafe to spend on an unmeasured day. So the digest travels in
+`params` as `topology_digest`, DECLARED in the sidecar at the point it is used,
+and WP 4.4 moves it into the anchor and deletes the entry.
 
-Add `seeded_from_hash` to `policy_overrides`. **One** staleness rule everywhere:
-stale iff `computed_from_hash <> current_graph_hash()`; delete the three ad-hoc ones.
+**D56's split is executed as far as a package that drops nothing can execute it.**
+The four tables are DESCRIBED — `network_nodes`, `network_edges`,
+`network_summary`, `node_list`, at tier 3, which is what the anchor has treated
+them as since WP 4.1 (`graphHashCoverage.test.ts`'s `DERIVED_AND_OUT`). They
+therefore enter the audit rule for the first time and gain the three triggers
+each: that is D54's largest remaining group, closed. Calling the uploaded half
+tier 2 is WP 5.3's, after the computed columns are gone — doing it sooner would
+fold an analysis's own output into the identity of its inputs, which is the one
+thing WP 4.2 §7 exists to refuse.
+
+**Exit** ✅ — asserted against a real PostgreSQL 16 in `supabase/rehearsal/130`,
+eleven sections: the anchor is blind and the digest is not (§1, the RED one) ·
+both destinations hold the same numbers, field by field (§2) · every written row
+carries the run's `input_hash` and an unwritten row carries none (§3) · a
+prominence-only run does not blank the five centralities (§4) · the mirror is
+refused once the run is frozen (§5) · a run may not stamp another project's rows
+(§6) · ONE audit row, naming the actor, on a table that had no trigger before this
+package (§7) · a changed graph MISSES and reverting re-hits the original run (§8) ·
+no analysis output has entered `graph_hash` (§9) · `set_current_user_context`
+really does name the actor (§10, D78) · D72's upsert runs, updates rather than
+duplicating, and refuses a duplicate (§11). **Mutation-tested.** The first draft of
+§7 passed the mutation that deletes the mirror's `assert_writer_may_act` outright,
+because the poison sat before a call that sets the GUC itself — §16 · WP 4.1 · E
+happening again to the package that quoted it.
+
+**Gap check** ✅ — the field-by-field numeric comparison is `rehearsal/130` §2,
+IN SQL rather than by hand, so a later change that writes one destination and not
+the other fails on the commit that makes them disagree instead of being noticed in
+WP 5.3 when the columns are dropped.
+
+### WP 4.4 — Staleness, invalidation, and the Trust Report ✅ *(D12, D70, D80, D81 closed — done `20260917000008`)*
+
+Add `seeded_from_hash` to `policy_overrides`. **One** staleness rule everywhere;
+delete the ad-hoc ones.
+
+**THE RULE IS THREE-STATE AND THIS SECTION USED TO SAY TWO.** It read "stale iff
+`computed_from_hash <> current_graph_hash()`", which is exactly right for a row
+that HAS a hash. WP 4.3 shipped those columns nullable on purpose — a row written
+before it has no provenance and inventing one is the silent default
+`declared-fallback` (I6) forbids — so a third state exists whether or not a rule
+names it:
+
+    fresh    the row names the world the project is in now
+    stale    the row names a DIFFERENT world
+    unknown  the row names NO world; nothing can say whether it is current
+
+`freshness_of(hash, project)` returns all three; `is_stale()` DELEGATES to it and
+collapses `unknown` into "do not trust", which is the only safe direction for a
+caller that can branch two ways. Display surfaces call `freshness_of`, because
+reporting "we cannot tell" as "out of date" answers T1 with a guess that happens
+to be cautious.
+
+**And there were TWO ad-hoc mechanisms, not three — D81.** The prompt's third,
+`autoSeedMarkerRef`, does not exist; the nearest identifier is a re-entry guard
+whose own comment records the bug that made it a `Set`. Deleting it would
+reintroduce that bug.
 **And the rule has a clause D70 is about: a hash change is a REVERSIBLE display state,
 never a persisted status write.** `expire_agent_proposals` breaks that today — it
 UPDATEs `proposals.status` to `expired`, one-way, from a READ, so a `schema_version`
@@ -1687,19 +1779,70 @@ limits** block (§5.4).
 
 Note: the engine reads policy overrides, not the grid — a stale override is a
 simulation-correctness problem, say so in the UI copy.
-**Gap check** — grep for any surviving timestamp-comparison staleness logic.
+
+**Exit** ✅ — `supabase/rehearsal/140`, eight sections against a real PostgreSQL 16:
+the rule is three-state and `is_stale` collapses it the safe way (§1) · **THE RED
+ONE — listing proposals does not rewrite them** (§2, which fails on every commit
+before this package) · the project drifts and drifts BACK and the proposal is
+untouched (§3, the half no source read can settle) · a TTL still expires, because
+time is one-way and removing that write would over-correct D70 into a second
+defect (§4) · a seeded override goes stale when the dataset moves and a TYPED one
+does not (§5) · the writer stamps the hash ITSELF and clears it when a person
+types over a seeded value (§5b) · the reimplemented `should_recalculate_network_metrics`
+answers from the hash, so writing a row's EXISTING value back no longer reports
+stale (§6) · the report reads one hash for six tables and its counts sum (§7) ·
+and it refuses a project the caller cannot reach (§8). Mutation-tested: restoring
+the drift UPDATE turns §2 red, collapsing `unknown` into `stale` turns §1 red.
+
+**Gap check** ✅ — the grep is a GATE, not a one-off:
+`src/lib/policies/__tests__/stalenessOneRule.test.ts` scans every live SQL
+definition and every page for timestamp-pair staleness, asserts `is_stale`
+delegates rather than restating the comparison, and asserts `project_freshness`
+reads `current_graph_hash` exactly once. **Nine of its ten tests are red without
+`20260917000008`**, measured by removing the migration and re-running — including
+the timestamp scan, which matches the old `last_data_time > last_calc_time`
+directly. It strips comments first: its own first run flagged
+`ProductLevelNetwork.tsx` for a comment EXPLAINING the comparison this package
+removed, and a scan that cannot tell code from prose rewards deleting the
+explanation.
 
 ---
 
 ## 12. Phase 5 — Lineage and published documentation
 
-### WP 5.1 — Surfaces (lineage) block
-Static analysis over `useStageRows`, `useItemMasters`, `projectLanes` and the
-`.rpc()`/`.from()`/`invoke()` calls in `src/pages/*.tsx` → `surfaces[]` per field;
-**human-confirmed** (an unconfirmed lineage entry is worse than none — it will be
-trusted). Regenerate `docs/data/tables/*.md` with lineage.
-**Gap check** — every page in `src/pages/` appears in a `surfaces` entry, or is
-explicitly marked as reading no project data.
+### WP 5.1 — Surfaces (lineage) block ✅ *(D82, D83 found — done, no migration)*
+
+Static analysis → `surfaces[]`, **human-confirmed** (an unconfirmed lineage entry
+is worse than none — it will be trusted). Regenerate `docs/data/tables/*.md` with
+lineage.
+
+**THE SCOPE IN THIS SECTION WAS TOO NARROW AND THE FIRST GREP SHOWED IT.** It says
+"the `.rpc()`/`.from()`/`invoke()` calls in `src/pages/*.tsx`". Seventeen pages
+contain **eight** direct table reads between them: almost every read happens in a
+hook or a component the page mounts, so a scan of `src/pages` alone reports that
+`DataManager` reads nothing — an empty lineage that looks like a finished one. The
+analyser is a module graph (page → transitive local imports → reads), plus one hop
+this section does not mention and cannot skip: an `.rpc()` names a FUNCTION, so
+every RPC is resolved to the tables its body reads.
+
+**THREE GRADES, NEVER BLURRED** — this is what "human-confirmed" turned into once
+the confirming started:
+
+| Grain | Claim | Evidence |
+|---|---|---|
+| `column` | this page names this column in an explicit `select` | the `.from(t).select('…c…')` chain |
+| `table` | this page reads this table by this path | the `.from()`/`.rpc()` call site |
+| `shell` | reached only through modules ≥80% of pages import | auth/session plumbing; **not lineage** |
+
+**Exit** ✅ — 129 entries (71 table, 30 column, 28 shell) across 23 tables and 10
+pages; every evidence line is `path:line` and `contract:check` **R12** re-opens it
+on every run, so an entry cannot go stale the way §4's citations did (D21, D22).
+Mutation-tested: moving an evidence line or naming a page that does not exist
+turns it red.
+
+**Gap check** ✅ — R12's second half: every page in `src/pages` appears in a
+non-shell entry (10) or is declared in `coverage.yaml`'s
+`pages_without_project_data` (7), each with a reason. 17 of 17.
 
 ### WP 5.2 — The manual (§6.3)
 
@@ -1767,23 +1910,133 @@ writes the introspected object. Forty-odd TS2322 errors that nothing sees, becau
 than types. One line of the type or one line of `refColumn()` — but decide which,
 because the page may want the target table's name.
 
-### WP 5.3 — Pages read `analysis_results`; drop entity columns
-Migrate readers one page per commit, comparing values before switching; drop entity
-columns only after confirming no reader remains, in a **separate** commit. Remove the
-downstream unit conversions made dead by WP 3.3.
-**If budget runs short:** migrate fewer pages fully rather than all pages partially.
+### WP 5.3 — The anchor sees the graph; the column drop is BLOCKED and counted ✅ *(D75 closed; D88 found — done `20260917000009`)*
+
+**THE PACKAGE'S OWN NAME IS NOT EXECUTABLE AND §15 IS WHY.** It reads "pages read
+`analysis_results`; drop entity columns". Run `35280849096` measured both halves:
+
+    network_nodes      1 385 rows   1 385 with NO input hash
+    node_list          1 747        1 747
+    supply_chain_data  5 445        5 445
+    network_summary        0            0
+    analysis_runs / analysis_results ............ 0 / 0
+
+**8 577 of 8 577, and an empty store.** Switching a reader to `analysis_results`
+shows nothing, for every project; dropping the columns destroys 8 577 values with
+nothing to replace them. And a backfill cannot substitute — a row written before
+WP 4.3 has no hash and one cannot be invented, which is the fabricated provenance
+`declared-fallback` (I6) forbids.
+
+This is **not a defect in the design**: WP 4.3 shipped the dual-write, and the
+store fills when somebody RUNS an analysis. The precondition is adoption. D88
+re-homes the drop to WP 6.3 with the rest of the result-binding group and states
+the unblocking condition as a number in §15 rather than as prose in a package.
+
+**What the package DID do is the half that was ready — D75.** `20260917000009`
+folds the deep-tier topology into `hash_network`: exactly the six columns
+`get_network_nodes_for_prominence` and `get_network_edges_for_prominence` return,
+and not one column an analysis writes. `schema_version` 2 → 3, taken against a
+measured blast radius of zero and as the first bump after D70 made a hash change
+reversible.
+
+**The fold is BY COLUMN, and that is a departure this section and D56 both need.**
+Both said the fold arrives with the tier change when the computed columns are
+dropped — the route D88 just closed. So the rule moved instead:
+`graphHashCoverage.test.ts` goes from *"these four tables are excluded"* to
+*"no computed column is hashed"*, which is what the invariant actually says. The
+table list was a usable proxy while none of their columns was hashed, and D75 is
+what the proxy cost.
+
+**Exit** ✅ — `supabase/rehearsal/150`: the `inputs` domain is byte-identical to
+v2's (§1, which is why the v2 body was EXTRACTED rather than retyped, and why the
+v2 builder is kept — it is the comparison) · the merge did not replace a
+pre-existing `network` block, which `||` would do silently on a key collision
+(§2) · **no analysis output reached the snapshot** (§3) · the anchor moves with
+`revenue`, returns when reverted, and does NOT move for `country` (§4).
+`130` §1 is inverted from WP 4.3's RED assertion to its opposite. Mutation-tested:
+folding `prominence` in turns two static assertions and §3 red.
+
+**Still owed, and named rather than quietly dropped:** the readers' dual-read, the
+downstream unit conversions WP 3.3 made dead, and the three deploy-window shims —
+all of which need the store to be non-empty first, so they move with D88.
+
+**Gap check** ✅ — `graphHashCoverage.test.ts` read `20260917000002` BY NAME and
+went on passing after `20260917000009` superseded it: 24 green assertions about a
+function the database no longer runs. It reads the live definition now, the way
+`dataPlaneAudit.test.ts` was taught to in WP 3.0. A suite describing a superseded
+definition is worse than a red one.
 
 ---
 
 ## 13. Phase 6 — Policy contract, researcher grade
 
-### WP 6.1 — Resolution chains, documented and pinned
-For every grid field: CSV column → DB column → RPC → hook → substitution → engine
-field → unit at each hop. Pin with parity fixtures in `grading.ts` style. **A chain
-you cannot write down is a bug** — list those rather than inventing prose; the list
-feeds WP 6.2.
+### WP 6.1 — Resolution chains, documented and pinned ✅ *(D89, D90 found — done, no migration)*
 
-### WP 6.2 — Fix the divergences *(D17, D18, D34, D47, D48, D49, D53, D58, D59, D66, D69, D71; D16 closed in WP 0.1)*
+For every grid field: CSV column → DB column → RPC → hook → substitution → engine
+field → unit at each hop. **A chain you cannot write down is a bug** — list those
+rather than inventing prose; the list feeds WP 6.2.
+
+**THE CHAINS ARE DERIVED, NOT WRITTEN DOWN**, and that is the one design decision
+this package makes. Roughly 120 hand-written chains are true on the day they are
+typed; every hop already exists as data — the column specs, the contract, the
+engine registry, the resolver's own ordering — so `resolutionChains.ts` computes
+them and `resolutionChains.test.ts` pins the parts that rot. What a person writes
+is the exception list, and even that is computed: a chain is unwritable when a
+hop it needs is missing, and **the missing hop IS the finding**.
+
+**38 chains. NINE break, and every one is WP 6.2's.** Eight are the class the
+WP 0.1 gap check named, pointing the other way — rendered, editable, hashed into
+`policy_hash`, and read by nothing (`material_price` is D18 itself). The ninth is
+new: **D89**, `plant.initial_on_hand` is master-backed by a column `products` does
+not have.
+
+**The one hop that is transcribed rather than computed is the resolver's ORDER**,
+because executing `getEffectiveValue` here would be a second implementation of it
+— `single-source` (I1) broken in order to document `single-source`. So the order
+is prose with a source file, and the test asserts the six branches still appear in
+that sequence. `dataRow` BEFORE the bundle is asserted on its own: WP 4.4's
+`seeded_from_hash` turns on it.
+
+**D90 — three doors reach the engine and only two are declarations.** The
+registry's `data_requirements`, a policy's `params_schema`, and a quoted string in
+`project_map.py`. Of 38 fields the registry declares the hop for 29; for the rest
+a string literal in a Python file is the only evidence. §3's standing law says the
+registry export is the single source for policy schemas — true of the schemas that
+exist, silent about the ones that do not.
+
+**Exit** ✅ — `resolutionChains.test.ts`, eleven assertions: every unbroken chain
+names its storage and write path · a declared default is always recorded as a
+substitution (T2) · the resolver's six branches still appear in the transcribed
+order · `dataRow` precedes the bundle · the break list is a RATCHET that may
+shrink and not grow, with a companion test that removes a name which stops
+breaking · **G4 as a gate**: no engine-read field is unreachable by both the grid
+and every upload, which is EMPTY today and so is a gate rather than a ratchet.
+Mutation-tested: closing door 3 and dropping a storage hop each turn it red.
+
+**Gap check** ✅ — and it is about this package's own method. **Three over-claims
+were caught inside it before anything shipped**, each of which would have produced
+a confident list of false findings: 28 → 11 (looking only at `data_requirements`
+for the engine hop, which reported `safety_stock_days` as unread — the field D1 is
+entirely about the engine reading); 11 → 9 (`__inv_params` is `synthetic: true`, a
+vector cell rather than a field); 7 → 0 (comparing the engine's `table.column`
+against the grid's `field` id, which reported `materials.cost` as invisible while
+it is on screen as `material_cost`). That is D82 and D83's lesson arriving a
+package later, in a package whose entire output is a list.
+
+### WP 6.2 — Fix the divergences *(D17, D18, D34, D47, D48, D49, D53, D58, D59, D66, D69, D71, D97, D98, D99; D16 closed in WP 0.1)*
+
+**D71 is CLOSED (slices 11 + 12).** Slice 11 took the three of sixteen that cost
+one line each — they already took `p_user_id` and never passed it to the trigger.
+Slice 12 took the nine that took no actor at all, in ONE migration, plus the
+eleven client call sites. The tenth was never this class: it is a trigger
+function, and PostgreSQL refuses declared arguments on one. **The list has become
+a gate**: four names remain, three attributing through a shared preamble and one
+a trigger, and a name may only sit on it with one of those two justifications.
+
+**What remains is adoption at ONE edge.** `supabase/functions/api/index.ts` makes
+three of these calls with no actor, because its principal is an API KEY and
+carries no user uuid — the same wall `snapshot_dataset` already hits there, and
+it answers to D28 / WP 7.1 rather than to this package.
 
 **RE-BUDGET FOR D71.** WP 4.1's gap check measured the class D36 was one slice of: 26
 `SECURITY DEFINER` functions write a tier-2/3/4 table and two set `app.current_user_id`.
@@ -1828,15 +2081,25 @@ gate could see, and each is small:
 - **D47** — `org_is_current_user_org` is uuid-only since WP 3.0, but the
   `organizations` table's own read policy still ORs the display NAME and the
   SLUG. Two lines, the same shape D29 was, on a different object.
-- **D48** — `20250827190942`'s sibling `20250827170942` carries a
-  `create_disruption_scenario_v2` overload Postgres cannot create (42P13), so
-  that migration aborted in production and nobody has ever known. Establish
-  which of the three overloads the callers actually reach, then delete the
-  other two or fix the broken definition.
-- **D49** — the introspector's ALTER handling does not follow a column RENAME
+- **D48 — CLOSED in slice 10, and it was three migrations rather than one.**
+  `20250827170942` carries a `create_disruption_scenario_v2` overload Postgres
+  cannot create (42P13), so it aborted in production. **The sibling this bullet
+  cited, `20250827190942`, does not exist** — the retry is `20250827171106`,
+  84 seconds later, carrying `-- FIXED: Put all parameters with defaults at the
+  end`. A whole-history scan found `20250904122241` and `20250904122347` doing
+  the same to three network RPCs. "Which of the three overloads the callers
+  reach" had a false premise: one of the three was a phantom, and of the two
+  real ones the single call site reaches `20250828005114`'s by NAMED argument.
+  Deleting the unreached 11-parameter overload is a migration and is left
+  unforced.
+- **D49 — CLOSED in slice 9.** The introspector's ALTER handling does not follow a column RENAME
   into the indexes that reference it, so the artifact describes three indexes
-  production cannot have. Fix `introspect.mjs`, regenerate, and the rehearsal's
-  three skip-warnings go with it.
+  production cannot have. **The recorded cause was right for ONE of the three.**
+  The other two name columns `supply_chain_data_multi_tier` has never had, so no
+  rename could have produced them — `20250909153130` aborted on 42703 and
+  `20250909153231` is its retry. That half is **D97**, D48's class, and it
+  brought a second aborted migration with it (`20250914113723`). Closed in
+  slice 9 with D59: one parser, one afternoon, as this section said.
 
 **D58 — `multi_tier_supply_chain` is a live tier-2 table with no reader and no
 writer.** WP 3.2 described it rather than deferring it a fourth time, and the
@@ -1847,13 +2110,23 @@ been carried through every RLS rewrite since 2025-08-20, most recently
 to a table nobody can reach. §15 counts its rows now; dropping it is a decision to
 take against that number, not against the absence of one.
 
-**D59 — an inline column CHECK is invisible to the artifact.** Third of the family
+**D59 — CLOSED in slice 9. An inline column CHECK is invisible to the artifact.** Third of the family
 after D49 and D52: the introspector is incomplete about DEPENDENT objects, one kind
 at a time, and each one has been found by something breaking rather than by
 reading. This one costs twice — the rehearsed database lacks a constraint
 production has, so a behavioural assertion can pass for the wrong reason; and the
 generated page omits a rule that rejects a user's upload. Fix it with the other
 two: they are the same parser and the same afternoon.
+
+**Both costs were real, and the second is D98.** 24 recorded CHECKs became 84,
+and `ingest_files` publishes its three rules for the first time. Restoring them
+turned four rehearsal files red — `030`, `110`, `140` and `170` each seeded a row
+production would refuse, including an EMAIL in `ingest_runs.triggered_by` and a
+jsonb `'{}'` in `proposals.provenance`. No live writer is affected; the fixtures
+were. And naming matters: PostgreSQL calls an unnamed column CHECK
+`<table>_<column>_check`, and until the artifact did too, the five migrations that
+widen `ai_chat_events.event_kind` by DROP-and-ADD matched nothing, so the artifact
+kept the narrowest vocabulary alongside the widest.
 
 ### WP 6.3 — Provenance vocabulary, value chain, reproducibility record
 Complete the A1 vocabulary. Ship **A2** the value-chain popover (source file → row →
@@ -1863,6 +2136,39 @@ Reproducibility Record (dataset, policy, scenario, engine and analysis versions 
 declared limits). Deep-link grid → P3 and the legend → P5.
 
 **Exit — the §5.4 acceptance test.**
+
+### WP 6.4 — The decision plane, described *(created by WP 6.1's gap check)*
+
+Eleven tables — `policy_versions`, `policy_presets`, `scenarios`,
+`scenario_templates`, the five `disruption_scenario_*`, `recovery_playbooks` and
+`external_evidence` — described, governed and audited like every other tier in the
+contract.
+
+**IT EXISTS BECAUSE R8 FOUND THEM WAITING ON A PACKAGE THAT NEVER CLAIMED THEM.**
+`coverage.yaml` deferred all eleven to WP 6.1, whose own reasoning gave it away:
+*"WP 6.1 pins the resolution chains … the scenario and disruption tables are the
+surface those chains resolve against."* Being the surface a package READS is not
+being its deliverable, and §13's WP 6.1 described no table at all — it traced 38
+grid fields. Eleven tables sat behind a sentence that reads like a plan and is an
+association.
+
+**WHY NOT ONTO WP 6.3, WHICH IS WHERE WP 4.4 SENT ITS ELEVEN.** Budget honesty.
+WP 6.3 already carries A2, A3, A5, the provenance vocabulary and the eleven
+result-binding tables. Twenty-two tables under one package is a number that
+misrepresents what it costs, and misrepresented budget is the thing boundary
+reviews exist to catch (§16 · Phase 2→3, where seven items were "carried by
+pointing at a package that had already shipped").
+
+**They belong together on their own terms**: this is the DECISION plane — what a
+person or an agent chose, as against the dataset they chose it over and the result
+it produced. `result-binding` (I8) is the invariant that needs all three, which is
+why WP 6.3 keeps the results and this package takes the decisions.
+
+**Gap check** — every one of the eleven is tier 4 or above and none is audited
+today (`contract:check` R11 prints the count). Describing them brings them inside
+`dataPlaneAudit.test.ts`'s rule, which is D54's lesson: a deferral hides a table's
+WRITERS from every check scoped to the contract, and WP 4.3 measured what that
+costs when the four deep-tier tables came in.
 
 ---
 
@@ -1959,6 +2265,20 @@ ever report is a finding nothing enforces, which is how `customers` and
 `product_code_map` sat untracked long enough for R4 to lose sight of them. The
 probe also prints the COLUMNS and row count of anything untracked, because an
 adoption migration cannot be written from a table name alone.
+
+**AND IT NOW READS THE VIEWS, WHICH THE SCHEMA PROBE CANNOT (D38).** That probe
+compares relation NAMES, so a view present under the right name with the wrong
+`reloptions` passes it. `viewSecurity()` reads `pg_class.reloptions` and
+`pg_get_viewdef()` for every view in `public` and gates on three things: an
+owner-run view that is not the one declared exception, the exception without the
+`current_is_super_admin()` predicate that MAKES it one, and the inverse — the
+exception carrying `security_invoker = true`, which raises "permission denied for
+table approved_users" for every reader and takes both admin pages down.
+`supabase/rehearsal/030` asserts the same rule against a database built from the
+migrations on the branch; this asks the database the Supabase linter is looking
+at. The linter's `security_definer_view` finding on `v_admin_user_usage` is
+correct and expected — it names the mechanism — and it cannot see the predicate,
+so it can never tell the declared exception from the disclosure it replaced.
 
 Record counts in §16 after each phase.
 
@@ -8156,6 +8476,841 @@ that has never once been read, and some of them will now bind.
 ---
 ---
 
+### WP 4.3 — Migrate the analyzers (dual-write) · 2026-09-17 · `20260917000007`
+
+**What the package promised:** the four analyzers write both destinations and gain
+a `code_version`; `computed_from_hash` + `computed_at` on every T3 table; drop
+nothing. **What it found:** one of the four analyzers is not an analyzer, the
+anchor the store keys on cannot see two of the others' inputs, the invocation path
+fires once per row rather than once per upload, and a class of writers the
+previous package counted as unattributed has been naming its actor since 2025.
+
+#### A · D75 — THE ANCHOR IS BLIND TO THE INPUTS THAT KEY ON IT
+
+This is the finding, and it arrived before any code was written, from reading what
+the two centrality analyzers actually read.
+
+`analysis_runs.input_hash` is `current_graph_hash(project)`, which hashes eleven
+tier-2 tables. The two analyzers read `get_network_nodes_for_prominence` →
+`network_nodes(uid, revenue, name)` and `get_network_edges_for_prominence` →
+`network_edges(src_uid, dst_uid, relative_revenue)`. **Not one of those tables is
+in the snapshot**, and not by accident: `graphHashCoverage.test.ts`'s
+`DERIVED_AND_OUT` keeps all four deep-tier tables out DELIBERATELY, which was
+correct while nothing keyed on the anchor.
+
+WP 4.2's store is the thing that keys on it. So: change an edge weight — every
+centrality in the project changes — and `input_hash` does not move.
+`analysis_get_or_start` reports `cache_hit: true` and returns an answer computed
+against a world that no longer exists. **A cache key that cannot see its own
+inputs is not an identity, it is a guess with a hash in it**, which is D19 rebuilt
+one layer up by the package meant to close it.
+
+The correct fix is `hash_network`. That is a `schema_version` bump, and D70 says
+what a bump does while it is unfixed — `expire_agent_proposals` rewrites stored
+proposals one-way, from a READ. WP 4.1's bump cost nothing because §15 had
+measured 0 live proposals grounded on a hash FIRST, and this session cannot reach
+the live database. Spending an unmeasured budget is the one thing §4 D42 says
+never to do.
+
+**So the digest travels in `params`, and the impurity is declared rather than
+hidden.** `network_topology_hash()` digests exactly the six columns those RPCs
+return — narrower than the tables, so an edit to `country` does not invalidate a
+centrality, which `rehearsal/130` §1 asserts. It is an INPUT in a PARAMETER and
+the sidecar's `analysis_kinds` block says so at the point a reader meets it (T2:
+substitution is visible at the point of display, not in a log). It is there
+because it moves no stored hash and bumps no `schema_version` — reversible in a
+way the correct fix is not. **WP 4.4 folds it into the anchor and deletes the
+entry, in the same package that makes a bump safe.**
+
+#### B · D76 and D77 — THE INVOCATION PATH, WHICH NOTHING HAD NAMED
+
+The brief says to check `auto_calculate_network_metrics_on_completion`. Reading
+for it found a second auto-invoker that no defect row, prompt or plan section has
+ever mentioned, and it is the more expensive one by three orders of magnitude.
+
+`trigger_auto_calculate_prominence_nodes` and `..._edges` were `FOR EACH ROW`.
+Each firing POSTs to `calculate-node-prominence`, which reads the whole graph and
+rescores every node. §15 measured `network_edges` at 2 129 rows in one project:
+**one upload, 2 129 full recomputations of the same graph.**
+
+The tempting dismissal is that WP 4.2's store now absorbs the repeats. It does
+not, and the reason is worth keeping: the topology digest moves with every
+inserted row, so each of the 2 129 requests presents a DIFFERENT key and every one
+is a genuine cold miss. The store would faithfully record 2 129 runs of an
+analysis the user asked for once.
+
+Statement grain is the fix — `20260916000001`'s fix, for `20260916000001`'s
+reason. Two details were decided by PostgreSQL rather than by preference:
+transition tables cannot be shared across events, so it is four triggers; and
+`REFERENCING ... TABLE` is refused alongside a column list, so the loop-prevention
+filter moved into the body. **It got better on the way.** The old filter was a
+column list naming the input columns; the new one compares
+`to_jsonb(row) - <derived columns>`, so a column added to `network_nodes` next
+quarter is covered on the day it is added, where the list would silently have
+stopped noticing it. Same lesson as `graphHashCoverage.test.ts`: fix the rule, not
+the three columns.
+
+**D77 came out of the same block and was found by EXECUTION.** The `pg_net`
+fallback caught `undefined_function`; a database without `pg_net` raises
+`invalid_schema_name` (3F000), because the SCHEMA is missing and not the function.
+So the handler never matched, the fallback was unreachable, and a failed
+notification propagated out of the trigger and **aborted the INSERT**.
+`rehearsal/130` could not write one `network_edges` row until it was fixed —
+because `rehearsal-schema.mjs` deliberately does not stub `pg_net`, with a comment
+saying a migration that needs it "should say so rather than pass on a fake". That
+decision, taken two packages ago for a different reason, is what surfaced this.
+Production has `pg_net`; the live blast radius is zero and the latent one is every
+environment that does not.
+
+#### C · D78 — THE PREVIOUS PACKAGE'S HEADLINE NUMBER OVER-COUNTS BY TEN
+
+Describing the four deep-tier tables brought five more writers into
+`dataPlaneAudit.test.ts`'s scan and turned the ratchet red:
+`bulk_insert_network_nodes`, `..._edges`, `..._summary`, `rebuild_node_list`,
+`upload_node_list_data`.
+
+The obvious move is to add five names to `UNATTRIBUTED` with a note. Reading them
+first is what made that wrong: **every one opens with
+`PERFORM public.set_current_user_context(p_user_id, p_user_email)`**, whose entire
+body is `set_config('app.current_user_id', user_id::text, true)`. They have named
+their actor since 2025-08-20. The scan is textual and cannot follow a call — which
+is the limitation `VIA_SHARED_PREAMBLE` was written for one package earlier, for
+the other helper.
+
+Teaching the scan then turned the ratchet's THIRD test red, which is that test
+doing exactly its job: ten names already on `UNATTRIBUTED` attribute the same way
+and had to leave. **So D71's "26 write, TWO attribute" was this scan's reading and
+not the world.** Corrected: 31 writers now that four more tables are described, 15
+attributing, 16 not.
+
+**The invariant does not move and the re-budget is smaller, not the work.**
+`audit-actor` (G4) is still not met; 16 functions still record `actor_known:
+false`. What changed is that WP 6.2 budgets for six live ones rather than
+seventeen.
+
+A ratchet widened on a READING is a ratchet that has started lying about its own
+method, so `rehearsal/130` §10 performs a `bulk_insert_network_nodes` with
+`app.current_user_id` poisoned with a different user first, and reads the audit row
+back. The same standard `rehearsal/110` §7 set after that one first passed for the
+wrong reason.
+
+#### D · D79 — THE CATALOG DESCRIBED THINGS THAT DO NOT EXIST
+
+`analysis_runs.contract.yaml`'s `analysis_kinds` listed `project_ai_health` with
+`entity_type: project` and a promise that this package would migrate it.
+`project-ai-health` probes whether the configured AI providers are reachable. It
+takes no `project_id`, writes no table, is invoked by nothing in `src/`, and has no
+world it could hash. The same block declared a `threshold` parameter on
+`critical_nodes` that `predictCriticalNodes` does not take.
+
+Both were authored from §11's prose before anything had read the functions, and
+both are D74's class pointing in opposite directions: an undeclared default breaks
+`declared-fallback` (I6), and a declared parameter no code reads is the same defect
+with the sign flipped. §11's own sentence — "the four analyzers" — named one that
+never was, and is corrected in this commit.
+
+#### E · THE PRECONDITION THIS PACKAGE INHERITED AND ALMOST GOT WRONG
+
+`20260917000007`'s first header deferred D72's unique index, reasoning that an
+index needs a dedup, a dedup needs a count, and nothing had counted. **§4 D72's own
+row carried the count** — §15 run `35233002946`, every project: 1 385 rows, ZERO
+duplicate `(project_id, uid)`, ZERO null `uid`. One `CREATE UNIQUE INDEX`, no
+dedup migration, no rows lost, and a defect that had failed silently on every
+fallback run since it was written is closed.
+
+The preamble's first non-negotiable is to VERIFY every precondition against the
+actual code rather than assume the previous package left things as promised. This
+is the inverse failure and it is worth naming: assuming a previous package had NOT
+done something it had. `rehearsal/130` §11 issues the exact statement the analyzer
+issues — `ON CONFLICT (project_id, uid) DO UPDATE` — rather than looking the index
+up in a catalog, because an index can exist and still not be inferrable.
+
+#### F · WHAT THE MUTATIONS SAID
+
+Two mutations, and the second is the one worth recording.
+
+`computed_from_hash = 'mutant'` → §3 red, naming both hashes. Expected.
+
+Deleting `assert_writer_may_act` from `analysis_apply_node_metrics` outright →
+**§7 STAYED GREEN.** The section poisons `app.current_user_id` with the analyst
+before the sequence, but `analysis_get_or_start` runs between the poison and the
+mirror write and sets the GUC itself, so the editor was already in place when the
+mutated function ran. That is §16 · WP 4.1 · E — "an earlier section had already
+put that user in the GUC and left it there" — happening again inside the package
+that quotes it in its own header. The poison moved BETWEEN the two calls and the
+mutation is caught. **A file that warns about a trap is not a file that avoids it.**
+
+#### G · WHAT WP 4.4 INHERITS, NAMED RATHER THAN DISCOVERED
+
+- **D75's real fix.** Fold `network_topology_hash` into `hash_network`, delete the
+  `topology_digest` params entry, bump `schema_version` — AFTER D70, and after §15
+  has counted `live_grounded_on_graph_hash` as WP 4.1 did.
+- **D70 first, and it is now load-bearing for something.** It was a finding with no
+  consumer; it is now the thing blocking D75's fix and the `network_nodes` tier
+  change.
+- **`combine_etl` registers a run and never skips.** Its output is rows in
+  `supply_chain_data`, not entries in `analysis_results`, so "already computed"
+  means "those rows are still there" — which the store cannot see. WP 4.4 owns
+  staleness and is the package that may turn a hit into a skip.
+- **`geocode-locations` writes `node_list` through PostgREST** and is D36's class,
+  not closed here. `longitude`/`latitude` are analysis output with no run: the
+  geocoder is not a registered kind, so `node_list.computed_from_hash` describes
+  the criticality columns only. The sidecar says so.
+- **The deprecated two-argument `analysis_mark_critical_nodes` and the
+  one-argument `refresh_node_list_for_project`** exist only for the window between
+  the migration deploy and the edge-function deploy, which are separate workflows
+  with no ordering between them. WP 5.3 deletes both once no deployed caller uses
+  them.
+- **§15 has never probed these four tables.** D19's 5 261-row measurement came from
+  WP 4.2 and counted rows, not provenance. The after-run should count
+  `computed_from_hash IS NULL` per table — that number is the size of what WP 5.3
+  cannot migrate.
+
+#### H · THE §15 RUN THIS PACKAGE DID NOT TAKE, AND WHY
+
+None. The three-door rule (§4 D31, and the WP 3.4 loss that added the third door)
+says a push carrying a migration may change none of `.github/verify-request`,
+`verification-sql.yml` or `verification-sql.mjs`. This package carries a migration.
+The probes it wants — `computed_from_hash IS NULL` per derived table, and the
+`network_nodes` duplicate sweep re-run against the new index — belong in a SECOND
+push after `Deploy Supabase Migrations` reports green. Four runs have been lost to
+racing that; this one is not the fifth.
+
+### WP 4.4 — Staleness, invalidation, and the Trust Report · 2026-09-17 · `20260917000008`
+
+**What the package promised:** one staleness rule, `seeded_from_hash`, a
+freshness badge, the A3 Trust Report, and D70's clause — a hash change is a
+reversible display state, never a persisted status write. **What it found:** the
+rule needed a third state the plan did not have, one of the three mechanisms it
+was told to delete does not exist, and the trigger at the centre of the oldest
+staleness defect has never invoked anything.
+
+#### A · D70 · THE FIX IS A SPLIT, NOT A DELETION
+
+`expire_agent_proposals` expired a proposal for two reasons under one UPDATE:
+
+    expires_at < now()              TIME, which is genuinely one-way
+    grounding hash <> current hash  DRIFT, which is not
+
+The tempting correction is "stop expiring proposals". That would be D70
+over-corrected into a second defect: a TTL that has passed is a record of
+something that happened and does not un-happen, and `rehearsal/140` §4 asserts it
+still fires. **Only the drift moves**, into `proposal_grounding_state` — a
+PostgREST computed column over the one rule — so a project that drifts and drifts
+back leaves the proposal exactly as it was.
+
+§2 is the RED assertion and it is deliberately not about the fix: it LISTS
+proposals after moving the hash and fails on `main` with the row rewritten by a
+READ. §3 is the half no source read can settle — it moves the project BACK and
+asserts the state returns to `fresh` with the status untouched. "Computed, not
+stored" is a claim about what happens when the world moves twice, and the only
+instrument for it is a database you can move twice.
+
+**AND THE DAMAGE ALREADY DONE CANNOT BE REPAIRED, which the migration says rather
+than implies.** A drifted row was `draft`, `proposed` or `approved`; `expired`
+overwrote it and `status_reason` records only WHY. The prior status is not
+recoverable from the row, so no UPDATE in that file can restore it. That is what
+"one-way" means, stated as a consequence rather than as an adjective — and it is
+why §15's after-run counts the affected rows rather than estimating them.
+
+#### B · THE RULE NEEDED A THIRD STATE, AND §11 IS EDITED
+
+§11 said "stale iff `computed_from_hash <> current_graph_hash()`". That is exactly
+right for a row that HAS a hash — and WP 4.3, one package ago, shipped those
+columns NULLABLE on purpose, because a row written before it has no provenance and
+inventing one is the silent default `declared-fallback` (I6) forbids.
+
+So a third state exists whether or not a rule names it, and a boolean can spell
+two. Collapsing `unknown` into `stale` is the SAFE direction and `is_stale()` does
+exactly that for callers that can only branch two ways. Collapsing it at the point
+of DISPLAY is a different act: it tells a user a number is out of date when the
+truth is that nothing can say, which is T1 answered with a guess that happens to
+be cautious. `freshness_of` returns three; the badge shows three; the mutation
+that collapses them turns §1 red.
+
+**One rule, two functions, and the test asserts the delegation** — `is_stale` may
+not spell the comparison itself. Two functions that agree today and are edited
+separately is `single-source` (I1), and `columnSpecs.defaultWhenMissing` versus
+the Zod bundle (WP 6.2) is what that looks like after a year.
+
+#### C · D81 · THE THIRD MECHANISM DOES NOT EXIST
+
+The brief lists three ad-hoc staleness mechanisms to delete, the third being
+"`StagePolicyTable`'s `autoSeedMarkerRef` (a useRef)". There is no such
+identifier. The nearest is `autoSeededRef`, and it is not staleness logic at all —
+it is a `Set` of `${projectId}::${stageKey}` markers that stops the auto-seed
+effect re-entering, and its own comment records the bug that made it a Set rather
+than a single slot (a supplier → plant → supplier tab round trip re-seeded the
+supplier stage). Deleting it would reintroduce that bug.
+
+The real count was two, and one of them — the prominence trigger — WP 4.3 had
+already made statement-level. **Second package in a row where an inherited
+"already verified" line was wrong**, and the two point in opposite directions:
+WP 4.3 nearly deferred D72's index because it assumed a count did not exist when
+§4 carried it. The preamble's first non-negotiable earns its place twice over.
+
+#### D · D80 · A PERFORMANCE MIGRATION SPENT ON THE INPUTS TO A LOG LINE
+
+`auto_calculate_network_metrics_on_completion` fires on every completion flip,
+calls the expensive staleness check, reads `needs_recalculation` into a record,
+and then — on the true branch — looks up the modeler's email, sets the user
+context, and `RAISE LOG`s. There is no `net.http_post`, no `PERFORM`, no insert.
+**Nothing downstream of the check has ever run.**
+
+`20260712110000` exists ENTIRELY to make that check fast: its own header records a
+seq-scan per node and a four-way cartesian product (≈6.8 × 10⁹ intermediate rows
+for a 1 200-node project) exceeding the anon statement timeout on a real project.
+A whole migration was spent optimising the inputs to a log line, because the
+question asked was "why is this slow" rather than "what is this for".
+
+It asks the one rule now, which costs a hash. Whether the trigger should EXIST is
+WP 5.3's with the rest of the invocation paths — deleting a live trigger is not a
+staleness package's call.
+
+#### E · `seeded_from_hash` · A COLUMN NOTHING FILLS IS A PROMISE
+
+The plan asks for the column. A column with no writer is the shape this plan
+spends most of its time undoing, so `bulk_upsert_policy_overrides` gained an
+optional per-row `seeded` flag and **stamps the hash ITSELF** — the client sends a
+boolean. Same stance WP 4.3 took for the run mirror: a caller that can supply
+provenance can supply the WRONG provenance, and a column that is confidently
+wrong is worse than one that is absent.
+
+Two clauses decide whether the distinction survives contact with users:
+
+- **ON CONFLICT overwrites the column.** Typing over a seeded override turns a
+  COPY into a DECISION, so the hash must go — otherwise the one number somebody
+  actually chose gets reported stale the next time the dataset moves. §5b asserts
+  it.
+- **The signature is unchanged.** `(uuid, jsonb)` with the flag read out of each
+  row, so the deployed frontend keeps working across the deploy window and writes
+  NULL, which is the honest record for a call that cannot say.
+
+The seed path (`applyPrefill`) sets the flag; the edit path (`upsertOverride`)
+does not, and that asymmetry is the whole feature.
+
+#### F · THE GAP CHECK IS A GATE, AND IT FLAGGED ITS OWN EXPLANATION
+
+§11's gap check is "grep for any surviving timestamp-comparison staleness logic".
+A grep run once is true on the day it is run, and every package that ended with
+one has watched the thing it measured drift back — so it is
+`stalenessOneRule.test.ts`.
+
+**Nine of its ten tests are red without the migration**, measured by removing
+`20260917000008` and re-running rather than asserted. That includes the timestamp
+scan, which matches `last_data_time > last_calc_time` in the old function
+directly.
+
+Its first run flagged `ProductLevelNetwork.tsx` — for a COMMENT explaining the
+comparison this package had just removed from it. A scan that cannot tell code
+from prose punishes the explanation and rewards deleting it, which is precisely
+backwards in a codebase whose migrations argue with themselves on purpose. It
+strips comments now, as the SQL side already did.
+
+#### G · WHAT THE TRUST REPORT DOES AND DOES NOT CLAIM
+
+§5.4: "a trust report that does not state its own limits is marketing." So
+`knownLimits()` is assembled from the report's own inputs and changes with the
+project — a limits block identical for every project is a disclaimer, one that
+counts this project's unattributed rows is a finding. Three entries are
+unconditional and name D75, G4 and D28; the rest appear only when the data
+produces them.
+
+Two absences are DECLARED rather than rendered empty:
+
+- **Coverage.** The pre-run surface carries `Finding[]` but not the graded
+  manifest behind it, so `graded: null` produces a limit saying coverage could
+  not be computed. An empty coverage table reads as "nothing is missing".
+- **Ingest history.** An empty list and a failed read are different facts and the
+  panel distinguishes them.
+
+The assembly is a PURE module so WP 6.3 can emit the same report as PDF/JSON
+through `report-render` without a second implementation — which is the defect
+WP 6.2 is still cleaning up in the policy defaults.
+
+The headline is DERIVED from the findings and the counts rather than written by a
+caller, so it can never be better than the limits allow.
+
+#### H · WHAT THE NEXT PACKAGES INHERIT
+
+- **D75's real fix is now unblocked.** D70 was the reason folding
+  `network_topology_hash` into `hash_network` was unsafe, and D70 is closed. The
+  bump still needs §15 to count `live_grounded_on_graph_hash` first, as WP 4.1
+  did — but the consequence of getting it wrong is no longer irreversible.
+- **WP 5.3 inherits three deletions**, all kept alive only for the window between
+  a migration deploy and a frontend deploy: `should_recalculate_network_metrics`
+  and its one caller, the two-argument `analysis_mark_critical_nodes`, and the
+  one-argument `refresh_node_list_for_project`. Plus the D80 trigger, if it should
+  exist at all.
+- **§15 owes two counts** this package could not take (see below): proposals
+  already expired for `grounding_drift`, which is D70's realised damage, and
+  `computed_from_hash IS NULL` per derived table, which is the size of what
+  WP 5.3 cannot migrate.
+- **`geocode-locations` still writes `node_list` coordinates with no run.** WP 4.3
+  named it; nothing has fixed it. Those two columns are analysis output whose
+  freshness this package cannot report.
+
+#### J · R8 CAUGHT AN OWNER TEN TABLES HAD BEEN WAITING ON
+
+Marking this package ✅ turned `contract:check` red in fifteen places, and twelve
+of them were one finding: **ten table deferrals and one invariant named WP 4.4 as
+their owner, and nothing in §11's WP 4.4 had ever agreed to it.**
+
+`coverage.yaml` said of the tier-5 run/result group: "Invariant `result-binding`
+is the claim these tables have to satisfy … and WP 4.1/4.4 are where the binding
+is completed and the staleness rules land." The second half is true. The first
+was written by whoever grouped the tables and never checked against the package
+brief: §11's WP 4.1 is the graph hash, §11's WP 4.4 is staleness plus the Trust
+Report, and neither mentions binding a result to a policy, a scenario or an engine
+version. `CLAUDE.md`'s `result-binding` row said "not yet — WP 4.4" for the same
+reason.
+
+**This is the defect R8 was built for, working exactly as intended.** The Phase
+2→3 review found seven items "carried by pointing at WP 2.4 and WP 2.3 after both
+had shipped — which is indistinguishable, in the document, from being scheduled",
+and R8 is the gate that came out of it. Here it fired on the commit that created
+the condition rather than at a boundary review two phases later.
+
+All twelve move to **WP 6.3**, which ships the A5 Reproducibility Record —
+"dataset, policy, scenario, engine and analysis versions plus declared limits" —
+and that is `result-binding` stated as a deliverable. `model_validations` moves
+with them: its row argued for WP 4.4 on the grounds that its subject is staleness,
+and WP 4.4 landed the staleness rule without needing to describe it, because the
+rule is a function over a hash column and that table already carries four.
+
+D75 moves to **WP 5.3** rather than to the next package, and the reason is
+structural: WP 5.3 drops `network_nodes`'s computed columns, at which point the
+remainder is a tier-2 input table and folds into `hash_network` by the coverage
+rule instead of by a special case. D56 already assigns that tier change there.
+It is the same change.
+
+#### I · THE §15 RUN THIS PACKAGE DID NOT TAKE
+
+None, and for the same reason as WP 4.3: this push carries a migration, and the
+three-door rule forbids touching `.github/verify-request`, `verification-sql.yml`
+or `verification-sql.mjs` alongside one. The two counts above belong in a second
+push after `Deploy Supabase Migrations` reports green. Four runs have been lost to
+racing that; these are not the fifth and sixth.
+
+### WP 5.1 — Surfaces (lineage) block · 2026-09-17 · no migration
+
+**What the package promised:** fill `surfaces[]` by static analysis over
+`src/pages`, human-confirmed, and regenerate the table pages with lineage.
+**What it found:** the scope was too narrow to see most reads, and the two
+heuristics that looked strongest were the two that over-claimed.
+
+#### A · THE BRIEF'S SCOPE WOULD HAVE PUBLISHED AN EMPTY LINEAGE
+
+§12 says to analyse "the `.rpc()`/`.from()`/`invoke()` calls in `src/pages/*.tsx`".
+Running exactly that grep first is what settled it: **seventeen pages contain
+eight direct table reads between them.** `DataManager.tsx` — the page the whole
+data layer is about — contains none. Almost every read is in a hook or a component
+the page mounts.
+
+A scan of `src/pages` alone would have produced a `surfaces` block that is present,
+short, and wrong by omission — which is harder to notice than an empty one,
+because it looks finished.
+
+So the analyser is a module graph: page → every local module it transitively
+imports → the reads in those modules. Plus a hop the brief does not mention and
+cannot be skipped: an `.rpc('x')` names a FUNCTION, not a table, and the policy
+grid reads almost everything that way, so every RPC is resolved to the tables ITS
+BODY reads — `FROM`/`JOIN` only, because a function that WRITES a table is not a
+surface. `surfaces` answers "where is this rendered"; an UPDATE renders nothing.
+
+#### B · D82 · A 404 PAGE CAME BACK AS A SURFACE FOR USER DATA
+
+First run: `approved_users` read from FIFTEEN pages, including `NotFound.tsx`,
+`Forbidden.tsx` and `Landing.tsx`. Every one of those is TRUE — they all import
+`useAuth`, which reads the table — and every one is useless as lineage. "True
+about the imports and false about the product" is the brief's "worse than none"
+stated precisely, and transitive reachability produces it for anything the shell
+mounts everywhere.
+
+The classifier is keyed on module REACH and not on a name: a module ≥80% of pages
+import is shell by definition, whatever it happens to be called. A rule spelling
+`useAuth` would have worked today and missed the next one.
+
+**And fixing table grain alone left the defect standing in the other grade.** Four
+of those pages still carried COLUMN-grain lineage for
+`approved_users.organization`, because `useAuth` names it in an explicit `select`
+and an explicit select had been treated as strong evidence without asking which
+module it sat in. **Strong evidence about a shell module is still shell.** Two
+passes, one rule.
+
+The 28 shell entries are RECORDED rather than dropped — the page list stays
+complete and the reader is told which rows are plumbing — and they deliberately do
+not satisfy R12's coverage half, so a page reaching tables only through the shell
+has to be declared with a reason.
+
+#### C · D83 · 979 PAIRS, AND ZERO FOR THE TABLE THE GRID RENDERS
+
+The first field-grain heuristic matched each column name against the concatenated
+source of everything a page reaches. It returned **979 field-page pairs** — and
+**zero for `suppliers`**, a table the policy grid plainly renders, because its
+columns reach the screen through generated column specs rather than by name.
+
+Noise in one direction and a hole in the other, from one heuristic, and all 979
+would have been published as lineage that nobody could check. That is the exact
+thing the brief's one constraint exists to prevent.
+
+Column grain is now ONLY what a `.from(t).select('a,b')` names: 30 entries against
+the 41 explicit select lists in `src/`. The columns rendered through generated
+specs have no column-grain lineage, and **that absence is the honest answer** —
+the table-grain entry says the page reads the table, and nothing claims more.
+
+Whoever wants field lineage on the policy grid needs the column specs resolved to
+their fields, which is WP 6.1's resolution-chain work. "A chain you cannot write
+down is a bug"; this is one of the places that shows.
+
+#### D · WHAT "HUMAN-CONFIRMED" WAS MADE TO MEAN
+
+A confirmation that happens once is a fact true on the day somebody looked. §4's
+own citations went stale within a quarter for want of anything re-opening them
+(D21, D22), and lineage is the same shape of claim.
+
+So every entry carries `path:line`, and **`contract:check` R12 re-opens it on
+every run** — the file must exist, the line must be in range, and a table read or
+rpc call must be within two lines of it. Two lines rather than exact, because a
+formatter moving a chained call by one is not a lineage defect and a gate that
+fails on reflow is a gate people switch off.
+
+Mutation-tested both ways: moving an evidence line to a blank one turns it red
+naming D21/D22, and a page that does not exist turns it red naming the page.
+
+R12's second half is §12's gap check, permanent: every page in `src/pages` appears
+in a non-shell entry (10) or is declared in `coverage.yaml`'s
+`pages_without_project_data` (7), each with a reason. 17 of 17, and a page in
+neither fails — the same silence R11 took away from the deferral list.
+
+#### E · THE HOP NOTHING HERE CAN FOLLOW, NAMED RATHER THAN GUESSED
+
+`functions.invoke('x')` is recorded per page and resolved to NOTHING. An edge
+function's reads live in Deno source this analyser does not parse, and inventing
+lineage for them would be the D83 failure with a different regex.
+
+The cost is visible in one place and it is declared there:
+`OrbitMrpCallback.tsx` touches `project_erp_links` through `erp-sync-orbit-mrp`,
+and it sits in `pages_without_project_data` with that written next to it rather
+than being reported as a page that reads nothing. Every page's invoked functions
+are in `build/surfaces.candidates.json` for whoever closes this.
+
+#### F · NO MIGRATION, AND THEREFORE NO REHEARSAL
+
+This package changes no schema, so `contract:rehearse` has nothing new to execute
+and none of the 14 behavioural files needed a fifteenth. The assertion that
+matters here is a static one about whether a claim still resolves, and R12 is
+where it belongs. Said explicitly because "no rehearsal" should always be a
+decision with a reason rather than an omission.
+
+**And it means this push CARRIES the §15 probes the last two could not.** WP 4.3
+and WP 4.4 each owed counts and neither could take them, because a push with a
+migration must not touch the three verification doors. This one has no migration,
+so `verification-sql.mjs` gains four probes and `.github/verify-request` is
+touched in the same push:
+
+- `computed_from_hash IS NULL` per derived table — I5 as a quantity, and the size
+  of what WP 5.3 cannot migrate: dropping the entity columns loses those values
+  with no `analysis_results` row to replace them;
+- proposals already expired for `grounding_drift` — **D70's realised damage**,
+  which is unrecoverable by construction, so knowing the number is the only
+  honest thing left to do about it;
+- `live_grounded_on_graph_hash` — what WP 5.3's D75 bump would land on, counted
+  BEFORE it happens, which is the discipline WP 4.1 established and the two lost
+  runs since have not undone;
+- `network_nodes_natural_key` — whether D72's index actually reached production,
+  gated, because the fallback upsert is still failing with 42P10 if it did not.
+
+**THE RUN CAME BACK RED AND NEITHER GATE LINE WAS A DEFECT — D84.** Both were
+probes asserting a premise that had expired:
+
+- the WP 4.1 landed-probe counted `pg_proc` ROWS for nine function NAMES, and
+  `pg_proc` has one row per OVERLOAD. WP 4.3's three-argument
+  `analysis_mark_critical_nodes` — a deliberate deploy-window shim — took it 9 → 10,
+  and a failure there also stamps every other count in the report as "a
+  measurement of the PRE-migration database". Three such shims are live, so it
+  would have recurred twice more;
+- the dirty-read probe asserted "every stored version predates v2". Production
+  holds 7 versions, 6 v1 and one v2, and the one that MATCHED was the v2 one —
+  which is the anchor working, reported as "THE BUMP DID NOT TAKE".
+
+Both fixed in the same push that noticed them. **The class is the finding**: a
+probe encoding "the world is currently in state X" is a gate with an expiry date
+nobody wrote down. §15 should assert relations that stay true.
+
+**R12 CAUGHT ITS FIRST REAL DRIFT WITHIN THE HOUR, AND IT WAS NOT A DRILL.** A
+parallel branch (PR #221, WP 6.2's plant-stage overrides) rewrote 269 lines of
+`ProcessLevelNetwork.tsx` and merged into this one. Three reads moved:
+`bom_multi_level` at :1104, `supply_chain_data_multi_tier` at :1105 and `projects`
+at :248. The gate went red on the merge commit naming D21 and D22, and the lineage
+was re-pointed by re-running the analyser.
+
+That is the whole argument for evidence-with-a-gate rather than a
+lineage block somebody once confirmed: it took **one merge from a branch nobody
+here was watching** to make six entries false, and the drift was found by CI on
+the same commit rather than by a reader trusting a page a quarter later.
+
+**It also exposed the writer as single-use.** `--write` could only fill an empty
+`surfaces: []`, so the fix for drift — re-run the analyser — would have duplicated
+every table block and left the stale field entries in place. A repair procedure
+that cannot be run twice is not a repair procedure; the writer strips what is
+there before writing now.
+
+**And the answers the run was actually asked for are in it**, unaffected by the two
+bad gates: `docs/PLAN.md` readers should take them from the report on the
+`verification-results` branch rather than from this entry, because a number copied
+into prose is a fact with no owner — which is what §4 exists to prevent.
+
+**Both prior migrations must have DEPLOYED before this report means anything.**
+`supabase-migrations.yml` and `verification-sql.yml` fire on a push with no
+ordering between them, and a §15 run that races a deploy reports a database that
+changed underneath it — WP 3.3's first after-run read 1 787 rows in one query and
+1 691 in another. The two migration pushes went out roughly forty minutes ahead of
+this one, so the deploys are done; if the report says a WP 4.3 or WP 4.4 object is
+missing, read it as a racing artefact and re-run rather than as a finding.
+
+### WP 5.3 — The anchor sees the graph; the drop is blocked and counted · 2026-09-17 · `20260917000009`
+
+**What the package promised:** pages read `analysis_results`, then the entity
+columns are dropped in a separate commit. **What §15 said when asked:** neither
+half is executable, and the number is 8 577 of 8 577.
+
+#### A · D88 · THE PACKAGE'S OWN NAME, MEASURED
+
+Run `35280849096`, every project: `network_nodes` 1 385, `node_list` 1 747,
+`supply_chain_data` 5 445, `network_summary` 0 — **every one of the 8 577 with
+`computed_from_hash IS NULL`** — and `analysis_runs` = 0, `analysis_results` = 0.
+
+So switching a reader to the store shows nothing, for every project, and dropping
+the columns destroys 8 577 values with nothing to replace them.
+
+**A backfill is not the answer and the reason is the plan's own rule.** A row
+written before WP 4.3 has no input hash, and one cannot be invented: that is
+fabricated provenance, which `declared-fallback` (I6) forbids, and a
+`computed_from_hash` that is confidently wrong is worse than the NULL it
+replaced — the same argument WP 4.3 made for stamping the mirror from the RUN
+rather than from a parameter.
+
+**This is not a defect in the design.** WP 4.3 shipped the dual-write correctly;
+the store fills when somebody RUNS an analysis, and nobody has since the deploy.
+The precondition is ADOPTION, not code — which is why D88 states the unblocking
+condition as a number in §15's standing report rather than as prose in a package
+that would then own a thing it cannot cause.
+
+**Doing it anyway was available and would have been the worse kind of green.** The
+columns would have gone, the readers would have pointed at an empty table, and
+every network view in the product would have shown nothing — with a package
+marked ✅ and a §16 entry describing a successful migration.
+
+#### B · D75 · THE HALF THAT WAS READY, AND THE BUMP TAKEN AGAINST A NUMBER
+
+`current_graph_hash` hashed eleven tier-2 tables and not the two the centrality
+analyzers read. `20260917000009` folds in exactly the six columns
+`get_network_nodes_for_prominence` and `get_network_edges_for_prominence` return.
+
+WP 4.1's rule is to count before a bump. The count was 0 live proposals grounded
+on a hash, 0 already expired for drift, 0 runs, 0 results — so it invalidated
+nothing that exists. **And it is the first bump after D70 was closed**, which is
+the difference that would have mattered had the count been non-zero: a hash change
+is a reversible display state now, so it costs a badge rather than a rewritten
+row.
+
+#### C · THE FOLD IS BY COLUMN, AND THE TIER ROUTE IS THE ONE D88 CLOSED
+
+§4 D56 and D75 both said the fold arrives with the tier change — drop the computed
+columns, the remainder is a tier-2 input table, the coverage rule pulls it in.
+D88 closed that route, so the fold is explicit and by column.
+
+**The rule that replaced it is better than the one it replaced.**
+`graphHashCoverage.test.ts` asserted that four TABLES are absent from the
+snapshot. That was a usable proxy while none of their columns was hashed, and D75
+is exactly what the proxy cost: the two tables holding the only inputs those
+analyzers read were excluded wholesale. The rule is now *no computed column is
+hashed*, which is what the invariant says, and a column added to the fold next
+quarter is judged by it instead of by a list somebody has to remember to edit.
+
+#### D · WHAT THE REWRITE COULD HAVE BROKEN, AND WHAT CATCHES IT
+
+Replacing `_build_dataset_snapshot` means restating 200 lines of column list, and
+a slip in the `inputs` domain would move every project's `hash_inputs` for a
+reason unrelated to this package — **looking identical to the intended change**,
+because the composite moves either way.
+
+So the v2 body was **extracted from `20260917000002` mechanically**, not retyped,
+and kept under its own name so `rehearsal/150` §1 can assert
+`v3->'inputs' = v2->'inputs'` for a real project. That is the only reason the v2
+builder still exists; D40's class is a second implementation nothing compares
+against, and this one has a comparison pointed at it.
+
+The hand-written draft that preceded the extraction is worth recording: it
+invented `suppliers.country`, `materials.unit`, `materials.lead_time_days` — none
+of which exist. The extraction is what made that irrelevant rather than a defect.
+
+**Two more things only a database settles**, both in `rehearsal/150`: the fold
+uses `||`, which REPLACES on a key collision rather than raising, so §2 asserts
+the three pre-existing `network` blocks are unchanged; and §3 searches the
+RENDERED snapshot for analysis-output column names, because what is hashed is
+what `jsonb_build_object` produces, not what the migration text names.
+
+#### E · THE ORDERING POSTGRESQL DECIDED, AND THE FIXTURE THE FOLD BROKE
+
+A `LANGUAGE sql` body is validated at CREATE time, so defining the v3 builder
+before the v2 function it calls fails outright. plpgsql would have accepted it and
+failed at run time instead — the worse of the two, and the reason the rehearsal
+harness exists at all (§4 D31).
+
+The fold then broke a fixture in a way worth keeping: `rehearsal/140` §6 inserted
+a node stamped with `current_graph_hash(project)` **in the same statement**. Nodes
+are in the anchor now, so the insert MOVES the hash and the row was stamped with
+the value from before its own insert — reading stale the instant it was written.
+§6 failed on its fixture rather than on the rule it tests. The stamp is a separate
+UPDATE now.
+
+#### F · THE GAP CHECK FOUND A SUITE DESCRIBING A FUNCTION NOBODY RUNS
+
+`graphHashCoverage.test.ts` read `20260917000002_graph_hash_v2.sql` BY NAME. After
+`20260917000009` superseded it, all 24 assertions went on passing — about a
+definition the database no longer executes. **A green suite describing a
+superseded function is worse than a red one**, because nothing will ever look at
+it again.
+
+It reads the live definition now, the way `dataPlaneAudit.test.ts` was taught to
+in WP 3.0 for the same reason. And because the snapshot is COMPOSED now, the
+parser had to learn the composition: reading only the live builder would report
+zero hashed columns and every coverage assertion would pass over an empty set —
+the same failure mode, one level down.
+
+#### G · WHAT WP 6.3 INHERITS FROM THIS PACKAGE
+
+- **The drop, with its unblocking number** (D88). Plus the readers' dual-read, the
+  downstream unit conversions WP 3.3 made dead, and the three deploy-window
+  shims — all of which need a non-empty store first.
+- **`network_topology_hash` and the `topology_digest` param are now redundant**,
+  not wrong. They are kept for the window in which the deployed edge functions
+  still send them; a run from one gets a params entry the anchor already covers.
+  Delete both with the other shims.
+- **`_build_dataset_snapshot_v2` is kept for `rehearsal/150` §1 alone.** If that
+  assertion goes, the function goes with it — §0 of that file says so, so the two
+  cannot quietly outlive each other.
+
+### WP 6.1 — Resolution chains, documented and pinned · 2026-09-17 · no migration
+
+**What §13 asks for:** every grid field's chain, CSV column through to engine
+field, pinned. **What the package decided first:** to compute the chains rather
+than write them, because the one line in the brief that constrains everything is
+*"a chain you cannot write down is a bug — list those rather than inventing prose"*
+— and a list is only worth having if it is derived from the same sources the code
+uses.
+
+#### A · WHY ~120 HAND-WRITTEN CHAINS WOULD HAVE BEEN THE WRONG ARTEFACT
+
+Every hop already exists as data: the column specs declare the field and its
+master, the contract declares the unit and the engine consumer, the registry
+declares the requirement level, the resolver declares the precedence. A prose
+document restates all of it in a place no generator reads, and is true on the day
+it is typed — which is D21 and D22, and which WP 5.1 spent a package learning
+about lineage.
+
+So `resolutionChains.ts` derives them and `resolutionChains.test.ts` pins the
+parts that rot. **38 chains, 9 broken**, and the nine are the deliverable.
+
+#### B · THE ONE HOP THAT IS TRANSCRIBED, AND WHY IT HAD TO BE
+
+`getEffectiveValue` takes eight arguments' worth of live React state. Executing it
+here would mean constructing that state — a second implementation of the resolver,
+which is `single-source` (I1) broken in order to document `single-source`.
+
+So `RESOLUTION_ORDER` is prose with a source file, and the test asserts the six
+branches still appear in `resolveEffective.ts` in that sequence. A reordering that
+does not update the transcription fails there.
+
+**`dataRow` BEFORE the bundle gets its own assertion**, because WP 4.4's whole
+`seeded_from_hash` design turns on it: a re-upload refreshes a field that lives on
+the row and does not refresh one that lives only in the bundle.
+
+#### C · THREE OVER-CLAIMS, CAUGHT INSIDE THE PACKAGE
+
+This is the part worth keeping, because the package's entire output is a list of
+findings and each of these would have made that list confidently wrong.
+
+**28 → 11.** The first engine hop looked only at the registry's
+`data_requirements` and reported 28 of 40 chains as reaching no engine field —
+including `safety_stock_days`, which §4 D1 is *entirely about the engine reading*.
+`data_requirements` names the TABLE columns a policy needs; a policy PARAMETER
+arrives by a different route. **Three doors**: `data_requirements`,
+`params_schema` (80 declared parameters), and a quoted key in `project_map.py`.
+
+**11 → 9.** `__inv_params` is `synthetic: true` — the vector CELL that groups a
+row's replenishment parameters (§II.3), not a field. Asking which engine field it
+reaches is a question about nothing, and two stages declare one.
+
+**7 → 0.** The reverse direction compared the engine's `table.column` against the
+grid's `field` id. They differ ON PURPOSE for a master-backed column:
+`materials.cost` is rendered as `material_cost`, and it and `materials.moq` were
+reported as invisible while both are on screen.
+
+Each was found by asking "is this plausible?" of a number, which is the only
+defence a derived list has. D82 and D83 are the same lesson one package earlier,
+and it did not transfer by being written down — it transferred by the number
+looking wrong.
+
+#### D · D89 · A MASTER COLUMN THAT POINTS AT NOTHING
+
+`plant.initial_on_hand` declares `master: { table: "products", field:
+"initial_on_hand" }`. `products` has eighteen columns and that is not one.
+**`materials` has it**, and the supplier stage uses it correctly fifty lines
+earlier — which is what makes this a copy rather than a misunderstanding.
+
+The failure is silent by construction: `masterValueFor` returns undefined for a
+column that does not exist, the cell falls through to the bundle, and the user
+sees a number under a header that says it is item-master data.
+
+It is the only one of the nine breaks that is a POINTER AT NOTHING rather than a
+value nothing reads, and the two ways out are not equivalent — add the column, or
+drop the `master:` block. Choosing by cost rather than by what the number means is
+how D17's class starts.
+
+#### E · D90 · THE THIRD DOOR IS NOT A DECLARATION
+
+Of 38 fields, the registry declares the engine hop for 29. For the rest, a quoted
+string in `project_map.py` is the only evidence they reach the engine at all.
+
+§3's standing law says "the registry export is the single source of truth for
+policy schemas (§6.2)". That is true of the schemas that EXIST and silent about
+the ones that do not: nine bundle keys the engine reads are declared nowhere.
+
+The fix is in `scsim` rather than here — a bundle key the engine reads belongs in
+a policy's `params_schema`, which `registry_export.py` already generates — so it
+is WP 6.2's. What this package did is make the weakness VISIBLE: the test accepts
+door 3 and says it is the weakest of the three, so the next reader is not told
+those nine are as well-declared as the other 29.
+
+#### F · THE GAP CHECK FOUND ELEVEN TABLES BEHIND AN ASSOCIATION
+
+R8 fired on this package's own ✅: `coverage.yaml` deferred eleven tables to
+WP 6.1 — the five `disruption_scenario_*`, `scenarios`, `scenario_templates`,
+`policy_versions`, `policy_presets`, `recovery_playbooks` and `external_evidence`.
+
+The deferral's reasoning is the finding: *"WP 6.1 pins the resolution chains … the
+scenario and disruption tables are the surface those chains resolve against."*
+Being the surface a package READS is not being its deliverable, and §13's WP 6.1
+describes no table at all.
+
+**They went to a NEW package (§13 · WP 6.4) rather than onto WP 6.3**, which is
+where WP 4.4 sent its eleven. WP 6.3 already carries A2, A3, A5, the vocabulary
+and the result-binding group; twenty-two tables under one package is a number that
+misrepresents what it costs. **Second time in three packages that R8 has caught a
+table waiting on an owner nothing behind it agreed to** — and the second time the
+answer was to give them one that had.
+
+#### G · WHAT WP 6.2 INHERITS, AS A LIST RATHER THAN A PARAGRAPH
+
+- **Nine broken chains**, ratcheted in `resolutionChains.test.ts` so the number can
+  only fall. Eight are "editable, stored, hashed, read by nothing"; one is D89.
+- **D90's nine undeclared bundle keys**, fixable in `registry_export.py`.
+- Every fix shows up as a name leaving `KNOWN_BREAKS`, so progress is countable
+  rather than described.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -8163,10 +9318,10 @@ that has never once been read, and some of them will now bind.
 | 0 | 0.1 – 0.3 | stabilize, consolidate docs | everything | ✅ done |
 | 1 | 1.1 – 1.4 | contract + CI gate | 2, 3, 5 | ✅ done — `contract:check` green, six commands wired in `data-contract.yml`, three orphans reconciled |
 | 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | ✅ done — uuid identity dual-read, project membership + subtractive delegation, data-plane audit, and the R7 §16 gate. **Reviewed 2026-09-16: still done, but NINE conditions carried, not two** — they are WP 3.0's (§16 · PHASE 2→3 ASSESSMENT) |
-| 3 | **3.0 – 3.4** ✅ | one ingestion contract | 4 | **✅ done — and the phase ends with three of its invariants met under a NAMED condition rather than outright.** **3.0 ✅** the Phase 2 carry-over: eight of nine closed, D35's required-check half is a repository-plan constraint (§16 · WP 3.0 · H); nine migrations, one deploy, zero failures, which is D31 stated as a number. **3.1 ✅** the tables are `ingest_*` and source-agnostic, tier 0 exists and is write-once. **3.2 ✅** the parse is server-side, the landing names its uploader, the client-side `split(',')` is gone. **3.3 ✅** seven natural keys are constraints and R5 is a `fail`, the promotion upserts and normalizes, the item masters land. **3.4 ✅** the diff is computed BEFORE the promotion and again inside it, `diff_state` stopped defaulting to an answer nothing had computed, the five counts are persisted where they were measured, promotion needs role ≥ editor and a rehearsal proves an analyst is refused, and a canonical row names the line of the file it came from (D61–D65 closed, D66 found, D28 given a real owner in §14). **Phase 4 opens with a list, not a discovery** — §16 · WP 3.4's phase handoff names what `no-tier-skip`, `ingestion-contract` and `normalize-at-promotion` still lack and who owns each. **WP 4.1 has run**, and it moved `no-tier-skip` from a property of today's code to a property of the schema for three more write paths — plus a fourth nothing had named: `erp-sync-orbit-mrp` promoted tier 1 → tier 2 without `ingest_apply_run` (§16 · WP 4.1 · D). **WP 4.2 has run**; WP 4.3 is next
-| 4 | 4.1 – 4.4 | trust anchor + analysis store + Trust Report | 5 | **4.1 ✅** — the snapshot covers every tier-2 value column (D11, D67 and D68 closed; the RULE is the fix and `graphHashCoverage.test.ts` is the gate), `hash_inputs`/`hash_network` split under a composite that keeps its name and place, `schema_version` 1 → 2 with the blast radius COUNTED before the deploy rather than after (§15: 0 proposals expired, 0 cards stale, 17 of 17 runs still resolving), and D36's six PostgREST writers each moved into an RPC that takes the actor — proved by reading the audit row back, not by counting lines. **Three findings: D69** (`project_map.py` never loads `customers`, so P-C.2's priorities are inert), **D70** (a `schema_version` bump EXPIRES stored proposals one-way, from a read), **D71** (D36 was one slice of a class of 26 — so `audit-actor` is NOT met and this package says so). **4.2 ✅** — the analysis store (`analysis_runs` + `analysis_results`) with the identity D19 says the centralities never had: a metric belongs to a run, and therefore to an input hash and a code version, so a repeat request is a HIT BY DEFINITION rather than a bet on a timestamp. `supabase/rehearsal/120` was written RED against `main` and holds all five exit checks plus the audit row read back with the GUC POISONED first; the concurrency gap check is proved from TWO REAL SESSIONS because one transaction cannot ask the question. D12's own citation was stale and is corrected against the live definition, measured rather than reasoned about; D54's rule landed as `contract:check` R11 (42 of 42 deferrals now SAY whether they are audited, and 42 of 42 are not); **D56's three-package deferral is decided — `network_nodes` is BOTH, so the answer is a split, deferred to WP 4.3 with its blast radius enumerated.** **Two findings: D72** (`calculate-network-science-metrics` upserts on a unique constraint that does not exist, fails every run, logs and carries on) **D73** (the introspected artifact discarded every `COMMENT ON FUNCTION`, so a base rebuilt from it lost them — D52's class, caught by `--since HEAD` alone) and **D74** (eleven of thirteen generated pages published the OPPOSITE of the truth about the natural key — D40's class, false since WP 3.3 landed the indexes). **WP 4.3 is next** |
-| 5 | 5.1 – 5.3 | lineage + the 80-page manual | 6 | 5.2a ✅, 5.2h ✅ — manual live at `/docs`; tree complete; sections 1, 2 and 15 written (14 of 80 pages) |
-| 6 | 6.1 – 6.3 | policy contract, researcher grade | — | — · 6.2 grew D47, D48, D49 at the WP 3.0 gap check |
+| 3 | **3.0 – 3.4** ✅ | one ingestion contract | 4 | **✅ done — and the phase ends with three of its invariants met under a NAMED condition rather than outright.** **3.0 ✅** the Phase 2 carry-over: eight of nine closed, D35's required-check half is a repository-plan constraint (§16 · WP 3.0 · H); nine migrations, one deploy, zero failures, which is D31 stated as a number. **3.1 ✅** the tables are `ingest_*` and source-agnostic, tier 0 exists and is write-once. **3.2 ✅** the parse is server-side, the landing names its uploader, the client-side `split(',')` is gone. **3.3 ✅** seven natural keys are constraints and R5 is a `fail`, the promotion upserts and normalizes, the item masters land. **3.4 ✅** the diff is computed BEFORE the promotion and again inside it, `diff_state` stopped defaulting to an answer nothing had computed, the five counts are persisted where they were measured, promotion needs role ≥ editor and a rehearsal proves an analyst is refused, and a canonical row names the line of the file it came from (D61–D65 closed, D66 found, D28 given a real owner in §14). **Phase 4 opens with a list, not a discovery** — §16 · WP 3.4's phase handoff names what `no-tier-skip`, `ingestion-contract` and `normalize-at-promotion` still lack and who owns each. **WP 4.1 has run**, and it moved `no-tier-skip` from a property of today's code to a property of the schema for three more write paths — plus a fourth nothing had named: `erp-sync-orbit-mrp` promoted tier 1 → tier 2 without `ingest_apply_run` (§16 · WP 4.1 · D). **WP 4.2 has run**, and **WP 4.3 has run** — it closed `no-tier-skip`'s deep-tier gap by DESCRIBING the four tables rather than by moving them, which brought them inside the audit rule for the first time (D54's largest group). **Phase 4 is complete: WP 4.4 has run.** **WP 5.1, 5.3 and 6.1 have run.** **WP 6.2 is next**
+| 4 | 4.1 – 4.4 ✅ | trust anchor + analysis store + Trust Report | 5 | **PHASE COMPLETE.** **4.1 ✅** — the snapshot covers every tier-2 value column (D11, D67 and D68 closed; the RULE is the fix and `graphHashCoverage.test.ts` is the gate), `hash_inputs`/`hash_network` split under a composite that keeps its name and place, `schema_version` 1 → 2 with the blast radius COUNTED before the deploy rather than after (§15: 0 proposals expired, 0 cards stale, 17 of 17 runs still resolving), and D36's six PostgREST writers each moved into an RPC that takes the actor — proved by reading the audit row back, not by counting lines. **Three findings: D69** (`project_map.py` never loads `customers`, so P-C.2's priorities are inert), **D70** (a `schema_version` bump EXPIRES stored proposals one-way, from a read), **D71** (D36 was one slice of a class of 26 — so `audit-actor` is NOT met and this package says so). **4.2 ✅** — the analysis store (`analysis_runs` + `analysis_results`) with the identity D19 says the centralities never had: a metric belongs to a run, and therefore to an input hash and a code version, so a repeat request is a HIT BY DEFINITION rather than a bet on a timestamp. `supabase/rehearsal/120` was written RED against `main` and holds all five exit checks plus the audit row read back with the GUC POISONED first; the concurrency gap check is proved from TWO REAL SESSIONS because one transaction cannot ask the question. D12's own citation was stale and is corrected against the live definition, measured rather than reasoned about; D54's rule landed as `contract:check` R11 (42 of 42 deferrals now SAY whether they are audited, and 42 of 42 are not); **D56's three-package deferral is decided — `network_nodes` is BOTH, so the answer is a split, deferred to WP 4.3 with its blast radius enumerated.** **Two findings: D72** (`calculate-network-science-metrics` upserts on a unique constraint that does not exist, fails every run, logs and carries on) **D73** (the introspected artifact discarded every `COMMENT ON FUNCTION`, so a base rebuilt from it lost them — D52's class, caught by `--since HEAD` alone) and **D74** (eleven of thirteen generated pages published the OPPOSITE of the truth about the natural key — D40's class, false since WP 3.3 landed the indexes). **4.3 ✅** — the analyzers dual-write, and the package changed shape before it wrote a line. **D75**: `analysis_runs.input_hash` is `current_graph_hash`, which hashes eleven tier-2 tables, and the two centrality analyzers read `network_nodes`/`network_edges` — NEITHER of them. Keying their cache on that anchor serves the PREVIOUS graph's centralities as a hit, which is D19 rebuilt one layer up by the package meant to close it. Mitigated by a declared `topology_digest` in `params` rather than by a `schema_version` bump, because D70 makes a bump unsafe to spend on a day nothing has measured; WP 4.4 takes the real fix. **D56's split executed as far as a package that drops nothing can**: the four deep-tier tables are DESCRIBED at tier 3, which is what the anchor has treated them as since WP 4.1, so they enter the audit rule for the first time and gain three triggers each — **D54's largest remaining group, closed** (38 deferred now, was 42; 22 tables audited by trigger, was 18). **D72 closed with one statement and no dedup**, because the count it needed was already in its own §4 row and the first draft of the migration deferred it anyway — the inverse of the precondition failure the preamble warns about. **Three more found by reading the invocation path nothing had named: D76** (the prominence auto-invoker is `FOR EACH ROW`, so §15's 2 129-edge project fires 2 129 full recomputations of one graph — and the store cannot absorb it, because the digest moves with every inserted row and every request is a genuine cold miss), **D77** (the `pg_net` fallback catches `undefined_function` and the real error is `invalid_schema_name`, so a failed notification ABORTED the write — found by execution, because the rehearsal deliberately does not stub `pg_net`), **D78** (D71's "26 write, TWO attribute" was a text scan's reading: ten writers attribute through `set_current_user_context` and have since 2025-08-20, so the honest figures are 31 and 15 — the invariant does not move, the re-budget shrinks from seventeen live functions to six) and **D79** (the catalog declared `project_ai_health` as an analysis kind and a `threshold` parameter no code takes; §11 named "the four analyzers" and one of the four never was). `supabase/rehearsal/130` holds eleven sections and was mutation-tested — the mutation that deletes the mirror's `assert_writer_may_act` outright passed the first draft, because the poison sat before a call that sets the GUC itself, which is §16 · WP 4.1 · E happening again inside the package that quotes it. **4.3 ✅** and **4.4 ✅** — see §16 for both. 4.4 closed **D70** by SPLITTING rather than deleting: a TTL is a record of something that happened and still persists, while grounding drift became a computed column, so a project that drifts and drifts back leaves its proposals untouched — `rehearsal/140` §3 moves a real project twice, which is the half no source read can settle. It found that **the rule needed a THIRD state** (`unknown` is not `stale`; WP 4.3 shipped the provenance columns nullable, and reporting "we cannot tell" as "out of date" is T1 answered with a guess), that **one of the three ad-hoc mechanisms it was told to delete does not exist** (D81 — the third is a re-entry guard whose comment records the bug that made it one), and that **the trigger at the centre of D12 has never invoked anything** (D80 — `20260712110000` is a whole performance migration spent optimising the inputs to a `RAISE LOG`). The gap check is a GATE: nine of `stalenessOneRule.test.ts`'s ten tests are red without the migration, measured by removing it. **Phase 4 is complete.** **WP 5.1 ✅** — lineage lands with an evidence line per entry that `contract:check` R12 re-opens on every run, three grades that are never blurred (table / column / shell), and the gap check as R12's second half: 17 of 17 pages either carry a non-shell entry or are declared as reading no project data. It found the section's own scope too narrow to see most reads (17 pages, 8 direct table reads between them) and two over-claiming heuristics — **D82** (a 404 page reported as a surface for user data, and an explicit `select` list in a shell module does not save it) and **D83** (979 unverifiable field-page pairs, and zero for the table the policy grid plainly renders). **5.1 ✅** and **5.3 ✅**. 5.3 could not do what its name says and §15 is why: **8 577 of 8 577** derived rows carry no input hash and the store holds **0 runs, 0 results**, so switching readers shows nothing and dropping the columns destroys 8 577 values with no replacement (**D88**, re-homed to WP 6.3 with its unblocking condition stated as a number rather than as prose). What it DID ship is **D75 closed**: the deep-tier topology is in `hash_network`, `schema_version` 2 → 3, taken against a measured blast radius of zero and as the first bump after D70 made a hash change reversible. The fold is BY COLUMN because D88 closed the tier route — and `graphHashCoverage.test.ts` moves from "these four tables are excluded" to "no computed column is hashed", which is what the invariant says. Its gap check found that same suite had been passing 24 assertions about a migration the database no longer runs. **6.1 ✅** — 38 chains DERIVED rather than written (≈120 hand-written chains are true on the day they are typed, which is D21/D22), **9 broken and ratcheted** as WP 6.2's list. Found **D89** (`plant.initial_on_hand` is master-backed by a column `products` does not have — the cell silently falls through to the bundle under a header claiming item-master data) and **D90** (three doors reach the engine and only two are declarations: for nine bundle keys a quoted string in `project_map.py` is the only evidence). **Three over-claims were caught inside the package**, each of which would have shipped a confidently wrong list — 28→11, 11→9, 7→0. Its gap check found eleven tables deferred to it behind an association rather than a plan, now **WP 6.4**. **WP 6.2 is next** |
+| 5 | 5.1 – 5.3 | lineage + the 80-page manual | 6 | **5.1 ✅** — 129 surface entries, R12 re-opens every evidence line · 5.2a ✅, 5.2h ✅ — manual live at `/docs`; tree complete; sections 1, 2 and 15 written (14 of 80 pages) |
+| 6 | 6.1 – 6.4 | policy contract, researcher grade | — | **6.1 ✅** · — · 6.2 grew D47, D48, D49 at the WP 3.0 gap check |
 | 7+ | deferred | observations, estimation, backtesting | — | — |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
@@ -8212,3 +9367,1243 @@ clean, because §15 told the reader to measure one project and the largest proje
 the one the seeder creates. Sweeping all seven found 96 duplicate keys, 376 null
 volumes and 27 integer `time_unit` values. **The instrument was there, the
 instruction was wrong, and nothing between them would ever have said so.**
+
+### WP 6.2 (slice 1) — The engine scan, corrected · 2026-09-17 · no migration
+
+**What the previous package promised.** WP 6.1 closed with a countable hand-off:
+nine broken chains ratcheted in `resolutionChains.test.ts`, "a fix is a name
+leaving `KNOWN_BREAKS`". WP 6.2 was to start from that list.
+
+**What this one found: the list was wrong, in both directions.** The loop rule
+this plan has repeated since WP 5.1 — *sanity-check the count before believing
+it* — is what caught it, and it is now five for five.
+
+Door 3 of WP 6.1's engine scan was "the field appears as a quoted key in
+`project_map.py`". Checked against the whole engine tree:
+
+- **Too loose.** `order_up_to` passed on `project_map.py:865`:
+
+  ```python
+  w.append(MappingWarning("info", "policy:inventory_control", "order_up_to",
+           "legacy absolute order_up_to replaced by coverage-based κ (≈8 weeks)"))
+  ```
+
+  The scan accepted the string that says the engine DROPS the field as proof it
+  consumes it. Both stages' `order_up_to` were reported as resolving and are not.
+- **Too narrow.** Door 3 read `project_map.py` and nothing else, so six of the
+  nine breaks said "read by nothing" about fields that are read —
+  `review_period_days` at `sim-worker/sim_worker/engine.py:323` and
+  `order_up_to` at `sim-worker/sim_worker/engine.py:332`, and `primary_source`/`sourcing_firm` by the product, which
+  `project_map.py:826` excludes on purpose ("firm-routing hints, never engine
+  params").
+
+**No name left the list.** Nine became eleven. The ratchet grew, which its own
+rule forbids, and the growth is recorded in the test rather than hidden by
+re-basing — the move `dataPlaneAudit.test.ts` made when its writer scan widened
+(D71). The "may not grow" rule is about a commit that breaks a chain; these two
+were broken before the scan could see them.
+
+**What changed is the sentence, and every sentence now names a remedy.**
+`classifyBreak` sorts the eleven into five shapes with `file:line` apiece:
+
+| shape | n | what it means |
+|---|---|---|
+| `unread` | 1 | `material_price` — read by nothing anywhere. D18, and the only one where WP 6.1's wording was literally true |
+| `overridden` | 2 | `reorder_point` — declared in the legacy `InventoryPolicy` (`policies.py:41`) and consulted by NEITHER engine: `sim-worker/sim_worker/engine.py:320` computes `RP = avg_lt · avg_d + ss` itself. The grid accepts a number that changes no run |
+| `legacy-only` | 4 | `order_up_to`, `review_period_days` — read at `sim-worker/sim_worker/engine.py:332,323` and by no scsim mapping. §3 freezes that engine, so there is no route to the strategic one |
+| `app-routing` | 3 | `primary_source`, `sourcing_firm` — correct as built; what is missing is a declaration saying so |
+| `no-target` | 1 | `plant.initial_on_hand` — D89 |
+
+`reorder_point` is the one worth reading twice. It is not a field waiting to be
+wired; it is a field the engine computes for itself while the grid takes the
+user's number and drops it. That is a worse defect than D18's and nothing had
+named it.
+
+**Two things were fixed rather than recorded.**
+
+- **D89's display half.** `plant.initial_on_hand` declared
+  `master: { table: "products", field: "initial_on_hand" }` — a copy of the
+  supplier stage's correct `materials.initial_on_hand` — and `products` has no
+  such column. `masterValueFor` returns `undefined` for a column that does not
+  exist, indistinguishably from a master row with no value, so the cell fell
+  through to the policy bundle while the Parameter Sheet said **"reaches engine ·
+  from item master"**. A displayed value whose stated source is not its source:
+  T1, plainly. The pointer is deleted and
+  `masterPointersResolve.test.ts` is a **GATE** — empty on arrival, so a gate was
+  affordable — mutation-tested both ways (restore the pointer → red; break a join
+  key → red). The field is still read by nothing and stays on the ratchet:
+  fixing a lie is not wiring a field.
+
+  The other way out, adding `products.initial_on_hand`, was **not** taken and the
+  reason is not cost. `scsim/scsim/core/context.py:150` builds on-hand from
+  `net.materials` only, so there is no finished-goods initial inventory in the
+  strategic engine for the column to feed. That is a schema change *and* an
+  engine capability, and it needs a human.
+
+- **D92, which this package found while reading the first.**
+  `fieldStatus.ts::milestoneFor` returned the literal `"engine catalog — planned"`
+  for any family absent from `PENDING_FAMILY_POLICY`, and every caller treated it
+  as a milestone. So the sheet said, of `reorder_point`: **"stored only ·
+  activates with engine catalog — planned"**. Nothing is planned — `inventory`
+  and `sourcing` are not in that table, and D91 says what those fields are. The
+  other branch read "not consumed yet", where *yet* carries the same promise more
+  quietly. `FieldEngineStatus` gains `stored-only`, `milestoneFor` returns `null`
+  instead of a sentence, and the sheet now says **"stored only · no engine
+  consumer, none planned"**. The product was inventing a future to avoid telling
+  a user a field does nothing.
+
+**Gap check.** Three findings, none of them this slice's to fix:
+
+1. **`SCSIM_VISIBLE_FIELDS` is a fourth authority for the same fact.**
+   `schemas.ts:426` hand-lists which fields scsim consumes; `resolutionChains.ts`
+   computes it from the registry and `project_map.py`. They agree today, and
+   nothing checks that they do — `single-source` (I1). The cheap gate is a test
+   that the two derivations match; it is not written here because the honest
+   version needs the corrected doors to be stable for more than one commit.
+2. **`readsKey` is Python-shaped and `citeAppReads` is not.** The app scan is a
+   quoted-or-identifier match over three curated modules, which is loose. It is
+   confined to choosing between two BREAK classes and never decides whether a
+   chain resolves, and the code says so — but a scan this plan has now been
+   burned by five times should not be believed further than that.
+3. **Nine of the eleven need a decision, not a fix.** `legacy-only`,
+   `overridden` and `unread` all end the same way: a field that is editable,
+   stored, versioned and hashed into `policy_hash` while changing no result.
+   Remove the column, wire the field, or badge it — and that is a product call
+   per field. The badge now tells the truth (D92), which makes deferring the
+   other two honest rather than silent.
+
+**Still open in WP 6.2**, untouched by this slice: D17, D18, D23, D24, D26, D34,
+D47, D48, D49, D51, D53, D58, D59, D66, D69, D71, D85, D87, and the
+`StagePolicyTable.tsx:1208-1276` / `resolveEffective.ts` de-duplication.
+
+### WP 6.2 (slice 2) — One resolver, and the sixty suppliers · 2026-09-17 · no migration
+
+**What slice 1 promised.** That the remaining WP 6.2 defects were reachable now
+that the evidence base was corrected. The first one attempted proved the order
+mattered more than expected.
+
+**D17 could not be fixed once, so the duplication was paid first.** The intended
+target was D17 — a null `capacity_per_week` (`item_master.sql:44`: "NULL = ∞")
+rendering as a substituted `0`. Its fix lives in `liveDefault`, and `liveDefault`
+existed **twice**: `resolveEffective.ts::resolveCell` and a verbatim copy inside
+`StagePolicyTable.tsx`'s cell renderer, about seventy lines, each carrying a
+comment telling the reader to change both. Fixing D17 in two places would have
+deepened the exact debt this package owns, so the de-duplication came first and
+D17 became a one-place change.
+
+The desktop grid now calls `resolveCell`. `ResolvedCell` gained `cellValue`,
+`liveDefault` and `edited` — the intermediates that renderer needs, and nothing
+else, because a second return shape is how the copy started. `oneResolver.test.ts`
+is a **GATE**: both renderers must call `resolveCell`, neither may declare the
+ladder inline, and a third assertion checks the ladder is still present in
+`resolveEffective.ts` so the first two cannot pass by renaming. Proven red against
+the pre-commit tree — two of three fail on `HEAD~`.
+
+**Why a gate and not a comment.** The plan has already run this experiment. D26:
+two implementations of the D1 prefill rule, both imported, both unit-tested, one
+never called — both suites green while only one ran. A comment did not prevent
+that, because nothing was watching.
+
+**D17, and the correction it needed.** The recorded symptom was "renders as `0`,
+no dot", measured at **60 of 60 suppliers**. That is true of the MOBILE list and
+not of the desktop grid, and checking which was worth the time:
+
+- `MobileStagePolicyList` renders `resolveCell`'s `value`, which is
+  `cellValue ?? liveDefault` — so it read **"Capacity 0"** for all sixty.
+- The desktop grid passed only `cellValue` to `NumCell`, so it rendered the "—"
+  placeholder: not a claim that capacity is zero, but nothing saying blank means
+  unlimited, and no dot either — `default`'s colour is null.
+
+Two different failures, one `?? 0` behind both, and the six-for-six lesson holds:
+a symptom recorded once is a symptom recorded on one surface.
+
+The fix is `declared-fallback` (I6) applied to the UI. `columnSpecs.ts` declares
+`master.nullMeans: { token: "∞", title }` **next to the pointer**, which is the
+one place a reader looks to find out what the column is. The resolver substitutes
+no number, and returns provenance `contract` — a state that HAS a colour, so the
+substitution is visible at the point of display (T2). `NumCell` gained a
+`placeholder`, `formatValue` an argument. Mutation-tested three ways: restore the
+`0` → red; make the dot invisible → red; drop the declaration → three red.
+
+**One trap found while fixing it, worth naming.** `kindOf` picks the cell widget
+with `typeof liveDefault === "number"`. The fix makes `liveDefault` *undefined*
+by construction, so the capacity column would have silently become a **text
+input** — a fix for a display lie introducing a worse editing bug. `kindOf` now
+forces a `nullMeans` column to the numeric widget, and the fourth assertion in
+`columnNullMeans.test.ts` gates that `nullMeans` is only ever declared on a
+column `COLUMN_FIT` calls numeric, so that shortcut stays true.
+
+**One reserved state spent, and WP 6.3 should know.** §13 WP 6.3 reserves
+`contract` and `estimated` for the provenance vocabulary. This package spent
+`contract`, for exactly its reserved meaning — the value is what the schema says
+an empty cell means. `ProvenanceLegend` was updated in the same commit, because a
+state absent from the legend under-reports, which is the failure §13 warns about.
+`estimated` is untouched.
+
+**Gap check.** Two findings, neither this slice's:
+
+1. **`nullMeans` is declared on exactly one column, and it is not the only
+   nullable master column that means something.** `materials.moq` and
+   `products.initial_on_hand` are nullable too, and nothing here establishes what
+   *their* empty state means — the sidecars do not say and the engine's behaviour
+   was not read. Declaring a meaning that is wrong is worse than declaring none,
+   so only the column with a schema comment, an engine field-map entry and a §15
+   measurement behind it was declared. The rest is a per-column reading.
+2. **The desktop grid and the mobile list still differ in what they DISPLAY for a
+   resolved value**, even sharing one resolver: the grid passes `cellValue` to
+   `NumCell` and the list renders `cellValue ?? liveDefault`. That difference is
+   how D17 hid on one surface for six phases. It is deliberate today (an input
+   must not pre-fill with a default the user did not type), but nothing states it
+   and no test holds it, so the next person to "fix the inconsistency" can
+   reintroduce the frozen-default bug D1 is about.
+
+**Still open in WP 6.2:** D18, D23, D24, D26, D34, D47, D48, D49, D51, D53, D58,
+D59, D66, D69, D71, D85, D87.
+
+### WP 6.2 (slice 3) — D26, and the test that belonged to the dead copy · 2026-09-17 · no migration
+
+**What slice 2 promised.** Slice 2 cited D26 twice as the reason a gate beats a
+comment. This slice closes it, and the closing found the cost was already paid.
+
+**D26 predicted a risk. The risk had already happened.** D26 records two
+implementations of the D1 prefill rule and warns that "the next edit to *the rule*
+has even odds of landing on the dead one". Comparing them line by line before
+deleting either — rather than assuming the dead one was a copy — found they
+**already disagreed**, on a case both were tested for:
+
+> the user types a value over an imputed average
+
+| | answer |
+|---|---|
+| `isPrefillPersistable` (live, called at `StagePolicyTable:866`) | **not persisted** — `__imputed` is tested BEFORE the draft |
+| `prefillSelect.ts::prefillSourceFor` (imported, never called) | **persisted** as `"edit"` — `__imputed` was not tested at all |
+
+`policyPrefill.test.ts` asserted the second answer, in a test named *"does NOT
+persist an imputed average, but DOES persist an edit of one"*. It passed for its
+whole life, against a function no screen has ever called. **That is worse than an
+untested rule**: it is a claim on the record that the product behaves a certain
+way, and here the claimed behaviour is the D1 defect's own shape — freezing an
+estimate as though it were data — written down as the intention.
+
+**Which answer was kept, and why it is not just incumbency.** The live one. The
+prefill's job is to freeze what the DATA says; an imputed average is an estimate
+to verify whether or not somebody typed over it; and a manual save is a different
+path that still writes the user's value. The assertion is inverted **in place**,
+with the reasoning written above it, so a later reader does not find a test that
+looks edited to pass.
+
+**A second difference, latent.** The dead copy had a third source, `"decision"`,
+reading `__decided`. The live rule has none and needs none:
+`useStageRows::markFromData` writes `__from_data.primary_source` whenever the
+field has a value, so the G16 routing decision persists through the same door as
+an uploaded column. Adding a `__decided` branch would make a field with **no**
+value newly persistable — the other half of §4 D23, and not something to change
+blind while closing a different defect. The test fixture carried `__decided`
+without the matching `__from_data`, which no row from that hook actually emits;
+it is corrected, and a new assertion pins that a `__decided` marker ALONE does not
+persist.
+
+**The gate.** `oneResolver.test.ts` gained two assertions: exactly one module in
+`src/lib/policies` may define the predicate, and that predicate must still test
+`__imputed` before the draft — the order that IS the behaviour, and the exact
+point the copies disagreed on. Mutation-tested: hoisting the draft test fails both
+the gate and the behavioural test.
+
+**Gap check.** Two findings:
+
+1. **`__from_data` and `__decided` overlap and nothing says how.** `markFromData`
+   sets `__from_data.primary_source`; `useStageRows` also sets
+   `__decided.primary_source` unconditionally on the same rows. One field, two
+   provenance markers, with different rules keying off each — `__decided` drives
+   the `suggested` dot, `__from_data` drives persistence. The relationship is
+   discoverable only by reading both writers. This is the substrate D23 sits on
+   and it should be settled when D23 is.
+2. **The deletion removed a vocabulary the plan may want back.** `PrefillSource`
+   is now `"edit" | "data"`, where the dead copy had three. If WP 6.3's provenance
+   export wants to say *why* a prefill wrote a value, the label already exists and
+   is honest for the two cases that occur.
+
+**Still open in WP 6.2:** D18, D23, D24, D34, D47, D48, D49, D51, D53, D58, D59,
+D66, D69, D71, D85, D87.
+
+### WP 6.2 (slice 4) — A saved sourcing choice survives a reload · 2026-09-17 · no migration
+
+**What slice 3 promised.** It deferred one thing explicitly: "adding a `__decided`
+branch would make a field with NO value newly persistable, which is the other half
+of §4 D23". This slice is that other half, and the deferral was right — the
+condition that made it unsafe is exactly what D23 turned out to be.
+
+**Both of D23's recorded mechanisms are real.** Verified against the code before
+touching either, because eight packages in a row have found "already verified"
+lines wrong:
+
+1. `getEffectiveValue` returns `dataRow[field]` before consulting the override
+   bundle, and `useStageRows` always puts a boolean `primary_source` on the row.
+   A saved override could never surface.
+2. `saveAll` skips any edit equal to the family default, and `primary_source`
+   defaults to `false`. Un-checking a primary wrote nothing at all.
+
+**The root cause is one step further back than the row said.** Why was a
+SUGGESTION sitting in the slot reserved for uploaded data? Because a
+`markFromData` helper put it there — while the comment at **both** call sites
+said these fields are "not `__from_data`". The intent was on the record and the
+code did the other thing. Three costs, and the recorded defect is only the first:
+
+- the shadowing above;
+- a green **"From project data"** dot for a value no upload contained — §4 D16's
+  exact shape, on the most-clicked cell in the stage;
+- `hasRealProjectData` counting a project with no uploads at all as having real
+  data.
+
+**The fix, in four parts, none of which could ship alone.**
+
+- Routing decisions carry `__decided` only. `markFromData` is deleted; it existed
+  for nothing else.
+- `getEffectiveValue` resolves a `__decided` field against the **raw override
+  patches** (`savedOverrideValue`) rather than `effectivePolicy`'s merged answer.
+  That distinction is the whole fix: the merged bundle cannot tell *somebody saved
+  `false`* from *nobody saved anything and the default is `false`*, and for a
+  routing decision those are opposite answers. It then falls back to the
+  suggestion, so a fresh row still shows one — ranking the bundle above the row
+  would have deleted **every** suggestion instead of the replaced ones.
+- `saveAll` no longer drops an edit equal to the default when the field is
+  overridden or is a decision. Both exceptions are the same user action.
+- `prefillSourceFor` gains the `decision` source. Taking the decisions out of
+  `__from_data` would otherwise have silently broken blueprint **G16** — the
+  pre-dispatch gate reads the primary supplier from the SAVED bundle, so the
+  prefill has to write it. This branch is now the only thing that keeps it
+  satisfied.
+
+`savedRoutingSurvives.test.ts` proves the round trip a person performs — decide,
+persist, re-resolve — and **four of its nine assertions fail against the pre-fix
+tree**, including the round trip itself. Two of its assertions exist to pin what
+must NOT change: an uploaded field still outranks the bundle (WP 4.4's staleness
+brief turns on that), and a row with no `__decided` map behaves exactly as before.
+
+**Two transcriptions had to move with the behaviour, and neither is a test edited
+to pass.** `RESOLUTION_ORDER` is a transcription of the resolver's branches, so it
+gains `savedOverride` and `suggestion` steps; and `policyPrefill.test.ts`'s
+assertion that "a `__decided` marker ALONE does not persist" — which slice 3 wrote,
+correctly, one slice ago — is now deliberately false, and says so above itself with
+the reason.
+
+**D24 closed in the same commit**, being the same class one stage over: a value
+the application COMPUTED wearing the marker that means an upload carried it.
+`production_lead_time_mean_days` is the median of a product's **inbound** lead
+times. Its latency was confirmed rather than inherited — the plant spec declares
+no column, AND `runPrefill` iterates the spec rather than the row's fields, so
+both ways it could have been live were checked. Fixed while cheap: the median
+moves to `resolveField`'s imputed argument, keeping the same precedence and
+telling the truth.
+
+**Gap check.** Three findings:
+
+1. **`resolveField` decides a provenance from a value's SHAPE, not its origin.**
+   Its real branch fires on `Number.isFinite(r) && r > 0`, so any number in the
+   third argument becomes `__from_data`. That is how D24 happened, and the
+   parameter position is the only thing distinguishing "uploaded" from
+   "computed". A named argument, or two functions, would make the class
+   unwritable; today a gate would have nothing textual to key on.
+2. **There is no `derived` provenance for a non-master field.** `resolveCell`'s
+   `derivedFallback` requires `col.master`, so a computed non-master value can
+   only be `data` or `imputed`. `imputed` is the honest choice for D24 and is not
+   an exact one — a median of a real signal is not a project average. WP 6.3 owns
+   the vocabulary and `estimated` is still reserved.
+3. **`__from_data` is now three markers' worth of meaning in two maps.** Uploaded
+   (`__from_data`), estimated (`__imputed`), decided (`__decided`) — with
+   `savedOverrideValue` keying off the third and the prefill off all three.
+   Nothing states the set or checks it is exhaustive; a fourth kind of value will
+   be added to whichever map is nearest.
+
+**Still open in WP 6.2:** D18, D34, D47, D48, D49, D51, D53, D58, D59, D66, D69,
+D71, D85, D87.
+
+### WP 6.2 (slice 5) — The customers table reaches the engine · 2026-09-18 · no migration
+
+**What slice 4 promised.** Nothing about this; D69 was picked as the highest-value
+item left in the package — a user input that changes no result, rather than a
+display defect. It is the first slice whose fix is in `scsim` rather than `src/`.
+
+**The recorded half was right and the unrecorded half was worse.** D69 names
+`priority_weight`. The mapper built `Customer(id=c, name=c)` from the ids on
+outbound arcs and never read the `customers` table, so every customer arrived
+with the entity defaults. That makes `priority_weight` inert — P-C.2 falls back
+to `Customer.priority_weight` for any customer its `priority_weights` param does
+not name, and the fallback was always 1.0.
+
+`segment` is the other half, and it fails in a way that hides itself:
+**`sla_tiers` is keyed BY SEGMENT**, every customer was in `"default"`, so no
+tier could ever match and every guaranteed fill floor was 0.0. **The engine
+already warned about this** — `unknown_sla_segment`, in P-C.2's own feasibility
+check. The warning named the symptom for as long as the defect existed, while
+nothing named the cause, because the segments it compared against were a
+constant.
+
+**The table was not merely unmapped — it was never fetched.**
+`load_project_data` did not request it and `build_project_data` had no parameter
+for it, so the fix spans three layers. `ProjectData` gains `customer_rows`,
+additive rather than retyping `customers`: the id set is the union of this table
+and the ids found on outbound arcs, and a customer can legitimately appear only
+on an arc. `_build_customers` merges them and overrides an entity default **only
+where the table says something** — a NULL column is not a value, and
+`Customer.segment` is typed `str`, so passing `None` would raise rather than fall
+back. An id with no row keeps the defaults, and a warning says how many did.
+
+**Not verified locally, and that is stated rather than glossed.** `scsim` imports
+`pydantic`, the egress proxy denies PyPI — the same environment limit D87
+records — so no Python in this repository can be executed from a work-package
+session. `sim-worker/tests/test_customer_attributes.py` is the verifier;
+`scsim-tests.yml` runs it on any `scsim/**` or `sim-worker/**` push. Six
+assertions, including the two that pin what must not change (an id with no row
+still appears; no table at all behaves exactly as before) and the one that states
+the property P-C.2 actually needs rather than a per-customer value: **more than
+one segment exists at all.**
+
+Ruff caught a real bug before it shipped — the first draft's `customer_rows`
+block landed in `load_project_data`'s CALL rather than `build_project_data`'s
+`ProjectData(...)`, where `customers` is not in scope (`F821`). Ruff's finding
+count for the changed trees goes 31 → 32, and the one addition is `CustomerRow`'s
+`F401` in `scsim/io/__init__.py`, which every other name in that re-export file
+already carries.
+
+**Two findings, both recorded rather than fixed, and the first is the structural
+root.**
+
+- **D94 — `P-C.2` does not DECLARE what it reads.** Its `data_requirements` names
+  one field, `outbound_logistics.volume`. It reads `Customer.priority_weight` and
+  `Customer.segment` on every run. That silence is why D69 survived adoption:
+  the sidecar could record `consumed_by: null` unchallenged, the mapper could
+  omit the table with no requirement naming what it failed to supply, and every
+  tool deriving "what the engine reads" from the registry — including WP 6.1's
+  door 1 — was blind to both columns.
+
+  The sidecar also gave a **false reason** for the blank, twice: *"`scsim` has no
+  customer-priority concept today … none of [the `P-C.x` policies] is
+  implemented"*. `customer_allocation` is `status: implemented` in the registry
+  export. The conclusion was right, the cause was wrong, and the wrong cause sent
+  the next reader to the blueprint's catalog instead of to `project_map.py`.
+
+  **The declaration was written and then reverted in this session.**
+  `registry.generated.json` is committed and `gen_frontend_registry.py --check`
+  gates it; regenerating needs `pydantic`; PyPI is denied here. Landing the
+  source change would have shipped a knowingly-red gate, which is the trade §5
+  exists to refuse. It needs a session that can run Python.
+
+  Once declared, **the gate it enables is the valuable part**: an implemented
+  policy's declared data requirement may not carry `consumed_by: null` in the
+  sidecar — the exact inverse of the rule `contract:generate` already enforces in
+  the other direction.
+
+- **D95 — `sla_fill_floor_pct` was given `priority_weight`'s reason rather than
+  its own.** Both notes said the same thing and only this one's conclusion
+  survives: P-C.2 IS implemented and DOES guarantee fill floors, via `sla_tiers`,
+  keyed by segment. This column is per customer, and `Customer` has no field for
+  it, so there is nothing to carry it into. Carrying it would mean deciding what
+  happens when two customers in one segment declare different floors — an engine
+  change, not the reader change D69 was.
+
+**Gap check.** One more, and it is a product gap rather than a data one: **no
+surface in this application writes `customers`.** Two of its columns now reach
+the engine and decide who is served when supply is short, and they can only be
+set by hand in the database. The sidecar's closing line said the missing writer
+was tidiness; it is now binding, and it says so.
+
+**CI caught what the session could not run, on the first push, and the catch was
+a real one.** `scsim`'s `test_e1_fully_specified_project_has_no_silent_fallbacks`
+— the engine-retirement gate E1 (§3) — failed: 222 passed, 1 failed. The first
+draft emitted its "these customers kept the engine defaults" note whenever ANY
+customer fell back, including when the table supplied no rows at all, and E1's
+rule is that a fully-specified project maps with no residue.
+
+E1 was right and the note was wrong. A project with no customer master data IS
+fully specified: the table is optional and, per D94, nothing in the product
+writes it — so every project in existence would have carried that note from this
+commit onward. The note now fires only on PARTIAL coverage, where the table
+describes some of a project's customers and not the rest, which is a gap in data
+somebody is actively maintaining rather than a baseline nobody chose. Pinned
+both ways in `test_customer_attributes.py`: silent when the table is absent,
+reported when coverage is partial.
+
+**And a SECOND bug, in the package's own new test, which the same run caught.**
+`test_a_row_naming_an_id_with_no_demand_is_reported_not_silent` failed: the GHOST
+warning never fired. The draft had also unioned the table's rows into the
+customer ID SET — so a row naming a customer the graph does not trade with became
+a `Customer` entity, and `unmatched` compared against a set that already
+contained every row and could never find one.
+
+Two changes that each looked right and contradicted each other. The id set is now
+left exactly as it was before D69 — **the table attributes customers, it does not
+decide which ones exist** — which is both the minimal fix and the correct one:
+widening it would have put demand-less customers into `len(net.customers)`, which
+P-C.2's own feasibility check reads.
+
+Worth recording as a pattern rather than an incident. **Two bugs, in a change
+that was reviewed, linted, type-checked and reasoned through — and neither was
+findable without executing it.** Both were in BRANCHING, which is why the fix
+came with a local harness: `_build_customers`'s body is now exercised against
+stub `Customer`/`MappingWarning` classes, no `pydantic` required, over the four
+cases that matter (no table, partial, ghost row, full). That harness is the
+thing to reach for next time a work-package session has to touch Python: it
+cannot run the engine, but it can run a function.
+
+**Still open in WP 6.2:** D18, D34, D47, D48, D49, D51, D53, D58, D59, D66, D71,
+D85, D87, D94, D95.
+
+### WP 6.2 (slice 6) — All three gates, every time · 2026-09-18 · no migration
+
+**What slice 5 promised.** Nothing about this. D85 was picked because it is the
+defect that makes every other verification claim in this plan weaker: three work
+packages reported "lint at baseline" on the strength of a command that stopped at
+its first step.
+
+**The recorded remedy was right to be refused.** D85's own note says flipping
+`&&` to `;` "turns a red gate into a redder one" and defers the fix to whoever
+pays down the eslint debt. `;` is worse than that note suggests — `a; b; c`
+reports the exit code of `c` alone, so a red eslint would begin **passing**. That
+is a gate switched off in the name of repairing it, and it would have looked like
+progress.
+
+`scripts/lint-all.mjs` runs all three, prints each one's output verbatim, and
+exits non-zero if any failed. Strictly more information, identical verdict, and
+**no dependency on the eslint debt at all** — which is why this did not have to
+wait for the package D85 deferred it to. Nothing here makes eslint pass, hides
+its errors, or adds a baseline threshold.
+
+**The first run proved the row's own point.** `audit:ui` is also failing — two of
+three gates red, where the command previously stopped at one and reported that as
+the whole story. Anyone running `npm run lint` on this repository has been seeing
+one third of their local gate coverage.
+
+**No CI risk, and this was checked rather than assumed.** CI has never invoked
+`npm run lint`: `data-contract.yml` calls each command directly and its header
+comment already states the reason, in the same words D85 uses. This is the local
+command catching up with what CI decided some time ago.
+
+**Gap check.** Two findings:
+
+1. **`npm run lint` is now honest and still not sufficient.** It covers eslint,
+   `audit:ui` and `check:docs`. It does not cover `npm test`, `contract:check` or
+   `contract:rehearse`, which is why the loop driving this work runs them
+   separately. A contributor who runs only `lint` still misses the data contract
+   entirely. Whether `lint` should grow or a `verify:local` should exist beside
+   it is a convention question, not a defect.
+2. **The eslint debt is now VISIBLE per-gate and still unowned.** 336 errors, 116
+   warnings, mostly `no-explicit-any` and `ban-ts-comment` in edge functions. No
+   package owns paying it down, and the summary line now prints that number on
+   every local run, which is the right place for it to become uncomfortable.
+
+**Still open in WP 6.2:** D18, D34, D47, D48, D49, D51, D53, D58, D59, D66, D71,
+D87, D94, D95.
+
+### WP 6.2 (slice 7) — The organization row, by uuid · 2026-09-18 · `20260918000001`
+
+**What slice 6 promised.** Nothing about this. D47 was picked because it is the
+last named exception to `uuid-identity` (G1) and because it is the only open
+defect in the package with a cross-tenant read behind it.
+
+**The defect, reproduced before it was fixed.** `rehearsal/160` run against the
+unmigrated database fails on §2: a second organization sharing a display name is
+readable, and with it that tenant's `settings` jsonb. `organizations.name` has no
+unique constraint — the introspected schema lists exactly two, `organizations_pkey`
+on `id` and `organizations_slug_key` on `slug`.
+
+**The `slug` branch was wrong too, in a way the defect row did not name.** `slug`
+IS unique, so it admits at most one row and there is no collision — but the
+comparison was the caller's organization **name** against another organization's
+**slug**. A tenant whose slug happens to equal another tenant's display name was
+readable by every member of that other tenant. §4 pins it.
+
+**The policy rewrite was only half the work, and the other half is the finding.**
+Making the read uuid-only denies any caller whose `approved_users.organization_id`
+is NULL — and D29's own note is the rule here: *"a package whose job is to stop
+revoking access must not add a new way to revoke it."* §15 measured 14 of 14
+accounts carrying the uuid, which is what let D29 proceed in the first place.
+
+**Nothing kept that true.** The column is nullable, has no default, no trigger
+stamped it, and the backfill ran once. That is **D96**, and it is load-bearing
+for D29 as much as for this: since `20260916000011`, an account arriving without
+the uuid can read *no project at all*, silently. The trigger this migration adds
+closes the write path for both.
+
+**It refuses to guess.** When two organizations share the display name it is
+resolving, it stamps nothing and leaves NULL (§6). Picking one would grant an
+account a tenant nobody put it in — this defect exactly, arriving through the
+write path instead of the read path. NULL denies; a guess mis-grants.
+
+**Verification.** Red first on §2. Three mutations: restore the `name` branch
+(§2 red), drop the trigger (§5 red), let the trigger guess on an ambiguous name
+(§6 red). All three rehearse modes green — plain, `--fixtures`, `--since HEAD`.
+
+**One mutation passed for the wrong reason and was redone.** The first attempt at
+the trigger mutation *renamed* it, and a renamed trigger still fires. It came
+back green and would have been recorded as a load-bearing assertion that isn't.
+That is §16 · WP 4.1 · E happening again, three packages later, to someone who
+had read it.
+
+**Gap check.** Three findings, all recorded:
+
+1. **D96's general shape is not gated.** A `NOT NULL` on
+   `approved_users.organization_id` would make the invariant structural rather
+   than maintained, and adding one needs a **fresh** §15 read — reusing the
+   2026-09-16 number to prove it safe would be the same mistake this row exists
+   to record.
+2. **Nothing checks for a write path that bypasses the trigger.** A `COPY`, a
+   restore, or a `SECURITY DEFINER` function writing `approved_users` directly
+   would reintroduce the NULL. The trigger is a `BEFORE INSERT OR UPDATE OF`, so
+   ordinary DML is covered and bulk paths are not read.
+3. **D27's other uuid columns may share the one-off-backfill shape.** This
+   package looked at `approved_users.organization_id` because D47 forced it to.
+   Whether `projects.organization_id` and the rest were backfilled and left
+   unmaintained the same way is unread.
+
+**Still open in WP 6.2:** D18, D34, D48, D49, D51, D53, D58, D59, D66, D71, D87,
+D94, D95, D96.
+
+### WP 6.2 (slice 8) — Nine foreign keys that never existed · 2026-09-18 · no migration
+
+**What slice 7 promised.** Nothing about this — but slice 7's own
+`--since HEAD` run printed the nine skip-warnings, which is how D53 got picked.
+The instrument reported its own blind spot and the package believed it.
+
+**The defect.** `readQualifiedName` has always returned `{ schema, name }`; the
+introspector read only `.name`, so `REFERENCES auth.users(id)` was recorded as
+`users`. `rehearsal-schema.mjs` qualified that bare name to `public.users`, found
+no such table, and skipped the key — on **every rehearsal this repository has
+ever run.** Production has all nine.
+
+The fix is additive: `references.schema` is recorded and `table` stays bare,
+because the rename and drop trackers in the same file compare against it.
+Measured after: 9 references record `schema: auth`, 106 `public`, 0 unqualified,
+and the nine warnings are gone.
+
+**The rehearsal proves semantics, not existence.** A warning that stops appearing
+is not a constraint, and a constraint is not a CASCADE — three claims, and only
+the third is what a reader of D53 needs. `rehearsal/170` deletes a user and
+watches: `ingest_runs` REFUSES (NO ACTION — the orphaned-actor case), and
+`scenarios.created_by` SET NULLs while the scenario itself survives.
+
+**── THE PART WORTH READING: A MUTATION THAT SURVIVED ──────────────────────**
+
+A fix to the INTROSPECTOR cannot be proven by the plain rehearsal mode, because
+that mode builds its base from the **base branch's** artifact — so until this
+merges, the nine are legitimately absent there and `170` must not fail. It
+therefore skips when all nine are missing, and raises when only *some* are (a
+partial set cannot be a stale base).
+
+That skip was written with a stated justification: "the static test catches the
+regression." **The static test did not exist yet.** The mutation — revert the
+introspector — left `170` green in every mode, because the skip branch fired on
+exactly the condition it was meant to distinguish. SQL cannot tell "this base
+predates the fix" from "the fix broke," and no amount of comment persuades it to.
+
+`introspectorRefSchema.test.ts` is what makes the skip safe rather than merely
+claimed. It reads the migrations and the artifact, needs no database, and so has
+no base to be stale. It catches both mutations: dropping the schema in the parse
+(3 assertions red) and hard-coding `public.` in the base builder (1 red).
+
+The lesson is narrower than "mutation-test everything," which this plan already
+says. It is: **when a gate is justified by another gate, build the other one
+first.** A division of labour asserted in a comment is not a division of labour.
+
+**Gap check.** Three findings:
+
+1. **D49 is the same family and is now one line from closing.** Three indexes are
+   recorded on columns renamed out from under them. The introspector's
+   `ALTER TABLE … RENAME` handling follows the column into the table but not into
+   its indexes — the same incompleteness about DEPENDENT objects that D52
+   (foreign keys), D59 (inline CHECKs) and this are. Unowned still, but the
+   pattern is now four instances and deserves one fix rather than four.
+2. **No gate says a rehearsal must not skip silently.** WP 3.1 made the skip
+   WARN, which is how D53 was found — by a human reading warnings. A run that
+   emits *any* skip warning could fail, or at least print a count the way
+   `contract:check` prints its rule tallies. Nothing does.
+3. **`--since HEAD` is the only mode that can see a tooling fix, and nothing says
+   so.** The CLAUDE.md note explains why the third mode exists (an artifact can
+   be wrong about what a migration did) without naming this consequence: a change
+   to the introspector is invisible to two of the three modes until it merges.
+
+**Still open in WP 6.2:** D18, D34, D48, D49, D51, D58, D59, D66, D71, D87, D94,
+D95, D96.
+
+### WP 6.2 (slice 9) — One parser, four defects, two aborted migrations · 2026-09-18 · no migration
+
+**What slice 8 promised.** Its gap check, finding 1: *"D49 is the same family and
+is now one line from closing … the pattern is now four instances and deserves one
+fix rather than four."* §13 said the same of D59: *"Fix it with the other two:
+they are the same parser and the same afternoon."* Both were taken at face value.
+**One of them was wrong in a way worth the whole slice.**
+
+**D59 — the inline CHECK.** `parseColumn` read a column's type, its NOT NULL and
+its DEFAULT and threw the rest away, so a `CHECK` written on the column reached
+nothing. It now extracts every one, `liftImplicitConstraints` lifts them to
+table-level constraints, `DROP COLUMN` takes them with the column, and a column
+RENAME rewrites them. **24 CHECKs became 84**, and `docs/data/tables/ingest_files.md`
+publishes its three rules — the source-kind vocabulary, `byte_size >= 0` and the
+SHA-256 shape — for the first time (§5 T1).
+
+**The measured gap was never 253 to 24.** That figure counts every `CHECK (` in
+the migration directory: shadowed re-declarations, every policy's `WITH CHECK`,
+every retry. The honest number is **65 inline column CHECKs in `CREATE TABLE`
+statements and one on an `ADD COLUMN`**, of which 60 reach the artifact and five
+are superseded by name. Sanity-checking the count changed what the fix had to do.
+
+**THE NAMING IS THE FIX, NOT A DETAIL.** PostgreSQL calls an unnamed column CHECK
+`<table>_<column>_check`. The first draft recorded `name: null`, which is honest
+about the migration text and wrong about the database — and the base build failed
+outright on `ai_chat_events_event_kind_check` already exists. Five migrations
+widen `ai_chat_events.event_kind` with `DROP CONSTRAINT IF EXISTS
+ai_chat_events_event_kind_check` + `ADD CONSTRAINT` of the same name; four more
+do it to `proposals.agent_id` and `.artifact_type`. **A constraint recorded with
+no name matches no DROP**, so the artifact kept the ORIGINAL, NARROWEST
+vocabulary beside the final one. The duplicate-name failure was the lucky
+outcome. The unlucky one is a rehearsed database that refuses what production
+accepts — D59's own defect, in the other direction, produced by fixing it.
+
+**D98 — and the other half of D59's stated cost, measured.** With the CHECKs
+restored, four rehearsal files went red. Each had seeded a row production cannot
+hold:
+
+| File | Column | Wrote | The rule, since |
+|---|---|---|---|
+| `030` | `user_files.kind` | `report` | `report_xlsx`/`report_pdf`/`export_csv`/`upload`, `20260723000001` |
+| `110` | `ingest_runs.triggered_by` | `schedule` | `manual`/`scheduled`, `20260829120000` |
+| `170` | `ingest_runs.triggered_by` | an email address | as above |
+| `140` | `proposals.provenance` | `'{}'::jsonb` | `deterministic`/`llm_drafted`/`user_supplied`, `20260715000001` |
+
+`170`'s is the one to read: `triggered_by` is HOW a run started, `triggered_by_user_id`
+is WHO started it, and that file's whole subject is the second column. `140`'s
+`provenance` is TEXT sitting between two jsonb columns and was given a jsonb. Both
+are mistakes a CHECK would have named on the first run. **No live writer is
+affected** — `ingest_land_file` writes `'manual'` — so the four fixture rows were
+fixed and the constraints left alone.
+
+**D49 — and the finding that made this slice worth its length.** The defect row
+named three indexes and one cause. The cause is right for ONE.
+`supply_chain_data_multi_tier` has never carried `material_id` or
+`higher_level_component_id` in any definition — they are `bom_multi_level`'s —
+so no rename can have produced them. `CREATE INDEX IF NOT EXISTS` guards the
+index NAME, not the column: PostgreSQL raises 42703.
+
+**D97 — so `20250909153130` aborted in production, and nothing has ever said so.**
+Its other four statements never ran either, and `20250909153231` — **61 seconds
+later** — re-issues exactly those four with the two impossible lines removed. A
+retry, the same signature §4's `20250820145017`/`145652` pair carries. Teaching
+the replay that a rejected statement aborts its file then found a **second**:
+`20250914113723` indexes `simulation_jobs(job_id)` against a table whose live
+definition has none, and **34 seconds later** `20250914113757` runs
+`ALTER TABLE simulation_jobs ADD COLUMN job_id TEXT`. Neither was visible before
+because the abort detector keys only on the corroboration test — which of two
+`CREATE TABLE`s the later INSERTs agree with — and a file that creates no table
+is invisible to it.
+
+**── THE PART WORTH READING: THE ORDER BETWEEN TWO KINDS OF EVIDENCE ────────**
+
+The first draft read the rejected-statement evidence from the FIRST replay, before
+the corroboration test had settled. It accused **`20260916000018_natural_key_unique.sql`**
+— WP 3.3's seven unique indexes, the entire basis of `natural-key` (I4) — of
+aborting on 42703. Its index reads `inbound_logistics(plant_name, …)`, and in a
+replay where `20250820145017` has not yet been excluded, `inbound_logistics`
+still carries that aborted file's `plant_id`. **The index was right. The schema it
+was judged against never existed.** Had that shipped, the artifact would have
+dropped seven unique indexes and R5 — a `fail`, not a warn — would have gone red
+on `main` with a reason nobody could read.
+
+Settle the corroboration evidence first, judge the rejected statements against
+the corrected shape, then re-settle. `introspectorDependents.test.ts` asserts
+that `20260916000018` is NOT accused, by name, because the general rule is also
+satisfied by a detector that accuses nothing.
+
+**And the gate made the same mistake twice, in itself.** Its first draft judged
+every historical `CREATE INDEX` against the FINAL schema and accused
+`20250816052311`'s `supply_chain_data(plant)` — right until `20250822025432`
+renamed it. Its second draft judged against every column a table has ever had and
+accused `20260916000012`'s `ingest_runs(link_id)` — a column `erp_sync_runs` had
+carried since `20260829120000`, which the gate did not follow across the table
+RENAME. **That is D52, reappearing inside the gate for D49.** A rule about
+dependent objects is itself a dependent object.
+
+**Mutation-tested, nine ways.** Four against the introspector, each caught by the
+static gate: the rename stops following (2 red), inline CHECKs dropped (2 red),
+the rejected-statement detector disabled (3 red), the two abort kinds read out of
+order (2 red, including the `natural-key` assertion by name). One against the
+naming: `name: chk.name` instead of the auto-name, and the supersession assertion
+goes red. Four against `rehearsal/180` on a live database: one CHECK removed →
+raises rather than skipping; all three removed → skips and says so, while §3 and
+§4 still run; a CHECK replaced by a tautology → §2 catches it; the impossible
+index recreated under its own name → §3 raises; the renamed index put back on
+`plant` → §4 raises.
+
+**The skip in `180` §1 is safe for the reason slice 8's was not.** It is justified
+by `introspectorDependents.test.ts`, which was written, run red, and
+mutation-tested **before** the rehearsal was written. §3 and §4 need no base
+detection at all: they assert an ABSENCE and a rewrite, so a stale base fails
+them, which is the right way round.
+
+**Verified:** all three rehearse modes green (17 assertion files) · `contract:check` ✓ ·
+392 tests ✓ (was 380) · `build` ✓ · eslint 336/116 and `audit:ui` 8, unchanged.
+
+**Gap check.** Three findings:
+
+1. **The abort detector now has two kinds of evidence and no third, and the
+   third is known.** D48 is a migration that aborts on 42P13 — a function whose
+   parameters follow a defaulted one — and the rehearsal's replay prints that
+   error today (`02-replay.sql:541`). It is the same shape as D97: a statement
+   PostgreSQL rejects, in a file the artifact records as applied. Seventeen
+   historical definitions do not replay and are reported, not fatal; **nothing
+   asks which of them are in a file whose OTHER statements the artifact
+   believes.** That is D48's remaining half and it is now one loop away.
+2. **`CREATE INDEX` is the only statement kind checked for rejection.** An
+   `ADD CONSTRAINT … FOREIGN KEY` to a missing column, an `ALTER COLUMN TYPE`
+   that cannot cast, a `CREATE POLICY` naming an absent column — each would abort
+   its file and each is recorded as applied. The mechanism (`schema.impossible`)
+   is general; the one detector is not.
+3. **Nothing stops the next rehearsal seeding a row a CHECK refuses.** D98 was
+   caught because the constraints arrived, not because anything looks. Four files
+   out of seventeen carried one, which is a rate, not an accident.
+
+**Still open in WP 6.2:** D18, D34, D48, D51, D58, D66, D71, D87, D94, D95, D96.
+
+### WP 6.2 (slice 10) — D48, and the two migrations nobody counted · 2026-09-18 · no migration
+
+**What slice 9 promised.** Its gap check, finding 1: *"D48 is now one loop away
+— it is a migration that aborts on 42P13, the same shape as D97, and the
+rehearsal already prints that error."* That was right about the mechanism and
+wrong about the number.
+
+**The defect row cited a migration that does not exist.** D48 named
+`20250827190942` as the sibling of `20250827170942`. There is no such file. The
+retry is **`20250827171106`, 84 seconds later**, and it is not an inference: it
+re-issues the same four tables, three trigger functions, eight triggers, eight
+policies and the RPC, and its copy of the RPC opens with
+
+    -- FIXED: Put all parameters with defaults at the end
+
+**The migration's author knew the file had failed. The contract never did**, for
+thirteen months.
+
+**And it was three files, not one.** Scanning every `CREATE FUNCTION` in the
+history for an input parameter with no default after one with a default found
+`20250904122241` and `20250904122347`, each declaring `get_network_nodes`,
+`get_network_edges` and `get_network_summary` with `p_user_id` after a defaulted
+`p_plant_name`. The second repeats the first's error exactly as `20250820145155`
+repeats `20250820145017`'s — §4 already documents that pattern, on a different
+pair. `20250904124537` is the definition that works.
+
+**The blast radius, measured before believing it.** Aborting all three removes
+**exactly one object**: the phantom `create_disruption_scenario_v2` overload.
+No table, no policy, no index, no enum, no view and no other function changes —
+because every statement in the three files is re-issued by its retry. What DOES
+change is attribution: all four `disruption_scenario_*` tables now record
+`created_by` as `20250827171106`. Every generated page named a file that never
+ran as the place to go and read (§5 T1).
+
+**D48's open half, answered.** *"Nothing has ever checked which of the three
+overloads the callers actually reach."* There were never three to choose
+between — one was a phantom. There is exactly one call site,
+`DisruptionDialog.tsx:195`, and it sends `p_disruption_start` and
+`p_disruption_end`; PostgREST resolves an RPC by NAMED arguments, so it reaches
+`20250828005114`'s 13-parameter definition. `20250827171106`'s 11-parameter one
+is live and unreached. Dropping it is a migration and a product decision, so it
+is recorded and left.
+
+**── THE PART WORTH READING: THREE MUTATIONS THAT SURVIVED ─────────────────**
+
+The rule started with three guards. Two of them were removed, because a mutation
+deleting each produced a **byte-identical artifact and a green suite**:
+
+- **parenthesis depth**, so a `DEFAULT` inside `numeric(16, 6)` or
+  `concat(a, b)` would not count;
+- **string-literal skipping**, so the `=` in `text DEFAULT 'a=b'` would not.
+
+Neither can change an answer, and the reason is structural rather than lucky: in
+a parameter DECLARATION a `DEFAULT` or an `=` appears either at the top level as
+the default marker, or inside the default EXPRESSION that follows one — and in
+the second case the parameter already carries a default, which is the only thing
+the rule asks. **A guard that cannot change an answer is not defence; it is a
+line no test can justify**, and writing a test that "covers" it would have been
+a green assertion asserting nothing.
+
+The third survivor was a test's fault, not the code's. The word-boundary check
+has two halves — the character BEFORE `DEFAULT` and the one after — and both of
+the cases written for it (`p_defaulted_at`, `is_default`) are caught by the
+preceding-character half, because in each the keyword follows an underscore.
+Only a name that STARTS with it (`default_mode`, `defaults`) reaches the
+boundary. With those added, every remaining line of the rule has a mutation that
+kills it: the `= expr` spelling, each half of the boundary, and the
+OUT/VARIADIC exemption.
+
+**The exemption is deliberately a refusal to judge.** PostgreSQL exempts OUT
+parameters from the rule. This repository has none, and a rule that guessed at a
+shape it has never seen would be a false accusation with a migration's blast
+radius — which is exactly what slice 9's first draft did to `20260916000018`.
+
+**A fourth mistake, in the rehearsal.** `190` §4 asserts that the three network
+RPCs put their defaulted `p_plant_name` last, and its first draft read
+`proargnames[array_length(proargnames, 1)]`. **`proargnames` carries the
+`RETURNS TABLE` column names after the input parameters**, so it indexed past
+the arguments into the result columns and accused three correct functions.
+`pronargs` is the count that stops at the inputs. Red first, for the wrong
+reason, and the wrong reason was worth the ten minutes.
+
+**Mutation-tested, nine ways.** Five against the rule (detector disabled → 5
+red; the ordering inverted → 4 red; `= expr` dropped → 1; each boundary half →
+1; the exemption dropped → 1), and five against `rehearsal/190` on a live
+database (the phantom overload restored → §1; the caller's overload replaced by
+a 13-argument decoy with different NAMES, so the count stays 2 → §2, which
+`DROP` alone could not reach because §1 fires first; a disruption table renamed
+away → §3; an illegal network ordering restored → §4).
+
+**`190` needs no base-detection branch, and that is the point.** `170` and `180`
+assert that something IS present, so a base built from the base branch's
+artifact legitimately lacks it and they must skip. Every section here asserts an
+ABSENCE or a count that a stale base FAILS — the right way round. §4 says so in
+place.
+
+**Verified:** all three rehearse modes green (18 assertion files) · the replay's
+42P13 error is GONE, 17 historical non-replaying definitions down to 16 ·
+`contract:check` ✓ · 407 tests ✓ (was 392) · `build` ✓ · eslint 336/116 and
+`audit:ui` 8, unchanged.
+
+**Gap check.** Three findings:
+
+1. **D99 — the rejected-statement class has two detectors and at least three
+   more members.** `ADD CONSTRAINT … FOREIGN KEY` to a column that does not
+   exist, an `ALTER COLUMN … TYPE` that cannot cast (§4 already documents
+   `20250820145017` failing exactly that way, found by corroboration rather than
+   by rejection), and a `CREATE POLICY` naming an absent column. Each aborts its
+   file; each is recorded as applied.
+2. **Sixteen historical definitions still do not replay, and nothing asks which
+   FILE each one is in.** The rehearsal prints them and calls them "reported,
+   not fatal". Three are `syntax error at or near "DEFAULT"` — a different
+   error from 42P13 and possibly a different abort. A line that names the
+   migration rather than the offset in a concatenated replay file would turn
+   sixteen anonymous errors into sixteen answerable questions.
+3. **The unreached overload is dead surface with a live GRANT.**
+   `20260610000001_grant_disruption_rpc.sql` grants `create_disruption_scenario_v2`
+   to the anon role. Whether it grants one overload or both, and whether an
+   unreachable 11-parameter RPC should be callable at all, belongs with WP 6.4's
+   decision plane — the disruption tables are eleven of its own.
+
+**Still open in WP 6.2:** D18, D34, D51, D58, D66, D71, D87, D94, D95, D96, D99.
+
+### WP 6.2 (slice 11) — Three writers that already took the actor · 2026-09-18 · `20260918000002`
+
+**What slice 10 promised.** Nothing about D71 — its gap check pointed at the
+rejected-statement class. D71 was taken because it is one of the two open items
+that MOVES AN INVARIANT (`audit-actor`, G4), and because §13's own budget line
+says each one is "one line plus a rehearsal assertion that reads the row back".
+
+**That line is true of three of the sixteen and false of the other thirteen, and
+nothing said which.** The ratchet in `dataPlaneAudit.test.ts` lists sixteen
+names as one debt. Reading each signature splits them:
+
+| | |
+|---|---|
+| **3** already take `p_user_id` and never pass it on | one line, no signature change, no caller change |
+| **3** already attribute via `assert_writer_may_act` | nothing to do; on the list because a text scan cannot follow a call |
+| **10** take no actor parameter at all | a migration AND every caller — a different size entirely |
+
+`apply_policy_bundle`, `assign_bom_line` and `assign_outbound_customer` are the
+first group, and they are `assign_material_supplier`'s shape three more times:
+the actor was a parameter all along and only the line telling the trigger was
+missing. `20260918000002` adds it, guarded on NULL.
+
+**THE BODIES WERE COPIED MECHANICALLY, NOT RETYPED.** A `CREATE OR REPLACE` that
+silently drops a line of a 105-line function is a regression no gate in this
+repository would catch — the artifact would record the new body and agree with
+itself. So the migration was generated by a script that extracts each function
+verbatim and inserts one block after `BEGIN`, and the diff against each original
+is exactly that block and nothing else.
+
+**`rehearsal/200` poisons before every call.** `set_config(..., true)` is
+transaction-local and a rehearsal file is one transaction, so asserting that a
+row names the actor proves nothing if the GUC already held that value —
+`rehearsal/110` §7 was written that way first and its mutation left it green.
+Here the GUC is set to a STRANGER before each call and each function is called
+with a different actor, so a row naming the actor can only have come from the
+function.
+
+**§4 of it is the half that is easy to leave out.** `apply_policy_bundle`'s
+`p_user_id` is `DEFAULT NULL`. An unguarded `set_config(..., p_user_id::text,
+true)` writes an empty string over whatever the caller's transaction had already
+established — making the row LESS attributable than before this migration. The
+guard prevents that, and the mutation removing it is caught by §4 alone.
+
+**── THE PART WORTH READING: THE BUDGET HAS BEEN WRONG TWICE ───────────────**
+
+D71 said "seventeen have a live caller". D78 corrected it to six. **Neither
+survived measurement: twelve of the thirteen were reachable.** A figure written
+in prose goes stale the moment a caller is added and nothing notices — which is
+the defect the two orphan tables were (D3, D4), in a defect row instead of a
+schema.
+
+So it is no longer prose. `dataPlaneAudit.test.ts` derives the number and fails
+when §4 stops matching it, which makes editing one without the other impossible.
+
+**And the first draft of that counter was wrong in the direction that matters.**
+It matched `rpc('<name>')`, and `useItemMasters.tsx` dispatches through
+`sb.rpc(UPSERT_RPC[table], …)` against a lookup table whose values are the RPC
+names — so the upload path's `bulk_upsert_materials` and `bulk_upsert_products`
+were reported as having NO caller at all. Counting the name as a whole string
+literal catches a call and a dispatch entry alike, and excludes prose and
+backticked mentions in comments without needing a parser. Nine of the ten are
+reachable; `create_default_policy_defaults` is referenced by nothing but a test.
+
+**One mutation survived and it was the mutation's fault, again.** Removing the
+`set_config` line from `assign_bom_line` left `rehearsal/200` green — because the
+script anchored on the first occurrence of the string `assign_bom_line`, which is
+in the migration's own header comment, so the replacement matched nothing.
+Re-anchored on `CREATE OR REPLACE FUNCTION public.assign_bom_line` with an
+`assert` that the text actually changed, it is caught. That is the third time in
+three slices that a surviving mutation turned out to have disabled nothing, and
+the fix each time was to assert that the mutation edited something.
+
+**Seven mutations, all caught.** Four against the migration (each of the three
+writers stops setting the GUC → its own section; the NULL guard removed → §4) and
+three against the ratchet (a now-attributed name left on the list → 3 red; a
+closed writer losing its line → 2 red; the counter reverted to the direct-`rpc(`
+regex → 1 red).
+
+**`audit-actor` (G4) has NOT moved to met, and saying so is the point.** Ten
+writers still name no actor. What moved is that five functions now do where three
+did, the remaining debt is sized by a count rather than a memory, and the ratchet
+proves the one-line group is empty — so the next reader cannot mistake ten
+signature changes for ten one-liners.
+
+**Verified:** red first (`rehearsal/200` §1 fails with the migration removed) ·
+all three rehearse modes green (19 assertion files) · `contract:check` ✓ ·
+409 tests ✓ (was 407) · `build` ✓ · eslint 336/116 and `audit:ui` 8, unchanged.
+
+**Gap check.** Three findings:
+
+1. **The ten that remain are one migration, not ten.** Each needs the same
+   change — an `_actor_user_id uuid DEFAULT NULL` parameter, the guarded line,
+   and the caller passing it. Nine callers are in four files (`usePolicies.tsx`,
+   `useItemMasters.tsx`, `supabase/functions/api/index.ts`,
+   `supabase/functions/agent-apply/*`). Doing them one at a time would cost ten
+   migrations and ten rehearsals for one invariant.
+2. **`create_default_policy_defaults` is reachable from nothing.** It is
+   `multi_tier_supply_chain`'s shape (D58) in a function: carried through every
+   rewrite, called by no code. Dropping it is not this slice's call, but it
+   should not be budgeted as work.
+3. **The audit row records `actor_known` from a GUC the CLIENT ultimately
+   supplies.** D28 already says this application authenticates against
+   `approved_users` rather than Supabase Auth, so `p_user_id` is client-asserted;
+   these three now name an actor the database has not authenticated. That is a
+   real improvement over naming nobody and it is not proof of identity, and WP
+   7.1 remains where that is answered.
+
+**Still open in WP 6.2:** D18, D34, D51, D58, D66, D71 *(ten writers)*, D87,
+D94, D95, D96, D99.
+
+### WP 6.2 (slice 12) — The remaining nine, in one migration · 2026-09-18 · `20260918000003`
+
+**What slice 11 promised.** Its gap check, finding 1: *"The ten that remain are
+one migration, not ten. Each needs the same change … Doing them one at a time
+would cost ten migrations and ten rehearsals for one invariant."* That was right
+about the shape and wrong about the number.
+
+**IT WAS NINE, AND THE TENTH IS A CATEGORY ERROR.**
+`create_default_policy_defaults` sat on the ratchet beside the others and
+`RETURNS trigger` — it runs `FOR EACH ROW` on `projects`. PostgreSQL REFUSES a
+trigger function with declared arguments, so the change was not merely
+unnecessary for it but impossible; the generator asserted on `RETURNS trigger`
+and stopped. Nor is it needed: a trigger fires INSIDE someone else's statement,
+so `app.current_user_id` already holds whatever that statement set, and naming
+the actor is the caller's job.
+
+**Slice 11 also called it "reachable from nothing", and that was wrong for a
+related reason**: the call-site counter looks for RPC names, and a trigger is
+wired by `EXECUTE FUNCTION` rather than called by name. `20260609040000`
+attaches it. Corrected here and in §4.
+
+**The migration.** `_actor_user_id uuid DEFAULT NULL` is APPENDED to nine
+functions, so every existing caller keeps working with no change and no actor —
+exactly the old behaviour — and nothing regresses by omission. That is what
+makes a nine-function migration safe to land at once rather than as nine slices.
+
+**DROP AND CREATE, NOT CREATE OR REPLACE, AND THAT IS THE RISK IT CARRIES.**
+`CREATE OR REPLACE FUNCTION` cannot change a parameter count; it creates a second
+overload. Two overloads differing only by a trailing defaulted parameter make
+every unqualified `GRANT EXECUTE ON FUNCTION public.<name>` ambiguous and every
+PostgREST call a coin toss. So each is dropped and recreated — **and DROP takes a
+function's grants with it.** The artifact records functions and not privileges,
+so a grant that fails to come back is invisible to every static gate here and
+surfaces as the anon role silently losing an RPC.
+
+**── THE PART WORTH READING: THE GRANT ASSERTION COULD NOT FAIL ────────────**
+
+`rehearsal/210` §2 was written first as
+`has_function_privilege('anon', …, 'EXECUTE')`. The mutation that removed `anon`
+from a GRANT came back **GREEN**.
+
+The reason is that **PostgreSQL grants EXECUTE on a new function to PUBLIC by
+default**, so every role already has it and the question answers itself. Which
+means something worth writing down: **the explicit grants on these nine are
+belt-and-braces today.** Losing one would not break anything *while PUBLIC keeps
+EXECUTE* — and three migrations already `REVOKE ... FROM PUBLIC` for other
+functions (`get_my_profile`, `update_own_profile`, `change_own_password`), so the
+day that pattern reaches one of these, the explicit grant becomes the only thing
+keeping the anon role able to call it.
+
+The assertion is now about `proacl`: each role must appear as an EXPLICIT
+grantee, via `aclexplode`, with `grantee <> 0` — which is exactly what the
+migration writes and exactly what DROP removes. Both grant mutations are caught
+by it.
+
+**The bodies were copied mechanically, as in slice 11**, and the diff against
+each original was checked to be the appended parameter and the inserted block and
+nothing else. A `CREATE OR REPLACE` that silently drops a line of an existing
+function is a regression no gate here would catch, because the artifact would
+record the new body and agree with itself.
+
+**The callers.** Eleven client call sites now pass the actor — eight in
+`usePolicies.tsx`, two in `useItemMasters.tsx`, one in each of two `agent-apply`
+modules. **Ten `useCallback` dependency arrays gained `user?.id` with them**, and
+that was not lint appeasement: without it the callback closes over the user from
+first render, so a session change would attribute a write to the previous person.
+eslint found it; the baseline is 336/116 either side.
+
+**THREE CALL SITES PASS NOTHING, DELIBERATELY.**
+`supabase/functions/api/index.ts` has an API KEY as its principal — `keyId`,
+`orgId`, `scopes` — and no user uuid, because a key is issued to an organization
+rather than a person. `snapshot_dataset` already faces this there and does the
+same: `p_user_id: null` with the key named in `p_user_email`. Passing a
+fabricated uuid would make `actor_known` TRUE about somebody who did not act,
+which is worse than recording that the actor is unknown. Making an API key
+nameable in the audit plane is D28's question and WP 7.1's to answer.
+
+**The list is now a GATE.** Sixteen names became four, and none of the four is
+debt — three attribute through `assert_writer_may_act` and one is the trigger.
+`dataPlaneAudit.test.ts` fails if a name sits on the list without one of those
+two justifications, and separately if the trigger function stops returning
+`trigger`. There is no backlog left to park a new writer beside.
+
+**Verified:** red first (`210` §1 names all nine with the migration removed) ·
+all three rehearse modes green (20 assertion files) · `contract:check` ✓ ·
+410 tests ✓ (was 409) · `build` ✓ · eslint 336/116 and `audit:ui` 8, unchanged.
+
+**Gap check.** Three findings:
+
+1. **`audit-actor` (G4) is met in the SQL plane and NOT at the API edge**, and
+   the two should not be reported as one. Every `SECURITY DEFINER` writer now
+   names an actor when its caller supplies one; the API surface structurally
+   cannot supply one. That is a bounded, named exception rather than a backlog,
+   and it is the second thing in this plan (with D28's client-asserted identity)
+   that answers to WP 7.1.
+2. **A grant assertion that asks `has_function_privilege` can never fail in this
+   database.** §2 here was caught by a mutation, but nothing stops the next one
+   being written the same way. The general rule — privileges are asserted
+   against `proacl`, never against the effective privilege — belongs wherever
+   rehearsals are described.
+3. **Nothing gates the client side.** Eleven call sites pass the actor because
+   this slice edited them; a twelfth added tomorrow would compile, run, and
+   write an unattributed row. The function-side gate cannot see it. A lint rule
+   or a scan asserting that every `.rpc()` naming one of the fourteen passes
+   `_actor_user_id` would close the loop, and it is not written.
+
+**Still open in WP 6.2:** D18, D34, D51, D58, D66, D87, D94, D95, D96, D99.
+
+### WP 6.4 (slice 13) — The disruption plane, described and audited · 2026-09-18 · `20260918000004`
+
+**What slice 12 promised.** Nothing about WP 6.4 — its gap check pointed at the
+client-side actor gate. This package was taken because it is the largest
+un-decided work left: **38 of 81 tables deferred, and all 38 unaudited** (D54).
+
+**Five tables described**: `disruption_scenarios` and the
+`disruption_scenario_profiles`/`_targets`/`_effects`/`_settings` group. 43 → 48
+described, 38 → 33 deferred, 22 → 27 audited by trigger.
+
+**What the sidecars had to say out loud.** Writing them is where the reading
+happens, and four things came out of it that no gate would have asked:
+
+1. **TWO DISRUPTION MODELS ARE LIVE AT ONCE AND NEITHER READS THE OTHER.**
+   `disruption_scenarios` is the 2025-08-26 shape — one row per node, capacity
+   and delay inline. The profile group is the 2025-08-27 redesign of the same
+   idea. Nothing migrated the rows and nothing deprecates either, so a project
+   can hold disruptions in both and a reader of one sees half the picture.
+2. **`_targets` has a discriminator and no validation.** `target_type` decides
+   whether `node_ids` or `edge_list` is meaningful, and nothing stops a `node`
+   target carrying an `edge_list`. `_effects` has exactly this shape AND a
+   `validate_disruption_effect` trigger that enforces it — so the gap is
+   visible only when the two are read side by side.
+3. **`_settings.key` is free text with no vocabulary.** `natural_key` (I4) is
+   satisfied — `(profile_id, key)` is unique — but uniqueness over an open set
+   means a typo creates a setting rather than failing.
+4. **`disruption_scenarios.time_delay_days` carries its unit in the column
+   NAME**, the opposite of the tier-2 `lead_time`/`lead_time_unit` convention
+   that `normalize-at-promotion` (I3) governs. Defensible for a decision, and
+   worth stating, because a reader who has learned the tier-2 rule will look for
+   a companion column that does not exist.
+
+**The rehearsal proves the cascade, which is what the package buys.** A profile
+DELETE cascades into three child tables, so ONE statement by a person removes
+rows from four — and until these sidecars existed, three of the four were
+deferred and therefore unaudited, so the cascade recorded a quarter of what it
+did. `rehearsal/220` §3 deletes a profile and requires an audit row from each of
+the four, each naming the actor.
+
+**── THE PART WORTH READING: THE WRITER SCAN WAS ANSWERING ABOUT 253 OF 257 ──**
+
+WP 4.3's lesson is that describing a table brings its WRITERS inside the audit
+rule, and measures what that costs. Applied here on purpose rather than after
+the fact: five `SECURITY DEFINER` writers came into scope and all five
+attribute, so the gate stayed green.
+
+**Except `create_disruption_scenario_v2` was not among them, and it writes four
+of these tables.** It is not in `liveDefinitions().functions` at all.
+
+`live-sql.mjs` keys that map by NAME, justified by a comment reading *"args
+ignored: this repo never overloads"*. **The repo overloads nine names** —
+`create_project` six times, `update_project` five. And its `DROP FUNCTION`
+branch deleted the whole name whatever signature the statement gave, so the five
+signature-qualified drops in `20250902084748`–`20250902084844` removed
+`create_disruption_scenario_v2` outright. Four more went the same way:
+`get_network_nodes`, `_edges`, `_summary` and `net.http_post`.
+
+So every rule scoped to that map was blind to five live functions, and the
+question *"does every `SECURITY DEFINER` writer name its actor?"* was being
+answered about **253 of 257**. That is D78's shape on a different axis: the scan
+could not see what it was not looking at.
+
+**The invariant does not move** — both `create_disruption_scenario_v2` overloads
+attribute through `set_current_user_context`, and the three network functions
+are read-only. But "happens to" is not a gate. The DROP now compares signatures
+(257 of 257), and `dataPlaneAudit.test.ts` asserts the map's coverage against
+the artifact by name. **The collapsing half is NOT fixed and is stated instead**:
+one body per name, nine names affected, pinned by a second assertion so the
+number cannot grow quietly.
+
+**A rehearsal assertion failed for its own reason first.** §3's actor check
+compared `action = 'DELETE'`; `audit_tier_write` writes `lower(TG_OP)`. Red for
+the wrong reason is still red, and worth the two minutes to tell apart.
+
+**Four mutations, all caught, and the third was redone.** Removing a DELETE
+trigger → §1; removing a table's three triggers → §1; row grain instead of
+statement grain → caught by PostgreSQL itself (`new_rows` does not exist), which
+proves the database refuses it but leaves §2 unproven — so a fourth mutation
+added a SECOND statement-grain trigger on the same event, and §2 caught the
+duplicate row.
+
+**Verified:** all three rehearse modes green (21 assertion files) ·
+`contract:check` ✓ (R1 48/33/81, R9 27 audited) · 412 tests ✓ (was 410) ·
+`build` ✓ · eslint 336/116 and `audit:ui` 8, unchanged.
+
+**Gap check.** Three findings:
+
+1. **Six tables remain on WP 6.4 and they are the harder six.**
+   `policy_versions`, `policy_presets`, `scenarios`, `scenario_templates`,
+   `recovery_playbooks`, `external_evidence`. Unlike the disruption group these
+   have live client writers — `scenarios` alone has 24 `from()` call sites — so
+   describing them brings a much larger writer surface into the audit rule.
+2. **The two disruption models need a decision, not a description.** This slice
+   could name that both are live; it cannot choose. Deprecating either is a
+   product call and a migration, and it belongs with whoever owns the
+   disruption feature.
+3. **`create_disruption_scenario_v2`'s unreached overload is still there.**
+   Slice 10 established that the 11-parameter definition serves no call site and
+   that `20260610000001` grants the name to `anon`. Now that its tables are
+   described, dropping it is a smaller decision than it was — but it is still a
+   migration and still nobody's yet.
+
+**Still open in WP 6.2:** D18, D34, D51, D58, D66, D87, D94, D95, D96, D99.

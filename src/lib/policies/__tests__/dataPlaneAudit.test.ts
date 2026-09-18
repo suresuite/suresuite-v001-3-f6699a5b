@@ -227,33 +227,155 @@ describe("export is a governed action — the first check there has ever been", 
  * discovering it needs two months late.
  */
 describe("the actor reaches the trigger — a ratchet on the class D36 was one slice of", () => {
-  /** Known, measured, and owned by WP 6.2. Shrinking this list is the work. */
+  /**
+   * Known, measured, and owned by WP 6.2. Shrinking this list is the work.
+   *
+   * WP 4.3 SHRANK IT BY TEN WITHOUT WRITING A LINE OF SQL, and that is a
+   * correction rather than an achievement: the ten below all call
+   * `set_current_user_context`, which has set `app.current_user_id` LOCAL since
+   * 2025-08-20, and the scan above could not follow the call. They were never
+   * unattributed. See the comment on `guc` — and §4 D71, corrected in the same
+   * commit, because "26 write, TWO attribute" was this scan's reading and the
+   * honest figures are 31 writers (four more tables are described now) of which
+   * 15 attribute.
+   *
+   *   bulk_insert_bom_multi_level · bulk_insert_bom_single_level
+   *   bulk_insert_inbound_logistics · bulk_insert_multi_tier_supply_chain
+   *   bulk_insert_outbound_logistics · bulk_insert_tier2_suppliers
+   *   bulk_insert_tier3_suppliers · combine_project_into_supply_chain
+   *   delete_project · delete_project_dataset
+   */
+  // WP 6.2 slices 11 + 12 · SIXTEEN → FOUR, AND THE FOUR ARE NOT DEBT.
+  //
+  // Slice 11 closed the three that already took `p_user_id` and never passed it
+  // on (`20260918000002`). Slice 12 closed the nine that took no actor at all,
+  // in ONE migration (`20260918000003`): `_actor_user_id uuid DEFAULT NULL`
+  // appended, so every existing caller kept working unchanged, plus the eleven
+  // client call sites that now pass it.
+  //
+  // WHAT IS LEFT IS NOT WORK, AND THAT IS THE WHOLE POINT OF KEEPING THE LIST:
+  //
+  //   · three attribute through `assert_writer_may_act` and are here only
+  //     because a text scan cannot follow a call (VIA_SHARED_PREAMBLE);
+  //   · one is a TRIGGER function (TRIGGER_FUNCTIONS).
+  //
+  // So the ratchet has become a GATE. `no NEW tier-2/3/4 writer may be added
+  // without setting app.current_user_id` no longer tolerates a backlog, because
+  // there is none.
   const UNATTRIBUTED = [
-    "analysis_mark_critical_nodes", "apply_policy_bundle", "assign_bom_line",
-    "assign_outbound_customer", "bulk_insert_bom_multi_level",
-    "bulk_insert_bom_single_level", "bulk_insert_inbound_logistics",
-    "bulk_insert_multi_tier_supply_chain", "bulk_insert_outbound_logistics",
-    "bulk_insert_tier2_suppliers", "bulk_insert_tier3_suppliers",
-    "bulk_upsert_materials", "bulk_upsert_policy_overrides", "bulk_upsert_products",
-    "bulk_upsert_suppliers", "clear_policy_preset", "combine_project_into_supply_chain",
-    "create_default_policy_defaults", "delete_policy_override", "delete_project",
-    "delete_project_dataset", "ensure_item_masters", "etl_replace_supply_chain",
-    "mrp_apply_staged_products", "restore_policy_version", "save_policy_defaults",
+    "analysis_mark_critical_nodes", "create_default_policy_defaults",
+    "etl_replace_supply_chain", "mrp_apply_staged_products",
   ];
 
   /**
-   * Three of the names above DO set the GUC — through
-   * `assert_writer_may_act`, which WP 4.1 wrote so three RPCs share one
-   * preamble instead of three copies of it. They stay on the list because a
-   * text scan cannot follow a call, and quietly special-casing them here would
-   * make the ratchet lie about its own method. The rehearsal is what proves
-   * those three: `supabase/rehearsal/110` §7 performs each write and reads the
-   * audit row back, with the GUC deliberately POISONED first so a row naming
-   * the right actor can only have come from the RPC.
+   * `create_default_policy_defaults` CANNOT take the actor and does not need to.
+   *
+   * It `RETURNS trigger` and runs `FOR EACH ROW` on `projects`
+   * (`20260609040000`). PostgreSQL REFUSES a trigger function with declared
+   * arguments, so slice 12's change is not merely unnecessary for it — it is
+   * impossible; the generator asserted on `RETURNS trigger` and stopped.
+   *
+   * Nor is it needed: a trigger fires INSIDE someone else's statement, so
+   * `app.current_user_id` already holds whatever that statement established.
+   * Naming the actor is the caller's job and never the trigger's.
+   *
+   * Slice 11 also called this one "reachable from nothing", which was wrong for
+   * a related reason: the call-site counter looks for RPC names, and a trigger
+   * is wired by `EXECUTE FUNCTION` rather than called by name.
    */
+  const TRIGGER_FUNCTIONS = new Set(["create_default_policy_defaults"]);
+
   const VIA_SHARED_PREAMBLE = new Set([
     "analysis_mark_critical_nodes", "etl_replace_supply_chain", "mrp_apply_staged_products",
   ]);
+
+  /**
+   * How many places the application can reach this RPC — `src/` and
+   * `supabase/functions/`, excluding this test, the generated modules and the
+   * agent eval harnesses, none of which is a caller a user can reach.
+   *
+   * IT COUNTS THE NAME AS A WHOLE STRING LITERAL, NOT `rpc('<name>')`, AND THE
+   * FIRST DRAFT COUNTED THE LATTER. `useItemMasters.tsx` dispatches through
+   * `sb.rpc(UPSERT_RPC[table], …)` against a lookup table whose VALUES are the
+   * RPC names, so a `rpc(` regex reported `bulk_upsert_materials` and
+   * `bulk_upsert_products` as having no caller at all while the upload path
+   * calls both. A name in quotes is a call or a dispatch entry; a name in prose
+   * or in backticks inside a comment is neither, and single/double quotes
+   * separate the two without a parser.
+   */
+  const callSites = (name: string) => {
+    const roots = [join(ROOT, "src"), join(ROOT, "supabase", "functions")];
+    const re = new RegExp(`(['"])${name}\\1`);
+    let n = 0;
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        if (e.isDirectory()) {
+          if (e.name === "node_modules" || e.name === "__tests__" || e.name === "eval" || e.name === "generated") continue;
+          walk(full);
+          continue;
+        }
+        if (!/\.(ts|tsx|js|jsx)$/.test(e.name)) continue;
+        for (const line of readFileSync(full, "utf8").split("\n")) if (re.test(line)) n++;
+      }
+    };
+    for (const r of roots) walk(r);
+    return n;
+  };
+
+  it("every function the ARTIFACT records is visible to this scan (D100)", () => {
+    // THE SCAN CAN ONLY JUDGE WHAT IT CAN SEE, and for a year it could not see
+    // five live functions. `live-sql.mjs` keys its function map by NAME and its
+    // `DROP FUNCTION` branch deleted the name outright — so a DROP naming ONE
+    // overload's signature removed every overload from the map.
+    //
+    // `create_disruption_scenario_v2` writes four tier-4 tables and was
+    // invisible here; `get_network_nodes`, `_edges` and `_summary` were too.
+    // Both `create_disruption_scenario_v2` overloads happen to attribute, so the
+    // invariant did not move — but "happens to" is not a gate, and this is.
+    //
+    // `net.http_post` is excluded because it is not in `public`: the map is the
+    // public surface, and a wrapper around a pg_net extension function is not
+    // this contract's to describe.
+    const art = JSON.parse(
+      readFileSync(join(ROOT, "build", "schema.introspected.json"), "utf8"),
+    ) as { functions: { name: string }[] };
+    const seen = live().functions;
+    const missing = [...new Set(art.functions.map((f) => f.name))]
+      .filter((n) => n !== "http_post")
+      .filter((n) => !seen.has(n))
+      .sort();
+    expect(
+      missing,
+      "these functions exist in the introspected schema and are invisible to every " +
+        "rule scoped to `liveDefinitions()` — the writer scan below included.",
+    ).toEqual([]);
+  });
+
+  it("the overloaded names are known, and collapsing them is a STATED limit", () => {
+    // The half of D100 that is NOT fixed: the map still holds one body per name,
+    // so for an overloaded name a rule reads the last CREATE and no other. Nine
+    // names carry more than one live overload. Pinned so the number cannot grow
+    // quietly, and so a future rule that needs per-overload bodies has a count
+    // to argue with rather than a comment claiming the repo never overloads.
+    const art = JSON.parse(
+      readFileSync(join(ROOT, "build", "schema.introspected.json"), "utf8"),
+    ) as { functions: { name: string }[] };
+    const counts = new Map<string, number>();
+    for (const f of art.functions) counts.set(f.name, (counts.get(f.name) ?? 0) + 1);
+    const overloaded = [...counts.entries()].filter(([, n]) => n > 1).map(([n]) => n).sort();
+    expect(overloaded).toEqual([
+      "analysis_mark_critical_nodes",
+      "capabilities_for_user",
+      "create_disruption_scenario_v2",
+      "create_project",
+      "get_project_dataset_status",
+      "get_supply_chain_data_multi_tier",
+      "refresh_node_list_for_project",
+      "update_project",
+      "update_project_completion_status",
+    ]);
+  });
 
   const writers = () => {
     const tier = new Set(tieredTables().map(([t]) => t));
@@ -267,8 +389,34 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
       if (!writes) continue;
       out.push({
         name,
+        // WP 4.3 · `set_current_user_context` JOINS `assert_writer_may_act` HERE,
+        // AND THE REASON IS A CORRECTION RATHER THAN AN ACCOMMODATION.
+        //
+        // Describing the four deep-tier tables (WP 4.3) brought five more
+        // writers into the scan's scope — `bulk_insert_network_nodes`,
+        // `..._edges`, `..._summary`, `rebuild_node_list`,
+        // `upload_node_list_data` — and every one of them opens with
+        // `PERFORM public.set_current_user_context(p_user_id, p_user_email)`,
+        // whose body is `set_config('app.current_user_id', user_id::text, true)`
+        // (`20250820165722`). They have named their actor since 2025-08-20. The
+        // scan could not see it because a text scan cannot follow a call, which
+        // is the same limitation `VIA_SHARED_PREAMBLE` was written for one
+        // package earlier.
+        //
+        // SO D71's HEADLINE NUMBER OVER-COUNTS. "26 SECURITY DEFINER functions
+        // write a tier-2/3/4 table and TWO set `app.current_user_id`" was
+        // measured with this scan, and the second figure counts the two that set
+        // the GUC IN THEIR OWN BODY rather than the ones that attribute. §4 D71
+        // and §16 are corrected in the same commit.
+        //
+        // Special-casing a helper is only honest if something PROVES it, so
+        // `supabase/rehearsal/130` §10 performs a `bulk_insert_network_nodes`
+        // with `app.current_user_id` deliberately POISONED first and reads the
+        // audit row back. Widening a scan without that is how a ratchet starts
+        // lying about its own method.
         guc: /set_config\s*\(\s*'app\.current_user_id'/i.test(body)
-          || /assert_writer_may_act/.test(body),
+          || /assert_writer_may_act/.test(body)
+          || /set_current_user_context/.test(body),
         actor: /_actor|_user_id|p_user_id|_by_user/i.test(body),
       });
     }
@@ -301,11 +449,64 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
     expect(stale, `no longer unattributed — remove from UNATTRIBUTED`).toEqual([]);
   });
 
-  it("the two that DO name their actor still do", () => {
-    // `assign_material_supplier` (WP 3.3) and `snapshot_dataset` (WP 4.1) are
-    // the whole of the attributed SQL surface. A regression in either is the
-    // invariant going backwards.
-    for (const name of ["assign_material_supplier", "snapshot_dataset"]) {
+  it("there is no remaining one-line or signature-change debt — the class is closed", () => {
+    // §4 D71 carried a budget figure twice — "seventeen live", then "six" — and
+    // both were wrong when slice 11 measured them (twelve of thirteen were
+    // reachable). A number in prose goes stale the moment a caller moves and
+    // nothing notices, which is the defect the two orphan tables were (D3, D4).
+    //
+    // It is now ZERO, and derived rather than remembered: every name left on the
+    // list is either attributing through a shared preamble or a trigger
+    // function, and both are justified above rather than owed.
+    const owed = UNATTRIBUTED.filter(
+      (n) => !VIA_SHARED_PREAMBLE.has(n) && !TRIGGER_FUNCTIONS.has(n),
+    );
+    expect(
+      owed,
+      `these SECURITY DEFINER writers still name no actor and have no reason not ` +
+        `to. \`audit-actor\` (G4) is not met while this list is non-empty, and §4 ` +
+        `D71 must state the same count.`,
+    ).toEqual([]);
+  });
+
+  it("a name may only sit on the list for a REASON, not as a backlog", () => {
+    // The list is no longer a ratchet, so the way it could rot is a future name
+    // being parked on it. Every entry must be in one of the two justified
+    // categories — which is the assertion above stated from the other side, and
+    // it is what stops the next writer being added to the list instead of fixed.
+    const unjustified = UNATTRIBUTED.filter(
+      (n) => !VIA_SHARED_PREAMBLE.has(n) && !TRIGGER_FUNCTIONS.has(n),
+    );
+    expect(unjustified).toEqual([]);
+    expect(
+      [...VIA_SHARED_PREAMBLE, ...TRIGGER_FUNCTIONS].every((n) => UNATTRIBUTED.includes(n)),
+      "a justification names a function that is no longer on the list — delete the justification too",
+    ).toBe(true);
+  });
+
+  it("the trigger function is still a trigger function", () => {
+    // Its exemption rests entirely on that. If it ever becomes an ordinary
+    // SECURITY DEFINER RPC, it owes the actor like every other one.
+    const def = fn("create_default_policy_defaults");
+    expect(def, "create_default_policy_defaults is gone — remove it from TRIGGER_FUNCTIONS").toBeDefined();
+    expect(
+      /RETURNS\s+trigger/i.test(def!.sql),
+      "it no longer RETURNS trigger, so the exemption above no longer applies",
+    ).toBe(true);
+  });
+
+  it("the FOURTEEN that name their actor still do", () => {
+    // `assign_material_supplier` (WP 3.3), `snapshot_dataset` (WP 4.1), the
+    // three slice 11 closed and the nine slice 12 closed. A regression in any is
+    // the invariant going backwards, and `supabase/rehearsal/200` and `/210`
+    // prove them against a real database with the GUC poisoned first.
+    for (const name of [
+      "assign_material_supplier", "snapshot_dataset",
+      "apply_policy_bundle", "assign_bom_line", "assign_outbound_customer",
+      "bulk_upsert_materials", "bulk_upsert_policy_overrides", "bulk_upsert_products",
+      "bulk_upsert_suppliers", "clear_policy_preset", "delete_policy_override",
+      "ensure_item_masters", "restore_policy_version", "save_policy_defaults",
+    ]) {
       expect(fn(name).sql, `${name} stopped setting the actor GUC`).toMatch(
         /set_config\s*\(\s*'app\.current_user_id'/i,
       );

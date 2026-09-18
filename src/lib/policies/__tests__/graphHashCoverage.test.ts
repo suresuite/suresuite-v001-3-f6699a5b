@@ -23,17 +23,32 @@
  * left to care.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
-const MIGRATION = join(ROOT, "supabase", "migrations", "20260917000002_graph_hash_v2.sql");
+/**
+ * WP 5.3 — THE LIVE DEFINITION, NOT ONE NAMED FILE.
+ *
+ * This read `20260917000002_graph_hash_v2.sql` by name. `20260917000009` folded
+ * the deep-tier topology into the snapshot (D75) and became the live builder,
+ * and every assertion here went on passing — about a function the database no
+ * longer runs. A green suite describing a superseded definition is worse than a
+ * red one, and it is `dataPlaneAudit.test.ts`'s WP 3.0 lesson exactly: the
+ * source has to be "whatever is live", never a filename somebody typed.
+ */
+const MIGRATIONS_DIR = join(ROOT, "supabase", "migrations");
 const DATAMAP = join(ROOT, "sim-worker", "sim_worker", "datamap.py");
 const CONTRACT = JSON.parse(
   readFileSync(join(ROOT, "build", "data-contract.generated.json"), "utf8"),
 ) as { tables: Record<string, { tier?: string; columns?: Array<{ name: string }> }> };
 
-const sql = readFileSync(MIGRATION, "utf8");
+/** Every migration, newest last — so the last definition of a function wins. */
+const sql = readdirSync(MIGRATIONS_DIR)
+  .filter((f) => f.endsWith(".sql"))
+  .sort()
+  .map((f) => readFileSync(join(MIGRATIONS_DIR, f), "utf8"))
+  .join("\n");
 
 /**
  * Columns the snapshot does NOT hash, and each exclusion is a decision:
@@ -53,23 +68,77 @@ const NOT_A_VALUE = new Set([
   "name",
 ]);
 
-/** The three §11 settled as `hash_network`; everything else tier-2 is an input. */
-const NETWORK_TABLES = new Set(["tier2_suppliers", "tier3_suppliers", "multi_tier_supply_chain"]);
+/**
+ * `hash_network`'s tables. §11 settled THREE; WP 5.3 added the two the deep-tier
+ * upload fills, because the centrality analyzers read them and D75 is what their
+ * absence cost. "Network" is the right domain for them in the sense that
+ * matters — they describe the graph between firms rather than the plant's own
+ * dataset — so the split §11 drew still holds; only its membership grew.
+ */
+const NETWORK_TABLES = new Set([
+  "tier2_suppliers", "tier3_suppliers", "multi_tier_supply_chain",
+  "network_nodes", "network_edges",
+]);
 
 /**
- * The four DERIVED tables. They are what an analysis WROTE, they are WP 4.2's,
- * and folding a derived artifact into the identity of its own inputs is exactly
- * the confusion `input-hash` (I5) exists to prevent.
+ * Tables with NO column in the hash at all. `node_list` is derived end to end
+ * (`refresh_node_list_for_project` builds it from `supply_chain_data`, which is
+ * itself hashed through its own inputs) and `network_summary` is counts OF the
+ * graph — hashing either would fold a derivation into the identity of the thing
+ * it derives from.
+ *
+ * `network_nodes` and `network_edges` LEFT this list in WP 5.3: they carry the
+ * uploaded topology the centrality analyzers read, which is an input, and
+ * keeping them out wholesale is what D75 was.
  */
-const DERIVED_AND_OUT = ["node_list", "network_nodes", "network_edges", "network_summary"];
+const STILL_WHOLLY_OUT = ["node_list", "network_summary"];
+
+/**
+ * Columns an analysis WRITES. No table may contribute one of these to the
+ * snapshot, whatever tier it is labelled — this is the rule the table list above
+ * used to stand in for.
+ */
+const COMPUTED_COLUMNS = new Set([
+  "prominence", "prominence_updated_at", "network_metrics_updated_at",
+  "degree_centrality", "weighted_degree_centrality", "eigenvector_centrality",
+  "betweenness_centrality", "closeness_centrality",
+  "computed_from_hash", "computed_at",
+  "is_critical_node", "critical_node_score", "prediction_timestamp",
+  "nodes_count", "edges_count", "tiers_data",
+  "longitude", "latitude",   // geocode-locations writes these onto node_list
+]);
 
 /** Split the snapshot into its two domains and read each table's hashed columns. */
 function snapshotDomains(): Record<"inputs" | "network", Record<string, Set<string>>> {
-  const body = sql.slice(sql.indexOf("CREATE OR REPLACE FUNCTION public._build_dataset_snapshot"));
-  const inputsAt = body.indexOf("'inputs', jsonb_build_object");
-  const networkAt = body.indexOf("'network', jsonb_build_object");
+  // WP 5.3 — THE SNAPSHOT IS COMPOSED NOW, AND THE PARSER FOLLOWS IT.
+  //
+  // `20260917000009` builds v3 as "v2's object, with two blocks merged into its
+  // `network` domain", so the live builder contains neither `'inputs',
+  // jsonb_build_object` nor the eleven table blocks — they are in
+  // `_build_dataset_snapshot_v2`, which is kept precisely so the composition is
+  // reviewable and `rehearsal/150` can compare the two.
+  //
+  // Parsing only the live builder would report ZERO hashed columns and every
+  // coverage assertion below would pass over an empty set. Parsing only v2 would
+  // miss the fold. Both, unioned on the `network` domain, is the shape that is
+  // actually hashed.
+  const base = sql.slice(
+    sql.lastIndexOf("CREATE OR REPLACE FUNCTION public._build_dataset_snapshot_v2(p_project_id"),
+  );
+  const inputsAt = base.indexOf("'inputs', jsonb_build_object");
+  const networkAt = base.indexOf("'network', jsonb_build_object");
   expect(inputsAt, "the snapshot has no `inputs` domain").toBeGreaterThan(-1);
   expect(networkAt, "the snapshot has no `network` domain").toBeGreaterThan(inputsAt);
+
+  const liveMarker = "CREATE OR REPLACE FUNCTION public._build_dataset_snapshot(p_project_id";
+  const liveAt = sql.lastIndexOf(liveMarker);
+  expect(liveAt, "no live `_build_dataset_snapshot`").toBeGreaterThan(-1);
+  const live = sql.slice(liveAt, sql.indexOf("$$;", liveAt));
+  expect(
+    live,
+    "the live builder does not compose the v2 base — if it inlines the domains " +
+      "again, this parser is reading the wrong thing and must be rewritten with it",
+  ).toContain("_build_dataset_snapshot_v2(p_project_id)");
 
   const read = (chunk: string) => {
     const out: Record<string, Set<string>> = {};
@@ -91,9 +160,15 @@ function snapshotDomains(): Record<"inputs" | "network", Record<string, Set<stri
     return out;
   };
 
+  const merged = read(live);
+  const networkBase = read(base.slice(networkAt));
+  for (const [t, cols] of Object.entries(merged)) {
+    networkBase[t] = new Set([...(networkBase[t] ?? []), ...cols]);
+  }
+
   return {
-    inputs: read(body.slice(inputsAt, networkAt)),
-    network: read(body.slice(networkAt)),
+    inputs: read(base.slice(inputsAt, networkAt)),
+    network: networkBase,
   };
 }
 
@@ -144,8 +219,26 @@ describe("the snapshot covers every tier-2 value column", () => {
 });
 
 describe("the split is the one §11 settled", () => {
-  it("`hash_network` covers exactly the three deep-tier tables", () => {
+  it("`hash_network` covers exactly the five deep-tier tables", () => {
     expect(new Set(Object.keys(domains.network))).toEqual(NETWORK_TABLES);
+  });
+
+  it("the two WP 5.3 added contribute their INPUT columns and no computed one", () => {
+    // The fold is the place this codebase is most likely to acquire an
+    // analysis output inside the anchor, because the columns sit on the same
+    // rows. Named explicitly rather than left to the general rule above, so a
+    // reader of this file sees which five columns the fold is allowed to hash.
+    // `id` is in each set because it appears in the block's ORDER BY, not
+    // because it is hashed — a surrogate in the VALUE would make two identical
+    // datasets hash differently, and `NOT_A_VALUE` above excludes it from the
+    // coverage rule for exactly that reason. It is there as the tiebreaker that
+    // makes the ordering TOTAL, which is D68: an ORDER BY fixes an order only as
+    // far as it discriminates, and two nodes sharing a `uid` would otherwise
+    // aggregate in whatever order the scan returned them.
+    expect(domains.network.network_nodes).toEqual(new Set(["uid", "revenue", "id"]));
+    expect(domains.network.network_edges).toEqual(
+      new Set(["src_uid", "dst_uid", "relative_revenue", "id"]),
+    );
   });
 
   it("`hash_inputs` covers every other tier-2 table and nothing from the network", () => {
@@ -158,8 +251,33 @@ describe("the split is the one §11 settled", () => {
   it("no DERIVED analysis output contributes to graph_hash (WP 4.2's exit check)", () => {
     // A claim about ABSENCE. WP 4.2 owns testing it from its own side; this is
     // the side that can break it, so it is asserted here too.
-    for (const t of DERIVED_AND_OUT) {
-      expect(Object.keys(hashed), `${t} is an analysis OUTPUT and is inside the hash`).not.toContain(t);
+    // WP 5.3 — THE RULE IS NOW ABOUT COLUMNS, AND THE TABLE LIST WAS A PROXY.
+    //
+    // This asserted that four TABLES are absent from the snapshot. That was a
+    // usable stand-in while none of their columns was hashed, and D75 is what it
+    // cost: `network_nodes` and `network_edges` carry the only inputs the two
+    // centrality analyzers read, so excluding the tables wholesale left the
+    // anchor blind to them and the store served a re-uploaded network the
+    // previous graph's centralities.
+    //
+    // What the invariant actually says is that no analysis OUTPUT may enter the
+    // identity of its own inputs. Stated as columns, `20260917000009` can fold
+    // in `uid`, `revenue`, `src_uid`, `dst_uid` and `relative_revenue` — which
+    // are uploaded — while `prominence` and the five centralities stay out, and
+    // a future column added to the block is judged by the same rule instead of
+    // by a list somebody has to remember to edit.
+    for (const t of STILL_WHOLLY_OUT) {
+      expect(Object.keys(hashed), `${t} is analysis output and is inside the hash`).not.toContain(t);
+    }
+    for (const [table, cols] of Object.entries(hashed)) {
+      for (const c of cols) {
+        expect(
+          COMPUTED_COLUMNS.has(c),
+          `${table}.${c} is written by an analysis and is inside the hash. Folding a ` +
+            `result into the identity of its own inputs means every run invalidates ` +
+            `itself and no cache can hit twice (I5, and WP 4.2's exit check).`,
+        ).toBe(false);
+      }
     }
   });
 

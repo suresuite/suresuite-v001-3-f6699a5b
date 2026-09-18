@@ -53,7 +53,7 @@ interface UsePoliciesResult {
   ) => Promise<void>;
   clearActivePreset: () => Promise<void>;
   upsertOverride: (row: OverrideRow) => Promise<void>;
-  bulkUpsertOverrides: (rows: OverrideRow[]) => Promise<void>;
+  bulkUpsertOverrides: (rows: OverrideRow[], opts?: { seeded?: boolean }) => Promise<void>;
   deleteOverride: (scope: "node" | "edge", targetKey: string, family: PolicyFamily) => Promise<void>;
   saveSnapshot: (label?: string, notes?: string) => Promise<string | null>;
   /** 6.D — edit a version's free-text notes (distinct from its label). */
@@ -239,6 +239,10 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         p_project_id: projectId,
         p_family: family,
         p_value: value,
+        // D71 · the actor, so `audit_tier_write` names a person instead of
+        // recording `actor_known: false`. `_actor_user_id` is DEFAULT NULL on
+        // every one of these RPCs, so omitting it is exactly the old behaviour.
+        _actor_user_id: user?.id ?? null,
       });
       if (error) {
         console.error("saveDefault failed", error);
@@ -248,7 +252,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       await dispatchSim({ family, scope: "default", patch: value });
       void refreshCurrentHash();
     },
-    [projectId, dispatchSim, refreshCurrentHash],
+    [projectId, dispatchSim, refreshCurrentHash, user?.id],
   );
 
   const upsertOverride = useCallback(
@@ -258,7 +262,11 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       const sb = supabase as any;
       const { error } = await sb.rpc("bulk_upsert_policy_overrides", {
         p_project_id: projectId,
+        // WP 4.4 · no `seeded` flag. This path is a person editing a cell, so
+        // the override is a DECISION and carries no `seeded_from_hash` — it does
+        // not go stale when the dataset moves. The seeding path sets the flag.
         p_rows: JSON.stringify([{ scope: row.scope, target_key: row.target_key, family: row.family, patch: row.patch }]),
+        _actor_user_id: user?.id ?? null,   // D71
       });
       if (error) {
         console.error("upsertOverride failed", error);
@@ -273,23 +281,32 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       });
       void refreshCurrentHash();
     },
-    [projectId, dispatchSim, refreshCurrentHash],
+    [projectId, dispatchSim, refreshCurrentHash, user?.id],
   );
 
   const bulkUpsertOverrides = useCallback(
-    async (rows: OverrideRow[]) => {
+    async (rows: OverrideRow[], opts?: { seeded?: boolean }) => {
       if (!projectId || rows.length === 0) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
+      // WP 4.4 · `seeded` says these values were COPIED from project data rather
+      // than decided by a person. The RPC stamps `seeded_from_hash` from the
+      // project's own `current_graph_hash` — the client never sends a hash,
+      // because a caller that supplies provenance can supply the wrong
+      // provenance. A seeded override goes stale when the dataset moves; a typed
+      // one does not, and THE ENGINE READS OVERRIDES, so the difference decides
+      // what a simulation computes.
       const payload = rows.map((r) => ({
         scope: r.scope,
         target_key: r.target_key,
         family: r.family,
         patch: r.patch,
+        seeded: opts?.seeded === true,
       }));
       const { error } = await sb.rpc("bulk_upsert_policy_overrides", {
         p_project_id: projectId,
         p_rows: payload,
+        _actor_user_id: user?.id ?? null,   // D71
       });
       if (error) {
         console.error("bulkUpsertOverrides failed", error);
@@ -315,7 +332,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       );
       void refreshCurrentHash();
     },
-    [projectId, dispatchSim, refreshCurrentHash],
+    [projectId, dispatchSim, refreshCurrentHash, user?.id],
   );
 
   const deleteOverride = useCallback(
@@ -328,6 +345,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         p_scope: scope,
         p_target_key: targetKey,
         p_family: family,
+        _actor_user_id: user?.id ?? null,   // D71
       });
       if (error) {
         console.error("deleteOverride failed", error);
@@ -336,7 +354,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       await dispatchSim({ family, scope, target_key: targetKey, patch: {} });
       void refreshCurrentHash();
     },
-    [projectId, dispatchSim, refreshCurrentHash],
+    [projectId, dispatchSim, refreshCurrentHash, user?.id],
   );
 
   const saveStrategy = useCallback(
@@ -350,6 +368,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         p_family: "fulfillment",
         p_value: defaults.fulfillment,
         p_strategy: strategy,
+        _actor_user_id: user?.id ?? null,   // D71
       });
       if (error) {
         console.error("saveStrategy failed", error);
@@ -358,7 +377,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       await dispatchSim({ family: "fulfillment", scope: "strategy", patch: { strategy } });
       void refreshCurrentHash();
     },
-    [projectId, defaults.fulfillment, dispatchSim, refreshCurrentHash],
+    [projectId, defaults.fulfillment, dispatchSim, refreshCurrentHash, user?.id],
   );
 
   const applyResolvedPreset = useCallback(
@@ -382,6 +401,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
             p_project_id: projectId,
             p_family: f,
             p_value: bundle[f],
+            _actor_user_id: user?.id ?? null,   // D71
           }),
         ),
       );
@@ -396,6 +416,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         p_value: bundle[families[0]],
         p_active_preset: slug,
         p_preset_applied_at: appliedAt.toISOString(),
+        _actor_user_id: user?.id ?? null,   // D71
       });
       if (error) {
         console.error("applyResolvedPreset (preset) failed", error);
@@ -408,7 +429,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       );
       void refreshCurrentHash();
     },
-    [projectId, dispatchSim, refreshCurrentHash],
+    [projectId, dispatchSim, refreshCurrentHash, user?.id],
   );
 
   const clearActivePreset = useCallback(async () => {
@@ -417,9 +438,9 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     setPresetAppliedAt(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
-    const { error } = await sb.rpc("clear_policy_preset", { p_project_id: projectId });
+    const { error } = await sb.rpc("clear_policy_preset", { p_project_id: projectId, _actor_user_id: user?.id ?? null });   // D71
     if (error) console.error("clearActivePreset failed", error);
-  }, [projectId]);
+  }, [projectId, user?.id]);
 
   const refreshVersions = useCallback(async () => {
     if (!projectId) return;
@@ -491,7 +512,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       if (!projectId) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
-      const { error } = await sb.rpc("restore_policy_version", { p_version_id: versionId });
+      const { error } = await sb.rpc("restore_policy_version", { p_version_id: versionId, _actor_user_id: user?.id ?? null });   // D71
       if (error) {
         console.error("restoreVersion failed", error);
         toast.error(`Load failed: ${error.message ?? error}`);
@@ -523,7 +544,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       setOverrides((ovData ?? []) as OverrideRow[]);
       void refreshCurrentHash();
     },
-    [projectId, refreshCurrentHash],
+    [projectId, refreshCurrentHash, user?.id],
   );
 
   // 6.D — edit a version's free-text notes (a description of the model),

@@ -63,6 +63,20 @@ partially or get corrected — the write fails.
 
 </details>
 
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `ProjectIntelligence.tsx` | table read | `src/hooks/usePolicies.tsx:141` | yes |
+| `ProjectPolicies.tsx` | table read | `src/hooks/usePolicies.tsx:141` | yes |
+| `SimulationLab.tsx` | table read | `src/hooks/usePolicies.tsx:141` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
+
 ## Columns
 
 `CSV header` is the name the **user types**, which is not always the column name —
@@ -325,6 +339,6 @@ When the preset was last applied.
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/policy_defaults.contract.yaml`, table created by `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

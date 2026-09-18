@@ -20,6 +20,15 @@ Created by `20260709000002_super_admin_phase1.sql`, which seeded one row per DIS
 | `id` | column PRIMARY KEY | `organizations_pkey` |
 | `slug` | column UNIQUE | `organizations_slug_key` |
 
+## Constraints
+
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `organizations_status_check` | `CHECK (status IN ('active','suspended'))` | `20260709000002_super_admin_phase1.sql` |
+
 ## Governance
 
 | | |
@@ -38,9 +47,21 @@ Created by `20260709000002_super_admin_phase1.sql`, which seeded one row per DIS
 | Policy | Command | Roles | Added by |
 |---|---|---|---|
 | orgs: super admin full | ALL | all | `20260709000002_super_admin_phase1.sql` |
-| orgs: members read own | SELECT | all | `20260915000004_org_identity_dual_read.sql` |
+| orgs: members read own | SELECT | all | `20260918000001_org_row_uuid_only.sql` |
 
 </details>
+
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `DeveloperApi.tsx` | rpc list_api_keys | `src/pages/DeveloperApi.tsx:261` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
 
 ## Columns
 
@@ -114,7 +135,7 @@ The approved user who owns the tenant. Advisory today — nothing in RLS or any 
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260709000002_super_admin_phase1.sql` |
-| References | `approved_users(id)` ON DELETE SET NULL |
+| References | `public.approved_users(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -179,6 +200,6 @@ When the row was last modified. Server-stamped by DEFAULT only — no trigger ma
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

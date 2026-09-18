@@ -25,15 +25,15 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "a29fd67bde88";
+export const CONTRACT_VERSION = "b45dc1ed55a3";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260917000006_analysis_store.sql";
+export const LAST_MIGRATION = "20260918000004_disruption_plane_audited.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
-  "tablesDescribed": 39,
-  "columnsDescribed": 456,
-  "tablesUndescribed": 42
+  "tablesDescribed": 48,
+  "columnsDescribed": 590,
+  "tablesUndescribed": 33
 } as const;
 
 /** Described tables, grouped by the tier their data sits in. */
@@ -181,9 +181,33 @@ export const TIERS: GlanceTier[] = [
         "owner": "platform"
       },
       {
+        "table": "network_edges",
+        "grain": "One directed relationship between two firms in one project's deep-tier graph. EVERY column is uploaded — nothing computes this table, which is why it gains no `computed_from_hash` in WP 4.3 although it sits in `graphHashCoverage.test.ts`'s DERIVED_AND_OUT list by name.",
+        "columns": 15,
+        "owner": "analysis"
+      },
+      {
+        "table": "network_nodes",
+        "grain": "One firm in one project's deep-tier network graph, identified by `uid`. THE TABLE IS TWO THINGS AND THAT IS §4 D56: nine columns a user uploaded and eight an analysis wrote. WP 4.3 gives the computed half a second home in `analysis_results`; WP 5.3 drops it from here, and what is left is a tier-2 input table.",
+        "columns": 30,
+        "owner": "analysis"
+      },
+      {
+        "table": "network_summary",
+        "grain": "One rolled-up description of one project's deep-tier graph: node and edge counts and a per-depth breakdown. Every value column is derived.",
+        "columns": 13,
+        "owner": "analysis"
+      },
+      {
+        "table": "node_list",
+        "grain": "One node of one project's supply chain, derived from `supply_chain_data` by `refresh_node_list_for_project`. Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others.",
+        "columns": 19,
+        "owner": "analysis"
+      },
+      {
         "table": "supply_chain_data",
         "grain": "One edge of the project's computed supply graph: material flows from this node to that one, carrying this weighted volume and this share of the destination's sourcing. Derived from the four lane tables by the ETL and always safe to drop and rebuild.",
-        "columns": 20,
+        "columns": 22,
         "owner": "etl"
       },
       {
@@ -199,6 +223,36 @@ export const TIERS: GlanceTier[] = [
     "name": "decisions — policies, overrides, scenarios",
     "tables": [
       {
+        "table": "disruption_scenario_effects",
+        "grain": "One effect for one profile: WHAT the disruption does to whatever it hits. A capacity reduction or a time delay, with a magnitude and the unit that magnitude is in.",
+        "columns": 9,
+        "owner": "policy-ui"
+      },
+      {
+        "table": "disruption_scenario_profiles",
+        "grain": "One disruption profile for one project — the HEADER of the normalised disruption model. What it hits lives in `_targets`, what it does in `_effects`, and how it is simulated in `_settings`; all three cascade from this row.",
+        "columns": 13,
+        "owner": "policy-ui"
+      },
+      {
+        "table": "disruption_scenario_settings",
+        "grain": "One simulation setting for one profile, as a key and a JSONB value. HOW the disruption is simulated, as against what it hits (`_targets`) and what it does (`_effects`).",
+        "columns": 8,
+        "owner": "policy-ui"
+      },
+      {
+        "table": "disruption_scenario_targets",
+        "grain": "One target set for one profile: WHAT the disruption hits. Either a list of nodes or a list of edges, decided by `target_type`.",
+        "columns": 10,
+        "owner": "policy-ui"
+      },
+      {
+        "table": "disruption_scenarios",
+        "grain": "One disruption applied to one node of one project: a capacity cut, a delay, or both. The ORIGINAL disruption shape, superseded in design by the `disruption_scenario_*` profile/target/effect/setting split but never migrated — both are live and neither reads the other.",
+        "columns": 14,
+        "owner": "policy-ui"
+      },
+      {
         "table": "policy_defaults",
         "grain": "One row per project: the policy each family runs with unless a specific node overrides it. The bundle, in other words — and the thing a policy_override is a patch against.",
         "columns": 15,
@@ -207,7 +261,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "policy_overrides",
         "grain": "One patch against the project bundle, for one target: this supplier, this material, this customer/product pair. The only tier-4 table with a real natural key — (project, scope, target, family) is UNIQUE, so a target cannot hold two conflicting patches for the same family.",
-        "columns": 9,
+        "columns": 10,
         "owner": "policy-ui"
       }
     ]
@@ -319,80 +373,6 @@ export const TIERS: GlanceTier[] = [
 /** The rest of the schema, under the work package that owes each one. */
 export const UNDESCRIBED: UndescribedGroup[] = [
   {
-    "wp": "4.3",
-    "why": "Analysis output, and the four tables D56's decision is about. WP 4.2 built the store (`analysis_runs` + `analysis_results`) and DECIDED what these are: `network_nodes` and `node_list` are BOTH — each carries columns a user uploaded beside columns an analysis wrote, which is D19 stated precisely in one table and is why \"what tier is it\" has no answer while the table is one thing. So the answer is a SPLIT, not a tier, and WP 4.3 executes it because the computed half has nowhere to go until the analyzers dual-write into `analysis_results`. Two things must land before the input half can be described: D72 (`network_nodes` has no unique key on `(project_id, uid)`, so an upsert that names one fails every time it runs) and the second `schema_version` bump that describing it would force, because WP 4.1's coverage rule folds a described tier-2 input table into `hash_network` the moment its sidecar exists. §4 D56 carries the enumerated blast radius — every writer, every reader, every RPC — so this package inherits it rather than rediscovering it.",
-    "tables": [
-      {
-        "table": "network_edges",
-        "columns": 15
-      },
-      {
-        "table": "network_nodes",
-        "columns": 28
-      },
-      {
-        "table": "network_summary",
-        "columns": 11
-      },
-      {
-        "table": "node_list",
-        "columns": 17
-      }
-    ]
-  },
-  {
-    "wp": "4.4",
-    "why": "`model_validations` is a VALIDATION CARD, not analysis output — it already carries `graph_hash`, `policy_hash`, `scenario_hash` and `engine_fingerprint` and its whole subject is whether a card has gone stale, which is the one staleness rule WP 4.4 lands (\"stale iff `computed_from_hash <> current_graph_hash()`\") and the Trust Report that reads it. It was grouped with the network tables by WP 1.4 on the strength of the word \"validation\"; WP 4.2 moved it when the D56 decision made the network group specific. §15 measured 0 active cards, so nothing is waiting on it.",
-    "tables": [
-      {
-        "table": "model_validations",
-        "columns": 24
-      }
-    ]
-  },
-  {
-    "wp": "4.4",
-    "why": "Runs and results (tier 5). Invariant `result-binding` is the claim these tables have to satisfy — every result binds dataset + policy + scenario + engine version — and WP 4.1/4.4 are where the binding is completed and the staleness rules land. NOTE for whoever authors `simulation_jobs`: it carries an UNRESOLVED shadowed definition (`20250914113723` re-declares what `20250913085427` created, and the two disagree about `job_id`). The introspector records the disagreement rather than picking a winner. Resolve it BEFORE writing the sidecar — a field entry for a column whose type depends on which CREATE TABLE won is a guess with a schema around it.",
-    "tables": [
-      {
-        "table": "experiments",
-        "columns": 10
-      },
-      {
-        "table": "run_item_series",
-        "columns": 7
-      },
-      {
-        "table": "run_replications",
-        "columns": 12
-      },
-      {
-        "table": "simulation_cache",
-        "columns": 13
-      },
-      {
-        "table": "simulation_job_magnitudes",
-        "columns": 13
-      },
-      {
-        "table": "simulation_jobs",
-        "columns": 25
-      },
-      {
-        "table": "simulation_performance_metrics",
-        "columns": 14
-      },
-      {
-        "table": "simulation_results",
-        "columns": 13
-      },
-      {
-        "table": "simulation_runs",
-        "columns": 24
-      }
-    ]
-  },
-  {
     "wp": "5.2",
     "why": "Outside the data spine. These are the AI and public-API control planes: they carry no simulation input, no engine-read field and no user-uploaded value, so a data-contract sidecar would describe machinery rather than the user's data. PLAN.md §6.3 documents them in the manual's sections 14 and 15 instead, and lists several of them explicitly as internal-only. If one ever starts carrying a value a simulation reads, it moves into the contract — that is the test, not the table's age.",
     "tables": [
@@ -467,8 +447,60 @@ export const UNDESCRIBED: UndescribedGroup[] = [
     ]
   },
   {
-    "wp": "6.1",
-    "why": "`external_evidence` is the AGENT's evidence store — retrieved URLs, content hashes and confidence behind a proposal — and it belongs with the decision plane rather than with analysis output. Same regrouping as `model_validations` above: it was in the WP 4.2 bucket because nobody had looked at it, which is exactly what D54 says a deferral list does when it is allowed to decide by omission.",
+    "wp": "6.3",
+    "why": "MOVED FROM WP 4.4 BY WP 4.4 ITSELF, and the reason is a correction rather than a deferral. This row said the table's subject is \"whether a card has gone stale, which is the one staleness rule WP 4.4 lands\" — and WP 4.4 landed that rule without needing to DESCRIBE the table, because the rule is a function over a hash column and `model_validations` already carries four of them. What the table actually needs is the thing WP 6.3 builds: it binds a verdict to a dataset, a policy, a scenario and an engine fingerprint, which IS invariant `result-binding` (I8) and IS the A5 Reproducibility Record. Describing it in a staleness package would have put it in the contract under a package that had no reason to think about what its columns mean. §15 measured 0 active cards, so nothing is waiting on it. Original note follows. `model_validations` is a VALIDATION CARD, not analysis output — it already carries `graph_hash`, `policy_hash`, `scenario_hash` and `engine_fingerprint` and its whole subject is whether a card has gone stale, which is the one staleness rule WP 4.4 lands (\"stale iff `computed_from_hash <> current_graph_hash()`\") and the Trust Report that reads it. It was grouped with the network tables by WP 1.4 on the strength of the word \"validation\"; WP 4.2 moved it when the D56 decision made the network group specific. §15 measured 0 active cards, so nothing is waiting on it.",
+    "tables": [
+      {
+        "table": "model_validations",
+        "columns": 24
+      }
+    ]
+  },
+  {
+    "wp": "6.3",
+    "why": "Runs and results (tier 5). Invariant `result-binding` is the claim these tables have to satisfy — every result binds dataset + policy + scenario + engine version. MOVED FROM WP 4.4 BY WP 4.4 ITSELF. This row read \"WP 4.1/4.4 are where the binding is completed\", and neither package was ever scoped to complete it: §11's WP 4.1 is the graph hash and §11's WP 4.4 is staleness plus the Trust Report. Ten tables were waiting on a sentence no work item behind them ever agreed to. WP 6.3 ships the A5 Reproducibility Record — \"dataset, policy, scenario, engine and analysis versions plus declared limits\" — which is `result-binding` stated as a deliverable, so the tables and the invariant now wait on the same package. See §16 · WP 4.4 · J. NOTE for whoever authors `simulation_jobs`: it carries an UNRESOLVED shadowed definition (`20250914113723` re-declares what `20250913085427` created, and the two disagree about `job_id`). The introspector records the disagreement rather than picking a winner. Resolve it BEFORE writing the sidecar — a field entry for a column whose type depends on which CREATE TABLE won is a guess with a schema around it.",
+    "tables": [
+      {
+        "table": "experiments",
+        "columns": 10
+      },
+      {
+        "table": "run_item_series",
+        "columns": 7
+      },
+      {
+        "table": "run_replications",
+        "columns": 12
+      },
+      {
+        "table": "simulation_cache",
+        "columns": 13
+      },
+      {
+        "table": "simulation_job_magnitudes",
+        "columns": 13
+      },
+      {
+        "table": "simulation_jobs",
+        "columns": 25
+      },
+      {
+        "table": "simulation_performance_metrics",
+        "columns": 14
+      },
+      {
+        "table": "simulation_results",
+        "columns": 13
+      },
+      {
+        "table": "simulation_runs",
+        "columns": 24
+      }
+    ]
+  },
+  {
+    "wp": "6.4",
+    "why": "MOVED FROM WP 6.1 BY WP 6.1 ITSELF. §13 scopes that package to resolution chains — \"CSV column → DB column → RPC → hook → substitution → engine field → unit at each hop\" — and says nothing about describing tables. Eleven tables were waiting on it anyway, which is the R8 finding WP 4.4 hit from the other side: an owner nothing behind it ever agreed to. They go to a NEW package rather than onto WP 6.3, and the reason is budget honesty: WP 6.3 already carries A2, A3, A5, the provenance vocabulary and the eleven result-binding tables WP 4.4 re-homed to it. Twenty-two tables under one package is a number that misrepresents what it costs, and misrepresented budget is what boundary reviews exist to catch (§16 · Phase 2→3). See §14 · WP 6.4. Original note follows. `external_evidence` is the AGENT's evidence store — retrieved URLs, content hashes and confidence behind a proposal — and it belongs with the decision plane rather than with analysis output. Same regrouping as `model_validations` above: it was in the WP 4.2 bucket because nobody had looked at it, which is exactly what D54 says a deferral list does when it is allowed to decide by omission.",
     "tables": [
       {
         "table": "external_evidence",
@@ -477,29 +509,9 @@ export const UNDESCRIBED: UndescribedGroup[] = [
     ]
   },
   {
-    "wp": "6.1",
-    "why": "Decisions (tier 4) beyond the two policy tables the contract already covers. WP 6.1 pins the resolution chains and WP 6.2 fixes the divergences (D17, D18, D23, D24, D26); the scenario and disruption tables are the surface those chains resolve against.",
+    "wp": "6.4",
+    "why": "Decisions (tier 4) beyond the two policy tables the contract already covers. MOVED FROM WP 6.1 BY WP 6.1 ITSELF, with `external_evidence` above. This row's own reasoning is what gave it away: \"WP 6.1 pins the resolution chains … the scenario and disruption tables are the surface those chains resolve against\". Being the surface a package READS is not the same as being a package's deliverable, and §13's WP 6.1 never claimed them — it traced 38 grid fields and described no table at all. Ten tables sat behind a sentence that reads like a plan and is an association. WP 6.4 owns them with `external_evidence`: together they are the DECISION PLANE — what a person or an agent chose, and what a result must bind to under `result-binding` (I8). See §14 · WP 6.4.",
     "tables": [
-      {
-        "table": "disruption_scenario_effects",
-        "columns": 9
-      },
-      {
-        "table": "disruption_scenario_profiles",
-        "columns": 13
-      },
-      {
-        "table": "disruption_scenario_settings",
-        "columns": 8
-      },
-      {
-        "table": "disruption_scenario_targets",
-        "columns": 10
-      },
-      {
-        "table": "disruption_scenarios",
-        "columns": 14
-      },
       {
         "table": "policy_presets",
         "columns": 9

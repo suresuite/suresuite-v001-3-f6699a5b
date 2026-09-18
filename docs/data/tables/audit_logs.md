@@ -95,7 +95,7 @@ Who did it. NULLABLE, and the null carries meaning: a service-role write with no
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260709000002_super_admin_phase1.sql` |
-| References | `approved_users(id)` ON DELETE SET NULL |
+| References | `public.approved_users(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -245,6 +245,6 @@ for one you did.
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/audit_logs.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -25,7 +25,13 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    concurrency: deploy-sim-worker   # never run two deploys at once
+    # A Docker build + Fly release; measured ~100s, but a slow image push is
+    # normal. This caps a HUNG deploy, it does not hurry a real one.
+    timeout-minutes: 30
+    # Never run two deploys at once — and NO `cancel-in-progress`: a
+    # half-cancelled deploy leaves the Fly app mid-release, which costs more
+    # than the minute it would save.
+    concurrency: deploy-sim-worker
     env:
       # Fall back to sim-worker/fly.toml's app name so every step (not just
       # `flyctl deploy`, which reads --config) still targets the right app

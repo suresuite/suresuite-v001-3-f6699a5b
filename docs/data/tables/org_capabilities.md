@@ -72,7 +72,7 @@ the organization the row grants for.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260711000002_unified_access_control.sql` |
-| References | `organizations(id)` ON DELETE CASCADE |
+| References | `public.organizations(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -87,7 +87,7 @@ The capability, naming a row in `capabilities`.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260711000002_unified_access_control.sql` |
-| References | `capabilities(key)` ON DELETE CASCADE |
+| References | `public.capabilities(key)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | must exist in capabilities |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -143,6 +143,6 @@ When it was last changed. Server-stamped.
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/org_capabilities.contract.yaml`, table created by `20260711000002_unified_access_control.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

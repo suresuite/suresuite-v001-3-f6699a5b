@@ -63,16 +63,16 @@ export function useScenarios(projectId: string | null | undefined) {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
     if (!projectId) return;
-    setLoading(true);
+    if (!opts?.silent) setLoading(true);
     const { data } = await sb
       .from("scenarios")
       .select("*")
       .eq("project_id", projectId)
       .order("created_at", { ascending: true });
     setScenarios((data ?? []) as Scenario[]);
-    setLoading(false);
+    if (!opts?.silent) setLoading(false);
   }, [projectId]);
 
   useEffect(() => {
@@ -80,13 +80,13 @@ export function useScenarios(projectId: string | null | undefined) {
       setScenarios([]);
       return;
     }
-    void refresh();
+    void refresh(); // initial load — show the loading state
     const ch = sb
       .channel(`scenarios:${projectId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "scenarios", filter: `project_id=eq.${projectId}` },
-        () => void refresh(),
+        () => void refresh({ silent: true }), // background sync — no flash
       )
       .subscribe();
     return () => {
@@ -109,9 +109,13 @@ export function useScenarios(projectId: string | null | undefined) {
   );
 
   const update = useCallback(async (id: string, patch: Partial<Scenario>) => {
+    setScenarios((cur) => cur.map((s) => (s.id === id ? { ...s, ...patch } : s)));
     const { error } = await sb.from("scenarios").update(patch).eq("id", id);
-    if (error) throw error;
-  }, []);
+    if (error) {
+      void refresh(); // failed — resync with the server's actual state
+      throw error;
+    }
+  }, [refresh]);
 
   const remove = useCallback(async (id: string) => {
     const { error } = await sb.from("scenarios").delete().eq("id", id);

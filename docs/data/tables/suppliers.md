@@ -77,7 +77,7 @@ The project this supplier belongs to. Half of the primary key.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260614000001_item_master.sql` |
-| References | `projects(id)` ON DELETE CASCADE |
+| References | `public.projects(id)` ON DELETE CASCADE |
 | Read by the engine | `datamap.py::rows -> per-project fetch` |
 | Transform | filter, never read as a value |
 | Validated at ingest | set from the selected project, never from the CSV |
@@ -295,7 +295,7 @@ The ingestion run that last wrote this row (WP 3.3, D55), and through it the pro
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260916000020_item_masters_land.sql` |
-| References | `ingest_runs(id)` ON DELETE SET NULL |
+| References | `public.ingest_runs(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -316,6 +316,6 @@ The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_numb
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/suppliers.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

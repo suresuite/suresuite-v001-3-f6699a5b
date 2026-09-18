@@ -19,6 +19,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { FindingsPanel } from "./RunGate";
 import { fieldWalkToRoute } from "@/lib/policies/dataMap";
 import type { Finding } from "@/lib/policies/validationService";
+import { FreshnessBadge } from "@/components/trust/FreshnessBadge";
+import { TrustReportPanel } from "@/components/trust/TrustReportPanel";
 
 interface Props {
   projectId: string;
@@ -30,6 +32,8 @@ interface Props {
   onAcknowledgedChange: (v: boolean) => void;
   /** Known supplier ids — options for the assign-supplier one-click fix. */
   supplierIds: string[];
+  /** Display name for the trust report's heading; falls back to the id. */
+  projectName?: string;
 }
 
 /** Inline remediation for the unsourced-BOM blocker: one select + apply per
@@ -129,7 +133,10 @@ export function PreRunValidationPanel({
   acknowledged,
   onAcknowledgedChange,
   supplierIds,
+  projectName,
 }: Props) {
+  const [showTrust, setShowTrust] = useState(false);
+
   if (findings === null) {
     return (
       <div className="flex items-center gap-2 rounded-sm border border-[--hair-rule] bg-white px-3 py-[10px] text-[12.5px] text-[#52525b]">
@@ -142,6 +149,28 @@ export function PreRunValidationPanel({
   const warns = findings.filter((f) => f.severity === "warn").length;
 
   return (
+    <div className="space-y-3">
+      {/* WP 4.4 · A3. The freshness badge answers "is what I am looking at
+          current?" in one line; the report below answers "is this model built on
+          good data?", limits first. Both are COMPUTED at read time — opening
+          this panel writes nothing (§4 D70). */}
+      <div className="flex items-center gap-2">
+        <FreshnessBadge projectId={projectId} />
+        <button
+          type="button"
+          onClick={() => setShowTrust((v) => !v)}
+          className="text-[11.5px] text-[#52525b] underline-offset-2 hover:text-foreground hover:underline"
+        >
+          {showTrust ? "hide data trust report" : "data trust report"}
+        </button>
+      </div>
+      {showTrust && (
+        <TrustReportPanel
+          projectId={projectId}
+          projectName={projectName ?? projectId}
+          findings={findings}
+        />
+      )}
     <FindingsPanel
       findings={findings}
       source={source}
@@ -178,5 +207,6 @@ export function PreRunValidationPanel({
         );
       }}
     />
+    </div>
   );
 }

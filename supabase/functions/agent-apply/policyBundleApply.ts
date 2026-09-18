@@ -154,6 +154,7 @@ export async function applyPolicyBundle(
     if (baseVersionId) {
       const { error: restoreErr } = await db.rpc("restore_policy_version", {
         p_version_id: baseVersionId,
+        _actor_user_id: args.userId ?? null,   // D71
       });
       if (restoreErr) console.error("restore_policy_version failed:", restoreErr.message);
     }

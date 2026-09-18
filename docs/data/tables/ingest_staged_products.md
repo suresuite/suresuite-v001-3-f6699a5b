@@ -26,6 +26,7 @@ partially or get corrected — the write fails.
 
 | Constraint | Rule | Added by |
 |---|---|---|
+| `erp_staged_products_diff_state_check` | `CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))` | `20260829120000_erp_connector_phase1_2.sql` |
 | `ingest_staged_products_source_kind_check` | `CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))` | `20260916000012_ingest_rename_and_widen.sql` |
 | `ingest_staged_products_fact_class_check` | `CHECK (fact_class IN ('master', 'transactional'))` | `20260916000012_ingest_rename_and_widen.sql` |
 
@@ -103,7 +104,7 @@ The run that staged this row. The owner: staged rows cascade with their run, and
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `ingest_runs(id)` ON DELETE CASCADE |
+| References | `public.ingest_runs(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -120,7 +121,7 @@ The ERP link the row came through, or NULL for a source that has none. Redundant
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `project_erp_links(id)` ON DELETE CASCADE |
+| References | `public.project_erp_links(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -377,6 +378,6 @@ master or transactional. Master rows describe things that persist — an item, a
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_staged_products.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

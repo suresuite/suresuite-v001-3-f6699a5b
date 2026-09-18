@@ -133,6 +133,49 @@ export function mergeRecovery(
   return base as unknown as RecoveryConfig;
 }
 
+/** Local display text, separate from the committed number: a controlled
+ *  input tied directly to a `number` can't represent "currently empty" or
+ *  "mid-edit", so clearing the field would otherwise snap back to the
+ *  fallback default on the very keystroke that empties it. */
+function StrategyParamInput({
+  value,
+  step,
+  onCommit,
+}: {
+  value: number;
+  step: string;
+  onCommit: (v: number) => void;
+}) {
+  const [text, setText] = useState(String(value));
+
+  // Resync when the committed value changes from outside (playbook switch,
+  // reset to playbook, another field's mutual-exclusion side effect, etc).
+  useEffect(() => {
+    setText(String(value));
+  }, [value]);
+
+  return (
+    <Input
+      type="number"
+      step={step}
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setText(raw); // reflect exactly what was typed, including ""
+        const v = parseFloat(raw);
+        if (raw !== "" && Number.isFinite(v)) onCommit(v);
+      }}
+      onBlur={() => {
+        const v = parseFloat(text);
+        if (text === "" || !Number.isFinite(v)) {
+          setText(String(value)); // revert display only, nothing to commit
+        }
+      }}
+      className="h-8 min-h-11 text-xs md:min-h-0"
+    />
+  );
+}
+
 function shallowEqualConfig(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   for (const k of keys) {
@@ -378,7 +421,7 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave, sect
                                 {f.label}
                                 <span className="text-muted-foreground font-normal ml-1">({f.unit})</span>
                               </Label>
-                              <Input
+                              {/* <Input
                                 type="number"
                                 step={f.step ?? "1"}
                                 value={displayVal}
@@ -386,7 +429,12 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave, sect
                                   patchOverride(f.key, parseFloat(e.target.value) || f.default)
                                 }
                                 className="h-8 min-h-11 text-xs md:min-h-0"
-                              />
+                              /> */}
+                              <StrategyParamInput
+                                value={displayVal}
+                                step={f.step ?? "1"}
+                                onCommit={(v) => patchOverride(f.key, v)}
+                                />
                             </div>
                           );
                         })}

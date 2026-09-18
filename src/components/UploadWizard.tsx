@@ -1287,8 +1287,10 @@ const UploadWizard = ({
       if (template.id === 'network_nodes' || template.id === 'network_edges' || template.id === 'deep_tier_json' || (selectedDataset === 'deep_tier' && deepTierFormat === 'csv')) {
         try {
           console.log('🔄 Auto-calculating prominence after', template.id, 'upload');
+          // WP 4.3 · the analyzer writes tier 3 through an RPC that takes the
+          // actor, so the actor travels with the request (invariant audit-actor).
           const prominenceResult = await supabase.functions.invoke('calculate-node-prominence', {
-            body: { project_id: selectedProject?.id }
+            body: { project_id: selectedProject?.id, uploaded_by: user?.id }
           });
           
           if (prominenceResult.error) {

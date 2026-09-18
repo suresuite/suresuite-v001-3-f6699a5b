@@ -192,6 +192,12 @@ export function buildContract({ introspected, registry, sidecars }) {
       // generated from here, so a new dataset is a sidecar edit and not a
       // second list inside an edge function.
       ingest_dataset: doc.ingest_dataset ?? null,
+      // WP 5.1 — TABLE-grain lineage: which pages read this table, by what path,
+      // with a file:line `contract:check` R12 re-opens on every run. It lives on
+      // the table rather than being repeated on every column, because "this page
+      // reads this table" is one fact and authoring it thirty times is `single-
+      // source` (I1) broken by copy-paste.
+      surfaces: doc.surfaces ?? [],
       // `rls_enabled` is the introspected value, never the sidecar's — and it is
       // NULL, not false, when a dynamic-SQL migration leaves the question open.
       governance: {
@@ -471,7 +477,12 @@ function renderColumnDetail(t) {
       ["Added by", code(c.added_by)],
     ];
     if (c.references) {
-      rows.push(["References", `\`${esc(c.references.table)}(${c.references.columns.join(", ")})\`${c.references.on_delete ? ` ON DELETE ${esc(c.references.on_delete)}` : ""}`]);
+      // Qualified when the migration qualified it (§4 D53). The page used to
+      // say a column references `users`, and there is no `public.users`.
+      const refName = c.references.schema
+        ? `${c.references.schema}.${c.references.table}`
+        : c.references.table;
+      rows.push(["References", `\`${esc(refName)}(${c.references.columns.join(", ")})\`${c.references.on_delete ? ` ON DELETE ${esc(c.references.on_delete)}` : ""}`]);
     }
     rows.push(["Read by the engine", c.engine.consumed_by ? `\`${esc(c.engine.consumed_by)}\`` : "**not traced**"]);
     if (c.engine.transform) rows.push(["Transform", prose(c.engine.transform)]);
@@ -517,6 +528,15 @@ function renderColumnDetail(t) {
       );
       if (r.note) out.push(prose(r.note), "");
     }
+    const surf = (c.surfaces ?? []).filter((e) => e.grain === "column");
+    if (surf.length) {
+      out.push(
+        `**Rendered on** ${surf.map((e) => `\`${esc(e.page)}\` (\`${esc(e.evidence)}\`${e.confirmed ? "" : ", **unconfirmed**"})`).join(", ")} —`,
+        `each of these names this column in an explicit \`select\` list, so the claim`,
+        `is about the column and not only about the table.`,
+        "",
+      );
+    }
     if (c.note) out.push(`> ${prose(c.note)}`, "");
   }
   return out;
@@ -529,6 +549,58 @@ function renderIndexes(t) {
     out.push(`| ${code(i.name)} | ${i.columns.map((c) => `\`${c}\``).join(", ")} | ${i.unique ? "yes" : "no"} | ${code(i.added_by)} |`);
   }
   out.push("");
+  return out;
+}
+
+
+/**
+ * WP 5.1 · LINEAGE — where this table's data reaches the screen.
+ *
+ * THREE GRADES, NEVER BLURRED, because the brief's whole constraint is that an
+ * unconfirmed entry is worse than none: it will be trusted. So the page states
+ * what each grade does and does not claim, rather than printing a page list and
+ * letting a reader assume the strongest reading of it.
+ */
+function renderSurfaces(t) {
+  const all = t.surfaces ?? [];
+  if (!all.length) return [];
+  const real = all.filter((e) => e.grain !== "shell");
+  const shell = all.filter((e) => e.grain === "shell");
+  const out = [`## Where this data is read\n`];
+
+  if (!real.length) {
+    out.push(
+      `**No page renders this table.** Every path to it runs through app-shell`,
+      `modules (auth and session) that almost every page imports, so reaching it`,
+      `is a property of the import graph rather than of the product.`,
+      "",
+    );
+  } else {
+    out.push(
+      `| Page | Via | Evidence | Confirmed |`, `|---|---|---|---|`,
+      ...real.map((e) =>
+        `| \`${esc(e.page)}\` | ${esc(e.via)} | \`${esc(e.evidence)}\` | ${e.confirmed ? "yes" : "**NO — unconfirmed**"} |`),
+      "",
+      `Each row says the page READS the table by that path, at that line. It does`,
+      `not say every column below is displayed there — a column carries its own`,
+      `lineage only where an explicit \`select\` names it. \`npm run contract:check\``,
+      `R12 re-opens every evidence line on each run, so an entry cannot go stale`,
+      `unnoticed.`,
+      "",
+    );
+  }
+
+  if (shell.length) {
+    out.push(
+      `<details><summary>${shell.length} app-shell read(s) — not lineage</summary>`, "",
+      ...shell.map((e) => `* \`${esc(e.page)}\` — \`${esc(e.evidence)}\``),
+      "",
+      `These reach the table only through modules the shell mounts on every page.`,
+      `Listing them as surfaces would be true about the imports and false about`,
+      `the product.`,
+      "", `</details>`, "",
+    );
+  }
   return out;
 }
 
@@ -549,6 +621,7 @@ export function renderPage(t, contract) {
   out.push(...renderKeys(t));
   out.push(...renderConstraints(t));
   out.push(...renderGovernance(t));
+  out.push(...renderSurfaces(t));
   out.push(...renderColumnSummary(t));
   out.push(...renderColumnDetail(t));
   out.push(...renderIndexes(t));

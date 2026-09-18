@@ -319,6 +319,10 @@ export async function applyNetworkMapDiff(
   if (newSuppliers.length > 0) {
     const { error } = await db.rpc("bulk_upsert_suppliers", {
       p_project_id: args.projectId,
+      // D71 · the actor, so the suppliers this creates carry one. The sibling
+      // calls in this file have passed `p_user_id` all along; this RPC only
+      // grew the parameter in `20260918000003`.
+      _actor_user_id: args.userId ?? null,
       p_rows: newSuppliers.map((v) => ({
         supplier_id: v.supplierId,
         name: v.row.supplier_name,

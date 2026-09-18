@@ -8,6 +8,7 @@ from scsim.io.project_map import (
     ProductRow,
     ProjectData,
     ScenarioSettings,
+    CustomerRow,
     SupplierRow,
     SupplyArc,
     from_project_data,

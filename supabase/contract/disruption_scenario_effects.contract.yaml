@@ -1,0 +1,160 @@
+# AUTHORED — the data contract's sidecar for `disruption_scenario_effects`.
+table: disruption_scenario_effects
+tier: '4'
+schema_name: public
+grain: >-
+  One effect for one profile: WHAT the disruption does to whatever it hits. A
+  capacity reduction or a time delay, with a magnitude and the unit that
+  magnitude is in.
+owner: policy-ui
+
+natural_key_unique:
+  - source: PRIMARY KEY constraint
+    columns: [id]
+    name: null
+
+governance:
+  read: project_member
+  write: project_member
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    Tier 4 — the DECISION plane. Audited from WP 6.4.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. The natural key is below; this is what the child rows
+      reference.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  profile_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The profile this effect belongs to. ON DELETE CASCADE.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  effect_type:
+    type: public.disruption_effect_type
+    unit: null
+    unit_source: none
+    meaning: >-
+      `capacity_reduction` or `time_delay`, as the `disruption_effect_type`
+      enum. It decides which units `unit` may legally carry, and
+      `validate_disruption_effect` enforces that on write.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  magnitude:
+    type: numeric
+    unit: column
+    unit_source: column
+    meaning: >-
+      How much. Its meaning depends entirely on `effect_type` and `unit`: a
+      capacity reduction is a percentage, a time delay a count of time. NOT
+      NULL, so an effect always states a size.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Reaches no engine field directly: the scenario runner reads it with
+      `effect_type` and `unit`, which together decide what the number means.
+      `validate_disruption_effect` is what keeps the three consistent on write,
+      and it is the only such trigger in this group.
+  unit:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The unit `magnitude` is in. A TEXT column rather than the canonical
+      `UNIT_DAYS` vocabulary that governs tier-2 lead times, because a
+      decision's unit is whatever the person chose and is converted where it is
+      read — `normalize-at-promotion` (I3) governs observations, not decisions.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  organization:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid-
+      identity` (G1) says a displayable name is never a join key: nothing joins
+      on this, and `organization_id` is the identity. Kept because the rows
+      exist.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_by:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user who created the row, as a uuid. Client-asserted — this
+      application authenticates against `approved_users` rather than Supabase
+      Auth (D28) — so it names who the client said acted, which is why the audit
+      row added by WP 6.4 is the record that matters.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was created. Server-stamped, never the client's clock.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it was last changed. Server-stamped by the `update_*_updated_at`
+      trigger.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+note: >-
+  THE ONLY TABLE IN THIS GROUP WHOSE PAYLOAD IS VALIDATED.
+  `validate_disruption_effect` fires BEFORE INSERT OR UPDATE and checks
+  `magnitude` and `unit` against `effect_type` — so an effect cannot carry a
+  unit its type does not admit. `_targets` has the same discriminator shape and
+  no such trigger, which is worth noticing when reading the two side by side.

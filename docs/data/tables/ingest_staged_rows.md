@@ -57,6 +57,18 @@ RLS reaches the project through the RUN — `has_project_access(r.project_id)` �
 
 </details>
 
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `DataManager.tsx` | table read | `src/hooks/useIngestRun.tsx:63` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
+
 ## Columns
 
 `CSV header` is the name the **user types**, which is not always the column name —
@@ -102,10 +114,14 @@ The run these rows were staged in. NOT NULL, ON DELETE CASCADE: the run is the o
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260916000014_ingest_staged_rows.sql` |
-| References | `ingest_runs(id)` ON DELETE CASCADE |
+| References | `public.ingest_runs(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `DataManager.tsx` (`src/components/ingest/RowProvenance.tsx:51`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 ### `source_kind`
 
@@ -165,7 +181,11 @@ The physical line in the file, 1-based, counting the header as line 1 — so the
 | Added by | `20260916000014_ingest_staged_rows.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | integer > 1 |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `DataManager.tsx` (`src/components/ingest/RowProvenance.tsx:51`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 > This is the anchor WP 3.4's review screen clicks through to and WP 3.3's tier-2 `source_row_id` points at. It is also why a rejected row is KEPT rather than dropped: "row 42 is why" needs row 42 to exist somewhere.
 
@@ -256,6 +276,6 @@ When the row was staged. Server-stamped, never the client's clock.
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_staged_rows.contract.yaml`, table created by `20260916000014_ingest_staged_rows.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

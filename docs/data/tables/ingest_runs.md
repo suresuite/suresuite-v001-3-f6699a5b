@@ -26,6 +26,8 @@ partially or get corrected — the write fails.
 
 | Constraint | Rule | Added by |
 |---|---|---|
+| `erp_sync_runs_triggered_by_check` | `CHECK (triggered_by IN ('manual', 'scheduled'))` | `20260829120000_erp_connector_phase1_2.sql` |
+| `erp_sync_runs_status_check` | `CHECK (status IN ('running', 'staged', 'applied', 'failed', 'skipped'))` | `20260829120000_erp_connector_phase1_2.sql` |
 | `ingest_runs_source_kind_check` | `CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))` | `20260916000012_ingest_rename_and_widen.sql` |
 
 ## Governance
@@ -48,6 +50,19 @@ RLS keys on the run's own `project_id` — `has_project_access(project_id)` — 
 | ingest_runs: project access | ALL | authenticated | `20260916000012_ingest_rename_and_widen.sql` |
 
 </details>
+
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `DataManager.tsx` | table read | `src/hooks/useErpConnections.tsx:65` | yes |
+| `SimulationLab.tsx` | table read | `src/components/trust/TrustReportPanel.tsx:36` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
 
 ## Columns
 
@@ -94,7 +109,11 @@ Surrogate key. Not the grain: a run is identified by what it did, and nothing jo
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:36`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 ### `link_id`
 
@@ -106,7 +125,7 @@ The ERP link this run used, or NULL for a source that has none. NULL means 'this
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `project_erp_links(id)` ON DELETE CASCADE |
+| References | `public.project_erp_links(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -139,7 +158,7 @@ The person who asked for a manual run, in `auth.users`. NULL for a scheduled run
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `users(id)` |
+| References | `auth.users(id)` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -172,7 +191,11 @@ Row counts pulled from the source, per entity — {"products": 1007, "bom_versio
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:36`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 ### `rows_new`
 
@@ -316,7 +339,11 @@ When the staged rows were promoted to tier 2. NULL for every run that has not be
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:36`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 ### `applied_by_user_id`
 
@@ -328,10 +355,14 @@ Who approved the promotion, in `auth.users`. NULL when the link's auto-apply thr
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `users(id)` |
+| References | `auth.users(id)` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:36`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 ### `error_detail`
 
@@ -371,7 +402,7 @@ The project this run ingests into. Added in WP 3.1 and NOT NULL: it is what the 
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260916000012_ingest_rename_and_widen.sql` |
-| References | `projects(id)` ON DELETE CASCADE |
+| References | `public.projects(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -390,7 +421,11 @@ Where this run's rows came from: csv, orbit-mrp or api. CHECK-constrained, so a 
 | Added by | `20260916000012_ingest_rename_and_widen.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:36`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 > NO DEFAULT, deliberately. The column is backfilled to 'orbit-mrp' for the runs that existed and the default is then dropped, so the next writer must state its source. A default here would record a CSV upload as a connector sync and nobody would be told, which is the §5 T1 failure — a value with no provenance — inside the table that exists to record provenance.
 
@@ -433,6 +468,6 @@ Staged rows that a LATER line of the same file repeats on the natural key. The p
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_runs.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

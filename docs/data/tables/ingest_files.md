@@ -22,6 +22,15 @@ TIER 0, CREATED IN PHASE 3 / WP 3.1, AND NOTHING WRITES IT YET. PLAN.md §2 list
 
 ## Constraints
 
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `ingest_files_source_kind_check` | `CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))` | `20260916000013_ingest_files_tier0.sql` |
+| `ingest_files_byte_size_check` | `CHECK (byte_size >= 0)` | `20260916000013_ingest_files_tier0.sql` |
+| `ingest_files_content_sha256_check` | `CHECK (content_sha256 ~ '^[0-9a-f]{64}$')` | `20260916000013_ingest_files_tier0.sql` |
+
 | Constraint | Kind | Definition |
 |---|---|---|
 | — | UNIQUE | `UNIQUE (storage_bucket, storage_path)` |
@@ -46,6 +55,18 @@ RLS reaches the project through the run, the same predicate the staging tables u
 | ingest_files: project access | ALL | authenticated | `20260916000013_ingest_files_tier0.sql` |
 
 </details>
+
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `DataManager.tsx` | table read | `src/hooks/useIngestRun.tsx:62` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
 
 ## Columns
 
@@ -92,7 +113,7 @@ The run this file was landed for. NOT NULL: a file with no run is a byte-stream 
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260916000013_ingest_files_tier0.sql` |
-| References | `ingest_runs(id)` ON DELETE CASCADE |
+| References | `public.ingest_runs(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -127,7 +148,11 @@ The file's name as the user's machine gave it, verbatim. For display and for the
 | Added by | `20260916000013_ingest_files_tier0.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `DataManager.tsx` (`src/components/ingest/RowProvenance.tsx:65`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 ### `storage_bucket`
 
@@ -197,7 +222,11 @@ SHA-256 of the bytes AS RECEIVED, lowercase hex, computed before any parse. The 
 | Added by | `20260916000013_ingest_files_tier0.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `DataManager.tsx` (`src/components/ingest/RowProvenance.tsx:65`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 > CHECK-constrained on SHAPE (`^[0-9a-f]{64}$`) rather than on content, because a truncated or upper-cased hash compares unequal to itself and would break every lineage claim built on it — quietly, and much later. It is also the dedup signal: 'you have uploaded these bytes before' is a question asked by hash, not by filename, and the index exists for it.
 
@@ -211,7 +240,7 @@ The person who uploaded the file, in `approved_users`. NULL when the landing had
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260916000013_ingest_files_tier0.sql` |
-| References | `approved_users(id)` ON DELETE SET NULL |
+| References | `public.approved_users(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -239,6 +268,6 @@ When the bytes were received. Server-stamped, never the client's clock.
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_files.contract.yaml`, table created by `20260916000013_ingest_files_tier0.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

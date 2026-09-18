@@ -4,11 +4,11 @@
   "title": "Data-contract sidecar",
   "description": "The AUTHORED half of the data contract (Phase 1 / WP 1.2). One file per table in supabase/contract/<table>.contract.yaml. The introspected half (build/schema.introspected.json) says what the schema IS; a sidecar says what each column MEANS, what unit it carries, which engine code reads it, and what the user typed to produce it. WP 1.4's generator merges the two; its checker fails when either describes something the other does not.",
   "$reserved": {
-    "$comment": "Declared now, used by nothing yet. Reserving costs a line; retrofitting costs a UI pass (PLAN.md \u00a78 WP 1.2 step 3).",
-    "tier.2-O": "Observations \u2014 timestamped, append-only, bitemporal (PLAN.md \u00a72, Phase 7+).",
+    "$comment": "Declared now, used by nothing yet. Reserving costs a line; retrofitting costs a UI pass (PLAN.md §8 WP 1.2 step 3).",
+    "tier.2-O": "Observations — timestamped, append-only, bitemporal (PLAN.md §2, Phase 7+).",
     "schema_name.observations": "The Postgres schema tier 2-O will live in. Nothing writes it yet.",
     "provenance.estimated": "A value fitted by an estimator from observations rather than asserted. Phase 7+.",
-    "provenance.contract": "A value the data contract itself supplies \u2014 the declared default, not a guess. Phase 6.",
+    "provenance.contract": "A value the data contract itself supplies — the declared default, not a guess. Phase 6.",
     "field.grain.rate": "A quantity per unit time (a flow). Needs `unit` to name the period.",
     "field.grain.event": "One timestamped occurrence rather than a standing level. Tier 2-O."
   },
@@ -29,7 +29,7 @@
       "pattern": "^[a-z_][a-z0-9_]*$"
     },
     "tier": {
-      "description": "PLAN.md \u00a72. '2-O' and 'reference' are reserved.",
+      "description": "PLAN.md §2. '2-O' and 'reference' are reserved.",
       "enum": [
         "0",
         "1",
@@ -53,10 +53,10 @@
     "grain": {
       "type": "string",
       "minLength": 10,
-      "description": "What ONE ROW is, in the user's terms. Not the primary key \u2014 the thing."
+      "description": "What ONE ROW is, in the user's terms. Not the primary key — the thing."
     },
     "owner": {
-      "description": "Which part of the system is responsible for the rows being correct. `analysis` (WP 4.2) is the analyses that produce derived metrics \u2014 distinct from `etl`, which is `combine-project`'s graph build, and from `engine`, which is the simulation. It was added rather than folding the analysis store into `etl`, because labelling the owner wrongly in the table that exists to end mislabelled provenance (D19) would be a poor trade for one enum value.",
+      "description": "Which part of the system is responsible for the rows being correct. `analysis` (WP 4.2) is the analyses that produce derived metrics — distinct from `etl`, which is `combine-project`'s graph build, and from `engine`, which is the simulation. It was added rather than folding the analysis store into `etl`, because labelling the owner wrongly in the table that exists to end mislabelled provenance (D19) would be a poor trade for one enum value.",
       "enum": [
         "data-ingestion",
         "etl",
@@ -183,7 +183,7 @@
             "master",
             "transactional"
           ],
-          "description": "What kind of fact one row is \u2014 the `ingest_staged_rows.fact_class` value. Structure (a BOM) is master; a quantity over a period (a lane) is transactional."
+          "description": "What kind of fact one row is — the `ingest_staged_rows.fact_class` value. Structure (a BOM) is master; a quantity over a period (a lane) is transactional."
         },
         "server_set": {
           "type": "array",
@@ -199,7 +199,7 @@
     },
     "analysis_kinds": {
       "type": "object",
-      "description": "WP 4.2 \u00b7 \u00a711's OPEN ENUM with its params schema. `analysis_kind` is a TEXT column whose CHECK constrains the shape only, so a new kind costs a sidecar edit and not an `ALTER TYPE`, a migration and a deploy. The catalog of kinds is a data fact and `single-source` (I1) says a data fact is authored exactly once \u2014 here.",
+      "description": "WP 4.2 · §11's OPEN ENUM with its params schema. `analysis_kind` is a TEXT column whose CHECK constrains the shape only, so a new kind costs a sidecar edit and not an `ALTER TYPE`, a migration and a deploy. The catalog of kinds is a data fact and `single-source` (I1) says a data fact is authored exactly once — here.",
       "additionalProperties": {
         "type": "object",
         "required": [
@@ -221,6 +221,13 @@
             "description": "Each parameter's type, default and meaning. A default declared nowhere is `declared-fallback` (I6) broken."
           }
         }
+      }
+    },
+    "surfaces": {
+      "type": "array",
+      "description": "TABLE-GRAIN lineage (WP 5.1): which pages reach this table, by what path, with a file:line a reviewer can open. It does NOT claim that every column is rendered on those pages — that claim needs column grain, and a field's own `surfaces` carries it where the evidence exists.",
+      "items": {
+        "$ref": "#/definitions/surface_entry"
       }
     }
   },
@@ -252,7 +259,7 @@
           "description": "The physical unit. null for dimensionless, identifiers and text."
         },
         "unit_source": {
-          "description": "Where the unit comes from. 'fixed' \u2014 the contract fixes it and the CSV cannot change it (inbound_logistics.lead_time is weeks, full stop). 'column' \u2014 another column of the same row names it (volume, via time_unit). 'derived' \u2014 it follows from the units of the inputs. 'none' \u2014 dimensionless.",
+          "description": "Where the unit comes from. 'fixed' — the contract fixes it and the CSV cannot change it (inbound_logistics.lead_time is weeks, full stop). 'column' — another column of the same row names it (volume, via time_unit). 'derived' — it follows from the units of the inputs. 'none' — dimensionless.",
           "enum": [
             "fixed",
             "column",
@@ -261,7 +268,7 @@
           ]
         },
         "normalize_at_promotion": {
-          "description": "WP 3.3 (invariant I3) \u2014 how this value is converted into a canonical unit as it is PROMOTED into tier 2, so that nothing downstream has to convert it. Present only on a column that also has `unit_column`, which already names where the unit comes from; this adds the two things `unit_column` does not say \u2014 which conversion applies, and what the value is left in.",
+          "description": "WP 3.3 (invariant I3) — how this value is converted into a canonical unit as it is PROMOTED into tier 2, so that nothing downstream has to convert it. Present only on a column that also has `unit_column`, which already names where the unit comes from; this adds the two things `unit_column` does not say — which conversion applies, and what the value is left in.",
           "type": [
             "object",
             "null"
@@ -277,11 +284,11 @@
                 "rate",
                 "duration"
               ],
-              "description": "`rate` \u2014 a quantity PER unit-period, normalized with public.rate_to_weekly. `duration` \u2014 a LENGTH of time, normalized with public.duration_to_weeks. They are NOT inverses: a duration of 1 month is ~4.35 weeks, a rate of 1 per month is ~0.23 per week, which is why the kind has to be stated and cannot be inferred from the unit."
+              "description": "`rate` — a quantity PER unit-period, normalized with public.rate_to_weekly. `duration` — a LENGTH of time, normalized with public.duration_to_weeks. They are NOT inverses: a duration of 1 month is ~4.35 weeks, a rate of 1 per month is ~0.23 per week, which is why the kind has to be stated and cannot be inferred from the unit."
             },
             "canonical": {
               "type": "string",
-              "description": "The unit the promoted value is in. `ingest_apply_run` writes it into `unit_column`, so the tier-2 row STATES its unit rather than leaving a reader to know a default (\u00a75 T1)."
+              "description": "The unit the promoted value is in. `ingest_apply_run` writes it into `unit_column`, so the tier-2 row STATES its unit rather than leaving a reader to know a default (§5 T1)."
             }
           }
         },
@@ -292,10 +299,10 @@
         "meaning": {
           "type": "string",
           "minLength": 10,
-          "description": "What the value IS, in the user's terms \u2014 not a restatement of the column name."
+          "description": "What the value IS, in the user's terms — not a restatement of the column name."
         },
         "grain": {
-          "description": "'level' \u2014 a standing quantity. 'rate' and 'event' are reserved (see $reserved).",
+          "description": "'level' — a standing quantity. 'rate' and 'event' are reserved (see $reserved).",
           "enum": [
             "level",
             "rate",
@@ -318,7 +325,7 @@
                 "string",
                 "null"
               ],
-              "description": "Where the engine reads it, traced by grep, e.g. 'project_map.py::_map_supply -> SupplierLink.cost'. null means NOT TRACED \u2014 and then `note` must say so. Never a guess."
+              "description": "Where the engine reads it, traced by grep, e.g. 'project_map.py::_map_supply -> SupplierLink.cost'. null means NOT TRACED — and then `note` must say so. Never a guess."
             },
             "transform": {
               "type": [
@@ -338,7 +345,7 @@
         },
         "substitutions": {
           "type": "array",
-          "description": "Every point where a value the user did not supply can stand in for one they did. \u00a75's transparency standard is built on this list being complete.",
+          "description": "Every point where a value the user did not supply can stand in for one they did. §5's transparency standard is built on this list being complete.",
           "items": {
             "type": "object",
             "required": [
@@ -413,7 +420,7 @@
               "additionalProperties": false,
               "properties": {
                 "kind": {
-                  "description": "`unit` is a token public.unit_days() knows \u2014 the ONE unit table, never a list restated here (D10).",
+                  "description": "`unit` is a token public.unit_days() knows — the ONE unit table, never a list restated here (D10).",
                   "enum": [
                     "text",
                     "numeric",
@@ -455,9 +462,9 @@
         },
         "surfaces": {
           "type": "array",
-          "description": "Where the value is rendered. Filled in Phase 5 (WP 5.1); empty until then, not absent.",
+          "description": "COLUMN-GRAIN lineage: pages that name this field in an explicit select list. Filled by WP 5.1. Table-grain reach lives on the TABLE's own `surfaces`, because 'this page reads this table' is a fact about the table and repeating it on 30 columns is a fact authored 30 times (I1).",
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/surface_entry"
           }
         },
         "resolution": {
@@ -519,7 +526,7 @@
                       }
                     }
                   ],
-                  "description": "null means the engine has no variability field for this quantity \u2014 see the RFC in PLAN.md \u00a714. Do not invent one here."
+                  "description": "null means the engine has no variability field for this quantity — see the RFC in PLAN.md §14. Do not invent one here."
                 },
                 "on_conflict": {
                   "enum": [
@@ -543,6 +550,51 @@
         },
         "note": {
           "type": "string"
+        }
+      }
+    },
+    "surface_entry": {
+      "type": "object",
+      "required": [
+        "page",
+        "via",
+        "grain",
+        "evidence",
+        "confirmed"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "page": {
+          "type": "string",
+          "description": "The file in src/pages that reaches this data, e.g. `DataManager.tsx`."
+        },
+        "via": {
+          "type": "string",
+          "description": "How: `table read`, or `rpc <name>` when the hop goes through a SECURITY DEFINER function. An `.rpc()` names a function, not a table; recording which one is the difference between lineage and a list of RPC names."
+        },
+        "grain": {
+          "enum": [
+            "column",
+            "table",
+            "shell"
+          ],
+          "description": "`column` — the field is named in an explicit `.select('a,b')` on a chain whose own `.from()` is this table; a reviewer can open the evidence line and see it. `table` — the page reaches the table at the evidence line, and whether THIS column is rendered is not established. `shell` — every module providing the read is reachable from ≥80% of pages, i.e. auth/session plumbing rather than a place this data is shown. The three are never blurred: claiming column grain on table evidence is the 'worse than none' case WP 5.1's brief names."
+        },
+        "evidence": {
+          "type": "string",
+          "pattern": "^[^:]+:[0-9]+$",
+          "description": "`path:line` of the access, relative to the repo root. `contract:check` R12 re-opens it and fails if no matching access is there — so a lineage entry cannot quietly go stale the way §4's citations did (D21, D22)."
+        },
+        "confirmed": {
+          "type": "boolean",
+          "description": "A person read the evidence line and agreed. WP 5.1's brief: an unconfirmed lineage entry is worse than none, because it will be trusted. `false` publishes as UNCONFIRMED rather than as lineage."
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why this entry is qualified — e.g. the RPC reads the table but the page renders a verdict rather than the rows."
         }
       }
     }

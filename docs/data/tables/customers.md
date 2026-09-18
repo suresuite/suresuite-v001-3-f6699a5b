@@ -11,7 +11,7 @@
 
 **One row is** One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows.
 
-ADOPTED IN PHASE 3 / WP 3.0 (D43). This table existed in the production database with six rows and no creating migration, and it was invisible to the `no-orphan-table` gate for a reason worth keeping: R4 catches tables the CODE READS that no migration creates, and nothing has ever read this one. §15's schema probe — which keys on "production has it" rather than "the code reads it" — is what found it, and that probe now fails the verification run rather than reporting. NOTHING READS IT YET, and the sidecar says so in every `consumed_by: null`. It is not dead: its columns are the inputs of the customer-echelon policies (`P-C.x`), which is why it was adopted rather than dropped the way `product_code_map` was in the same migration. A later package gives it a writer, a CSV template and the tier-2 audit triggers; until then it is a described, governed, empty-of-readers table, which is a better state than an undescribed one holding the same six rows.
+ADOPTED IN PHASE 3 / WP 3.0 (D43). This table existed in the production database with six rows and no creating migration, and it was invisible to the `no-orphan-table` gate for a reason worth keeping: R4 catches tables the CODE READS that no migration creates, and nothing has ever read this one. §15's schema probe — which keys on "production has it" rather than "the code reads it" — is what found it, and that probe now fails the verification run rather than reporting. TWO OF ITS COLUMNS ARE READ SINCE WP 6.2 (§4 D69): `segment` and `priority_weight` reach `P-C.2 customer_allocation`, because the mapper now loads this table instead of synthesizing `Customer(id=c, name=c)` from the outbound arcs. The sentence that stood here — "NOTHING READS IT YET, and the sidecar says so in every `consumed_by: null`" — was true of the outcome and wrong about the cause, and it gave that wrong cause twice more in the column notes below. It is not dead: its columns are the inputs of the customer-echelon policies (`P-C.x`), which is why it was adopted rather than dropped the way `product_code_map` was in the same migration. What it still lacks is a WRITER and a CSV template, and that gap is now BINDING rather than tidy: two of its columns reach the engine and no surface in this product writes them, so the values deciding who is served when supply is short can only arrive by hand in the database (§4 D94).
 
 ## Uniqueness
 
@@ -125,7 +125,7 @@ The customer's service segment, the axis the customer-echelon allocation policie
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
-> DEFAULT 'default' is production's own default, adopted rather than chosen. It is a value, not an absence, and a later reader must not treat it as "unsegmented" without saying so at the point of display (§5 T2).
+> DEFAULT 'default' is production's own default, adopted rather than chosen. It is a value, not an absence, and a later reader must not treat it as "unsegmented" without saying so at the point of display (§5 T2). TRACED IN WP 6.2 (§4 D69). This is the column whose absence was silent in a second way: `P-C.2`'s `sla_tiers` guarantees a fill floor PER SEGMENT, and the mapper gave every customer the entity default `"default"`, so no tier could ever match and every floor was 0.0. The engine already warned (`unknown_sla_segment` in P-C.2's feasibility) — the warning named the symptom while nothing named the cause, because the segments it compared against were a constant.
 
 ### `priority_weight`
 
@@ -137,11 +137,12 @@ Relative allocation priority when demand exceeds supply. Dimensionless and relat
 | Grain | `rate` |
 | Unit | dimensionless |
 | Added by | `20260916000003_adopt_customers_drop_product_code_map.sql` |
-| Read by the engine | **not traced** |
+| Read by the engine | `P-C.2 customer_allocation — Customer.priority_weight, the fallback ordering under the `priority` rule wherever the `priority_weights` param does not name the customer` |
+| When NULL, the engine uses | 1.0 (Customer.priority_weight's own default) — every customer equal, so the `priority` rule cannot order anything |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
-> NOT TRACED into the engine, and the blank is deliberate rather than unfinished. `scsim` has no customer-priority concept today: the customer echelon's allocation policies are `P-C.x` in the blueprint's catalog and none of them is implemented (§4.2, Appendix A). Whoever implements one traces this column then; wiring the mapper to a column the registry does not know is how a fallback ends up undeclared (I6).
+> TRACED IN WP 6.2 (§4 D69), AND THE PREVIOUS NOTE'S REASON WAS FALSE. It read: "`scsim` has no customer-priority concept today … none of [the `P-C.x` policies] is implemented". `p_c2_customer_allocation` is `status: implemented` in the registry export and has always read `Customer.priority_weight`. What was true is the CONSEQUENCE — nothing reached it — but the cause was the mapper never loading this table, not an absent policy, and the stated reason sent the next reader to the blueprint instead of to `project_map.py`. The blank was still correct while it lasted: `from_project_data` built `Customer(id=c, name=c)` from the outbound arcs, so every customer arrived at 1.0 whatever this column held. The mapper now reads it.
 
 ### `sla_fill_floor_pct`
 
@@ -157,7 +158,7 @@ The minimum fill rate the customer is contracted to receive, as a percentage. NU
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
-> NOT TRACED into the engine, for the same reason as `priority_weight`: the service-level policies that would read a contracted fill floor are `P-C.x` and none is implemented. Recorded here so the column is a declared gap rather than a silent one.
+> NOT TRACED, and the REASON is now different from `priority_weight`'s — the two were given the same one and only this column's survives (§4 D69, D94). `P-C.2 customer_allocation` IS implemented, and it does guarantee fill floors: `sla_tiers`, keyed BY SEGMENT. This column is per CUSTOMER, and `Customer` has no field for it at all, so there is nothing to carry it into. Mapping per-customer floors onto a per-segment param needs a rule for what happens when two customers in one segment disagree, and inventing that rule is not a reader change. Declared gap, not a silent one.
 
 ### `updated_at`
 
@@ -189,6 +190,6 @@ When the row was first inserted. Server-stamped.
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/customers.contract.yaml`, table created by `20260916000003_adopt_customers_drop_product_code_map.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

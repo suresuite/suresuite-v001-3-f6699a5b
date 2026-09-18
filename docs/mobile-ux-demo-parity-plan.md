@@ -706,6 +706,17 @@ makes it a second run of `ui-audit.yml`'s gate; restoring the real copy-deck
 gates means restoring the checker from `e0bb85c^` first, which is a separate
 decision. A duplicated green gate beats a permanently red one.
 
+**Resolved 2026-09-18: `mobile-verify.yml` is deleted.** The duplicate ran ~200
+times in 30 days for an answer `ui-audit.yml` already gave on the same commits.
+Its one non-duplicated path, `index.html`, moved into `ui-audit.yml`'s filter —
+`audit-adaptive-ui.mjs:319` reads that file for the `viewport-fit=cover` rule,
+so it is a real input, not an inheritance. `handoff/**` did not move: the
+directory still does not exist, and a filter on an absent path matches nothing.
+The restoration recipe (`git show e0bb85c^:handoff/verify-repo.mjs` and
+`:handoff/PAGES.md`) now lives in `ui-audit.yml`'s header, next to the gate that
+replaced it. The copy-deck coverage is still missing, and it went missing in
+`e0bb85c` — deleting the duplicate did not take it.
+
 `PageLayout`'s `--pi-chrome` now has a second reader: the Lab column is
 `100svh - var(--pi-chrome)` so the gate footer stays on screen. An honest gate
 you have to scroll to find is not one.

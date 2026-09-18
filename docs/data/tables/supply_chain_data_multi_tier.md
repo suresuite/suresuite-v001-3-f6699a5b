@@ -41,6 +41,21 @@ Written by the `combine-project` edge function, never by a page. Invariant I2: p
 
 </details>
 
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `DataManager.tsx` | rpc combine_project_into_supply_chain | `src/pages/DataManager.tsx:650` | yes |
+| `InteractiveNetworkSpace.tsx` | table read | `src/pages/InteractiveNetworkSpace.tsx:369` | yes |
+| `ProcessLevelNetwork.tsx` | table read | `src/pages/ProcessLevelNetwork.tsx:1190` | yes |
+| `ProjectPolicies.tsx` | rpc get_supply_chain_data_multi_tier | `src/hooks/useProjectContext.tsx:49` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
+
 ## Columns
 
 `CSV header` is the name the **user types**, which is not always the column name —
@@ -78,7 +93,11 @@ Surrogate row identifier. Carries no meaning.
 | Added by | `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `InteractiveNetworkSpace.tsx` (`src/pages/InteractiveNetworkSpace.tsx:369`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 ### `project_id`
 
@@ -123,7 +142,11 @@ Which deep-tier upload produced this edge.
 | Read by the engine | `the network pages' filters` |
 | Transform | set by the ETL |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:1190`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 ### `from_location`
 
@@ -213,7 +236,11 @@ How many tiers upstream of the plant this edge sits. 2 is a supplier's supplier.
 | Read by the engine | `the network pages' depth filter` |
 | Transform | int() |
 | Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
+| Rendered at | `[object Object]` |
+
+**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:1190`) —
+each of these names this column in an explicit `select` list, so the claim
+is about the column and not only about the table.
 
 ### `path_root`
 
@@ -298,14 +325,12 @@ When the edge was last recomputed. Server-set.
 | `idx_scmt_project_source` | `project_id`, `data_source` | no | `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql` |
 | `idx_scmt_paths` | `project_id`, `path_root`, `level` | no | `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql` |
 | `idx_scmt_from_to` | `project_id`, `from_location`, `to_location` | no | `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql` |
-| `idx_supply_chain_data_multi_tier_material_id` | `material_id` | no | `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` |
-| `idx_supply_chain_data_multi_tier_higher_level_component_id` | `higher_level_component_id` | no | `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` |
-| `idx_supply_chain_data_multi_tier_project_level` | `project_id`, `level` | no | `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` |
 | `idx_supply_chain_data_multi_tier_from_location` | `from_location` | no | `20250909153231_00d6f1a2-b407-4464-9884-b98cda90556f.sql` |
 | `idx_supply_chain_data_multi_tier_to_location` | `to_location` | no | `20250909153231_00d6f1a2-b407-4464-9884-b98cda90556f.sql` |
+| `idx_supply_chain_data_multi_tier_project_level` | `project_id`, `level` | no | `20250909153231_00d6f1a2-b407-4464-9884-b98cda90556f.sql` |
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data_multi_tier.contract.yaml`, table created by `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

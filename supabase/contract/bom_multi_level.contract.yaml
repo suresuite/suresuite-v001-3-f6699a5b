@@ -36,6 +36,28 @@ natural_key_unique:
 # at two depths of a deep BOM, and the two lines are different facts.
 natural_key_intended: [project_id, plant_name, material_id, higher_level_component_id, level]
 
+surfaces:
+  - page: "DataManager.tsx"
+    via: "rpc get_project_dataset_status"
+    grain: table
+    evidence: "src/pages/DataManager.tsx:429"
+    confirmed: true
+  - page: "ProcessLevelNetwork.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/pages/ProcessLevelNetwork.tsx:1189"
+    confirmed: true
+  - page: "ProjectPolicies.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/lib/policies/projectLanes.ts:48"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/lib/policies/projectLanes.ts:48"
+    confirmed: true
+
 governance:
   read: null
   write: "data_editing"
@@ -150,7 +172,12 @@ fields:
       required: true
       validate: "integer >= 0 — level 0 is a root component, which both live parsers admit and always have (WP 3.2 §16)"
       rule: {kind: integer, min: 0, blank: reject}
-    surfaces: []
+    surfaces:
+      - page: "ProcessLevelNetwork.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/pages/ProcessLevelNetwork.tsx:1189"
+        confirmed: true
     resolution:
       default_mode: asserted
       assertable_by: [csv_upload]

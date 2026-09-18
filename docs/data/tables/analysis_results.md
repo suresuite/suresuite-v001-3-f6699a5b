@@ -22,6 +22,15 @@
 database ENFORCES it: `analysis_results_entity_uniq`. A re-upload of the same row updates
 it rather than duplicating it.
 
+## Constraints
+
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `analysis_results_entity_type_check` | `CHECK (entity_type ~ '^[a-z][a-z0-9_]*$')` | `20260917000006_analysis_store.sql` |
+
 ## Governance
 
 | | |
@@ -83,7 +92,7 @@ The run that computed this. Every result reaches its dataset, its parameters and
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260917000006_analysis_store.sql` |
-| References | `analysis_runs(id)` ON DELETE CASCADE |
+| References | `public.analysis_runs(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -152,6 +161,6 @@ Row insert time, maintained by the database.
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/analysis_results.contract.yaml`, table created by `20260917000006_analysis_store.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

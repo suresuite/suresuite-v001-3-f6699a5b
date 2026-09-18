@@ -42,7 +42,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 456;
+export const REFERENCE_COLUMN_COUNT = 590;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -62,7 +62,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "entity_type",
       "entity_id"
     ],
-    "checks": [],
+    "checks": [
+      {
+        "name": "analysis_results_entity_type_check",
+        "definition": "CHECK (entity_type ~ '^[a-z][a-z0-9_]*$')"
+      }
+    ],
     "columns": [
       {
         "name": "id",
@@ -92,6 +97,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "analysis_runs",
           "columns": [
             "id"
@@ -189,7 +195,16 @@ export const REFERENCE_TABLES: RefTable[] = [
       "params_hash",
       "code_version"
     ],
-    "checks": [],
+    "checks": [
+      {
+        "name": "analysis_runs_analysis_kind_check",
+        "definition": "CHECK (analysis_kind ~ '^[a-z][a-z0-9_]*$')"
+      },
+      {
+        "name": "analysis_runs_status_check",
+        "definition": "CHECK (status IN ('running','succeeded','failed'))"
+      }
+    ],
     "columns": [
       {
         "name": "id",
@@ -219,6 +234,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -417,6 +433,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -747,6 +764,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "organizations",
           "columns": [
             "id"
@@ -804,6 +822,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -1018,6 +1037,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -1166,6 +1186,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -1243,6 +1264,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -1375,6 +1397,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -1413,7 +1436,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "key"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "capabilities_kind_check",
+        "definition": "CHECK (kind IN ('page','feature'))"
+      }
+    ],
     "columns": [
       {
         "name": "key",
@@ -1715,6 +1743,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -1871,6 +1900,10 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": null,
         "definition": "CHECK (grantor_user_id <> grantee_user_id)"
+      },
+      {
+        "name": "delegation_grants_project_role_check",
+        "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))"
       }
     ],
     "columns": [
@@ -1902,6 +1935,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -1924,6 +1958,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -1946,6 +1981,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -2039,6 +2075,963 @@ export const REFERENCE_TABLES: RefTable[] = [
     ]
   },
   {
+    "table": "disruption_scenario_effects",
+    "tier": "4",
+    "tierName": "decisions — policies, overrides, scenarios",
+    "owner": "policy-ui",
+    "grain": "One effect for one profile: WHAT the disruption does to whatever it hits. A capacity reduction or a time delay, with a magnitude and the unit that magnitude is in.",
+    "naturalKey": [
+      "id"
+    ],
+    "naturalKeyIntended": null,
+    "checks": [],
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Surrogate key. The natural key is below; this is what the child rows reference.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The profile this effect belongs to. ON DELETE CASCADE.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "disruption_scenario_profiles",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "effect_type",
+        "type": "public.disruption_effect_type",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "`capacity_reduction` or `time_delay`, as the `disruption_effect_type` enum. It decides which units `unit` may legally carry, and `validate_disruption_effect` enforces that on write.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "magnitude",
+        "type": "numeric",
+        "nullable": false,
+        "unit": "column",
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "How much. Its meaning depends entirely on `effect_type` and `unit`: a capacity reduction is a percentage, a time delay a count of time. NOT NULL, so an effect always states a size.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "unit",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The unit `magnitude` is in. A TEXT column rather than the canonical `UNIT_DAYS` vocabulary that governs tier-2 lead times, because a decision's unit is whatever the person chose and is converted where it is read — `normalize-at-promotion` (I3) governs observations, not decisions.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "organization",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid- identity` (G1) says a displayable name is never a join key: nothing joins on this, and `organization_id` is the identity. Kept because the rows exist.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The user who created the row, as a uuid. Client-asserted — this application authenticates against `approved_users` rather than Supabase Auth (D28) — so it names who the client said acted, which is why the audit row added by WP 6.4 is the record that matters.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the row was created. Server-stamped, never the client's clock.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When it was last changed. Server-stamped by the `update_*_updated_at` trigger.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      }
+    ]
+  },
+  {
+    "table": "disruption_scenario_profiles",
+    "tier": "4",
+    "tierName": "decisions — policies, overrides, scenarios",
+    "owner": "policy-ui",
+    "grain": "One disruption profile for one project — the HEADER of the normalised disruption model. What it hits lives in `_targets`, what it does in `_effects`, and how it is simulated in `_settings`; all three cascade from this row.",
+    "naturalKey": [
+      "id"
+    ],
+    "naturalKeyIntended": null,
+    "checks": [],
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Surrogate key. The natural key is below; this is what the child rows reference.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The project this row belongs to.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "plant_name",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The plant this scenario belongs to, by display name. A project has one plant_name, so this is a denormalised copy of `projects.plant_name` rather than a second identity.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "scenario_name",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "What the person called this profile. Not unique — two profiles may share a name, and the surrogate id is the key.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "status",
+        "type": "public.disruption_status",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "`draft`, `active` or `archived`, as the `disruption_status` enum. CHECKed by the type rather than by a constraint, so an unknown value is refused at cast time.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Free text the person wrote. Never parsed.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "tags",
+        "type": "text[]",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Free-form labels. No vocabulary and no validation — a tag is whatever was typed.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "organization",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid- identity` (G1) says a displayable name is never a join key: nothing joins on this, and `organization_id` is the identity. Kept because the rows exist.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The user who created the row, as a uuid. Client-asserted — this application authenticates against `approved_users` rather than Supabase Auth (D28) — so it names who the client said acted, which is why the audit row added by WP 6.4 is the record that matters.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the row was created. Server-stamped, never the client's clock.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When it was last changed. Server-stamped by the `update_*_updated_at` trigger.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "disruption_start",
+        "type": "date",
+        "nullable": true,
+        "unit": "date",
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "First day the disruption applies, inclusive. NULLABLE and unconstrained against `disruption_end`: nothing stops an end before a start.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "disruption_end",
+        "type": "date",
+        "nullable": true,
+        "unit": "date",
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Last day the disruption applies, inclusive. See `disruption_start` — the pair has no CHECK.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      }
+    ]
+  },
+  {
+    "table": "disruption_scenario_settings",
+    "tier": "4",
+    "tierName": "decisions — policies, overrides, scenarios",
+    "owner": "policy-ui",
+    "grain": "One simulation setting for one profile, as a key and a JSONB value. HOW the disruption is simulated, as against what it hits (`_targets`) and what it does (`_effects`).",
+    "naturalKey": [
+      "profile_id",
+      "key",
+      "id"
+    ],
+    "naturalKeyIntended": null,
+    "checks": [],
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Surrogate key. The natural key is below; this is what the child rows reference.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The profile this setting belongs to. ON DELETE CASCADE.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "disruption_scenario_profiles",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "key",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The setting's name. FREE TEXT with no vocabulary: nothing declares which keys are meaningful, so an unread key and a misspelt one are indistinguishable.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "value",
+        "type": "jsonb",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The setting's value, as JSONB so a key may hold a scalar, a list or an object. NOT NULL — a setting always has a value, and absence is expressed by the row not existing.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "organization",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid- identity` (G1) says a displayable name is never a join key: nothing joins on this, and `organization_id` is the identity. Kept because the rows exist.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The user who created the row, as a uuid. Client-asserted — this application authenticates against `approved_users` rather than Supabase Auth (D28) — so it names who the client said acted, which is why the audit row added by WP 6.4 is the record that matters.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the row was created. Server-stamped, never the client's clock.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When it was last changed. Server-stamped by the `update_*_updated_at` trigger.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      }
+    ]
+  },
+  {
+    "table": "disruption_scenario_targets",
+    "tier": "4",
+    "tierName": "decisions — policies, overrides, scenarios",
+    "owner": "policy-ui",
+    "grain": "One target set for one profile: WHAT the disruption hits. Either a list of nodes or a list of edges, decided by `target_type`.",
+    "naturalKey": [
+      "id"
+    ],
+    "naturalKeyIntended": null,
+    "checks": [],
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Surrogate key. The natural key is below; this is what the child rows reference.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "profile_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The profile this target belongs to. ON DELETE CASCADE — deleting a profile deletes its targets.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "disruption_scenario_profiles",
+          "columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "target_type",
+        "type": "public.disruption_target_type",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "`node` or `edge`, as the `disruption_target_type` enum. It decides WHICH of the three columns below is meaningful, and nothing enforces that the other two are empty.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "node_ids",
+        "type": "text[]",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The nodes hit, by display id, when `target_type` is `node`. An array rather than a row per node, so a target is one statement and one audit row.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "edge_list",
+        "type": "jsonb",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The edges hit, as `[{from_node, to_node}]`, when `target_type` is `edge`. JSONB with no schema check — a malformed entry is stored and fails at read.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "selector",
+        "type": "jsonb",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "An optional saved query describing the target set instead of enumerating it. Nothing evaluates it today; it is stored for a feature that has not landed.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "organization",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid- identity` (G1) says a displayable name is never a join key: nothing joins on this, and `organization_id` is the identity. Kept because the rows exist.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The user who created the row, as a uuid. Client-asserted — this application authenticates against `approved_users` rather than Supabase Auth (D28) — so it names who the client said acted, which is why the audit row added by WP 6.4 is the record that matters.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the row was created. Server-stamped, never the client's clock.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When it was last changed. Server-stamped by the `update_*_updated_at` trigger.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      }
+    ]
+  },
+  {
+    "table": "disruption_scenarios",
+    "tier": "4",
+    "tierName": "decisions — policies, overrides, scenarios",
+    "owner": "policy-ui",
+    "grain": "One disruption applied to one node of one project: a capacity cut, a delay, or both. The ORIGINAL disruption shape, superseded in design by the `disruption_scenario_*` profile/target/effect/setting split but never migrated — both are live and neither reads the other.",
+    "naturalKey": [
+      "id"
+    ],
+    "naturalKeyIntended": null,
+    "checks": [],
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Surrogate key. The natural key is below; this is what the child rows reference.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The project this row belongs to.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "plant_name",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The plant this scenario belongs to, by display name. A project has one plant_name, so this is a denormalised copy of `projects.plant_name` rather than a second identity.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "node_id",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The node the disruption is applied to, by its display id — the same string the network pages use. Not a uuid and not a foreign key: a scenario may name a node that no longer exists in the graph, and deleting it silently would lose the decision.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "scenario_name",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "What the person called this scenario. Not unique — see `natural_key_unique` below, which is the surrogate id and nothing else.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "capacity_reduction_percent",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "percent",
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "How much of the node's capacity the scenario removes. A PERCENT, not a fraction: the column name says so and the default of 0 means 'no reduction'.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "time_delay_days",
+        "type": "numeric",
+        "nullable": true,
+        "unit": "days",
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Additional delay the scenario imposes at this node. DAYS, and it is NOT normalised at promotion the way a tier-2 lead time is — this is a decision the user typed, not an observation, so it is stored as entered and converted where it is read.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Free text the person wrote. Never parsed.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The user who created the row, as a uuid. Client-asserted — this application authenticates against `approved_users` rather than Supabase Auth (D28) — so it names who the client said acted, which is why the audit row added by WP 6.4 is the record that matters.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "organization",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The tenant's DISPLAY NAME, carried on every row of this vintage. `uuid- identity` (G1) says a displayable name is never a join key: nothing joins on this, and `organization_id` is the identity. Kept because the rows exist.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the row was created. Server-stamped, never the client's clock.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When it was last changed. Server-stamped by the `update_*_updated_at` trigger.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "sim_payload",
+        "type": "jsonb",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The scenario as the simulator receives it, frozen at save time. A denormalised copy of the columns above plus whatever the caller added; nothing reads it back into the columns, so a divergence between the two is possible and unnoticed.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "from_network",
+        "type": "boolean",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Whether the scenario was created by clicking a node on a network page (true) or entered by hand. Defaults true, so a row written by any other path claims a provenance it may not have.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      }
+    ]
+  },
+  {
     "table": "inbound_logistics",
     "tier": "2",
     "tierName": "canonical — the only tier humans edit",
@@ -2092,6 +3085,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -2315,6 +3309,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -2355,7 +3350,20 @@ export const REFERENCE_TABLES: RefTable[] = [
       "id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "ingest_files_source_kind_check",
+        "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))"
+      },
+      {
+        "name": "ingest_files_byte_size_check",
+        "definition": "CHECK (byte_size >= 0)"
+      },
+      {
+        "name": "ingest_files_content_sha256_check",
+        "definition": "CHECK (content_sha256 ~ '^[0-9a-f]{64}$')"
+      }
+    ],
     "columns": [
       {
         "name": "id",
@@ -2385,6 +3393,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -2519,6 +3528,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -2559,6 +3569,14 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [
       {
+        "name": "erp_sync_runs_triggered_by_check",
+        "definition": "CHECK (triggered_by IN ('manual', 'scheduled'))"
+      },
+      {
+        "name": "erp_sync_runs_status_check",
+        "definition": "CHECK (status IN ('running', 'staged', 'applied', 'failed', 'skipped'))"
+      },
+      {
         "name": "ingest_runs_source_kind_check",
         "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))"
       }
@@ -2592,6 +3610,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "project_erp_links",
           "columns": [
             "id"
@@ -2630,6 +3649,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "auth",
           "table": "users",
           "columns": [
             "id"
@@ -2844,6 +3864,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "auth",
           "table": "users",
           "columns": [
             "id"
@@ -2898,6 +3919,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -2970,6 +3992,10 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [
       {
+        "name": "erp_staged_bom_lines_diff_state_check",
+        "definition": "CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))"
+      },
+      {
         "name": "ingest_staged_bom_lines_source_kind_check",
         "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))"
       },
@@ -3007,6 +4033,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -3029,6 +4056,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "project_erp_links",
           "columns": [
             "id"
@@ -3213,6 +4241,10 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [
       {
+        "name": "erp_staged_bom_versions_diff_state_check",
+        "definition": "CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))"
+      },
+      {
         "name": "ingest_staged_bom_versions_source_kind_check",
         "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))"
       },
@@ -3250,6 +4282,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -3272,6 +4305,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "project_erp_links",
           "columns": [
             "id"
@@ -3440,6 +4474,10 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [
       {
+        "name": "erp_staged_products_diff_state_check",
+        "definition": "CHECK (diff_state IN ('new', 'changed', 'unchanged', 'removed_upstream'))"
+      },
+      {
         "name": "ingest_staged_products_source_kind_check",
         "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))"
       },
@@ -3477,6 +4515,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -3499,6 +4538,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "project_erp_links",
           "columns": [
             "id"
@@ -3827,6 +4867,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -4008,6 +5049,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -4280,6 +5322,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -4357,6 +5400,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -4482,6 +5526,1304 @@ export const REFERENCE_TABLES: RefTable[] = [
     ]
   },
   {
+    "table": "network_edges",
+    "tier": "3",
+    "tierName": "derived — a pure function of tier 2",
+    "owner": "analysis",
+    "grain": "One directed relationship between two firms in one project's deep-tier graph. EVERY column is uploaded — nothing computes this table, which is why it gains no `computed_from_hash` in WP 4.3 although it sits in `graphHashCoverage.test.ts`'s DERIVED_AND_OUT list by name.",
+    "naturalKey": [
+      "id"
+    ],
+    "naturalKeyIntended": null,
+    "checks": [],
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Surrogate row identifier. Carries no meaning: what identifies a row here is the natural key, not this.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The project this row belongs to. Referenced by uuid and never by a displayable name (`uuid-identity`, G1); cascades on project delete.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "plant_name",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The plant label the row was uploaded under. NOT a project scope — a plant name is not unique across projects, which is the ambiguity `analysis_mark_critical_nodes` had to work around by deriving the project from the rows it was given.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "organization",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Legacy organization display string, defaulted to `default_org`. A DISPLAY name and never a join key (`uuid-identity`, G1): the live predicate is `org_is_current_user_org`, uuid-only since WP 3.0 (D29).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The user who created the row, as the uploader asserted it. This application authenticates against `approved_users` rather than Supabase Auth, so the id is CLIENT-ASSERTED — a real constraint, not proof of identity (D28).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "uploaded_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The user the upload named. Same client-asserted caveat as `created_by` (D28).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Row insert time, maintained by the database.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Row update time, maintained by the database. When a row was TOUCHED is not what it SAYS, which is why `input-hash` (I5) is anchored on `computed_from_hash` and not on this (§4 D12).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "src_uid",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Source node `uid`. Part of the natural key with `project_id` and `dst_uid`; READ BY THE PROMINENCE ANALYSIS, so it is digested by `network_topology_hash`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "dst_uid",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Destination node `uid`. Part of the natural key; digested by `network_topology_hash`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "relation_type",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "What the edge represents (supplier, customer, …), as uploaded.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "relative_revenue",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The share of revenue this relationship carries, as uploaded. READ BY THE PROMINENCE ANALYSIS as the edge weight, so it is digested by `network_topology_hash` — changing it changes every centrality in the project.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "relative_revenue_percentage",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The same share expressed as a percentage. Uploaded, and read by no analysis — a second spelling of one fact, which is the shape `single-source` (I1) exists to refuse. Named for the WP 6.2 sweep.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "depth",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Tier distance of the edge from the seed, as uploaded.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "direction",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Upstream or downstream relative to the seed, as uploaded.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      }
+    ]
+  },
+  {
+    "table": "network_nodes",
+    "tier": "3",
+    "tierName": "derived — a pure function of tier 2",
+    "owner": "analysis",
+    "grain": "One firm in one project's deep-tier network graph, identified by `uid`. THE TABLE IS TWO THINGS AND THAT IS §4 D56: nine columns a user uploaded and eight an analysis wrote. WP 4.3 gives the computed half a second home in `analysis_results`; WP 5.3 drops it from here, and what is left is a tier-2 input table.",
+    "naturalKey": [
+      "id",
+      "project_id",
+      "uid"
+    ],
+    "naturalKeyIntended": [
+      "project_id",
+      "uid"
+    ],
+    "checks": [],
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Surrogate row identifier. Carries no meaning: what identifies a row here is the natural key, not this.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The project this row belongs to. Referenced by uuid and never by a displayable name (`uuid-identity`, G1); cascades on project delete.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "plant_name",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The plant label the row was uploaded under. NOT a project scope — a plant name is not unique across projects, which is the ambiguity `analysis_mark_critical_nodes` had to work around by deriving the project from the rows it was given.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "organization",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Legacy organization display string, defaulted to `default_org`. A DISPLAY name and never a join key (`uuid-identity`, G1): the live predicate is `org_is_current_user_org`, uuid-only since WP 3.0 (D29).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The user who created the row, as the uploader asserted it. This application authenticates against `approved_users` rather than Supabase Auth, so the id is CLIENT-ASSERTED — a real constraint, not proof of identity (D28).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "uploaded_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The user the upload named. Same client-asserted caveat as `created_by` (D28).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Row insert time, maintained by the database.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Row update time, maintained by the database. When a row was TOUCHED is not what it SAYS, which is why `input-hash` (I5) is anchored on `computed_from_hash` and not on this (§4 D12).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "uid",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The node's identifier within the project's graph, as the uploaded CSV gave it. It is the natural key with `project_id`, and `network_nodes_natural_key` has enforced that since WP 4.3 — before which there was NO unique index behind it and `calculate- network-science-metrics`'s fallback upsert named a conflict target PostgreSQL rejected with 42P10 on every run (§4 D72). NULLS NOT DISTINCT, because `uid` is nullable and a plain index would constrain every row except the null ones (D5).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "depth",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Tier distance from the seed firm: 0 is the seed, 1 its direct partners, and so on. Uploaded, not computed.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "name",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Display name of the firm. Cosmetic — a rename must never invalidate a run, which is why `graphHashCoverage.test.ts` excludes `name` from the anchor.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "country",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Country of the firm, as uploaded. Joined to `risk_data` by country for the network risk views.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "industry",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Industry label of the firm, as uploaded.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "website",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Firm website, as uploaded. Display only.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "traded_as",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Ticker or trading symbol, as uploaded. Display only.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "number_of_employees",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Headcount, as uploaded. Read by no analysis and by no engine mapping today — same class as D18, and a candidate for the WP 6.2 sweep.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "revenue",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Firm revenue, as uploaded. READ BY THE PROMINENCE ANALYSIS (`get_network_nodes_for_prominence` returns it), so it is one of the six columns `network_topology_hash` digests.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "lat",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Latitude, as uploaded. Display only — the map reads `node_list`, not this table.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "long",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Longitude, as uploaded. Display only.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "is_seed",
+        "type": "boolean",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "True for the focal firm the deep-tier crawl started from.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "prominence",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — `calculate-node-prominence`'s composite score. Dual-written into `analysis_results` since WP 4.3, so it can be read with the run, the input hash and the code version that produced it. WP 5.3 drops the column once every reader has moved.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "prominence_updated_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When `prominence` was last written. Superseded by the run: `computed_at` and `computed_from_hash` say the same thing and more. Dropped with the column in WP 5.3.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "degree_centrality",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — `calculate-network-science-metrics`. Dual- written into `analysis_results` since WP 4.3.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "weighted_degree_centrality",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — degree weighted by `relative_revenue`. Dual- written since WP 4.3.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "eigenvector_centrality",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — dual-written since WP 4.3.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "betweenness_centrality",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — dual-written since WP 4.3.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "closeness_centrality",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — dual-written since WP 4.3.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "network_metrics_updated_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the five centralities were last written. Superseded by `computed_at`; dropped with the columns in WP 5.3.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "computed_from_hash",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that wrote this row's computed columns — the world the number came from. NULL means \"written before WP 4.3, provenance unknown\", which is a reportable state and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "computed_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "WP 4.3 · when the run that wrote the computed columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, which is WP 4.4's one rule, and a timestamp comparison is the thing that rule replaces (§4 D12).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      }
+    ]
+  },
+  {
+    "table": "network_summary",
+    "tier": "3",
+    "tierName": "derived — a pure function of tier 2",
+    "owner": "analysis",
+    "grain": "One rolled-up description of one project's deep-tier graph: node and edge counts and a per-depth breakdown. Every value column is derived.",
+    "naturalKey": [
+      "id"
+    ],
+    "naturalKeyIntended": null,
+    "checks": [],
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Surrogate row identifier. Carries no meaning: what identifies a row here is the natural key, not this.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The project this row belongs to. Referenced by uuid and never by a displayable name (`uuid-identity`, G1); cascades on project delete.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "plant_name",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The plant label the row was uploaded under. NOT a project scope — a plant name is not unique across projects, which is the ambiguity `analysis_mark_critical_nodes` had to work around by deriving the project from the rows it was given.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "organization",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Legacy organization display string, defaulted to `default_org`. A DISPLAY name and never a join key (`uuid-identity`, G1): the live predicate is `org_is_current_user_org`, uuid-only since WP 3.0 (D29).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The user who created the row, as the uploader asserted it. This application authenticates against `approved_users` rather than Supabase Auth, so the id is CLIENT-ASSERTED — a real constraint, not proof of identity (D28).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "uploaded_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The user the upload named. Same client-asserted caveat as `created_by` (D28).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Row insert time, maintained by the database.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Row update time, maintained by the database. When a row was TOUCHED is not what it SAYS, which is why `input-hash` (I5) is anchored on `computed_from_hash` and not on this (§4 D12).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "nodes_count",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — the node count of the project's graph.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "edges_count",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — the edge count of the project's graph.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "tiers_data",
+        "type": "jsonb",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — per-depth breakdown of the graph, as jsonb.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "computed_from_hash",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that wrote this row's computed columns — the world the number came from. NULL means \"written before WP 4.3, provenance unknown\", which is a reportable state and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "computed_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "WP 4.3 · when the run that wrote the computed columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, which is WP 4.4's one rule, and a timestamp comparison is the thing that rule replaces (§4 D12).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      }
+    ]
+  },
+  {
+    "table": "node_list",
+    "tier": "3",
+    "tierName": "derived — a pure function of tier 2",
+    "owner": "analysis",
+    "grain": "One node of one project's supply chain, derived from `supply_chain_data` by `refresh_node_list_for_project`. Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others.",
+    "naturalKey": [
+      "project_id",
+      "node_id",
+      "id"
+    ],
+    "naturalKeyIntended": [
+      "project_id",
+      "node_id"
+    ],
+    "checks": [],
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Surrogate row identifier. Carries no meaning: what identifies a row here is the natural key, not this.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The project this row belongs to. Referenced by uuid and never by a displayable name (`uuid-identity`, G1); cascades on project delete.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "plant_name",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The plant label the row was uploaded under. NOT a project scope — a plant name is not unique across projects, which is the ambiguity `analysis_mark_critical_nodes` had to work around by deriving the project from the rows it was given.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "node_id",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The node's identifier within the project, derived by `refresh_node_list_for_project` from `supply_chain_data`. Natural key with `project_id`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "node_type",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Supplier, plant, customer — the echelon the node sits in, derived by the refresh.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "node_group",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Grouping label for the node, derived by the refresh.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "description_text",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Free-text description carried through from the source row.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "location_text",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The location string the source row carried. `geocode-locations` reads it to produce `latitude`/`longitude`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "longitude",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — written by `geocode-locations` from `location_text`, NOT uploaded. It carries no provenance of its own: the geocoder is not yet a registered analysis kind, so `computed_from_hash` on this row describes the CRITICALITY columns only. Named for WP 4.4.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "latitude",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — see `longitude`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "is_critical_node",
+        "type": "boolean",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — the critical-node prediction. NOTE that the LIVE writer of this prediction is `analysis_mark_critical_nodes`, which writes `supply_chain_data`, not this table; these columns are the older destination and §15 has never measured whether anything still fills them.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "critical_node_score",
+        "type": "numeric",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "ANALYSIS OUTPUT — the prediction score. See `is_critical_node` on which destination is live.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "prediction_timestamp",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the prediction columns were last written. Superseded by `computed_at`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The user who created the row, as the uploader asserted it. This application authenticates against `approved_users` rather than Supabase Auth, so the id is CLIENT-ASSERTED — a real constraint, not proof of identity (D28).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "organization",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Legacy organization display string, defaulted to `default_org`. A DISPLAY name and never a join key (`uuid-identity`, G1): the live predicate is `org_is_current_user_org`, uuid-only since WP 3.0 (D29).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Row insert time, maintained by the database.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Row update time, maintained by the database. When a row was TOUCHED is not what it SAYS, which is why `input-hash` (I5) is anchored on `computed_from_hash` and not on this (§4 D12).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "computed_from_hash",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that wrote this row's computed columns — the world the number came from. NULL means \"written before WP 4.3, provenance unknown\", which is a reportable state and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "computed_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "WP 4.3 · when the run that wrote the computed columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, which is WP 4.4's one rule, and a timestamp comparison is the thing that rule replaces (§4 D12).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      }
+    ]
+  },
+  {
     "table": "org_capabilities",
     "tier": "G",
     "tierName": "governance — identity, capability, delegation, audit",
@@ -4506,6 +6848,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "organizations",
           "columns": [
             "id"
@@ -4528,6 +6871,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "capabilities",
           "columns": [
             "key"
@@ -4607,7 +6951,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "organization_members_org_role_check",
+        "definition": "CHECK (org_role IN ('owner','admin','member'))"
+      }
+    ],
     "columns": [
       {
         "name": "id",
@@ -4637,6 +6986,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "organizations",
           "columns": [
             "id"
@@ -4659,6 +7009,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -4721,7 +7072,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "slug"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "organizations_status_check",
+        "definition": "CHECK (status IN ('active','suspended'))"
+      }
+    ],
     "columns": [
       {
         "name": "id",
@@ -4783,6 +7139,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -4908,6 +7265,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -5095,6 +7453,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -5398,6 +7757,10 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKeyIntended": null,
     "checks": [
       {
+        "name": "policy_overrides_scope_check",
+        "definition": "CHECK (scope IN ('node','edge'))"
+      },
+      {
         "name": "policy_overrides_family_chk",
         "definition": "CHECK (family IN ('sourcing','inventory','transport','fulfillment','production','recovery','demand'))"
       }
@@ -5546,6 +7909,22 @@ export const REFERENCE_TABLES: RefTable[] = [
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null
+      },
+      {
+        "name": "seeded_from_hash",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "WP 4.4 · the `current_graph_hash` of the moment this override was SEEDED from project data. NULL means a person TYPED it, and the NULL is meaningful rather than missing: a seeded override is a COPY of a number the dataset held, and a typed one is a DECISION. A copy goes stale when the dataset moves; a decision does not, and marking it stale would tell the engine to distrust the one number somebody actually chose. Written by `bulk_upsert_policy_overrides`, which reads the hash from the project ITSELF rather than taking one from the caller — a caller that can supply provenance can supply the wrong provenance. ON CONFLICT it is overwritten, so typing over a seeded override clears it. Freshness is COMPUTED from it by `freshness_of` and never written back (§4 D70). **THE ENGINE READS OVERRIDES, NOT THE GRID**, so a stale value here is a simulation-correctness problem rather than a display one.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
       }
     ]
   },
@@ -5574,6 +7953,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -5911,6 +8291,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -5952,7 +8333,16 @@ export const REFERENCE_TABLES: RefTable[] = [
       "id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "project_erp_links_status_check",
+        "definition": "CHECK (status IN ('active', 'needs_attention', 'revoked'))"
+      },
+      {
+        "name": "project_erp_links_auto_apply_threshold_pct_check",
+        "definition": "CHECK (auto_apply_threshold_pct >= 0 AND auto_apply_threshold_pct <= 100)"
+      }
+    ],
     "columns": [
       {
         "name": "id",
@@ -5982,6 +8372,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -6052,6 +8443,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "auth",
           "table": "users",
           "columns": [
             "id"
@@ -6219,7 +8611,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "user_id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "project_members_project_role_check",
+        "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))"
+      }
+    ],
     "columns": [
       {
         "name": "project_id",
@@ -6233,6 +8630,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -6255,6 +8653,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -6293,6 +8692,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -6387,7 +8787,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "capability_key"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "project_role_capabilities_project_role_check",
+        "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))"
+      }
+    ],
     "columns": [
       {
         "name": "project_role",
@@ -6417,6 +8822,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "capabilities",
           "columns": [
             "key"
@@ -6504,6 +8910,10 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "chk_supply_chain_model",
         "definition": "CHECK (supply_chain_model IN ('Make-To-Stock','Make-To-Order'))"
+      },
+      {
+        "name": "projects_data_type_check",
+        "definition": "CHECK (data_type IN ('curated', 'uncurated'))"
       }
     ],
     "columns": [
@@ -6842,6 +9252,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "organizations",
           "columns": [
             "id"
@@ -7043,7 +9454,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "capability_key"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "role_capabilities_role_check",
+        "definition": "CHECK (role IN ('super_admin','admin','modeler','user'))"
+      }
+    ],
     "columns": [
       {
         "name": "role",
@@ -7073,6 +9489,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "capabilities",
           "columns": [
             "key"
@@ -7165,6 +9582,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "projects",
           "columns": [
             "id"
@@ -7352,6 +9770,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -7596,6 +10015,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -7711,6 +10131,38 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "Why the edge was filtered. One value is used today: zero_incoming_outgoing_flow.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "computed_from_hash",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null
+      },
+      {
+        "name": "computed_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -8217,6 +10669,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -8488,6 +10941,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ingest_runs",
           "columns": [
             "id"
@@ -8540,6 +10994,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": true,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -8585,6 +11040,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ai_models",
           "columns": [
             "id"
@@ -8607,6 +11063,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "ai_models",
           "columns": [
             "id"
@@ -8708,6 +11165,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "approved_users",
           "columns": [
             "id"
@@ -8730,6 +11188,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": {
+          "schema": "public",
           "table": "capabilities",
           "columns": [
             "key"

@@ -64,9 +64,10 @@ Two things it settled that later packages rely on:
 · `__from_data` now also carries the routing decisions the data's shape makes
   (`primary_source`, `sourcing_firm`), because the pre-dispatch validator reads
   those from the saved override bundle, not from the row.
-· the two provenance copies (§4.1: `resolveEffective.ts:103-193` and
-  `StagePolicyTable.tsx:1208-1276`) must stay in lockstep until WP 6.2 de-duplicates
-  them. So must the two prefill rules D26 left behind, until the same WP kills one.
+· the two provenance copies are GONE — WP 6.2 de-duplicated them, the desktop grid
+  calls `resolveEffective.ts::resolveCell`, and `oneResolver.test.ts` is a gate that
+  fails if either renderer rebuilds the ladder inline. The two prefill rules D26 left
+  behind are still there, until the same WP kills one.
 
 ### WP 0.2 — Unit conversion + orphan-table honesty ✅ DONE
 
@@ -557,10 +558,13 @@ semantics silently; investigate before Phase 5.
 Implement WP 4.4 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
-· THREE ad-hoc staleness mechanisms exist and none consults graph_hash:
-  should_recalculate_network_metrics (timestamps), prominence-recalc-on-upload
-  (event-triggered), and StagePolicyTable's autoSeedMarkerRef (a useRef).
-  All three must go.
+· CORRECTED BY WP 4.4 (§4 D81): there were TWO, not three.
+  should_recalculate_network_metrics (timestamps) and prominence-recalc-on-upload
+  (event-triggered, already made statement-level by WP 4.3). The third,
+  "StagePolicyTable's autoSeedMarkerRef", DOES NOT EXIST — the nearest identifier
+  is `autoSeededRef`, a Set of `${projectId}::${stageKey}` re-entry markers whose
+  own comment records the bug that made it a Set. It is not staleness logic and
+  deleting it reintroduces that bug. Verify every "already verified" line.
 · getEffectiveValue (resolveEffective.ts:82) checks dataRow[field] BEFORE the
   override bundle. So re-uploads already refresh fields that live on the row
   (material_price, primary_source) but NOT fields that don't (type, basis,
@@ -733,7 +737,8 @@ Already verified (re-check before relying on it):
 · Substitutions to document exhaustively: resolveField's `> 0` test
   (useStageRows.tsx:162), the per-item-then-global smart averages (:146-153),
   defaultWhenMissing (columnSpecs.ts:132-171), the effectivePolicy bundle,
-  liveDefault = derivedVal ?? 0 (resolveEffective.ts:135), grading.ts's reducers,
+  liveDefault's master fallback (§4 D17 — the bare `?? 0` is gone; a column whose
+  empty state means something declares it), grading.ts's reducers,
   and ENGINE_DEFAULT_PRICE.
 · supabase/functions/_shared/grading.ts is pinned to project_map.py by
   validation-parity fixtures. Pin the chains the same way, in the same style.

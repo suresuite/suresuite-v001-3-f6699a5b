@@ -827,6 +827,97 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
 // ──────────────────────────────────────────────────────────────────── report
 
 const covered = [...sidecars.keys()].length;
+// ───────── R12: LINEAGE MUST RESOLVE, AND EVERY PAGE MUST BE ACCOUNTED FOR
+//
+// WP 5.1 fills `surfaces`, and its brief is one sentence long about why this
+// rule exists: "an unconfirmed lineage entry is worse than none — it will be
+// trusted." A lineage entry is a claim about a file and a line, and §4's own
+// citations went stale within a quarter for want of anything re-opening them
+// (D21, D22). So every entry carries `path:line` and this rule opens it.
+//
+// TWO HALVES, and the second is the gap check §12 asks for:
+//
+//   1. every `surfaces` entry's evidence resolves — the file exists, the line
+//      is in range, and an access is actually there (±2 lines, because a
+//      formatter moving a chained call by one is not a lineage defect and a
+//      gate that fails on reflow is a gate people switch off);
+//   2. every page in `src/pages` appears in at least one entry OR is declared
+//      in `coverage.yaml`'s `pages_without_project_data`. A page in neither is a
+//      page nobody has decided about — the same silence R11 took away from the
+//      deferral list.
+{
+  const rd = readdirSync;
+  const pagesDir = join(ROOT, "src", "pages");
+  const allPages = rd(pagesDir).filter((f) => f.endsWith(".tsx"));
+  const seenPages = new Set();
+  let entries = 0;
+  let unconfirmed = 0;
+
+  const checkEntry = (where, e) => {
+    entries++;
+    // A `shell` entry does NOT count as lineage and that is deliberate. It says
+    // the page reaches this table only through auth/session plumbing every page
+    // imports — which is a fact worth recording and is not "this is where the
+    // data is shown". Letting it satisfy the coverage half would mean a page
+    // that renders nothing passes because it imports `useAuth`, which is the
+    // over-claim WP 5.1's first analyser run produced for fifteen pages.
+    if (e.grain !== "shell") seenPages.add(e.page);
+    if (e.confirmed === false) unconfirmed++;
+    if (!allPages.includes(e.page)) {
+      fail("R12", `${where} names page "${e.page}", which does not exist in src/pages`);
+      return;
+    }
+    const [file, lineStr] = String(e.evidence).split(":");
+    const abs = join(ROOT, file);
+    if (!existsSync(abs)) {
+      fail("R12", `${where} cites \`${e.evidence}\` — no such file`);
+      return;
+    }
+    const lines = readFileSync(abs, "utf8").split("\n");
+    const line = Number(lineStr);
+    if (!(line >= 1 && line <= lines.length)) {
+      fail("R12", `${where} cites \`${e.evidence}\` but that file has ${lines.length} lines — the lineage is stale`);
+      return;
+    }
+    const window = lines.slice(Math.max(0, line - 3), line + 2).join("\n");
+    if (!/\.from\(\s*["'][a-z_]+["']\s*\)|\.rpc\(\s*["'][a-z_]+["']/.test(window)) {
+      fail("R12", `${where} cites \`${e.evidence}\`, and there is no table read or rpc call within two lines of it. ` +
+        `A lineage entry whose evidence has moved is exactly what D21 and D22 look like.`);
+    }
+  };
+
+  // Read the SIDECARS, not the generated artifact: the sidecar is what a person
+  // authored, and checking the derived copy would let an un-regenerated artifact
+  // hide a stale entry behind a second failure.
+  for (const [name, rel] of sidecars) {
+    const doc = load(readFileSync(join(ROOT, rel), "utf8"));
+    for (const e of doc.surfaces ?? []) checkEntry(`${name}.surfaces`, e);
+    for (const [field, f] of Object.entries(doc.fields ?? {})) {
+      for (const e of f?.surfaces ?? []) checkEntry(`${name}.${field}.surfaces`, e);
+    }
+  }
+
+  const declared = new Set(coverage.pages_without_project_data ?? []);
+  for (const d of declared) {
+    if (!allPages.includes(d)) {
+      fail("R12", `coverage.yaml declares "${d}" as reading no project data, and no such page exists`);
+    }
+    if (seenPages.has(d)) {
+      fail("R12", `coverage.yaml declares "${d}" as reading no project data, but it appears in a surfaces entry — one of the two is wrong`);
+    }
+  }
+  for (const p of allPages) {
+    if (seenPages.has(p) || declared.has(p)) continue;
+    fail("R12", `page "${p}" appears in no \`surfaces\` entry and is not declared in coverage.yaml's ` +
+      `pages_without_project_data. A page in neither is a page nobody has decided about.`);
+  }
+
+  console.log(
+    `  R12 lineage resolves · ${entries} surface entr(ies) across ${seenPages.size} page(s) · ` +
+    `${declared.size} page(s) declared as reading no project data · ${unconfirmed} UNCONFIRMED`,
+  );
+}
+
 console.log(`  R1  ${covered} tables described · ${deferred.size} deferred with a named work package · ${tables.size} in the schema`);
 console.log(`  R4  ${schema.orphans.length} orphans · ${schema.phantom_tables.length} phantom tables`);
 console.log(

@@ -69,7 +69,7 @@ The user these entitlements belong to. PK, so a user has at most one row.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260709000002_super_admin_phase1.sql` |
-| References | `approved_users(id)` ON DELETE CASCADE |
+| References | `public.approved_users(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -105,7 +105,7 @@ The model a new conversation starts on. Nullable — the app falls back to its o
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260709000002_super_admin_phase1.sql` |
-| References | `ai_models(id)` ON DELETE SET NULL |
+| References | `public.ai_models(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -120,7 +120,7 @@ The model used when the default is unavailable or over budget.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260709000002_super_admin_phase1.sql` |
-| References | `ai_models(id)` ON DELETE SET NULL |
+| References | `public.ai_models(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -185,6 +185,6 @@ When it was last changed. Server-stamped.
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/user_ai_permissions.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

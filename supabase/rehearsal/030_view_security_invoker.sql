@@ -126,9 +126,15 @@ BEGIN
 
   -- Two files, neither owned by the reading admin. A roll-up that reports zero
   -- is the failure this assertion exists for.
+  -- `report_xlsx`, not `report`. `user_files.kind` has carried
+  -- `CHECK (kind IN ('report_xlsx','report_pdf','export_csv','upload'))` inline
+  -- since `20260723000001`, and until §4 D59 was closed the artifact recorded
+  -- no inline CHECK at all — so the rehearsed database accepted a value
+  -- production refuses, and this file asserted a roll-up over two rows that
+  -- could never exist. The assertion is unchanged; the rows are now legal.
   INSERT INTO public.user_files (user_id, org_id, kind, name, path, size_bytes, retained)
-  VALUES (v_other, v_org, 'report', 'a.xlsx', 'org/a/a.xlsx', 1000, true),
-         (v_other, v_org, 'report', 'b.xlsx', 'org/a/b.xlsx', 2000, false);
+  VALUES (v_other, v_org, 'report_xlsx', 'a.xlsx', 'org/a/a.xlsx', 1000, true),
+         (v_other, v_org, 'report_xlsx', 'b.xlsx', 'org/a/b.xlsx', 2000, false);
 
   PERFORM set_config('app.current_user_id', v_super::text, true);
   SET LOCAL ROLE authenticated;

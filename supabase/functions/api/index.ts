@@ -567,6 +567,16 @@ const putPolicies: Handler = async (ctx) => {
   ctx.auditProjectId = projectId;
   const body = parseBody(PoliciesPutSchema, ctx.body);
   // Same write RPCs the /policies page uses (20260609000025) — no forked path.
+  //
+  // D71 · THESE THREE CALLS PASS NO `_actor_user_id`, AND THAT IS THE HONEST
+  // ANSWER RATHER THAN AN OMISSION. `ctx.principal` is an API KEY — keyId,
+  // orgId, scopes — and carries no user uuid, because a key is issued to an
+  // organization and not to a person. `snapshot_dataset` above already faces
+  // this and does the same thing: `p_user_id: null` with the key named in
+  // `p_user_email`. Passing a fabricated uuid would make `actor_known` true
+  // about somebody who did not act, which is worse than recording that the
+  // actor is unknown. Making an API key nameable in the audit plane is D28's
+  // question and WP 7.1's to answer.
   let strategySent = false;
   for (const [family, value] of Object.entries(body.defaults ?? {})) {
     const { error } = await svc.rpc("save_policy_defaults", {

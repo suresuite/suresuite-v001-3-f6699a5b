@@ -36,6 +36,21 @@ export const PROVENANCE: Record<Provenance, { color: string | null; title: strin
   },
   override: { color: LAYER.product, title: "Saved override" },
   edited: { color: "#111111", title: "Edited" },
+  /**
+   * NOT A VALUE — the DECLARED MEANING OF AN EMPTY ONE (§4 D17).
+   *
+   * `suppliers.capacity_per_week` is nullable and `item_master.sql:44` says what
+   * a null means: "NULL = ∞; finite enables partial capacity cuts". The grid used
+   * to render that as `0` with provenance `default`, whose colour is null — so no
+   * dot at all. Sixty of sixty suppliers in the measured project have a null
+   * capacity (§15), which means the grid told the user every supplier in their
+   * network had ZERO capacity when the model means unlimited. The exact inverse,
+   * silently, on every row.
+   *
+   * This state renders the declared token instead of a made-up number, and it has
+   * a colour, so a substitution is visible at the point of display (T2).
+   */
+  contract: { color: LAYER.firm, title: "Empty — the schema declares what that means" },
   default: { color: null, title: "Bundle default" },
 };
 
@@ -55,7 +70,7 @@ export function ProvenanceLegend({ imputedLines }: { imputedLines?: number }) {
   const items: Array<[string, string]> = [
     ["from project data", LAYER.process],
     ["imputed average — verify", LAYER.brand],
-    ["derived fallback (≈) · suggested", LAYER.firm],
+    ["derived fallback (≈) · suggested · declared meaning of empty", LAYER.firm],
     ["saved override", LAYER.product],
     ["edited", "#111111"],
   ];
@@ -260,10 +275,20 @@ export function NumCell({
   decimals,
   integer,
   unit,
+  placeholder = "—",
+  title,
 }: {
   value: number | undefined;
   provenance: Provenance;
   onCommit: (v: number | undefined) => void;
+  /**
+   * What an EMPTY cell shows. "—" for a column where empty means "unset", and
+   * the schema's declared token where empty means something — "∞" for a supplier
+   * capacity (§4 D17). It is a placeholder and not a value on purpose: typing
+   * over it still commits a number, and clearing the cell returns to the
+   * declared meaning rather than to a zero nobody chose.
+   */
+  placeholder?: string;
   /** Fixed decimal count — what puts every row's decimal point on one axis. */
   decimals?: number;
   /** Thousands-separated, no decimals (columnFit `kind: "int"`). */
@@ -285,8 +310,8 @@ export function NumCell({
         <input
           defaultValue={text}
           key={text}
-          placeholder="—"
-          title={PROVENANCE[provenance].title}
+          placeholder={placeholder}
+          title={title ?? PROVENANCE[provenance].title}
           size={1}
           onBlur={(e) => {
             const raw = e.target.value.replace("≈", "").trim();

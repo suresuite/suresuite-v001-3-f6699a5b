@@ -17,8 +17,35 @@ name: AI Agent Eval (model-scored tier) + live deployment state
 #   * workflow_dispatch with inputs, or
 #   * pushing a change to .github/model-eval-request (for environments that can
 #     push but cannot call the Actions API), or
-#   * nightly schedule (§7.4: "nightly + before any flag flip") — active once
-#     this file is on the default branch.
+#   * NO NIGHTLY SCHEDULE — removed 2026-09-18, see below.
+#
+# §7.4 DEVIATION, RECORDED SO IT IS NOT SILENT. §7.4 asks for "nightly + before
+# any flag flip". The `schedule:` trigger (cron "17 3 * * *") is GONE; the two
+# on-demand triggers are kept, and they are the half that gates a release —
+# nothing flips a flag without a dispatch or a `.github/model-eval-request`
+# push, so the flag-flip evidence §7.4 actually depends on is unchanged.
+#
+# WHY. 35 scheduled runs in the last 30 days, every one FAILED, and none of
+# them was a CI defect. Tier 1 (deterministic) passes in ~20s; tier 2 spends
+# ~14 MINUTES OF LIVE GPT-5 CALLS and then reports the truth — run 76's report:
+#
+#   routing: FAIL  vv-analyst recall 0.303 < 0.85; experiment-designer recall
+#            0.267 < 0.85; cache-checkable precision 0.239 < 0.85
+#   data-steward: FAIL  schema validity 0.833 < 0.95
+#   policy-configurator: FAIL  schema validity 0.714 < 0.95
+#   coverage: FAIL  entity-fabrication count 1 > 0
+#   overall: FAIL
+#
+# So the gate WORKS and the product misses its §7.4 targets. Running it nightly
+# does not change that: it re-establishes the same result every night, at ~15
+# billable CI minutes plus real provider spend, and nobody has acted on any of
+# the 35. A gate whose finding is already known and already recorded does not
+# need to re-buy that finding daily — it needs to be run when somebody is about
+# to rely on the answer, which is exactly what the two remaining triggers are.
+#
+# TO RESTORE THE CADENCE: put `schedule:` back. Weekly ("17 3 * * 1") is the
+# cheaper honest option if a trend line is wanted; nightly was never load-bearing
+# for anything but the trend.
 #
 # The full log + report land on the eval-results branch (results/latest.log,
 # results/latest-report.json, plus per-run copies) so the outcome is readable
@@ -41,8 +68,6 @@ on:
   push:
     paths:
       - ".github/model-eval-request"
-  schedule:
-    - cron: "17 3 * * *"
 
 # Model-scored runs are expensive (every golden row × every enabled model);
 # never overlap two.
@@ -53,7 +78,11 @@ concurrency:
 jobs:
   evidence:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    # Was 150. Measured: tier 1 ~20s, tier 2 ~14 min, state capture ~15s —
+    # the longest real run is well under 20 minutes. 40 leaves generous headroom
+    # for a slow provider while still capping a hung run at 40 wasted minutes
+    # instead of 150.
+    timeout-minutes: 40
     permissions:
       contents: write   # publish the report to the eval-results branch
     steps:
@@ -80,7 +109,8 @@ jobs:
             MODELS="${{ inputs.models }}"
             MODE="${{ inputs.mode }}"
           else
-            # nightly (§7.4): always the full suite on the full enabled roster
+            # No other trigger reaches here since the nightly schedule was
+            # removed; kept as the safe default if one is ever added back.
             AGENTS=""; MODELS=""; MODE=""
           fi
           echo "agents=${AGENTS:-$DEFAULT_AGENTS}" >> "$GITHUB_OUTPUT"

@@ -79,7 +79,35 @@ export function getEffectiveValue(args: {
     const mv = masterValueFor(mcol, dataRow, masterRowById);
     return mv !== undefined ? mv : derivedValueFor(mcol, dataRow, derived);
   }
-  if (dataRow[field] !== undefined && dataRow[field] !== null) return dataRow[field];
+  /**
+   * A ROUTING SUGGESTION IS NOT UPLOADED DATA, AND THAT DISTINCTION IS §4 D23.
+   *
+   * `dataRow[field]` ranks above the bundle on purpose: an uploaded column is a
+   * fact about the project and must beat a stale override, and WP 4.4's
+   * staleness brief turns on exactly that. But `useStageRows` also puts the
+   * stage's own routing SUGGESTION on the row — which supplier it thinks is
+   * primary, which firm it thinks ships a lane — and a suggestion in that slot
+   * outranked the user's saved decision forever: pick a supplier, save, reload,
+   * and the suggestion is back. Nothing on screen said why.
+   *
+   * So a `__decided` field is resolved in two pieces. An EXPLICIT override — a
+   * patch somebody saved — beats it; the family DEFAULT does not, because the
+   * bundle always carries one (`primary_source` defaults to `false`) and letting
+   * that win would delete every suggestion instead of the ones a user replaced.
+   * Ordering it against the raw patches rather than against `effectivePolicy`'s
+   * merged answer is the whole of the fix.
+   */
+  const decided = (dataRow.__decided ?? {}) as Record<string, true>;
+  const isSuggestion = decided[field] === true;
+  const hasValue = dataRow[field] !== undefined && dataRow[field] !== null;
+  if (hasValue && !isSuggestion) return dataRow[field];
+
+  if (isSuggestion) {
+    const saved = savedOverrideValue(overrides, rowKey, field, family, families);
+    if (saved !== undefined) return saved;
+    if (hasValue) return dataRow[field];
+  }
+
   const bundle = effectivePolicy(defaults, overrides, scope, rowKey);
   if (family) {
     const own = bundle[family] as Record<string, unknown> | undefined;
@@ -92,14 +120,85 @@ export function getEffectiveValue(args: {
   return undefined;
 }
 
+/**
+ * The value an override PATCH carries for this row+field, or `undefined`.
+ *
+ * Deliberately not `effectivePolicy`: that merges the schema defaults under the
+ * patches and cannot tell "somebody saved `false`" from "nobody saved anything
+ * and the default is `false`". For a routing decision those are opposite
+ * answers — the first is a user un-checking a primary supplier, the second is a
+ * fresh row — so the distinction has to be read from the patches themselves.
+ */
+export function savedOverrideValue(
+  overrides: OverrideRow[],
+  rowKey: string,
+  field: string,
+  family: PolicyFamily | undefined,
+  families: readonly PolicyFamily[],
+): unknown {
+  const forRow = overrides.filter((o) => o.target_key === rowKey);
+  const pick = (fam: PolicyFamily): unknown => {
+    for (const o of forRow) {
+      if (o.family !== fam) continue;
+      const patch = (o.patch ?? {}) as Record<string, unknown>;
+      if (field in patch) return patch[field];
+    }
+    return undefined;
+  };
+  // The column's own family first, then the others — the same order the bundle
+  // lookup below uses, so a name shared across families resolves consistently.
+  if (family) {
+    const own = pick(family);
+    if (own !== undefined) return own;
+  }
+  for (const fam of families) {
+    const v = pick(fam);
+    if (v !== undefined) return v;
+  }
+  return undefined;
+}
+
 export interface ResolvedCell {
   /** What the grid actually displays for this cell (`cellValue ?? liveDefault`). */
   value: unknown;
   provenance: Provenance;
+  /**
+   * The two halves of `value`, exposed because the DESKTOP grid needs them
+   * apart and used to compute them itself (see the note on `resolveCell`).
+   * `kindOf` picks a widget from both, a `<Select>` falls back through them to
+   * an option list, and a checkbox reads `liveDefault` for its unchecked state.
+   */
+  cellValue: unknown;
+  liveDefault: unknown;
+  /** True when an unsaved draft supplied the value. */
+  edited: boolean;
+  /**
+   * What an empty cell should SHOW, when the schema declares a meaning for empty
+   * (§4 D17). `undefined` for every other column, which keeps the "—" placeholder.
+   */
+  placeholder?: string;
+  /** The sentence explaining that token, for the cell's own tooltip. */
+  placeholderTitle?: string;
 }
 
-/** Resolves one cell's displayed value + provenance dot, matching exactly
- *  what StagePolicyTable's own cell renderer computes and shows. */
+/**
+ * Resolves one cell's displayed value + provenance dot.
+ *
+ * ── THIS WAS TWO IMPLEMENTATIONS UNTIL WP 6.2 ─────────────────────────────
+ *
+ * `StagePolicyTable.tsx`'s desktop renderer carried a VERBATIM copy of the body
+ * below — about seventy lines, from `masterSet` through the `provenance`
+ * ladder — and both copies carried a comment telling the next reader that "every
+ * change here changes BOTH". It had been that way since WP 0.1. Two copies of a
+ * resolution rule is `single-source` (I1) broken in the one place the product
+ * decides what a number MEANS, and the plan already has D26 on the record for
+ * what it costs: two implementations of the D1 prefill rule, both unit-tested,
+ * one of them dead and unreachable, so the tests stayed green while only one ran.
+ *
+ * The desktop grid now calls this. The extra fields on `ResolvedCell` are the
+ * intermediates its renderer needs and nothing else — deliberately not a second
+ * return shape, because that is how the copy started.
+ */
 export function resolveCell(args: {
   rowKey: string;
   row: Record<string, unknown>;
@@ -132,8 +231,25 @@ export function resolveCell(args: {
   const bundleVal = (
     effectivePolicy(defaults, overrides, scope, rowKey)[col.family] as Record<string, unknown> | undefined
   )?.[col.field];
+  /**
+   * `?? 0` WAS A SUBSTITUTION NOBODY DECLARED (§4 D17).
+   *
+   * For a master column with no master value and no derived fallback, this read
+   * `derivedVal ?? 0` — a hard-coded zero, with provenance `default`, whose
+   * colour is null, so the cell showed a number and no dot. For
+   * `capacity_per_week` that zero is the exact inverse of the schema's meaning
+   * (`item_master.sql:44`: "NULL = ∞"), and §15 measured 60 of 60 suppliers with
+   * a null capacity — so the grid reported every supplier in the network as
+   * having no capacity at all.
+   *
+   * `declared-fallback` (I6) is the rule this broke: a fallback absent from the
+   * contract may not exist in code. A column whose empty state MEANS something
+   * now declares it in `columnSpecs.ts`, and the cell renders that token instead
+   * of inventing a number.
+   */
+  const nullMeans = col.master?.nullMeans;
   const liveDefault = col.master
-    ? derivedVal ?? 0
+    ? derivedVal ?? (nullMeans ? undefined : 0)
     : bundleVal !== undefined
       ? bundleVal
       : col.defaultWhenMissing !== undefined
@@ -146,7 +262,8 @@ export function resolveCell(args: {
   // The stage's own routing decisions (`primary_source`, `sourcing_firm`), written
   // by `useStageRows::markFromData`. Read here so the `suggested` branch below has
   // a map to test — it referenced `decidedMap` without one from `5c7129f` until the
-  // Phase 1 precondition check, and every cell render threw (D26's sibling).
+  // Phase 1 precondition check, and every cell render threw (D26's sibling). That
+  // bug is exactly what one copy of a two-copy rule looks like from the inside.
   const decidedMap = (row.__decided ?? {}) as Record<string, true>;
   const imputed = !edited && !col.master && imputedMap[col.field] === true;
   // D16 — `__from_data` is the ONLY evidence that a value came from the
@@ -154,11 +271,15 @@ export function resolveCell(args: {
   // green-dotted every hardcoded constant useStageRows wrote onto the row as
   // "From project data". A field that is neither tracked nor master-backed
   // resolves to `default`, never `data`.
-  // NOTE: duplicated verbatim in StagePolicyTable.tsx's cell renderer — the
-  // two must stay in lockstep until WP 6.2 de-duplicates them.
   const fromData =
     !edited && !imputed && (col.master ? masterSet : fromDataMap[col.field] === true);
   const derivedFallback = !edited && !!col.master && !masterSet && derivedVal !== undefined;
+  // The master column is empty, nothing derived a value for it, and the schema
+  // says what empty means. Ranked BELOW `derived`: a computed fallback is a
+  // better answer than "this is what blank means", and above everything else,
+  // because for a master column there is nothing else left.
+  const declaredEmpty =
+    !edited && !!nullMeans && !masterSet && derivedVal === undefined && cellValue === undefined;
   const fromOverride =
     !edited &&
     !imputed &&
@@ -183,13 +304,23 @@ export function resolveCell(args: {
           : "data"
         : derivedFallback
           ? "derived"
-          : fromOverride
+          : declaredEmpty
+            ? "contract"
+            : fromOverride
             ? "override"
             : suggested
               ? "suggested"
               : "default";
 
-  return { value: cellValue ?? liveDefault, provenance };
+  return {
+    value: cellValue ?? liveDefault,
+    provenance,
+    cellValue,
+    liveDefault,
+    edited,
+    placeholder: declaredEmpty ? nullMeans!.token : undefined,
+    placeholderTitle: declaredEmpty ? nullMeans!.title : undefined,
+  };
 }
 
 /**
@@ -209,16 +340,70 @@ export function resolveCell(args: {
  * which the pre-dispatch validator reads from the saved bundle.
  *
  * Imputed averages are excluded even when edited: they are estimates to verify,
- * and silently freezing them has poisoned projects before.
+ * and silently freezing them has poisoned projects before. Note the ORDER — the
+ * imputed test runs BEFORE the draft test, and that is the whole of the
+ * difference described next.
+ *
+ * ── THE SECOND IMPLEMENTATION IS GONE, AND IT DISAGREED (§4 D26, D93) ──────
+ *
+ * `prefillSelect.ts` held `prefillSourceFor` / `isPrefillable`: the same rule,
+ * separately written, imported by `StagePolicyTable` and never called. D26
+ * predicted the cost — "the next edit to the rule has even odds of landing on the
+ * dead one" — and understated it. The two did not merely risk drifting; they had
+ * already drifted, on a case each of them was TESTED for:
+ *
+ *     the user types a value over an imputed average
+ *       · this rule      → NOT persisted by the prefill (imputed is checked first)
+ *       · prefillSelect  → persisted as `"edit"` (imputed was not checked at all)
+ *
+ * `policyPrefill.test.ts` asserted the second answer, in a test named "does NOT
+ * persist an imputed average, but DOES persist an edit of one", and it passed for
+ * as long as it existed — against a function no screen ever called. A green test
+ * for behaviour that has never run is worse than no test: it is a claim on the
+ * record that the product does something it does not do.
+ *
+ * This rule's answer is kept because it is the one that has been running and the
+ * safer of the two: the prefill's job is to freeze what the DATA says, and an
+ * imputed average is an estimate to verify whether or not somebody typed over it.
+ * A manual save is a different path and still writes the user's value.
+ *
+ * `__decided` is deliberately NOT a source here. It marks the stage's routing
+ * suggestion for the `suggested` provenance dot; the routing decision reaches the
+ * prefill through `__from_data`, which `useStageRows::markFromData` sets for
+ * `primary_source`/`sourcing_firm` whenever they have a value. Adding a
+ * `__decided` branch would make a field with NO value newly persistable, which is
+ * the other half of §4 D23 and not this package's to change blind.
  */
+
+/** Why a row×field may be persisted by the prefill. */
+export type PrefillSource = "edit" | "data" | "decision";
+
+export function prefillSourceFor(
+  row: Record<string, unknown>,
+  field: string,
+  draft?: unknown,
+): PrefillSource | null {
+  const imputed = (row.__imputed ?? {}) as Record<string, true>;
+  if (imputed[field] === true) return null;
+  if (draft !== undefined) return "edit";
+  const fromData = (row.__from_data ?? {}) as Record<string, true>;
+  if (fromData[field] === true) return "data";
+  // THE THIRD SOURCE, RESTORED DELIBERATELY (§4 D23). WP 6.2 slice 3 deleted a
+  // dead copy of this rule that had one, and did NOT adopt it, because at the
+  // time the routing decisions ALSO sat in `__from_data` and a `__decided`
+  // branch would only have made a valueless field newly persistable. D23 took
+  // them out of `__from_data` — they were never uploaded — so this branch is
+  // now the only thing that keeps blueprint G16 satisfied: the pre-dispatch
+  // gate reads the primary supplier from the SAVED bundle, so the prefill has
+  // to write it. `useStageRows` sets `__decided` only where a value exists.
+  const decided = (row.__decided ?? {}) as Record<string, true>;
+  return decided[field] === true ? "decision" : null;
+}
+
 export function isPrefillPersistable(
   row: Record<string, unknown>,
   field: string,
   draft?: unknown,
 ): boolean {
-  const imputed = (row.__imputed ?? {}) as Record<string, true>;
-  if (imputed[field] === true) return false;
-  if (draft !== undefined) return true;
-  const fromData = (row.__from_data ?? {}) as Record<string, true>;
-  return fromData[field] === true;
+  return prefillSourceFor(row, field, draft) !== null;
 }

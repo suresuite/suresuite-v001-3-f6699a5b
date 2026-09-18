@@ -10,15 +10,21 @@ on:
       - "scripts/audit-bundle-size.mjs"
       - "scripts/bundle-size-baseline.json"
       - ".github/workflows/bundle-audit.yml"
-  pull_request:
-    paths:
-      - "src/**"
-      - "vite.config.ts"
-      - "package.json"
-      - "package-lock.json"
-      - "scripts/audit-bundle-size.mjs"
-      - "scripts/bundle-size-baseline.json"
   workflow_dispatch:
+
+# ONE RUN PER COMMIT — 2026-09-18. `pull_request:` removed; the unfiltered
+# `push:` above is kept and is what reports on a pull request (checks attach to
+# the SHA). Every commit on a PR branch used to run this gate TWICE, once per
+# event, for one answer. Coverage is unchanged: same gate, same paths, same
+# commits. Every pull request in this repository is same-repo (`claude/*`
+# branches) — IF FORK PRs EVER BECOME EXPECTED, `pull_request:` MUST COME BACK,
+# because a fork's push raises no event here.
+#
+# `concurrency` cancels a superseded run on the same ref: pushing three times in
+# a minute now pays for the last commit, not all three.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 # Guards the initial load graph — the entry chunk plus everything statically
 # reachable from it, which is what a first visit downloads before paint.
@@ -35,6 +41,7 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 15   # measured ~70s (npm ci + vite build + the audit)
     steps:
       - uses: actions/checkout@v4
 

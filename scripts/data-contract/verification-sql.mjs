@@ -194,6 +194,117 @@ async function schemaProbe() {
   return liveNames;
 }
 
+// ── D38: the declared exception, asked of PRODUCTION rather than of a rehearsal
+//
+// The Supabase database linter reports `v_admin_user_usage` as
+// `security_definer_view`, ERROR, EXTERNAL — and it is RIGHT that the view runs
+// as its owner. That is the one declared exception to D38: `approved_users` is
+// REVOKEd from `authenticated` (20250826015629), so `security_invoker = true`
+// raises "permission denied" for every reader including the super admins whose
+// two pages are its only consumers. `20260916000009` proved that by executing it.
+//
+// The exception is safe for exactly one reason: the view states its own
+// authorization, `WHERE public.current_is_super_admin()`, the same predicate
+// `ai_usage_logs`'s own policy enforces. Without that line an owner-run view
+// hands every user's month-to-date AI SPEND to anyone who can select from it.
+//
+// WHAT WAS MISSING IS THE HALF §15 EXISTS FOR. `supabase/rehearsal/030` asserts
+// both clauses — no seventh owner-view, and this one keeps its predicate — but
+// against a database built from the migrations ON THE BRANCH. Nothing had ever
+// asked PRODUCTION. The schema probe above compares relation NAMES, so a view
+// that exists under the right name with the wrong `reloptions`, or one replaced
+// from the SQL editor, is invisible to it. That is D45's lesson with a different
+// object in it: WP 2.3 claimed the data-plane audit worked on the strength of a
+// migration that landed, and §15 found zero rows. This is the same claim about
+// views, made against the database the linter is actually looking at.
+//
+// A GATE, not a report (D43): either half failing is a live disclosure of
+// per-person cost data, which is not a finding to read in a branch later.
+async function viewSecurity() {
+  section("D38 — every view runs as its caller, or is the declared exception");
+
+  // `pg_options_to_table` yields (option_name, option_value); a view with no
+  // reloptions at all yields no row, which is `security_invoker` OFF — Postgres
+  // defaults it off, which is the whole of why D38 was a class rather than a bug.
+  const res = await tryQ(`
+    select c.relname as view_name,
+           coalesce((select o.option_value = 'true'
+                       from pg_options_to_table(c.reloptions) o
+                      where o.option_name = 'security_invoker'), false) as security_invoker,
+           pg_get_viewdef(c.oid, true) like '%current_is_super_admin()%' as states_own_rule
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'v'
+    order by c.relname`);
+
+  if (res.error) {
+    out(`- **view security** — QUERY FAILED: \`${res.error.replace(/\n/g, " ").slice(0, 300)}\``);
+    gateFailures.push(
+      "the D38 view-security probe could not run, so nothing in this repository " +
+        "has checked production's views. PLAN.md §4 D38.",
+    );
+    return;
+  }
+
+  // The Management API renders a boolean as JSON `true` on some paths and as the
+  // string `"t"`/`"true"` on others; reading only one of the two would report
+  // every view as owner-run and fail this gate on all seven.
+  const truthy = (v) => v === true || v === "t" || v === "true";
+  const rows = res.rows.map((r) => ({
+    view_name: r.view_name,
+    security_invoker: truthy(r.security_invoker),
+    states_own_rule: truthy(r.states_own_rule),
+  }));
+
+  out(`- production's \`public\` schema holds **${rows.length} view${rows.length === 1 ? "" : "s"}**.`);
+  out(...table(rows.map((r) => ({
+    view: r.view_name,
+    runs_as: r.security_invoker ? "caller" : "OWNER",
+    states_own_rule: r.states_own_rule ? "yes" : "—",
+  }))));
+
+  const EXCEPTION = "v_admin_user_usage";
+
+  // 1 · a SEVENTH owner-view. The rehearsal fails on this against the branch;
+  //     this fails on it against the database, which is where a view created
+  //     outside a migration actually appears.
+  const ownerRun = rows.filter((r) => !r.security_invoker && r.view_name !== EXCEPTION);
+  if (ownerRun.length) {
+    gateFailures.push(
+      `${ownerRun.length} view(s) in production run as their OWNER and bypass their ` +
+        `base tables' RLS: ${ownerRun.map((r) => r.view_name).join(", ")}. Set ` +
+        `security_invoker = true in a migration, or — if the view cannot take it — ` +
+        `give it its own authorization predicate and declare it the way ` +
+        `20260916000009 declares v_admin_user_usage. PLAN.md §4 D38.`,
+    );
+  }
+
+  // 2 · the exception without the thing that makes it one.
+  const exc = rows.find((r) => r.view_name === EXCEPTION);
+  if (!exc) {
+    out(`- \`${EXCEPTION}\` is ABSENT from production — the schema probe above should already have failed this run.`);
+  } else if (!exc.security_invoker && !exc.states_own_rule) {
+    gateFailures.push(
+      `${EXCEPTION} runs as its OWNER in production and its definition does NOT ` +
+        `contain current_is_super_admin(). An owner-run view with no predicate of ` +
+        `its own returns every user's month-to-date AI requests, tokens and ` +
+        `cost_usd to any reader who can select from it — the disclosure ` +
+        `20260916000009 closed. Restore the WHERE clause. PLAN.md §4 D38.`,
+    );
+  } else if (exc.security_invoker) {
+    // Not a disclosure — the opposite failure, and it takes the admin area down
+    // rather than leaking from it. A gate because both admin pages break.
+    gateFailures.push(
+      `${EXCEPTION} carries security_invoker = true in production. approved_users ` +
+        `is REVOKEd from authenticated (20250826015629), so this view now raises ` +
+        `"permission denied for table approved_users" for EVERY reader — ` +
+        `AdminDashboard and AdminUsers are both broken. PLAN.md §4 D38.`,
+    );
+  } else {
+    out(`- \`${EXCEPTION}\` runs as its owner AND states its own rule — the declared exception is intact in production.`);
+  }
+}
+
 // ── D30: which of the two migrations actually ran? ─────────────────────────
 //
 // `20250913085427` creates the view/modify policy pair on `simulation_cache`,
@@ -608,7 +719,15 @@ async function graphHashBlastRadius() {
     select (select count(*)::int from information_schema.columns
              where table_schema = 'public' and table_name = 'dataset_versions'
                and column_name in ('hash_inputs','hash_network'))              as domain_columns,
-           (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           -- DISTINCT proname, because pg_proc has one row PER OVERLOAD and this
+           -- probe asks whether nine FUNCTIONS exist. It read count(*) and
+           -- reported 10/9 the moment WP 4.3 added the three-argument
+           -- analysis_mark_critical_nodes beside the two-argument one: an
+           -- overload that exists on purpose, to cover the window between a
+           -- migration deploy and an edge-function deploy. Three such shims are
+           -- live right now, so the bug would have recurred twice more.
+           (select count(distinct p.proname)::int from pg_proc p
+              join pg_namespace n on n.oid = p.pronamespace
              where n.nspname = 'public'
                and p.proname in ('current_hash_inputs','current_hash_network',
                                  '_dataset_domain_hashes','_dataset_graph_hash',
@@ -658,21 +777,44 @@ async function graphHashBlastRadius() {
     }
   });
 
-  // THE DIRTY READ, WHICH IS THE BUMP'S WHOLE VISIBLE EFFECT. Every stored
-  // version predates v2, so no stored `graph_hash` may still equal its
-  // project's current one. A match would mean the deploy did not take.
+  // THE DIRTY READ, AND ITS PREMISE HAS AN EXPIRY DATE THAT HAS NOW PASSED.
+  //
+  // WP 4.1 wrote this as "every stored version predates v2, so no stored
+  // `graph_hash` may still equal its project's current one". True on the day of
+  // the bump and FALSE from the first version frozen after it: a v2 version on a
+  // project nobody has edited since SHOULD equal the current hash — that is the
+  // anchor working, not the deploy failing.
+  //
+  // Production now holds 7 versions, 6 of them v1 (`hash_inputs IS NULL`) and one
+  // v2, and the one that matched was the v2 one. The gate was reporting correct
+  // behaviour as "THE BUMP DID NOT TAKE".
+  //
+  // So the check is scoped to the rows the premise is actually about: a PRE-BUMP
+  // version whose stored hash still equals the current one is the real defect,
+  // because a v1 hash cannot equal a v2 hash unless the composite is unversioned.
   const dirty = await tryQ(`
     select count(*)::int as versions,
-           count(*) filter (where v.graph_hash = public.current_graph_hash(v.project_id))::int
-             as still_matching_current,
+           count(*) filter (where v.hash_inputs is null
+                              and v.graph_hash = public.current_graph_hash(v.project_id))::int
+             as pre_bump_still_matching,
+           count(*) filter (where v.hash_inputs is not null
+                              and v.graph_hash = public.current_graph_hash(v.project_id))::int
+             as post_bump_matching_expected,
            count(*) filter (where v.hash_inputs is null)::int as without_domain_hashes
       from public.dataset_versions v`);
   report("every pre-bump version now reads dirty (§16 · WP 4.1 · C)", dirty, (rows) => {
     out(...table(rows));
     const r = rows[0] ?? {};
-    if (Number(r.versions) > 0 && Number(r.still_matching_current) > 0) {
+    if (Number(r.post_bump_matching_expected) > 0) {
+      out(
+        `- ${r.post_bump_matching_expected} POST-bump version(s) match their project's current`,
+        `  hash, which is correct: a v2 version on a project nobody has edited since`,
+        `  should match. This row used to be counted as a failure.`,
+      );
+    }
+    if (Number(r.versions) > 0 && Number(r.pre_bump_still_matching) > 0) {
       gateFailures.push(
-        `WP 4.1: ${r.still_matching_current} stored dataset version(s) still match ` +
+        `WP 4.1: ${r.pre_bump_still_matching} PRE-BUMP dataset version(s) still match ` +
         `current_graph_hash. Every one was frozen under v1 and a v1 hash cannot equal a v2 ` +
         `hash, so either the bump did not deploy or the composite is not versioned.`,
       );
@@ -837,6 +979,121 @@ async function wp42Smear() {
 // therefore about the SCHEMA, not the data, and they push to `gateFailures` so a
 // half-landed deploy turns the run red instead of publishing a report that looks
 // like the previous one.
+/**
+ * WP 4.3 + WP 4.4 — THE THREE COUNTS TWO PACKAGES OWED AND NEITHER COULD TAKE.
+ *
+ * Both carried a migration, and a push with a migration must not touch any of
+ * the three doors that fire `verification-sql.yml` (§4 D31, and the fourth loss
+ * that added the third door). WP 5.1 changes no schema, so it can carry them.
+ *
+ * MEASURE EVERY PROJECT. §4 D42: the largest project here is the one the seeder
+ * creates, and reading it alone reports a clean data layer that is not clean.
+ */
+async function wp43and44Counts() {
+  section("WP 4.3 / 4.4 — provenance coverage, and D70's realised damage");
+
+  // 1 · I5 as a quantity. `computed_from_hash IS NULL` is the size of what
+  // WP 5.3 cannot migrate: a row that cannot say which data produced it.
+  const prov = await tryQ(`
+    select 'network_nodes' as tbl,
+           count(*)::int as rows,
+           count(*) filter (where computed_from_hash is null)::int as no_provenance,
+           count(distinct project_id)::int as projects
+      from public.network_nodes
+    union all
+    select 'node_list', count(*)::int,
+           count(*) filter (where computed_from_hash is null)::int,
+           count(distinct project_id)::int
+      from public.node_list
+    union all
+    select 'supply_chain_data', count(*)::int,
+           count(*) filter (where computed_from_hash is null)::int,
+           count(distinct project_id)::int
+      from public.supply_chain_data
+    union all
+    select 'network_summary', count(*)::int,
+           count(*) filter (where computed_from_hash is null)::int,
+           count(distinct project_id)::int
+      from public.network_summary
+     order by 1`);
+  report("`computed_from_hash IS NULL` per derived table — I5 as a number", prov, (rows) => {
+    out(...table(rows));
+    const total = rows.reduce((n, r) => n + Number(r.rows ?? 0), 0);
+    const none = rows.reduce((n, r) => n + Number(r.no_provenance ?? 0), 0);
+    out(
+      `- **${none} of ${total}** derived row(s) carry NO input hash. Those are rows`,
+      `  written before WP 4.3, and nothing can say whether they are current — the`,
+      `  freshness badge reports them as \`unknown\`, which is not the same as stale.`,
+      `- This is the size of what WP 5.3 cannot migrate: dropping the entity columns`,
+      `  loses these values with no \`analysis_results\` row to replace them.`,
+    );
+  });
+
+  // 2 · D70's realised damage. UNRECOVERABLE by construction — `expired`
+  // overwrote the prior status and the row does not record it — so the only
+  // honest thing left is to know the number.
+  const drift = await tryQ(`
+    select count(*)::int as expired_for_drift,
+           count(distinct project_id)::int as projects,
+           min(updated_at) as earliest,
+           max(updated_at) as latest
+      from public.proposals
+     where status = 'expired' and status_reason = 'grounding_drift'`);
+  report("proposals a READ expired for grounding drift (§4 D70)", drift, (rows) => {
+    out(...table(rows));
+    const n = Number(rows[0]?.expired_for_drift ?? 0);
+    if (n === 0) {
+      out("- **Zero.** D70 was closed before it cost anything, which is what WP 4.1's");
+      out("  measure-before-the-bump discipline bought.");
+    } else {
+      out(
+        `- **${n} proposal(s) were expired by somebody opening a page**, not by any`,
+        `  decision. Each said \`draft\`, \`proposed\` or \`approved\` and \`expired\``,
+        `  overwrote it; the row does not record which, so THEY CANNOT BE RESTORED.`,
+        `  The number is the point: it is the realised cost of D70 and it can only`,
+        `  ever grow smaller by somebody re-authoring those proposals by hand.`,
+      );
+    }
+  });
+
+  // 3 · what a `schema_version` bump would cost TODAY. WP 5.3 folds the network
+  // topology into `hash_network` (D75) and WP 4.1's rule is to count first.
+  const bump = await tryQ(`
+    select count(*)::int as live_grounded_on_graph_hash,
+           count(distinct project_id)::int as projects
+      from public.proposals
+     where status in ('draft','proposed','approved')
+       and grounding ? 'graph_hash'`);
+  report("what WP 5.3's hash bump would land on (D75) — count before, not after", bump, (rows) => {
+    out(...table(rows));
+    const n = Number(rows[0]?.live_grounded_on_graph_hash ?? 0);
+    out(
+      n === 0
+        ? "- **Zero.** WP 5.3 can take the bump for the same reason WP 4.1 could."
+        : `- **${n} live proposal(s)** are grounded on a graph hash. Since WP 4.4 a bump `
+          + `no longer EXPIRES them — drift is computed now — so they will read as `
+          + `\`stale\` and come back if the hash does. That is the whole value of D70 `
+          + `being closed before this bump rather than after it.`,
+    );
+  });
+
+  // 4 · D72's index, re-measured against the constraint that now exists.
+  const key = await tryQ(`
+    select (select count(*)::int from pg_index i join pg_class c on c.oid = i.indexrelid
+             where c.relname = 'network_nodes_natural_key' and i.indisunique) as key_present,
+           (select count(*)::int from public.network_nodes where uid is null)  as null_uid`);
+  report("D72's `(project_id, uid)` key, after the fact", key, (rows) => {
+    out(...table(rows));
+    if (Number(rows[0]?.key_present ?? 0) !== 1) {
+      gateFailures.push(
+        "WP 4.3's `network_nodes_natural_key` is NOT in production, so " +
+        "`calculate-network-science-metrics`'s fallback upsert is still failing with " +
+        "42P10 on every run (§4 D72).",
+      );
+    }
+  });
+}
+
 async function wp42Landed() {
   section("WP 4.2 — did the analysis store reach production?");
 
@@ -1578,6 +1835,7 @@ async function main() {
   out(`- every statement is a \`select\`; \`assertReadOnly()\` refuses anything else.`);
 
   await schemaProbe();
+  await viewSecurity();
   await d30();
   await d29();
   await boundaryDecisions();
@@ -1585,7 +1843,7 @@ async function main() {
   await graphHashBlastRadius();
   await wp42Smear();
   await wp42Landed();
-  await wp43Before();
+  await wp43and44Counts();
 
   const project = await pickProject();
   if (!project) {

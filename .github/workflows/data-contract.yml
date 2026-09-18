@@ -29,16 +29,38 @@ name: data contract
 # `pull_request` event at all. The result is a pull request with no run, and a
 # check that never ran is indistinguishable in the UI from one that passed.
 # Running on every push means the head commit carries a `data contract` result
-# however the pull request came to exist. It costs a duplicate run per pull
-# request; a gate that can be bypassed by the way a PR was opened costs more.
+# however the pull request came to exist.
+#
+# `pull_request:` IS GONE — 2026-09-18 — AND D35 IS STRICTLY BETTER FOR IT.
+# The sentence above used to end "it costs a duplicate run per pull request",
+# and that duplicate was real: every commit on a PR branch ran this whole
+# workflow TWICE, once for `push` and once for `pull_request`, ~7 billable
+# minutes where 4 buys the same answer. Checks attach to the SHA, so the `push`
+# run still reports on the pull request.
+#
+# The unfiltered `push` is the half that must never go: it is D35's first
+# clause, and dropping `pull_request` makes this workflow depend on the trigger
+# that ALWAYS fires rather than the one an app-token PR never raises. Every PR
+# in this repository is same-repo (`claude/*` branches; confirmed across the
+# last 15). IF FORK PULL REQUESTS EVER BECOME EXPECTED, `pull_request:` MUST
+# COME BACK — a fork's push raises no event here and the gate would not run.
 on:
   push:
-  pull_request:
   workflow_dispatch:
+
+# One run per commit, and a superseded commit's run is cancelled rather than
+# finished. NOT on the default branch: `base-is-green` below reads `main`'s own
+# latest completed `push` run, and a cancelled run is a completed run with
+# conclusion `cancelled` — cancelling main's would make every later pull request
+# red for a reason that is not about that pull request.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   contract:
     runs-on: ubuntu-latest
+    timeout-minutes: 15   # measured ~1 min; a hang is a hang, not a slow run
     steps:
       - uses: actions/checkout@v4
         with:
@@ -127,6 +149,7 @@ jobs:
   migrations-run:
     name: migrations run
     runs-on: ubuntu-latest
+    timeout-minutes: 20   # measured ~80s including the postgres service
     services:
       postgres:
         image: postgres:16
@@ -223,10 +246,25 @@ jobs:
   # check that is RED while the branch it would merge into is red. It does not
   # block the button — nothing in this plan can — but it removes the one excuse
   # the three merges had, which is that nobody could see it from the pull request.
+  #
+  # MOVED OFF `pull_request` — 2026-09-18. This job was guarded
+  # `if: github.event_name == 'pull_request'` and read `github.base_ref`, so
+  # dropping that trigger would have deleted it outright. It now runs on a push
+  # to any branch that is NOT the default branch, and takes the base from
+  # `github.event.repository.default_branch`.
+  #
+  # That is a WIDENING, not a narrowing, and it is the same widening D35 is
+  # about: the old guard meant the check only existed once a `pull_request`
+  # event had fired, and D35's second clause is precisely that an app-token PR
+  # raises no such event. A branch now carries "is main green?" from its first
+  # push, whether or not a pull request exists yet.
   base-is-green:
     name: base branch is green
-    if: github.event_name == 'pull_request'
+    if: >-
+      github.event_name == 'push' &&
+      github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       actions: read
       contents: read
@@ -235,6 +273,8 @@ jobs:
       - name: The base branch's own data contract run must be green
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BASE: ${{ github.base_ref }}
+          # `github.base_ref` is empty outside a pull_request event; the default
+          # branch is what a feature branch will merge into either way.
+          BASE: ${{ github.base_ref || github.event.repository.default_branch }}
           REPO: ${{ github.repository }}
         run: node .github/scripts/base-is-green.mjs

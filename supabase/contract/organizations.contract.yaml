@@ -21,6 +21,13 @@ natural_key_unique:
 # column the access layer compared against for a year is the one that may
 # collide and may be edited, and the one that may not is the one nothing read.
 
+surfaces:
+  - page: "DeveloperApi.tsx"
+    via: "rpc list_api_keys"
+    grain: table
+    evidence: "src/pages/DeveloperApi.tsx:261"
+    confirmed: true
+
 governance:
   read: null
   write: super_admin

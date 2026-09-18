@@ -22,6 +22,14 @@ NOT RENAMED BY WP 3.1, AND THAT IS A DECISION. The four tables around it became 
 
 ## Constraints
 
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `project_erp_links_status_check` | `CHECK (status IN ('active', 'needs_attention', 'revoked'))` | `20260829120000_erp_connector_phase1_2.sql` |
+| `project_erp_links_auto_apply_threshold_pct_check` | `CHECK (auto_apply_threshold_pct >= 0 AND auto_apply_threshold_pct <= 100)` | `20260829120000_erp_connector_phase1_2.sql` |
+
 | Constraint | Kind | Definition |
 |---|---|---|
 | — | UNIQUE | `UNIQUE (project_id, external_system, external_company_id)` |
@@ -54,6 +62,18 @@ One FOR ALL policy — `has_project_access(project_id)` — so reading and writi
 | erp_links: project access | ALL | authenticated | `20260829120000_erp_connector_phase1_2.sql` |
 
 </details>
+
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `DataManager.tsx` | table read | `src/hooks/useErpConnections.tsx:57` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
 
 ## Columns
 
@@ -104,7 +124,7 @@ The SuReSuite project this link feeds. One side of the two-sided grant.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `projects(id)` ON DELETE CASCADE |
+| References | `public.projects(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -163,7 +183,7 @@ The person whose own OAuth consent proved membership of that company, in `auth.u
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `users(id)` |
+| References | `auth.users(id)` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -310,6 +330,6 @@ Whether the schedule is live. Two fields rather than one because a paused schedu
 
 ---
 
-*Generated from data contract `a29fd67bde88`, engine `0.2.3`,
+*Generated from data contract `b45dc1ed55a3`, engine `0.2.3`,
 sidecar `supabase/contract/project_erp_links.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
