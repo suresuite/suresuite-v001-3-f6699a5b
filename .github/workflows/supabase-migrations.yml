@@ -1,7 +1,33 @@
 name: Deploy Supabase Migrations
 
+# SCOPED TO `main` — 2026-09-18. This is PLAN.md §4 D31's first half, closed.
+#
+# The `push` trigger carried NO branch filter, so every push to every feature
+# branch that touched `supabase/migrations/**` DEPLOYED THAT BRANCH'S MIGRATIONS
+# TO PRODUCTION. That is not a hypothetical: run 95 (2026-09-15) deployed from
+# `claude/brave-einstein-xi1kh2`, and it is one of ~55 such runs in 30 days. The
+# database therefore reached states no merge commit ever described, which is the
+# shape of half the repairs in the "Repair remote migration history" step below.
+#
+# A branch's migrations are still EXECUTED before merge — `data-contract.yml`'s
+# `migrations run` job applies them three ways against a throwaway PostgreSQL 16
+# (fresh, over production's untracked shape, and against the artifact the branch
+# writes). That is where a migration should first run. This workflow is the
+# DEPLOY, and a deploy belongs to `main`.
+#
+# The filter also removes D31's coupling to `verification-sql.yml`: the standing
+# rule "never push a migration in the same push as a §15 verify request" existed
+# because both workflows fired on any branch push with no ordering between them.
+# On a feature branch only one of them can fire now.
+#
+# NOTE FOR THE NEXT READER: this file's own path is a trigger path, so editing
+# it used to deploy. With `branches: [main]` that is no longer true off `main` —
+# GitHub reads the workflow file from the pushed commit, so the narrowed filter
+# governs the very push that introduces it.
+
 on:
   push:
+    branches: [main]
     paths:
       - 'supabase/migrations/**'
       - '.github/workflows/supabase-migrations.yml'
