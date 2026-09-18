@@ -453,6 +453,6 @@ WP 4.3 · when the run that wrote the criticality columns finished. It is proven
 
 ---
 
-*Generated from data contract `8625740a5eba`, engine `0.2.3`,
+*Generated from data contract `79191f91f602`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data.contract.yaml`, table created by `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

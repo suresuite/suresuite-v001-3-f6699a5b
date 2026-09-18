@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 327,
-  "migrations_applied": 324,
+  "migrations_found": 328,
+  "migrations_applied": 325,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260917000009_topology_in_the_anchor.sql",
+  "last_migration": "20260918000001_org_row_uuid_only.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 273,
+    "functions": 274,
     "shadowed_definitions": 11,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -11171,15 +11171,15 @@
             "name": "orgs: members read own",
             "command": "SELECT",
             "roles": [],
-            "using": "id = public.get_current_user_org_id(public.get_current_user_id()) OR name = public.get_current_user_org() OR slug = public.get_current_user_org()",
-            "with_check": "id = public.get_current_user_org_id(public.get_current_user_id()) OR name = public.get_current_user_org() OR slug = public.get_current_user_org()",
-            "added_by": "20260915000004_org_identity_dual_read.sql"
+            "using": "id = public.get_current_user_org_id(public.get_current_user_id())",
+            "with_check": "id = public.get_current_user_org_id(public.get_current_user_id())",
+            "added_by": "20260918000001_org_row_uuid_only.sql"
           }
         ],
         "determinate": true
       },
       "replica_identity": null,
-      "comment": null,
+      "comment": "Tenant root. Read by uuid only since WP 6.2 (§4 D47): `name` carries no ",
       "natural_key_unique": [
         {
           "source": "column PRIMARY KEY",
@@ -20698,6 +20698,16 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260710000001_model_validations.sql"
+    },
+    {
+      "name": "approved_users_stamp_organization_id",
+      "signature": "approved_users_stamp_organization_id()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "Fills `approved_users.organization_id` from the organization display name when ",
+      "defined_by": "20260918000001_org_row_uuid_only.sql"
     },
     {
       "name": "archive_project_memory",

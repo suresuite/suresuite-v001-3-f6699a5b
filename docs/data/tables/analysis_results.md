@@ -152,6 +152,6 @@ Row insert time, maintained by the database.
 
 ---
 
-*Generated from data contract `8625740a5eba`, engine `0.2.3`,
+*Generated from data contract `79191f91f602`, engine `0.2.3`,
 sidecar `supabase/contract/analysis_results.contract.yaml`, table created by `20260917000006_analysis_store.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

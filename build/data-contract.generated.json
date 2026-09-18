@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 327,
-      "migrations_applied": 324,
-      "last_migration": "20260917000009_topology_in_the_anchor.sql"
+      "migrations_found": 328,
+      "migrations_applied": 325,
+      "last_migration": "20260918000001_org_row_uuid_only.sql"
     },
     "sidecars": 43,
     "registry": {
@@ -13900,9 +13900,9 @@
             "name": "orgs: members read own",
             "command": "SELECT",
             "roles": [],
-            "using": "id = public.get_current_user_org_id(public.get_current_user_id()) OR name = public.get_current_user_org() OR slug = public.get_current_user_org()",
-            "with_check": "id = public.get_current_user_org_id(public.get_current_user_id()) OR name = public.get_current_user_org() OR slug = public.get_current_user_org()",
-            "added_by": "20260915000004_org_identity_dual_read.sql"
+            "using": "id = public.get_current_user_org_id(public.get_current_user_id())",
+            "with_check": "id = public.get_current_user_org_id(public.get_current_user_id())",
+            "added_by": "20260918000001_org_row_uuid_only.sql"
           }
         ],
         "determinate": true
@@ -23594,5 +23594,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "8625740a5eba"
+  "contract_version": "79191f91f602"
 }

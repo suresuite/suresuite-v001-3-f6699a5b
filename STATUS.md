@@ -3,11 +3,52 @@
 > Updated at the end of every work package. `docs/PLAN.md` §16 is the authority
 > for what each package found; this file is the short version you read first.
 
-**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–6** · PR [#223](https://github.com/suresuite/suresuite-v001-3-f6699a5b/pull/223) open
+**Branch:** `claude/busy-thompson-9p8zb9` · **Started from:** `e9b9644` (WP 4.2 merged) · **5 packages closed + WP 6.2 slices 1–7** · PR [#223](https://github.com/suresuite/suresuite-v001-3-f6699a5b/pull/223) open
 
 ---
 
 ## Closed this run
+
+### WP 6.2 (slice 7) — The organization row, by uuid · `20260918000001`
+
+**D47 closed — the last named exception to `uuid-identity` (G1), and the only
+open defect in the package with a cross-tenant read behind it.**
+
+`organizations`' own read policy still ORed the display **name** and the **slug**.
+`name` has no unique constraint, so two tenants sharing a display name each read
+the other's row — name, slug, status, and the whole `settings` jsonb. Reproduced
+against a real database *before* fixing: `rehearsal/160` §2 fails on the
+unmigrated schema.
+
+The slug branch was wrong in a way the defect row didn't name: `slug` is unique
+so there's no collision, but it compared the caller's **name** to another
+tenant's **slug** — so a tenant whose slug equals another's display name was
+readable by all of that other tenant's members.
+
+**The policy rewrite was only half the work, and the other half is the finding
+(D96).** Going uuid-only denies anyone whose `organization_id` is NULL, and
+D29's own note forbids adding a way to revoke access. §15 measured 14/14 carrying
+it — **and nothing kept that true**: nullable, no default, no trigger, backfill
+ran once. That's load-bearing for D29 too: since `20260916000011`, an account
+arriving without the uuid can read *no project at all*, silently. The trigger
+added here closes the write path for both, and **refuses to guess** when two orgs
+share a name — NULL denies, a guess mis-grants.
+
+**Verified:** red first on §2 · three mutations (restore name branch, drop
+trigger, let it guess) all caught · all three rehearse modes green ·
+`contract:check` ✓ · 375 tests ✓ · build ✓ · eslint 336/116 and `audit:ui` 8,
+unchanged.
+
+⚠️ **One mutation passed for the wrong reason and was redone** — I *renamed* the
+trigger, and a renamed trigger still fires. It came back green and would have
+been recorded as a load-bearing assertion that isn't. Same trap as §16 · WP 4.1 ·
+E, three packages later, to someone who had read it.
+
+**Needs a decision (D96):** a `NOT NULL` on `approved_users.organization_id`
+would make this structural instead of maintained — but it needs a **fresh** §15
+read, not the 2026-09-16 number. Also unread: whether any bulk path (`COPY`,
+restore) bypasses the trigger, and whether D27's other uuid columns share the
+same one-off-backfill shape.
 
 ### WP 6.2 (slice 6) — All three gates, every time · no migration
 
