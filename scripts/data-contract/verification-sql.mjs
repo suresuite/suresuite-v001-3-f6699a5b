@@ -750,10 +750,21 @@ async function graphHashBlastRadius() {
     out("- Landed: both domain columns and all nine functions are present.");
   });
 
-  // The snapshot is v2 AND the hash moved. Two separate claims: the function
-  // could be replaced and still return a v1-shaped object if a later definition
-  // shadowed it, and the shape could be right while the composite was not
-  // recomputed. `schema_version` is read from the live snapshot, not asserted.
+  // The snapshot is at the CURRENT schema_version AND the hash moved. Two
+  // separate claims: the function could be replaced and still return a
+  // v1-shaped object if a later definition shadowed it, and the shape could be
+  // right while the composite was not recomputed. `schema_version` is read from
+  // the live snapshot, not asserted.
+  //
+  // THE EXPECTED VERSION IS A NAMED CONSTANT BECAUSE THIS GATE WENT STALE (D101).
+  // It was written pinned to the literal "2". `20260917000009_topology_in_the_anchor.sql`
+  // folded the deep-tier topology into `hash_network` and bumped 2 -> 3 — a bump
+  // §15 itself had asked for and measured the blast radius of — and the gate was
+  // not moved with it. Every run after that migration reported five correct
+  // projects as a GATE FAILURE, which is the failure mode a gate exists to
+  // prevent: production was right and the check called it red. One name, one
+  // place to change at the next bump.
+  const SNAPSHOT_SCHEMA_VERSION = "3"; // 20260917000009_topology_in_the_anchor.sql
   const shape = await tryQ(`
     select p.id::text as project_id,
            public._build_dataset_snapshot(p.id) -> 'schema_version'          as schema_version,
@@ -765,15 +776,21 @@ async function graphHashBlastRadius() {
   report("the live snapshot's own shape, on real projects", shape, (rows) => {
     if (!rows?.length) { out("- No project to build a snapshot for."); return; }
     out(...table(rows));
-    const bad = rows.filter((r) => String(r.schema_version) !== "2" || r.has_inputs !== true);
+    const bad = rows.filter(
+      (r) => String(r.schema_version) !== SNAPSHOT_SCHEMA_VERSION || r.has_inputs !== true,
+    );
     if (bad.length) {
       gateFailures.push(
-        `WP 4.1: ${bad.length} project(s) still build a snapshot that is not v2. ` +
-        `\`_build_dataset_snapshot\` was not replaced, or a later definition shadows it.`,
+        `WP 4.1: ${bad.length} project(s) build a snapshot that is not ` +
+        `v${SNAPSHOT_SCHEMA_VERSION}. \`_build_dataset_snapshot\` was not replaced, ` +
+        `or a later definition shadows it.`,
       );
-      out("- **NOT v2.** See the GATE section.");
+      out(`- **NOT v${SNAPSHOT_SCHEMA_VERSION}.** See the GATE section.`);
     } else {
-      out("- Every project builds a v2 snapshot with both domains, and both domain hashes compute.");
+      out(
+        `- Every project builds a v${SNAPSHOT_SCHEMA_VERSION} snapshot with both domains, ` +
+        `and both domain hashes compute.`,
+      );
     }
   });
 
