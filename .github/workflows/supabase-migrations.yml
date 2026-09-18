@@ -36,6 +36,11 @@ on:
 jobs:
   migrate:
     runs-on: ubuntu-latest
+    # Caps a hung `db push`/`migration repair`. NO `concurrency` cancellation
+    # anywhere in this file: cancelling a migration deploy mid-push is how a
+    # database ends up in a state no migration describes, which is the whole
+    # subject of the repair list below.
+    timeout-minutes: 30
     permissions:
       contents: write   # publish the db push log to the migration-results branch
     steps:
