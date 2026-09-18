@@ -8365,18 +8365,79 @@ grid**: two capacity columns side by side, one weekly and one daily, is a data-e
 trap that no mapping fix can close, and mis-entering it by a factor of seven WOULD
 depress a fill rate — unlike the default the report blamed.
 
+#### F2 · THE DEFECT WAS FIXED TWICE, AND THAT IS THE FINDING
+
+Within hours of `6366759`, `6c2aa36` (nganho124, PR #220 → main → this branch)
+fixed the same defect in the same file at the same call site, by a different
+mechanism: `plant_scoped` and `warnings` parameters on `_merged_policy`, matching
+a compound key by its LAST `::`-segment.
+
+Git's auto-merge kept this package's call site and left theirs **unreachable** —
+`plant_scoped=True` was passed nowhere. Both suites stayed green, because the dead
+half cannot run. So the branch briefly carried 36 lines of code whose docstring
+asserted behaviour that never executed: **D74's class, arriving inside the commit
+that closed a defect of D74's class**, and undetectable by every gate here, since
+none of them ask whether a parameter is ever passed.
+
+**The process finding is the point, not the merge.** Two people worked the same
+bug in parallel with nowhere to see that: it had no §4 row until one of them wrote
+one, and a defect with no row is a defect with no owner. That is the mechanism §4
+exists to provide, observed failing from the inside for the first time. The cost
+here was small (one reconciliation); it is small only because both fixes were
+correct.
+
+Reconciled to one resolver. **What the second fix got right and this one did not**:
+
+- **The ambiguity warning.** Two owners patching the same target resolved
+  silently in `_composite_patches` — sorted-first won, nothing said so. A silent
+  choice between two values a user typed is precisely the substitution D75 is
+  about, reproduced inside D75's own fix. Now one `warn` names every key and
+  which one wins. Their message, carried over.
+- **The last-`::` split.** Both halves of a target key are free-text user data, so
+  a plant literally named `A::B` defeats a first-`::` split. `_composite_target`
+  now tries first-`::` (this file's convention, and what the TS mirror and both
+  legacy readers use) and then last-`::`, each validated against the known ids —
+  so the extra candidate can only rescue a key, never mis-resolve one.
+
+**What was dropped, and why**: the `plant_scoped` mechanism itself. Not because it
+was wrong — because `_composite_patches` was already the reachable path and
+already carries the TS mirror, the two legacy readers, the orphan guard and the
+shared fixture. Two resolvers for one question is `single-source` broken in the
+mapping plane, which is the same argument D65 settled for the governance plane.
+Three new cases pin the merged behaviour on both sides, each confirmed RED first.
+
+---
+
 #### F · Gap check — what this found and did not fix
 
-- **`supabase/functions/_shared/grading.ts` grades capacity from
-  `defaults.production` ONLY.** `buildReducerCtx` computes one scalar
-  `policyCapacity` for every product from the project defaults; `GradingDataset`
-  never receives `policy_overrides` at all. The divergence PRE-DATES this fix (a
-  bare `node:<product>` override was already invisible to it) but this fix widens
-  it from a spelling no UI writes to the one the plant grid does — so the
-  preflight now under-reports exactly the case the user hit, telling them capacity
-  is defaulted when the engine will use their value. **→ affects WP 6.2**: it is a
-  threading change through five callers plus the validation-parity fixture, not a
-  line, and it belongs with D18/D69 rather than bolted onto a reader fix.
+- **`supabase/functions/_shared/grading.ts` graded capacity from
+  `defaults.production` ONLY — CLOSED, in the commit after this one, and the
+  deferral was argued from a false premise.** `buildReducerCtx` computed one
+  scalar `policyCapacity` for every product; `GradingDataset` never received
+  `policy_overrides` at all. The divergence PRE-DATED the reader fix (a bare
+  `node:<product>` override was already invisible to it) but the fix widened it
+  from a spelling no UI writes to the one the plant grid does — so for one
+  commit the preflight under-reported exactly the case the user hit, telling
+  them capacity is defaulted while the engine used their value. **The reason
+  given for deferring it was wrong**: "a threading change through five callers"
+  — it is ten call sites, not five, AND none of them had to change, because
+  `GradingDataset` already carries an optional field (`truncated?`) and one more
+  changes no signature and no existing behaviour. A defect was sized by
+  assertion rather than by counting, and the size was then used to justify not
+  fixing it. **That is the failure mode worth carrying forward, not the fix.**
+  Closed by: `overrides?: Row[]` on the dataset; `policyCapacityById` on
+  `ReducerCtx`, consulted before the scalar so an absent or empty field grades
+  byte-identically (the golden snapshot did not move); `productionByProduct`,
+  the TS mirror of `_composite_patches` with the same parse, the same sorted
+  determinism and the same empty-target guard; and `loadGateDataset` — the ONE
+  place a `GradingDataset` is built from the database — reading
+  `policy_overrides` under the same row ceiling and truncation reporting as its
+  seven existing tables. Master precedence needed no work: `gradeManifest`
+  already short-circuits on `binding.master(row) > 0`, which is the engine's own
+  order. **The parity fixture now carries the case in one place for both
+  suites** (`plant_override_variant`), so `grading_test.ts` and
+  `test_validation_parity.py` assert the same thing from their own sides — the
+  test that would have caught this at PR #221 rather than one commit later.
 - **The plant stage's `inventory` columns** (`type`, `reorder_point`,
   `order_up_to`, `safety_stock_days`, the `fg_*` group) are written under the same
   composite key, and NO engine reads inventory per product at all — `project_map.py`

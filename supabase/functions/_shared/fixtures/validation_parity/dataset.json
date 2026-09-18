@@ -12,7 +12,8 @@
     "The deno test locks the grader to expected_findings.json; the pytest runs",
     "this same dataset through datamap→from_project_data and asserts the",
     "engine's WARN-level MappingWarnings match the grader's warn findings.",
-    "activation_variant: policy-activation parity — python _map_policies keys == TS activeEnginePolicies for the same defaults (M_OK is dual-sourced via the priced S2 arc, so P-S.2 is feasible)."
+    "activation_variant: policy-activation parity — python _map_policies keys == TS activeEnginePolicies for the same defaults (M_OK is dual-sourced via the priced S2 arc, so P-S.2 is feasible).",
+    "plant_override_variant: §4 D75 parity — the /policies plant grid keys per-row production patches \"<plant>::<product>\". P_PRICE_FALLBACK, which grades WARN on capacity in the golden set, carries one here; both surfaces must resolve it via production_policy_capacity and drop the warn. The bare node:<product> spelling and the precedence between them ride along."
   ],
   "defaults": {},
   "scenario": {
@@ -282,6 +283,68 @@
       "proactive_multi_sourcing",
       "safety_stock_materials",
       "unmet_demand_handling"
+    ]
+  },
+  "plant_override_variant": {
+    "_comment": "policy_overrides rows AS STORED. composite = what the plant grid writes; bare = the node:<product> form; both_precedence proves composite wins. 20 units/day x 7 x 80% = 112 units/week; bare is 10 x 7 x 80% = 56. ambiguous = the SAME product patched under two plants (nganho124's case, PR #220): merged in key order, last wins, and the pick is announced. nested_owner = an owner whose own name contains '::' — the second split candidate.",
+    "composite": [
+      {
+        "scope": "node",
+        "target_key": "Focal plant::P_PRICE_FALLBACK",
+        "family": "production",
+        "patch": {
+          "capacity_units_per_day": 20.0,
+          "utilization_cap_pct": 80.0
+        }
+      }
+    ],
+    "bare": [
+      {
+        "scope": "node",
+        "target_key": "P_PRICE_FALLBACK",
+        "family": "production",
+        "patch": {
+          "capacity_units_per_day": 10.0,
+          "utilization_cap_pct": 80.0
+        }
+      }
+    ],
+    "expected_weekly_capacity": {
+      "composite": 112.0,
+      "bare": 56.0,
+      "ambiguous": 168.0,
+      "nested_owner": 112.0
+    },
+    "target_product": "P_PRICE_FALLBACK",
+    "ambiguous": [
+      {
+        "scope": "node",
+        "target_key": "Plant A::P_PRICE_FALLBACK",
+        "family": "production",
+        "patch": {
+          "capacity_units_per_day": 20.0,
+          "utilization_cap_pct": 80.0
+        }
+      },
+      {
+        "scope": "node",
+        "target_key": "Plant B::P_PRICE_FALLBACK",
+        "family": "production",
+        "patch": {
+          "capacity_units_per_day": 30.0
+        }
+      }
+    ],
+    "nested_owner": [
+      {
+        "scope": "node",
+        "target_key": "Plant A::B::P_PRICE_FALLBACK",
+        "family": "production",
+        "patch": {
+          "capacity_units_per_day": 20.0,
+          "utilization_cap_pct": 80.0
+        }
+      }
     ]
   }
 }

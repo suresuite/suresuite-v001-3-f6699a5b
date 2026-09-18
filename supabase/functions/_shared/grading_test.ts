@@ -196,3 +196,105 @@ Deno.test("gate: partial-magnitude disruption on a capacity-less supplier warns"
   );
   if (!hit) throw new Error("expected the S1 capacity warn");
 });
+
+// ── §4 D75 — per-product capacity must grade the way the engine resolves it ──
+// The plant grid keys its production patches "<plant>::<product>". Before the
+// engine learned that spelling the grader agreed with it by accident: both
+// ignored the row. Now the engine applies it, so a grader that still reports
+// "defaulted" tells the user the opposite of what the run will do.
+
+const PLANT = fixture.plant_override_variant;
+const CAP_FIELD = "products.production_capacity";
+const CAP_TARGET = PLANT.target_product as string;
+
+/** Rows still reported as capacity-defaulted for `overrides`. */
+function capacityWarnRows(overrides: Row[]): string[] {
+  const variant: GradingDataset = { ...DATASET, overrides };
+  const findings = flattenFindings(gradeManifest(variant, DEFAULTS, REG, BRIDGE));
+  const warn = findings.find((f) => f.field === CAP_FIELD && f.severity === "warn");
+  return warn ? warn.rows : [];
+}
+
+/** The weekly capacity the grader resolved for `id`, or undefined. */
+function resolvedCapacity(overrides: Row[], id: string): number | undefined {
+  const variant: GradingDataset = { ...DATASET, overrides };
+  const graded = gradeManifest(variant, DEFAULTS, REG, BRIDGE)
+    .find((g) => g.field === CAP_FIELD);
+  return graded?.resolved.find((r) => r.id === id)?.value;
+}
+
+Deno.test("D75: a dataset with no overrides grades exactly as before", () => {
+  // The no-regression guard. The golden snapshot test above already pins the
+  // absent-field case; this pins the present-but-empty one.
+  assertEquals(capacityWarnRows([]), ["P_PRICE_FALLBACK", "P_NO_DEMAND"],
+    "an empty overrides array must change nothing");
+});
+
+Deno.test("D75: a composite <plant>::<product> override resolves capacity", () => {
+  const rows = capacityWarnRows(PLANT.composite as Row[]);
+  assertEquals(rows.includes(CAP_TARGET), false,
+    `${CAP_TARGET} has a line capacity — the engine uses it, so the grader may not call it defaulted`);
+  assertEquals(rows, ["P_NO_DEMAND"], "the product without an override still warns");
+  assertEquals(
+    resolvedCapacity(PLANT.composite as Row[], CAP_TARGET),
+    PLANT.expected_weekly_capacity.composite,
+    "capacity_units_per_day x 7 x utilization — the engine's own arithmetic",
+  );
+});
+
+Deno.test("D75: the bare node:<product> spelling still resolves", () => {
+  assertEquals(
+    resolvedCapacity(PLANT.bare as Row[], CAP_TARGET),
+    PLANT.expected_weekly_capacity.bare,
+    "the bare key must keep working — no writer is required to use the composite form",
+  );
+});
+
+Deno.test("D75: composite beats bare, matching the engine's precedence", () => {
+  const both = [...(PLANT.bare as Row[]), ...(PLANT.composite as Row[])];
+  assertEquals(
+    resolvedCapacity(both, CAP_TARGET),
+    PLANT.expected_weekly_capacity.composite,
+    "defaults < node:<product> < node:<owner>::<product>",
+  );
+});
+
+Deno.test("D75: an override on a product with a master capacity is not consulted", () => {
+  // Master precedence is the engine's (project_map.py) and gradeManifest's
+  // short-circuit on binding.master(row) > 0 — P_OK carries 900 units/week.
+  const rows = capacityWarnRows([{
+    scope: "node", target_key: "Focal plant::P_OK", family: "production",
+    patch: { capacity_units_per_day: 1 },
+  }] as Row[]);
+  assertEquals(rows, ["P_PRICE_FALLBACK", "P_NO_DEMAND"],
+    "P_OK has a master capacity, so it is neither warned nor policy-resolved");
+});
+
+Deno.test("D75: a non-production or non-node override is ignored", () => {
+  const rows = capacityWarnRows([
+    { scope: "node", target_key: `Focal plant::${CAP_TARGET}`, family: "inventory",
+      patch: { capacity_units_per_day: 20 } },
+    { scope: "edge", target_key: `Focal plant::${CAP_TARGET}`, family: "production",
+      patch: { capacity_units_per_day: 20 } },
+    { scope: "node", target_key: "Focal plant::P_NOT_A_PRODUCT", family: "production",
+      patch: { capacity_units_per_day: 20 } },
+  ] as Row[]);
+  assertEquals(rows, ["P_PRICE_FALLBACK", "P_NO_DEMAND"],
+    "only a node-scoped production patch naming a real product may resolve capacity");
+});
+
+Deno.test("D75: two owners on one product merge in key order (nganho124, PR #220)", () => {
+  assertEquals(
+    resolvedCapacity(PLANT.ambiguous as Row[], CAP_TARGET),
+    PLANT.expected_weekly_capacity.ambiguous,
+    "last key wins on a shared field; the other owner's untouched fields survive",
+  );
+});
+
+Deno.test("D75: an owner name containing the separator still resolves", () => {
+  assertEquals(
+    resolvedCapacity(PLANT.nested_owner as Row[], CAP_TARGET),
+    PLANT.expected_weekly_capacity.nested_owner,
+    "second split candidate — a plant literally named \"A::B\"",
+  );
+});

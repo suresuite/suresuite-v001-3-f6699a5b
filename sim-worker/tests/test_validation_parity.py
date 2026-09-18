@@ -223,3 +223,102 @@ def test_sla_tiers_and_node_ratio_overrides_reach_the_engine():
     assert round(weights["S1"], 4) == 62.5 and round(weights["S2"], 4) == 37.5
     assert any(w.entity == "policy:proactive_multi_sourcing" and "renormalized" in w.reason
                for w in mapping.warnings)
+
+
+# ── §4 D75 — per-product capacity, both surfaces ────────────────────────────
+# The /policies plant grid keys production patches "<plant>::<product>". Before
+# the engine learned that spelling, engine and grader agreed by accident: both
+# ignored the row. This is the assertion that would have caught the divergence,
+# and the one that fails if either side stops honouring the key.
+
+def _policy_map(fx: dict, override_rows: list[dict]) -> dict:
+    """policy_overrides rows → the worker's policies dict.
+
+    Mirrors how the run assembles it (`policy_snapshot.py`, `graph_cache.py`):
+    the map key is f"{scope}:{target_key}" and the patch sits under its family.
+    """
+    policies: dict = {"default": fx["defaults"]}
+    for row in override_rows:
+        key = f"{row['scope']}:{row['target_key']}"
+        policies.setdefault(key, {})[row["family"]] = row["patch"]
+    return policies
+
+
+def _capacity_of(fx: dict, override_rows: list[dict], product_id: str):
+    data = build_project_data(
+        suppliers=fx["dataset"]["suppliers"], materials=fx["dataset"]["materials"],
+        products=fx["dataset"]["products"], inbound=fx["dataset"]["inbound"],
+        bom=fx["dataset"]["bom"], outbound=fx["dataset"]["outbound"],
+        policies=_policy_map(fx, override_rows), scenario=fx["scenario"],
+        project_model="make_to_stock",
+    )
+    mapping = from_project_data(data)
+    product = next(p for p in mapping.scenario.network.products if p.id == product_id)
+    return product.production_capacity, mapping.warnings
+
+
+def test_composite_plant_key_capacity_reaches_the_engine():
+    fx = _fixture()
+    variant = fx["plant_override_variant"]
+    target = variant["target_product"]
+    cap, warns = _capacity_of(fx, variant["composite"], target)
+    assert cap == pytest.approx(variant["expected_weekly_capacity"]["composite"])
+    # …and the engine stops calling it defaulted, which is the half the grader
+    # mirrors: grading_test.ts asserts the same product leaves the warn rows.
+    assert (("products.production_capacity", target)) not in _engine_warns(warns)
+
+
+def test_bare_product_key_capacity_still_reaches_the_engine():
+    fx = _fixture()
+    variant = fx["plant_override_variant"]
+    cap, _ = _capacity_of(fx, variant["bare"], variant["target_product"])
+    assert cap == pytest.approx(variant["expected_weekly_capacity"]["bare"])
+
+
+def test_composite_key_wins_over_bare_key():
+    """defaults < node:<product> < node:<owner>::<product> — the precedence
+    grading.ts::productionByProduct implements on the other side."""
+    fx = _fixture()
+    variant = fx["plant_override_variant"]
+    cap, _ = _capacity_of(
+        fx, list(variant["bare"]) + list(variant["composite"]), variant["target_product"],
+    )
+    assert cap == pytest.approx(variant["expected_weekly_capacity"]["composite"])
+
+
+def test_engine_and_grader_agree_on_which_rows_are_capacity_defaulted():
+    """The parity claim itself, for the field D75 moved.
+
+    The grader's answer for this variant is pinned in grading_test.ts; here the
+    engine must reach the same set — every product that warns on capacity with
+    the override applied, and only those.
+    """
+    fx = _fixture()
+    variant = fx["plant_override_variant"]
+    _, warns = _capacity_of(fx, variant["composite"], variant["target_product"])
+    capacity_warns = {
+        entity for field, entity in _engine_warns(warns)
+        if field == "products.production_capacity"
+    }
+    assert capacity_warns == {"P_NO_DEMAND"}, (
+        "engine capacity warns diverged from the grader's — grading.ts and "
+        "project_map.py no longer mirror each other on per-product capacity"
+    )
+
+
+def test_two_owners_on_one_product_match_the_grader():
+    """nganho124's ambiguity case, pinned on both sides from one fixture."""
+    fx = _fixture()
+    variant = fx["plant_override_variant"]
+    cap, warns = _capacity_of(fx, variant["ambiguous"], variant["target_product"])
+    assert cap == pytest.approx(variant["expected_weekly_capacity"]["ambiguous"])
+    assert any(w.field == "target_key" and w.level == "warn" for w in warns), (
+        "two owners on one product must be announced, not silently resolved"
+    )
+
+
+def test_owner_name_containing_the_separator_matches_the_grader():
+    fx = _fixture()
+    variant = fx["plant_override_variant"]
+    cap, _ = _capacity_of(fx, variant["nested_owner"], variant["target_product"])
+    assert cap == pytest.approx(variant["expected_weekly_capacity"]["nested_owner"])

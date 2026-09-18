@@ -490,3 +490,43 @@ def test_known_target_keys_do_not_warn_as_orphans():
         master=200.0,
     )
     assert not any(w.field == "target_key" for w in warns)
+
+
+def test_two_owners_on_one_product_warn_instead_of_silently_picking():
+    """Two plants patching the same product (nganho124, PR #220).
+
+    The merge is deterministic — sorted key order, last wins on a shared
+    field — and it is ANNOUNCED. A silent choice between two values a user
+    typed is the same defect D75 was.
+    """
+    prod, warns = _plant_capacity_case(
+        {
+            "node:Plant A::p1": {"production": {
+                "capacity_units_per_day": 20.0, "utilization_cap_pct": 80.0}},
+            "node:Plant B::p1": {"production": {"capacity_units_per_day": 30.0}},
+        },
+        master=None,
+    )
+    # B wins the field both set; A's utilization survives — B never sets it.
+    assert prod.production_capacity == pytest.approx(30.0 * 7.0 * 0.80)
+    amb = [w for w in warns if w.field == "target_key" and w.level == "warn"]
+    assert len(amb) == 1, "exactly one ambiguity warning"
+    assert "Plant A::p1" in amb[0].reason and "Plant B::p1" in amb[0].reason
+
+
+def test_one_owner_per_product_does_not_warn():
+    _, warns = _plant_capacity_case(
+        {"node:Plant A::p1": {"production": {"capacity_units_per_day": 20.0}}},
+        master=None,
+    )
+    assert not any(w.field == "target_key" and w.level == "warn" for w in warns)
+
+
+def test_owner_name_containing_the_separator_still_resolves():
+    """A plant literally named "A::B" — the second split candidate."""
+    prod, _ = _plant_capacity_case(
+        {"node:Plant A::B::p1": {"production": {
+            "capacity_units_per_day": 20.0, "utilization_cap_pct": 80.0}}},
+        master=None,
+    )
+    assert prod.production_capacity == pytest.approx(20.0 * 7.0 * 0.80)

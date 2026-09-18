@@ -41,6 +41,16 @@ export interface GradingDataset {
    * exists so a caller can say "this was graded on a partial dataset"
    * instead of reporting a partial grade as complete. */
   truncated?: string[];
+  /** `policy_overrides` rows AS STORED (scope, target_key, family, patch).
+   * Optional and unset for every in-memory dataset; loadGateDataset populates
+   * it. When absent the grader resolves policy values from `defaults` alone,
+   * which is what it did before per-entity resolution existed — so omitting
+   * the field grades exactly as it always has. When present, capacity is
+   * resolved per product the way the engine resolves it (§4 D75): a plant-grid
+   * row keyed "<plant>::<product>" is the value the run will actually use, and
+   * reporting it as defaulted is the grader telling the user the opposite of
+   * what will happen. */
+  overrides?: Row[];
 }
 
 export interface FallbackStep {
@@ -206,8 +216,13 @@ export interface ReducerCtx {
   weeklyDemand: Map<string, number>;
   /** master demand_mean (>0) else weekly outbound — feeds the capacity default. */
   effectiveDemand: Map<string, number>;
-  /** production policy capacity_units_per_day × 7 × utilization, 0 when unset. */
+  /** production policy capacity_units_per_day × 7 × utilization, 0 when unset.
+   * The PROJECT-DEFAULT value; per-product overrides live in the map below. */
   policyCapacity: number;
+  /** Per-product weekly capacity from a `production` override, when the
+   * dataset carries overrides. Engine precedence, most specific last:
+   * defaults < node:<product> < node:<owner>::<product>. Empty otherwise. */
+  policyCapacityById: Map<string, number>;
 }
 
 /** Named reducers — the shared vocabulary of registry `fallback_spec`.
@@ -220,8 +235,11 @@ export const REDUCERS: Record<string, (id: string, ctx: ReducerCtx) => number | 
     const v = c.weeklyDemand.get(id) ?? 0;
     return v > 0 ? v : undefined;
   },
-  production_policy_capacity: (_id, c) =>
-    c.policyCapacity > 0 ? c.policyCapacity : undefined,
+  production_policy_capacity: (id, c) => {
+    const per = c.policyCapacityById.get(id);
+    if (per !== undefined && per > 0) return per;
+    return c.policyCapacity > 0 ? c.policyCapacity : undefined;
+  },
   // Engine default when no capacity source exists: max(2·demand, 1000) —
   // always resolves (that is why its registry step carries grade "warn").
   twice_demand_floor_1000: (id, c) =>
@@ -411,6 +429,67 @@ const FIELD_BINDINGS: Record<string, FieldBinding> = {
   "outbound_logistics.unit_price": { rows: (d) => d.outbound, id: laneId, master: (r) => num(r.unit_price) },
 };
 
+/** Per-product `production` patches, resolved the way the engine resolves them.
+ *
+ * The TS mirror of `_composite_patches` + `_merged_policy` in
+ * `scsim/scsim/io/project_map.py` — same two-candidate parse (first `::`, then
+ * last, each validated against the known ids: `_composite_target`), same
+ * sorted-key determinism. Most specific last:
+ *
+ *     defaults.production  <  node:<product>  <  node:<owner>::<product>
+ *
+ * Divergence here is not a cosmetic difference: this module's contract is
+ * byte-identical agreement with the engine, and the parity fixture is what
+ * holds the two to it (§4 D75).
+ */
+function compositeTarget(keyBody: string, ids: Set<string>): string | undefined {
+  // Split at the FIRST "::" — this file's convention and the engine's. Both
+  // halves are free-text user data, so the LAST "::" is tried as a second
+  // candidate (a plant literally named "A::B"). Each is validated against the
+  // known ids, so the extra candidate can only rescue, never mis-resolve.
+  const first = keyBody.slice(keyBody.indexOf("::") + 2);
+  if (first && ids.has(first)) return first;
+  const last = keyBody.slice(keyBody.lastIndexOf("::") + 2);
+  if (last && ids.has(last)) return last;
+  return undefined;
+}
+
+function productionByProduct(overrides: Row[], productIds: Set<string>): Map<string, Row> {
+  const bare = new Map<string, Row>();
+  const composite = new Map<string, Row>();
+  const rows = [...overrides]
+    .filter((o) => String(o.scope ?? "") === "node" && String(o.family ?? "") === "production")
+    .sort((a, b) => String(a.target_key ?? "").localeCompare(String(b.target_key ?? "")));
+  for (const o of rows) {
+    const key = String(o.target_key ?? "");
+    if (!key) continue;
+    const patch = (o.patch ?? {}) as Row;
+    if (!patch || typeof patch !== "object") continue;
+    const isComposite = key.includes("::");
+    const target = isComposite ? compositeTarget(key, productIds) : key;
+    if (!target || !productIds.has(target)) continue;
+    const into = isComposite ? composite : bare;
+    into.set(target, { ...(into.get(target) ?? {}), ...patch });
+  }
+  const out = new Map<string, Row>();
+  for (const id of productIds) {
+    const b = bare.get(id);
+    const c = composite.get(id);
+    if (b || c) out.set(id, { ...(b ?? {}), ...(c ?? {}) });
+  }
+  return out;
+}
+
+/** Weekly capacity from a production patch — the engine's own arithmetic:
+ * capacity_units_per_day × 7 × (utilization_cap_pct ?? 85)/100. Returns 0 when
+ * the patch names no daily capacity, which is the "unset" the reducer skips. */
+function weeklyCapacityFrom(patch: Row): number {
+  const daily = num(patch.capacity_units_per_day);
+  if (daily <= 0) return 0;
+  const util = num(patch.utilization_cap_pct ?? 85) / 100;
+  return daily * 7 * util;
+}
+
 export function buildReducerCtx(dataset: GradingDataset, defaults: Row): ReducerCtx {
   const weekly = weeklyDemand(dataset.outbound);
   const effectiveDemand = new Map<string, number>();
@@ -423,12 +502,28 @@ export function buildReducerCtx(dataset: GradingDataset, defaults: Row): Reducer
   const prodPolicy = (defaults.production ?? {}) as Row;
   const daily = num(prodPolicy.capacity_units_per_day);
   const util = num(prodPolicy.utilization_cap_pct ?? 85) / 100;
+  // A dataset that carries no overrides yields an empty map, so the reducer
+  // falls straight through to the project-default scalar — today's answer.
+  const policyCapacityById = new Map<string, number>();
+  if (dataset.overrides?.length) {
+    const productIds = new Set(
+      dataset.products.map((p) => String(p.product_id ?? "")).filter(Boolean),
+    );
+    for (const [id, patch] of productionByProduct(dataset.overrides, productIds)) {
+      // The override merges ONTO the project default, so a row that sets only
+      // utilization_cap_pct still re-scales the default capacity — which is
+      // what the engine does with the same two dicts.
+      const weekly = weeklyCapacityFrom({ ...prodPolicy, ...patch });
+      if (weekly > 0) policyCapacityById.set(id, weekly);
+    }
+  }
   return {
     cheapestInbound: cheapestInboundCost(dataset.inbound),
     weightedPrice: demandWeightedSellPrice(dataset.outbound),
     weeklyDemand: weekly,
     effectiveDemand,
     policyCapacity: daily > 0 ? daily * 7 * util : 0,
+    policyCapacityById,
   };
 }
 
