@@ -608,7 +608,15 @@ async function graphHashBlastRadius() {
     select (select count(*)::int from information_schema.columns
              where table_schema = 'public' and table_name = 'dataset_versions'
                and column_name in ('hash_inputs','hash_network'))              as domain_columns,
-           (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           -- DISTINCT proname, because pg_proc has one row PER OVERLOAD and this
+           -- probe asks whether nine FUNCTIONS exist. It read count(*) and
+           -- reported 10/9 the moment WP 4.3 added the three-argument
+           -- analysis_mark_critical_nodes beside the two-argument one: an
+           -- overload that exists on purpose, to cover the window between a
+           -- migration deploy and an edge-function deploy. Three such shims are
+           -- live right now, so the bug would have recurred twice more.
+           (select count(distinct p.proname)::int from pg_proc p
+              join pg_namespace n on n.oid = p.pronamespace
              where n.nspname = 'public'
                and p.proname in ('current_hash_inputs','current_hash_network',
                                  '_dataset_domain_hashes','_dataset_graph_hash',
@@ -658,21 +666,44 @@ async function graphHashBlastRadius() {
     }
   });
 
-  // THE DIRTY READ, WHICH IS THE BUMP'S WHOLE VISIBLE EFFECT. Every stored
-  // version predates v2, so no stored `graph_hash` may still equal its
-  // project's current one. A match would mean the deploy did not take.
+  // THE DIRTY READ, AND ITS PREMISE HAS AN EXPIRY DATE THAT HAS NOW PASSED.
+  //
+  // WP 4.1 wrote this as "every stored version predates v2, so no stored
+  // `graph_hash` may still equal its project's current one". True on the day of
+  // the bump and FALSE from the first version frozen after it: a v2 version on a
+  // project nobody has edited since SHOULD equal the current hash — that is the
+  // anchor working, not the deploy failing.
+  //
+  // Production now holds 7 versions, 6 of them v1 (`hash_inputs IS NULL`) and one
+  // v2, and the one that matched was the v2 one. The gate was reporting correct
+  // behaviour as "THE BUMP DID NOT TAKE".
+  //
+  // So the check is scoped to the rows the premise is actually about: a PRE-BUMP
+  // version whose stored hash still equals the current one is the real defect,
+  // because a v1 hash cannot equal a v2 hash unless the composite is unversioned.
   const dirty = await tryQ(`
     select count(*)::int as versions,
-           count(*) filter (where v.graph_hash = public.current_graph_hash(v.project_id))::int
-             as still_matching_current,
+           count(*) filter (where v.hash_inputs is null
+                              and v.graph_hash = public.current_graph_hash(v.project_id))::int
+             as pre_bump_still_matching,
+           count(*) filter (where v.hash_inputs is not null
+                              and v.graph_hash = public.current_graph_hash(v.project_id))::int
+             as post_bump_matching_expected,
            count(*) filter (where v.hash_inputs is null)::int as without_domain_hashes
       from public.dataset_versions v`);
   report("every pre-bump version now reads dirty (§16 · WP 4.1 · C)", dirty, (rows) => {
     out(...table(rows));
     const r = rows[0] ?? {};
-    if (Number(r.versions) > 0 && Number(r.still_matching_current) > 0) {
+    if (Number(r.post_bump_matching_expected) > 0) {
+      out(
+        `- ${r.post_bump_matching_expected} POST-bump version(s) match their project's current`,
+        `  hash, which is correct: a v2 version on a project nobody has edited since`,
+        `  should match. This row used to be counted as a failure.`,
+      );
+    }
+    if (Number(r.versions) > 0 && Number(r.pre_bump_still_matching) > 0) {
       gateFailures.push(
-        `WP 4.1: ${r.still_matching_current} stored dataset version(s) still match ` +
+        `WP 4.1: ${r.pre_bump_still_matching} PRE-BUMP dataset version(s) still match ` +
         `current_graph_hash. Every one was frozen under v1 and a v1 hash cannot equal a v2 ` +
         `hash, so either the bump did not deploy or the composite is not versioned.`,
       );

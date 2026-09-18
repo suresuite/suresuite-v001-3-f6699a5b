@@ -31,7 +31,7 @@ surfaces:
   - page: "ProcessLevelNetwork.tsx"
     via: "table read"
     grain: table
-    evidence: "src/pages/ProcessLevelNetwork.tsx:1105"
+    evidence: "src/pages/ProcessLevelNetwork.tsx:1190"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "rpc get_supply_chain_data_multi_tier"
@@ -140,7 +140,7 @@ fields:
       - page: "ProcessLevelNetwork.tsx"
         via: "table read"
         grain: column
-        evidence: "src/pages/ProcessLevelNetwork.tsx:1105"
+        evidence: "src/pages/ProcessLevelNetwork.tsx:1190"
         confirmed: true
     resolution: null
   from_location:
@@ -258,7 +258,7 @@ fields:
       - page: "ProcessLevelNetwork.tsx"
         via: "table read"
         grain: column
-        evidence: "src/pages/ProcessLevelNetwork.tsx:1105"
+        evidence: "src/pages/ProcessLevelNetwork.tsx:1190"
         confirmed: true
     resolution: null
   path_root:

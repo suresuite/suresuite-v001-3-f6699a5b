@@ -388,6 +388,15 @@ export function writeSidecars() {
     const p = path.join(dir, file);
     let src = readFileSync(p, "utf8");
 
+    // IDEMPOTENT. The first version of this writer could only fill an empty
+    // `surfaces: []`, so a second run duplicated the table block and left every
+    // field's stale entries in place. It had to be re-runnable within the hour:
+    // a parallel branch rewrote `ProcessLevelNetwork.tsx` and moved three reads,
+    // R12 went red naming D21/D22, and the fix is "re-run the analyser" — which
+    // is only a fix if running it twice is safe.
+    src = src.replace(/\nsurfaces:\n(?:  [-\s].*\n|\n)*?(?=governance:)/, "\n");
+    src = src.replace(/^(    )surfaces:\n(?:      [-\s].*\n)*/gm, "$1surfaces: []\n");
+
     // TABLE grain. Shell access is recorded too — with `grain: shell`, so the
     // page list is complete and the reader is told which entries are plumbing.
     const reach = (report.by_table_reach?.[table] ?? []).map((e) => ({

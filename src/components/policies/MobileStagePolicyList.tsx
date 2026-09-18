@@ -68,8 +68,16 @@ interface Props {
   stageRows: StageRowsQuery;
 }
 
-function formatValue(col: ColSpec, value: unknown): string {
-  if (value === undefined || value === null || value === "") return "—";
+/**
+ * `placeholder` is the DECLARED meaning of an empty cell (§4 D17), and this list
+ * is where that defect was actually visible: `resolveCell` returns
+ * `cellValue ?? liveDefault`, `liveDefault` was a hard-coded `0`, and provenance
+ * `default` draws no dot — so every one of the 60 null-capacity suppliers read
+ * "Capacity 0" here, with nothing to say it was a substitution. The desktop grid
+ * showed a blank cell instead, which was less wrong and still said nothing.
+ */
+function formatValue(col: ColSpec, value: unknown, placeholder?: string): string {
+  if (value === undefined || value === null || value === "") return placeholder ?? "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number") return col.format ? col.format(value) : String(value);
   return String(value);
@@ -296,7 +304,7 @@ export function MobileStagePolicyList({
                   counter={`${cols.length + activeParams.length}`}
                 >
                   {cols.map((col) => {
-                    const { value, provenance } = resolveCol(openRow, col);
+                    const { value, provenance, placeholder } = resolveCol(openRow, col);
                     return (
                       <MobileRow
                         key={col.field}
@@ -304,7 +312,7 @@ export function MobileStagePolicyList({
                         label={col.label}
                         value={
                           <span className="inline-flex items-center gap-1.5">
-                            {formatValue(col, value)}
+                            {formatValue(col, value, placeholder)}
                             <span className="relative inline-block h-2 w-2">
                               <ProvenanceDot p={provenance} />
                             </span>

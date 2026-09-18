@@ -189,9 +189,15 @@ function emitConstraints(artifact, warn) {
   for (const t of artifact.tables) {
     for (const c of t.columns) {
       if (!c.references) continue;
-      const target = c.references.table.includes(".")
-        ? c.references.table
-        : `public.${c.references.table}`;
+      // §4 D53 — the schema the migration actually wrote, when the artifact
+      // kept it. `public` is the fallback for an unqualified reference, not a
+      // guess applied to everything: applying it to `auth.users` is what
+      // skipped nine keys on every rehearsal ever run.
+      const target = c.references.schema
+        ? `${c.references.schema}.${c.references.table}`
+        : c.references.table.includes(".")
+          ? c.references.table
+          : `public.${c.references.table}`;
       if (!known.has(target) && target !== "auth.users") {
         // NOT SILENT. A skipped foreign key is a cascade the rehearsed database
         // does not have, and the first time it happened — `ingest_staged_*`

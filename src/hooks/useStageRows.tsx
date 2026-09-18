@@ -179,20 +179,31 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
 
         // A routing DECISION the project data's own shape determines (how many
         // suppliers a material has; which firm ships the most volume). Nobody
-        // uploads a `primary_source` column, but this is not a default either —
-        // the data decided it. Tracking it as project-backed is what makes it
-        // survive the prefill: `applyPrefill` persists only `__from_data`
-        // fields, and the pre-dispatch validator (verification.ts:110,144)
-        // reads `primary_source` / `sourcing_firm` from the saved override
-        // bundle, never from the row.
-        const markFromData = <T,>(
-          prov: { __from_data: Record<string, true> },
-          field: string,
-          value: T,
-        ): T => {
-          if (value !== undefined && value !== null) prov.__from_data[field] = true;
-          return value;
-        };
+        // uploads a `primary_source` column, so it is NOT `__from_data` — it is
+        // `__decided`, and the difference is §4 D23.
+        //
+        // ── WHAT THIS USED TO DO, AND WHAT IT COST ────────────────────────
+        //
+        // A `markFromData` helper wrote these three fields into `__from_data`
+        // as well, to make the prefill persist them (G16 needs a primary
+        // supplier per material on the saved bundle). Both call sites carried a
+        // comment saying the opposite — "these are not `__from_data`" — so the
+        // intent was on the record and the code did the other thing. Three
+        // consequences, and the first is the defect:
+        //
+        //   · `getEffectiveValue` reads `dataRow[field]` BEFORE the override
+        //     bundle, deliberately, so an uploaded column always beats a stale
+        //     override. A suggestion sitting in that same slot means a SAVED
+        //     routing choice could never surface — the user picks a supplier,
+        //     saves, reloads, and sees the suggestion again.
+        //   · the grid badged it "From project data" (green), for a value no
+        //     upload contained — §4 D16's exact shape.
+        //   · `hasRealProjectData` counted a project with no uploads at all as
+        //     having real data.
+        //
+        // The prefill still persists them, through `__decided` — a source
+        // `prefillSourceFor` now names, which is the honest door for a value the
+        // STAGE decided rather than the upload.
 
         // Determine which BOM nodes are raw materials (= leaf level, never a parent).
         const isParent = new Set<string>();
@@ -296,11 +307,7 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               enrich.unit_price,
               impute(inPriceByMaterial, String(material), inPriceGlobal),
             );
-            const primary_source = markFromData(
-              prov,
-              "primary_source",
-              count === 1 ? true : isSuggested,
-            );
+            const primary_source = count === 1 ? true : isSuggested;
             seen.set(key, {
               key,
               supplier_id: supplier,
@@ -327,7 +334,9 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               // Not uploaded data (so not `__from_data`) and not an invented
               // constant either — the grid badges them "suggested" and the
               // prefill is allowed to persist them, because recording a primary
-              // source is what the stage exists to do (blueprint G16).
+              // source is what the stage exists to do (blueprint G16). This
+              // comment was true of the intent and false of the code until
+              // §4 D23; `__decided` is now the only marker these carry.
               __decided: { primary_source: true } as Record<string, true>,
             });
           }
@@ -422,11 +431,30 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             const demand = outboundDemandByProduct.get(prod);
             const lt = median(inboundLeadTimesByProduct.get(prod) ?? []);
             const prov = { __from_data: {} as Record<string, true>, __imputed: {} as Record<string, true> };
+            // §4 D24 — AN INBOUND MEDIAN IS NOT AN UPLOADED PRODUCTION LEAD TIME.
+            //
+            // `lt` is the median of the INBOUND lead times of this product's
+            // feeding components. It was passed as `resolveField`'s REAL
+            // argument, which marks `__from_data` — the marker that means "an
+            // upload carried this value". Nobody uploads a production lead time;
+            // this one is inferred from a different quantity on different rows.
+            //
+            // Latent today and confirmed so rather than assumed: the plant spec
+            // declares no column for it, so nothing renders a dot, and
+            // `runPrefill` iterates the SPEC rather than the row's fields, so
+            // nothing persists it either. It would become a lie the moment a
+            // column was added — which is the reason to fix it while it is
+            // still cheap, and the reason this is a one-argument change.
+            //
+            // Passing it as the IMPUTED argument keeps the same precedence
+            // (this product's own median first, then the smart average) and
+            // tells the truth: an estimate to verify. It also rounds to 2dp, as
+            // every other imputed value does.
             const production_lead_time_mean_days = resolveField(
               prov,
               "production_lead_time_mean_days",
-              lt,
-              impute(inLeadByMaterial, String(prod), inLeadGlobal),
+              undefined,
+              lt ?? impute(inLeadByMaterial, String(prod), inLeadGlobal),
             );
             seen.set(key, {
               key,
@@ -492,18 +520,10 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             const suggestedFirm = meta?.firm ?? "";
             const prov = { __from_data: {} as Record<string, true>, __imputed: {} as Record<string, true> };
             // Both firm-routing fields are decided by the uploaded outbound
-            // volumes (highest volume wins), so they are tracked as
-            // project-backed — see `markFromData`.
-            const sourcing_firm = markFromData(
-              prov,
-              "sourcing_firm",
-              suggestedFirm || undefined,
-            );
-            const primary_source = markFromData(
-              prov,
-              "primary_source",
-              suggestedFirm ? true : undefined,
-            );
+            // volumes (highest volume wins). DECIDED, not uploaded — see the
+            // supplier stage above for what conflating the two cost (§4 D23).
+            const sourcing_firm = suggestedFirm || undefined;
+            const primary_source = suggestedFirm ? true : undefined;
             seen.set(key, {
               key,
               customer_id: customer,

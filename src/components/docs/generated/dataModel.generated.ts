@@ -25,9 +25,9 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "98389a09bead";
+export const CONTRACT_VERSION = "7bd2a0fd8e4f";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260917000008_one_staleness_rule.sql";
+export const LAST_MIGRATION = "20260918000001_org_row_uuid_only.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
@@ -417,62 +417,6 @@ export const UNDESCRIBED: UndescribedGroup[] = [
     ]
   },
   {
-    "wp": "6.1",
-    "why": "`external_evidence` is the AGENT's evidence store — retrieved URLs, content hashes and confidence behind a proposal — and it belongs with the decision plane rather than with analysis output. Same regrouping as `model_validations` above: it was in the WP 4.2 bucket because nobody had looked at it, which is exactly what D54 says a deferral list does when it is allowed to decide by omission.",
-    "tables": [
-      {
-        "table": "external_evidence",
-        "columns": 9
-      }
-    ]
-  },
-  {
-    "wp": "6.1",
-    "why": "Decisions (tier 4) beyond the two policy tables the contract already covers. WP 6.1 pins the resolution chains and WP 6.2 fixes the divergences (D17, D18, D23, D24, D26); the scenario and disruption tables are the surface those chains resolve against.",
-    "tables": [
-      {
-        "table": "disruption_scenario_effects",
-        "columns": 9
-      },
-      {
-        "table": "disruption_scenario_profiles",
-        "columns": 13
-      },
-      {
-        "table": "disruption_scenario_settings",
-        "columns": 8
-      },
-      {
-        "table": "disruption_scenario_targets",
-        "columns": 10
-      },
-      {
-        "table": "disruption_scenarios",
-        "columns": 14
-      },
-      {
-        "table": "policy_presets",
-        "columns": 9
-      },
-      {
-        "table": "policy_versions",
-        "columns": 13
-      },
-      {
-        "table": "recovery_playbooks",
-        "columns": 9
-      },
-      {
-        "table": "scenario_templates",
-        "columns": 15
-      },
-      {
-        "table": "scenarios",
-        "columns": 22
-      }
-    ]
-  },
-  {
     "wp": "6.3",
     "why": "MOVED FROM WP 4.4 BY WP 4.4 ITSELF, and the reason is a correction rather than a deferral. This row said the table's subject is \"whether a card has gone stale, which is the one staleness rule WP 4.4 lands\" — and WP 4.4 landed that rule without needing to DESCRIBE the table, because the rule is a function over a hash column and `model_validations` already carries four of them. What the table actually needs is the thing WP 6.3 builds: it binds a verdict to a dataset, a policy, a scenario and an engine fingerprint, which IS invariant `result-binding` (I8) and IS the A5 Reproducibility Record. Describing it in a staleness package would have put it in the contract under a package that had no reason to think about what its columns mean. §15 measured 0 active cards, so nothing is waiting on it. Original note follows. `model_validations` is a VALIDATION CARD, not analysis output — it already carries `graph_hash`, `policy_hash`, `scenario_hash` and `engine_fingerprint` and its whole subject is whether a card has gone stale, which is the one staleness rule WP 4.4 lands (\"stale iff `computed_from_hash <> current_graph_hash()`\") and the Trust Report that reads it. It was grouped with the network tables by WP 1.4 on the strength of the word \"validation\"; WP 4.2 moved it when the D56 decision made the network group specific. §15 measured 0 active cards, so nothing is waiting on it.",
     "tables": [
@@ -521,6 +465,62 @@ export const UNDESCRIBED: UndescribedGroup[] = [
       {
         "table": "simulation_runs",
         "columns": 24
+      }
+    ]
+  },
+  {
+    "wp": "6.4",
+    "why": "MOVED FROM WP 6.1 BY WP 6.1 ITSELF. §13 scopes that package to resolution chains — \"CSV column → DB column → RPC → hook → substitution → engine field → unit at each hop\" — and says nothing about describing tables. Eleven tables were waiting on it anyway, which is the R8 finding WP 4.4 hit from the other side: an owner nothing behind it ever agreed to. They go to a NEW package rather than onto WP 6.3, and the reason is budget honesty: WP 6.3 already carries A2, A3, A5, the provenance vocabulary and the eleven result-binding tables WP 4.4 re-homed to it. Twenty-two tables under one package is a number that misrepresents what it costs, and misrepresented budget is what boundary reviews exist to catch (§16 · Phase 2→3). See §14 · WP 6.4. Original note follows. `external_evidence` is the AGENT's evidence store — retrieved URLs, content hashes and confidence behind a proposal — and it belongs with the decision plane rather than with analysis output. Same regrouping as `model_validations` above: it was in the WP 4.2 bucket because nobody had looked at it, which is exactly what D54 says a deferral list does when it is allowed to decide by omission.",
+    "tables": [
+      {
+        "table": "external_evidence",
+        "columns": 9
+      }
+    ]
+  },
+  {
+    "wp": "6.4",
+    "why": "Decisions (tier 4) beyond the two policy tables the contract already covers. MOVED FROM WP 6.1 BY WP 6.1 ITSELF, with `external_evidence` above. This row's own reasoning is what gave it away: \"WP 6.1 pins the resolution chains … the scenario and disruption tables are the surface those chains resolve against\". Being the surface a package READS is not the same as being a package's deliverable, and §13's WP 6.1 never claimed them — it traced 38 grid fields and described no table at all. Ten tables sat behind a sentence that reads like a plan and is an association. WP 6.4 owns them with `external_evidence`: together they are the DECISION PLANE — what a person or an agent chose, and what a result must bind to under `result-binding` (I8). See §14 · WP 6.4.",
+    "tables": [
+      {
+        "table": "disruption_scenario_effects",
+        "columns": 9
+      },
+      {
+        "table": "disruption_scenario_profiles",
+        "columns": 13
+      },
+      {
+        "table": "disruption_scenario_settings",
+        "columns": 8
+      },
+      {
+        "table": "disruption_scenario_targets",
+        "columns": 10
+      },
+      {
+        "table": "disruption_scenarios",
+        "columns": 14
+      },
+      {
+        "table": "policy_presets",
+        "columns": 9
+      },
+      {
+        "table": "policy_versions",
+        "columns": 13
+      },
+      {
+        "table": "recovery_playbooks",
+        "columns": 9
+      },
+      {
+        "table": "scenario_templates",
+        "columns": 15
+      },
+      {
+        "table": "scenarios",
+        "columns": 22
       }
     ]
   }

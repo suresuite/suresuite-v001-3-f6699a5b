@@ -64,9 +64,10 @@ Two things it settled that later packages rely on:
 · `__from_data` now also carries the routing decisions the data's shape makes
   (`primary_source`, `sourcing_firm`), because the pre-dispatch validator reads
   those from the saved override bundle, not from the row.
-· the two provenance copies (§4.1: `resolveEffective.ts:103-193` and
-  `StagePolicyTable.tsx:1208-1276`) must stay in lockstep until WP 6.2 de-duplicates
-  them. So must the two prefill rules D26 left behind, until the same WP kills one.
+· the two provenance copies are GONE — WP 6.2 de-duplicated them, the desktop grid
+  calls `resolveEffective.ts::resolveCell`, and `oneResolver.test.ts` is a gate that
+  fails if either renderer rebuilds the ladder inline. The two prefill rules D26 left
+  behind are still there, until the same WP kills one.
 
 ### WP 0.2 — Unit conversion + orphan-table honesty ✅ DONE
 
@@ -736,7 +737,8 @@ Already verified (re-check before relying on it):
 · Substitutions to document exhaustively: resolveField's `> 0` test
   (useStageRows.tsx:162), the per-item-then-global smart averages (:146-153),
   defaultWhenMissing (columnSpecs.ts:132-171), the effectivePolicy bundle,
-  liveDefault = derivedVal ?? 0 (resolveEffective.ts:135), grading.ts's reducers,
+  liveDefault's master fallback (§4 D17 — the bare `?? 0` is gone; a column whose
+  empty state means something declares it), grading.ts's reducers,
   and ENGINE_DEFAULT_PRICE.
 · supabase/functions/_shared/grading.ts is pinned to project_map.py by
   validation-parity fixtures. Pin the chains the same way, in the same style.

@@ -14,6 +14,7 @@ if TYPE_CHECKING:  # httpx only used by load_project_data (the worker's DB reads
 
 from scsim.io import (
     BomArc,
+    CustomerRow,
     MaterialRow,
     OutboundArc,
     ProductRow,
@@ -88,6 +89,7 @@ def build_project_data(
     policies: dict,
     scenario: dict,
     project_model: Optional[str],
+    customers: Optional[list[dict]] = None,
 ) -> ProjectData:
     return ProjectData(
         suppliers=[
@@ -152,6 +154,18 @@ def build_project_data(
                 time_unit=r.get("time_unit"),
             )
             for r in outbound if r.get("product_id") and r.get("customer_id")
+        ],
+        # §4 D69 — the `customers` table was fetched by nothing, so every customer
+        # reached the engine with `segment="default"` and `priority_weight=1.0`.
+        # `ProjectData.customers` stays the ID list (ids also come from outbound
+        # arcs); this carries the ATTRIBUTES for the ids the table describes.
+        customer_rows=[
+            CustomerRow(
+                id=str(r["customer_id"]), name=r.get("name"),
+                segment=r.get("segment"),
+                priority_weight=_num(r.get("priority_weight")),
+            )
+            for r in (customers or []) if r.get("customer_id")
         ],
         policies=policies or {},
         scenario=ScenarioSettings(
@@ -230,6 +244,15 @@ async def load_project_data(
         ),
         bom=bom,
         outbound=await rows("outbound_logistics", "product_id,customer_id,unit_price,volume,time_unit"),
+        # §4 D69 — nothing fetched this table, so P-C.2's `priority` ordering and
+        # its per-segment `sla_tiers` were inert on every project. Columns are
+        # named explicitly for the same reason D9 gives above, and the names are
+        # checked against the data contract rather than remembered: `rows()`
+        # SWALLOWS a failed request and returns [], so one wrong column name
+        # would leave every customer on the engine defaults and look exactly
+        # like the defect being fixed. `sla_fill_floor_pct` is not selected —
+        # `Customer` has no field for it (§16).
+        customers=await rows("customers", "customer_id,name,segment,priority_weight"),
         policies=policies,
         scenario=scenario,
         project_model=project_model,

@@ -102,64 +102,79 @@ BEGIN
     RAISE EXCEPTION 'WP 4.3 §0 — the project has no graph hash; nothing below keys on anything.';
   END IF;
 
-  -- ── 1 · THE RED ONE · the anchor is BLIND to the analyzers' inputs ───────
+  -- ── 1 · THE ANCHOR SEES THE TOPOLOGY (D75 closed by WP 5.3) ────────────
   --
-  -- This is the finding, asserted rather than described. It has two halves and
-  -- the second is what makes the first a defect rather than a curiosity.
-
-  IF to_regprocedure('public.network_topology_hash(uuid)') IS NULL THEN
-    RAISE EXCEPTION
-      'WP 4.3 §1 — THERE IS NO TOPOLOGY DIGEST. `current_graph_hash` hashes '
-      'eleven tier-2 tables and NOT `network_nodes` or `network_edges`, which '
-      'are the only things the two centrality analyzers read. Key their cache on '
-      'that hash alone and a re-uploaded network returns the PREVIOUS graph''s '
-      'centralities and calls it a hit. This is the RED assertion for WP 4.3.';
-  END IF;
+  -- THIS SECTION USED TO ASSERT THE OPPOSITE, and it is worth saying why rather
+  -- than quietly editing it. WP 4.3 wrote it as the RED assertion for D75: that
+  -- `current_graph_hash` does NOT move when `network_edges` changes, so the two
+  -- centrality analyzers keyed their cache on an anchor blind to their own
+  -- inputs. Its failure message named the way out —
+  --
+  --     "That is a better world than the one this package was written for, and
+  --      it means the topology is already in the anchor: delete the params-borne
+  --      digest and key on the hash directly."
+  --
+  -- — and `20260917000009` made that world, so the assertion fired exactly as
+  -- designed and is now inverted. What it tests is unchanged in substance: the
+  -- anchor must distinguish two different graphs, and must NOT move for an edit
+  -- no analysis reads.
 
   v_topo0 := public.network_topology_hash(v_project);
 
-  -- half one: change the graph.
+  -- half one: change the graph. The ANCHOR moves now, not just the digest.
   UPDATE public.network_edges SET relative_revenue = 0.9
    WHERE project_id = v_project AND src_uid = 'N1' AND dst_uid = 'N2';
 
   v_graph1 := public.current_graph_hash(v_project);
   v_topo1  := public.network_topology_hash(v_project);
 
-  IF v_graph1 IS DISTINCT FROM v_graph0 THEN
+  IF v_graph1 IS NOT DISTINCT FROM v_graph0 THEN
     RAISE EXCEPTION
-      'WP 4.3 §1 — `current_graph_hash` MOVED when only `network_edges` changed. '
-      'That is a better world than the one this package was written for, and it '
-      'means the topology is already in the anchor: delete the params-borne '
-      'digest and key on the hash directly.';
+      'WP 5.3 §1 — `current_graph_hash` did NOT move when an edge weight changed, '
+      'so the anchor is blind to the inputs the two centrality analyzers read and '
+      'D75 is open again. A re-uploaded network is served the previous graph''s '
+      'centralities as a cache hit.';
   END IF;
   IF v_topo1 IS NOT DISTINCT FROM v_topo0 THEN
     RAISE EXCEPTION
-      'WP 4.3 §1 — the topology digest did NOT move when an edge weight changed, '
-      'so it cannot tell two graphs apart and the cache key is no better than '
-      'the blind anchor it was added to compensate for.';
+      'WP 4.3 §1 — the topology digest did NOT move when an edge weight changed. '
+      'It is deprecated but still live for the deploy window, and a deprecated '
+      'function that has silently stopped working is worse than a deleted one.';
   END IF;
 
-  -- half two: put it back. A digest that only ever changes is a timestamp.
+  -- half two: put it back. A hash that only ever changes is a version counter.
   UPDATE public.network_edges SET relative_revenue = 0.5
    WHERE project_id = v_project AND src_uid = 'N1' AND dst_uid = 'N2';
+
+  IF public.current_graph_hash(v_project) IS DISTINCT FROM v_graph0 THEN
+    RAISE EXCEPTION
+      'WP 5.3 §1 — reverting the edge did not restore the anchor. The hash is '
+      'order-dependent or time-dependent, which makes every repeat request a miss '
+      'and every analysis a full recomputation.';
+  END IF;
   v_topo2 := public.network_topology_hash(v_project);
   IF v_topo2 IS DISTINCT FROM v_topo0 THEN
     RAISE EXCEPTION
-      'WP 4.3 §1 — reverting the edge did not restore the digest (% then %). The '
-      'digest is order-dependent or time-dependent, which makes every repeat '
-      'request a miss and every analysis a full recomputation.', v_topo0, v_topo2;
+      'WP 4.3 §1 — reverting the edge did not restore the digest (% then %).',
+      v_topo0, v_topo2;
   END IF;
 
-  -- and it must be blind to what the analyzers do NOT read. `country` is an
-  -- uploaded column on the same table; editing it must not invalidate a
-  -- centrality, or every unrelated edit costs a recomputation.
+  -- AND IT MUST STAY NARROWER THAN THE TABLE. `country` is an uploaded column on
+  -- `network_nodes`; no analyzer reads it and the engine never sees it. Folding
+  -- the topology in was a chance to hash the whole table by accident, which
+  -- would make every unrelated edit cost a full recomputation of every
+  -- centrality in the project.
   UPDATE public.network_nodes SET country = 'Narnia'
    WHERE project_id = v_project AND uid = 'N1';
-  IF public.network_topology_hash(v_project) IS DISTINCT FROM v_topo0 THEN
+  IF public.current_graph_hash(v_project) IS DISTINCT FROM v_graph0 THEN
     RAISE EXCEPTION
-      'WP 4.3 §1 — the digest moved when `country` changed, and no analyzer '
-      'reads `country`. A digest wider than the read turns every unrelated edit '
-      'into a full recomputation.';
+      'WP 5.3 §1 — the ANCHOR moved when `country` changed, and no analyzer reads '
+      '`country`. The fold took the whole table instead of the six columns the '
+      'prominence RPCs return, so every unrelated edit now invalidates every '
+      'centrality in the project.';
+  END IF;
+  IF public.network_topology_hash(v_project) IS DISTINCT FROM v_topo0 THEN
+    RAISE EXCEPTION 'WP 4.3 §1 — the digest moved when `country` changed.';
   END IF;
 
   -- ── 2 · the dual-write · both destinations, one run, one hash ───────────

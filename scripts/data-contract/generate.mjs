@@ -477,7 +477,12 @@ function renderColumnDetail(t) {
       ["Added by", code(c.added_by)],
     ];
     if (c.references) {
-      rows.push(["References", `\`${esc(c.references.table)}(${c.references.columns.join(", ")})\`${c.references.on_delete ? ` ON DELETE ${esc(c.references.on_delete)}` : ""}`]);
+      // Qualified when the migration qualified it (§4 D53). The page used to
+      // say a column references `users`, and there is no `public.users`.
+      const refName = c.references.schema
+        ? `${c.references.schema}.${c.references.table}`
+        : c.references.table;
+      rows.push(["References", `\`${esc(refName)}(${c.references.columns.join(", ")})\`${c.references.on_delete ? ` ON DELETE ${esc(c.references.on_delete)}` : ""}`]);
     }
     rows.push(["Read by the engine", c.engine.consumed_by ? `\`${esc(c.engine.consumed_by)}\`` : "**not traced**"]);
     if (c.engine.transform) rows.push(["Transform", prose(c.engine.transform)]);

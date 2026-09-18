@@ -74,7 +74,7 @@ The project the membership is on. CASCADEs when the project is deleted.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260915000005_project_membership_and_delegation.sql` |
-| References | `projects(id)` ON DELETE CASCADE |
+| References | `public.projects(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -89,7 +89,7 @@ The approved user who holds it. CASCADEs when the account is deleted.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260915000005_project_membership_and_delegation.sql` |
-| References | `approved_users(id)` ON DELETE CASCADE |
+| References | `public.approved_users(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -118,7 +118,7 @@ Who granted the membership. SET NULL rather than CASCADE on purpose — losing t
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260915000005_project_membership_and_delegation.sql` |
-| References | `approved_users(id)` ON DELETE SET NULL |
+| References | `public.approved_users(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -188,6 +188,6 @@ When it was last changed. Server-stamped by DEFAULT only; no trigger maintains i
 
 ---
 
-*Generated from data contract `98389a09bead`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/project_members.contract.yaml`, table created by `20260915000005_project_membership_and_delegation.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -114,7 +114,7 @@ The run these rows were staged in. NOT NULL, ON DELETE CASCADE: the run is the o
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260916000014_ingest_staged_rows.sql` |
-| References | `ingest_runs(id)` ON DELETE CASCADE |
+| References | `public.ingest_runs(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
@@ -276,6 +276,6 @@ When the row was staged. Server-stamped, never the client's clock.
 
 ---
 
-*Generated from data contract `98389a09bead`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_staged_rows.contract.yaml`, table created by `20260916000014_ingest_staged_rows.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

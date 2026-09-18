@@ -123,7 +123,7 @@ The ERP link this run used, or NULL for a source that has none. NULL means 'this
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `project_erp_links(id)` ON DELETE CASCADE |
+| References | `public.project_erp_links(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -156,7 +156,7 @@ The person who asked for a manual run, in `auth.users`. NULL for a scheduled run
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `users(id)` |
+| References | `auth.users(id)` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -353,7 +353,7 @@ Who approved the promotion, in `auth.users`. NULL when the link's auto-apply thr
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `users(id)` |
+| References | `auth.users(id)` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
@@ -400,7 +400,7 @@ The project this run ingests into. Added in WP 3.1 and NOT NULL: it is what the 
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260916000012_ingest_rename_and_widen.sql` |
-| References | `projects(id)` ON DELETE CASCADE |
+| References | `public.projects(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -466,6 +466,6 @@ Staged rows that a LATER line of the same file repeats on the natural key. The p
 
 ---
 
-*Generated from data contract `98389a09bead`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_runs.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

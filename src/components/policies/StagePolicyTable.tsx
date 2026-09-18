@@ -47,10 +47,10 @@ import {
   derivedValueFor as derivedValueForShared,
   getEffectiveValue as getEffectiveValueShared,
   isPrefillPersistable,
+  resolveCell,
 } from "@/lib/policies/resolveEffective";
 import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
 import { groupHasPrimary as groupHasPrimaryFor, groupKeyFor, lineNeedsInput } from "@/lib/policies/stageGuards";
-import { isPrefillable } from "@/lib/policies/prefillSelect";
 import { ParameterSheet } from "./ParameterSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
@@ -690,7 +690,29 @@ export function StagePolicyTable({
         }
         if (v === undefined) continue;
         const def = getDefault(field, col.family);
-        if (isEqual(v, def)) continue;
+        // ── "EQUAL TO THE DEFAULT" IS NOT ALWAYS A NO-OP (§4 D23) ──────────
+        //
+        // Skipping an edit that matches the family default keeps the bundle
+        // clean: an override restating the default is noise, and writing one is
+        // how §4 D1 froze decisions nobody made. But it is only a no-op when the
+        // default is what the cell would SHOW after the skip, and there are two
+        // cases where it is not:
+        //
+        //   · a saved override already carries a different value for this field,
+        //     so dropping the edit leaves the STALE override in place. Setting
+        //     `primary_source` back to `false` looked saved and reloaded as
+        //     `true`, because `false` is the schema default (`schemas.ts:81`).
+        //   · the field is a routing DECISION, so the row's own suggestion is
+        //     what shows when no override exists — not the default. Un-checking
+        //     the suggested primary wrote nothing and changed nothing.
+        //
+        // Both are the same user action — un-checking a primary supplier — and
+        // it was unsaveable either way.
+        const overridden = overrides.some(
+          (o) => o.target_key === rowKey && o.family === col.family && field in (o.patch ?? {}),
+        );
+        const isDecision = ((dataRow?.__decided ?? {}) as Record<string, true>)[field] === true;
+        if (isEqual(v, def) && !overridden && !isDecision) continue;
         const bucket = byFamily.get(col.family) ?? {};
         bucket[field] = v;
         byFamily.set(col.family, bucket);
@@ -982,6 +1004,13 @@ export function StagePolicyTable({
       return firms.length <= 4 ? "segmented" : "select";
     if (opts) return opts.length <= 4 ? "segmented" : "select";
     if (typeof liveDefault === "boolean" || typeof value === "boolean") return "toggle";
+    // A master column whose empty state is DECLARED has `liveDefault ===
+    // undefined` by construction (§4 D17 — the fix is precisely that it no longer
+    // invents a `0`), so the numeric probe below cannot see that the column is
+    // numeric and the cell would silently become a text input. `nullMeans` is
+    // only ever declared on a numeric master column; `columnNullMeans.test.ts`
+    // is the gate that keeps that true.
+    if (col.master?.nullMeans) return "number";
     if (typeof liveDefault === "number" || typeof value === "number") return "number";
     return "text";
   };
@@ -1209,76 +1238,31 @@ export function StagePolicyTable({
               </td>
             );
           }
-          const cellValue = getEffective(rowKey, r, col.field, col.family);
-          // Master-backed columns: value from the item master, with
-          // the engine's derived fallback (≈) shown when unset.
-          const masterSet = col.master ? masterValueFor(col, r) !== undefined : false;
-          const derivedVal = col.master && !masterSet ? derivedValueFor(col, r) : undefined;
-          // live default = bundle value > spec.defaultWhenMissing > family raw default.
-          // Read from the column's own family (not the flattened first-wins
-          // map) so a name shared across families resolves to this header's value.
-          const bundleVal = (
-            effectivePolicy(defaults, overrides, spec.scope, rowKey)[col.family] as
-              | Record<string, unknown>
-              | undefined
-          )?.[col.field];
-          const liveDefault = col.master
-            ? derivedVal ?? 0
-            : bundleVal !== undefined
-              ? bundleVal
-              : col.defaultWhenMissing !== undefined
-                ? col.defaultWhenMissing
-                : getDefault(col.field, col.family);
-          const edited = rowDraft[col.field] !== undefined;
-          // Provenance maps emitted by useStageRows for project-backed fields.
-          // NOTE: this block is a verbatim mirror of resolveEffective.ts's
-          // `resolveCell` (the mobile list's resolver) — de-duplicating them is
-          // WP 6.2. Until then, every change here changes BOTH.
-          const fromDataMap = (r.__from_data ?? {}) as Record<string, true>;
-          const imputedMap = (r.__imputed ?? {}) as Record<string, true>;
-          // Lockstep with resolveEffective.ts:resolveCell — see the note there.
-          const decidedMap = (r.__decided ?? {}) as Record<string, true>;
-          const imputed = !edited && !col.master && imputedMap[col.field] === true;
-          // D16 — `__from_data` is the ONLY evidence that a value came from the
-          // project. The old fallback ("untracked but the row carries a value")
-          // green-dotted every hardcoded constant useStageRows wrote onto the
-          // row as "From project data". A field that is neither tracked nor
-          // master-backed resolves to `default`, never `data`.
-          // NOTE: duplicated verbatim in resolveEffective.ts:resolveCell —
-          // the two must stay in lockstep until WP 6.2 de-duplicates them.
-          const fromData =
-            !edited && !imputed && (col.master ? masterSet : fromDataMap[col.field] === true);
-          const derivedFallback = !edited && !!col.master && !masterSet && derivedVal !== undefined;
-          const fromOverride =
-            !edited &&
-            !imputed &&
-            !fromData &&
-            !col.master &&
-            overrides.some(
-              (o) => o.target_key === rowKey && o.family === col.family && col.field in (o.patch ?? {}),
-            );
-          const suggested =
-            !edited &&
-            !imputed &&
-            !fromData &&
-            !col.master &&
-            !fromOverride &&
-            decidedMap[col.field] === true;
-          const prov: Provenance = edited
-            ? "edited"
-            : imputed
-              ? "imputed"
-              : fromData
-                ? col.master
-                  ? "master"
-                  : "data"
-                : derivedFallback
-                  ? "derived"
-                  : fromOverride
-                    ? "override"
-                    : suggested
-                      ? "suggested"
-                      : "default";
+          // ONE RESOLVER (WP 6.2). This was a verbatim copy of
+          // `resolveEffective.ts::resolveCell` — masterSet, derivedVal,
+          // liveDefault, the provenance ladder, all of it — carried in lockstep
+          // since WP 0.1 with a comment in each copy telling the reader to
+          // change both. That is `single-source` (I1) broken in the one place
+          // the product decides what a number MEANS, and D26 is the record of
+          // what the shape costs: two implementations of the D1 prefill rule,
+          // both unit-tested, one dead, the suite green while only one ran.
+          const {
+            cellValue, liveDefault, provenance: prov, edited,
+            placeholder: cellPlaceholder, placeholderTitle,
+          } = resolveCell({
+            rowKey,
+            row: r,
+            col,
+            draft: rowDraft[col.field],
+            families,
+            masterColByField,
+            masterRowById,
+            derived,
+            defaults,
+            overrides,
+            scope: spec.scope,
+            familyDefault: getDefault,
+          });
 
           const firms = r.__firms_available as string[] | undefined;
           const opts = enumOptionsFor(col);
@@ -1363,6 +1347,8 @@ export function StagePolicyTable({
                   decimals={fc.kind === "num" ? (fc.dec ?? 2) : prov === "derived" ? 2 : undefined}
                   integer={fc.kind === "int"}
                   unit={fc.unit}
+                  placeholder={cellPlaceholder}
+                  title={placeholderTitle}
                   onCommit={commit}
                 />
               )}

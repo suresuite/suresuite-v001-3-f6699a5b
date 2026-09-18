@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "lint": "eslint . && npm run audit:ui && npm run check:docs",
+    "lint": "node scripts/lint-all.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "api": "uvicorn services.api.main:app --host 0.0.0.0 --port 8000",

@@ -96,7 +96,7 @@ The project the grant applies to. A delegation is never org-wide.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260915000005_project_membership_and_delegation.sql` |
-| References | `projects(id)` ON DELETE CASCADE |
+| References | `public.projects(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -111,7 +111,7 @@ Who gave it. Their effective project role at the moment of granting is the ceili
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260915000005_project_membership_and_delegation.sql` |
-| References | `approved_users(id)` ON DELETE CASCADE |
+| References | `public.approved_users(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | must differ from grantee — CHECK |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -126,7 +126,7 @@ Who received it.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260915000005_project_membership_and_delegation.sql` |
-| References | `approved_users(id)` ON DELETE CASCADE |
+| References | `public.approved_users(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | must differ from grantor — CHECK |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -209,6 +209,6 @@ When the grant was made. Server-stamped.
 
 ---
 
-*Generated from data contract `98389a09bead`, engine `0.2.3`,
+*Generated from data contract `7bd2a0fd8e4f`, engine `0.2.3`,
 sidecar `supabase/contract/delegation_grants.contract.yaml`, table created by `20260915000005_project_membership_and_delegation.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -72,7 +72,10 @@ export function ParameterSheet({
                     : "reaches engine"
                   : meta.engine.state === "pending"
                     ? `stored only · activates with ${meta.engine.milestone}`
-                    : "stored only · not consumed yet"}
+                    : /* `stored-only` — and the word "yet" was the lie (§4 D92).
+                         There is no catalog policy queued for these; saying so
+                         plainly is T2 at the point of display. */
+                      "stored only · no engine consumer, none planned"}
               </span>
 
               {/* Facts. */}
