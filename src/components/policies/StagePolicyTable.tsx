@@ -129,6 +129,24 @@ function isEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/**
+ * `fitColsForStage` reruns on every draft edit (drafts is in its deps via
+ * rowCtxs), but the resolved *set* of visible columns only changes when an
+ * edit actually flips a `visibleWhen` gate — not on every keystroke. Columns
+ * are drawn from the static ColSpec definitions, so two calls describe the
+ * same layout iff their `.key`s match in order. Reusing the previous
+ * reference here lets `fit`, `bandGroups`, `visible` and `folded` below skip
+ * recomputation on the vast majority of edits, which don't affect layout.
+ */
+function useStableColumnList(cols: FitCol[]): FitCol[] {
+  const ref = useRef(cols);
+  const prev = ref.current;
+  const same =
+    prev.length === cols.length && prev.every((c, i) => c.key === cols[i].key);
+  if (!same) ref.current = cols;
+  return ref.current;
+}
+
 export function StagePolicyTable({
   projectId,
   plantName,
@@ -307,7 +325,8 @@ export function StagePolicyTable({
   );
 
   // Fit/render metadata for the header union (columnFit.ts, joined by field).
-  const fitCols = useMemo(() => fitColsForStage(stageKey, rowCtxs), [stageKey, rowCtxs]);
+  const fitColsRaw = useMemo(() => fitColsForStage(stageKey, rowCtxs), [stageKey, rowCtxs]);
+  const fitCols = useStableColumnList(fitColsRaw);
 
   // Every family that has at least one column at this stage, in canonical
   // order — independent of fold/collapse state, so the toolbar always offers
