@@ -1381,12 +1381,28 @@ The task distribution is empirical: a weekly triage (owner: the agent workstream
 Two tiers, both under `supabase/functions/project-ai-chat/eval/`:
 
 1. **Deterministic tier — every PR, must pass** (`deno test eval/`): validates every fixture's expected payload against the §5 JSON Schemas; runs each agent's tool handlers with a **mocked LLM** (fixtures carry the mocked tool-call arguments) asserting the deterministic machinery — reducer recomputation, enum/range/scope gates, idempotency, error taxonomy, router fallbacks/tie-breaks, state-machine preconditions. This is what makes agent changes CI-gateable without model calls, exactly as the docs gate (A13) checks generated artifacts without running the engine's full studies.
-2. **Model-scored tier — nightly + before any flag flip, must pass** (`deno run eval/run_model_eval.ts`): executes each *enabled* agent's full fixtures and the routing golden set against the default model plus every other enabled model; scores schema-validity rate (≥ 0.95), gate-violation rate (= 0 by construction — violations are caught, the metric is how often the model *attempts* one, alarm at > 10%), citation coverage, router targets. Results land in `ai_chat_events` (`event_kind` reuse with `thread_id = 'eval:<run-id>'`) so dashboards and history are free.
+2. **Model-scored tier — on demand + before any flag flip, must pass** (cadence amended 2026-09-18; see below) (`deno run eval/run_model_eval.ts`): executes each *enabled* agent's full fixtures and the routing golden set against the default model plus every other enabled model; scores schema-validity rate (≥ 0.95), gate-violation rate (= 0 by construction — violations are caught, the metric is how often the model *attempts* one, alarm at > 10%), citation coverage, router targets. Results land in `ai_chat_events` (`event_kind` reuse with `thread_id = 'eval:<run-id>'`) so dashboards and history are free.
 
 A roster change (new agent, prompt-template change, tool-surface change) requires: deterministic tier green + a model-scored run green + the §7.2 guardrail-health review — the agent-layer analogue of "no engine change without golden traces."
 
-**Tier 2 has never run. Read this before treating any flag flip as "gated on the eval."**
-Across every nightly run published to the `eval-results` branch, tier 2 has failed or been skipped — it has never once scored an answer. The current failure is `no provider keys configured`: `GEMINI_API_KEY` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` exist as Supabase **function secrets** but not as **GitHub Actions secrets**, and the Management API returns sha256 digests rather than plaintext, so CI cannot recover them from the deployment (`ai-agent-model-eval.yml` documents this). The single run that ever produced a report scored **0.000 recall on every agent and every model** because the key it did have was rejected as `API_KEY_INVALID`.
+**Tier 2 RUNS NOW, AND IT FAILS ON THE PRODUCT. Read this before treating any flag flip as "gated on the eval."**
+The paragraph that stood here said tier 2 had never scored an answer because `no provider keys configured` — `GEMINI_API_KEY` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` existed as Supabase **function secrets** but not as **GitHub Actions secrets**. **That is no longer the failure.** The workflow's "Resolve provider keys from the deployment" step now recovers plaintext keys from the Management API, and tier 2 spends ~14 minutes of live `gpt-5` calls per run and produces a real report. Run 76 (2026-09-17, `eval-results` branch):
+
+```
+routing: FAIL — vv-analyst R=0.303; experiment-designer R=0.267;
+                cache-checkable precision 0.239; advisory false-artifact 0.072
+data-steward:         FAIL — schema-validity 0.833 < 0.95; gate-violation 0.167 > 0.1
+policy-configurator:  FAIL — schema-validity 0.714 < 0.95; gate-violation 0.286 > 0.1
+vv-analyst:           PASS
+experiment-designer:  FAIL — ed-02-new-scenario
+report-builder:       FAIL — rb-01, rb-03 (expected not_grounded refusal, got a proposal)
+coverage:             FAIL — entity-fabrication count 1 > 0
+overall: FAIL
+```
+
+So the gate is sound and **the product misses its §7.4 targets**. Nothing here is a CI defect, and no flag should be flipped on the strength of "the eval runs."
+
+**CADENCE AMENDED 2026-09-18 — nightly removed, on-demand kept.** The `schedule:` trigger produced 35 consecutive failing runs in 30 days, each re-establishing the result above at ~15 billable CI minutes plus live provider spend, and none was acted on. `ai-agent-model-eval.yml` keeps `workflow_dispatch` and the `.github/model-eval-request` push trigger, so **the "before any flag flip" clause — the half that gates a release — is untouched**. What is lost is the trend line; restoring it is one `schedule:` block, and weekly is the cheaper honest cadence if it is wanted. The deviation is recorded in that workflow's header as well.
 
 Two consequences, both load-bearing:
 
