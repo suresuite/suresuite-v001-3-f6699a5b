@@ -167,17 +167,10 @@ export const CHAINS: PolicyChain[] = [
         "kind": "rpc",
         "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
         "evidence": null
-      },
-      {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 0` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
       }
     ],
-    "breaks": [
-      "is read by NO consumer anywhere — not scsim, not the frozen legacy engine, and by nothing in the product beyond the grid that renders it. Editable, stored, versioned and hashed into `policy_hash`, and the only thing that ever happens to the value is that it is shown back. This is §4 D18's exact shape."
-    ],
-    "breakClass": "unread",
+    "breaks": [],
+    "breakClass": null,
     "breakEvidence": []
   },
   {
@@ -1357,9 +1350,6 @@ export const BREAKS_BY_CLASS: Record<string, string[]> = {
     "customer.primary_source",
     "customer.sourcing_firm"
   ],
-  "unread": [
-    "supplier.material_price"
-  ],
   "overridden": [
     "supplier.reorder_point",
     "plant.reorder_point"
@@ -1657,4 +1647,4 @@ export const API_ROUTES: ApiRoute[] = [
 ];
 
 export const CHAIN_COUNT = 38;
-export const BROKEN_COUNT = 11;
+export const BROKEN_COUNT = 10;

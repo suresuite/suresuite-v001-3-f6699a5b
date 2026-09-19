@@ -197,8 +197,19 @@ describe("WP 6.1 · the chains that cannot be written down", () => {
    *
    * THE ELEVEN, BY SHAPE (`classifyBreak`):
    *
-   *   unread       supplier.material_price — §4 D18 itself, and the ONLY one
-   *                where "read by nothing" was literally true.
+   *   unread       WAS supplier.material_price — §4 D18 itself, and the ONLY one
+   *                where "read by nothing" was literally true. **GONE IN WP 6.2,
+   *                and the fix was not to wire it.** The cell was seeded from
+   *                `inbound_logistics.unit_price`, which IS a declared engine
+   *                requirement and IS what the engine reads, so the number was
+   *                right and only the EDIT went nowhere — stored as an override,
+   *                hashed into `policy_hash`, consulted by nothing. It is
+   *                `readOnly` now, which says "this is the engine's number, change
+   *                it in the inbound file", and the chain stops breaking because
+   *                a read-only column claims no write path. Master-backing it on
+   *                the arc is the end state and needs a write path that does not
+   *                exist (`master` is typed to the three item masters with a
+   *                single-column `idFrom`).
    *   overridden   plant/supplier.reorder_point — declared in the legacy
    *                `InventoryPolicy` schema and consulted by neither engine:
    *                `engine.py:320` computes `RP = avg_lt · avg_d + ss` itself.
@@ -227,7 +238,6 @@ describe("WP 6.1 · the chains that cannot be written down", () => {
     "plant.order_up_to",
     "plant.reorder_point",
     "plant.review_period_days",
-    "supplier.material_price",
     "supplier.order_up_to",
     "supplier.primary_source",
     "supplier.reorder_point",

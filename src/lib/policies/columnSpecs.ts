@@ -149,7 +149,41 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("primary_source", "sourcing"),
       // P-S.2 standing split: this row's share of its material (0–1).
       col("supply_share", "sourcing", { visibleWhen: multiSourcing, defaultWhenMissing: 0 }),
-      col("material_price", "sourcing", { defaultWhenMissing: 0 }),
+      // §4 D18, AND THE DEFECT IS WORSE THAN THE ROW RECORDED.
+      //
+      // "Displayed prominently; consumed nowhere" understates it. The cell is
+      // SEEDED FROM `inbound_logistics.unit_price` (`useStageRows`'s
+      // `resolveField(prov, "material_price", enrich.unit_price, …)`), which IS a
+      // declared engine requirement and IS what the engine reads
+      // (`project_map.py` takes `arc.unit_price` directly). So the number on
+      // screen was right, the cell was editable, the edit was stored as a policy
+      // override and hashed into `policy_hash` — and the engine went on reading
+      // the uploaded value. A user correcting a price got no error, no warning
+      // and no effect, and because the cell was seeded with the REAL value they
+      // had nothing to compare against.
+      //
+      // WHY NOT THE ROW'S OTHER OPTION. §4 D18 offers "map it to
+      // `materials.cost`", and that is wrong: `materials.cost` is the material's
+      // own cost per unit, this is the price paid to THIS supplier for it, and
+      // the grid already renders the first as `material_cost` beside this one.
+      // Mapping them together would merge two quantities to make one chain
+      // resolve.
+      //
+      // WHY NOT MASTER-BACK IT ON `inbound_logistics`. That is the right end
+      // state and it is not a reader change: `master` is typed to the three item
+      // masters with a single-column `idFrom`, and an arc needs the composite
+      // (supplier_id, material_id) plus a write path that does not exist. The
+      // upload does — `inbound_logistics` is landable dataset #1 — so READ-ONLY
+      // plus "change it in the inbound file" is the honest affordance today, and
+      // it is the same answer WP 6.2 gave `customers`: when an engine field has
+      // no way in, the way in is the upload, not a cell that pretends.
+      //
+      // `defaultWhenMissing: 0` is GONE and was already dead: the Zod sourcing
+      // bundle declares `material_price: z.number().min(0).default(0)`, a parsed
+      // bundle always has the key, and `bundleVal` is checked before this table
+      // (the WP 0.1 gap check's second divergence). A second default table that
+      // only ever speaks when it disagrees by accident.
+      col("material_price", "sourcing", { readOnly: true }),
       col("material_cost", "sourcing", {
         master: { table: "materials", field: "cost", idFrom: "material_id" },
       }),
@@ -388,7 +422,7 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   // ---- supplier · sourcing
   primary_source: { sub: "one per mat.", w: 64, kind: "toggle", keep: true, filterable: false, align: "center" },
   supply_share: { sub: "0–1", w: 74, kind: "num", dec: 2, keep: true },
-  material_price: { sub: "€ / unit", w: 84, kind: "num", dec: 2, unit: "€", keep: true },
+  material_price: { sub: "€ / unit · inbound file", w: 116, kind: "num", dec: 2, unit: "€", keep: true },
   material_cost: { sub: "€ / unit · master", w: 96, kind: "num", dec: 2, unit: "€", prio: 8 },
   material_moq: { sub: "units · master", w: 84, kind: "int", prio: 5 },
   capacity_per_week: { sub: "units / wk · master", w: 96, kind: "int", prio: 4 },

@@ -82,7 +82,15 @@ export const PARAM_META: Record<string, ParamMeta> = {
     unit: "€ / unit",
     range: "≥ 0",
     meaning:
-      "Purchase price paid to this supplier for the material — feeds the purchase-cost ledger and least-cost sourcing selection.",
+      "Purchase price paid to this supplier for the material — the engine's " +
+      "purchase-cost ledger and its least-cost sourcing selection both read it. " +
+      "READ-ONLY HERE: the value is `inbound_logistics.unit_price` from the " +
+      "inbound upload, which is where the engine reads it from and where a " +
+      "correction has to be made. Editing it on this grid used to store an " +
+      "override the engine never consulted (§4 D18). Where the inbound file gives " +
+      "no price the cell shows an imputed average and the run does NOT use that " +
+      "number — the engine substitutes the cheapest link for the material, or 1.0 " +
+      "when there is none; the imputation dot is the cell saying so.",
     specRef: "§IV.1",
   },
   reliability_score: {
