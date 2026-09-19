@@ -244,6 +244,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D120** | **A blank optional cell aborts the WHOLE promotion when its column is NOT NULL with a DEFAULT — LIVE on `suppliers` since WP 3.3.** `ingest_promotion_plan` builds ONE column list per run: the union of every parsed key across every staged row. That is correct and load-bearing — one statement per target is what makes the tier-2 audit trigger write one row saying "n rows" rather than n rows saying one (WP 2.3) — but it means a column ONE row supplies is written for EVERY row, and a row that left it blank contributes NULL. For a nullable column that is exactly right: an absence lands as an absence. For a NOT NULL column carrying a DEFAULT the statement aborts, so the user loses the entire upload to a constraint message naming a cell they deliberately left empty. **Three columns are in that shape and one of them shipped three packages ago**: `suppliers.reliability_score` (NOT NULL DEFAULT 1.0, `required: false`), plus `customers.segment` and `customers.priority_weight` from this package. **WHY NOBODY HAD HIT IT: the shipped `suppliers.csv` template fills `reliability_score` on all three of its rows**, so the template never exercises the case the contract explicitly permits — a gap a fixture cannot find, because the fixture is the template. Found by `rehearsal/230` on its FIRST run, against a real database, and then reproduced on `suppliers` to establish it was not this package's defect. Fixed by reading the column's own default out of `pg_attrdef` and wrapping the value expression in `COALESCE` — never by restating the default, which would be a second authority for it (D101). The fix is in the PLAN and not in `ingest_apply_run`, because `ingest_diff_run` reads the same plan and `diff-before-decision` says the review screen computes with the values the promotion would write | `supabase/migrations/20260917000001_diff_before_promotion.sql`'s `ingest_promotion_plan` value expression against `suppliers.reliability_score`'s `attnotnull` + `pg_attrdef`; `supabase/rehearsal/230_customers_land.sql` §9 | **CLOSED (Phase 6 / WP 6.2)** — `20260919000001`, mutation-tested: reverting the `COALESCE` turns §4 and §9 red, and §10 proves a NOT NULL column with NO default still refuses the row rather than having its error moved somewhere less legible |
 | **D121** | **`graphHashCoverage.test.ts`'s snapshot parser read past the function it was parsing, and every coverage assertion in the file depended on it.** `snapshotDomains()` set `base = sql.slice(lastIndexOf("…_build_dataset_snapshot_v2(p_project_id"))` — to the END of every concatenated migration, with no closing bound — and then derived the `network` domain from `base.slice(networkAt)`. So every `FROM public.<table> <alias> WHERE` in every migration added after `20260917000009` was read as a block of the snapshot. **It was wrong from the commit that wrote it (WP 5.3) and could only be found by accident**: no later migration happened to match the regex until WP 6.3's dual read, whose `FROM public.analysis_runs r WHERE r.id = v_run` made `analysis_runs` — the analysis STORE — appear inside `hash_network`, so the file reported the trust anchor as hashing its own results. **The cost is not the extra table**: `hashed` is the union of both domains and is what every coverage assertion reads, so an unbounded slice can add COLUMNS to a REAL table's set and make "the snapshot covers every tier-2 value column" pass over a column the snapshot does not hash — D11 and D67 returning, through the gate written to catch them. Same shape as §4 D51: a rule that fired for the right reason by luck. Closed by bounding the slice at v2's own `$$;` AND asserting the bound, because the previous version was caught by a coincidence and the next one must not have to be | `src/lib/policies/__tests__/graphHashCoverage.test.ts`'s `snapshotDomains` slice against the migrations concatenated after `20260917000009` | **CLOSED (Phase 6 / WP 6.3)** — bounded, and `base` is asserted not to contain `analysis_runs` or the live builder's own `CREATE`, so re-unbounding it fails directly rather than waiting for another migration to collide |
 | **D122** | **A §4 D-number can be duplicated by a MERGE, and every rule that walks §4 keeps whichever it saw last.** Two branches each took "the next free D-number" from the same §4 and each was right on its own. The merge produced §4 with **two D112 rows describing different defects, two D113, two D114 — and four duplicated EXISTING rows (D87-D90)**, because the table's lines merged cleanly line by line while meaning nothing as a table. **NOTHING NOTICED.** R6 resolved both citations, R8 read both owners, `check:docs` passed, and `trustReportLimits.test.ts` built a `Map` keyed by D-number and silently kept the last — so a CLOSED defect and an OPEN one shared a key and the open one won, which is how it was finally found: a test asserting "no published limit cites a closed defect" started failing about a row whose closure was two lines above. A D-number is the identity CLAUDE.md makes every other document cite by ("cite §4 by D-number"), and an identity that can be duplicated is not one. The duplicated pairs also disagreed about their own state — four rows said `WP 6.2` open beside the same rows saying CLOSED — so §4 simultaneously asserted and denied four closures | `docs/PLAN.md` §4's row table against a `git merge` of two branches that each appended to it; `scripts/data-contract/check.mjs`'s R16 | **CLOSED (Phase 6 / WP 6.3)** — R16 fails on a duplicate, names both rows, and prints the next free number so the next author does not have to count. Mutation-tested by reintroducing the exact collision the merge made |
+| **D123** | **Code reaching `main` is not code reaching production, and the deploy workflow named SIX of eighteen edge functions.** `.github/workflows/supabase-functions.yml` carried a deploy step for six; the other twelve shipped to `main`, passed every gate, and kept running whatever build was last pushed by hand — for an unknown length of time. **What hid it is that the workflow's own history read as SUCCESS on the very commits that shipped them**: `supabase/functions/_shared/**` is a push path, so a change there fires the workflow, it deploys the six it names, and the run goes green. An edge function bundles its imports at publish time, so the unnamed ones did not even pick up the `_shared/` change that triggered the run. WP 4.3's dual-write is the headline case — shipped, green, recorded done, absent from production for two packages — and it is why `analysis_results` held 0 rows while D88 read the emptiness as non-adoption. **`ingest-file` is the worse one**: WP 3.2's entire deliverable, which §2.1's `ingestion-contract` (I7) row describes as a live second source on the strength of `supabase/rehearsal/070_ingest_file_landing.sql` — a rehearsal that proves the DATABASE path and says nothing about whether the function reaching it is published. Every CSV upload WP 6.2 added to that path was therefore correct in the repo and unreachable in production. **And the finding had no §4 row at all**: it was recorded in §16 as "D104", a number §4 had already given to the bare-filename citation collision, so for one slice the most-cited new defect in the repository had two meanings and no owner. R16 could not see it — R16 checks that §4's rows do not collide, and this collision was between a §4 row and a §16 entry that never became one. Renumbered to D123 here | `.github/workflows/supabase-functions.yml`'s deploy steps and push paths against the directories in `supabase/functions/`; `scripts/data-contract/check.mjs`'s R17; `scripts/data-contract/coverage.yaml`'s `functions_not_deployed` | **CLOSED AS A GATE (Phase 6 / WP 6.3)** — R17 fails a function that is neither deployed nor deferred, and fails SEPARATELY a function with a deploy step and no push path, which is the half `_shared/**` exploited. Mutation-tested five ways (deploy step removed, push path removed, a deployed function also deferred, a deferral naming no function, a deferral with no owning package). **Twelve deployed, six deferred to WP 7.1**, each with a written reason — a described gap rather than an invisible one. What this row does NOT close is the PUBLICATION of the six, nor the green run for the twelve: `supabase-functions.yml` is `branches: [main]`, so the deploys reach production on merge and not before |
 | **D110** | **The manual was written from the contract and never from the product's own assets, so eighty pages point at none of them.** Three sets of files exist, are shipped, and are reachable by a user — and no page of the manual links one. (1) **Fourteen CSV templates** in `public/template/`: the actual file a person downloads before filling anything in. §6.3 section 3 asks every table page for a "template" and the pages render a header row synthesised from the contract instead, so a reader of "Inbound Logistics" cannot get `inbound_logistic.csv`. (2) **Three guide documents** in `public/docs/` — `csv-upload-guide.md`, `location-dataset-guide.md`, `nexus-node.md` — which `UploadWizard` already surfaces per dataset as `guideFile`. (3) **A ready-to-run Colab notebook**, `public/notebooks/suresuite_api_quickstart.ipynb`, with a pre-filled CONFIG cell and a poll-a-run recipe, offered on `/developer` beside "Open example in Colab" — and absent from all four Developer API pages. **The mapping is DECLARED, which is what makes this a generator's job rather than a typist's**: `UploadWizard.tsx`'s `templateTypes` pairs every dataset id with its `templateFile` and `guideFile`, so the links derive the same way the stress battery and the API route table do. Two facts a derivation would also carry that no page states today: `node_list` has `templateFile: ''` — there is deliberately no template, the user works from downloaded data — and `deep_tier_json` offers a JSON template rather than a CSV. **The class is the finding, not the three instances**: the manual's rule was "never retype a generated fact", and nothing in it said "and point at what the product already ships". A page can be perfectly sourced and still leave a reader hunting for the file they came for | `public/template/` (14), `public/docs/` (3), `public/notebooks/` (1) against `src/components/docs/bodies/` (0 references); the declared mapping in `src/components/UploadWizard.tsx`'s `templateTypes` | **CLOSED (Phase 5 / WP 5.2j)** — three derivations (`deriveUploadAssets`, `deriveApiNotebook`, and the registry `wizardId` for the four tables outside the ingestion contract), rendered on every §3 table page and on `getting-an-api-key`, with `docsAssets.test.ts` resolving every derived path against `public/` on disk. **Three counts were one count until it separated them**: fourteen FILES, thirteen wizard datasets, twelve offered templates — and **two files reachable from nothing in the repository** (`location-dataset-template.csv`, `supply-chain-data-template.csv`), reported rather than failed because deleting a shipped asset is a product decision |
 | **D111** | **`stress-tests` documents a feature the product cannot reach, using names the user never sees, while the seven presets they actually click are undocumented.** WP 5.2d read the battery from `scsim/scsim/stress/battery.py`'s `ST_DEFINITIONS` — ST-1…ST-7, two runnable — and published it as "the standing battery". **`run_st1`/`run_st2` are imported by exactly two things: the engine's own `scsim/tests/test_stress.py` and `scsim/scsim/__init__.py`.** Nothing in `sim-worker/`, nothing in `supabase/functions/`, nothing in `src/`. The only occurrences of "ST-1" in the application are the documentation page itself and its registry entry. The battery is a **Python library API**, legitimately usable by a researcher importing `scsim`, and it is not a product feature. **What the user is actually offered is `src/components/sim/StressTestCard.tsx`'s seven presets** — `single_supplier_outage`, `plant_shutdown`, `material_shortage`, `lead_time_shock`, `demand_surge`, `multi_hit`, `nexus_attack` — each a pre-built `disruption_schedule` of `{target, target_type, start_day, duration_days, magnitude_pct}` launched down the disruption path, a different mechanism entirely. The contradiction is direct and a user will hit it: the screen offers **Demand surge** and the manual says ST-5 Demand surge is declared and not implemented. **This is the inverse of D21**: not documenting an engine name for a field the user typed, but documenting an engine FEATURE for a screen the user is looking at. The generator was sound and pointed at the wrong artifact, which is why "read it from the engine rather than mining the archive" was necessary and not sufficient | `scsim/scsim/stress/battery.py`'s importers (two, both inside `scsim/`) against `src/components/sim/StressTestCard.tsx`'s `STRESS_TESTS`; `src/components/docs/bodies/StressTests.tsx` | **CLOSED (Phase 5 / WP 5.2j)** — the page leads with the seven presets, derived from the drawer's own literal and rendered as the schedule rather than as prose; the battery stays, demoted to the library API it is. §16 · WP 5.2d is corrected in place. **Confirming the presets run end to end found D112**, which is the larger defect |
 | **D112** | **Six of the seven stress presets never reach the engine, and the run reports KPIs anyway.** A scenario's `disruption_schedule` reaches scsim through `project_map.py`'s `_map_events`, which strips everything before the last colon, accepts the result only if it is one of the project's own supplier ids or the focal plant, and **skips anything else with a mapping warning**. `StressTestCard.tsx`'s presets ship fixed placeholders — `supplier:primary`, `material:critical`, `customer:all`, `edge:inbound`, `node:nexus` — that no real project's ids match. Only `node:plant` resolves. **Measured, not reasoned about**: running `_map_events` over all seven schedules against a two-supplier project maps **1 event of 8** and raises seven warnings, every one `unsupported target skipped (material/edge land later in M7)`. The run then completes and reports KPIs, because a dropped event is not a failed run — so a stress test that hit nothing is indistinguishable from a chain that absorbed the shock, unless the reader opens the mapping warnings. **The warning IS surfaced** (`MappingWarningsCard`, on the run panel and the mobile lab), which is what keeps this a usability defect rather than a silent-wrong-number defect; nothing ranks it above the KPIs a reader came for. The same trap is in the shipped Colab notebook, whose §11 and §13 suggest a material code as a disruption target, and in the public API, whose `DisruptionSchema` accepts any 200-character string. **This is D111's real content**: D111 was a page pointed at the wrong artifact, and the right artifact turned out not to work either | `scsim/scsim/io/project_map.py`'s `_map_events` against `src/components/sim/StressTestCard.tsx`'s `STRESS_TESTS`; the classification is derived and pinned in `scripts/data-contract/chains.mjs` (`assertMapperUnchanged`, six anchors) | **OPEN — WP 6.4** *(the decision plane. The fix is a product decision this package does not own: either the presets carry targets resolved from the project at click time, or the mapper learns material, customer and edge targets — the warning's own text says "land later in M7". The manual states the situation on `stress-tests`, `getting-an-api-key` and `endpoints-and-schemas` meanwhile)* |
@@ -2378,6 +2379,25 @@ done; each turned out to need a decision this package is not the one to make.
   historical definitions sit in a file whose other statements the artifact
   believes. That is a whole-history pass, and this package already has to read
   every migration.
+
+**WP 6.3 ADDED A FOURTH, AND IT IS SIX FUNCTIONS RATHER THAN A DECISION — D123.**
+R17 now refuses a function that is neither deployed nor deferred to a named package,
+and six are deferred here:
+
+| Function | Why it is this package's |
+|---|---|
+| `delete-project` | Destructive and undiffed. It removes a project and leaves ten project-scoped tables behind (D117), including the user's own policy decisions, and its `multi_tier` branch is live (D58). Deploying a newer delete path sight-unseen is the one case where being wrong is not recoverable |
+| `erp-sync-orbit-mrp` | Holds ERP credentials and, until WP 4.1, promoted staged products with no actor. Its blast radius is an external system |
+| `get-mapbox-token` | A secret-bearing path running an unknown build |
+| `ingest-bom-multi-level`, `ingest-inbound-logistics`, `ingest-outbound-logistics` | One group. They write through `ingest_legacy_upsert_lane` and their promotion semantics predate WP 3.3, so publishing the repo's copy changes what a legacy upload DOES, not just where its code lives |
+
+Each has been running an unknown build for an unknown time, so publishing any of
+them is a production change whose blast radius nobody has measured — they need
+diffing against production one at a time. They belong here because **the grants each
+runs under are the question this package exists to answer**: four of the six write
+tier-2 data under `anon`'s permissive policies, and deploying them before the session
+model changes republishes that surface rather than replacing it.
+
 
 - **Tier 2-O `observations`** — append-only, bitemporal (`valid_time` +
   `recorded_at`), partitioned monthly, joined to T2 by the same arc keys.
@@ -13007,6 +13027,112 @@ mutation-tested against the real collision · `contract:rehearse` ✓ 25 of 25 �
 **Still open in WP 6.3:** A2 (value-chain popover), A3 (Trust Report via
 `report-render`), D104's other eight functions, and D88's drop (waiting on
 adoption).
+### WP 6.3 (slice 24) — The gate slice 15 sized, and the number it spent twice · 2026-09-19 · no migration
+
+**What the previous package promised.** Slice 23 listed "D104's other eight
+functions" as open and treated the gate itself as sized-but-unwritten, which is how
+slice 15 left it: *"Nothing compares the functions the repo holds against the
+functions the workflow names. That check is the real fix — the same shape as
+`table-covered` … Sized, not taken."* This slice takes it, and in doing so found
+two things slice 15 could not have known it was leaving behind.
+
+#### A · THE FINDING HAD NO §4 ROW, AND THE NUMBER IT USED WAS TAKEN — D123
+
+Slice 15 recorded the finding in §16 as **"D104 — twelve of eighteen edge functions
+never reach production from CI."** §4's D104 is a different defect: the bare-filename
+citation collision WP 5.2e found. So for one slice the most-cited new defect in the
+repository **had two meanings and no owner** — CLAUDE.md's rule is "cite §4 by
+D-number", and this one resolved to a row about something else.
+
+**R16 could not see it, and this is the precise limit of R16.** R16 checks that §4's
+rows do not collide with each other; this collision was between a §4 row and a §16
+entry that never became one. Every other gate was equally blind, and for the same
+reason: a citation resolves (`D104` exists), an owner parses, `check:docs` passes.
+Nothing in the repository compares *what a D-number is cited as meaning* against
+*what §4 says it means*, because that comparison is a judgement about prose and not
+an identity check. **Named, not taken** — a similarity threshold over two titles is a
+gate that fails on rewording and passes on a genuine mismatch, which is worse than
+the procedural fix: R16 already prints the next free number, and slice 15 did not
+ask it.
+
+The finding is now **§4 D123**, with its own row and its own evidence column. The
+slice 15 entry above keeps its heading and its text — §16 is append-only, and a
+drift log that edits its own history is not one.
+
+#### B · R17 — DEPLOYED, OR DEFERRED TO A NAMED PACKAGE
+
+`scripts/data-contract/check.mjs` gains **R17**, the shape R1 gave tables:
+
+- a function in `supabase/functions/` is either named by a **deploy step** in
+  `.github/workflows/supabase-functions.yml` or listed in
+  `scripts/data-contract/coverage.yaml`'s new **`functions_not_deployed`** register
+  with `fn`, `wp` and `why`. There is no third option;
+- a function with a deploy step and **no push path** fails SEPARATELY. That is the
+  half `_shared/**` exploited: such a function redeploys only when something else
+  watched changes, so its build is whatever the last unrelated trigger happened to
+  publish — and the run that published it reads as a success about *it*;
+- a function that is deployed **and** deferred fails, so a stale deferral cannot
+  record work already done (R8's defect at function grain);
+- a deferral naming a directory that does not exist fails.
+
+**Mutation-tested five ways**, each producing a distinct message: `ingest-file`'s
+deploy step removed → named as unpublished; its push path removed → named as
+trigger-less while still counted deployed; `ingest-file` deferred while deployed →
+"pick one"; a deferral for `no-such-function`; `delete-project`'s deferral stripped
+of its `wp` → the malformed-row failure *and* the unpublished failure, because a row
+that cannot be read is not a deferral.
+
+**Six deferrals authored, all to WP 7.1**, each with the reason rather than a
+placeholder: `delete-project` (destructive and undiffed — D117's ten orphaned tables,
+and its `multi_tier` branch is live per D58), `erp-sync-orbit-mrp` (credential blast
+radius), `get-mapbox-token` (a secret-bearing path running an unknown build), and the
+three legacy `ingest-*` functions as one group (they write through
+`ingest_legacy_upsert_lane` and their promotion semantics predate WP 3.3). WP 7.1
+owns them because the grants each runs under are the same question that package
+exists to answer.
+
+**Counts: 18 functions · 6 deployed when slice 15 measured · 12 deployed now · 6
+deferred.** The intermediate steps are on the record: slice 15 added the four
+analyzers (6 → 10), WP 6.2's `combine-project` work added a fifth (→ 11), and this
+slice adds `ingest-file` (→ 12).
+
+#### C · `ingest-file` — WHAT I7 HAS BEEN ASSERTING FOR FOUR PACKAGES
+
+`ingest-file` is **WP 3.2's entire deliverable**, and §2.1's `ingestion-contract`
+(I7) row describes it as a live second source on the strength of
+`supabase/rehearsal/070_ingest_file_landing.sql`. That rehearsal proves the DATABASE
+path against a real database and says nothing about whether the function reaching it
+is published — the function was not in the deploy workflow at all. **So "a live
+second source" was true of `main` and false of production, from WP 3.2 until this
+slice.** CLAUDE.md's I7 row now says so in those terms.
+
+**This corrects slice 16 of this session.** Slice 16 made `customers` the tenth
+landable dataset and routed its upload through `supabase.functions.invoke('ingest-file', …)`.
+The migration is deployed, `rehearsal/230` proves the whole path including D120's
+COALESCE fix, and **the upload still cannot run in production**, because the function
+it invokes has never been published. Slice 16's entry claimed a working upload; what
+it shipped was a correct one. The fix is in this push and lands on merge.
+
+#### D · WHAT IS STILL NOT VERIFIED, AND CANNOT BE FROM A BRANCH
+
+`supabase-functions.yml` is `branches: [main]`. Nothing in this push deploys
+anything; the twelve deploy steps run on merge. **So the honest state is: R17 is
+green, the workflow names `ingest-file`, and `Deploy Supabase Functions` has not yet
+published it.** Trap 2 of this session's brief is exactly this ("_shared/** firing
+the workflow is NOT proof"), and the same discipline applies to the fix: the claim
+"`ingest-file` is live" is not available until that run is green on main, and D123's
+Closed-by column says so rather than implying otherwise.
+
+**Verified:** R17 green and mutation-tested five ways · `contract:check` R1–R17 ✓ ·
+`check:docs` ✓ · YAML parses, 16 steps, 12 deploys · §4 at 123 rows, none unused.
+**Read, not verified:** that the six deferred functions are running the builds their
+directories contain — nobody has diffed production, which is precisely why they are
+deferred and not deployed.
+
+**Still open in WP 6.3:** A2 (value-chain popover), A3 (Trust Report via
+`report-render`), D123's six deferred functions (re-homed to WP 7.1 with reasons),
+and D88's drop (waiting on adoption).
+
 ### WP 5.2j — The page that documented the wrong feature, the assets nobody pointed at, and the thin half · 2026-09-19 · no migration
 
 **What the previous package promised, and what it missed.** 5.2i closed the

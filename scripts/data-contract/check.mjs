@@ -21,12 +21,15 @@
 //   R9  `governance.audited` matches the audit triggers the migrations create
 //   R10 §17's sequencing table agrees with §7–§13's ✅ markers (WP 3.3)
 //   R11 every DEFERRED table says whether it is audited, and is right (D54, WP 4.2)
+//   R12 every §5.1 lineage row resolves to a real page and a real read, and every
+//       page in src/pages is accounted for (WP 5.2e)
 //   R13 an IMPLEMENTED policy's declared data requirement is described by the
 //       contract AND reaches a display surface (D94, D112, WP 6.2)
 //   R14 no dynamic RLS statement resolves to zero known tables (D51, WP 6.2)
 //   R15 a sidecar's prose may not deny a reader its own `surfaces` block confirms
 //       (D58, D101's shape inside one file, WP 6.2)
-//   R16 every §4 D-number is unique, and §4 has no duplicated row (D121's merge, WP 6.3)
+//   R16 every §4 D-number is unique, and §4 has no duplicated row (D122's merge, WP 6.3)
+//   R17 every edge function is DEPLOYED or deferred with a named owner (D104, WP 6.3)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -834,6 +837,96 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
 // ──────────────────────────────────────────────────────────────────── report
 
 const covered = [...sidecars.keys()].length;
+// ───────── R17: AN EDGE FUNCTION IS DEPLOYED, OR DEFERRED WITH A REASON
+//
+// §4 D104: TWELVE OF EIGHTEEN edge functions were absent from
+// `.github/workflows/supabase-functions.yml`. Their code shipped to `main`, CI went
+// green, and they never reached production — and the workflow's history showed
+// SUCCESS on the very commits that shipped them, because `supabase/functions/_shared/**`
+// IS a path trigger: a change there fires the workflow, it deploys the functions it
+// names, and reports success. An edge function bundles its imports at publish time,
+// so the unnamed ones kept running the `_shared/` of whenever they were last pushed
+// by hand. **Every signal said it had landed.**
+//
+// WP 4.3's dual-write is the headline case: shipped, green, recorded as done, and
+// absent from production for two packages. `ingest-file` is the worse one — WP 3.2's
+// entire deliverable, which §2.1's `ingestion-contract` (I7) row described as "a live
+// second source" on the strength of `rehearsal/070`. That rehearsal proves the
+// DATABASE path and says nothing about whether the function reaching it is published.
+//
+// Slice 15 named this gate and did not write it: "the same shape as `table-covered`,
+// where a table is either described or deferred to a named package — and it would
+// have caught this on the day WP 4.3 merged." This is it. A function is deployed or
+// it is in `coverage.yaml`'s `functions_not_deployed` with an owner and a reason.
+// There is no third option, which is what R1 took away from tables.
+{
+  const fnDir = join(ROOT, "supabase", "functions");
+  const wfPath = join(ROOT, ".github", "workflows", "supabase-functions.yml");
+  if (!existsSync(fnDir) || !existsSync(wfPath)) {
+    fail("R17", "supabase/functions or the deploy workflow is missing — cannot check deployment coverage");
+  } else {
+    const wf = readFileSync(wfPath, "utf8");
+    const deployed = new Set(
+      [...wf.matchAll(/functions deploy ([a-z0-9-]+)/g)].map((m) => m[1]),
+    );
+    // The PATH TRIGGER matters as much as the deploy step: a function deployed by a
+    // step whose path is not watched only redeploys when something else changes it.
+    // That is how `_shared/**` made the history read as success.
+    const watched = new Set(
+      [...wf.matchAll(/supabase\/functions\/([a-z0-9-]+)\/\*\*/g)].map((m) => m[1]),
+    );
+    const present = readdirSync(fnDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && !d.name.startsWith("_"))
+      .map((d) => d.name)
+      .sort();
+
+    const deferredFns = new Map();
+    for (const row of coverage.functions_not_deployed ?? []) {
+      if (!row.fn || !row.wp || !row.why) {
+        fail("R17", `a functions_not_deployed row is missing fn, wp or why: ${JSON.stringify(row)}`);
+        continue;
+      }
+      deferredFns.set(row.fn, row);
+    }
+
+    for (const fn of present) {
+      if (deployed.has(fn)) {
+        if (!watched.has(fn)) {
+          fail("R17",
+            `${fn} has a deploy step and NO path trigger — it redeploys only when some ` +
+            "other watched path changes. That is how `_shared/**` made this workflow's " +
+            "history read as success while the functions it did not name went stale (D104). " +
+            `Add 'supabase/functions/${fn}/**' to the push paths.`);
+        }
+        if (deferredFns.has(fn)) {
+          fail("R17",
+            `${fn} is deployed AND listed in functions_not_deployed — pick one. A stale ` +
+            "deferral records work that is already done, which is the defect R8 exists for.");
+        }
+        continue;
+      }
+      const row = deferredFns.get(fn);
+      if (!row) {
+        fail("R17",
+          `${fn} exists in supabase/functions/ and the deploy workflow never publishes it, ` +
+          "so its code reaches `main` and never production — and CI goes green either way " +
+          "(§4 D104). Add a deploy step AND a path trigger, or defer it in " +
+          "coverage.yaml's `functions_not_deployed` with the package that will and why.");
+      }
+    }
+    for (const fn of deferredFns.keys()) {
+      if (!present.includes(fn)) {
+        fail("R17", `functions_not_deployed names "${fn}", which is not a function in the repo`);
+      }
+    }
+    console.log(
+      `  R17 edge functions reach production · ${present.length} in the repo · ` +
+      `${present.filter((f) => deployed.has(f)).length} deployed · ` +
+      `${deferredFns.size} deferred with a named package (D104)`,
+    );
+  }
+}
+
 // ───────── R16: A D-NUMBER IS AN IDENTITY, SO IT HAS TO BE UNIQUE
 //
 // FOUND BY A MERGE, WHICH IS THE ONLY WAY IT COULD BE FOUND (WP 6.3).

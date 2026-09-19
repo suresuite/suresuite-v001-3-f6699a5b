@@ -31,6 +31,16 @@ on:
       - 'supabase/functions/calculate-node-prominence/**'
       - 'supabase/functions/predict-critical-nodes/**'
       - 'supabase/functions/geocode-locations/**'
+      # `ingest-file` (§4 D104, added WP 6.3). WP 3.2's ENTIRE DELIVERABLE, and it
+      # had never been deployed from CI — while CLAUDE.md's `ingestion-contract`
+      # (I7) row described it as "a live second source" on the strength of
+      # `rehearsal/070`, which proves the DATABASE path and says nothing about
+      # whether the function reaching it is published. WP 6.2's tenth dataset
+      # (`customers`) invokes it, so the upload was correct in the repo and
+      # unreachable in production. Added for the same reason slice 15 added the
+      # four analyzers: it is what a shipped package depends on and its source is
+      # CI-green.
+      - 'supabase/functions/ingest-file/**'
       - 'supabase/functions/_shared/**'
       - 'supabase/config.toml'
       - '.github/workflows/supabase-functions.yml'
@@ -196,6 +206,20 @@ jobs:
       # and fails closed on auth/authz/quota.
       - name: Deploy api gateway
         run: supabase functions deploy api --project-ref wckdrutwkytwcomrlpib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # Deploy the CSV landing function — WP 3.2's deliverable and the second
+      # ingestion source `ingestion-contract` (I7) is about (§4 D104, WP 6.3).
+      #
+      # IT HAD NEVER BEEN DEPLOYED FROM CI. `rehearsal/070` proves the landing
+      # against a real database and `ingestSpecParity.test.ts` proves the function
+      # names no tier-2 table of its own — neither says whether the function is
+      # PUBLISHED, and the answer was no. Every dataset the wizard routes through
+      # `INGEST_DATASETS` reaches production only through this step, including the
+      # ten it now declares.
+      - name: Deploy ingest-file
+        run: supabase functions deploy ingest-file --project-ref wckdrutwkytwcomrlpib
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
