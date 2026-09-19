@@ -2658,5 +2658,257 @@ export const RECOVERY_LEVERS: RecoveryLevers = {
   ]
 };
 
+/**
+ * The assistant's three declared vocabularies: the personas in the picker,
+ * the interaction modes, and the specialist agents the server's router
+ * chooses from. The chat tables are deferred in the contract, so these are
+ * the only declarations §9 has.
+ *
+ * `autoTooltip` is the unlock condition for the disabled third mode, taken
+ * VERBATIM: it is a commitment about when autonomous change becomes
+ * possible, and paraphrasing a commitment is how it quietly loosens.
+ */
+export type Assistant = {
+  personas: { id: string; name: string; blurb: string; requiresProject: boolean }[];
+  modes: { id: string; label: string; hint: string; live: boolean }[];
+  autoTooltip: string;
+  defaultMode: string;
+  agents: { slug: string; mission: string }[];
+};
+
+export const ASSISTANT: Assistant = {
+  "personas": [
+    {
+      "id": "risk-analyst",
+      "name": "Risk Analyst",
+      "blurb": "Supplier & network risk, single-source exposure, criticality.",
+      "requiresProject": true
+    },
+    {
+      "id": "simulation-modeler",
+      "name": "Simulation Modeler",
+      "blurb": "Design scenarios, stress tests, and recovery playbooks.",
+      "requiresProject": true
+    },
+    {
+      "id": "inventory-strategist",
+      "name": "Inventory Strategist",
+      "blurb": "Safety stock, MOQ, service level, and working capital trade-offs.",
+      "requiresProject": true
+    },
+    {
+      "id": "logistics-planner",
+      "name": "Logistics Planner",
+      "blurb": "Lead times, routing, in-transit inventory, expediting.",
+      "requiresProject": true
+    },
+    {
+      "id": "general",
+      "name": "General Assistant",
+      "blurb": "Open-ended supply-chain conversation. No project required.",
+      "requiresProject": false
+    }
+  ],
+  "modes": [
+    {
+      "id": "ask",
+      "label": "Ask",
+      "hint": "Decision Support — answers and analyses only; nothing about the project changes",
+      "live": true
+    },
+    {
+      "id": "review",
+      "label": "Review",
+      "hint": "Accept edits — agents draft; every change is a proposal card you approve",
+      "live": true
+    }
+  ],
+  "autoTooltip": "Auto isn't available. It unlocks only after: ≥ 3 consecutive months of per-agent accepted-proposal rate ≥ 0.9 AND an org explicitly requesting it AND resolved principals (server-verified identity) — and then as a per-org opt-in designed as a new decision, scoped first to deterministic diffs. Until then every change is a reviewable proposal.",
+  "defaultMode": "review",
+  "agents": [
+    {
+      "slug": "data-steward",
+      "mission": "completes and corrects item-master data (materials, products, suppliers) as reviewable diffs"
+    },
+    {
+      "slug": "cost-estimator",
+      "mission": "estimates missing item-master economics with method-cited values and uncertainty intervals where the data alone cannot supply them"
+    },
+    {
+      "slug": "network-cartographer",
+      "mission": "maps the supply network beyond tier 1 from user-provided documents and registered external sources, as evidence-cited reviewable graph extensions"
+    },
+    {
+      "slug": "disruption-sentinel",
+      "mission": "assesses disruption events on demand against registered sensing feeds and files corroborated, simulation-sized risk alerts for the project's network"
+    },
+    {
+      "slug": "policy-configurator",
+      "mission": "turns natural-language intent into a reviewable policy-configuration change (defaults + overrides)"
+    },
+    {
+      "slug": "vv-analyst",
+      "mission": "interprets verification & validation evidence and drafts model-validation cards"
+    },
+    {
+      "slug": "experiment-designer",
+      "mission": "compiles decision questions into reviewable, gate-checked experiment specifications"
+    },
+    {
+      "slug": "explainer",
+      "mission": "answers \"why did the model do that?\" from recorded decision traces with mandatory citations"
+    },
+    {
+      "slug": "report-builder",
+      "mission": "turns persisted data and completed simulation runs into downloadable decision reports (XLSX/PDF) via a reviewable spec"
+    }
+  ]
+};
+
+/**
+ * The proposal lifecycle, the memory vocabulary and the plan states, read
+ * from the CHECK constraints in the introspected schema.
+ *
+ * The three tables are deferred in `coverage.yaml` — correctly, they carry
+ * no simulation value — so their closed vocabularies are the only
+ * generated fact §9 has. Read from the introspection rather than from the
+ * migration that first wrote them: the agent-to-artifact pairing was five
+ * pairs at creation and is nine now.
+ */
+export type Intelligence = {
+  proposal: {
+    pairs: { agent: string; artifact: string }[];
+    statuses: string[];
+    provenance: string[];
+    expiresAfter: string | null;
+  };
+  memory: { kinds: string[]; statuses: string[]; contentCap: number };
+  plan: { statuses: string[]; expiresAfter: string | null };
+};
+
+export const INTELLIGENCE: Intelligence = {
+  "proposal": {
+    "pairs": [
+      {
+        "agent": "data-steward",
+        "artifact": "item_master_diff"
+      },
+      {
+        "agent": "policy-configurator",
+        "artifact": "policy_bundle_diff"
+      },
+      {
+        "agent": "vv-analyst",
+        "artifact": "model_card_draft"
+      },
+      {
+        "agent": "experiment-designer",
+        "artifact": "experiment_spec"
+      },
+      {
+        "agent": "explainer",
+        "artifact": "trace_explanation"
+      },
+      {
+        "agent": "report-builder",
+        "artifact": "decision_report"
+      },
+      {
+        "agent": "cost-estimator",
+        "artifact": "parameter_estimate"
+      },
+      {
+        "agent": "network-cartographer",
+        "artifact": "network_map_diff"
+      },
+      {
+        "agent": "disruption-sentinel",
+        "artifact": "risk_alert"
+      }
+    ],
+    "statuses": [
+      "draft",
+      "proposed",
+      "approved",
+      "applied",
+      "rejected",
+      "expired"
+    ],
+    "provenance": [
+      "deterministic",
+      "llm_drafted",
+      "user_supplied"
+    ],
+    "expiresAfter": "14 days"
+  },
+  "memory": {
+    "kinds": [
+      "fact",
+      "preference",
+      "decision"
+    ],
+    "statuses": [
+      "active",
+      "archived"
+    ],
+    "contentCap": 500
+  },
+  "plan": {
+    "statuses": [
+      "active",
+      "done",
+      "failed",
+      "abandoned",
+      "expired"
+    ],
+    "expiresAfter": "14 days"
+  }
+};
+
+/** Budget scopes, periods and ceilings, and what a recorded AI call carries. */
+export type AiGovernance = {
+  budgetScopes: string[];
+  budgetPeriods: string[];
+  budgetCeilings: string[];
+  usageStatuses: string[];
+  usageRecorded: string[];
+  modelCostColumns: string[];
+};
+
+export const AI_GOVERNANCE: AiGovernance = {
+  "budgetScopes": [
+    "user",
+    "org",
+    "project"
+  ],
+  "budgetPeriods": [
+    "daily",
+    "monthly"
+  ],
+  "budgetCeilings": [
+    "budget_usd",
+    "token_limit",
+    "rpm",
+    "rpd"
+  ],
+  "usageStatuses": [
+    "success",
+    "error",
+    "blocked"
+  ],
+  "usageRecorded": [
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "cost_usd",
+    "latency_ms",
+    "error_code"
+  ],
+  "modelCostColumns": [
+    "input_cost_per_1k",
+    "output_cost_per_1k"
+  ]
+};
+
 export const CHAIN_COUNT = 38;
 export const BROKEN_COUNT = 11;

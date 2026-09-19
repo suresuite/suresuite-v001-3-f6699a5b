@@ -9,10 +9,12 @@
 
 import { PageTitle, Section, P, Key, Callout, Prose, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
 import { refTable } from "@/components/docs/tableFacts";
+import { AI_GOVERNANCE } from "@/components/docs/generated/policy.generated";
 
 export default function ModelsBudgetsLimits() {
   const perms = refTable("user_ai_permissions");
   const allow = perms.columns.find((c) => c.name === "allowed_model_ids");
+  const g = AI_GOVERNANCE;
 
   return (
     <>
@@ -34,9 +36,51 @@ export default function ModelsBudgetsLimits() {
 
       <Section id="budgets" title="Budgets">
         <P>
-          A budget is a ceiling on spend, and usage is recorded against it as work happens. When it
-          is reached, requests stop rather than continuing silently at cost — which means a stopped
+          A budget is a ceiling, and usage is recorded against it as work happens. When it is
+          reached, requests stop rather than continuing silently at cost — which means a stopped
           assistant is sometimes the budget working rather than a fault.
+        </P>
+        <P>
+          <strong>A budget is set at one of {g.budgetScopes.length} scopes</strong> —{" "}
+          {g.budgetScopes.map((x, i) => (
+            <span key={x}>
+              {i > 0 && i === g.budgetScopes.length - 1 ? " or " : i > 0 ? ", " : ""}
+              <Term>{x}</Term>
+            </span>
+          ))}{" "}
+          — over a {g.budgetPeriods.join(" or ")} window. So “the budget” is rarely one number: a
+          person can be inside their own and stopped by their organization's.
+        </P>
+        <P>
+          Each one can cap {g.budgetCeilings.length} different things at once: money, tokens, and
+          requests per minute and per day. <strong>Being stopped on requests per minute is not the
+          same as being out of budget</strong>, and the two feel identical from the conversation —
+          if the assistant recovers after a minute, it was rate rather than spend.
+        </P>
+      </Section>
+
+      <Section id="usage" title="What gets recorded about each call">
+        <P>
+          Every request the assistant makes records the model, the provider, the tokens in and out,
+          the cost, how long it took, and whether it succeeded. Failed calls are recorded too, with
+          their error, which is what makes “it stopped working at four o'clock” answerable.
+        </P>
+        <P>
+          The status vocabulary is worth knowing because the third value is not an error:{" "}
+          {g.usageStatuses.map((x, i) => (
+            <span key={x}>
+              {i > 0 ? ", " : ""}
+              <Term>{x}</Term>
+            </span>
+          ))}
+          . <Term>blocked</Term> means a limit refused the call before it was made — it cost nothing
+          and it is not a fault. A run of them is a budget or an entitlement, not an outage.
+        </P>
+        <P>
+          Cost is computed from the model's own per-thousand-token input and output prices, which
+          are configured per model rather than looked up from a provider. A price set wrong makes
+          every figure on the usage screen wrong in the same direction, and nothing external
+          contradicts it.
         </P>
       </Section>
 
@@ -77,6 +121,43 @@ export default function ModelsBudgetsLimits() {
         </p>
       </Callout>
 
+      <Section id="check-your-own" title="Checking your own access">
+        <P>
+          <AppLink to="/profile">Your account page</AppLink> has an “AI models you can use” block,
+          and it is the only place you can see your own entitlements without an administrator. It
+          says one of three things, and the first one is the one to read carefully.
+        </P>
+        <div className="space-y-3">
+          <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
+            <p className="text-[13px] font-semibold text-foreground">
+              “All enabled models are available to you.”
+            </p>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+              This is what you see both when somebody deliberately granted you everything{" "}
+              <strong>and</strong> when nobody has ever set an entitlement for you — including when
+              an administrator cleared your list intending to take access away. The page cannot tell
+              the three apart, because the stored state is the same.
+            </p>
+          </div>
+          <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
+            <p className="text-[13px] font-semibold text-foreground">A list of named models</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+              Somebody restricted you on purpose, to exactly these. The block also names the model a
+              new conversation starts on and the one used when that is unavailable.
+            </p>
+          </div>
+          <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
+            <p className="text-[13px] font-semibold text-foreground">
+              “No AI models are enabled for your account.”
+            </p>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+              Not an empty entitlement — the models themselves are not enabled in this deployment.
+              This is an administrator's question, not yours.
+            </p>
+          </div>
+        </div>
+      </Section>
+
       <Section id="where" title="Where this is set">
         <P>
           Models and budgets at <AppLink to="/admin/models">/admin/models</AppLink> and{" "}
@@ -96,7 +177,7 @@ export default function ModelsBudgetsLimits() {
         </P>
       </Section>
 
-      <Provenance from="the user_ai_permissions sidecar, whose own description of the empty-list rule is quoted above" />
+      <Provenance from="the user_ai_permissions sidecar, whose own description of the empty-list rule is quoted above, and the CHECK constraints on ai_budgets and ai_usage_logs in the introspected schema for the scopes, periods and statuses — those tables are deliberately outside the data contract" />
     </>
   );
 }

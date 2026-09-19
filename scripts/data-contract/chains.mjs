@@ -918,3 +918,219 @@ export function deriveRecoveryLevers(root) {
   if (levers.length < 4) throw new Error(`chains: parsed ${levers.length} recovery levers; the pane offers more`);
   return { levers, engineOnly };
 }
+
+/**
+ * The assistant's three declared vocabularies — WP 5.2j.
+ *
+ * `chat_threads`, `chat_messages` and `chat_folders` are deferred in the
+ * contract, so §9's pages had no generated fact to render and were among the
+ * thinnest in the manual. What IS declared, in three places:
+ *
+ *   · the five PERSONAS in the picker (`src/lib/chat/agents.ts`) — and the
+ *     module's own header says a persona is a system-prompt preamble and
+ *     nothing else, which is the single most useful sentence a reader of that
+ *     picker could have;
+ *   · the interaction MODES (`ModeSwitch.tsx`), including the disabled `Auto`
+ *     position and the unlock conditions its tooltip states verbatim;
+ *   · the nine specialist AGENTS the server's router selects from
+ *     (`supabase/functions/project-ai-chat/router.ts`), each with the mission
+ *     sentence the classifier prompt itself uses.
+ *
+ * The third is the one no page could have guessed at: the picker's five names
+ * map onto NONE of the nine, and the router chooses from what you asked rather
+ * than from what you picked.
+ */
+export function deriveAssistant(root) {
+  const personaSrc = readFileSync(join(root, "src", "lib", "chat", "agents.ts"), "utf8");
+  const pBlock = /export const AGENTS: AgentSpec\[\] = \[([\s\S]*?)\n\];/.exec(personaSrc);
+  if (!pBlock) throw new Error("chains: `AGENTS` not found in src/lib/chat/agents.ts");
+  const personas = [
+    ...pBlock[1].matchAll(
+      /id:\s*"([\w-]+)",\s*name:\s*"([^"]+)",\s*blurb:\s*"((?:[^"\\]|\\.)*)",[\s\S]{0,200}?(?:requiresProject:\s*(true|false),)?\s*\},/g,
+    ),
+  ].map((m) => ({
+    id: m[1],
+    name: m[2],
+    blurb: m[3].replace(/\\"/g, '"'),
+    requiresProject: m[4] !== "false",
+  }));
+  if (personas.length < 3) throw new Error(`chains: parsed ${personas.length} chat personas`);
+
+  const modeSrc = readFileSync(join(root, "src", "components", "chat", "ModeSwitch.tsx"), "utf8");
+  const mBlock = /const POSITIONS: Array<\{[^}]*\}> = \[([\s\S]*?)\n\];/.exec(modeSrc);
+  if (!mBlock) throw new Error("chains: `POSITIONS` not found in src/components/chat/ModeSwitch.tsx");
+  const modes = [
+    ...mBlock[1].matchAll(/id:\s*"(\w+)",\s*label:\s*"([^"]+)",\s*hint:\s*"((?:[^"\\]|\\.)*)"/g),
+  ].map((m) => ({ id: m[1], label: m[2], hint: m[3].replace(/\\"/g, '"'), live: true }));
+  const autoBlock = /export const AUTO_TOOLTIP =\s*([\s\S]*?);\n/.exec(modeSrc);
+  if (!autoBlock) throw new Error("chains: `AUTO_TOOLTIP` not found in ModeSwitch.tsx");
+  // A multi-line concatenation of string literals; join them the way the
+  // tooltip does, so the manual states the unlock conditions VERBATIM rather
+  // than paraphrasing a commitment.
+  const autoTooltip = [...autoBlock[1].matchAll(/"((?:[^"\\]|\\.)*)"/g)]
+    .map((m) => m[1].replace(/\\"/g, '"'))
+    .join("");
+  if (autoTooltip.length < 40) throw new Error("chains: AUTO_TOOLTIP parsed too short to be the real text");
+  const defaultMode = /export const DEFAULT_THREAD_MODE: ThreadMode = "(\w+)"/.exec(modeSrc)?.[1] ?? null;
+  if (!defaultMode) throw new Error("chains: DEFAULT_THREAD_MODE not found in ModeSwitch.tsx");
+
+  const routerSrc = readFileSync(
+    join(root, "supabase", "functions", "project-ai-chat", "router.ts"),
+    "utf8",
+  );
+  const rBlock = /export const AGENT_ROSTER: Record<AgentSlug, \{ mission: string; intents: string\[\] \}> = \{([\s\S]*?)\n\};/.exec(
+    routerSrc,
+  );
+  if (!rBlock) throw new Error("chains: `AGENT_ROSTER` not found in project-ai-chat/router.ts");
+  const agents = [
+    ...rBlock[1].matchAll(/"?([\w-]+)"?:\s*\{\s*mission:\s*\n?\s*((?:\s*"(?:[^"\\]|\\.)*"\s*\+?)+),/g),
+  ].map((m) => ({
+    slug: m[1],
+    mission: [...m[2].matchAll(/"((?:[^"\\]|\\.)*)"/g)]
+      .map((x) => x[1].replace(/\\"/g, '"'))
+      .join(""),
+  }));
+  if (agents.length < 5) {
+    throw new Error(`chains: parsed ${agents.length} specialist agents; the roster declares more`);
+  }
+  for (const a of agents) {
+    if (!a.mission) throw new Error(`chains: specialist agent "${a.slug}" parsed with no mission`);
+  }
+  return { personas, modes, autoTooltip, defaultMode, agents };
+}
+
+/**
+ * The proposal lifecycle, the memory vocabulary and the plan states — WP 5.2j.
+ *
+ * All three tables are deferred in `coverage.yaml` under the "control plane, no
+ * simulation value" group, which is the right call for the DATA contract and
+ * left §9's pages with nothing to render. But the facts a reader needs are not
+ * column descriptions: they are the CHECK constraints — which agent may file
+ * which kind of artifact, what states a proposal can be in, how long it lives.
+ *
+ * Those are in `build/schema.introspected.json`, which replays every migration,
+ * so this reads the CURRENT constraint rather than the migration that first
+ * wrote it. That matters here more than anywhere: the agent-to-artifact pairing
+ * was five pairs when it was created and is nine now, and a page written from
+ * the original migration would be four agents short.
+ */
+function introspected(root) {
+  const raw = readFileSync(join(root, "build", "schema.introspected.json"), "utf8");
+  const j = JSON.parse(raw);
+  if (!Array.isArray(j.tables) || j.tables.length < 10) {
+    throw new Error("chains: build/schema.introspected.json has no table list — re-run contract:introspect");
+  }
+  return j;
+}
+
+/** `CHECK (col IN ('a','b'))` → ['a','b'], from the table's own constraints. */
+function checkValues(table, column) {
+  const c = (table.constraints ?? []).find((x) =>
+    new RegExp(`CHECK\\s*\\(\\s*${column} IN`).test(String(x.definition ?? "")),
+  );
+  if (!c) {
+    throw new Error(
+      `chains: ${table.name}.${column} has no CHECK … IN constraint. The page that renders it ` +
+        "states a closed vocabulary; publishing an empty one would be worse than none.",
+    );
+  }
+  return [...String(c.definition).matchAll(/'([^']+)'/g)].map((m) => m[1]);
+}
+
+/** `DEFAULT now() + interval '14 days'` → "14 days", or null. */
+function intervalDefault(table, column) {
+  const col = (table.columns ?? []).find((c) => c.name === column);
+  const m = /interval\s*'([^']+)'/.exec(String(col?.default ?? ""));
+  return m ? m[1] : null;
+}
+
+export function deriveIntelligence(root) {
+  const j = introspected(root);
+  const table = (name) => {
+    const t = j.tables.find((x) => x.name === name);
+    if (!t) throw new Error(`chains: the introspected schema has no table "${name}"`);
+    return t;
+  };
+
+  const proposals = table("proposals");
+  const pairing = (proposals.constraints ?? []).find((c) =>
+    String(c.definition ?? "").includes("(agent_id, artifact_type) IN"),
+  );
+  if (!pairing) {
+    throw new Error(
+      "chains: the proposals agent-owns-artifact constraint is gone. It is the fact that says " +
+        "which specialist may file which kind of change — do not publish the page without it.",
+    );
+  }
+  const pairs = [...String(pairing.definition).matchAll(/\('([\w-]+)',\s*'([\w-]+)'\)/g)].map((m) => ({
+    agent: m[1],
+    artifact: m[2],
+  }));
+  if (pairs.length < 5) throw new Error(`chains: parsed ${pairs.length} agent/artifact pairs`);
+
+  const memory = table("project_memory");
+  const contentCap = /char_length\(content\) <= (\d+)/.exec(
+    (memory.constraints ?? []).map((c) => String(c.definition ?? "")).join(" "),
+  )?.[1];
+  if (!contentCap) throw new Error("chains: project_memory has no content length cap");
+
+  const plans = table("chat_plans");
+
+  return {
+    proposal: {
+      pairs,
+      statuses: checkValues(proposals, "status"),
+      provenance: checkValues(proposals, "provenance"),
+      expiresAfter: intervalDefault(proposals, "expires_at"),
+    },
+    memory: {
+      kinds: checkValues(memory, "kind"),
+      statuses: checkValues(memory, "status"),
+      contentCap: Number(contentCap),
+    },
+    plan: {
+      statuses: checkValues(plans, "status"),
+      expiresAfter: intervalDefault(plans, "expires_at"),
+    },
+  };
+}
+
+
+/**
+ * Budgets, usage and entitlements — WP 5.2j.
+ *
+ * The four AI tables are deferred in `coverage.yaml` for the right reason (no
+ * simulation value), and their CHECK constraints are still the vocabulary a
+ * reader needs: a budget has a SCOPE and a PERIOD, and a recorded call has a
+ * STATUS. `user_ai_permissions` has a sidecar, so its columns come from the
+ * contract and are not repeated here.
+ */
+export function deriveAiGovernance(root) {
+  const j = introspected(root);
+  const table = (name) => {
+    const t = j.tables.find((x) => x.name === name);
+    if (!t) throw new Error(`chains: the introspected schema has no table "${name}"`);
+    return t;
+  };
+  const budgets = table("ai_budgets");
+  const usage = table("ai_usage_logs");
+  const models = table("ai_models");
+  const cost = models.columns.filter((c) => /cost_per_1k$/.test(c.name)).map((c) => c.name);
+  if (cost.length < 2) {
+    throw new Error("chains: ai_models no longer carries per-1k input and output costs");
+  }
+  return {
+    budgetScopes: checkValues(budgets, "scope"),
+    budgetPeriods: checkValues(budgets, "period"),
+    budgetCeilings: budgets.columns
+      .map((c) => c.name)
+      .filter((n) => ["budget_usd", "token_limit", "rpm", "rpd"].includes(n)),
+    usageStatuses: checkValues(usage, "status"),
+    usageRecorded: usage.columns
+      .map((c) => c.name)
+      .filter((n) =>
+        ["prompt_tokens", "completion_tokens", "total_tokens", "cost_usd", "latency_ms", "error_code"].includes(n),
+      ),
+    modelCostColumns: cost,
+  };
+}
