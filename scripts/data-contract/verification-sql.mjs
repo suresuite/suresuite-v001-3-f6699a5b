@@ -1879,7 +1879,7 @@ async function allProjectsSweep() {
 // D42's lesson is that the largest project is the seeded one: all six run across
 // every project in the database and print per-project rows.
 async function graphLayerBefore() {
-  section("WP 8.0 — the graph layer, measured before it is changed (D112–D118)");
+  section("WP 8.0 — the graph layer, measured before it is changed (D119–D125)");
 
   // 1 ── the shape the ladder depends on, per project.
   const shape = await tryQ(`
@@ -1893,7 +1893,7 @@ async function graphLayerBefore() {
            (select count(*)::int from public.supply_chain_data t where t.project_id = p.id) as scd_rows,
            (select count(*)::int from public.supply_chain_data_multi_tier t where t.project_id = p.id) as scdmt_rows
       from public.projects p order by p.created_at`);
-  report("the shape every classifier depends on, per project (D115, D112)", shape, (rows) => {
+  report("the shape every classifier depends on, per project (D122, D119)", shape, (rows) => {
     if (!rows?.length) { out("- No projects."); return; }
     out(...table(rows));
     const single = rows.filter((r) => r.bom_level === "single");
@@ -1902,7 +1902,7 @@ async function graphLayerBefore() {
     out("");
     out(
       `- **${single.length} of ${rows.length} project(s) are \`bom_level = 'single'\`**, and ${singleNoTier.length} ` +
-        "of those hold ZERO `supply_chain_data_multi_tier` rows. That is **D115** measured: the ETL builds the " +
+        "of those hold ZERO `supply_chain_data_multi_tier` rows. That is **D122** measured: the ETL builds the " +
         "multi-tier lanes only inside its multi-level branch, so a single-level project's Process-level page is " +
         "permanently empty and no error says why.",
     );
@@ -1920,7 +1920,7 @@ async function graphLayerBefore() {
       `- **${deep.length} project(s) have a multi-level BOM at all; ${ladderHolds.length} of them are exactly ` +
         "4 levels deep.** `ProcessLevelNetwork.tsx`'s ladder calls level 5 a supplier and the inbound lane writes " +
         "`max BOM depth + 1`, so the ladder is right on the 4-deep ones and wrong on every other one — suppliers " +
-        "there are rendered and labelled `material level N`. That is **D112** as a count of affected projects.",
+        "there are rendered and labelled `material level N`. That is **D119** as a count of affected projects.",
     );
   });
 
@@ -1946,7 +1946,7 @@ async function graphLayerBefore() {
     );
   });
 
-  // 3 ── D114, the severed BOM root, in both edge tables. `''` and NULL are
+  // 3 ── D121, the severed BOM root, in both edge tables. `''` and NULL are
   //      counted apart because the page's own falsiness test cannot tell them
   //      apart and a migration would have to.
   const blanks = await tryQ(`
@@ -1970,7 +1970,7 @@ async function graphLayerBefore() {
       join public.projects p on p.id = t.project_id
      group by 1, 2
      order by 1, 2`);
-  report("D114 — edges pointing at the empty string, where the BOM root should be", blanks, (rows) => {
+  report("D121 — edges pointing at the empty string, where the BOM root should be", blanks, (rows) => {
     if (!rows?.length) { out("- Both edge tables are empty."); return; }
     out(...table(rows));
     const empties = rows.reduce((a, r) => a + Number(r.to_empty || 0) + Number(r.from_empty || 0), 0);
@@ -1980,14 +1980,14 @@ async function graphLayerBefore() {
         ? `- **${empties} edge endpoint(s) are the empty string.** \`bom_multi_level.higher_level_component_id\` is ` +
           "blank at the top of the tree, where the parent IS the finished product, and the ETL writes that blank " +
           "straight through. The page treats `''` as falsy, so it creates no node and skips the edge: every " +
-          "material→finished-product edge is dropped, which is **D114**."
+          "material→finished-product edge is dropped, which is **D121**."
         : "- **No empty endpoints.** Either the BOM roots reach the product already, or no project has a level-1 " +
           "BOM row for the defect to act on — the `bom_level_1_rows` column above says which, and a zero there " +
-          "makes D114 latent rather than absent.",
+          "makes D121 latent rather than absent.",
     );
   });
 
-  // 4 ── D113. The dedup guard computes `nodeId::level::data_source` and tests
+  // 4 ── D120. The dedup guard computes `nodeId::level::data_source` and tests
   //      `nodeMap[dedupKey]` while writing `nodeMap[nodeId]`, so the guard never
   //      fires and the LAST row read wins the node's level, type and lane. This
   //      counts the nodes for which "last row wins" is a real choice.
@@ -2011,7 +2011,7 @@ async function graphLayerBefore() {
       from per_node
       join public.projects p on p.id = per_node.project_id
      group by 1 order by 1`);
-  report("D113 — nodes whose level depends on which row was read last", multiLevel, (rows) => {
+  report("D120 — nodes whose level depends on which row was read last", multiLevel, (rows) => {
     if (!rows?.length) { out("- No multi-tier nodes to count."); return; }
     out(...table(rows));
     const affected = rows.reduce((a, r) => a + Number(r.nodes_at_many_levels || 0), 0);
@@ -2021,11 +2021,11 @@ async function graphLayerBefore() {
         "written by whichever row the loop reached last — its level, its type, its lane and its colour. The guard " +
         "meant to prevent that tests a key the map is never keyed by, so it has never fired once. `levelNodeCounts` " +
         "is incremented in the same unreachable-guard block, which is why the legend counts and the \"BOM levels\" " +
-        "tile count ROWS rather than nodes: **D113**.",
+        "tile count ROWS rather than nodes: **D120**.",
     );
   });
 
-  // 5 ── D116. Node identity is a bare string shared by three lanes, so a role
+  // 5 ── D123. Node identity is a bare string shared by three lanes, so a role
   //      is not part of it. The pairs that matter are the ones a supply-chain
   //      reader would refuse to merge: a firm that sells to the plant and buys
   //      from it is two roles on one legal entity, not one node.
@@ -2067,7 +2067,7 @@ async function graphLayerBefore() {
       from per_node
       join public.projects p on p.id = per_node.project_id
      group by 1 order by 1`);
-  report("D116 / D112 — nodes holding more than one lane role, which eight classifiers resolve eight ways", roles, (rows) => {
+  report("D123 / D119 — nodes holding more than one lane role, which eight classifiers resolve eight ways", roles, (rows) => {
     if (!rows?.length) { out("- `supply_chain_data` is empty in every project."); return; }
     out(...table(rows));
     const dual = rows.reduce((a, r) => a + Number(r.any_dual_role || 0), 0);
@@ -2080,10 +2080,10 @@ async function graphLayerBefore() {
         "construction: `classify_node_type` resolves a supplier-and-material node to `material` by its priority " +
         "order, `ProductLevelNetwork` resolves it to A or B depending on which row it read last, " +
         "`ProcessLevelNetwork` resolves it to `supplier` through its `inbound` override, and `MapView`'s binary " +
-        "supplier-else-customer test drops it from the map. Same node, four answers, one screen apart (**D112**).",
+        "supplier-else-customer test drops it from the map. Same node, four answers, one screen apart (**D119**).",
     );
     out(
-      `- ${bothFirm} are BOTH a supplier and a customer — **D116**: identity is a bare string with no role in it, ` +
+      `- ${bothFirm} are BOTH a supplier and a customer — **D123**: identity is a bare string with no role in it, ` +
         `so the two collapse into one node. ${supMat} are a supplier and a material; ${matProd} are a material and ` +
         "a product, which is the `subassembly` the SQL classifier has no value for and WP 8.1 adds.",
     );
@@ -2116,7 +2116,7 @@ async function graphLayerBefore() {
            (select count(*)::int from public.node_list l
              where l.project_id = p.id and (l.node_type is null or l.node_type = 'unknown')) as node_list_untyped
       from public.projects p order by p.created_at`);
-  report("D117 — how much of the graph the typed projection cannot see", projection, (rows) => {
+  report("D124 — how much of the graph the typed projection cannot see", projection, (rows) => {
     if (!rows?.length) { out("- No projects."); return; }
     out(...table(rows));
     const missing = rows.reduce((a, r) => a + Number(r.scdmt_nodes_untyped || 0), 0);
@@ -2125,7 +2125,7 @@ async function graphLayerBefore() {
     out(
       `- **${missing} multi-tier node(s) have no \`node_list\` row.** \`rebuild_node_list\` reads ` +
         "`supply_chain_data` and nothing else, so the deep-tier half of the graph — the half Process-level renders " +
-        "— is outside the one typed projection this repository has. That is **D117**, and it is why WP 8.1's " +
+        "— is outside the one typed projection this repository has. That is **D124**, and it is why WP 8.1's " +
         "derivation has to read both edge tables before WP 8.3 can make a page read a type instead of guessing one.",
     );
     out(
@@ -2137,15 +2137,15 @@ async function graphLayerBefore() {
   });
 
   // 7 ── the two columns a page filters on and a report reads, both measured
-  //      rather than assumed: `data_source_group` (D118) and a NULL `level`,
-  //      which `COALESCE(level, 0)` serves to the ladder as a PRODUCT (D119).
+  //      rather than assumed: `data_source_group` (D125) and a NULL `level`,
+  //      which `COALESCE(level, 0)` serves to the ladder as a PRODUCT (D126).
   const columns = await tryQ(`
     select (select count(*)::int from public.supply_chain_data)                                    as scd_rows,
            (select count(*)::int from public.supply_chain_data where data_source_group is not null) as scd_group_written,
            (select count(*)::int from public.supply_chain_data_multi_tier)                          as scdmt_rows,
            (select count(*)::int from public.supply_chain_data_multi_tier where level is null)      as scdmt_level_null,
            (select count(*)::int from public.supply_chain_data_multi_tier where level = 0)          as scdmt_level_zero`);
-  report("D118 / D119 — the documented filter column, and the NULL level the RPC types as a product", columns, (rows) => {
+  report("D125 / D126 — the documented filter column, and the NULL level the RPC types as a product", columns, (rows) => {
     if (!rows?.length) { out("- No rows returned."); return; }
     out(...table(rows));
     const r = rows[0];
@@ -2154,7 +2154,7 @@ async function graphLayerBefore() {
       Number(r.scd_group_written) === 0
         ? `- **\`data_source_group\` is written on 0 of ${r.scd_rows} rows.** Its sidecar says the network pages ` +
           "filter on it and no writer anywhere sets it, so the filter is a documented fact about a column that is " +
-          "always NULL — **D118**. WP 8.2 writes it or deletes it and its contract claim together; a third option " +
+          "always NULL — **D125**. WP 8.2 writes it or deletes it and its contract claim together; a third option " +
           "would be leaving T1 broken on purpose."
         : `- \`data_source_group\` is written on ${r.scd_group_written} of ${r.scd_rows} rows — the sidecar's ` +
           "claim is partly true, and WP 8.2 owns which rows it is false for.",
@@ -2162,7 +2162,7 @@ async function graphLayerBefore() {
     out(
       `- **${r.scdmt_level_null} row(s) carry a NULL \`level\`** and ${r.scdmt_level_zero} carry 0. ` +
         "`COALESCE(scdmt.level, 0)` in the multi-tier RPC serves a NULL as 0, and the ladder calls 0 a **product**: " +
-        "an unknown depth is answered with a confident wrong type rather than with `unknown` (**D119**). A zero " +
+        "an unknown depth is answered with a confident wrong type rather than with `unknown` (**D126**). A zero " +
         "count makes it latent, not closed — nothing stops the next NULL.",
     );
   });
@@ -2183,15 +2183,15 @@ async function graphLayerBefore() {
 // rule that is nothing like the edge function's: outbound `0`, `bom_single_level`
 // a literal `1`, **`bom_multi_level` a literal `2` — ignoring `b.level`
 // entirely** — and inbound `GREATEST(1, max_level + 1)` per material. That is
-// D125, and it is the ninth classifier of the eight D112 counts, one layer down:
-// two live writers disagreeing about what the column MEANS, where D112 is eight
+// D132, and it is the ninth classifier of the eight D119 counts, one layer down:
+// two live writers disagreeing about what the column MEANS, where D119 is eight
 // live readers disagreeing about what it SAYS.
 //
-// It also changes D114 from "an edge is dropped" to something worse. The RPC
+// It also changes D121 from "an edge is dropped" to something worse. The RPC
 // writes `COALESCE(b.higher_level_component_id, 'ROOT')` — so where the BOM root
 // has no parent it does not drop the edge, it **invents a node called `ROOT`** and
 // points every root material at it. The first seven probes found zero empty
-// endpoints and read that as D114 being latent. It is not latent; it is a
+// endpoints and read that as D121 being latent. It is not latent; it is a
 // different shape, and a count of `''` could never have seen it.
 //
 // So: four more probes, all `select`, all every-project. Which writer wrote each
@@ -2199,7 +2199,7 @@ async function graphLayerBefore() {
 // agrees with the tables it was derived from (probe 10), and how many BOM roots
 // there are for the defect to act on (probe 11).
 async function graphLayerWhoWroteIt() {
-  section("WP 8.0 — WHICH ETL wrote this graph, and what it invented (D125, D126)");
+  section("WP 8.0 — WHICH ETL wrote this graph, and what it invented (D132, D133)");
 
   // 8 ── the signature. The two writers leave different fingerprints in the bom
   //      lane, and the BOM's own depth is the control.
@@ -2214,7 +2214,7 @@ async function graphLayerWhoWroteIt() {
               from public.supply_chain_data_multi_tier t
              where t.project_id = p.id and t.data_source = 'inbound')  as lane_inbound_levels
       from public.projects p order by p.created_at`);
-  report("D125 — the bom lane's levels against the BOM table's own depths", signature, (rows) => {
+  report("D132 — the bom lane's levels against the BOM table's own depths", signature, (rows) => {
     if (!rows?.length) { out("- No projects."); return; }
     out(...table(rows));
     const withLane = rows.filter((r) => r.lane_bom_levels);
@@ -2226,7 +2226,7 @@ async function graphLayerWhoWroteIt() {
         `${laddered.length} carry a ladder of several levels. Those are the two ETLs' fingerprints: the SQL RPC ` +
         "writes a LITERAL `2` for every `bom_multi_level` row and the edge function writes `row.level || 1`, so the " +
         "histogram says which one last ran — and a page reading a fixed echelon ladder is reading a column whose " +
-        "meaning depends on that. **D125**: two live writers, one column, two definitions.",
+        "meaning depends on that. **D132**: two live writers, one column, two definitions.",
     );
     out(
       "- The `lane_inbound_levels` column is the same story on the other lane. Both writers use a `max BOM depth + 1` " +
@@ -2249,7 +2249,7 @@ async function graphLayerWhoWroteIt() {
              where b.project_id = p.id
                and (b.higher_level_component_id is null or btrim(b.higher_level_component_id) = '')) as bom_roots
       from public.projects p order by p.created_at`);
-  report("D126 — `ROOT`, the node no upload contains", root, (rows) => {
+  report("D133 — `ROOT`, the node no upload contains", root, (rows) => {
     if (!rows?.length) { out("- No projects."); return; }
     out(...table(rows));
     const edges = rows.reduce((a, r) => a + Number(r.scdmt_root_edges || 0) + Number(r.scd_root_edges || 0), 0);
@@ -2265,14 +2265,14 @@ async function graphLayerWhoWroteIt() {
           "every centrality on the page is computed over. **T1 in one string**: a node on screen sourced to nothing."
         : `- **No \`ROOT\` edges.** The substitution is in the live RPC and has produced nothing measurable — either ` +
           `no project has a parentless BOM row (the \`bom_roots\` column says: ${roots} across all projects), or the ` +
-          "lane predates it. A zero here makes D126 latent, not absent: the `COALESCE` is still what the next " +
+          "lane predates it. A zero here makes D133 latent, not absent: the `COALESCE` is still what the next " +
           "parentless row meets.",
     );
     out(
       `- ${roots} \`bom_multi_level\` row(s) have no parent at all, which is how many finished-product edges the ` +
         "two writers have to get right. The edge function drops them (the demand walk finds no parent, so the child " +
         "gets no root and the row is never emitted); the RPC points them at `ROOT`. **Neither writes the product** — " +
-        "which is D114, restated against what the data actually shows rather than against the `|| ''` a reader sees " +
+        "which is D121, restated against what the data actually shows rather than against the `|| ''` a reader sees " +
         "first.",
     );
   });
@@ -2294,7 +2294,7 @@ async function graphLayerWhoWroteIt() {
            (select max(t.updated_at) from public.supply_chain_data_multi_tier t where t.project_id = p.id) as lane_written,
            (select max(s.updated_at) from public.inbound_logistics s where s.project_id = p.id)            as inbound_touched
       from public.projects p order by p.created_at`);
-  report("D127 — the lane against the tables it was derived from", stale, (rows) => {
+  report("D134 — the lane against the tables it was derived from", stale, (rows) => {
     if (!rows?.length) { out("- No projects."); return; }
     out(...table(rows));
     const drifted = rows.filter(
@@ -2306,7 +2306,7 @@ async function graphLayerWhoWroteIt() {
         ? `- **${drifted.length} project(s) have an inbound lane whose row count does not match ` +
           "`inbound_logistics`.** Neither writer is a trigger: both are invoked by a client, so a CSV uploaded after " +
           "the last combine changes the source table and leaves the graph exactly as it was. The page then renders a " +
-          "graph of a world that no longer exists, with no staleness signal on it — **D127**, and it is the one " +
+          "graph of a world that no longer exists, with no staleness signal on it — **D134**, and it is the one " +
           "defect in this phase that a user would describe as \"the map looks wrong\" without any classifier being " +
           "involved at all."
         : "- Every non-empty inbound lane matches its source row count. That does not make the lane fresh — a " +
