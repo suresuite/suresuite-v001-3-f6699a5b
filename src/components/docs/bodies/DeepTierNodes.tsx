@@ -1,7 +1,7 @@
 // §6.3 section 3 — Deep-Tier Nodes. Generated reference, authored narrative.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
-import { HowItLoads, SuppliedAndComputed, DatabaseRules } from "@/components/docs/tableRef";
+import { HowItLoads, SuppliedAndComputed, DatabaseRules, TemplateHeaders } from "@/components/docs/tableRef";
 import { refTable, computedColumns, suppliedColumns } from "@/components/docs/tableFacts";
 
 export default function DeepTierNodes() {
@@ -48,11 +48,21 @@ export default function DeepTierNodes() {
 
       <Callout title="The engine does not read this table">
         <p>
-          The simulation runs on the tier-2 chain — arcs, BOM, item masters. The deep-tier graph
+          The simulation runs on the tier-2 chain — lanes, BOM, item masters. The deep-tier graph
           feeds the network analyses and the firm-level map, not the simulation. So a change here
           changes centralities and prominence, and it does not change a fill rate.
         </p>
       </Callout>
+
+      <Section id="template" title="The file you upload">
+        <TemplateHeaders table={t} />
+        <P>
+          Upload it from <AppLink to="/project-manager">Project Manager</AppLink> under the Deep
+          Tier Network tab, with the CSV format selected. The nodes file and the{" "}
+          <DocLink to="deep-tier-edges">edges file</DocLink> are two halves of one graph — upload
+          the nodes first, because an edge naming a firm that has no node has nothing to connect.
+        </P>
+      </Section>
 
       <DatabaseRules table={t} />
 

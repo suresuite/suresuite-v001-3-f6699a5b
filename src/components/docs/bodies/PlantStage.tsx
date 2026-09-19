@@ -16,7 +16,7 @@ export default function PlantStage() {
           What the plant can make, what it costs to make it, and — where the product is made to
           stock — how much finished inventory to keep. The rows come from your{" "}
           <DocLink to="products">Products</DocLink> master and the{" "}
-          <DocLink to="outbound-logistics">outbound arcs</DocLink> that name a product.
+          <DocLink to="outbound-logistics">outbound lanes</DocLink> that name a product.
         </P>
         <P>
           A product's <Term>fulfillment_mode</Term> decides how much of this stage applies to it: a

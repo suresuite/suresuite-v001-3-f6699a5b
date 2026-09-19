@@ -10,7 +10,7 @@ export default function Suppliers() {
 
   return (
     <>
-      <PageTitle lead="Capacity and reliability, beyond the arcs that connect a supplier to materials.">
+      <PageTitle lead="Capacity and reliability, beyond the lanes that connect a supplier to materials.">
         Suppliers
       </PageTitle>
 
@@ -73,7 +73,7 @@ export default function Suppliers() {
 
       <Section id="no-master-row" title="A supplier with no row here still works">
         <P>
-          If an inbound arc names a supplier this file never mentions, the model does not stop. It
+          If an inbound lane names a supplier this file never mentions, the model does not stop. It
           synthesises a supplier with perfect reliability and no capacity limit, and carries on.
           That is a reasonable default and it is also an invisible one — nothing on screen
           distinguishes a supplier you declared as perfect from one you never declared at all.

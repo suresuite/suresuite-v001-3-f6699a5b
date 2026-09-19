@@ -18,9 +18,17 @@ export default function ConnectingErp() {
           A standing permission to read from your system, attached to one project.
         </Key>
         <P>
-          Once linked, a sync can be requested and the rows arrive the same way an upload does —
-          into staging, diffed against what you already have, waiting for somebody to approve.{" "}
-          <DocLink to="reviewing-a-sync">Reviewing and applying a sync</DocLink> is that half.
+          Once linked, a sync can be requested: the rows arrive into staging, diffed against what
+          you already have, and wait for somebody to approve — unless the link's own auto-apply
+          threshold lets them through.{" "}
+          <DocLink to="reviewing-a-sync">Reviewing and applying a sync</DocLink> is that half, and
+          it is where the threshold's consequences are.
+        </P>
+        <P>
+          <strong>One system is supported today and it brings across products.</strong> Your other
+          tables — lanes, bills of materials, materials, suppliers, the deep-tier network — are files
+          whether or not a link exists. <DocLink to="csv-vs-connector">CSV or connector</DocLink>{" "}
+          sets out what that means for how you build a model.
         </P>
         <P>
           A link belongs to one project. Connecting a system does not connect it to your

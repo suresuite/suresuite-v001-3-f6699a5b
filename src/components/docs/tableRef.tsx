@@ -42,6 +42,7 @@ import {
   filled,
   suppliedColumns,
   typed,
+  uploadAssetFor,
   type BlankSource,
 } from "@/components/docs/tableFacts";
 
@@ -363,24 +364,77 @@ export function DatabaseRules({ table }: { table: RefTable }) {
   );
 }
 
-/** The header row of a template file, built from the contract's own order. */
+/**
+ * The file a reader downloads, and the header row it contains.
+ *
+ * Until WP 5.2j this rendered ONLY the synthesised header row, and §4 D110 is
+ * what that cost: the product ships fourteen templates in `public/template/`,
+ * §6.3 asks every table page for "template", and a reader of this page could
+ * not get the file. A header row a person has to paste into a spreadsheet
+ * themselves is not the template — it is a description of one.
+ *
+ * Both are here now, in the order a reader needs them: the file first, the
+ * header row second for anyone building the file from their own system rather
+ * than filling one in. Neither is typed — the path comes from the wizard's own
+ * declaration through `uploadAssetFor`, and the headers from the contract.
+ */
 export function TemplateHeaders({ table }: { table: RefTable }) {
   const cols = typed(table);
-  if (!cols.length) return null;
+  const asset = uploadAssetFor(table);
   const required = cols.filter((c) => blankBehaviour(c).source === "rejected");
+  if (!cols.length && !asset) return null;
   return (
-    <div className="space-y-2">
-      <div className="overflow-x-auto rounded-sm border border-border bg-card p-3 shadow-xs">
-        <code className="whitespace-pre font-mono text-[12px] text-foreground">
-          {cols.map((c) => c.csvHeader).join(",")}
-        </code>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        {cols.length} columns, of which {required.length}{" "}
-        {required.length === 1 ? "is required" : "are required"}:{" "}
-        {required.map((c) => c.csvHeader).join(", ") || "none"}. Column order does not matter — the
-        parser reads the header row, not the position.
-      </p>
+    <div className="space-y-3">
+      {asset?.templateFile && (
+        <p className="text-[13px] leading-relaxed">
+          <a
+            href={asset.templateFile}
+            download
+            className="font-medium text-primary underline underline-offset-2"
+          >
+            Download {asset.templateFile.split("/").pop()}
+          </a>{" "}
+          <span className="text-muted-foreground">
+            — the same file the upload wizard offers under{" "}
+            <span className="font-medium text-foreground">{asset.name}</span>. It is a filled
+            example, not an empty header row: overwrite the rows, keep the headers.
+          </span>
+        </p>
+      )}
+      {asset && !asset.templateFile && (
+        // node_list, and the sentence is the finding rather than an apology
+        // for a gap: `templateFile: ''` is a declaration in the wizard.
+        <p className="text-[13px] leading-relaxed text-muted-foreground">
+          <span className="font-medium text-foreground">There is no template for this one, on
+          purpose.</span>{" "}
+          The wizard offers none because you do not start from a blank file — you start from the
+          nodes already in your project, export them, add the columns below, and upload the result.
+        </p>
+      )}
+      {cols.length > 0 && (
+        <>
+          <div className="overflow-x-auto rounded-sm border border-border bg-card p-3 shadow-xs">
+            <code className="whitespace-pre font-mono text-[12px] text-foreground">
+              {cols.map((c) => c.csvHeader).join(",")}
+            </code>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {cols.length} columns, of which {required.length}{" "}
+            {required.length === 1 ? "is required" : "are required"}:{" "}
+            {required.map((c) => c.csvHeader).join(", ") || "none"}. Column order does not matter —
+            the parser reads the header row, not the position.
+          </p>
+        </>
+      )}
+      {asset?.guideFile && (
+        <p className="text-xs text-muted-foreground">
+          The wizard links{" "}
+          <a href={asset.guideFile} className="text-primary underline underline-offset-2">
+            {asset.guideFile.split("/").pop()}
+          </a>{" "}
+          beside this dataset. It is a short format note, not a substitute for this page.
+        </p>
+      )}
     </div>
   );
 }

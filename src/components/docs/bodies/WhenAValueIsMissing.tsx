@@ -61,7 +61,7 @@ export default function WhenAValueIsMissing() {
         </P>
         <P>
           A substitution is not an error. Most of them are the answer you would have given: the
-          cheapest price you actually pay, the demand your own outbound arcs imply. What matters is
+          cheapest price you actually pay, the demand your own outbound lanes imply. What matters is
           that you can tell one from a number you supplied — which is what{" "}
           <DocLink to="where-a-number-came-from">the provenance marks</DocLink> are for.
         </P>

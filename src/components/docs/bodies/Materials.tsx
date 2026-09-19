@@ -33,7 +33,7 @@ export default function Materials() {
             cost: (
               <>
                 Leaving this blank is <em>not</em> an error and is often the right choice: the
-                cheapest inbound arc's price is usually what you meant, and the model marks the cell
+                cheapest inbound lane's price is usually what you meant, and the model marks the cell
                 as derived so you can see it happened.
               </>
             ),
@@ -46,12 +46,12 @@ export default function Materials() {
               <>
                 A commercial fact the supplier states. It applies per supplier-and-material link, so
                 two suppliers of the same material can carry different minimums only if you say so
-                on the arc.
+                on the lane.
               </>
             ),
             lead_time_cv: (
               <>
-                The <em>spread</em> around a lead time whose centre lives on the inbound arc. This
+                The <em>spread</em> around a lead time whose centre lives on the inbound lane. This
                 file says how variable; <DocLink to="inbound-logistics">Inbound Logistics</DocLink>{" "}
                 says how long.
               </>
