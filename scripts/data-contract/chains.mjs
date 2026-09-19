@@ -23,7 +23,7 @@
 // derivation disagree, and CI runs it on every pull request.
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -718,21 +718,33 @@ export function deriveReplicationSeries(root) {
   const orow = /\{\s*key:\s*"(\w+)",\s*label:\s*"([^"]+)",\s*unit:\s*"([^"]*)"/g;
   while ((m = orow.exec(sBlock[1]))) offered.push({ key: m[1], label: m[2], unit: m[3] });
 
-  const heatmap = readFileSync(join(root, "src", "components", "sim", "UtilizationHeatmap.tsx"), "utf8");
-  const wants = /\?\.(\w+) as\s*\|\s*Record<string, number\[\]>/.exec(heatmap)?.[1]
-    ?? /\)\?\.(\w+) as/.exec(heatmap)?.[1]
-    ?? null;
-  if (!wants) {
-    throw new Error(
-      "chains: could not read which series UtilizationHeatmap looks for. Re-read the " +
-        "component rather than dropping the claim that it never finds one.",
-    );
+  // THE PANEL WAS REMOVED IN WP 6.3 (§4 D113) and this derivation reports the
+  // removal rather than assuming it. Two states, both read from the tree: the file
+  // exists and we say which series it looks for, or it is gone and the manual says
+  // so. Deleting this read instead would leave the manual silently unable to
+  // mention a panel that used to be there, and a reader who remembers it with no
+  // explanation is worse off than one who is told.
+  const heatmapPath = join(root, "src", "components", "sim", "UtilizationHeatmap.tsx");
+  const heatmapRemoved = !existsSync(heatmapPath);
+  let wants = null;
+  if (!heatmapRemoved) {
+    const heatmap = readFileSync(heatmapPath, "utf8");
+    wants = /\?\.(\w+) as\s*\|\s*Record<string, number\[\]>/.exec(heatmap)?.[1]
+      ?? /\)\?\.(\w+) as/.exec(heatmap)?.[1]
+      ?? null;
+    if (!wants) {
+      throw new Error(
+        "chains: could not read which series UtilizationHeatmap looks for. Re-read the " +
+          "component rather than dropping the claim that it never finds one.",
+      );
+    }
   }
   return {
     written,
     offered: offered.map((o) => ({ ...o, written: written.includes(o.key) })),
-    heatmapWants: wants,
-    heatmapEverRenders: written.includes(wants),
+    heatmapRemoved,
+    heatmapWants: wants ?? "utilization",
+    heatmapEverRenders: wants != null && written.includes(wants),
   };
 }
 

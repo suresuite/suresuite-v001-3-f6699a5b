@@ -2315,6 +2315,121 @@ export const RUN_KPIS: RunKpis = {
       "emitted": true
     },
     {
+      "key": "revenue",
+      "label": "Revenue",
+      "emitted": true
+    },
+    {
+      "key": "demand_value",
+      "label": "Demand (value)",
+      "emitted": true
+    },
+    {
+      "key": "produced_value",
+      "label": "Produced (value)",
+      "emitted": true
+    },
+    {
+      "key": "lost_sales_value",
+      "label": "Lost sales (value)",
+      "emitted": true
+    },
+    {
+      "key": "lost_units",
+      "label": "Lost units",
+      "emitted": true
+    },
+    {
+      "key": "lost_inbound_units",
+      "label": "Lost inbound units",
+      "emitted": true
+    },
+    {
+      "key": "max_backlog",
+      "label": "Peak backlog (units)",
+      "emitted": true
+    },
+    {
+      "key": "avg_on_hand_value",
+      "label": "Average on-hand (value)",
+      "emitted": true
+    },
+    {
+      "key": "capacity_utilization",
+      "label": "Capacity utilization",
+      "emitted": true
+    },
+    {
+      "key": "cost_of_resilience",
+      "label": "Cost of resilience",
+      "emitted": true
+    },
+    {
+      "key": "cost_ss_holding",
+      "label": "Cost · safety-stock holding",
+      "emitted": true
+    },
+    {
+      "key": "cost_backup_premium",
+      "label": "Cost · backup supplier premium",
+      "emitted": true
+    },
+    {
+      "key": "cost_multi_sourcing_premium",
+      "label": "Cost · multi-sourcing premium",
+      "emitted": true
+    },
+    {
+      "key": "cost_expediting",
+      "label": "Cost · expediting freight",
+      "emitted": true
+    },
+    {
+      "key": "cost_overtime",
+      "label": "Cost · overtime capacity",
+      "emitted": true
+    },
+    {
+      "key": "cost_lost_sales",
+      "label": "Cost · lost sales",
+      "emitted": true
+    },
+    {
+      "key": "cost_allocation_labor",
+      "label": "Cost · allocation labour",
+      "emitted": true
+    },
+    {
+      "key": "cost_fg_ss_holding",
+      "label": "Cost · finished-goods safety stock",
+      "emitted": true
+    },
+    {
+      "key": "cost_backorder_penalty",
+      "label": "Cost · backorder penalty",
+      "emitted": true
+    },
+    {
+      "key": "cost_monitoring",
+      "label": "Cost · supplier monitoring",
+      "emitted": true
+    },
+    {
+      "key": "ttr_weeks",
+      "label": "Time to recover (weeks)",
+      "emitted": true
+    },
+    {
+      "key": "tts_weeks",
+      "label": "Time to survive (weeks)",
+      "emitted": true
+    },
+    {
+      "key": "pre_disruption_fill_rate",
+      "label": "Fill rate before the disruption",
+      "emitted": true
+    },
+    {
       "key": "fill_rate_beta",
       "label": "Fill rate (β)",
       "emitted": false
@@ -2335,11 +2450,6 @@ export const RUN_KPIS: RunKpis = {
       "emitted": false
     },
     {
-      "key": "revenue",
-      "label": "Revenue",
-      "emitted": true
-    },
-    {
       "key": "cost",
       "label": "Cost",
       "emitted": false
@@ -2351,7 +2461,7 @@ export const RUN_KPIS: RunKpis = {
     },
     {
       "key": "utilization",
-      "label": "Utilization (avg)",
+      "label": "Utilization (avg) · legacy",
       "emitted": false
     },
     {
@@ -2366,12 +2476,7 @@ export const RUN_KPIS: RunKpis = {
     },
     {
       "key": "ttr_days",
-      "label": "Time-to-recover",
-      "emitted": false
-    },
-    {
-      "key": "resilience_index",
-      "label": "Resilience index",
+      "label": "Time-to-recover (days) · legacy",
       "emitted": false
     }
   ],
@@ -2411,6 +2516,9 @@ export const RUN_KPIS: RunKpis = {
 export type ReplicationSeries = {
   written: string[];
   offered: { key: string; label: string; unit: string; written: boolean }[];
+  /** WP 6.3 removed the panel (§4 D113). The manual says which state it is in,
+   *  rather than falling silent about a panel a reader may remember. */
+  heatmapRemoved: boolean;
   heatmapWants: string;
   heatmapEverRenders: boolean;
 };
@@ -2448,6 +2556,7 @@ export const REPLICATION_SERIES_FACTS: ReplicationSeries = {
       "written": true
     }
   ],
+  "heatmapRemoved": true,
   "heatmapWants": "utilization",
   "heatmapEverRenders": false
 };
