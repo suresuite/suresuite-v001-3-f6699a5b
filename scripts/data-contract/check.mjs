@@ -32,6 +32,7 @@
 //   R16 every §4 D-number is unique, and §4 has no duplicated row (D122's merge, WP 6.3)
 //   R17 every edge function is DEPLOYED or deferred with a named owner (D123, WP 6.3)
 //   R18 a `computed_by` names a writer that is CALLED, or declares why not (D118, WP 6.2)
+//   R19 §4, §16 and §17 each have exactly ONE heading (D146's merge, WP 8.0)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -61,6 +62,34 @@ const PLAN = join(ROOT, "docs", "PLAN.md");
 const GENERATED = join(ROOT, "build", "data-contract.generated.json");
 
 const PLAN_SECTIONS = /\n## (7|8|9|10|11|12|13)\. /;
+
+// THE ROADMAP IS NOT ONE CONTIGUOUS SLICE ANY MORE, and reading it as one is how
+// a whole phase would sit outside every rule that reads ✅ markers.
+//
+// Phases 0–6 are §7–§13, ending where §14's deferred work begins. Phase 8 is §18,
+// which is AFTER §16 and §17 — it had to be, because a phase inserted between §13
+// and §14 would renumber §15 and §16, and this document is cited by section number
+// from the sidecars, from CLAUDE.md and from eleven hundred places in itself.
+//
+// So the roadmap is two ranges, joined. R7 rule 2 (every done package has a §16
+// entry), R8 (nothing open is owned by a finished package) and R10 (§17 agrees
+// with the roadmap) all read THIS, so a Phase 8 package marked ✅ is held to
+// exactly what a Phase 3 package is held to. A gate whose scope stops at the
+// section a phase happens to live in is a gate that a new section walks around.
+const ROADMAP_RANGES = [
+  [PLAN_SECTIONS, "\n## 14."],
+  [/\n## 18\. /, null],
+];
+function roadmapText(planText) {
+  const parts = [];
+  for (const [startRe, endMarker] of ROADMAP_RANGES) {
+    const a = planText.search(startRe);
+    if (a < 0) continue;
+    const b = endMarker ? planText.indexOf(endMarker, a) : -1;
+    parts.push(planText.slice(a, b < 0 ? undefined : b));
+  }
+  return parts.join("\n");
+}
 
 const failures = [];
 const warnings = [];
@@ -377,6 +406,28 @@ const PLAN_PATH = "docs/PLAN.md";
 // drift entry appended past it — §17 has no sub-headings of its own), or EOF.
 // Verified against BOTH document shapes: 69 entries with §17 in the middle, 69 with
 // §17 moved to the end, and §17's own table excluded either way.
+//
+// ── AND A PHASE SECTION IS EXCLUDED WHOLE, WHICH THE `###` RULE ALONE CANNOT DO
+//    (WP 8.0, §4 D146's merge).
+//
+// The rule above stops a later section at its first `### ` heading, on the stated
+// assumption that such a section "has no sub-headings of its own" — true of §17,
+// whose body is one table. It is NOT true of a PHASE section: §7–§13 and §18 each
+// carry a `### WP N.M — …` heading per package, and those are ROADMAP headings, not
+// drift-log entries. With §18 at the end of the document the older rule read its six
+// package headings as six §16 entries, and R7's append-only half then reported a
+// LOSS every time one of their titles was edited — a gate crying wolf about the one
+// section it should never have been looking at.
+//
+// So a later section runs to the next `## ` heading when it is a phase section, and
+// to the next `## ` OR `### ` otherwise. Both halves keep their reason: an entry
+// appended past §17 is still recovered, and a phase's packages are never entries.
+//
+// Rejected: filtering entry headings on the `·` that carries their date. It is a
+// real discriminator for 82 of the 90 headings in scope and it drops
+// `### PHASE 3 → 4 HANDOFF`, a genuine entry with no date — so it would trade a
+// false positive for a silent false negative on exactly the kind of entry that
+// matters most.
 const section16 = (text) => {
   const a = text.indexOf("\n## 16.");
   if (a < 0) return "";
@@ -386,7 +437,9 @@ const section16 = (text) => {
     if (!m) break;
     const start = m.index + 1;
     const after = rest.slice(start + 1);
-    const end = /\n(?=## |### )/.exec(after);
+    const heading = /^[^\n]*/.exec(after)[0];
+    const isPhase = /^## \d+\.\s+Phase\b/.test(heading);
+    const end = isPhase ? /\n(?=## )/.exec(after) : /\n(?=## |### )/.exec(after);
     rest = rest.slice(0, start) + (end ? after.slice(end.index) : "");
   }
   return rest;
@@ -460,9 +513,7 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
 
 {
   const planText = readFileSync(PLAN, "utf8");
-  const roadmapStart = planText.search(PLAN_SECTIONS);
-  const roadmapEnd = planText.indexOf("\n## 14.");
-  const roadmap = roadmapStart < 0 ? "" : planText.slice(roadmapStart, roadmapEnd < 0 ? undefined : roadmapEnd);
+  const roadmap = roadmapText(planText);
 
   // "### WP 2.3 — Data-plane audit ✅ *(D15 — done …)*" → "WP 2.3 — Data-plane audit"
   const donePackages = roadmap
@@ -519,9 +570,7 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
 
 {
   const planText = readFileSync(PLAN, "utf8");
-  const roadmapStart = planText.search(PLAN_SECTIONS);
-  const roadmapEnd = planText.indexOf("\n## 14.");
-  const roadmap = roadmapStart < 0 ? "" : planText.slice(roadmapStart, roadmapEnd < 0 ? undefined : roadmapEnd);
+  const roadmap = roadmapText(planText);
 
   const headings = roadmap.split("\n").filter((l) => /^### WP /.test(l));
   const donePackages = new Set(
@@ -849,8 +898,7 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
   if (seqStart < 0) {
     fail("R10", "PLAN.md §17 could not be located — the section heading moved");
   } else {
-    const roadmapStart = planText.search(PLAN_SECTIONS);
-    const roadmap = planText.slice(roadmapStart, seqStart);
+    const roadmap = roadmapText(planText);
     const seq = planText.slice(seqStart);
 
     // Packages §7–§13 marks done, by number — from BOTH places the roadmap marks
@@ -925,6 +973,43 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
       console.log(`  R10 §17 agrees with §7–§13 · ${done.size} done package(s) cross-checked`);
     }
   }
+}
+
+// ───────── R19: A SECTION SLICE KEYS ON THE FIRST HEADING, SO THERE IS ONE
+//
+// FOUND BY THE SAME MERGE R16 WAS, AND IT IS THE HALF R16 DOES NOT COVER (§4 D146).
+//
+// One branch had moved `## 17. Sequencing` to the end of the document so that §16
+// would run to it; the other had edited §17 in place. Both were right on their own,
+// the lines never collided, and the merge produced a PLAN.md with TWO
+// `## 17. Sequencing` headings.
+//
+// `section16()` slices from `## 16.` to the FIRST `## 17.`, and §4's own slice does
+// the same between `## 4.` and `## 4.1`. So twenty-two drift-log entries fell
+// outside §16 — which is D139 reopened four commits after it was closed, by a merge
+// rather than by an edit. R7's append-only half could not see them, and R7's second
+// half would have accepted a done package whose entry landed out there.
+//
+// R16 makes a defect's identity unique. This makes a SECTION's identity unique, for
+// the same reason: everything that reads this document reads it by slicing on a
+// heading, and a slice that keys on the first of two is a slice that silently drops
+// everything after the second.
+{
+  const planText = readFileSync(PLAN, "utf8");
+  const singletons = ["## 4. ", "## 16. ", "## 17. Sequencing"];
+  let duplicated = 0;
+  for (const heading of singletons) {
+    const count = planText.split("\n").filter((l) => l.startsWith(heading.trimEnd())).length;
+    if (count !== 1) {
+      duplicated += 1;
+      fail("R19", `PLAN.md has ${count} "${heading.trimEnd()}" heading(s) and must have exactly 1. ` +
+                  "`section16()` and §4's own slice key on the FIRST occurrence, so a duplicate " +
+                  "silently drops everything between the second one and the end of the section — " +
+                  "which is how a merge reopened §4 D139 (see §4 D146).");
+    }
+  }
+  if (!duplicated)
+    console.log(`  R19 §4, §16 and §17 each have exactly one heading · ${singletons.length} checked`);
 }
 
 // ──────────────────────────────────────────────────────────────────── report
