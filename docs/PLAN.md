@@ -15995,3 +15995,19 @@ accommodate a migration would be worse than no rehearsal.
   `auth.users`. Named; no owner has agreed to them.
 - **WP 6.5 (a) is unblocked on this axis and gains a warning**: publishing `ingest-file` now
   works, and makes the first uploader undeletable until WP 7.2 decides what erasure means.
+- **AND THIS SLICE BROKE THE SEQUENCING RULE IT DOCUMENTED TWO SLICES AGO.** Commit
+  `8643014` carries `20260919000012` AND an edit to `verification-sql.mjs` (probe 0.9's
+  expected count) in ONE push — exactly what CLAUDE.md forbids and what D128 is about. It
+  costs nothing on the branch, because `supabase-migrations.yml` is `branches: [main]` and
+  the migration cannot deploy from here; the §15 run this push fires reads production
+  WITHOUT it and will correctly report 8 keys against the probe's new expectation of 6.
+  **At the MERGE both doors fire together and the report will straddle the deploy**, which
+  is D128's own subject.
+
+  The fence added in stage 0 is what catches it: the merge's run will read the migration
+  ledger moving and fail with "the report straddles a deploy", rather than publishing a
+  number somebody could quote. **So the gate works on its author, which is the only real
+  test of a gate** — and the remedy is unchanged and now actually required: take the
+  after-reading in the push AFTER the merge, not from the merge. Recorded rather than
+  quietly corrected, because a rule broken by the person who wrote it two slices earlier is
+  better evidence about the rule than any number of clean slices.
