@@ -21,6 +21,8 @@
 //   R9  `governance.audited` matches the audit triggers the migrations create
 //   R10 §17's sequencing table agrees with §7–§13's ✅ markers (WP 3.3)
 //   R11 every DEFERRED table says whether it is audited, and is right (D54, WP 4.2)
+//   R13 an IMPLEMENTED policy's declared data requirement is described by the
+//       contract AND reaches a display surface (D94, D112, WP 6.2)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -47,6 +49,7 @@ const ROOT = join(HERE, "..", "..");
 const INTROSPECTED = join(ROOT, "build", "schema.introspected.json");
 const COVERAGE = join(HERE, "coverage.yaml");
 const PLAN = join(ROOT, "docs", "PLAN.md");
+const GENERATED = join(ROOT, "build", "data-contract.generated.json");
 
 const PLAN_SECTIONS = /\n## (7|8|9|10|11|12|13)\. /;
 
@@ -827,6 +830,106 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
 // ──────────────────────────────────────────────────────────────────── report
 
 const covered = [...sidecars.keys()].length;
+// ───────── R13: A DECLARED REQUIREMENT IS DESCRIBED, AND IS NOT SWALLOWED
+//
+// TWO RULES THAT ONLY LOOK LIKE ONE, and the second was found by trying to
+// satisfy the first.
+//
+// (1) §4 D94 — `contract:generate` already refuses a `base_data_requirements`
+// field the contract has no column for. Its INVERSE had nobody: an IMPLEMENTED
+// policy could read an entity field, declare nothing, and the sidecar would
+// record `consumed_by: null` with nothing to contradict it. That is exactly how
+// `P-C.2`'s two `Customer` reads survived a trace, a sidecar rewrite and a
+// resolution-chain package. So: a requirement declared by a policy whose
+// `status` is `implemented` must name a column the contract describes, and that
+// column's `engine.consumed_by` may not be null.
+//
+// (2) §4 D112 — a requirement the GRADER has no binding for is dropped, in
+// silence, on every surface: `grading.ts::flattenFindings`, `validationService
+// .ts::compileRequiredDataFindings` and `trustReport.ts` each skip a field whose
+// `evaluable` is false, and `itemMasterCandidates.ts` twice more. Thirteen of
+// thirteen declared fields were bound when WP 6.2 looked, which is why nothing
+// had ever noticed: the FIRST declaration for a table the grader does not load
+// would have been declared in the engine, described in the contract, and
+// invisible to every reader — T1's "no number without a source" inverted into a
+// source with no number. A binding is `FIELD_BINDINGS` in the shared grader, and
+// this rule counts the fields that have none so the next one cannot vanish.
+{
+  const registryPath = join(ROOT, "src", "lib", "policies", "registry.generated.json");
+  const gradingPath = join(ROOT, "supabase", "functions", "_shared", "grading.ts");
+  if (!existsSync(registryPath) || !existsSync(gradingPath)) {
+    fail("R13", "the registry snapshot or the shared grader is missing — cannot check declared requirements");
+  } else {
+    const registry = JSON.parse(readFileSync(registryPath, "utf8"));
+    const grading = readFileSync(gradingPath, "utf8");
+    // `FIELD_BINDINGS` keys, read from the grader itself rather than listed here:
+    // a second list of the same fact is the defect this rule is about.
+    const boundFields = new Set(
+      [...grading.matchAll(/"([a-z_]+\.[a-z_]+)":\s*\{\s*rows:/g)].map((m) => m[1]),
+    );
+    if (boundFields.size === 0) {
+      fail("R13", "no FIELD_BINDINGS parsed out of grading.ts — fix the scan rather than reporting zero");
+    }
+    const contract = JSON.parse(readFileSync(GENERATED, "utf8"));
+    const declared = new Map();
+    const note = (req, who) => {
+      const prev = declared.get(req.field);
+      declared.set(req.field, prev ? { ...prev, by: `${prev.by}, ${who}` } : { req, by: who });
+    };
+    for (const req of registry.base_data_requirements ?? []) note(req, "the engine");
+    for (const pol of registry.policies ?? []) {
+      // Only an IMPLEMENTED policy's requirement is a fact about running code. A
+      // `planned` policy declaring a field it will one day read is a design note,
+      // and holding the contract to it would be the mirror of D95: giving a
+      // column a reason that belongs to a different column.
+      if (pol.status !== "implemented") continue;
+      for (const req of pol.data_requirements ?? []) note(req, pol.catalog_ref ?? pol.id);
+    }
+
+    let unbound = 0;
+    const unboundFields = [];
+    for (const [field, { by }] of declared) {
+      // Counted BEFORE the resolution checks below, which `continue`. A count
+      // that only sees the fields that resolved is a count that reports zero on
+      // the day everything breaks.
+      if (!boundFields.has(field)) { unbound++; unboundFields.push(field); }
+      const [table, column] = field.split(".");
+      const described = contract.tables?.[table];
+      if (!described) {
+        fail("R13",
+          `the engine declares "${field}" (${by}) and the contract describes no table "${table}" — ` +
+          "describe it or stop declaring the field; a requirement nothing can resolve is D95's shape");
+        continue;
+      }
+      const col = (described.columns ?? []).find((c) => c.name === column);
+      if (!col) {
+        fail("R13",
+          `the engine declares "${field}" (${by}) and "${table}" has no column "${column}"`);
+        continue;
+      }
+      if (!col.engine || col.engine.consumed_by === null || col.engine.consumed_by === undefined) {
+        fail("R13",
+          `"${field}" is a declared data requirement of ${by} and its sidecar says ` +
+          "`consumed_by: null` — the engine and the contract disagree about whether anything reads it (D94)");
+      }
+    }
+
+    // The count is printed rather than failed. A binding needs the table in
+    // `GradingDataset`, which is a loader change in two runtimes, so a
+    // declaration may legitimately land one commit ahead of it — but it may not
+    // land SILENTLY, which is the whole of D112.
+    if (unbound > 0) {
+      warn("R13", `${unbound} declared requirement(s) have no FIELD_BINDINGS entry, so every ` +
+        "grading surface drops them (`evaluable: false`). Add the binding or record the gap (D112): " +
+        unboundFields.join(", "));
+    }
+    console.log(
+      `  R13 declared requirements resolve · ${declared.size} declared by implemented policies + the engine · ` +
+      `${declared.size - unbound} gradeable, ${unbound} not (D94, D112)`,
+    );
+  }
+}
+
 // ───────── R12: LINEAGE MUST RESOLVE, AND EVERY PAGE MUST BE ACCOUNTED FOR
 //
 // WP 5.1 fills `surfaces`, and its brief is one sentence long about why this

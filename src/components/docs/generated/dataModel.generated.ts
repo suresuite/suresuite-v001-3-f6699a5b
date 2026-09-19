@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "de7031e73047";
+export const CONTRACT_VERSION = "9fbe1d355f43";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260918000004_disruption_plane_audited.sql";
+export const LAST_MIGRATION = "20260919000001_customers_land.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
   "tablesDescribed": 48,
-  "columnsDescribed": 590,
+  "columnsDescribed": 592,
   "tablesUndescribed": 33
 } as const;
 
@@ -105,7 +105,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "customers",
         "grain": "One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows.",
-        "columns": 8,
+        "columns": 10,
         "owner": "data-ingestion"
       },
       {

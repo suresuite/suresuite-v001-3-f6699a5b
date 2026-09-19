@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 331,
-      "migrations_applied": 323,
-      "last_migration": "20260918000004_disruption_plane_audited.sql"
+      "migrations_found": 332,
+      "migrations_applied": 324,
+      "last_migration": "20260919000001_customers_land.sql"
     },
     "sidecars": 48,
     "registry": {
@@ -18,7 +18,7 @@
   "counts": {
     "tables_in_schema": 81,
     "tables_covered": 48,
-    "columns_covered": 590,
+    "columns_covered": 592,
     "check_constraints": 41,
     "engine_requirements": 7,
     "orphans": 0,
@@ -3902,7 +3902,13 @@
         "project_id",
         "customer_id"
       ],
-      "ingest_dataset": null,
+      "ingest_dataset": {
+        "wizard_id": "item_master_customers",
+        "fact_class": "master",
+        "server_set": [
+          "project_id"
+        ]
+      },
       "surfaces": [],
       "governance": {
         "read": "project_member",
@@ -3945,6 +3951,15 @@
           ],
           "definition": "UNIQUE (project_id, customer_id)",
           "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        },
+        {
+          "name": "customers_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260919000001_customers_land.sql"
         }
       ],
       "indexes": [],
@@ -3994,7 +4009,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The customer's identifier as the source file spells it. Joins to `outbound_logistics.customer_id`, which is the only place the identifier is used today — and the join is by string, untrimmed, which is D8's shape.",
+          "meaning": "The customer's identifier as the source file spells it. Joins to `outbound_logistics.customer_id`, which is the only place the identifier is used today — and the join is by string, untrimmed, which is D8's shape. IT IS ALSO THE UPLOAD KEY since WP 6.2 (§4 D108): the same string the outbound file spells, so a customer row and its lanes meet on the value the user typed rather than on a normalisation neither file performed.",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
@@ -4004,9 +4019,13 @@
           },
           "substitutions": [],
           "ingest": {
-            "csv_header": null,
+            "csv_header": "customer_id",
             "required": true,
-            "validate": null
+            "validate": "non-empty; unique within the project",
+            "rule": {
+              "kind": "text",
+              "blank": "reject"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -4036,9 +4055,13 @@
           },
           "substitutions": [],
           "ingest": {
-            "csv_header": null,
+            "csv_header": "name",
             "required": false,
-            "validate": null
+            "validate": "optional; display only",
+            "rule": {
+              "kind": "text",
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": null,
@@ -4058,23 +4081,27 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The customer's service segment, the axis the customer-echelon allocation policies tier on (`P-C.x`, blueprint §4.2 and Appendix A). NOT a closed vocabulary yet — there is no CHECK, because the policy that reads it does not exist, and inventing the set before the reader is how a column gets a constraint nobody can satisfy.",
+          "meaning": "The customer's service segment, the axis the customer-echelon allocation policies tier on (`P-C.x`, blueprint §4.2 and Appendix A). NOT a closed vocabulary yet — there is no CHECK, because the set a CHECK would name is the user's own segmentation and inventing it before anybody can write the table is how a column gets a constraint nobody can satisfy.",
           "grain": "level",
           "computed_by": null,
           "engine": {
-            "consumed_by": null,
+            "consumed_by": "P-C.2 customer_allocation — Customer.segment, the axis `sla_tiers` keys its fill floors by, and what the `fill_rate_segment_<segment>` KPIs are named after",
             "transform": null,
-            "missing_default": null
+            "missing_default": "\"default\" (Customer.segment's own default) — every customer in one segment, so no `sla_tiers` key can match and every declared floor resolves to 0.0"
           },
           "substitutions": [],
           "ingest": {
-            "csv_header": null,
+            "csv_header": "segment",
             "required": false,
-            "validate": null
+            "validate": "optional; any string. Blank lands NOTHING and the column's own DEFAULT 'default' stands in — which is a value and not an absence, so the landing reports it as a substitution rather than leaving the cell silent (T2).",
+            "rule": {
+              "kind": "text",
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": null,
-          "note": "DEFAULT 'default' is production's own default, adopted rather than chosen. It is a value, not an absence, and a later reader must not treat it as \"unsegmented\" without saying so at the point of display (§5 T2). TRACED IN WP 6.2 (§4 D69). This is the column whose absence was silent in a second way: `P-C.2`'s `sla_tiers` guarantees a fill floor PER SEGMENT, and the mapper gave every customer the entity default `\"default\"`, so no tier could ever match and every floor was 0.0. The engine already warned (`unknown_sla_segment` in P-C.2's feasibility) — the warning named the symptom while nothing named the cause, because the segments it compared against were a constant.",
+          "note": "DEFAULT 'default' is production's own default, adopted rather than chosen. It is a value, not an absence, and a later reader must not treat it as \"unsegmented\" without saying so at the point of display (§5 T2). DECLARED IN WP 6.2 (§4 D94), which is what closed the blank above rather than the trace alone. `p_c2_customer_allocation.data_requirements` named one field — `outbound_logistics.volume` — while reading this column and `priority_weight` on every run, so `consumed_by: null` here had nothing to contradict it. The requirement is declared now, at level `defaulted` because `Customer` carries a default, and the gate that fell out of it is the inverse of the one `contract:generate` already enforces: an IMPLEMENTED policy's declared data requirement may not be `consumed_by: null` in the sidecar. TRACED IN WP 6.2 (§4 D69). This is the column whose absence was silent in a second way: `P-C.2`'s `sla_tiers` guarantees a fill floor PER SEGMENT, and the mapper gave every customer the entity default `\"default\"`, so no tier could ever match and every floor was 0.0. The engine already warned (`unknown_sla_segment` in P-C.2's feasibility) — the warning named the symptom while nothing named the cause, because the segments it compared against were a constant.",
           "engine_requirement": null
         },
         {
@@ -4100,13 +4127,18 @@
           },
           "substitutions": [],
           "ingest": {
-            "csv_header": null,
+            "csv_header": "priority_weight",
             "required": false,
-            "validate": null
+            "validate": "optional; >= 0. ZERO IS ALLOWED AND MEANS SOMETHING: only the ratio between two customers matters, so 0 is the lowest priority there is — served last, and only out of what is left. `exclusive_min` would reject a value the engine reads correctly. Blank lands nothing and the DEFAULT 1.0 stands in, which makes the `priority` rule inert for that customer.",
+            "rule": {
+              "kind": "numeric",
+              "min": 0,
+              "blank": "null"
+            }
           },
           "surfaces": [],
           "resolution": null,
-          "note": "TRACED IN WP 6.2 (§4 D69), AND THE PREVIOUS NOTE'S REASON WAS FALSE. It read: \"`scsim` has no customer-priority concept today … none of [the `P-C.x` policies] is implemented\". `p_c2_customer_allocation` is `status: implemented` in the registry export and has always read `Customer.priority_weight`. What was true is the CONSEQUENCE — nothing reached it — but the cause was the mapper never loading this table, not an absent policy, and the stated reason sent the next reader to the blueprint instead of to `project_map.py`. The blank was still correct while it lasted: `from_project_data` built `Customer(id=c, name=c)` from the outbound arcs, so every customer arrived at 1.0 whatever this column held. The mapper now reads it.",
+          "note": "TRACED IN WP 6.2 (§4 D69), AND THE PREVIOUS NOTE'S REASON WAS FALSE. It read: \"`scsim` has no customer-priority concept today … none of [the `P-C.x` policies] is implemented\". `p_c2_customer_allocation` is `status: implemented` in the registry export and has always read `Customer.priority_weight`. What was true is the CONSEQUENCE — nothing reached it — but the cause was the mapper never loading this table, not an absent policy, and the stated reason sent the next reader to the blueprint instead of to `project_map.py`. The blank was still correct while it lasted: `from_project_data` built `Customer(id=c, name=c)` from the outbound arcs, so every customer arrived at 1.0 whatever this column held. The mapper now reads it. AND IT IS DECLARED SINCE WP 6.2 (§4 D94). The mapper reading a column is the hop; the registry DECLARING it is what every tool deriving \"what the engine reads\" was missing — this sidecar, `project_map`'s requirement list and WP 6.1's resolution-chain door 1 were all blind to a field the engine consumes on every run.",
           "engine_requirement": null
         },
         {
@@ -4188,6 +4220,77 @@
           "normalize_at_promotion": null,
           "meaning": "When the row was first inserted. Server-stamped.",
           "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "ingest_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260919000001_customers_land.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The ingestion run that last wrote this row (WP 6.2, §4 D108), and through it the file, the uploader and who approved the promotion. NULL for every row that predates the CSV landing path — and on THIS table that is every row written before `20260919000001`, because until then nothing in the product wrote it at all: the only way a row got here was a hand at the database. A null means the provenance is unknown, never that there was none.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_row_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260919000001_customers_land.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The tier-1 staged row this was promoted from (WP 6.2). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the LINE rather than told a file name. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and a customer belongs to the project rather than to the run.",
+          "grain": "identifier",
           "computed_by": null,
           "engine": {
             "consumed_by": null,
@@ -26707,5 +26810,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "de7031e73047"
+  "contract_version": "9fbe1d355f43"
 }

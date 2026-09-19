@@ -1460,54 +1460,71 @@ export const ANALYSIS_KINDS: AnalysisKind[] = [
 ];
 
 /**
- * The stress-test battery, READ FROM THE ENGINE SOURCE.
+ * The stress-test battery, READ FROM THE ENGINE'S OWN DECLARATION.
  *
- * This is §4 D90's weakest door — a text scan over a Python literal — and
- * the page that renders it says so. The battery is not in
- * `registry_export.py`, which is where a declaration belongs; until it is,
- * a scan that goes red when the literal moves beats a hand copy that goes
- * quietly wrong (§4 D22, and the archived copy already had).
+ * WP 5.2d parsed the `ST_DEFINITIONS` dict literal out of
+ * `scsim/scsim/stress/battery.py` — §4 D90's WEAKEST door, a quoted string
+ * in a Python file as the only evidence — and recorded why: the declaration
+ * belongs in `registry_export.py` and regenerating that needs PyPI, which §4
+ * D94 recorded as unreachable. WP 6.2 found that premise false. The battery
+ * is declared in the registry export now (§4 D106), this reads it, and the
+ * scan is deleted rather than kept beside it — two readers of one fact is
+ * `single-source` (I1) broken.
  *
- * `runnable` is derived from a `_run_battery(..., "ST-n", ...)` call site,
- * not from the module docstring that claims the same thing.
+ * `entrypoint` is the module-level callable Python itself resolved, so
+ * `runnable` answers "is there something to call" rather than "does a
+ * docstring claim one". It also says WHERE the battery lives: these are
+ * `scsim` library entry points and not a screen in this product (§4 D111).
  */
-export type StressTest = { id: string; description: string; runnable: boolean };
+export type StressTest = {
+  id: string;
+  description: string;
+  runnable: boolean;
+  entrypoint: string | null;
+};
 
 export const STRESS_TESTS: StressTest[] = [
   {
     "id": "ST-1",
     "description": "Supplier outage sweep (manuscript): each supplier × LT-extension × Δt {5,8,10}.",
-    "runnable": true
+    "runnable": true,
+    "entrypoint": "scsim.stress.run_st1"
   },
   {
     "id": "ST-2",
     "description": "Supplier capacity-cut sweep: each supplier × φ {0.75,0.5,0.25,0} × {4,8} wks.",
-    "runnable": true
+    "runnable": true,
+    "entrypoint": "scsim.stress.run_st2"
   },
   {
     "id": "ST-3",
     "description": "Material shortage sweep (M7: material-scoped capacity).",
-    "runnable": false
+    "runnable": false,
+    "entrypoint": null
   },
   {
     "id": "ST-4",
     "description": "Edge/lane shock (M7: edge split).",
-    "runnable": false
+    "runnable": false,
+    "entrypoint": null
   },
   {
     "id": "ST-5",
     "description": "Demand surge (M7: demand-side events).",
-    "runnable": false
+    "runnable": false,
+    "entrypoint": null
   },
   {
     "id": "ST-6",
     "description": "Compound: ST-1 ∩ ST-5 (M7).",
-    "runnable": false
+    "runnable": false,
+    "entrypoint": null
   },
   {
     "id": "ST-7",
     "description": "Nexus-node attack: top-k ML-critical (M7; ml-service integration).",
-    "runnable": false
+    "runnable": false,
+    "entrypoint": null
   }
 ];
 

@@ -177,27 +177,37 @@ export function knownLimits(input: TrustReportInput): KnownLimit[] {
     });
   }
 
-  // ALWAYS TRUE TODAY. Not conditional on the data, and stating it is the whole
-  // difference between a trust report and a marketing page.
+  // ── THE ALWAYS-TRUE HALF, AND WHY IT IS THE DANGEROUS HALF ────────────────
+  //
+  // Stating these is the whole difference between a trust report and a marketing
+  // page. It is also the half NOTHING RECOMPUTES, and §4 D103 is what that cost:
+  // two entries here outlived the defects they described and went on being
+  // published to users on every project, more pessimistic than the software.
+  //
+  //   · "the dataset hash does not cover the deep-tier network" cited §4 D75,
+  //     which `20260917000009` CLOSED by folding exactly the six deep-tier
+  //     topology columns into `hash_network` at `schema_version` 3;
+  //   · "sixteen database functions write data without naming the person who ran
+  //     them" was §4 D71/D78's figure, and WP 6.2 slices 11 and 12 closed that
+  //     list to four names, none of which is debt — three attribute through
+  //     `assert_writer_may_act` and the fourth `RETURNS trigger`, which
+  //     PostgreSQL forbids from declaring arguments.
+  //
+  // Both are gone. What replaces the second is the limit that IS still true, and
+  // it is at the edge rather than in the database. And `ref` is now GATED: a
+  // `§4 D<n>` reference is checked against §4's own "Closed by" column by
+  // `trustReportLimits.test.ts`, so an entry citing a closed defect fails CI
+  // instead of reaching a reader. That gate is the actual fix — the two
+  // corrections above are what it would have caught.
   out.push({
-    ref: "§4 D75",
+    ref: "§4 D28",
     limit:
-      "The dataset hash does not cover the deep-tier network (`network_nodes`, " +
-      "`network_edges`).",
+      "Three calls in the public API write data without naming a person.",
     consequence:
-      "Centrality and prominence figures are keyed on a separate topology " +
-      "digest rather than on the dataset hash, so a freshness verdict for those " +
-      "two analyses is sound but is not the same anchor as the rest of this " +
-      "report.",
-  });
-  out.push({
-    ref: "G4 · audit-actor",
-    limit:
-      "Sixteen database functions write data without naming the person who ran " +
-      "them.",
-    consequence:
-      "The audit trail behind some rows in this project records that a change " +
-      "happened but not who made it.",
+      "The API's principal is a key, not a user, so those writes record that a " +
+      "change happened and cannot name who asked for it. A fabricated user id " +
+      "would be worse: the trail would read as though somebody acted when " +
+      "nobody did.",
   });
   out.push({
     ref: "§4 D28",
@@ -218,6 +228,26 @@ export function knownLimits(input: TrustReportInput): KnownLimit[] {
         "manifest behind them, so this report does not say how many entities " +
         "each engine-read field covers. Absence of a coverage table here is not " +
         "evidence that coverage is complete.",
+    });
+  }
+
+  // §4 D112 — a requirement the grader has no binding for is `evaluable: false`,
+  // and every surface DROPPED it in silence until WP 6.2. Reporting it here is
+  // T3 applied to the report's own inputs: the engine reads this field, and this
+  // report cannot tell you how well it is covered.
+  const unevaluable = (input.graded ?? []).filter((g) => !g.evaluable);
+  if (unevaluable.length > 0) {
+    out.push({
+      ref: "§4 D112 (closed — this is the measurement it made visible)",
+      limit:
+        `${unevaluable.length} field(s) the engine reads are not measurable on ` +
+        `this report: ${unevaluable.map((g) => g.field).join(", ")}.`,
+      consequence:
+        "The engine consumes them and the grader has no binding for their " +
+        "table, so the coverage table above does not count them. Absence from " +
+        "that table is not evidence that they are covered — for these fields " +
+        "the engine is using its own defaults and nothing here can say for how " +
+        "many entities.",
     });
   }
 

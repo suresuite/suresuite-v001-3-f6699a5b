@@ -250,7 +250,8 @@ const UploadWizard = ({
   // WP 3.2: the wizard is an uploader and a STATUS VIEW. This is the status.
   const [lastRun, setLastRun] = useState<IngestRunSummary | null>(null);
   const [deepTierFormat, setDeepTierFormat] = useState<'csv' | 'json'>('csv');
-  const [itemMasterType, setItemMasterType] = useState<'materials' | 'products' | 'suppliers'>('materials');
+  const [itemMasterType, setItemMasterType] =
+    useState<'materials' | 'products' | 'suppliers' | 'customers'>('materials');
   
   // Deep tier CSV specific states
   const [nodesFile, setNodesFile] = useState<File | null>(null);
@@ -367,6 +368,30 @@ const UploadWizard = ({
       templateFile: '/template/suppliers.csv',
       guideFile: '/docs/csv-upload-guide.md',
       expectedHeaders: ['supplier_id', 'name', 'capacity_per_week', 'reliability_score'],
+      category: 'item-master',
+    },
+    {
+      // §4 D108 — the demand-side counterpart of the suppliers master, and the
+      // surface §4 D94's declaration forced. `P-C.2 customer_allocation` reads
+      // `segment` and `priority_weight` on every run and nothing in this product
+      // could set either, so WP 6.1's G4 gate ("no engine-read field is
+      // unreachable by both the grid and every upload") fired on the commit that
+      // declared them. It was right: this is the missing surface, not a gate to
+      // relax.
+      //
+      // `sla_fill_floor_pct` is DELIBERATELY NOT OFFERED. The column exists and
+      // no engine field carries it — `scsim`'s `Customer` has no per-customer
+      // floor and `sla_tiers` is keyed by SEGMENT (§4 D95) — so a header for it
+      // would be a column a user fills that changes nothing, which is exactly
+      // the defect §4 D18 is. It comes back when the engine has somewhere to put
+      // it.
+      id: 'item_master_customers',
+      name: 'Customers Master',
+      description: 'Per-customer segment and allocation priority the simulation reads under scarcity',
+      templateFile: '/template/customers.csv',
+      guideFile: '/docs/csv-upload-guide.md',
+      expectedHeaders: ['customer_id'],
+      optionalHeaders: ['name', 'segment', 'priority_weight'],
       category: 'item-master',
     },
     {
@@ -1497,7 +1522,7 @@ const UploadWizard = ({
                   <Label className="text-xs font-medium">Item Master Table</Label>
                   <RadioGroup
                     value={itemMasterType}
-                    onValueChange={(value: 'materials' | 'products' | 'suppliers') => {
+                    onValueChange={(value: 'materials' | 'products' | 'suppliers' | 'customers') => {
                       setItemMasterType(value);
                       setFile(null);
                       setCsvData([]);
@@ -1521,6 +1546,12 @@ const UploadWizard = ({
                       <RadioGroupItem value="suppliers" id="im-suppliers" />
                       <Label htmlFor="im-suppliers" className="text-xs cursor-pointer">
                         Suppliers (capacity, reliability)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="customers" id="im-customers" />
+                      <Label htmlFor="im-customers" className="text-xs cursor-pointer">
+                        Customers (segment, allocation priority)
                       </Label>
                     </div>
                   </RadioGroup>

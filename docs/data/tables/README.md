@@ -6,7 +6,7 @@
 > `supabase/contract/`, not these pages.
 
 48 of 81 tables are covered,
-590 columns in all. A table that is not here is listed
+592 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -19,7 +19,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`bom_multi_level`](bom_multi_level.md) | 2 | `data-ingestion` | 11 | One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`), and the index is NULLS NOT DISTINCT because a ROOT line has no parent — without that clause the constraint would hold every line except the roots (D5 closed). |
 | [`bom_single_level`](bom_single_level.md) | 2 | `data-ingestion` | 10 | One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`) — a re-upload updates the line rather than repeating it (D5 closed). |
 | [`capabilities`](capabilities.md) | G | `platform` | 7 | One thing a user may or may not be permitted to do — a page they may open or a feature they may use. The CATALOG: it says what rights exist, never who holds them. The four grant tables answer that. |
-| [`customers`](customers.md) | 2 | `data-ingestion` | 8 | One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows. |
+| [`customers`](customers.md) | 2 | `data-ingestion` | 10 | One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows. |
 | [`dataset_versions`](dataset_versions.md) | 3 | `platform` | 10 | One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot. |
 | [`delegation_grants`](delegation_grants.md) | G | `platform` | 9 | One temporary, subtractive grant of project access from one person to another. `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the grantor holds, and it always ends. |
 | [`disruption_scenario_effects`](disruption_scenario_effects.md) | 4 | `policy-ui` | 9 | One effect for one profile: WHAT the disruption does to whatever it hits. A capacity reduction or a time delay, with a magnitude and the unit that magnitude is in. |
@@ -63,4 +63,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `de7031e73047`, engine `0.2.3`.*
+*Generated from data contract `9fbe1d355f43`, engine `0.2.3`.*

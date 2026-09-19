@@ -1362,6 +1362,22 @@
           "field": "outbound_logistics.volume",
           "level": "required",
           "reason": "Per-customer demand shares come from outbound volumes; without them there are no customer segments to allocate between (the policy is inert below two customers)."
+        },
+        {
+          "condition": null,
+          "fallback": "Customer.priority_weight's own default, 1.0 \u2014 every customer equal, which makes the `priority` rule inert",
+          "fallback_spec": [],
+          "field": "customers.priority_weight",
+          "level": "defaulted",
+          "reason": "The `priority` rule orders customers by this weight wherever the `priority_weights` param does not name the customer (SimContext.cust_priority). Only the RATIO between two customers means anything, so a table where every row is unset cannot order anything."
+        },
+        {
+          "condition": null,
+          "fallback": "Customer.segment's own default, \"default\" \u2014 every customer in one segment, so no `sla_tiers` key can match and every declared floor resolves to 0.0",
+          "fallback_spec": [],
+          "field": "customers.segment",
+          "level": "defaulted",
+          "reason": "`sla_tiers` maps segment \u2192 fill floor %, so the segment is the axis the `sla_tier` rule tiers on (SimContext.cust_segment). It is also what the `fill_rate_segment_<segment>` KPIs are keyed by."
         }
       ],
       "hooks": [
@@ -3121,6 +3137,43 @@
       "status": "planned",
       "strategy_class": "meta",
       "summary": "Firms execute SEQUENCED responses \u2014 detect \u2192 expedite \u2192 backup \u2192 overtime \u2014 gated by triggers and budget. Composes enabled policies; replaces flat recovery lists. Hook: PH-20 (evaluation) + delegated."
+    }
+  ],
+  "stress_tests": [
+    {
+      "description": "Supplier outage sweep (manuscript): each supplier \u00d7 LT-extension \u00d7 \u0394t {5,8,10}.",
+      "entrypoint": "scsim.stress.run_st1",
+      "id": "ST-1"
+    },
+    {
+      "description": "Supplier capacity-cut sweep: each supplier \u00d7 \u03c6 {0.75,0.5,0.25,0} \u00d7 {4,8} wks.",
+      "entrypoint": "scsim.stress.run_st2",
+      "id": "ST-2"
+    },
+    {
+      "description": "Material shortage sweep (M7: material-scoped capacity).",
+      "entrypoint": null,
+      "id": "ST-3"
+    },
+    {
+      "description": "Edge/lane shock (M7: edge split).",
+      "entrypoint": null,
+      "id": "ST-4"
+    },
+    {
+      "description": "Demand surge (M7: demand-side events).",
+      "entrypoint": null,
+      "id": "ST-5"
+    },
+    {
+      "description": "Compound: ST-1 \u2229 ST-5 (M7).",
+      "entrypoint": null,
+      "id": "ST-6"
+    },
+    {
+      "description": "Nexus-node attack: top-k ML-critical (M7; ml-service integration).",
+      "entrypoint": null,
+      "id": "ST-7"
     }
   ]
 }

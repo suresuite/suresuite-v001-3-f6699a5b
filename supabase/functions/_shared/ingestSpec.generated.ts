@@ -172,6 +172,67 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
     ],
     "normalize": []
   },
+  "item_master_customers": {
+    "dataset": "item_master_customers",
+    "target": "customers",
+    "tier": "2",
+    "factClass": "master",
+    "serverSet": [
+      "project_id"
+    ],
+    "columns": [
+      {
+        "column": "customer_id",
+        "csvHeader": "customer_id",
+        "required": true,
+        "type": "text",
+        "nullable": false,
+        "rule": {
+          "kind": "text",
+          "blank": "reject"
+        },
+        "validate": "non-empty; unique within the project"
+      },
+      {
+        "column": "name",
+        "csvHeader": "name",
+        "required": false,
+        "type": "text",
+        "nullable": true,
+        "rule": {
+          "kind": "text",
+          "blank": "null"
+        },
+        "validate": "optional; display only"
+      },
+      {
+        "column": "segment",
+        "csvHeader": "segment",
+        "required": false,
+        "type": "text",
+        "nullable": false,
+        "rule": {
+          "kind": "text",
+          "blank": "null"
+        },
+        "validate": "optional; any string. Blank lands NOTHING and the column's own DEFAULT 'default' stands in — which is a value and not an absence, so the landing reports it as a substitution rather than leaving the cell silent (T2)."
+      },
+      {
+        "column": "priority_weight",
+        "csvHeader": "priority_weight",
+        "required": false,
+        "type": "numeric",
+        "nullable": false,
+        "rule": {
+          "kind": "numeric",
+          "min": 0,
+          "blank": "null"
+        },
+        "validate": "optional; >= 0. ZERO IS ALLOWED AND MEANS SOMETHING: only the ratio between two customers matters, so 0 is the lowest priority there is — served last, and only out of what is left. `exclusive_min` would reject a value the engine reads correctly. Blank lands nothing and the DEFAULT 1.0 stands in, which makes the `priority` rule inert for that customer."
+      }
+    ],
+    "normalize": []
+  },
   "inbound_logistics": {
     "dataset": "inbound_logistics",
     "target": "inbound_logistics",
@@ -953,6 +1014,7 @@ export const INGEST_DATASETS: Record<string, IngestDataset> = {
 export const PROMOTABLE_TARGETS: string[] = [
   "bom_multi_level",
   "bom_single_level",
+  "customers",
   "inbound_logistics",
   "materials",
   "outbound_logistics",

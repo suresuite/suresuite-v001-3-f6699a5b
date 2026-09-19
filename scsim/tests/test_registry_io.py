@@ -85,6 +85,13 @@ def test_param_schemas_carry_units():
 _KNOWN_DATASETS = {
     "materials", "products", "suppliers",
     "inbound_logistics", "outbound_logistics", "bom_single_level",
+    # `customers` joined the vocabulary in WP 6.2 (§4 D94): P-C.2 reads
+    # `Customer.priority_weight` and `Customer.segment` on every run and declared
+    # neither, so three separate gates that derive "what the engine reads" from
+    # the registry were blind to them. This allow-list is the fourth — it had to
+    # move in the same change, which is §4 D101's lesson (a gate pinned to a
+    # value a declaration moved).
+    "customers",
 }
 _LEVELS = {"required", "recommended", "defaulted"}
 
@@ -106,6 +113,12 @@ def test_registry_exports_data_requirements():
     assert p5["products.production_capacity"]["level"] == "required"
     pc2 = {r["field"]: r for r in by_id["customer_allocation"]["data_requirements"]}
     assert pc2["outbound_logistics.volume"]["level"] == "required"
+    # §4 D94 — the two Customer attributes P-C.2 reads on every run. `defaulted`
+    # and not `recommended`: `Customer` carries a default for both, so an absent
+    # value is a substitution to report (T2) and never a blocked dispatch.
+    for field in ("customers.priority_weight", "customers.segment"):
+        assert pc2[field]["level"] == "defaulted", field
+        assert pc2[field]["fallback"], f"{field} declares no fallback"
 
     # Vocabulary discipline: every declared field must parse as a known
     # dataset.column reference with a valid level (else the generated
@@ -235,3 +248,39 @@ def test_legacy_adapter_maps_plant_targets():
     assert not any("skipped" in n for n in conv.notes)
     res = run_scenario(conv.scenario, debug=True)
     assert res.aggregates["lost_sales_value"]["mean"] > 0.0
+
+
+# ------------------------------------------------- stress battery (§4 D106)
+
+def test_registry_declares_the_stress_battery():
+    """The battery is a DECLARATION, not a text scan over a Python literal.
+
+    §4 D106: `ST_DEFINITIONS` was reachable only by parsing the literal out of
+    `scsim/stress/battery.py`, which is §4 D90's weakest door — and the archived
+    manual had already drifted from it. §3 makes this module the single source of
+    truth for what the engine declares, so the battery is exported here.
+    """
+    from scsim.stress.battery import ST_DEFINITIONS
+
+    reg = build_registry()
+    tests = reg["stress_tests"]
+    assert [t["id"] for t in tests] == list(ST_DEFINITIONS), \
+        "the export must carry every declared cell, in the engine's own order"
+
+    # `entrypoint` is resolved by getattr, so it answers "is there a callable"
+    # rather than "does a docstring claim one". ST-1 and ST-2 are runnable; the
+    # rest are declared and wait on M7.
+    runnable = {t["id"]: t["entrypoint"] for t in tests if t["entrypoint"]}
+    assert runnable == {
+        "ST-1": "scsim.stress.run_st1",
+        "ST-2": "scsim.stress.run_st2",
+    }, runnable
+
+    # No glyph survives into the description, and no stray space is left where
+    # one was: "(manuscript ✅)" must become "(manuscript)", not "(manuscript )".
+    for t in tests:
+        assert not set(t["description"]) & set("✅❌️"), t["id"]
+        assert " )" not in t["description"], t["id"]
+        assert t["description"] == t["description"].strip()
+    st1 = next(t for t in tests if t["id"] == "ST-1")
+    assert "(manuscript)" in st1["description"], st1["description"]
