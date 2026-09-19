@@ -197,7 +197,19 @@ own push, which is why WP 3.4 lost a run: it shipped four new probes beside a mi
 A §15 run that races a deploy still reports a database that changed underneath it, and on
 `main` that race is live: WP 3.3's first after-run read 1 787 rows in its lane sweep and a
 total of 1 691 in a later query of the same report. Four runs across three packages have
-been lost to this rule's older form. **Measure every project, never just one** — the
+been lost to this rule's older form. **AND THE RULE CANNOT BE OBEYED AT THE MERGE, WHICH
+IS WHERE IT MATTERS — §4 D128.** `verification-sql.yml` has no branch filter, so the merge
+commit fires it AND the migration deploy at the same second: WP 6.4 put its migrations and
+its probe in two separate pushes, as the rule says, and the merge carried both doors
+anyway — the report is stamped 20:03:28Z and the seven migrations applied 20:04:11–13Z,
+with 74 statements spanning the boundary. So an after-reading taken on a merge is not a
+reading. **Take it in the push AFTER the merge**, and read the report's last section:
+`verification-sql.mjs` now reads the migration ledger before its first probe and after its
+last, FAILS the run if it moved, and timestamps every `### ` heading, so a raced report
+says so itself instead of being quoted as a measurement. **And a migration cannot report
+its own numbers to you**: `supabase db push` forwards no notices and a `DELETE`'s row count
+is a command tag, so the published deploy log is `Applying …` lines and nothing else (D127).
+A migration that wants a number read back must write it into a table. **Measure every project, never just one** — the
 largest project in this database is the one `seed-project.yml` seeds, and reading it
 alone reports a clean data layer that is not clean (PLAN.md §4 D42).
 

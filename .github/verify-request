@@ -57,3 +57,41 @@ What it is asked to answer:
      `ingest-file` has never been deployed (D123) and WP 6.5 (a) is the switch.
 
 No migration in this push and none of the other two doors touched.
+
+────────────────────────────────────────────────────────────────────────────────
+WP 7.1 STAGE 0 — the access-control surface, and a clean re-read of the merge
+2026-09-19, no migration in this push. Two jobs in one run.
+
+**1 · STAGE 0, the measurement everything after it is sized by.** §14's staged plan
+counts 27 predicate-less policies, 7 predicate-less write policies and 7 write grants
+to `anon` — all of them read from MIGRATION HISTORY. `no-orphan-table`'s lesson (§4
+D43) is that production can differ: a policy dropped by hand, a grant added in the
+dashboard, a role that is not there. Stages 1–6 change live access control, so they
+are sized from the database and not from the repo. Seven probes:
+
+  0.1 every policy in `public`, classified — how many refuse nothing, how many name
+      the GUC path, how many already name `auth.uid()`
+  0.2 the tables stage 3 has to cover, BY NAME, from `pg_policies`
+  0.3 grants per role, and whether any reach `PUBLIC` (which would make revoking
+      from `anon` alone a no-op)
+  0.4 what `anon` may write, by name — stage 4's worklist
+  0.5 whether `auth.users` holds rows with the SAME uuids as `approved_users`, which
+      decides whether stage 1 mints a session for an existing id or has to create
+      identities first
+  0.6 which ROLE each policy is granted to. **This is stage 1's own blast radius and
+      nothing in the plan had asked it**: the moment a real session exists a request
+      arrives as `authenticated` rather than `anon`, a policy granted to `{anon}`
+      alone stops applying to it, and RLS denies by default — so stage 1 would break
+      reads for exactly the users who logged in
+  0.7 the grant half of the same question: privileges `anon` holds that
+      `authenticated` does not, which is a permission error before RLS is consulted
+
+**2 · A CLEAN RE-READ OF WHAT THE MERGE DID.** Run `35466205199` raced the deploy
+(§4 D128): its report is stamped 20:03:28Z and the seven migrations applied at
+20:04:11–13Z, so D117's after-reading of 0 orphans is an inference rather than a
+measurement. This push carries no migration, `32e581c` is deployed and settled, so
+the same probes now answer for one schema. The number to confirm is **0 orphans in
+all seven tables, against 43 before** — and the migration fence added in this push
+will say so at the bottom of the report rather than leaving it to be trusted.
+
+No migration in this push; the other two doors are untouched.

@@ -120,6 +120,7 @@ function table(rows, cols) {
 function section(title) {
   out("");
   out(`### ${title}`);
+  out(`<!-- at ${new Date().toISOString()} -->`);
   out("");
 }
 
@@ -140,6 +141,81 @@ function report(label, res, render) {
 const gateFailures = [];
 
 // ── schema probe: what does production ACTUALLY have? (D32, D43) ───────────
+// ── THE MIGRATION FENCE (D128) ──────────────────────────────────────────────
+//
+// §15 must not race a deploy, and the rule for that has always been a HABIT: do
+// not put a probe in the same push as a migration. That habit is satisfiable on a
+// feature branch and **unsatisfiable at the merge**, which is where both workflows
+// actually fire — `supabase-migrations.yml` is `branches: [main]` and this workflow
+// has no branch filter at all, so a branch that touched a migration AND one of the
+// three §15 doors fires both on its merge commit, at the same second, by
+// construction. Run `35466205199` is that: the report is stamped 20:03:28 and the
+// seven migrations applied at 20:04:11–13, in the middle of its 74 statements.
+//
+// So the instrument detects it instead of the author remembering. `max(version)` of
+// the migration ledger is read BEFORE the first probe and again AFTER the last one.
+// If it moved, the database changed underneath the report and every count in it is of
+// an unknown shape — which is a GATE FAILURE, not a footnote, because a number nobody
+// can date is the thing this whole file exists to replace.
+//
+// Each `### ` heading also carries an HTML-comment timestamp, so a raced report can
+// still be read: the sections before the deploy are of the old shape and those after
+// are of the new one, and the boundary is visible rather than guessed.
+let fenceBefore = null;
+
+async function migrationFenceOpen() {
+  const res = await tryQ(
+    `select max(version) as version, count(*)::int as applied
+       from supabase_migrations.schema_migrations`);
+  fenceBefore = res.rows?.[0] ?? null;
+  out(
+    `- migration ledger at start: **${fenceBefore?.version ?? "unreadable"}** ` +
+      `(${fenceBefore?.applied ?? "?"} applied)`,
+  );
+}
+
+async function migrationFenceClose() {
+  const res = await tryQ(
+    `select max(version) as version, count(*)::int as applied
+       from supabase_migrations.schema_migrations`);
+  const after = res.rows?.[0] ?? null;
+  section("The migration fence — did the database change under this report?");
+  if (!fenceBefore || !after) {
+    out("- **UNREADABLE.** `supabase_migrations.schema_migrations` could not be read at",
+        "  one or both ends, so this run cannot say whether a deploy landed during it.");
+    gateFailures.push(
+      "the migration fence could not be read, so no count in this report can be " +
+        "dated against the schema it describes (PLAN.md §4 D128).",
+    );
+    return;
+  }
+  const moved = String(fenceBefore.version) !== String(after.version) ||
+    Number(fenceBefore.applied) !== Number(after.applied);
+  out(`  | end | version | applied |`,
+      `  |-----|---------|---------|`,
+      `  | before | ${fenceBefore.version} | ${fenceBefore.applied} |`,
+      `  | after  | ${after.version} | ${after.applied} |`);
+  if (moved) {
+    out(
+      "- **A DEPLOY LANDED WHILE THIS REPORT WAS BEING WRITTEN.** The counts above",
+      "  describe two different databases and the report cannot say which section got",
+      "  which. Use the per-section timestamps against the deploy log to find the",
+      "  boundary, then request a fresh run in a push that carries no migration.",
+    );
+    gateFailures.push(
+      `the migration ledger moved from ${fenceBefore.version} to ${after.version} ` +
+        `during this run (${fenceBefore.applied} → ${after.applied} applied): the report ` +
+        `straddles a deploy and every count in it is of an unknown shape. Request a ` +
+        `fresh run from a push carrying no migration (PLAN.md §4 D128).`,
+    );
+  } else {
+    out(
+      `- **Unmoved at \`${after.version}\`.** No migration was applied between the first`,
+      "  probe and the last, so every count in this report is of one schema.",
+    );
+  }
+}
+
 async function schemaProbe() {
   section("Schema probe — production vs. the migrations (D32, D43)");
 
@@ -1017,6 +1093,208 @@ async function wp42Smear() {
  *
  * SELECT ONLY, like every probe in this file (`assertReadOnly`).
  */
+/**
+ * WP 7.1 STAGE 0 — the access-control surface, read from the LIVE database.
+ *
+ * The plan in §14 counts 27 predicate-less policies, 7 predicate-less write policies
+ * and 7 write grants to `anon`. **Those numbers come from MIGRATION HISTORY**, and
+ * `no-orphan-table`'s lesson (§4 D43) is that production can differ from what the
+ * migrations say: a policy dropped by hand, a grant added in the dashboard, a role
+ * that does not exist here. Stage 0 exists because every stage after it is sized by
+ * these figures, and a plan sized from history is a plan sized from a guess.
+ *
+ * SELECT ONLY. `pg_policies`, `information_schema.role_table_grants` and `pg_roles`
+ * are catalog reads; nothing here changes anything.
+ *
+ * WHAT A PREDICATE-LESS POLICY IS, precisely, because the whole stage turns on it:
+ * `qual` is the USING clause and `with_check` is the WITH CHECK clause. A policy with
+ * neither, or with one that is literally `true`, permits every row for every caller
+ * holding the table grant. That is not "permissive RLS" in the PostgreSQL sense of
+ * `AS PERMISSIVE` — it is RLS that refuses nothing.
+ */
+async function wp71Stage0() {
+  section("§15 · WP 7.1 stage 0 — the access surface, from the live database");
+
+  // 1 · Every policy, classified. `roles` is a name[] so it is unnested for the
+  // report: "which ROLE can do this without a predicate" is the question, and a
+  // policy granted to `{public}` answers it differently from one granted to `{anon}`.
+  const policies = await tryQ(`
+    select count(*)::int as policies,
+           count(distinct tablename)::int as tables,
+           count(*) filter (where coalesce(qual, '') in ('', 'true')
+                              and coalesce(with_check, '') in ('', 'true'))::int as no_predicate,
+           count(*) filter (where cmd in ('INSERT','UPDATE','DELETE','ALL')
+                              and coalesce(qual, '') in ('', 'true')
+                              and coalesce(with_check, '') in ('', 'true'))::int as no_predicate_write,
+           count(*) filter (where qual ilike '%get_current_user_id%'
+                               or with_check ilike '%get_current_user_id%'
+                               or qual ilike '%app.current_user_id%'
+                               or with_check ilike '%app.current_user_id%')::int as via_guc,
+           count(*) filter (where qual ilike '%auth.uid%' or with_check ilike '%auth.uid%')::int as via_auth_uid
+      from pg_policies where schemaname = 'public'`);
+  report("stage 0.1 — every policy in `public`, classified", policies, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    out(
+      `- **${r.no_predicate ?? "?"} of ${r.policies ?? "?"}** policies refuse nothing: no USING and no`,
+      "  WITH CHECK, or one that is literally `true`. Those are what makes the product",
+      "  work while it runs as `anon`, and stage 3 is what replaces them.",
+      `- **${r.via_guc ?? "?"}** name the GUC path (\`get_current_user_id\` /`,
+      `  \`app.current_user_id\`) and **${r.via_auth_uid ?? "?"}** name \`auth.uid()\`. The first`,
+      "  number is the size of what stage 2's re-ordering has to keep working; the",
+      "  second is how much of the schema already speaks the language stage 1 issues.",
+      "- **Compare all of these with §14's counts from migration history.** A difference",
+      "  is not an error in either place — it is a policy or grant that moved outside a",
+      "  migration, and it is the reason this stage exists (D43's class).",
+    );
+  });
+
+  // 2 · The tables whose policies refuse nothing, by name, so stage 3 has its list
+  // from the database rather than from a test fixture.
+  const uncond = await tryQ(`
+    select tablename,
+           count(*)::int as no_predicate_policies,
+           string_agg(distinct cmd, ', ' order by cmd) as commands
+      from pg_policies
+     where schemaname = 'public'
+       and coalesce(qual, '') in ('', 'true')
+       and coalesce(with_check, '') in ('', 'true')
+     group by tablename
+     order by tablename`);
+  report("stage 0.2 — the tables stage 3 has to cover, from `pg_policies`", uncond, (rows) => {
+    out(...table(rows));
+    out(
+      `- **${rows.length} table(s).** \`governanceEnforcement.test.ts\` pins a list of 27 read`,
+      "  from the migrations; this is the same question asked of production.",
+      "- Stage 3 adds ONE restrictive policy per table here. A restrictive policy ANDs",
+      "  with whatever is already present, so `DROP POLICY` is an exact undo — which is",
+      "  why the plan prefers it to rewriting each permissive policy in place.",
+    );
+  });
+
+  // 3 · The grants, per role. A policy that refuses nothing only matters to a role
+  // that holds the table grant, so these two reads are halves of one answer.
+  const grants = await tryQ(`
+    select grantee,
+           count(*) filter (where privilege_type = 'SELECT')::int as select_on,
+           count(*) filter (where privilege_type in ('INSERT','UPDATE','DELETE'))::int as write_privs,
+           count(distinct table_name) filter (where privilege_type in ('INSERT','UPDATE','DELETE'))::int as writable_tables
+      from information_schema.role_table_grants
+     where table_schema = 'public'
+       and grantee in ('anon','authenticated','service_role','PUBLIC')
+     group by grantee
+     order by grantee`);
+  report("stage 0.3 — table grants per role", grants, (rows) => {
+    out(...table(rows));
+    out(
+      "- `anon` is the role this product runs as. Its `writable_tables` is what stage 4",
+      "  revokes, one table per push, with a read either side.",
+      "- A `PUBLIC` row here would be the widest finding on the page: a grant to PUBLIC",
+      "  reaches every role including `anon`, and revoking it from `anon` alone would",
+      "  change nothing at all.",
+    );
+  });
+
+  // 4 · The writable tables by name, which is stage 4's worklist.
+  const writable = await tryQ(`
+    select table_name,
+           string_agg(distinct privilege_type, ', ' order by privilege_type) as privs
+      from information_schema.role_table_grants
+     where table_schema = 'public' and grantee = 'anon'
+       and privilege_type in ('INSERT','UPDATE','DELETE')
+     group by table_name
+     order by table_name`);
+  report("stage 0.4 — what `anon` may write, by name (stage 4's worklist)", writable, (rows) => {
+    out(...table(rows));
+    out(
+      `- **${rows.length} table(s).** §14 counts 7 from migration history; a difference here`,
+      "  changes stage 4's size and is the kind of thing only a live read can say.",
+    );
+  });
+
+  // 5 · Does the database have anybody to be? Stage 1 issues real sessions, and this
+  // says whether `auth.users` is populated at all today — if it is empty, stage 1 is
+  // creating identities rather than attaching to them, which is a bigger change than
+  // the plan's wording implies.
+  const authUsers = await tryQ(`
+    select (select count(*) from auth.users)::int as auth_users,
+           (select count(*) from public.approved_users)::int as approved_users,
+           (select count(*) from public.approved_users a
+              where exists (select 1 from auth.users u where u.id = a.id))::int as approved_with_matching_auth_row`);
+  report("stage 0.5 — is there an identity to attach a session to?", authUsers, (rows) => {
+    out(...table(rows));
+    const r = rows[0] ?? {};
+    const a = Number(r.auth_users ?? 0);
+    const m = Number(r.approved_with_matching_auth_row ?? 0);
+    const ap = Number(r.approved_users ?? 0);
+    out(...(m === ap && ap > 0
+      ? ["- **Every `approved_users` row has an `auth.users` row with the SAME uuid.** So",
+         "  stage 1 can mint a session whose `sub` is the id every predicate already uses,",
+         "  and `auth.uid()` will equal `get_current_user_id()` without a mapping table."]
+      : [`- **${m} of ${ap}** approved users have a matching \`auth.users\` row (\`auth.users\``,
+         `  holds ${a}). Where they do not, stage 1 cannot simply mint a session for the`,
+         "  existing uuid — it has to create the auth identity first, which is a larger",
+         "  change than the plan's stage 1 describes and must be re-planned before stage 2."]));
+  });
+
+  // 6 · THE BLAST RADIUS OF STAGE 1 ITSELF, which nothing above asks.
+  //
+  // Stage 1 issues a real Supabase session. The moment it does, a request stops
+  // arriving as `anon` and starts arriving as `authenticated` — and a policy whose
+  // `roles` is `{anon}` STOPS APPLYING to it. RLS denies by default when no policy
+  // applies, so a policy that today permits everything would, after stage 1, refuse
+  // everything: the product breaks on the read path, not on the write path, and it
+  // breaks for the users who logged in rather than for the ones who did not.
+  //
+  // The same question for grants: `authenticated` must hold the table privilege too,
+  // or the role change is a permission error before RLS is ever consulted.
+  const byRole = await tryQ(`
+    select array_to_string(roles, ',') as granted_to,
+           count(*)::int as policies,
+           count(distinct tablename)::int as tables
+      from pg_policies where schemaname = 'public'
+     group by 1 order by 2 desc`);
+  report("stage 0.6 — which ROLE each policy is granted to (stage 1's own blast radius)", byRole, (rows) => {
+    out(...table(rows));
+    const anonOnly = rows.filter((r) => String(r.granted_to ?? "") === "anon");
+    const n = anonOnly.reduce((s, r) => s + Number(r.policies ?? 0), 0);
+    out(...(n === 0
+      ? ["- **No policy is granted to `anon` alone**, so switching a request from `anon` to",
+         "  `authenticated` takes no policy away from it. Stage 1 is safe on this axis."]
+      : [`- **${n} policy/policies are granted to \`anon\` ALONE.** After stage 1 a logged-in`,
+         "  request arrives as `authenticated`, those policies stop applying to it, and RLS",
+         "  denies by default — so stage 1 would break reads for exactly the users who",
+         "  authenticated. Each must be widened to include `authenticated` BEFORE stage 1,",
+         "  which is work the plan's stage 1 does not currently contain."]));
+    out(
+      "- A `public` row is the benign case: `TO public` covers every role, so the role",
+      "  change is invisible to it.",
+    );
+  });
+
+  // 7 · …and the grant half of the same question.
+  const grantGap = await tryQ(`
+    select table_name,
+           string_agg(distinct privilege_type, ', ' order by privilege_type) as anon_has
+      from information_schema.role_table_grants g
+     where table_schema = 'public' and grantee = 'anon'
+       and privilege_type in ('SELECT','INSERT','UPDATE','DELETE')
+       and not exists (
+         select 1 from information_schema.role_table_grants h
+          where h.table_schema = g.table_schema and h.table_name = g.table_name
+            and h.grantee = 'authenticated' and h.privilege_type = g.privilege_type)
+     group by table_name order by table_name`);
+  report("stage 0.7 — privileges `anon` holds that `authenticated` does not", grantGap, (rows) => {
+    out(...table(rows));
+    out(...(rows.length === 0
+      ? ["- **None.** Every privilege `anon` holds, `authenticated` holds too, so the role",
+         "  change stage 1 causes cannot produce a permission error before RLS is reached."]
+      : [`- **${rows.length} table(s).** A request that becomes \`authenticated\` loses these`,
+         "  privileges outright — a `permission denied for table` error, which RLS never",
+         "  gets to soften. Grant them to `authenticated` before stage 1, not after."]));
+  });
+}
+
 async function wp62and64Before() {
   section("§15 · WP 6.2 / 6.4 — before the cascade, and the catalog nothing reads");
 
@@ -1943,6 +2221,8 @@ async function main() {
   out(`- route: Supabase Management API \`/database/query\` (the route §16 · WP 2.1 follow-up and \`seed-project.yml\` prove)`);
   out(`- every statement is a \`select\`; \`assertReadOnly()\` refuses anything else.`);
 
+  await migrationFenceOpen();
+
   await schemaProbe();
   await viewSecurity();
   await d30();
@@ -1954,6 +2234,7 @@ async function main() {
   await wp42Landed();
   await wp43and44Counts();
   await wp62and64Before();
+  await wp71Stage0();
 
   const project = await pickProject();
   if (!project) {
@@ -1966,6 +2247,7 @@ async function main() {
   }
 
   await allProjectsSweep();
+  await migrationFenceClose();
 
   out("");
   out(`_${queryCount} statements, all \`SELECT\`._`);
