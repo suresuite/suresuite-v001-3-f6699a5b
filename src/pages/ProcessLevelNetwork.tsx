@@ -182,8 +182,9 @@ function getNodeTypeFromLevel(level: number, dataSource: string, position: 'from
     return 'product';
   }
   
-  // Level 1: Work Station
-  if (level === 1) return 'material'; // Keep as 'material' for internal processing, but display will show "work station"
+  // Level 1 used to be labelled "work station" for display. It is not one — see
+  // `getDisplayNodeType` below and §4 D124. A BOM row is a material either way.
+  if (level === 1) return 'material';
   
   // Level 2-4: Material Levels
   if (level >= 2 && level <= 4) return 'material';
@@ -198,14 +199,37 @@ function getNodeTypeFromLevel(level: number, dataSource: string, position: 'from
   return 'material';
 }
 
-// Helper function to get display type for UI
+/**
+ * The label a user reads for a node.
+ *
+ * TWO FABRICATIONS WERE REMOVED HERE (WP 8.5 · §4 D124, D125).
+ *
+ * 1. `level === 1` used to render as **"work station"**. There is no routing,
+ *    operation or work-centre table anywhere in `supabase/contract/` — the label
+ *    was invented from an integer. That is **T1** broken in the plainest possible
+ *    form: a noun on screen that no table in this database can produce, presented
+ *    beside real ids, from which a user reasonably concludes the product knows
+ *    about their operations. It does not. §14 carries the routings dataset that
+ *    would earn the name back.
+ *
+ * 2. `material level N` asserted a BOM DEPTH, and this column is not one.
+ *    `supply_chain_data_multi_tier.level` has two live writers that disagree
+ *    (§4 D125): one stamps every `bom_multi_level` row with a literal 2 and never
+ *    reads the real depth. §15 measured a project whose BOM is four levels deep
+ *    and whose entire bom lane sits at level 2 — so "material level 2" was a
+ *    confident statement about 260 materials and 66 products at once, and it was
+ *    wrong for all of them.
+ *
+ * So the label says the echelon and nothing more. The DEPTH returns when the page
+ * reads `node_list.bom_depth`, which comes from `bom_multi_level` — the table that
+ * owns the measurement — and is unaffected by either writer (WP 8.1 authored it;
+ * WP 8.4 moves this page onto it).
+ */
 function getDisplayNodeType(level: number): string {
   if (level === -1) return 'customer';
   if (level === 0) return 'product';
-  if (level === 1) return 'work station';
-  if (level >= 2 && level <= 4) return `material level ${level}`;
-  if (level === 5) return 'supplier';
-  if (level >= 6) return 'supplier';
+  if (level >= 1 && level <= 4) return 'material';
+  if (level >= 5) return 'supplier';
   return 'unknown';
 }
 
@@ -1234,7 +1258,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
       {isMobile && (
         <MobilePageHeader
           variant="root"
-          title="Process-level Network Intelligence"
+          title="Product Structure — Multi-level BOM Network"
           meta={
             <button
               type="button"
@@ -1262,7 +1286,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
            page's own graph controls and before the project select. Same
            button, same handler — see HeaderRefreshButton. */
         <PageHeader
-          title="Process-level Network Intelligence"
+          title="Product Structure — Multi-level BOM Network"
           rightContent={
             /* `gap-2` rather than `space-x-2`: `space-x-*` puts its margin on
                the DOM children, so it would land on the `md:contents` wrapper
@@ -1527,7 +1551,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                         <p className="text-sm text-muted-foreground mt-2">
                           {globalSelectedProjectId 
                             ? "This project doesn't have multi-tier supply chain data uploaded yet."
-                            : "Select a project to view its integrated process-level network."
+                            : "Select a project to view its multi-level bill of materials."
                           }
                         </p>
                         {globalSelectedProjectId && (
@@ -1590,7 +1614,13 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                       <span className="font-medium text-right break-all">{selectedNode.data.label as string}</span>
                     </div> */}
                     <div className="flex justify-between">
-                      <span>Process Level:</span>
+                      {/* WP 8.5 · §4 D125. This is the lane's own `level`
+                          ordinate, and TWO live writers disagree about what it
+                          means — so it is labelled as the raw column it is rather
+                          than as a process level or a BOM depth, neither of which
+                          it reliably carries. `node_list.bom_depth` is the depth,
+                          and WP 8.4 is what puts it here. */}
+                      <span>Lane level (raw):</span>
                       <Badge variant="outline" className="text-xs">
                         {selectedNode.data.level}
                       </Badge>
@@ -1661,10 +1691,12 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
               </Card>
             )}
 
-            {/* Process Level Legend */}
+            {/* WP 8.5 · §4 D124 — these buckets are echelons in a bill of
+                materials, not process levels. Nothing in this database describes a
+                process. */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Process Levels</CardTitle>
+                <CardTitle className="text-base">Echelons</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {legendGroups.map((g) => (
