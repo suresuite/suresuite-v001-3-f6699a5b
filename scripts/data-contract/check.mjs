@@ -24,6 +24,8 @@
 //   R13 an IMPLEMENTED policy's declared data requirement is described by the
 //       contract AND reaches a display surface (D94, D112, WP 6.2)
 //   R14 no dynamic RLS statement resolves to zero known tables (D51, WP 6.2)
+//   R15 a sidecar's prose may not deny a reader its own `surfaces` block confirms
+//       (D58, D101's shape inside one file, WP 6.2)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -831,6 +833,66 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
 // ──────────────────────────────────────────────────────────────────── report
 
 const covered = [...sidecars.keys()].length;
+// ───────── R15: A SIDECAR MAY NOT CONTRADICT ITSELF ABOUT ITS OWN READERS
+//
+// §4 D58, and it is §4 D101's shape one scope tighter — not two files disagreeing,
+// ONE FILE disagreeing with itself.
+//
+// `multi_tier_supply_chain.contract.yaml` carried a `surfaces` entry naming
+// `DataManager.tsx` via `rpc delete_project_dataset` with `confirmed: true`, and
+// twenty lines later a prose note reading "no RPC writes it … no application code
+// in `src/` or `supabase/functions/` mentions it". Both were authored by hand, both
+// describe what reaches the table, and nothing compared them. **The generated page
+// renders the PROSE**, so the manual told users nothing touches a table that the
+// project manager's "Delete ALL data" button empties.
+//
+// The rule is narrow on purpose. It does not try to read prose in general — it looks
+// for the specific CLAIM OF ABSENCE that `surfaces` can refute, in a table that has
+// `surfaces` entries. A sidecar is free to say a table has no UPLOAD, no WRITER, or
+// no engine consumer; it may not say nothing REACHES it while its own lineage block
+// names something that does.
+{
+  const contract = JSON.parse(readFileSync(GENERATED, "utf8"));
+  // Phrases that deny any application path at all. Each is a sentence a reader
+  // would take as "no code touches this", which `surfaces` is the authority on.
+  const DENIES_ALL_ACCESS = [
+    /no\s+application\s+code[^.]{0,80}mentions\s+it/i,
+    /nothing\s+(?:reads|touches|reaches)\s+it\b/i,
+    /no\s+reader\s+and\s+no\s+writer/i,
+  ];
+  let checked = 0;
+  let cleared = 0;
+  for (const t of Object.values(contract.tables)) {
+    const surfaces = t.surfaces ?? [];
+    const confirmed = surfaces.filter((x) => x.confirmed && x.via);
+    if (confirmed.length === 0) continue;
+    checked++;
+    const note = String(t.note ?? "");
+    if (!note) continue;
+    const denial = DENIES_ALL_ACCESS.find((re) => re.test(note));
+    if (!denial) { cleared++; continue; }
+    // The denial stands ONLY if the note also accounts for the surface — naming
+    // the path, or the rule, somewhere in its own text. That is the correction
+    // D58 took: keep the claim, and say what the exception is.
+    const accounted = confirmed.every((x) => {
+      const rpc = /rpc\s+([a-z_][a-z0-9_]*)/i.exec(String(x.via))?.[1];
+      return rpc ? note.includes(rpc) : note.includes(String(x.via));
+    });
+    if (accounted) { cleared++; continue; }
+    fail("R15",
+      `${t.table}'s note claims nothing in the application reaches it, and its own ` +
+      `\`surfaces\` block confirms ${confirmed.length}: ` +
+      `${confirmed.map((x) => `${x.page} via ${x.via}`).join("; ")}. ` +
+      "One file, two statements of one fact, and the generated page renders the " +
+      "prose — so the contradiction is published to users (D58, D101's shape). " +
+      "Name the path in the note, or stop claiming the absence.");
+  }
+  console.log(
+    `  R15 no sidecar denies a reader it confirms · ${checked} table(s) with a confirmed surface · ` +
+    `${cleared} whose note is consistent with it (D58)`,
+  );
+}
+
 // ───────── R14: A DYNAMIC RLS STATEMENT MUST NAME SOMETHING
 //
 // §4 D51 — the introspector cannot EVALUATE `EXECUTE format(…)`, and it does not

@@ -3139,6 +3139,71 @@
       "summary": "Firms execute SEQUENCED responses \u2014 detect \u2192 expedite \u2192 backup \u2192 overtime \u2014 gated by triggers and budget. Composes enabled policies; replaces flat recovery lists. Hook: PH-20 (evaluation) + delegated."
     }
   ],
+  "policy_bundle_keys": [
+    {
+      "catalog_ref": "P-S.2",
+      "family": "sourcing",
+      "key": "supply_share",
+      "target": "proactive_multi_sourcing.weights",
+      "transform": "fraction x 100 into the material's weight map, keyed by supplier; only for a supplier the material actually has a link to"
+    },
+    {
+      "catalog_ref": "P-X.1",
+      "family": "inventory",
+      "key": "type",
+      "target": "inventory_control.policy_type",
+      "transform": "enum map \u2014 min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic; anything unrecognised falls back to min_max"
+    },
+    {
+      "catalog_ref": "P-X.2",
+      "family": "inventory",
+      "key": "safety_stock_days",
+      "target": "safety_stock_materials.fixed_days_cover",
+      "transform": "days, clamped 0-84. Only when `safety_stock_method` is neither service_level/demand_variability nor king_method \u2014 those two take a different classification and this key is not read"
+    },
+    {
+      "catalog_ref": "P-X.2",
+      "family": "inventory",
+      "key": "service_level_target",
+      "target": "safety_stock_materials.uniform_service_level",
+      "transform": "fraction x 100, clamped 80.0-99.9. Read only when `safety_stock_method` is service_level or demand_variability"
+    },
+    {
+      "catalog_ref": null,
+      "family": "production",
+      "key": "capacity_units_per_day",
+      "target": "Product.production_capacity",
+      "transform": "units/day x 7 x utilization_cap_pct (default 0.85) -> units/week. The MASTER `products.production_capacity` shadows it entirely when present, and the mapper warns that the grid entry is not applied"
+    },
+    {
+      "catalog_ref": "P-P.4",
+      "family": "inventory",
+      "key": "fg_safety_stock",
+      "target": "fg_safety_stock.sizing",
+      "transform": "enum \u2014 'none' skips the policy; 'service_level' selects service-level sizing; anything else selects fixed_days. Gated on the engine's own `has_mts`, not on the policy's fulfillment_strategy string"
+    },
+    {
+      "catalog_ref": "P-P.4",
+      "family": "inventory",
+      "key": "fg_service_level_target",
+      "target": "fg_safety_stock.service_level_pct",
+      "transform": "fraction x 100, clamped 80.0-99.9. Read only when `fg_safety_stock` is service_level"
+    },
+    {
+      "catalog_ref": "P-P.4",
+      "family": "inventory",
+      "key": "fg_safety_stock_days",
+      "target": "fg_safety_stock.fixed_days_cover",
+      "transform": "days, clamped 0-12. Read only when `fg_safety_stock` selects fixed_days sizing"
+    },
+    {
+      "catalog_ref": "P-X.3",
+      "family": "production",
+      "key": "allocation_priority_weight",
+      "target": "material_allocation.priority_weights",
+      "transform": "per-product weight, collected from composite `node:<node>::<product>` override keys. Read only when the scenario asks for `allocate_materials`, and its presence switches the objective to priority_weighted"
+    }
+  ],
   "stress_tests": [
     {
       "description": "Supplier outage sweep (manuscript): each supplier \u00d7 LT-extension \u00d7 \u0394t {5,8,10}.",

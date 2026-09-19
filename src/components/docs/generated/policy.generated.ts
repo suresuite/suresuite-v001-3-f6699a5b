@@ -140,8 +140,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:832"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → proactive_multi_sourcing.weights (P-S.2). Transform: fraction x 100 into the material's weight map, keyed by supplier; only for a supplier the material actually has a link to",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -335,8 +335,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:974"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic; anything unrecognised falls back to min_max",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -572,8 +572,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:988"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → safety_stock_materials.fixed_days_cover (P-X.2). Transform: days, clamped 0-84. Only when `safety_stock_method` is neither service_level/demand_variability nor king_method — those two take a different classification and this key is not read",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -807,8 +807,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:634"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → Product.production_capacity — an ENTITY field, not a policy parameter. Transform: units/day x 7 x utilization_cap_pct (default 0.85) -> units/week. The MASTER `products.production_capacity` shadows it entirely when present, and the mapper warns that the grid entry is not applied",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -837,8 +837,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:974"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic; anything unrecognised falls back to min_max",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1068,8 +1068,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:988"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → safety_stock_materials.fixed_days_cover (P-X.2). Transform: days, clamped 0-84. Only when `safety_stock_method` is neither service_level/demand_variability nor king_method — those two take a different classification and this key is not read",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1138,8 +1138,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:980"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → safety_stock_materials.uniform_service_level (P-X.2). Transform: fraction x 100, clamped 80.0-99.9. Read only when `safety_stock_method` is service_level or demand_variability",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1168,8 +1168,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:1040"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → fg_safety_stock.sizing (P-P.4). Transform: enum — 'none' skips the policy; 'service_level' selects service-level sizing; anything else selects fixed_days. Gated on the engine's own `has_mts`, not on the policy's fulfillment_strategy string",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1203,8 +1203,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:1049"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → fg_safety_stock.service_level_pct (P-P.4). Transform: fraction x 100, clamped 80.0-99.9. Read only when `fg_safety_stock` is service_level",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1238,8 +1238,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:1055"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → fg_safety_stock.fixed_days_cover (P-P.4). Transform: days, clamped 0-12. Read only when `fg_safety_stock` selects fixed_days sizing",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1273,8 +1273,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:1098"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → material_allocation.priority_weights (P-X.3). Transform: per-product weight, collected from composite `node:<node>::<product>` override keys. Read only when the scenario asks for `allocate_materials`, and its presence switches the objective to priority_weighted",
+        "evidence": null
       }
     ],
     "breaks": [],

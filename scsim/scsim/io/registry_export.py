@@ -29,7 +29,7 @@ from scsim.entities.network import (
     Supplier,
     SupplierLink,
 )
-from scsim.io.project_map import base_data_requirements
+from scsim.io.project_map import POLICY_BUNDLE_KEYS, base_data_requirements
 from scsim.kpi.definitions import KPI_DICTIONARY
 from scsim.policies.registry import catalog
 from scsim.stress import battery as stress_battery
@@ -126,6 +126,13 @@ def build_registry() -> dict[str, Any]:
         "base_data_requirements": [r.as_dict() for r in base_data_requirements()],
         # Part VI — the stress battery, declared rather than scanned (§4 D106).
         "stress_tests": stress_tests(),
+        # §4 D90 — the POLICY-BUNDLE keys the mapper reads, and what each one
+        # feeds. The third of WP 6.1's three doors to the engine, and the only one
+        # that was a text scan over a Python file rather than a declaration.
+        # Authored in `project_map.py` beside the code that performs the mapping,
+        # for the same reason `base_data_requirements` is: the declaration and the
+        # reader drift the moment they live apart.
+        "policy_bundle_keys": [dict(k) for k in POLICY_BUNDLE_KEYS],
         "pipeline": pipeline_schema(),
         "kpis": [
             {"name": k.name, "symbol": k.symbol, "definition": k.definition, "unit": k.unit}

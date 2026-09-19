@@ -93,6 +93,14 @@ export interface RegistryLike {
     params_schema?: { properties?: Record<string, unknown> };
   }>;
   base_data_requirements?: Array<{ field: string; level: string; fallback: string | null }>;
+  /** §4 D90 — the policy-bundle keys, declared in `project_map.py`. */
+  policy_bundle_keys?: Array<{
+    key: string;
+    family: string;
+    target: string;
+    catalog_ref: string | null;
+    transform: string;
+  }>;
 }
 
 /**
@@ -137,7 +145,18 @@ export interface EngineDoors {
   dataRequirements: Map<string, string>;
   /** Declared policy parameter names, from every policy's `params_schema`. */
   params: Set<string>;
-  /** The source texts doors 3 and the break CLASSIFIER read. */
+  /**
+   * §4 D90 — the POLICY-BUNDLE keys, DECLARED. Bundle key → what it feeds.
+   *
+   * Door 3 used to be a text scan over `project_map.py`: a dict read was the only
+   * evidence nine grid fields reached the engine at all. It is a declaration now,
+   * authored in `project_map.py` beside the code that performs the mapping and
+   * published through `registry_export`, so this reads a contract rather than a
+   * Python file. The scan remains ONLY as the classifier for a chain that BREAKS —
+   * where the question is "what shape of nothing is this", not "does it reach".
+   */
+  bundleKeys: Map<string, { target: string; catalogRef: string | null; transform: string }>;
+  /** The source texts the break CLASSIFIER reads. */
   src: EngineSources;
 }
 
@@ -146,7 +165,15 @@ export function engineDoors(registry: RegistryLike, src: EngineSources): EngineD
   for (const p of registry.policies ?? []) {
     for (const k of Object.keys(p.params_schema?.properties ?? {})) params.add(k);
   }
-  return { dataRequirements: engineReads(registry), params, src };
+  const bundleKeys = new Map<string, { target: string; catalogRef: string | null; transform: string }>();
+  for (const k of registry.policy_bundle_keys ?? []) {
+    bundleKeys.set(k.key, {
+      target: k.target,
+      catalogRef: k.catalog_ref ?? null,
+      transform: k.transform,
+    });
+  }
+  return { dataRequirements: engineReads(registry), params, bundleKeys, src };
 }
 
 /**
@@ -281,16 +308,39 @@ export function engineDoorFor(field: string, doors: EngineDoors): Hop | null {
       evidence: null,
     };
   }
-  // Door 3 — a READ in `project_map.py`, not a mention of the name. See
-  // `readsKey` for the `order_up_to` warning that made the difference matter.
+  // Door 3 — THE DECLARED BUNDLE KEY (§4 D90, closed in WP 6.2).
+  //
+  // This used to be a text scan: a `.get("<field>")` in `project_map.py` was the
+  // only evidence nine grid fields reached the engine at all, which is the
+  // weakest of the three doors and was said out loud rather than presented as a
+  // contract. `POLICY_BUNDLE_KEYS` declares each one now — what it feeds, under
+  // which policy, through which transform — and a bidirectional parity test in
+  // `scsim/tests/test_registry_io.py` keeps the declaration and the mapper
+  // together in both directions.
+  const declared = doors.bundleKeys.get(field);
+  if (declared) {
+    return {
+      kind: "engine",
+      detail:
+        `declared policy-bundle key (\`POLICY_BUNDLE_KEYS\`) → ${declared.target}` +
+        (declared.catalogRef ? ` (${declared.catalogRef})` : " — an ENTITY field, not a policy parameter") +
+        `. Transform: ${declared.transform}`,
+      evidence: null,
+    };
+  }
+  // AND THE SCAN IS STILL HERE, for a key the declaration does not carry. That is
+  // not a fallback for door 3 — it is the honest report that a bundle key reaches
+  // the engine with nothing declaring it, which is what D90 WAS and what the
+  // parity test now prevents. If this ever fires, the declaration has a hole.
   const cite = citeReads({ "scsim/scsim/io/project_map.py": doors.src.projectMap }, field, 1);
   if (cite.length) {
     return {
       kind: "engine",
       detail:
         "read by `project_map.py` as a bundle key — and by NOTHING that declares it. " +
-        "The registry neither requires it as data nor declares it as a parameter, so " +
-        "the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
+        "The registry neither requires it as data, nor declares it as a parameter, nor " +
+        "carries it in `POLICY_BUNDLE_KEYS`, so the only evidence it reaches the engine " +
+        "is a dict read in a Python file (§4 D90 — this should no longer be reachable).",
       evidence: cite[0],
     };
   }

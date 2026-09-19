@@ -287,5 +287,112 @@ BEGIN
       'from, which is a guess.', v_org_id;
   END IF;
 
-  RAISE NOTICE 'WP 6.2 · 240: D66 diverges both ways; two org stamps, two mechanisms, one inherited hole — 5 section(s)';
+  -- ── 6 · D58 · THE TABLE WITH "NO READER AND NO WRITER" HAS BOTH ──────────
+  --
+  -- §4 D58 and the `multi_tier_supply_chain` sidecar both said "no reader and no
+  -- writer", and the SAME SIDECAR listed three confirmed `surfaces` entries
+  -- twenty lines away. Nothing compared the two, and the generated manual page
+  -- renders the PROSE — so the contradiction was published to users. That is §4
+  -- D101's shape one scope tighter: not two files disagreeing, ONE file
+  -- disagreeing with itself. `contract:check` R15 refuses it now.
+  --
+  -- Both paths are asserted here because both decide whether the table can be
+  -- dropped, and reading the two function bodies is what produced the wrong
+  -- answer in the first place.
+  DECLARE
+    v_ds   jsonb;
+    v_del  integer;
+    v_mtp  uuid;
+  BEGIN
+    PERFORM set_config('app.current_user_id', v_admin::text, true);
+    INSERT INTO public.projects (name, modeler_id, plant_name, organization_id)
+      VALUES ('WP62 Multi Tier', v_admin, 'WP62M', v_org) RETURNING id INTO v_mtp;
+    INSERT INTO public.multi_tier_supply_chain
+      (project_id, plant_name, from_firm_id, to_firm_id, to_firm_tier)
+      VALUES (v_mtp, 'WP62M', 'FIRM-A', 'FIRM-B', 2);
+
+    -- 6a · THE READER. `get_project_datasets` SELECTs this table and returns its
+    -- rows; `projectLanes.ts` calls it from /policies and /simulation-lab. So the
+    -- table has a live reader feeding two pages, and dropping it would break
+    -- them — which is what the sidecar's own `surfaces` block said all along.
+    v_ds := public.get_project_datasets(v_mtp, v_admin, 'wp62-admin@example.invalid');
+    IF v_ds IS NULL THEN
+      RAISE EXCEPTION 'WP 6.2 / D58: get_project_datasets returned NULL — the fixture cannot test the reader';
+    END IF;
+    -- THE KEY IS `multiTier`, NOT `multi_tier`. Read from the running function
+    -- rather than guessed from the table name, which is what the first draft did.
+    IF NOT (v_ds ? 'multiTier') THEN
+      RAISE EXCEPTION
+        'WP 6.2 / D58: get_project_datasets no longer returns a `multiTier` key. '
+        'If the reader was removed, the table may now be droppable — say so in §16 '
+        'and re-take the decision. Keys: %', (SELECT string_agg(k, ',') FROM jsonb_object_keys(v_ds) k);
+    END IF;
+    IF jsonb_array_length(COALESCE(v_ds -> 'multiTier', '[]'::jsonb)) <> 1 THEN
+      RAISE EXCEPTION 'WP 6.2 / D58: the reader returned % multiTier row(s), expected the 1 just inserted',
+        jsonb_array_length(COALESCE(v_ds -> 'multiTier', '[]'::jsonb));
+    END IF;
+
+    -- 6b · THE DELETE PATH, exactly as `DataManager.tsx` invokes it: the "Delete
+    -- ALL data" button passes `p_dataset := 'all'`.
+    v_del := public.delete_project_dataset(v_mtp, 'all', v_admin, 'wp62-admin@example.invalid');
+    IF v_del < 1 THEN
+      RAISE EXCEPTION 'WP 6.2 / D58: delete_project_dataset(all) reported % row(s); the multi_tier row was not counted', v_del;
+    END IF;
+    IF EXISTS (SELECT 1 FROM public.multi_tier_supply_chain WHERE project_id = v_mtp) THEN
+      RAISE EXCEPTION
+        'WP 6.2 / D58: the "Delete ALL data" RPC left multi_tier_supply_chain rows '
+        'behind. If that branch was removed the table is closer to droppable — §16, '
+        'not a deleted assertion.';
+    END IF;
+
+    -- 6c · AND THE "NO WRITER" HALF IS FALSE TOO, ONE LAYER DOWN.
+    --
+    -- The first draft of this section asserted that NOTHING inserts into the
+    -- table — the one part of D58's claim that looked safe. It fired immediately:
+    -- `bulk_insert_multi_tier_supply_chain` exists, and it is already on
+    -- `dataPlaneAudit.test.ts`'s list of tier-2 writers.
+    --
+    -- The distinction that makes the claim salvageable is the one this repository
+    -- keeps having to make: NO APPLICATION CODE CALLS IT. Nothing in `src/` or
+    -- `supabase/functions/` names it, so no screen and no edge function can put a
+    -- row here — which is why the reader in 6a is answered with an empty array on
+    -- every real project.
+    --
+    -- But an RPC with no caller is not an absent write path. This application runs
+    -- as `anon` against permissive grants (D28), so anyone holding a PostgREST
+    -- client is one call away from writing this table — the same sentence WP 4.1
+    -- wrote about the three legacy `ingest-*` functions before
+    -- `ingest_legacy_upsert_lane` turned their target list into a whitelist in a
+    -- migration. So the honest form of D58's claim is APPLICATION-level, and the
+    -- database-level write path is a fact about the grant surface, which is
+    -- WP 7.1's subject.
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public' AND p.proname = 'bulk_insert_multi_tier_supply_chain'
+    ) THEN
+      RAISE EXCEPTION
+        'WP 6.2 / D58: bulk_insert_multi_tier_supply_chain is gone. If the write '
+        'path was removed the table is closer to droppable and the sidecar''s '
+        'account of it is stale — §16, not a deleted assertion.';
+    END IF;
+
+    -- It really does write, and asserting that is what stops "an RPC with no
+    -- caller" being read as "an RPC that does nothing".
+    -- The signature is `(p_rows jsonb, p_user_id uuid, p_user_email text)` and the
+    -- project comes from INSIDE the rows — read off `pg_get_function_identity_arguments`
+    -- rather than assumed from the other bulk writers, which take it as a parameter.
+    PERFORM public.bulk_insert_multi_tier_supply_chain(
+      jsonb_build_array(jsonb_build_object(
+        'project_id', v_mtp, 'plant_name', 'WP62M',
+        'from_firm_id', 'FIRM-C', 'to_firm_id', 'FIRM-D', 'to_firm_tier', 3)),
+      v_admin, 'wp62-admin@example.invalid');
+    IF NOT EXISTS (
+      SELECT 1 FROM public.multi_tier_supply_chain
+       WHERE project_id = v_mtp AND from_firm_id = 'FIRM-C'
+    ) THEN
+      RAISE EXCEPTION 'WP 6.2 / D58: the bulk insert RPC wrote no row — the signature or the body changed';
+    END IF;
+  END;
+
+  RAISE NOTICE 'WP 6.2 · 240: D66 diverges both ways; two org stamps; and the table with "no reader" has two — 6 section(s)';
 END $wp62gov$;

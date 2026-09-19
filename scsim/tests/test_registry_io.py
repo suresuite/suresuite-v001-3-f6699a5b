@@ -284,3 +284,84 @@ def test_registry_declares_the_stress_battery():
         assert t["description"] == t["description"].strip()
     st1 = next(t for t in tests if t["id"] == "ST-1")
     assert "(manuscript)" in st1["description"], st1["description"]
+
+
+# ------------------------------------------------- policy bundle keys (§4 D90)
+
+def test_policy_bundle_keys_match_what_the_mapper_reads():
+    """The declaration and the reader may not drift — §4 D90.
+
+    `POLICY_BUNDLE_KEYS` says which policy parameter or entity field each
+    /policies bundle key feeds. It makes no runtime decision, so nothing would
+    break if it went stale — which is exactly why it needs a gate. A declaration
+    nothing checks is the defect §4 D21 and D22 are, and this one is published
+    through the registry into the frontend's resolution chains.
+
+    BOTH DIRECTIONS. A key declared here that the mapper does not read is fiction;
+    a key the mapper reads that is not declared here is door 3 reopening.
+    """
+    import re
+    from pathlib import Path
+
+    from scsim.io.project_map import POLICY_BUNDLE_KEYS
+
+    src = Path(__file__).resolve().parents[1].joinpath(
+        "scsim", "io", "project_map.py").read_text()
+    # The declaration block itself must not count as a read, or every entry
+    # corroborates itself and the gate is vacuous.
+    start = src.index("POLICY_BUNDLE_KEYS")
+    end = src.index("def base_data_requirements")
+    body = src[:start] + src[end:]
+
+    declared = {k["key"] for k in POLICY_BUNDLE_KEYS}
+    assert len(declared) == len(POLICY_BUNDLE_KEYS), "a key is declared twice"
+
+    # Direction 1 — everything declared is read by the mapper, as a bundle key.
+    for key in sorted(declared):
+        assert re.search(rf"""\.get\(\s*["']{re.escape(key)}["']""", body), (
+            f"{key} is declared in POLICY_BUNDLE_KEYS and the mapper never reads it")
+
+    # Direction 2 — every FAMILY dict read is declared. The families are the
+    # /policies bundle's own namespaces; a `.get` on one of them is a bundle key.
+    family_vars = {"inv": "inventory", "fulfil": "fulfillment", "src": "sourcing",
+                   "prod_pol": "production", "sourcing": "sourcing"}
+    # Keys the mapper reads that are NOT grid fields: the grid declares what it
+    # renders (`columnSpecs`), and a bundle key with no column is not door 3's
+    # subject — door 3 is about CELLS whose only evidence is this file.
+    not_rendered = {
+        "ratios", "strategy", "safety_stock_method", "backorder_allowed",
+        "max_backorder_days", "backorder_cost_per_day", "allocation",
+        "tier_overrides", "utilization_cap_pct", "fulfillment_strategy",
+        "min_share_pct", "reorder_point", "order_up_to", "review_period_days",
+        "primary_source", "material_price", "initial_on_hand", "holding_cost_pct",
+        "sourcing_firm", "moq", "lead_time_distribution", "ordering_cost",
+        "supplier_capacity_per_day", "capacity_machine_per_day",
+        "capacity_labor_per_day", "production_cost_per_unit", "mode",
+        "cost_per_km", "production_lead_time_mean_days",
+    }
+    seen: set[str] = set()
+    for var, _family in family_vars.items():
+        for m in re.finditer(rf"""\b{var}\.get\(\s*["']([a-z_]+)["']""", body):
+            seen.add(m.group(1))
+    undeclared = sorted(seen - declared - not_rendered)
+    assert not undeclared, (
+        "the mapper reads these bundle keys and POLICY_BUNDLE_KEYS does not declare "
+        f"them: {undeclared}. Either declare them (they are door 3) or add them to "
+        "`not_rendered` with the reason they are not a grid cell (§4 D90).")
+
+
+def test_registry_publishes_the_policy_bundle_keys():
+    reg = build_registry()
+    keys = reg["policy_bundle_keys"]
+    assert len(keys) >= 9, keys
+    for k in keys:
+        assert k["key"] and k["family"] and k["target"], k
+        # `transform` is the part a reader cannot get anywhere else: it says what
+        # happens to the number between the cell and the engine, which is what
+        # makes a chain followable rather than merely present (§5 T1).
+        assert len(k["transform"]) > 30, f"{k['key']} declares no usable transform"
+    # One of them lands on an ENTITY field rather than a policy parameter, and
+    # that is the case door 2 could never have covered — a Params addition would
+    # have been the wrong fix.
+    entity = [k for k in keys if k["catalog_ref"] is None]
+    assert [k["key"] for k in entity] == ["capacity_units_per_day"], entity

@@ -269,6 +269,76 @@ describe("WP 6.1 · the chains that cannot be written down", () => {
   });
 });
 
+describe("§4 D90 · door 3 is a DECLARATION, not a scan", () => {
+  // WP 6.1 found three doors to the engine and said out loud that the third was
+  // not a contract: a `.get("<field>")` in `project_map.py` was the only evidence
+  // nine grid fields reached the engine at all. §4 D90 deferred the fix on "it
+  // needs a session that can run Python", the same premise D94 and D106 were
+  // deferred on and which WP 6.2 found false.
+  //
+  // `POLICY_BUNDLE_KEYS` declares each one now, and these assertions are what stop
+  // it becoming a second copy of the mapping rather than the declaration of it.
+  const doorDetail = (stage: string, field: string) => {
+    const c = chains.find((x) => x.stage === stage && x.field === field);
+    expect(c, `no chain for ${stage}.${field}`).toBeTruthy();
+    return (c!.hops.find((h) => h.kind === "engine")?.detail ?? "");
+  };
+
+  it("no chain reaches the engine on a Python dict read alone", () => {
+    // The scan is deliberately still in `engineDoorFor`, AFTER the declaration
+    // lookup, so a key nobody declared is reported rather than silently accepted.
+    // It must be unreachable: if this fails, `POLICY_BUNDLE_KEYS` has a hole and
+    // the bidirectional parity test in scsim did not catch it.
+    const scanned = chains
+      .filter((c) => c.hops.some((h) => h.kind === "engine" && /only evidence it reaches the engine/.test(h.detail)))
+      .map((c) => `${c.stage}.${c.field}`);
+    expect(
+      scanned,
+      "these fields reach the engine with nothing declaring them — door 3 has " +
+        "reopened. Declare them in `POLICY_BUNDLE_KEYS` (scsim/scsim/io/project_map.py) " +
+        "and regenerate the registry snapshot (§4 D90).",
+    ).toEqual([]);
+  });
+
+  it("the nine declared keys carry their target and their transform", () => {
+    // NINE KEYS, ELEVEN CHAINS: `type` and `safety_stock_days` are rendered by
+    // both the supplier and the plant stage, which is why the chain count and the
+    // key count differ and why D90's "nine" was never wrong.
+    const byDeclaration = chains.filter((c) =>
+      /declared policy-bundle key/.test(c.hops.find((h) => h.kind === "engine")?.detail ?? ""));
+    expect(byDeclaration.length).toBe(11);
+    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(9);
+    for (const c of byDeclaration) {
+      const detail = c.hops.find((h) => h.kind === "engine")!.detail;
+      // The TARGET is what makes the chain followable; the TRANSFORM is what makes
+      // it true (§5 T1 — a number and what happened to it on the way).
+      expect(detail, `${c.stage}.${c.field}`).toMatch(/→ \S+/);
+      expect(detail, `${c.stage}.${c.field}`).toMatch(/Transform: \S+/);
+    }
+  });
+
+  it("the one key that lands on an ENTITY field says so", () => {
+    // `capacity_units_per_day` feeds `Product.production_capacity`, not a policy
+    // parameter — which is why door 2 could never have declared it and why adding
+    // a Params field would have been the wrong fix.
+    const detail = doorDetail("plant", "capacity_units_per_day");
+    expect(detail).toMatch(/Product\.production_capacity/);
+    expect(detail).toMatch(/ENTITY field, not a policy parameter/);
+    // And it says the master shadows it, which is the part a user needs: the cell
+    // can be filled and still not be what the run uses.
+    expect(detail).toMatch(/shadows/i);
+  });
+
+  it("a conditional key says WHEN it is read", () => {
+    // Three of the nine are read only under another key's value. A chain that
+    // claimed the cell always reaches the engine would be wrong in the direction
+    // §4 D18 is — a control whose effect depends on a setting elsewhere.
+    expect(doorDetail("plant", "fg_safety_stock_days")).toMatch(/only when/i);
+    expect(doorDetail("plant", "service_level_target")).toMatch(/only when/i);
+    expect(doorDetail("supplier", "safety_stock_days")).toMatch(/Only when/i);
+  });
+});
+
 describe("WP 6.1 · G4 · every engine input has a data-entry surface", () => {
   it("no engine-read field is unreachable by both the grid and every upload", () => {
     // Blueprint gap G4 — "no data-entry surface for the economics" — stated as a
