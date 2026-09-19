@@ -37,7 +37,7 @@ import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { load } from "js-yaml";
-import { deriveChains } from "./chains.mjs";
+import { deriveChains, deriveStressTests, deriveApiRoutes } from "./chains.mjs";
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const INTROSPECTED = join(ROOT, "build", "schema.introspected.json");
@@ -224,6 +224,12 @@ export function buildContract({ introspected, registry, sidecars }) {
       indexes: t.indexes,
       columns,
       note: doc.note ?? null,
+      // WP 4.2's OPEN ENUM of analysis kinds, with each kind's analyzer, code
+      // version and parameter schema. Carried into the contract (and from there
+      // into the manual) because it is the catalog of what an analysis IS, and
+      // `single-source` (I1) says that is authored once — which it is, in the
+      // sidecar, because a CHECK constraining the shape cannot hold a catalog.
+      analysis_kinds: doc.analysis_kinds ?? null,
     };
   }
 
@@ -899,6 +905,18 @@ export function renderReferenceModule(contract) {
           serverSet: t.ingest_dataset.server_set ?? [],
         }
       : null,
+    // WP 5.2e — WP 5.1's lineage, at TABLE grain only.
+    //
+    // THE THREE GRADES ARE NEVER BLURRED and only one of them is carried here.
+    // `table` means "this page reads this table by this path"; `column` is a
+    // stronger claim about one column; `shell` is auth/session plumbing that
+    // ≥80% of pages import and is EXPLICITLY NOT LINEAGE. D82 is what happens
+    // when the two are mixed — a 404 page reported as a surface for user data.
+    // The manual renders `table` entries, and it renders them as "this screen
+    // reads this table", which is exactly the claim the grade supports.
+    surfaces: (t.surfaces ?? [])
+      .filter((x) => x.grain === "table" && x.confirmed)
+      .map((x) => ({ page: x.page, via: x.via, evidence: x.evidence })),
     governance: t.governance
       ? {
           read: t.governance.read ?? null,
@@ -908,6 +926,25 @@ export function renderReferenceModule(contract) {
           rlsEnabled: Boolean(t.governance.rls_enabled),
         }
       : null,
+    // WP 5.2g — what row-level security actually IS on this table, in three
+    // states rather than two.
+    //
+    // "RLS: enabled" reads as an assurance it does not give. WP 2.4 executed
+    // the migration against a real PostgreSQL and found the inherited claim
+    // wrong in BOTH directions: RLS is enabled on all three item masters, AND
+    // both policies on each are `USING (true)`, so enabling it buys nothing.
+    // `determinate: false` is the third state — the static replay could not
+    // settle the question, which is a different answer from "off" and the
+    // manual renders it as one.
+    rls: {
+      enabled: Boolean(t.rls?.enabled),
+      determinate: Boolean(t.rls?.determinate),
+      policies: (t.rls?.policies ?? []).length,
+      // A policy whose USING clause is the literal `true` restricts nothing.
+      // Counted rather than judged, so a page can say "two of two" instead of
+      // "permissive", which is a word a reader has to take on trust.
+      unrestricted: (t.rls?.policies ?? []).filter((p) => String(p.using ?? "").trim() === "true").length,
+    },
     columns: t.columns.map(refColumn),
   }));
 
@@ -988,8 +1025,22 @@ export function renderReferenceModule(contract) {
     "  naturalKey: string[];",
     "  naturalKeyIntended: string[] | null;",
     "  checks: { name: string; definition: string }[];",
+    "  /**",
+    "   * Which screens read this table, at TABLE grain, human-confirmed (WP 5.1).",
+    "   *",
+    "   * `column`-grain and `shell`-grain entries are deliberately NOT here:",
+    "   * a shell entry is auth plumbing that almost every page imports and is",
+    "   * not lineage at all, and presenting one as a data surface is §4 D82.",
+    "   */",
+    "  surfaces: { page: string; via: string; evidence: string }[];",
     "  /** The CSV origin, where the table has one. `null` means it has none. */",
     "  ingestDataset: { wizardId: string; factClass: string; serverSet: string[] } | null;",
+    "  /**",
+    "   * Row-level security, in THREE states. `determinate: false` means the",
+    "   * static replay could not settle it — which is not the same answer as",
+    "   * `enabled: false`, and WP 2.4 is why the difference is carried.",
+    "   */",
+    "  rls: { enabled: boolean; determinate: boolean; policies: number; unrestricted: number };",
     "  governance: {",
     "    read: string | null;",
     "    write: string | null;",
@@ -1180,6 +1231,28 @@ export function renderIngestSpecModule(contract) {
  * WP 6.1's own opening sentence is the reason: "~120 hand-written chains are
  * true on the day they are typed", which is D21 and D22 stated as a rule.
  */
+export function renderAnalysisKinds(contract) {
+  const kinds = [];
+  for (const t of Object.values(contract.tables)) {
+    for (const [kind, k] of Object.entries(t.analysis_kinds ?? {})) {
+      kinds.push({
+        kind,
+        computedBy: k.computed_by,
+        codeVersion: k.code_version ?? null,
+        entityType: k.entity_type,
+        note: String(k.note ?? "").replace(/\s+/g, " ").trim() || null,
+        params: Object.entries(k.params ?? {}).map(([name, p]) => ({
+          name,
+          type: p.type,
+          default: p.default ?? null,
+          meaning: String(p.meaning ?? "").replace(/\s+/g, " ").trim(),
+        })),
+      });
+    }
+  }
+  return kinds.sort((a, b) => a.kind.localeCompare(b.kind));
+}
+
 export function renderPolicyModule(contract, registry) {
   const { chains, order, orderSource } = deriveChains(ROOT, contract, registry);
   const broken = chains.filter((c) => c.breaks.length);
@@ -1238,6 +1311,55 @@ export function renderPolicyModule(contract, registry) {
     "",
     "/** How many chains break, by shape. A page renders the number, never types it. */",
     `export const BREAKS_BY_CLASS: Record<string, string[]> = ${JSON.stringify(byClass, null, 2)};`,
+    "",
+    "/**",
+    " * WP 4.2's OPEN ENUM of analysis kinds, from the sidecar that declares it.",
+    " *",
+    " * The catalog is a data fact, so it is authored once — in",
+    " * `analysis_runs.contract.yaml` — rather than in a CHECK constraint, which",
+    " * could only constrain the shape. §4 D79 is what the alternative costs: a",
+    " * kind was declared here with a parameter no code takes, and §11's \"four",
+    " * analyzers\" turned out to be three.",
+    " */",
+    "export type AnalysisKind = {",
+    "  kind: string;",
+    "  computedBy: string;",
+    "  codeVersion: string | null;",
+    "  entityType: string;",
+    "  note: string | null;",
+    "  params: { name: string; type: string; default: unknown; meaning: string }[];",
+    "};",
+    "",
+    `export const ANALYSIS_KINDS: AnalysisKind[] = ${JSON.stringify(renderAnalysisKinds(contract), null, 2)};`,
+    "",
+    "/**",
+    " * The stress-test battery, READ FROM THE ENGINE SOURCE.",
+    " *",
+    " * This is §4 D90's weakest door — a text scan over a Python literal — and",
+    " * the page that renders it says so. The battery is not in",
+    " * `registry_export.py`, which is where a declaration belongs; until it is,",
+    " * a scan that goes red when the literal moves beats a hand copy that goes",
+    " * quietly wrong (§4 D22, and the archived copy already had).",
+    " *",
+    " * `runnable` is derived from a `_run_battery(..., \"ST-n\", ...)` call site,",
+    " * not from the module docstring that claims the same thing.",
+    " */",
+    "export type StressTest = { id: string; description: string; runnable: boolean };",
+    "",
+    `export const STRESS_TESTS: StressTest[] = ${JSON.stringify(deriveStressTests(ROOT), null, 2)};`,
+    "",
+    "/**",
+    " * The public API's routes, read from the dispatcher's own table.",
+    " *",
+    " * §6.3 marks this section G. The data contract describes TABLES and not an",
+    " * HTTP surface, so the nearest declaration is the `routes` literal the",
+    " * dispatcher itself matches against — which means a route added, removed",
+    " * or re-scoped changes the manual with nobody editing a page. Another",
+    " * instance of §4 D90's weakest door, and the page says so.",
+    " */",
+    "export type ApiRoute = { method: string; path: string; scope: string; handler: string };",
+    "",
+    `export const API_ROUTES: ApiRoute[] = ${JSON.stringify(deriveApiRoutes(ROOT), null, 2)};`,
     "",
     `export const CHAIN_COUNT = ${chains.length};`,
     `export const BROKEN_COUNT = ${broken.length};`,

@@ -320,7 +320,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "analysis_runs": {
       "table": "analysis_runs",
@@ -989,7 +990,63 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": {
+        "network_metrics": {
+          "computed_by": "calculate-network-science-metrics (migrated in WP 4.3)",
+          "code_version": "network_metrics@wp43.1",
+          "entity_type": "node",
+          "params": {
+            "weighted": {
+              "type": "boolean",
+              "default": true,
+              "meaning": "Weight edges by `relative_revenue` rather than treating the graph as unweighted."
+            },
+            "topology_digest": {
+              "type": "string",
+              "default": null,
+              "meaning": "`public.network_topology_hash(project)` — a digest of the six columns `get_network_nodes_for_prominence` and `get_network_edges_for_prominence` return. IT IS AN INPUT TRAVELLING IN A PARAMETER AND THAT IS DECLARED HERE RATHER THAN HIDDEN: `current_graph_hash` covers eleven tier-2 tables and NOT `network_nodes`/`network_edges`, so without this the key cannot tell two different graphs apart and a re-uploaded network is served the previous graph's centralities as a hit. It belongs in `hash_network`; moving it there is a `schema_version` bump and a bump is unsafe until D70 lands, so WP 4.4 moves it and deletes this entry."
+            }
+          }
+        },
+        "prominence": {
+          "computed_by": "calculate-node-prominence (migrated in WP 4.3)",
+          "code_version": "prominence@wp43.1",
+          "entity_type": "node",
+          "params": {
+            "config": {
+              "type": "object",
+              "default": null,
+              "meaning": "The caller's `ProminenceConfig` — the four weights and the two caps. It is part of the key because two configs produce two different scores over one graph. `null` means the analyzer's `defaultConfig`, which the function fills in before the digest is taken, so a stored run always records the config it actually used rather than the word \"default\"."
+            },
+            "topology_digest": {
+              "type": "string",
+              "default": null,
+              "meaning": "See `network_metrics.topology_digest` — the same digest, for the same reason."
+            }
+          }
+        },
+        "critical_nodes": {
+          "computed_by": "predict-critical-nodes (migrated in WP 4.3)",
+          "code_version": "critical_nodes@wp43.1",
+          "entity_type": "supply_chain_row",
+          "params": {
+            "plant_name": {
+              "type": "string",
+              "default": null,
+              "meaning": "The plant filter the request carried, or null for every row of the project. It is part of the key because two plants of one project are two different analyses over two different row sets. NOTE that `plant_name` is NOT project-scoped, which is why the function derives the project from the rows it loaded and refuses a set spanning two."
+            }
+          },
+          "note": "NO `topology_digest`, and the absence is a statement: this analyzer reads `supply_chain_data`, which is `combine-project`'s output over the eleven tier-2 tables `current_graph_hash` already covers. Its inputs ARE in the anchor. The `threshold` parameter this block used to declare DOES NOT EXIST — `predictCriticalNodes` takes no threshold and the entry was authored from the plan rather than from the code. Removed in WP 4.3 rather than carried: an undeclared default is `declared-fallback` (I6) broken, and a DECLARED parameter that no code reads is the same defect pointing the other way."
+        },
+        "combine_etl": {
+          "computed_by": "combine-project (migrated in WP 4.3, as §11 names it)",
+          "code_version": "combine_etl@wp43.1",
+          "entity_type": "project",
+          "params": {},
+          "note": "REGISTERED BUT NEVER SKIPPED. `combine_etl`'s output is rows in `supply_chain_data`, not entries in `analysis_results`, so \"already computed\" means \"those rows are still there\" — which the store cannot see, and a row deleted by hand would make a hit skip an ETL the project needs. WP 4.3 records the run for its identity; WP 4.4 owns staleness and is the package that may turn a hit into a skip."
+        }
+      }
     },
     "approved_users": {
       "table": "approved_users",
@@ -1870,7 +1927,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "The table WP 1.4 found existed in production but in no migration — the authentication table, untracked for a year, discovered by the orphan rule (D4). `20250815000000_approved_users_base.sql` now builds it on a fresh database, and the parts of that file which are reconstruction rather than evidence are marked as such in it. This sidecar describes the table as the migrations now define it."
+      "note": "The table WP 1.4 found existed in production but in no migration — the authentication table, untracked for a year, discovered by the orphan rule (D4). `20250815000000_approved_users_base.sql` now builds it on a fresh database, and the parts of that file which are reconstruction rather than evidence are marked as such in it. This sidecar describes the table as the migrations now define it.",
+      "analysis_kinds": null
     },
     "audit_logs": {
       "table": "audit_logs",
@@ -2347,7 +2405,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "Coverage on the data plane is by TRIGGER, not by instrumented RPCs, and the difference is the point. WP 2.3's gap check measured 22 live SQL functions writing tier 2/3/4 with none emitting an audit row, plus six more write paths in edge functions running as the service role. Editing the 22 would have been the obvious reading of \"emit on every tier transition\" and would have missed all six, and would have missed the twenty-third function somebody writes next month. A statement-level trigger on each of the twelve tier 2/3/4 tables catches every writer that exists and every writer added later."
+      "note": "Coverage on the data plane is by TRIGGER, not by instrumented RPCs, and the difference is the point. WP 2.3's gap check measured 22 live SQL functions writing tier 2/3/4 with none emitting an audit row, plus six more write paths in edge functions running as the service role. Editing the 22 would have been the obvious reading of \"emit on every tier transition\" and would have missed all six, and would have missed the twenty-third function somebody writes next month. A statement-level trigger on each of the twelve tier 2/3/4 tables catches every writer that exists and every writer added later.",
+      "analysis_kinds": null
     },
     "bom_multi_level": {
       "table": "bom_multi_level",
@@ -2962,7 +3021,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "bom_single_level": {
       "table": "bom_single_level",
@@ -3512,7 +3572,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "capabilities": {
       "table": "capabilities",
@@ -3815,7 +3876,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "THE CATALOG IS DUPLICATED IN TYPESCRIPT. `src/lib/capabilities.ts` carries the same keys as a union type and a list, because the client needs them without a round trip. Two hand-maintained copies of one fact is an I1 violation waiting to drift — `projectMembership.test.ts` asserts the WP 2.2 keys agree, but nothing checks the whole catalog, and the honest count is that the DB has grown keys the TS list learned about only when someone noticed. Generating one from the other is the fix and it belongs with the contract's other generators, not here."
+      "note": "THE CATALOG IS DUPLICATED IN TYPESCRIPT. `src/lib/capabilities.ts` carries the same keys as a union type and a list, because the client needs them without a round trip. Two hand-maintained copies of one fact is an I1 violation waiting to drift — `projectMembership.test.ts` asserts the WP 2.2 keys agree, but nothing checks the whole catalog, and the honest count is that the DB has grown keys the TS list learned about only when someone noticed. Generating one from the other is the fix and it belongs with the contract's other generators, not here.",
+      "analysis_kinds": null
     },
     "customers": {
       "table": "customers",
@@ -4144,7 +4206,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "ADOPTED IN PHASE 3 / WP 3.0 (D43). This table existed in the production database with six rows and no creating migration, and it was invisible to the `no-orphan-table` gate for a reason worth keeping: R4 catches tables the CODE READS that no migration creates, and nothing has ever read this one. §15's schema probe — which keys on \"production has it\" rather than \"the code reads it\" — is what found it, and that probe now fails the verification run rather than reporting. TWO OF ITS COLUMNS ARE READ SINCE WP 6.2 (§4 D69): `segment` and `priority_weight` reach `P-C.2 customer_allocation`, because the mapper now loads this table instead of synthesizing `Customer(id=c, name=c)` from the outbound arcs. The sentence that stood here — \"NOTHING READS IT YET, and the sidecar says so in every `consumed_by: null`\" — was true of the outcome and wrong about the cause, and it gave that wrong cause twice more in the column notes below. It is not dead: its columns are the inputs of the customer-echelon policies (`P-C.x`), which is why it was adopted rather than dropped the way `product_code_map` was in the same migration. What it still lacks is a WRITER and a CSV template, and that gap is now BINDING rather than tidy: two of its columns reach the engine and no surface in this product writes them, so the values deciding who is served when supply is short can only arrive by hand in the database (§4 D94)."
+      "note": "ADOPTED IN PHASE 3 / WP 3.0 (D43). This table existed in the production database with six rows and no creating migration, and it was invisible to the `no-orphan-table` gate for a reason worth keeping: R4 catches tables the CODE READS that no migration creates, and nothing has ever read this one. §15's schema probe — which keys on \"production has it\" rather than \"the code reads it\" — is what found it, and that probe now fails the verification run rather than reporting. TWO OF ITS COLUMNS ARE READ SINCE WP 6.2 (§4 D69): `segment` and `priority_weight` reach `P-C.2 customer_allocation`, because the mapper now loads this table instead of synthesizing `Customer(id=c, name=c)` from the outbound arcs. The sentence that stood here — \"NOTHING READS IT YET, and the sidecar says so in every `consumed_by: null`\" — was true of the outcome and wrong about the cause, and it gave that wrong cause twice more in the column notes below. It is not dead: its columns are the inputs of the customer-echelon policies (`P-C.x`), which is why it was adopted rather than dropped the way `product_code_map` was in the same migration. What it still lacks is a WRITER and a CSV template, and that gap is now BINDING rather than tidy: two of its columns reach the engine and no surface in this product writes them, so the values deciding who is served when supply is short can only arrive by hand in the database (§4 D94).",
+      "analysis_kinds": null
     },
     "dataset_versions": {
       "table": "dataset_versions",
@@ -4623,7 +4686,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers` and `multi_tier_supply_chain`. When this moves a multi-tier ANALYSIS is stale; no simulation changes.",
+          "meaning": "SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers`, `multi_tier_supply_chain`, and since `schema_version` 3 the deep-tier topology itself: the six columns the two prominence RPCs return from `network_nodes` and `network_edges`. When this moves a multi-tier or deep-tier ANALYSIS is stale; no simulation changes.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -4647,11 +4710,12 @@
             }
           ],
           "resolution": null,
-          "note": "All three source tables hold ZERO rows in production (§15), so this column is the digest of an empty domain on every project today and the half is UNEXERCISED outside `supabase/rehearsal/110`. A green test on it is not a working path. NULL before WP 4.1, and not backfillable, for the same reason as `hash_inputs`.",
+          "note": "THIS TEXT SAID THREE TABLES UNTIL WP 5.2f, AND `20260917000009` HAD ADDED TWO MORE. WP 5.3 folded the deep-tier topology in to close §4 D75 — a re-uploaded network was being served the previous graph's centralities as a cache hit, because the anchor could not see the tables the two centrality analyzers read. The sidecar was not updated with the migration, and the manual renders this sentence, so the drift would have been published. The original three source tables hold ZERO rows in production (§15); the two deep-tier tables do not, so the domain is no longer the digest of an empty set on every project. NULL before WP 4.1, and not backfillable, for the same reason as `hash_inputs`.",
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "delegation_grants": {
       "table": "delegation_grants",
@@ -5053,7 +5117,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "Expiry and revocation are both applied inside `effective_project_role()` rather than by each caller, so \"did you remember to check expires_at\" is not a question any future reader has to answer. Verified against a live PostgreSQL in WP 2.2: a grant exceeding the grantor's level is rejected, one with no expiry is rejected, and a grant whose expiry passes stops granting (PLAN.md §16)."
+      "note": "Expiry and revocation are both applied inside `effective_project_role()` rather than by each caller, so \"did you remember to check expires_at\" is not a question any future reader has to answer. Verified against a live PostgreSQL in WP 2.2: a grant exceeding the grantor's level is rejected, one with no expiry is rejected, and a grant whose expiry passes stops granting (PLAN.md §16).",
+      "analysis_kinds": null
     },
     "disruption_scenario_effects": {
       "table": "disruption_scenario_effects",
@@ -5441,7 +5506,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "THE ONLY TABLE IN THIS GROUP WHOSE PAYLOAD IS VALIDATED. `validate_disruption_effect` fires BEFORE INSERT OR UPDATE and checks `magnitude` and `unit` against `effect_type` — so an effect cannot carry a unit its type does not admit. `_targets` has the same discriminator shape and no such trigger, which is worth noticing when reading the two side by side."
+      "note": "THE ONLY TABLE IN THIS GROUP WHOSE PAYLOAD IS VALIDATED. `validate_disruption_effect` fires BEFORE INSERT OR UPDATE and checks `magnitude` and `unit` against `effect_type` — so an effect cannot carry a unit its type does not admit. `_targets` has the same discriminator shape and no such trigger, which is worth noticing when reading the two side by side.",
+      "analysis_kinds": null
     },
     "disruption_scenario_profiles": {
       "table": "disruption_scenario_profiles",
@@ -5960,7 +6026,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "CREATED BY `20250827171106`, NOT BY `20250827170942`. The earlier file appears to create this table and could not have: it declares `create_disruption_scenario_v2` with `p_user_id` after a defaulted parameter, which PostgreSQL refuses with 42P13, so the whole transaction rolled back. The retry 84 seconds later carries the comment `-- FIXED: Put all parameters with defaults at the end`. See §4 D48; the contract said the wrong origin until WP 6.2 slice 10."
+      "note": "CREATED BY `20250827171106`, NOT BY `20250827170942`. The earlier file appears to create this table and could not have: it declares `create_disruption_scenario_v2` with `p_user_id` after a defaulted parameter, which PostgreSQL refuses with 42P13, so the whole transaction rolled back. The retry 84 seconds later carries the comment `-- FIXED: Put all parameters with defaults at the end`. See §4 D48; the contract said the wrong origin until WP 6.2 slice 10.",
+      "analysis_kinds": null
     },
     "disruption_scenario_settings": {
       "table": "disruption_scenario_settings",
@@ -6334,7 +6401,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "`key` HAS NO DECLARED VOCABULARY, and that is the gap this sidecar can name but not close. `natural_key` (I4) is satisfied — `(profile_id, key)` is unique — but uniqueness over an open set means a typo creates a new setting rather than failing. The `analysis_kinds` block on `analysis_runs` is the pattern for declaring such a vocabulary in the contract; nothing has done it here because no code reads a fixed list of keys yet."
+      "note": "`key` HAS NO DECLARED VOCABULARY, and that is the gap this sidecar can name but not close. `natural_key` (I4) is satisfied — `(profile_id, key)` is unique — but uniqueness over an open set means a typo creates a new setting rather than failing. The `analysis_kinds` block on `analysis_runs` is the pattern for declaring such a vocabulary in the contract; nothing has done it here because no code reads a fixed list of keys yet.",
+      "analysis_kinds": null
     },
     "disruption_scenario_targets": {
       "table": "disruption_scenario_targets",
@@ -6754,7 +6822,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "`target_type` DISCRIMINATES AND NOTHING ENFORCES IT. A `node` target with an `edge_list`, or an `edge` target with `node_ids`, is storable — the enum constrains the discriminator and no CHECK constrains the payload columns against it. `validate_disruption_effect` does this job for `_effects`; nothing does it here."
+      "note": "`target_type` DISCRIMINATES AND NOTHING ENFORCES IT. A `node` target with an `edge_list`, or an `edge` target with `node_ids`, is storable — the enum constrains the discriminator and no CHECK constrains the payload columns against it. `validate_disruption_effect` does this job for `_effects`; nothing does it here.",
+      "analysis_kinds": null
     },
     "disruption_scenarios": {
       "table": "disruption_scenarios",
@@ -7271,7 +7340,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "TWO DISRUPTION MODELS ARE LIVE AT ONCE AND NEITHER READS THE OTHER. This table is the 2025-08-26 shape — one row per node, capacity and delay inline. The `disruption_scenario_profiles`/`_targets`/`_effects`/`_settings` group is the 2025-08-27 redesign that normalises the same idea. Nothing migrated the rows and nothing deprecates either, so a project can hold disruptions in both and a reader of one sees half the picture. Naming that is this sidecar's job; deciding it is not, and it belongs with WP 6.4's gap check."
+      "note": "TWO DISRUPTION MODELS ARE LIVE AT ONCE AND NEITHER READS THE OTHER. This table is the 2025-08-26 shape — one row per node, capacity and delay inline. The `disruption_scenario_profiles`/`_targets`/`_effects`/`_settings` group is the 2025-08-27 redesign that normalises the same idea. Nothing migrated the rows and nothing deprecates either, so a project can hold disruptions in both and a reader of one sees half the picture. Naming that is this sidecar's job; deciding it is not, and it belongs with WP 6.4's gap check.",
+      "analysis_kinds": null
     },
     "inbound_logistics": {
       "table": "inbound_logistics",
@@ -8062,7 +8132,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "ingest_files": {
       "table": "ingest_files",
@@ -8586,7 +8657,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "TIER 0, CREATED IN PHASE 3 / WP 3.1, AND NOTHING WRITES IT YET. PLAN.md §2 lists six tiers and this repository had five: there has never been a record of what a user actually uploaded. `UploadWizard` parses the file in the browser and throws it away, which is why every parse defect — D6's quoted comma, D7's blank numerics, D8's untrimmed identifiers, D46's integer `time_unit` — is unreproducible after the fact. You cannot re-read a file that was never kept. WP 3.2 is the writer: upload lands the bytes here, opens a run, and parses SERVER-SIDE. Landing the table one package ahead means that package does not have to invent a schema and a parser in the same session. WRITE-ONCE IS ENFORCED, NOT ASSERTED. `ingest_files_write_once()` refuses every UPDATE, and `supabase/rehearsal/060` proves it against a real database — both halves, because the rule is 'immutable' and not 'undeletable'. §2's tier laws have been sentences in a plan for three phases; a sentence nothing enforces drifts within two months, which is the lesson of the two orphan tables."
+      "note": "TIER 0, CREATED IN PHASE 3 / WP 3.1, AND NOTHING WRITES IT YET. PLAN.md §2 lists six tiers and this repository had five: there has never been a record of what a user actually uploaded. `UploadWizard` parses the file in the browser and throws it away, which is why every parse defect — D6's quoted comma, D7's blank numerics, D8's untrimmed identifiers, D46's integer `time_unit` — is unreproducible after the fact. You cannot re-read a file that was never kept. WP 3.2 is the writer: upload lands the bytes here, opens a run, and parses SERVER-SIDE. Landing the table one package ahead means that package does not have to invent a schema and a parser in the same session. WRITE-ONCE IS ENFORCED, NOT ASSERTED. `ingest_files_write_once()` refuses every UPDATE, and `supabase/rehearsal/060` proves it against a real database — both halves, because the rule is 'immutable' and not 'undeletable'. §2's tier laws have been sentences in a plan for three phases; a sentence nothing enforces drifts within two months, which is the lesson of the two orphan tables.",
+      "analysis_kinds": null
     },
     "ingest_runs": {
       "table": "ingest_runs",
@@ -9520,7 +9592,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "RENAMED FROM `erp_sync_runs` IN PHASE 3 / WP 3.1. The connector migration named it for the only source that existed and said in its own COMMENT ON TABLE that the name would be generalized in Phase 3; invariant `ingestion-contract` (I7) is why it had to be. A table whose name asserts one vendor cannot hold a second source's rows without lying about what it is. WHAT IS NOT HERE YET. Nothing writes a `csv` or `api` run: WP 3.2 builds the `ingest-file` edge function that does. The columns those runs need are here and described, which is the point of landing the schema one package ahead of its writer — WP 3.2 should not have to invent a schema and a parser in the same session. `supabase/rehearsal/050` and `060` assert what this table does: a connector run still stages, diffs and promotes identically, and a link-less run is legal and governed."
+      "note": "RENAMED FROM `erp_sync_runs` IN PHASE 3 / WP 3.1. The connector migration named it for the only source that existed and said in its own COMMENT ON TABLE that the name would be generalized in Phase 3; invariant `ingestion-contract` (I7) is why it had to be. A table whose name asserts one vendor cannot hold a second source's rows without lying about what it is. WHAT IS NOT HERE YET. Nothing writes a `csv` or `api` run: WP 3.2 builds the `ingest-file` edge function that does. The columns those runs need are here and described, which is the point of landing the schema one package ahead of its writer — WP 3.2 should not have to invent a schema and a parser in the same session. `supabase/rehearsal/050` and `060` assert what this table does: a connector run still stages, diffs and promotes identically, and a link-less run is legal and governed.",
+      "analysis_kinds": null
     },
     "ingest_staged_bom_lines": {
       "table": "ingest_staged_bom_lines",
@@ -10049,7 +10122,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "RENAMED FROM `erp_staged_bom_lines` IN PHASE 3 / WP 3.1. Nothing here is visible to the engine or to the pages, by tier rule (I2, `no-tier-skip`): staged rows reach tier 2 only through an approved promotion, which is why every `consumed_by` is null and why that is a statement rather than a gap. The assertions that hold this table to it are `supabase/rehearsal/050` and `060`. NOTHING WRITES THIS TABLE TODAY, for the same reason as the BOM headers: the connector stages products only."
+      "note": "RENAMED FROM `erp_staged_bom_lines` IN PHASE 3 / WP 3.1. Nothing here is visible to the engine or to the pages, by tier rule (I2, `no-tier-skip`): staged rows reach tier 2 only through an approved promotion, which is why every `consumed_by` is null and why that is a statement rather than a gap. The assertions that hold this table to it are `supabase/rehearsal/050` and `060`. NOTHING WRITES THIS TABLE TODAY, for the same reason as the BOM headers: the connector stages products only.",
+      "analysis_kinds": null
     },
     "ingest_staged_bom_versions": {
       "table": "ingest_staged_bom_versions",
@@ -10546,7 +10620,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "RENAMED FROM `erp_staged_bom_versions` IN PHASE 3 / WP 3.1. Nothing here is visible to the engine or to the pages, by tier rule (I2, `no-tier-skip`): staged rows reach tier 2 only through an approved promotion, which is why every `consumed_by` is null and why that is a statement rather than a gap. The assertions that hold this table to it are `supabase/rehearsal/050` and `060`. NOTHING WRITES THIS TABLE TODAY. The connector's `actionSync` stages products only; the BOM pull exists in the client (`getBom`) and is not wired to staging. Recorded plainly rather than left for a reader to infer from an empty table."
+      "note": "RENAMED FROM `erp_staged_bom_versions` IN PHASE 3 / WP 3.1. Nothing here is visible to the engine or to the pages, by tier rule (I2, `no-tier-skip`): staged rows reach tier 2 only through an approved promotion, which is why every `consumed_by` is null and why that is a statement rather than a gap. The assertions that hold this table to it are `supabase/rehearsal/050` and `060`. NOTHING WRITES THIS TABLE TODAY. The connector's `actionSync` stages products only; the BOM pull exists in the client (`getBom`) and is not wired to staging. Recorded plainly rather than left for a reader to infer from an empty table.",
+      "analysis_kinds": null
     },
     "ingest_staged_products": {
       "table": "ingest_staged_products",
@@ -11267,7 +11342,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "RENAMED FROM `erp_staged_products` IN PHASE 3 / WP 3.1. Nothing here is visible to the engine or to the pages, by tier rule (I2, `no-tier-skip`): staged rows reach tier 2 only through an approved promotion, which is why every `consumed_by` is null and why that is a statement rather than a gap. The assertions that hold this table to it are `supabase/rehearsal/050` and `060`. WHAT IS NOT HERE. No CSV writer — WP 3.2 builds it, and `fact_class` and `source_kind` exist so that it has somewhere truthful to write. No natural key: see the `id` field. No audit: see governance."
+      "note": "RENAMED FROM `erp_staged_products` IN PHASE 3 / WP 3.1. Nothing here is visible to the engine or to the pages, by tier rule (I2, `no-tier-skip`): staged rows reach tier 2 only through an approved promotion, which is why every `consumed_by` is null and why that is a statement rather than a gap. The assertions that hold this table to it are `supabase/rehearsal/050` and `060`. WHAT IS NOT HERE. No CSV writer — WP 3.2 builds it, and `fact_class` and `source_kind` exist so that it has somewhere truthful to write. No natural key: see the `id` field. No audit: see governance.",
+      "analysis_kinds": null
     },
     "ingest_staged_rows": {
       "table": "ingest_staged_rows",
@@ -11786,7 +11862,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "TIER 1, CREATED IN PHASE 3 / WP 3.2 — the fourth staging table and the last one of its kind. The three `ingest_staged_*` tables WP 3.1 renamed are TYPED against one source's entities (`external_id`, `sku`, `cycle_time_seconds`) because the connector knows what an orbit-mrp product is. A CSV of `inbound_logistics` is none of those things, and widening those three to hold it would have made each of them a table about two unrelated grains. So this one is generic where they are specific, and the generality is `ingestion-contract` (I7) working as intended: a new source lands here and never touches a tier-2 schema. WHAT IT CLOSES: the CSV path is the first in this repository for which `no-tier-skip` (I2) is true rather than aspirational. Before WP 3.2 a browser parsed the file and inserted straight into `inbound_logistics`."
+      "note": "TIER 1, CREATED IN PHASE 3 / WP 3.2 — the fourth staging table and the last one of its kind. The three `ingest_staged_*` tables WP 3.1 renamed are TYPED against one source's entities (`external_id`, `sku`, `cycle_time_seconds`) because the connector knows what an orbit-mrp product is. A CSV of `inbound_logistics` is none of those things, and widening those three to hold it would have made each of them a table about two unrelated grains. So this one is generic where they are specific, and the generality is `ingestion-contract` (I7) working as intended: a new source lands here and never touches a tier-2 schema. WHAT IT CLOSES: the CSV path is the first in this repository for which `no-tier-skip` (I2) is true rather than aspirational. Before WP 3.2 a browser parsed the file and inserted straight into `inbound_logistics`.",
+      "analysis_kinds": null
     },
     "materials": {
       "table": "materials",
@@ -12557,7 +12634,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "multi_tier_supply_chain": {
       "table": "multi_tier_supply_chain",
@@ -12995,7 +13073,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "DESCRIBED IN PHASE 3 / WP 3.2, AND THE DESCRIPTION IS MOSTLY A LIST OF ABSENCES. The deferral that pointed here called these \"the other inbound datasets, each with its own bespoke upload path\". `tier2_suppliers` and `tier3_suppliers` are that; this table is not. IT HAS NO UPLOAD PATH AT ALL, and no reader either: `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every occurrence is in migrations — created 2025-08-20, carried through RLS rewrites since, most recently by `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. EVERY `ingest.csv_header` ABOVE IS NULL FOR THAT REASON: there is no CSV to name a column of. It is described here rather than deferred again because a deferral is a promise that someone will look, and five packages of looking have now established what there is to see. DROPPING IT IS NOT THIS PACKAGE'S CALL — a table is not removed by the package that happened to notice. WP 3.2's gap check added the count to §15 so that the package which does decide is deciding against a number, AND THE NUMBER IS ZERO: run `35143830532`, 2026-09-16, reports 0 rows across 0 projects. So it is not a table whose data nobody reads; it is a table with no data, no reader and no writer. Recorded here and as D58 rather than acted on."
+      "note": "DESCRIBED IN PHASE 3 / WP 3.2, AND THE DESCRIPTION IS MOSTLY A LIST OF ABSENCES. The deferral that pointed here called these \"the other inbound datasets, each with its own bespoke upload path\". `tier2_suppliers` and `tier3_suppliers` are that; this table is not. IT HAS NO UPLOAD PATH AT ALL, and no reader either: `UploadWizard` offers no template for it, no RPC writes it, no edge function writes it, and outside the generated documentation modules no application code in `src/` or `supabase/functions/` mentions it. Every occurrence is in migrations — created 2025-08-20, carried through RLS rewrites since, most recently by `20260915000004`'s organization dual read, which rewrote policies governing access to a table nobody can reach. EVERY `ingest.csv_header` ABOVE IS NULL FOR THAT REASON: there is no CSV to name a column of. It is described here rather than deferred again because a deferral is a promise that someone will look, and five packages of looking have now established what there is to see. DROPPING IT IS NOT THIS PACKAGE'S CALL — a table is not removed by the package that happened to notice. WP 3.2's gap check added the count to §15 so that the package which does decide is deciding against a number, AND THE NUMBER IS ZERO: run `35143830532`, 2026-09-16, reports 0 rows across 0 projects. So it is not a table whose data nobody reads; it is a table with no data, no reader and no writer. Recorded here and as D58 rather than acted on.",
+      "analysis_kinds": null
     },
     "network_edges": {
       "table": "network_edges",
@@ -13587,7 +13666,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "network_nodes": {
       "table": "network_nodes",
@@ -14711,7 +14791,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "network_summary": {
       "table": "network_summary",
@@ -15234,7 +15315,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "node_list": {
       "table": "node_list",
@@ -16021,7 +16103,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "org_capabilities": {
       "table": "org_capabilities",
@@ -16272,7 +16355,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from whatever `data_editing` already said, so effective access on the day of deploy was identical to the day before. `data_editing` is deliberately still here: it is removed when the last call site has moved to one of the new keys, not before."
+      "note": "WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from whatever `data_editing` already said, so effective access on the day of deploy was identical to the day before. `data_editing` is deliberately still here: it is removed when the last call site has moved to one of the new keys, not before.",
+      "analysis_kinds": null
     },
     "organization_members": {
       "table": "organization_members",
@@ -16550,7 +16634,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "Backfilled once by `20260709000002` from `approved_users`, mapping the `admin` app_role to `org_role = 'admin'` and everyone else to `member`. Nothing has maintained it since except the super-admin RPCs, and because `approved_users.organization_id` is the column the backfill keyed on, a user whose uuid org was never stamped has no membership row at all. WP 2.1's backfill narrows that set; §15 is what counts what remains."
+      "note": "Backfilled once by `20260709000002` from `approved_users`, mapping the `admin` app_role to `org_role = 'admin'` and everyone else to `member`. Nothing has maintained it since except the super-admin RPCs, and because `approved_users.organization_id` is the column the backfill keyed on, a user whose uuid org was never stamped has no membership row at all. WP 2.1's backfill narrows that set; §15 is what counts what remains.",
+      "analysis_kinds": null
     },
     "organizations": {
       "table": "organizations",
@@ -16917,7 +17002,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "Created by `20260709000002_super_admin_phase1.sql`, which seeded one row per DISTINCT `approved_users.organization` string. That seeding is why the uuid plane and the text plane started out agreeing, and why nothing has kept them agreeing since: the seed ran once, `set_project_defaults()` never stamped the uuid (D27), and `admin_update_organization` renames without propagating. WP 2.1 fixed the trigger, backfilled what it could match unambiguously, and routed every live comparison through one predicate. It deliberately did NOT re-seed this table from distinct strings: after a rename, a user carrying the new name slugifies to a slug no row holds, and seeding would split one organization into two."
+      "note": "Created by `20260709000002_super_admin_phase1.sql`, which seeded one row per DISTINCT `approved_users.organization` string. That seeding is why the uuid plane and the text plane started out agreeing, and why nothing has kept them agreeing since: the seed ran once, `set_project_defaults()` never stamped the uuid (D27), and `admin_update_organization` renames without propagating. WP 2.1 fixed the trigger, backfilled what it could match unambiguously, and routed every live comparison through one predicate. It deliberately did NOT re-seed this table from distinct strings: after a rename, a user carrying the new name slugifies to a slug no row holds, and seeding would split one organization into two.",
+      "analysis_kinds": null
     },
     "outbound_logistics": {
       "table": "outbound_logistics",
@@ -17607,7 +17693,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "policy_defaults": {
       "table": "policy_defaults",
@@ -18219,7 +18306,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "policy_overrides": {
       "table": "policy_overrides",
@@ -18734,7 +18822,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "products": {
       "table": "products",
@@ -19652,7 +19741,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "project_erp_links": {
       "table": "project_erp_links",
@@ -20272,7 +20362,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "NOT RENAMED BY WP 3.1, AND THAT IS A DECISION. The four tables around it became `ingest_*` because they hold rows from ANY source; this one holds the credential and the consent for ONE source, and calling it `ingest_links` would promise a generality it does not have — a CSV upload has nothing to link. When a second connector arrives, the question to ask is whether it shares this shape (a per-user delegated token proving membership of an external tenant) or needs its own; `ingest_runs.source_kind` already carries the distinction that matters to everything downstream. ITS SIDECAR IS HERE BECAUSE WP 3.1 IS WHERE IT WAS DUE. The table was deferred under this package in `coverage.yaml` since WP 1.4, and a deferral is a commitment: carrying it forward to the next open package would have been the same move that produced D41 — an owner who has gone home, indistinguishable from an owner."
+      "note": "NOT RENAMED BY WP 3.1, AND THAT IS A DECISION. The four tables around it became `ingest_*` because they hold rows from ANY source; this one holds the credential and the consent for ONE source, and calling it `ingest_links` would promise a generality it does not have — a CSV upload has nothing to link. When a second connector arrives, the question to ask is whether it shares this shape (a per-user delegated token proving membership of an external tenant) or needs its own; `ingest_runs.source_kind` already carries the distinction that matters to everything downstream. ITS SIDECAR IS HERE BECAUSE WP 3.1 IS WHERE IT WAS DUE. The table was deferred under this package in `coverage.yaml` since WP 1.4, and a deferral is a commitment: carrying it forward to the next open package would have been the same move that produced D41 — an owner who has gone home, indistinguishable from an owner.",
+      "analysis_kinds": null
     },
     "project_members": {
       "table": "project_members",
@@ -20628,7 +20719,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "Backfilled from `projects.modeler_id` — every project's modeler becomes its owner. That records a fact that already held rather than granting anything new: every write policy in the schema already reads `modeler_id` as the project's owner. `modeler_id` is NOT a declared foreign key to `approved_users`, so the backfill filters on the user existing; a project whose modeler row is gone gets no owner and is visible only to the organization, which is the honest outcome and a §15 question worth asking."
+      "note": "Backfilled from `projects.modeler_id` — every project's modeler becomes its owner. That records a fact that already held rather than granting anything new: every write policy in the schema already reads `modeler_id` as the project's owner. `modeler_id` is NOT a declared foreign key to `approved_users`, so the backfill filters on the user existing; a project whose modeler row is gone gets no owner and is visible only to the organization, which is the honest outcome and a §15 question worth asking.",
+      "analysis_kinds": null
     },
     "project_role_capabilities": {
       "table": "project_role_capabilities",
@@ -20874,7 +20966,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "Seeded by WP 2.2 with the split that gives `analyst` its meaning: an analyst may edit tier-4 decisions (`data_edit_policies`) and may NOT edit the tier-2 measured inputs those decisions are judged against (`data_edit_inputs`). Before the split one `data_editing` flag governed both, so the role could not exist."
+      "note": "Seeded by WP 2.2 with the split that gives `analyst` its meaning: an analyst may edit tier-4 decisions (`data_edit_policies`) and may NOT edit the tier-2 measured inputs those decisions are judged against (`data_edit_inputs`). Before the split one `data_editing` flag governed both, so the role could not exist.",
+      "analysis_kinds": null
     },
     "projects": {
       "table": "projects",
@@ -21769,7 +21862,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "`natural_key_intended` is `(organization_id, name)` and the declared constraint is `(modeler_id, plant_name, name)` — they are different claims, and the declared one is the weaker: two modellers in one organization may each hold a project called the same thing for the same plant. Changing it is not WP 2.1's to do; `natural-key` (§2.1 I4) lands in WP 3.3 and this row is one of its inputs. Recorded here so the gap has an owner rather than being noticed again in a quarter."
+      "note": "`natural_key_intended` is `(organization_id, name)` and the declared constraint is `(modeler_id, plant_name, name)` — they are different claims, and the declared one is the weaker: two modellers in one organization may each hold a project called the same thing for the same plant. Changing it is not WP 2.1's to do; `natural-key` (§2.1 I4) lands in WP 3.3 and this row is one of its inputs. Recorded here so the gap has an owner rather than being noticed again in a quarter.",
+      "analysis_kinds": null
     },
     "risk_data": {
       "table": "risk_data",
@@ -22218,7 +22312,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "The second of WP 1.4's three orphans (D4), and the one that turned out not to be an orphan at all. Two network pages read it and no migration created it — but the table EXISTS in the production database, untracked, with the spreadsheet-header columns `COUNTRY` and `\"RISK CLASS\"`. CI proved it: the first version of the migration was a plain `CREATE TABLE IF NOT EXISTS`, which no-opped, and the next statement failed on a column that was not there. Same class as `approved_users`: created outside migration tracking, invisible to a static replay, which can only tell you no migration creates a table and not whether one exists. `20260915000003_risk_data.sql` now both builds it on a fresh database and ADOPTS the one already there — renaming the quoted columns, adding the provenance columns, and marking the pre-contract rows `source: 'unrecorded (loaded before the reference-tier contract)'` rather than inventing a publisher for them. The new CHECKs land `NOT VALID` on the adopted table: enforced for every future write, not retroactively asserted about rows nobody has looked at."
+      "note": "The second of WP 1.4's three orphans (D4), and the one that turned out not to be an orphan at all. Two network pages read it and no migration created it — but the table EXISTS in the production database, untracked, with the spreadsheet-header columns `COUNTRY` and `\"RISK CLASS\"`. CI proved it: the first version of the migration was a plain `CREATE TABLE IF NOT EXISTS`, which no-opped, and the next statement failed on a column that was not there. Same class as `approved_users`: created outside migration tracking, invisible to a static replay, which can only tell you no migration creates a table and not whether one exists. `20260915000003_risk_data.sql` now both builds it on a fresh database and ADOPTS the one already there — renaming the quoted columns, adding the provenance columns, and marking the pre-contract rows `source: 'unrecorded (loaded before the reference-tier contract)'` rather than inventing a publisher for them. The new CHECKs land `NOT VALID` on the adopted table: enforced for every future write, not retroactively asserted about rows nobody has looked at.",
+      "analysis_kinds": null
     },
     "role_capabilities": {
       "table": "role_capabilities",
@@ -22472,7 +22567,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from whatever `data_editing` already said, so effective access on the day of deploy was identical to the day before. `data_editing` is deliberately still here: it is removed when the last call site has moved to one of the new keys, not before."
+      "note": "WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from whatever `data_editing` already said, so effective access on the day of deploy was identical to the day before. `data_editing` is deliberately still here: it is removed when the last call site has moved to one of the new keys, not before.",
+      "analysis_kinds": null
     },
     "suppliers": {
       "table": "suppliers",
@@ -23021,7 +23117,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "supply_chain_data": {
       "table": "supply_chain_data",
@@ -23598,7 +23695,7 @@
           "normalize_at_promotion": null,
           "meaning": "Whether an analyzer flagged this edge's node as critical. An analysis result stored on an entity row — exactly the smearing D19 names.",
           "grain": "metadata",
-          "computed_by": null,
+          "computed_by": "predict-critical-nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -23630,7 +23727,7 @@
           "normalize_at_promotion": null,
           "meaning": "The score behind `is_critical_node`.",
           "grain": "level",
-          "computed_by": null,
+          "computed_by": "predict-critical-nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -23662,7 +23759,7 @@
           "normalize_at_promotion": null,
           "meaning": "When the criticality prediction was made. The closest thing this table has to a version stamp, and it names no model and no input hash.",
           "grain": "metadata",
-          "computed_by": null,
+          "computed_by": "predict-critical-nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -23957,7 +24054,7 @@
           "normalize_at_promotion": null,
           "meaning": "WP 4.3 · the `analysis_runs.input_hash` of the run that last wrote `is_critical_node` and `critical_node_score` on this row. It describes THOSE TWO COLUMNS ONLY — the rest of the row is `combine-project`'s ETL output, whose own run is recorded under `analysis_kind = 'combine_etl'`. NULL means the prediction predates WP 4.3 or was made through the deprecated two-argument `analysis_mark_critical_nodes`, which cannot name its run; NULL is the honest record and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about.",
           "grain": "metadata",
-          "computed_by": null,
+          "computed_by": "analysis_mark_critical_nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -23989,7 +24086,7 @@
           "normalize_at_promotion": null,
           "meaning": "WP 4.3 · when the run that wrote the criticality columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, WP 4.4's one rule, and a timestamp comparison is precisely what that rule replaces (§4 D12).",
           "grain": "metadata",
-          "computed_by": null,
+          "computed_by": "analysis_mark_critical_nodes",
           "engine": {
             "consumed_by": null,
             "transform": null,
@@ -24007,7 +24104,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "supply_chain_data_multi_tier": {
       "table": "supply_chain_data_multi_tier",
@@ -24709,7 +24807,8 @@
           "engine_requirement": null
         }
       ],
-      "note": null
+      "note": null,
+      "analysis_kinds": null
     },
     "tier2_suppliers": {
       "table": "tier2_suppliers",
@@ -25352,7 +25451,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "DESCRIBED IN PHASE 3 / WP 3.2, having been deferred under WP 3.1's group since WP 1.4. The deferral said these were \"the other inbound datasets, each with its own bespoke upload path\", and this package is the one that gives them the shared one: a tier2_suppliers CSV is now parsed server-side, landed in tier 0, staged in `ingest_staged_rows` and promoted by `ingest_apply_run` like any other lane. WHAT IS STILL TRUE AND UNCOMFORTABLE: the table has no natural-key constraint (D5's shape, WP 3.3) and no audit trigger (WP 2.3 instrumented twelve tables and could not instrument one the contract did not describe). Both are recorded above rather than rounded off, because a sidecar that describes the table it wishes existed is worth less than none."
+      "note": "DESCRIBED IN PHASE 3 / WP 3.2, having been deferred under WP 3.1's group since WP 1.4. The deferral said these were \"the other inbound datasets, each with its own bespoke upload path\", and this package is the one that gives them the shared one: a tier2_suppliers CSV is now parsed server-side, landed in tier 0, staged in `ingest_staged_rows` and promoted by `ingest_apply_run` like any other lane. WHAT IS STILL TRUE AND UNCOMFORTABLE: the table has no natural-key constraint (D5's shape, WP 3.3) and no audit trigger (WP 2.3 instrumented twelve tables and could not instrument one the contract did not describe). Both are recorded above rather than rounded off, because a sidecar that describes the table it wishes existed is worth less than none.",
+      "analysis_kinds": null
     },
     "tier3_suppliers": {
       "table": "tier3_suppliers",
@@ -25995,7 +26095,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "DESCRIBED IN PHASE 3 / WP 3.2, having been deferred under WP 3.1's group since WP 1.4. The deferral said these were \"the other inbound datasets, each with its own bespoke upload path\", and this package is the one that gives them the shared one: a tier3_suppliers CSV is now parsed server-side, landed in tier 0, staged in `ingest_staged_rows` and promoted by `ingest_apply_run` like any other lane. WHAT IS STILL TRUE AND UNCOMFORTABLE: the table has no natural-key constraint (D5's shape, WP 3.3) and no audit trigger (WP 2.3 instrumented twelve tables and could not instrument one the contract did not describe). Both are recorded above rather than rounded off, because a sidecar that describes the table it wishes existed is worth less than none."
+      "note": "DESCRIBED IN PHASE 3 / WP 3.2, having been deferred under WP 3.1's group since WP 1.4. The deferral said these were \"the other inbound datasets, each with its own bespoke upload path\", and this package is the one that gives them the shared one: a tier3_suppliers CSV is now parsed server-side, landed in tier 0, staged in `ingest_staged_rows` and promoted by `ingest_apply_run` like any other lane. WHAT IS STILL TRUE AND UNCOMFORTABLE: the table has no natural-key constraint (D5's shape, WP 3.3) and no audit trigger (WP 2.3 instrumented twelve tables and could not instrument one the contract did not describe). Both are recorded above rather than rounded off, because a sidecar that describes the table it wishes existed is worth less than none.",
+      "analysis_kinds": null
     },
     "user_ai_permissions": {
       "table": "user_ai_permissions",
@@ -26348,7 +26449,8 @@
           "engine_requirement": null
         }
       ],
-      "note": "The empty-array-means-everything rule in `allowed_model_ids` is the one thing a reader of this table must not get wrong. It is deliberate — it preserves the pre-column behaviour for every user who has no row — but it inverts the usual reading of an allow-list, and nothing at the point of display says so (§5 T2)."
+      "note": "The empty-array-means-everything rule in `allowed_model_ids` is the one thing a reader of this table must not get wrong. It is deliberate — it preserves the pre-column behaviour for every user who has no row — but it inverts the usual reading of an allow-list, and nothing at the point of display says so (§5 T2).",
+      "analysis_kinds": null
     },
     "user_capabilities": {
       "table": "user_capabilities",
@@ -26599,10 +26701,11 @@
           "engine_requirement": null
         }
       ],
-      "note": "WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from whatever `data_editing` already said, so effective access on the day of deploy was identical to the day before. `data_editing` is deliberately still here: it is removed when the last call site has moved to one of the new keys, not before."
+      "note": "WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from whatever `data_editing` already said, so effective access on the day of deploy was identical to the day before. `data_editing` is deliberately still here: it is removed when the last call site has moved to one of the new keys, not before.",
+      "analysis_kinds": null
     }
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "80ec518bc194"
+  "contract_version": "de7031e73047"
 }
