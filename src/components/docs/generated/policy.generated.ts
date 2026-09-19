@@ -1646,5 +1646,1760 @@ export const API_ROUTES: ApiRoute[] = [
   }
 ];
 
+/**
+ * The seven stress presets Simulation Lab offers, from the drawer's own
+ * literal — §4 D111.
+ *
+ * `STRESS_TESTS` above is the ENGINE's battery: a Python library API
+ * importable from `scsim` and reachable from nothing the product runs.
+ * These are what a user clicks. `resolves` on each event, and
+ * `reachesEngine` on each preset, are the mapper's own rule applied to the
+ * preset's fixed target — derived in `chains.mjs` against pinned anchors in
+ * `project_map.py`, so the classification goes red when the mapper moves
+ * rather than going quietly wrong.
+ */
+export type StressPresetEvent = {
+  target: string;
+  targetType: string;
+  startDay: number;
+  durationDays: number;
+  magnitudePct: number;
+  /** `plant` always maps · `supplier-id` maps only on a matching project · `unsupported` never maps. */
+  resolves: "plant" | "supplier-id" | "unsupported";
+};
+
+export type StressPreset = {
+  id: string;
+  label: string;
+  scenarioName: string;
+  description: string;
+  events: StressPresetEvent[];
+  reachesEngine: boolean;
+};
+
+export const STRESS_PRESETS: StressPreset[] = [
+  {
+    "id": "single_supplier_outage",
+    "label": "Single-supplier outage",
+    "scenarioName": "[Stress] Single-supplier outage",
+    "description": "Primary supplier offline for 14 days starting on day 30.",
+    "events": [
+      {
+        "target": "supplier:primary",
+        "targetType": "node",
+        "startDay": 30,
+        "durationDays": 14,
+        "magnitudePct": 100,
+        "resolves": "supplier-id"
+      }
+    ],
+    "reachesEngine": false
+  },
+  {
+    "id": "plant_shutdown",
+    "label": "Plant shutdown",
+    "scenarioName": "[Stress] Plant shutdown",
+    "description": "Plant production halted for 14 days starting on day 30.",
+    "events": [
+      {
+        "target": "node:plant",
+        "targetType": "node",
+        "startDay": 30,
+        "durationDays": 14,
+        "magnitudePct": 100,
+        "resolves": "plant"
+      }
+    ],
+    "reachesEngine": true
+  },
+  {
+    "id": "material_shortage",
+    "label": "Material shortage",
+    "scenarioName": "[Stress] Material shortage",
+    "description": "Critical material inbound capacity reduced 50% for 21 days.",
+    "events": [
+      {
+        "target": "material:critical",
+        "targetType": "node",
+        "startDay": 30,
+        "durationDays": 21,
+        "magnitudePct": 50,
+        "resolves": "unsupported"
+      }
+    ],
+    "reachesEngine": false
+  },
+  {
+    "id": "lead_time_shock",
+    "label": "Lead-time shock",
+    "scenarioName": "[Stress] Lead-time shock",
+    "description": "Inbound lane lead time extended 200% for 28 days.",
+    "events": [
+      {
+        "target": "edge:inbound",
+        "targetType": "edge",
+        "startDay": 30,
+        "durationDays": 28,
+        "magnitudePct": 200,
+        "resolves": "unsupported"
+      }
+    ],
+    "reachesEngine": false
+  },
+  {
+    "id": "demand_surge",
+    "label": "Demand surge",
+    "scenarioName": "[Stress] Demand surge",
+    "description": "Aggregate demand +40% for 21 days starting on day 30.",
+    "events": [
+      {
+        "target": "customer:all",
+        "targetType": "node",
+        "startDay": 30,
+        "durationDays": 21,
+        "magnitudePct": 40,
+        "resolves": "unsupported"
+      }
+    ],
+    "reachesEngine": false
+  },
+  {
+    "id": "multi_hit",
+    "label": "Multi-hit (compound)",
+    "scenarioName": "[Stress] Multi-hit compound",
+    "description": "Supplier outage on day 30, demand surge on day 45.",
+    "events": [
+      {
+        "target": "supplier:primary",
+        "targetType": "node",
+        "startDay": 30,
+        "durationDays": 14,
+        "magnitudePct": 100,
+        "resolves": "supplier-id"
+      },
+      {
+        "target": "customer:all",
+        "targetType": "node",
+        "startDay": 45,
+        "durationDays": 14,
+        "magnitudePct": 30,
+        "resolves": "unsupported"
+      }
+    ],
+    "reachesEngine": false
+  },
+  {
+    "id": "nexus_attack",
+    "label": "Nexus-node attack",
+    "scenarioName": "[Stress] Nexus-node attack",
+    "description": "Highest-prominence node offline for 14 days.",
+    "events": [
+      {
+        "target": "node:nexus",
+        "targetType": "node",
+        "startDay": 30,
+        "durationDays": 14,
+        "magnitudePct": 100,
+        "resolves": "unsupported"
+      }
+    ],
+    "reachesEngine": false
+  }
+];
+
+/**
+ * The template and guide the upload wizard offers per dataset — §4 D110.
+ *
+ * Derived from `UploadWizard.tsx`'s `templateTypes`, which is where the
+ * pairing is declared, so a template renamed in the wizard cannot leave a
+ * dead link on a documentation page. `templateFile: null` is a declaration
+ * and not a gap — `node_list` deliberately ships none.
+ */
+export type UploadAsset = {
+  id: string;
+  name: string;
+  description: string;
+  templateFile: string | null;
+  guideFile: string | null;
+};
+
+export const UPLOAD_ASSETS: UploadAsset[] = [
+  {
+    "id": "bom_single_level",
+    "name": "BOM Single Level",
+    "description": "Single-level Bill of Materials data",
+    "templateFile": "/template/bom_single_level.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "bom_multi_level",
+    "name": "BOM Multi Level",
+    "description": "Multi-level Bill of Materials data with hierarchy",
+    "templateFile": "/template/bom_multi_level.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "inbound_logistics",
+    "name": "Inbound Logistics",
+    "description": "Inbound supply network data from suppliers",
+    "templateFile": "/template/inbound_logistic.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "outbound_logistics",
+    "name": "Outbound Logistics",
+    "description": "Outbound distribution data to customers",
+    "templateFile": "/template/outbound_logistic.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "item_master_materials",
+    "name": "Materials Master",
+    "description": "Per-material economics the simulation reads (cost, MOQ, holding, lead-time shape)",
+    "templateFile": "/template/materials.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "item_master_products",
+    "name": "Products Master",
+    "description": "Per-product economics the simulation reads (price, capacity, demand shape, fulfillment mode)",
+    "templateFile": "/template/products.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "item_master_suppliers",
+    "name": "Suppliers Master",
+    "description": "Per-supplier capacity and reliability the simulation reads",
+    "templateFile": "/template/suppliers.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "node_list",
+    "name": "Node List",
+    "description": "Node list data with locations and descriptions",
+    "templateFile": null,
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "tier2_suppliers",
+    "name": "Tier-2 Suppliers",
+    "description": "Tier-2 supplier relationship data",
+    "templateFile": "/template/tier2_suppliers.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "tier3_suppliers",
+    "name": "Tier-3 Suppliers",
+    "description": "Tier-3 supplier relationship data",
+    "templateFile": "/template/tier3_suppliers.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "network_nodes",
+    "name": "Deep Tier Nodes",
+    "description": "Firm-level network nodes (deep tiers)",
+    "templateFile": "/template/nodes.csv",
+    "guideFile": "/docs/location-dataset-guide.md"
+  },
+  {
+    "id": "network_edges",
+    "name": "Deep Tier Edges",
+    "description": "Firm-level network edges (deep tiers)",
+    "templateFile": "/template/edges.csv",
+    "guideFile": "/docs/location-dataset-guide.md"
+  },
+  {
+    "id": "deep_tier_json",
+    "name": "Deep Tier Network (JSON)",
+    "description": "Complete network data in single JSON file",
+    "templateFile": "/template/summary.json",
+    "guideFile": "/docs/nexus-node.md"
+  }
+];
+
+/** The Colab notebook `/developer` offers, read from the href that offers it. */
+export const API_NOTEBOOK = "/notebooks/suresuite_api_quickstart.ipynb";
+
+/**
+ * Every failure the public API can return, by stable machine code.
+ *
+ * Read from the dispatcher's own `ApiError` construction sites, so a code
+ * the server stops throwing leaves this page on the next regenerate —
+ * which is §4 D21 and D22 pointed at an error a client branches on.
+ * `sites` is how many places raise it; `message` is the first, with
+ * `${...}` left in place because a runtime value's SHAPE is the fact.
+ */
+export type ApiErrorCode = { code: string; status: number; message: string; sites: number };
+
+export const API_ERRORS: ApiErrorCode[] = [
+  {
+    "code": "invalid_cursor",
+    "status": 400,
+    "message": "cursor must be a replication index",
+    "sites": 1
+  },
+  {
+    "code": "invalid_json",
+    "status": 400,
+    "message": "request body is not valid JSON",
+    "sites": 1
+  },
+  {
+    "code": "invalid_request",
+    "status": 400,
+    "message": "request body failed validation",
+    "sites": 1
+  },
+  {
+    "code": "expired_key",
+    "status": 401,
+    "message": "this API key has expired",
+    "sites": 1
+  },
+  {
+    "code": "invalid_key",
+    "status": 401,
+    "message": "missing or malformed API key (expected `Authorization: Bearer sk_…`)",
+    "sites": 2
+  },
+  {
+    "code": "org_suspended",
+    "status": 401,
+    "message": "the key's organization is not active",
+    "sites": 1
+  },
+  {
+    "code": "revoked_key",
+    "status": 401,
+    "message": "this API key has been revoked",
+    "sites": 1
+  },
+  {
+    "code": "missing_scope",
+    "status": 403,
+    "message": "this key does not have the ${scope} scope",
+    "sites": 1
+  },
+  {
+    "code": "replications_exceeded",
+    "status": 403,
+    "message": "scenario requests ${scenario.replications} replications (limit ${ctx.limits.max_replications})",
+    "sites": 1
+  },
+  {
+    "code": "key_not_found",
+    "status": 404,
+    "message": "key not found",
+    "sites": 1
+  },
+  {
+    "code": "project_not_found",
+    "status": 404,
+    "message": "project not found",
+    "sites": 1
+  },
+  {
+    "code": "route_not_found",
+    "status": 404,
+    "message": "no such route: ${req.method} /v1${subPath}",
+    "sites": 1
+  },
+  {
+    "code": "run_not_found",
+    "status": 404,
+    "message": "run not found",
+    "sites": 2
+  },
+  {
+    "code": "reuse_available",
+    "status": 409,
+    "message": "identical completed run exists — read it or retry with force_rerun=true",
+    "sites": 1
+  },
+  {
+    "code": "payload_too_large",
+    "status": 413,
+    "message": "request body exceeds 512 KB",
+    "sites": 1
+  },
+  {
+    "code": "validation_failed",
+    "status": 422,
+    "message": "run rejected by the required-data manifest",
+    "sites": 1
+  },
+  {
+    "code": "concurrent_runs_exceeded",
+    "status": 429,
+    "message": "organization already has ${active} queued/running runs (limit ${ctx.limits.max_concurrent_runs})",
+    "sites": 1
+  },
+  {
+    "code": "daily_quota_exceeded",
+    "status": 429,
+    "message": "daily request quota exceeded",
+    "sites": 1
+  },
+  {
+    "code": "rate_limited",
+    "status": 429,
+    "message": "per-minute rate limit exceeded",
+    "sites": 1
+  },
+  {
+    "code": "too_many_failed_auths",
+    "status": 429,
+    "message": "too many failed authentication attempts from this address",
+    "sites": 1
+  },
+  {
+    "code": "snapshot_failed",
+    "status": 500,
+    "message": "dataset snapshot failed",
+    "sites": 2
+  },
+  {
+    "code": "write_failed",
+    "status": 500,
+    "message": "saving ${family} defaults failed",
+    "sites": 5
+  },
+  {
+    "code": "auth_unavailable",
+    "status": 503,
+    "message": "authentication backend unavailable",
+    "sites": 1
+  },
+  {
+    "code": "authz_unavailable",
+    "status": 503,
+    "message": "authorization backend unavailable",
+    "sites": 1
+  },
+  {
+    "code": "quota_unavailable",
+    "status": 503,
+    "message": "compute quota check unavailable",
+    "sites": 1
+  },
+  {
+    "code": "rate_limiter_unavailable",
+    "status": 503,
+    "message": "rate limiter unavailable, request denied",
+    "sites": 1
+  },
+  {
+    "code": "read_failed",
+    "status": 503,
+    "message": "run read failed",
+    "sites": 9
+  }
+];
+
+/**
+ * The public API's ceilings, from the dispatcher's own literals.
+ *
+ * A per-key or per-organization row overrides the per-environment defaults
+ * without a deploy, so these are the floor a client should assume rather
+ * than a promise about any particular key.
+ */
+export type ApiLimits = {
+  envs: { env: string; rpm: number; rpd: number; maxConcurrentRuns: number }[];
+  maxBodyKb: number;
+  idempotencyTtlHours: number;
+  failedAuthsPerMinutePerIp: number;
+  maxPageSize: number;
+  defaultPageSize: number;
+};
+
+export const API_LIMITS: ApiLimits = {
+  "envs": [
+    {
+      "env": "live",
+      "rpm": 120,
+      "rpd": 5000,
+      "maxConcurrentRuns": 5
+    },
+    {
+      "env": "test",
+      "rpm": 30,
+      "rpd": 300,
+      "maxConcurrentRuns": 1
+    }
+  ],
+  "maxBodyKb": 512,
+  "idempotencyTtlHours": 24,
+  "failedAuthsPerMinutePerIp": 30,
+  "maxPageSize": 100,
+  "defaultPageSize": 20
+};
+
+/**
+ * The weekly measures an inspection run keeps, per item.
+ *
+ * `run_item_series` is deferred in the contract, so this is joined from the
+ * two places that declare it: the engine (which item kind each measure
+ * belongs to) and the explorer's legend (the name the reader sees). The
+ * derivation throws on either half missing a measure the other has.
+ */
+export type ItemSeries = { kind: string; key: string; label: string };
+
+export const ITEM_SERIES: ItemSeries[] = [
+  {
+    "kind": "material",
+    "key": "on_hand",
+    "label": "On hand"
+  },
+  {
+    "kind": "material",
+    "key": "in_transit",
+    "label": "In transit"
+  },
+  {
+    "kind": "material",
+    "key": "orders",
+    "label": "Orders placed"
+  },
+  {
+    "kind": "product",
+    "key": "demand",
+    "label": "Demand"
+  },
+  {
+    "kind": "product",
+    "key": "production",
+    "label": "Production"
+  },
+  {
+    "kind": "product",
+    "key": "fulfillment",
+    "label": "Fulfillment"
+  },
+  {
+    "kind": "product",
+    "key": "backlog",
+    "label": "Backlog"
+  },
+  {
+    "kind": "product",
+    "key": "lost_units",
+    "label": "Lost units"
+  }
+];
+
+/**
+ * What a replication row carries, against what the results table looks for.
+ *
+ * `emitted` is the engine's own per-replication row; `always: false` means
+ * the measure exists only on a run that had a disruption. `display` is the
+ * results screen's vocabulary with a flag saying whether the engine ever
+ * writes that key — §4 D21 at the results layer, visible only in the join.
+ */
+export type RunKpis = {
+  emitted: { key: string; always: boolean }[];
+  display: { key: string; label: string; emitted: boolean }[];
+  /** The scenario objective a user may pick, and whether a run produces it. */
+  objectives: { key: string; label: string; emitted: boolean }[];
+};
+
+export const RUN_KPIS: RunKpis = {
+  "emitted": [
+    {
+      "key": "fill_rate",
+      "always": true
+    },
+    {
+      "key": "demand_value",
+      "always": true
+    },
+    {
+      "key": "produced_value",
+      "always": true
+    },
+    {
+      "key": "revenue",
+      "always": true
+    },
+    {
+      "key": "lost_sales_value",
+      "always": true
+    },
+    {
+      "key": "lost_units",
+      "always": true
+    },
+    {
+      "key": "max_backlog",
+      "always": true
+    },
+    {
+      "key": "lost_inbound_units",
+      "always": true
+    },
+    {
+      "key": "avg_on_hand_value",
+      "always": true
+    },
+    {
+      "key": "capacity_utilization",
+      "always": true
+    },
+    {
+      "key": "cost_of_resilience",
+      "always": true
+    },
+    {
+      "key": "cost_ss_holding",
+      "always": true
+    },
+    {
+      "key": "cost_backup_premium",
+      "always": true
+    },
+    {
+      "key": "cost_multi_sourcing_premium",
+      "always": true
+    },
+    {
+      "key": "cost_expediting",
+      "always": true
+    },
+    {
+      "key": "cost_overtime",
+      "always": true
+    },
+    {
+      "key": "cost_lost_sales",
+      "always": true
+    },
+    {
+      "key": "cost_allocation_labor",
+      "always": true
+    },
+    {
+      "key": "cost_fg_ss_holding",
+      "always": true
+    },
+    {
+      "key": "cost_backorder_penalty",
+      "always": true
+    },
+    {
+      "key": "cost_monitoring",
+      "always": true
+    },
+    {
+      "key": "ttr_weeks",
+      "always": false
+    },
+    {
+      "key": "tts_weeks",
+      "always": false
+    },
+    {
+      "key": "pre_disruption_fill_rate",
+      "always": false
+    }
+  ],
+  "display": [
+    {
+      "key": "fill_rate",
+      "label": "Fill rate (α)",
+      "emitted": true
+    },
+    {
+      "key": "fill_rate_beta",
+      "label": "Fill rate (β)",
+      "emitted": false
+    },
+    {
+      "key": "otif",
+      "label": "OTIF",
+      "emitted": false
+    },
+    {
+      "key": "lead_time_days",
+      "label": "Lead time (days)",
+      "emitted": false
+    },
+    {
+      "key": "lead_time_p95",
+      "label": "Lead time p95",
+      "emitted": false
+    },
+    {
+      "key": "revenue",
+      "label": "Revenue",
+      "emitted": true
+    },
+    {
+      "key": "cost",
+      "label": "Cost",
+      "emitted": false
+    },
+    {
+      "key": "profit",
+      "label": "Profit",
+      "emitted": false
+    },
+    {
+      "key": "utilization",
+      "label": "Utilization (avg)",
+      "emitted": false
+    },
+    {
+      "key": "inventory_turns",
+      "label": "Inventory turns",
+      "emitted": false
+    },
+    {
+      "key": "backorder_days",
+      "label": "Backorder days",
+      "emitted": false
+    },
+    {
+      "key": "ttr_days",
+      "label": "Time-to-recover",
+      "emitted": false
+    },
+    {
+      "key": "resilience_index",
+      "label": "Resilience index",
+      "emitted": false
+    }
+  ],
+  "objectives": [
+    {
+      "key": "fill_rate",
+      "label": "Fill rate",
+      "emitted": true
+    },
+    {
+      "key": "otif",
+      "label": "OTIF",
+      "emitted": false
+    },
+    {
+      "key": "lead_time_days",
+      "label": "Lead time",
+      "emitted": false
+    },
+    {
+      "key": "profit",
+      "label": "Profit",
+      "emitted": false
+    },
+    {
+      "key": "utilization",
+      "label": "Utilization",
+      "emitted": false
+    }
+  ]
+};
+
+/**
+ * The weekly series a replication carries, and the one panel that looks for
+ * a series nothing writes.
+ */
+export type ReplicationSeries = {
+  written: string[];
+  offered: { key: string; label: string; unit: string; written: boolean }[];
+  heatmapWants: string;
+  heatmapEverRenders: boolean;
+};
+
+export const REPLICATION_SERIES_FACTS: ReplicationSeries = {
+  "written": [
+    "fill_rate",
+    "backlog_units",
+    "on_hand_value",
+    "revenue_value"
+  ],
+  "offered": [
+    {
+      "key": "fill_rate",
+      "label": "Fill rate",
+      "unit": "fraction",
+      "written": true
+    },
+    {
+      "key": "backlog_units",
+      "label": "Backlog",
+      "unit": "units",
+      "written": true
+    },
+    {
+      "key": "on_hand_value",
+      "label": "On-hand value",
+      "unit": "€",
+      "written": true
+    },
+    {
+      "key": "revenue_value",
+      "label": "Revenue",
+      "unit": "€/week",
+      "written": true
+    }
+  ],
+  "heatmapWants": "utilization",
+  "heatmapEverRenders": false
+};
+
+/**
+ * A scenario's settings, labelled as the setup form labels them.
+ *
+ * `scenarios` is deferred in the contract, so this is the only route to a
+ * settings reference. Label → stored key → default is a join the form's
+ * own `prov(local.X !== SCENARIO_ENGINE_DEFAULTS.X)` already declares.
+ */
+export type ScenarioSetupGroup = {
+  name: string;
+  fields: { label: string; unit: string | null; key: string; default: string }[];
+};
+
+export const SCENARIO_SETUP: ScenarioSetupGroup[] = [
+  {
+    "name": "Run window",
+    "fields": [
+      {
+        "label": "Planning horizon",
+        "unit": "the project's planning unit",
+        "key": "horizon_days",
+        "default": "90"
+      },
+      {
+        "label": "Steady state starts at",
+        "unit": "the project's planning unit",
+        "key": "warmup_days",
+        "default": "14"
+      },
+      {
+        "label": "Warm-up detection",
+        "unit": null,
+        "key": "warmup_mode",
+        "default": "\"auto\""
+      },
+      {
+        "label": "Time step",
+        "unit": null,
+        "key": "time_step",
+        "default": "\"day\""
+      }
+    ]
+  },
+  {
+    "name": "Precision",
+    "fields": [
+      {
+        "label": "Replications",
+        "unit": "runs",
+        "key": "replications",
+        "default": "10"
+      },
+      {
+        "label": "Common random numbers",
+        "unit": null,
+        "key": "crn",
+        "default": "true"
+      },
+      {
+        "label": "Seed",
+        "unit": null,
+        "key": "seed",
+        "default": "42"
+      },
+      {
+        "label": "Stopping rule",
+        "unit": null,
+        "key": "stopping_rule",
+        "default": "{ kind: \"fixed_horizon\", max_wall_seconds: 600 }"
+      }
+    ]
+  },
+  {
+    "name": "Objective",
+    "fields": [
+      {
+        "label": "Primary KPI",
+        "unit": null,
+        "key": "primary_kpi",
+        "default": "\"fill_rate\""
+      }
+    ]
+  }
+];
+
+/**
+ * The recovery levers a scenario offers, joined to the engine plugin each
+ * one reaches — `plugin: null` means the engine has no branch for it, so
+ * the lever is saved, shown enabled, and changes no number.
+ *
+ * `inGrid` is whether the /policies grid offers the same response: that
+ * list was already restricted to what the engine maps, so the two
+ * disagreeing is the finding. `engineOnly` is the reverse — responses the
+ * engine honours that the scenario pane never offers.
+ */
+export type RecoveryLever = {
+  key: string;
+  label: string;
+  description: string | null;
+  plugin: string | null;
+  inGrid: boolean;
+  params: { key: string; label: string; unit: string; default: number; hint: string | null }[];
+};
+
+export type RecoveryLevers = {
+  levers: RecoveryLever[];
+  engineOnly: { key: string; plugin: string; inGrid: boolean }[];
+};
+
+export const RECOVERY_LEVERS: RecoveryLevers = {
+  "levers": [
+    {
+      "key": "dual_source_activate",
+      "label": "Backup supplier",
+      "description": "Release orders to a predefined backup supplier when the primary is disrupted",
+      "plugin": "backup_supplier",
+      "inGrid": true,
+      "params": [
+        {
+          "key": "backup_lead_time_weeks",
+          "label": "Backup supplier lead time",
+          "unit": "weeks",
+          "default": 6,
+          "hint": "Standard lead time assumed for all backup suppliers (Ts')"
+        }
+      ]
+    },
+    {
+      "key": "safety_stock_drawdown",
+      "label": "Safety stock",
+      "description": "ABC-XYZ classified buffer stock protects against deep disruptions; incurs annual holding cost",
+      "plugin": null,
+      "inGrid": false,
+      "params": [
+        {
+          "key": "holding_cost_pct",
+          "label": "Annual holding cost",
+          "unit": "% of material cost",
+          "default": 20,
+          "hint": "Inventory carrying cost as a percentage of material value per year (hm)"
+        }
+      ]
+    },
+    {
+      "key": "capacity_flex",
+      "label": "Overtime production",
+      "description": "Activate overtime shifts when the revenue gain exceeds the overtime cost",
+      "plugin": "short_term_capacity",
+      "inGrid": true,
+      "params": [
+        {
+          "key": "overtime_cost_pct",
+          "label": "Overtime cost",
+          "unit": "% of product price",
+          "default": 5,
+          "hint": "Additional cost per unit produced during overtime shifts (Cop)"
+        }
+      ]
+    },
+    {
+      "key": "demand_shaping",
+      "label": "Material reallocation",
+      "description": "Revenue-maximising material allocation LP over a rolling planning horizon",
+      "plugin": null,
+      "inGrid": false,
+      "params": [
+        {
+          "key": "allocation_horizon_weeks",
+          "label": "Planning horizon",
+          "unit": "weeks",
+          "default": 4,
+          "hint": "Rolling window for the material-allocation LP (W)"
+        },
+        {
+          "key": "annual_labor_cost",
+          "label": "Annual planning labor cost",
+          "unit": "€",
+          "default": 6240,
+          "hint": "Indirect labor cost for supply chain allocation team — 208 h/yr (Calc)"
+        }
+      ]
+    },
+    {
+      "key": "mode_shift",
+      "label": "Expedite shipments",
+      "description": "Accelerate in-transit shipments when expedite revenue exceeds expedite cost",
+      "plugin": "expedited_shipments",
+      "inGrid": true,
+      "params": [
+        {
+          "key": "expedite_cost_pct",
+          "label": "Expedite cost",
+          "unit": "% of material cost per order",
+          "default": 3,
+          "hint": "Premium to accelerate in-transit materials to the current week (Cexp)"
+        }
+      ]
+    },
+    {
+      "key": "reroute",
+      "label": "Network rerouting",
+      "description": "Redirect flows through alternative network paths",
+      "plugin": "expedited_shipments",
+      "inGrid": true,
+      "params": []
+    }
+  ],
+  "engineOnly": [
+    {
+      "key": "early_warning",
+      "plugin": "early_warning_failover",
+      "inGrid": true
+    },
+    {
+      "key": "allocate_materials",
+      "plugin": "material_allocation",
+      "inGrid": true
+    }
+  ]
+};
+
+/**
+ * The assistant's three declared vocabularies: the personas in the picker,
+ * the interaction modes, and the specialist agents the server's router
+ * chooses from. The chat tables are deferred in the contract, so these are
+ * the only declarations §9 has.
+ *
+ * `autoTooltip` is the unlock condition for the disabled third mode, taken
+ * VERBATIM: it is a commitment about when autonomous change becomes
+ * possible, and paraphrasing a commitment is how it quietly loosens.
+ */
+export type Assistant = {
+  personas: { id: string; name: string; blurb: string; requiresProject: boolean }[];
+  modes: { id: string; label: string; hint: string; live: boolean }[];
+  autoTooltip: string;
+  defaultMode: string;
+  agents: { slug: string; mission: string }[];
+};
+
+export const ASSISTANT: Assistant = {
+  "personas": [
+    {
+      "id": "risk-analyst",
+      "name": "Risk Analyst",
+      "blurb": "Supplier & network risk, single-source exposure, criticality.",
+      "requiresProject": true
+    },
+    {
+      "id": "simulation-modeler",
+      "name": "Simulation Modeler",
+      "blurb": "Design scenarios, stress tests, and recovery playbooks.",
+      "requiresProject": true
+    },
+    {
+      "id": "inventory-strategist",
+      "name": "Inventory Strategist",
+      "blurb": "Safety stock, MOQ, service level, and working capital trade-offs.",
+      "requiresProject": true
+    },
+    {
+      "id": "logistics-planner",
+      "name": "Logistics Planner",
+      "blurb": "Lead times, routing, in-transit inventory, expediting.",
+      "requiresProject": true
+    },
+    {
+      "id": "general",
+      "name": "General Assistant",
+      "blurb": "Open-ended supply-chain conversation. No project required.",
+      "requiresProject": false
+    }
+  ],
+  "modes": [
+    {
+      "id": "ask",
+      "label": "Ask",
+      "hint": "Decision Support — answers and analyses only; nothing about the project changes",
+      "live": true
+    },
+    {
+      "id": "review",
+      "label": "Review",
+      "hint": "Accept edits — agents draft; every change is a proposal card you approve",
+      "live": true
+    }
+  ],
+  "autoTooltip": "Auto isn't available. It unlocks only after: ≥ 3 consecutive months of per-agent accepted-proposal rate ≥ 0.9 AND an org explicitly requesting it AND resolved principals (server-verified identity) — and then as a per-org opt-in designed as a new decision, scoped first to deterministic diffs. Until then every change is a reviewable proposal.",
+  "defaultMode": "review",
+  "agents": [
+    {
+      "slug": "data-steward",
+      "mission": "completes and corrects item-master data (materials, products, suppliers) as reviewable diffs"
+    },
+    {
+      "slug": "cost-estimator",
+      "mission": "estimates missing item-master economics with method-cited values and uncertainty intervals where the data alone cannot supply them"
+    },
+    {
+      "slug": "network-cartographer",
+      "mission": "maps the supply network beyond tier 1 from user-provided documents and registered external sources, as evidence-cited reviewable graph extensions"
+    },
+    {
+      "slug": "disruption-sentinel",
+      "mission": "assesses disruption events on demand against registered sensing feeds and files corroborated, simulation-sized risk alerts for the project's network"
+    },
+    {
+      "slug": "policy-configurator",
+      "mission": "turns natural-language intent into a reviewable policy-configuration change (defaults + overrides)"
+    },
+    {
+      "slug": "vv-analyst",
+      "mission": "interprets verification & validation evidence and drafts model-validation cards"
+    },
+    {
+      "slug": "experiment-designer",
+      "mission": "compiles decision questions into reviewable, gate-checked experiment specifications"
+    },
+    {
+      "slug": "explainer",
+      "mission": "answers \"why did the model do that?\" from recorded decision traces with mandatory citations"
+    },
+    {
+      "slug": "report-builder",
+      "mission": "turns persisted data and completed simulation runs into downloadable decision reports (XLSX/PDF) via a reviewable spec"
+    }
+  ]
+};
+
+/**
+ * The proposal lifecycle, the memory vocabulary and the plan states, read
+ * from the CHECK constraints in the introspected schema.
+ *
+ * The three tables are deferred in `coverage.yaml` — correctly, they carry
+ * no simulation value — so their closed vocabularies are the only
+ * generated fact §9 has. Read from the introspection rather than from the
+ * migration that first wrote them: the agent-to-artifact pairing was five
+ * pairs at creation and is nine now.
+ */
+export type Intelligence = {
+  proposal: {
+    pairs: { agent: string; artifact: string }[];
+    statuses: string[];
+    provenance: string[];
+    expiresAfter: string | null;
+  };
+  memory: { kinds: string[]; statuses: string[]; contentCap: number };
+  plan: { statuses: string[]; expiresAfter: string | null };
+};
+
+export const INTELLIGENCE: Intelligence = {
+  "proposal": {
+    "pairs": [
+      {
+        "agent": "data-steward",
+        "artifact": "item_master_diff"
+      },
+      {
+        "agent": "policy-configurator",
+        "artifact": "policy_bundle_diff"
+      },
+      {
+        "agent": "vv-analyst",
+        "artifact": "model_card_draft"
+      },
+      {
+        "agent": "experiment-designer",
+        "artifact": "experiment_spec"
+      },
+      {
+        "agent": "explainer",
+        "artifact": "trace_explanation"
+      },
+      {
+        "agent": "report-builder",
+        "artifact": "decision_report"
+      },
+      {
+        "agent": "cost-estimator",
+        "artifact": "parameter_estimate"
+      },
+      {
+        "agent": "network-cartographer",
+        "artifact": "network_map_diff"
+      },
+      {
+        "agent": "disruption-sentinel",
+        "artifact": "risk_alert"
+      }
+    ],
+    "statuses": [
+      "draft",
+      "proposed",
+      "approved",
+      "applied",
+      "rejected",
+      "expired"
+    ],
+    "provenance": [
+      "deterministic",
+      "llm_drafted",
+      "user_supplied"
+    ],
+    "expiresAfter": "14 days"
+  },
+  "memory": {
+    "kinds": [
+      "fact",
+      "preference",
+      "decision"
+    ],
+    "statuses": [
+      "active",
+      "archived"
+    ],
+    "contentCap": 500
+  },
+  "plan": {
+    "statuses": [
+      "active",
+      "done",
+      "failed",
+      "abandoned",
+      "expired"
+    ],
+    "expiresAfter": "14 days"
+  }
+};
+
+/** Budget scopes, periods and ceilings, and what a recorded AI call carries. */
+export type AiGovernance = {
+  budgetScopes: string[];
+  budgetPeriods: string[];
+  budgetCeilings: string[];
+  usageStatuses: string[];
+  usageRecorded: string[];
+  modelCostColumns: string[];
+};
+
+export const AI_GOVERNANCE: AiGovernance = {
+  "budgetScopes": [
+    "user",
+    "org",
+    "project"
+  ],
+  "budgetPeriods": [
+    "daily",
+    "monthly"
+  ],
+  "budgetCeilings": [
+    "budget_usd",
+    "token_limit",
+    "rpm",
+    "rpd"
+  ],
+  "usageStatuses": [
+    "success",
+    "error",
+    "blocked"
+  ],
+  "usageRecorded": [
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "cost_usd",
+    "latency_ms",
+    "error_code"
+  ],
+  "modelCostColumns": [
+    "input_cost_per_1k",
+    "output_cost_per_1k"
+  ]
+};
+
+/**
+ * The policy presets, in the order the dialog offers them.
+ *
+ * `derivesFrom` is the list of MEASURED PROJECT FACTS the preset's own
+ * derivation reads. It is the fact that makes a preset not a fixed set of
+ * values, and no other source carries it: `policy_presets` is deferred in
+ * the contract and the table stores a resolved bundle, not the function.
+ */
+export type PolicyPreset = {
+  slug: string;
+  name: string;
+  description: string;
+  isSystem: boolean;
+  derivesFrom: string[];
+  families: string[];
+};
+
+export const POLICY_PRESETS: PolicyPreset[] = [
+  {
+    "slug": "make_to_stock",
+    "name": "Make-to-Stock",
+    "description": "Produce ahead of demand, hold FG inventory, ship from stock.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "make_to_order",
+    "name": "Make-to-Order",
+    "description": "Zero FG stock, lot-for-lot production, long backorder window.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "lean_jit",
+    "name": "Lean / JIT",
+    "description": "Minimal inventory, daily review, single-source, FTL — fast & cheap when stable.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "supplier_lt_cv",
+      "supplier_lt_mean_days",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "resilient",
+    "name": "Resilient",
+    "description": "Dual-source, 14-day safety stock, mode-shift on disruption.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "supplier_lt_cv",
+      "supplier_lt_mean_days",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "service_first",
+    "name": "Service-first",
+    "description": "99% SLA, large safety stock, fair-share allocation, premium transport.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "cost_optimized",
+    "name": "Cost-optimized",
+    "description": "EOQ inventory, milk-run + LTL, weekly consolidation — lowest landed cost.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "agile_high_mix",
+    "name": "Agile / High-mix",
+    "description": "Multi-source, short review, parcel + LTL mix — adapts to choppy demand.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "sustainable",
+    "name": "Sustainable",
+    "description": "Sea/rail bias, large batches, carbon-capped routing.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "supply_chain_model",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  }
+];
+
+/**
+ * What a model-validation card records, from its own CHECK constraints and
+ * columns. `binding` is the four components a verdict is tied to — the one
+ * place in the product where `result-binding` (I8) already holds today.
+ */
+export type ValidationCard = {
+  binding: { component: string; columns: string[] }[];
+  verdicts: string[];
+  bases: string[];
+  statuses: string[];
+  warmupMethods: string[];
+  hasEvidenceRun: boolean;
+  adopts: string[];
+};
+
+export const VALIDATION_CARD: ValidationCard = {
+  "binding": [
+    {
+      "component": "dataset",
+      "columns": [
+        "dataset_version_id",
+        "graph_hash"
+      ]
+    },
+    {
+      "component": "policy",
+      "columns": [
+        "policy_version_id",
+        "policy_hash"
+      ]
+    },
+    {
+      "component": "scenario",
+      "columns": [
+        "scenario_hash",
+        "scenario_fingerprint"
+      ]
+    },
+    {
+      "component": "engine",
+      "columns": [
+        "engine_fingerprint"
+      ]
+    }
+  ],
+  "verdicts": [
+    "validated",
+    "rejected"
+  ],
+  "bases": [
+    "statistical",
+    "face"
+  ],
+  "statuses": [
+    "active",
+    "superseded",
+    "revoked"
+  ],
+  "warmupMethods": [
+    "engine",
+    "welch",
+    "mser5"
+  ],
+  "hasEvidenceRun": true,
+  "adopts": [
+    "adopted_warmup_days",
+    "recommended_replications"
+  ]
+};
+
+/**
+ * What deleting a project reaches, joined across the two mechanisms that do
+ * it: the foreign keys that cascade and the table list the delete function
+ * sweeps by name.
+ *
+ * `neither` is the number worth publishing — project-scoped tables that no
+ * cascade and no sweep removes, so their rows outlive the project.
+ */
+export type ProjectDeletion = {
+  projectScoped: number;
+  cascade: number;
+  detached: string[];
+  sweptOnly: string[];
+  neither: string[];
+  asynchronous: boolean;
+};
+
+export const PROJECT_DELETION: ProjectDeletion = {
+  "projectScoped": 49,
+  "cascade": 29,
+  "detached": [
+    "chat_threads",
+    "user_files"
+  ],
+  "sweptOnly": [
+    "disruption_scenario_profiles",
+    "disruption_scenarios",
+    "network_edges",
+    "network_nodes",
+    "node_list",
+    "simulation_results",
+    "supply_chain_data",
+    "supply_chain_data_multi_tier"
+  ],
+  "neither": [
+    "ai_chat_events",
+    "ai_usage_logs",
+    "api_request_logs",
+    "customers",
+    "network_summary",
+    "policy_defaults",
+    "policy_overrides",
+    "simulation_job_magnitudes",
+    "tier2_suppliers",
+    "tier3_suppliers"
+  ],
+  "asynchronous": true
+};
+
+/**
+ * The administrative routes the router declares, each with the page
+ * capability that gates it — resolved by the same longest-prefix rule the
+ * app itself uses. One gate for all of them is the fact a hand-written list
+ * could not carry.
+ */
+export type AdminScreens = {
+  routes: { path: string; component: string; gate: string | null }[];
+  gates: string[];
+  pageCapabilities: number;
+};
+
+export const ADMIN_SCREENS: AdminScreens = {
+  "routes": [
+    {
+      "path": "/admin",
+      "component": "AdminDashboard",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/users",
+      "component": "AdminUsers",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/users/:userId",
+      "component": "AdminUserAccess",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/roles",
+      "component": "AdminRoles",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/organizations",
+      "component": "AdminOrganizations",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/projects",
+      "component": "AdminProjects",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/models",
+      "component": "AdminModels",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/usage",
+      "component": "AdminUsage",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/audit",
+      "component": "AdminAudit",
+      "gate": "/admin"
+    }
+  ],
+  "gates": [
+    "/admin"
+  ],
+  "pageCapabilities": 12
+};
+
+/**
+ * Described tables with an unrestricted READ rule, and which roles hold it.
+ *
+ * `RefTable.rls.unrestricted` counts predicate-less policies and cannot say
+ * which command or which role — so a table with an open SELECT beside a
+ * restrictive write looks protected there and is not. §4 D28 records the
+ * class and its standing decision; this is the number a reader needs.
+ */
+export type ReadExposure = {
+  described: number;
+  open: { table: string; roles: string[] }[];
+  signedOut: string[];
+};
+
+export const READ_EXPOSURE: ReadExposure = {
+  "described": 48,
+  "open": [
+    {
+      "table": "approved_users",
+      "roles": [
+        "public"
+      ]
+    },
+    {
+      "table": "bom_multi_level",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "bom_single_level",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "capabilities",
+      "roles": [
+        "public"
+      ]
+    },
+    {
+      "table": "dataset_versions",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "inbound_logistics",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "outbound_logistics",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "policy_defaults",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "policy_overrides",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "project_role_capabilities",
+      "roles": [
+        "public"
+      ]
+    },
+    {
+      "table": "risk_data",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "role_capabilities",
+      "roles": [
+        "public"
+      ]
+    }
+  ],
+  "signedOut": [
+    "approved_users",
+    "bom_multi_level",
+    "bom_single_level",
+    "capabilities",
+    "dataset_versions",
+    "inbound_logistics",
+    "outbound_logistics",
+    "policy_defaults",
+    "policy_overrides",
+    "project_role_capabilities",
+    "risk_data",
+    "role_capabilities"
+  ]
+};
+
 export const CHAIN_COUNT = 38;
 export const BROKEN_COUNT = 10;

@@ -18,7 +18,7 @@ export default function BomMultiLevel() {
           it is, how deep it sits, what it feeds, and how much of it that parent takes.
         </P>
         <P>
-          The engine collapses this tree into the same product-to-material arcs that{" "}
+          The engine collapses this tree into the same product-to-material rows that{" "}
           <DocLink to="bom-single-level">BOM — single level</DocLink> states directly. What you gain
           by uploading the deep version is that the intermediate stages exist: they can be seen in
           the <DocLink to="process-level-network">Process-Level Network</DocLink>, and a disruption

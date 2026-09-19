@@ -60,7 +60,7 @@ export default function BomSingleLevel() {
         </P>
         <P>
           They are separate files and separate tables. A project can hold both; the engine collapses
-          the multi-level tree into the same arcs the single-level file states directly, so the two
+          the multi-level tree into the same product-to-material rows the single-level file states directly, so the two
           describe the same thing at different resolutions.
         </P>
       </Section>

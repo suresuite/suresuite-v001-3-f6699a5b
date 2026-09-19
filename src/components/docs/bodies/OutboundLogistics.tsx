@@ -10,13 +10,13 @@ export default function OutboundLogistics() {
 
   return (
     <>
-      <PageTitle lead="Demand arcs: which customer buys which product, at what price and lead time.">
+      <PageTitle lead="Demand lanes: which customer buys which product, at what price and lead time.">
         Outbound Logistics
       </PageTitle>
 
       <Section id="what-it-is" title="What this file is">
         <P>
-          One row per <em>demand arc</em> — a customer who buys a product. It is the mirror of{" "}
+          One row per <em>demand lane</em> — a customer who buys a product. It is the mirror of{" "}
           <DocLink to="inbound-logistics">Inbound Logistics</DocLink>: that file is where material
           comes from, this one is where product goes.
         </P>

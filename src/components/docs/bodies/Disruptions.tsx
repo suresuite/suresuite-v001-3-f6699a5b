@@ -35,25 +35,52 @@ export default function Disruptions() {
         Disruptions
       </PageTitle>
 
-      <Callout tone="limit" title="Read this first: there are two disruption models, and both are live">
+      <Callout tone="limit" title="Read this first: there are THREE disruption models, and the one the simulation reads is not on this page">
         <p>
-          This product holds disruptions in two unrelated shapes. One is a single row per affected
-          node. The other splits a disruption into a profile, its targets, its effects and its
-          settings. <strong>Neither reads the other.</strong>
+          <strong>The simulation runs off a disruption schedule stored on the scenario itself</strong>
+          — the list you edit on stage 2 of{" "}
+          <DocLink to="simulation-lab">Simulation Lab</DocLink>, and the one a{" "}
+          <DocLink to="stress-tests">stress preset</DocLink> fills in for you. That schedule is sent
+          with the run and is the only disruption the engine ever sees.
         </p>
         <p>
-          Nothing migrated the existing rows from the first into the second, and nothing marks
-          either as retired. So a project can hold disruptions in both, and a screen that reads one
-          shows you half of what the project contains.
+          The two <em>tables</em> described below are a different thing. One is a single row per
+          affected node; the other splits a disruption into a profile, its targets, its effects and
+          its settings. Neither reads the other, nothing migrated the rows from the first into the
+          second, and nothing marks either as retired. <strong>And no run reads either of
+          them</strong>: the worker loads the item masters, the logistics, the BOM, the customers
+          and the scenario, and no disruption table is in that list.
         </p>
         <p>
-          <strong>Which one wins has not been decided.</strong> That is a product decision with a
-          migration behind it, and this manual is not the place it gets made. What we can do is tell
-          you the situation, and describe both.
+          So a disruption recorded from a network map's dialog is recorded, and it does not change a
+          simulation. That is worth knowing before you build a library of them.
+        </p>
+        <p>
+          <strong>Which of the three wins has not been decided.</strong> That is a product decision
+          with a migration behind it, and this manual is not the place it gets made. What we can do
+          is tell you the situation, and describe both tables.
         </p>
       </Callout>
 
-      <Section id="the-original" title="The original shape — one row per affected node">
+      <Section id="the-live-one" title="The one the engine reads: a scenario's own schedule">
+        <P>
+          A list of events on the scenario, each naming what is hit, the day it starts, how many
+          days it lasts and how hard it is. It travels with the run and is the only disruption the
+          engine acts on.
+        </P>
+        <P>
+          Everything about how those four numbers are interpreted — which targets resolve, how days
+          become weeks, what a magnitude at or above 100% does, and the five-event cap — is on{" "}
+          <DocLink to="stress-tests">Stress tests</DocLink>, because that is the page a reader
+          arrives at with a schedule already written for them. Read it before you write one by hand.
+        </P>
+        <P>
+          It is a column on the scenario rather than a table of its own, which is why it has no
+          reference block here.
+        </P>
+      </Section>
+
+      <Section id="the-original" title="The first table — one row per affected node">
         <P>
           <Prose text={inline.grain} />
         </P>
@@ -67,7 +94,7 @@ export default function Disruptions() {
               <DocFigure id="disruption-models" />
       </Section>
 
-      <Section id="the-split" title="The redesign — a profile, and three tables under it">
+      <Section id="the-split" title="The second table set — a profile, and three tables under it">
         <P>
           The same idea, normalised. A profile is the disruption; three tables under it say what it
           hits, what it does, and how it is simulated. A profile deleted takes all three with it, so
@@ -119,7 +146,7 @@ export default function Disruptions() {
         </P>
       </Section>
 
-      <Provenance from="the five disruption sidecars, both models" />
+      <Provenance from="the five disruption sidecars for the two table models, and the worker's own table list for what a run loads — which is where the third model, and the fact that it is the only live one, comes from" />
     </>
   );
 }
