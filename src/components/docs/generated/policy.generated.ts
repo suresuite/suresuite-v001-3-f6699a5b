@@ -1639,5 +1639,493 @@ export const API_ROUTES: ApiRoute[] = [
   }
 ];
 
+/**
+ * The seven stress presets Simulation Lab offers, from the drawer's own
+ * literal — §4 D111.
+ *
+ * `STRESS_TESTS` above is the ENGINE's battery: a Python library API
+ * importable from `scsim` and reachable from nothing the product runs.
+ * These are what a user clicks. `resolves` on each event, and
+ * `reachesEngine` on each preset, are the mapper's own rule applied to the
+ * preset's fixed target — derived in `chains.mjs` against pinned anchors in
+ * `project_map.py`, so the classification goes red when the mapper moves
+ * rather than going quietly wrong.
+ */
+export type StressPresetEvent = {
+  target: string;
+  targetType: string;
+  startDay: number;
+  durationDays: number;
+  magnitudePct: number;
+  /** `plant` always maps · `supplier-id` maps only on a matching project · `unsupported` never maps. */
+  resolves: "plant" | "supplier-id" | "unsupported";
+};
+
+export type StressPreset = {
+  id: string;
+  label: string;
+  scenarioName: string;
+  description: string;
+  events: StressPresetEvent[];
+  reachesEngine: boolean;
+};
+
+export const STRESS_PRESETS: StressPreset[] = [
+  {
+    "id": "single_supplier_outage",
+    "label": "Single-supplier outage",
+    "scenarioName": "[Stress] Single-supplier outage",
+    "description": "Primary supplier offline for 14 days starting on day 30.",
+    "events": [
+      {
+        "target": "supplier:primary",
+        "targetType": "node",
+        "startDay": 30,
+        "durationDays": 14,
+        "magnitudePct": 100,
+        "resolves": "supplier-id"
+      }
+    ],
+    "reachesEngine": false
+  },
+  {
+    "id": "plant_shutdown",
+    "label": "Plant shutdown",
+    "scenarioName": "[Stress] Plant shutdown",
+    "description": "Plant production halted for 14 days starting on day 30.",
+    "events": [
+      {
+        "target": "node:plant",
+        "targetType": "node",
+        "startDay": 30,
+        "durationDays": 14,
+        "magnitudePct": 100,
+        "resolves": "plant"
+      }
+    ],
+    "reachesEngine": true
+  },
+  {
+    "id": "material_shortage",
+    "label": "Material shortage",
+    "scenarioName": "[Stress] Material shortage",
+    "description": "Critical material inbound capacity reduced 50% for 21 days.",
+    "events": [
+      {
+        "target": "material:critical",
+        "targetType": "node",
+        "startDay": 30,
+        "durationDays": 21,
+        "magnitudePct": 50,
+        "resolves": "unsupported"
+      }
+    ],
+    "reachesEngine": false
+  },
+  {
+    "id": "lead_time_shock",
+    "label": "Lead-time shock",
+    "scenarioName": "[Stress] Lead-time shock",
+    "description": "Inbound lane lead time extended 200% for 28 days.",
+    "events": [
+      {
+        "target": "edge:inbound",
+        "targetType": "edge",
+        "startDay": 30,
+        "durationDays": 28,
+        "magnitudePct": 200,
+        "resolves": "unsupported"
+      }
+    ],
+    "reachesEngine": false
+  },
+  {
+    "id": "demand_surge",
+    "label": "Demand surge",
+    "scenarioName": "[Stress] Demand surge",
+    "description": "Aggregate demand +40% for 21 days starting on day 30.",
+    "events": [
+      {
+        "target": "customer:all",
+        "targetType": "node",
+        "startDay": 30,
+        "durationDays": 21,
+        "magnitudePct": 40,
+        "resolves": "unsupported"
+      }
+    ],
+    "reachesEngine": false
+  },
+  {
+    "id": "multi_hit",
+    "label": "Multi-hit (compound)",
+    "scenarioName": "[Stress] Multi-hit compound",
+    "description": "Supplier outage on day 30, demand surge on day 45.",
+    "events": [
+      {
+        "target": "supplier:primary",
+        "targetType": "node",
+        "startDay": 30,
+        "durationDays": 14,
+        "magnitudePct": 100,
+        "resolves": "supplier-id"
+      },
+      {
+        "target": "customer:all",
+        "targetType": "node",
+        "startDay": 45,
+        "durationDays": 14,
+        "magnitudePct": 30,
+        "resolves": "unsupported"
+      }
+    ],
+    "reachesEngine": false
+  },
+  {
+    "id": "nexus_attack",
+    "label": "Nexus-node attack",
+    "scenarioName": "[Stress] Nexus-node attack",
+    "description": "Highest-prominence node offline for 14 days.",
+    "events": [
+      {
+        "target": "node:nexus",
+        "targetType": "node",
+        "startDay": 30,
+        "durationDays": 14,
+        "magnitudePct": 100,
+        "resolves": "unsupported"
+      }
+    ],
+    "reachesEngine": false
+  }
+];
+
+/**
+ * The template and guide the upload wizard offers per dataset — §4 D110.
+ *
+ * Derived from `UploadWizard.tsx`'s `templateTypes`, which is where the
+ * pairing is declared, so a template renamed in the wizard cannot leave a
+ * dead link on a documentation page. `templateFile: null` is a declaration
+ * and not a gap — `node_list` deliberately ships none.
+ */
+export type UploadAsset = {
+  id: string;
+  name: string;
+  description: string;
+  templateFile: string | null;
+  guideFile: string | null;
+};
+
+export const UPLOAD_ASSETS: UploadAsset[] = [
+  {
+    "id": "bom_single_level",
+    "name": "BOM Single Level",
+    "description": "Single-level Bill of Materials data",
+    "templateFile": "/template/bom_single_level.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "bom_multi_level",
+    "name": "BOM Multi Level",
+    "description": "Multi-level Bill of Materials data with hierarchy",
+    "templateFile": "/template/bom_multi_level.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "inbound_logistics",
+    "name": "Inbound Logistics",
+    "description": "Inbound supply network data from suppliers",
+    "templateFile": "/template/inbound_logistic.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "outbound_logistics",
+    "name": "Outbound Logistics",
+    "description": "Outbound distribution data to customers",
+    "templateFile": "/template/outbound_logistic.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "item_master_materials",
+    "name": "Materials Master",
+    "description": "Per-material economics the simulation reads (cost, MOQ, holding, lead-time shape)",
+    "templateFile": "/template/materials.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "item_master_products",
+    "name": "Products Master",
+    "description": "Per-product economics the simulation reads (price, capacity, demand shape, fulfillment mode)",
+    "templateFile": "/template/products.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "item_master_suppliers",
+    "name": "Suppliers Master",
+    "description": "Per-supplier capacity and reliability the simulation reads",
+    "templateFile": "/template/suppliers.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "node_list",
+    "name": "Node List",
+    "description": "Node list data with locations and descriptions",
+    "templateFile": null,
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "tier2_suppliers",
+    "name": "Tier-2 Suppliers",
+    "description": "Tier-2 supplier relationship data",
+    "templateFile": "/template/tier2_suppliers.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "tier3_suppliers",
+    "name": "Tier-3 Suppliers",
+    "description": "Tier-3 supplier relationship data",
+    "templateFile": "/template/tier3_suppliers.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "network_nodes",
+    "name": "Deep Tier Nodes",
+    "description": "Firm-level network nodes (deep tiers)",
+    "templateFile": "/template/nodes.csv",
+    "guideFile": "/docs/location-dataset-guide.md"
+  },
+  {
+    "id": "network_edges",
+    "name": "Deep Tier Edges",
+    "description": "Firm-level network edges (deep tiers)",
+    "templateFile": "/template/edges.csv",
+    "guideFile": "/docs/location-dataset-guide.md"
+  },
+  {
+    "id": "deep_tier_json",
+    "name": "Deep Tier Network (JSON)",
+    "description": "Complete network data in single JSON file",
+    "templateFile": "/template/summary.json",
+    "guideFile": "/docs/nexus-node.md"
+  }
+];
+
+/** The Colab notebook `/developer` offers, read from the href that offers it. */
+export const API_NOTEBOOK = "/notebooks/suresuite_api_quickstart.ipynb";
+
+/**
+ * Every failure the public API can return, by stable machine code.
+ *
+ * Read from the dispatcher's own `ApiError` construction sites, so a code
+ * the server stops throwing leaves this page on the next regenerate —
+ * which is §4 D21 and D22 pointed at an error a client branches on.
+ * `sites` is how many places raise it; `message` is the first, with
+ * `${...}` left in place because a runtime value's SHAPE is the fact.
+ */
+export type ApiErrorCode = { code: string; status: number; message: string; sites: number };
+
+export const API_ERRORS: ApiErrorCode[] = [
+  {
+    "code": "invalid_cursor",
+    "status": 400,
+    "message": "cursor must be a replication index",
+    "sites": 1
+  },
+  {
+    "code": "invalid_json",
+    "status": 400,
+    "message": "request body is not valid JSON",
+    "sites": 1
+  },
+  {
+    "code": "invalid_request",
+    "status": 400,
+    "message": "request body failed validation",
+    "sites": 1
+  },
+  {
+    "code": "expired_key",
+    "status": 401,
+    "message": "this API key has expired",
+    "sites": 1
+  },
+  {
+    "code": "invalid_key",
+    "status": 401,
+    "message": "missing or malformed API key (expected `Authorization: Bearer sk_…`)",
+    "sites": 2
+  },
+  {
+    "code": "org_suspended",
+    "status": 401,
+    "message": "the key's organization is not active",
+    "sites": 1
+  },
+  {
+    "code": "revoked_key",
+    "status": 401,
+    "message": "this API key has been revoked",
+    "sites": 1
+  },
+  {
+    "code": "missing_scope",
+    "status": 403,
+    "message": "this key does not have the ${scope} scope",
+    "sites": 1
+  },
+  {
+    "code": "replications_exceeded",
+    "status": 403,
+    "message": "scenario requests ${scenario.replications} replications (limit ${ctx.limits.max_replications})",
+    "sites": 1
+  },
+  {
+    "code": "key_not_found",
+    "status": 404,
+    "message": "key not found",
+    "sites": 1
+  },
+  {
+    "code": "project_not_found",
+    "status": 404,
+    "message": "project not found",
+    "sites": 1
+  },
+  {
+    "code": "route_not_found",
+    "status": 404,
+    "message": "no such route: ${req.method} /v1${subPath}",
+    "sites": 1
+  },
+  {
+    "code": "run_not_found",
+    "status": 404,
+    "message": "run not found",
+    "sites": 2
+  },
+  {
+    "code": "reuse_available",
+    "status": 409,
+    "message": "identical completed run exists — read it or retry with force_rerun=true",
+    "sites": 1
+  },
+  {
+    "code": "payload_too_large",
+    "status": 413,
+    "message": "request body exceeds 512 KB",
+    "sites": 1
+  },
+  {
+    "code": "validation_failed",
+    "status": 422,
+    "message": "run rejected by the required-data manifest",
+    "sites": 1
+  },
+  {
+    "code": "concurrent_runs_exceeded",
+    "status": 429,
+    "message": "organization already has ${active} queued/running runs (limit ${ctx.limits.max_concurrent_runs})",
+    "sites": 1
+  },
+  {
+    "code": "daily_quota_exceeded",
+    "status": 429,
+    "message": "daily request quota exceeded",
+    "sites": 1
+  },
+  {
+    "code": "rate_limited",
+    "status": 429,
+    "message": "per-minute rate limit exceeded",
+    "sites": 1
+  },
+  {
+    "code": "too_many_failed_auths",
+    "status": 429,
+    "message": "too many failed authentication attempts from this address",
+    "sites": 1
+  },
+  {
+    "code": "snapshot_failed",
+    "status": 500,
+    "message": "dataset snapshot failed",
+    "sites": 2
+  },
+  {
+    "code": "write_failed",
+    "status": 500,
+    "message": "saving ${family} defaults failed",
+    "sites": 5
+  },
+  {
+    "code": "auth_unavailable",
+    "status": 503,
+    "message": "authentication backend unavailable",
+    "sites": 1
+  },
+  {
+    "code": "authz_unavailable",
+    "status": 503,
+    "message": "authorization backend unavailable",
+    "sites": 1
+  },
+  {
+    "code": "quota_unavailable",
+    "status": 503,
+    "message": "compute quota check unavailable",
+    "sites": 1
+  },
+  {
+    "code": "rate_limiter_unavailable",
+    "status": 503,
+    "message": "rate limiter unavailable, request denied",
+    "sites": 1
+  },
+  {
+    "code": "read_failed",
+    "status": 503,
+    "message": "run read failed",
+    "sites": 9
+  }
+];
+
+/**
+ * The public API's ceilings, from the dispatcher's own literals.
+ *
+ * A per-key or per-organization row overrides the per-environment defaults
+ * without a deploy, so these are the floor a client should assume rather
+ * than a promise about any particular key.
+ */
+export type ApiLimits = {
+  envs: { env: string; rpm: number; rpd: number; maxConcurrentRuns: number }[];
+  maxBodyKb: number;
+  idempotencyTtlHours: number;
+  failedAuthsPerMinutePerIp: number;
+  maxPageSize: number;
+  defaultPageSize: number;
+};
+
+export const API_LIMITS: ApiLimits = {
+  "envs": [
+    {
+      "env": "live",
+      "rpm": 120,
+      "rpd": 5000,
+      "maxConcurrentRuns": 5
+    },
+    {
+      "env": "test",
+      "rpm": 30,
+      "rpd": 300,
+      "maxConcurrentRuns": 1
+    }
+  ],
+  "maxBodyKb": 512,
+  "idempotencyTtlHours": 24,
+  "failedAuthsPerMinutePerIp": 30,
+  "maxPageSize": 100,
+  "defaultPageSize": 20
+};
+
 export const CHAIN_COUNT = 38;
 export const BROKEN_COUNT = 11;

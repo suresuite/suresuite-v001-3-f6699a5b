@@ -240,8 +240,9 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D107** | **The Phase 5 brief's own trap list named `FOR EACH ROW` prominence recomputation as a live defect, and WP 4.3 had closed it.** D76 — one upload of 2 129 edges firing 2 129 full recomputations of the same graph — was fixed by moving the four triggers to statement grain in `20260917000007`, and §4's own row records that closure with a ✅. The brief handed to WP 5.2 described it in the present tense, so a page written from the brief rather than from §4 would have told users about a performance characteristic the software no longer has. **Caught by reading §4 before writing the page**, which is the discipline CLAUDE.md states and the reason it states it. Not a defect in the code; a defect in the class of instruction §16 · WP 5.2b already found once, where §12 told 5.2b to reassign four pages that Phase 3 and Phase 4 had made shippable. **Two instances in one phase makes it a pattern**: a brief is a snapshot, §4 is the authority, and where they disagree §4 wins | PLAN.md §4 D76's "Closed by" column against the Phase 5 brief's trap list; `supabase/migrations/20260917000007`'s statement-grain triggers | **CLOSED (Phase 5 / WP 5.2d)** — `performance-and-caching` documents the CURRENT behaviour (a bulk load is one statement and one recomputation) and says the old one is fixed rather than repeating it |
 | **D108** | **`customers` is a described tier-2 input table with no upload, no writer, no manual page, and two columns the engine reads.** WP 5.2's exit gap check is "diff the §6.3 inventory against the live schema"; it found five described tables with no narrative page, and four are explicable — `analysis_runs`/`analysis_results` are the store rather than a user surface, `tier2_suppliers`/`tier3_suppliers` are D102. `customers` is not. It is tier 2, it has a sidecar, its grain calls it "the demand-side counterpart of `suppliers`" — and `suppliers` has a whole page in §6.3 section 3 while this has none. It has **no `ingest_dataset`**, so no CSV lands it; D94 records that no surface in the product WRITES it; and D94 also establishes that `P-C.2` reads `priority_weight` and `segment` on every run. So two fields the engine consumes belong to a table a user cannot upload, cannot edit and cannot read about. The manual gap is the smallest of the three problems and it is the one that makes the other two visible: a reference section that documents `suppliers` and silently omits its demand-side twin reads as though the twin does not exist | `supabase/contract/customers.contract.yaml` against PLAN.md §6.3 section 3's eleven-table inventory; §4 D94 for the engine reads and the missing writer | **WP 6.2** *(which already owns D94's declaration half; the page follows the surface, and writing a reference page for a table nobody can write would document a dead end)* |
 | **D109** | **The manual has no door a figure can come through, and it shipped 66 pages without noticing.** PLAN.md's own header names **eleven diagrams** in an artifact this repository does not have, and §6.5 records WP 5.2a's decision not to link them — an external dependency the requirement forbids — and to draw three inline SVGs instead. WP 5.2b–g then wrote **sixty-six pages carrying zero figures**, and the reason is structural rather than an oversight of taste: there is no image component in `prose.tsx`, no asset folder, no convention, and `Figure` takes `children` so nothing would have failed if a page had tried. **The pages this hurts most are the ones about looking at something** — the four network pages averaged 332 words with no picture, describing screens whose entire purpose is visual. A reader with figures for their own application could not put one on a page, and nothing in the repository told them why. **CLOSED (WP 5.2i)**: `src/assets/manual/` + `figureManifest.ts` + `DocFigure`. A figure is one file plus one line; `import.meta.glob` resolves the folder at build time so there is no import, no path and no generator. **Sixteen SLOTS are declared and open**, each naming the page, the filename it wants, and a `shows` brief for whoever draws it — an unfilled slot renders a labelled placeholder rather than nothing, which is §5.3 T3 applied to the manual's own illustrations. The three existing inline SVGs became FALLBACKS rather than being replaced, so a real diagram supersedes the schematic and nothing regresses while the slots are empty | `src/components/docs/figureManifest.ts`; `src/components/docs/DocFigure.tsx`; `src/components/docs/__tests__/figures.test.ts` | **CLOSED (Phase 5 / WP 5.2i)** — the door. The sixteen diagrams themselves are the author's to draw, and the fill rate is a number the test prints on every run |
-| **D110** | **The manual was written from the contract and never from the product's own assets, so eighty pages point at none of them.** Three sets of files exist, are shipped, and are reachable by a user — and no page of the manual links one. (1) **Fourteen CSV templates** in `public/template/`: the actual file a person downloads before filling anything in. §6.3 section 3 asks every table page for a "template" and the pages render a header row synthesised from the contract instead, so a reader of "Inbound Logistics" cannot get `inbound_logistic.csv`. (2) **Three guide documents** in `public/docs/` — `csv-upload-guide.md`, `location-dataset-guide.md`, `nexus-node.md` — which `UploadWizard` already surfaces per dataset as `guideFile`. (3) **A ready-to-run Colab notebook**, `public/notebooks/suresuite_api_quickstart.ipynb`, with a pre-filled CONFIG cell and a poll-a-run recipe, offered on `/developer` beside "Open example in Colab" — and absent from all four Developer API pages. **The mapping is DECLARED, which is what makes this a generator's job rather than a typist's**: `UploadWizard.tsx`'s `templateTypes` pairs every dataset id with its `templateFile` and `guideFile`, so the links derive the same way the stress battery and the API route table do. Two facts a derivation would also carry that no page states today: `node_list` has `templateFile: ''` — there is deliberately no template, the user works from downloaded data — and `deep_tier_json` offers a JSON template rather than a CSV. **The class is the finding, not the three instances**: the manual's rule was "never retype a generated fact", and nothing in it said "and point at what the product already ships". A page can be perfectly sourced and still leave a reader hunting for the file they came for | `public/template/` (14), `public/docs/` (3), `public/notebooks/` (1) against `src/components/docs/bodies/` (0 references); the declared mapping in `src/components/UploadWizard.tsx`'s `templateTypes` | **WP 5.2j** |
-| **D111** | **`stress-tests` documents a feature the product cannot reach, using names the user never sees, while the seven presets they actually click are undocumented.** WP 5.2d read the battery from `scsim/scsim/stress/battery.py`'s `ST_DEFINITIONS` — ST-1…ST-7, two runnable — and published it as "the standing battery". **`run_st1`/`run_st2` are imported by exactly two things: the engine's own `scsim/tests/test_stress.py` and `scsim/scsim/__init__.py`.** Nothing in `sim-worker/`, nothing in `supabase/functions/`, nothing in `src/`. The only occurrences of "ST-1" in the application are the documentation page itself and its registry entry. The battery is a **Python library API**, legitimately usable by a researcher importing `scsim`, and it is not a product feature. **What the user is actually offered is `src/components/sim/StressTestCard.tsx`'s seven presets** — `single_supplier_outage`, `plant_shutdown`, `material_shortage`, `lead_time_shock`, `demand_surge`, `multi_hit`, `nexus_attack` — each a pre-built `disruption_schedule` of `{target, target_type, start_day, duration_days, magnitude_pct}` launched down the disruption path, a different mechanism entirely. The contradiction is direct and a user will hit it: the screen offers **Demand surge** and the manual says ST-5 Demand surge is declared and not implemented. **This is the inverse of D21**: not documenting an engine name for a field the user typed, but documenting an engine FEATURE for a screen the user is looking at. The generator was sound and pointed at the wrong artifact, which is why "read it from the engine rather than mining the archive" was necessary and not sufficient | `scsim/scsim/stress/battery.py`'s importers (two, both inside `scsim/`) against `src/components/sim/StressTestCard.tsx`'s `STRESS_TESTS`; `src/components/docs/bodies/StressTests.tsx` | **WP 5.2j** |
+| **D110** | **The manual was written from the contract and never from the product's own assets, so eighty pages point at none of them.** Three sets of files exist, are shipped, and are reachable by a user — and no page of the manual links one. (1) **Fourteen CSV templates** in `public/template/`: the actual file a person downloads before filling anything in. §6.3 section 3 asks every table page for a "template" and the pages render a header row synthesised from the contract instead, so a reader of "Inbound Logistics" cannot get `inbound_logistic.csv`. (2) **Three guide documents** in `public/docs/` — `csv-upload-guide.md`, `location-dataset-guide.md`, `nexus-node.md` — which `UploadWizard` already surfaces per dataset as `guideFile`. (3) **A ready-to-run Colab notebook**, `public/notebooks/suresuite_api_quickstart.ipynb`, with a pre-filled CONFIG cell and a poll-a-run recipe, offered on `/developer` beside "Open example in Colab" — and absent from all four Developer API pages. **The mapping is DECLARED, which is what makes this a generator's job rather than a typist's**: `UploadWizard.tsx`'s `templateTypes` pairs every dataset id with its `templateFile` and `guideFile`, so the links derive the same way the stress battery and the API route table do. Two facts a derivation would also carry that no page states today: `node_list` has `templateFile: ''` — there is deliberately no template, the user works from downloaded data — and `deep_tier_json` offers a JSON template rather than a CSV. **The class is the finding, not the three instances**: the manual's rule was "never retype a generated fact", and nothing in it said "and point at what the product already ships". A page can be perfectly sourced and still leave a reader hunting for the file they came for | `public/template/` (14), `public/docs/` (3), `public/notebooks/` (1) against `src/components/docs/bodies/` (0 references); the declared mapping in `src/components/UploadWizard.tsx`'s `templateTypes` | **CLOSED (Phase 5 / WP 5.2j)** — three derivations (`deriveUploadAssets`, `deriveApiNotebook`, and the registry `wizardId` for the four tables outside the ingestion contract), rendered on every §3 table page and on `getting-an-api-key`, with `docsAssets.test.ts` resolving every derived path against `public/` on disk. **Three counts were one count until it separated them**: fourteen FILES, thirteen wizard datasets, twelve offered templates — and **two files reachable from nothing in the repository** (`location-dataset-template.csv`, `supply-chain-data-template.csv`), reported rather than failed because deleting a shipped asset is a product decision |
+| **D111** | **`stress-tests` documents a feature the product cannot reach, using names the user never sees, while the seven presets they actually click are undocumented.** WP 5.2d read the battery from `scsim/scsim/stress/battery.py`'s `ST_DEFINITIONS` — ST-1…ST-7, two runnable — and published it as "the standing battery". **`run_st1`/`run_st2` are imported by exactly two things: the engine's own `scsim/tests/test_stress.py` and `scsim/scsim/__init__.py`.** Nothing in `sim-worker/`, nothing in `supabase/functions/`, nothing in `src/`. The only occurrences of "ST-1" in the application are the documentation page itself and its registry entry. The battery is a **Python library API**, legitimately usable by a researcher importing `scsim`, and it is not a product feature. **What the user is actually offered is `src/components/sim/StressTestCard.tsx`'s seven presets** — `single_supplier_outage`, `plant_shutdown`, `material_shortage`, `lead_time_shock`, `demand_surge`, `multi_hit`, `nexus_attack` — each a pre-built `disruption_schedule` of `{target, target_type, start_day, duration_days, magnitude_pct}` launched down the disruption path, a different mechanism entirely. The contradiction is direct and a user will hit it: the screen offers **Demand surge** and the manual says ST-5 Demand surge is declared and not implemented. **This is the inverse of D21**: not documenting an engine name for a field the user typed, but documenting an engine FEATURE for a screen the user is looking at. The generator was sound and pointed at the wrong artifact, which is why "read it from the engine rather than mining the archive" was necessary and not sufficient | `scsim/scsim/stress/battery.py`'s importers (two, both inside `scsim/`) against `src/components/sim/StressTestCard.tsx`'s `STRESS_TESTS`; `src/components/docs/bodies/StressTests.tsx` | **CLOSED (Phase 5 / WP 5.2j)** — the page leads with the seven presets, derived from the drawer's own literal and rendered as the schedule rather than as prose; the battery stays, demoted to the library API it is. §16 · WP 5.2d is corrected in place. **Confirming the presets run end to end found D112**, which is the larger defect |
+| **D112** | **Six of the seven stress presets never reach the engine, and the run reports KPIs anyway.** A scenario's `disruption_schedule` reaches scsim through `project_map.py`'s `_map_events`, which strips everything before the last colon, accepts the result only if it is one of the project's own supplier ids or the focal plant, and **skips anything else with a mapping warning**. `StressTestCard.tsx`'s presets ship fixed placeholders — `supplier:primary`, `material:critical`, `customer:all`, `edge:inbound`, `node:nexus` — that no real project's ids match. Only `node:plant` resolves. **Measured, not reasoned about**: running `_map_events` over all seven schedules against a two-supplier project maps **1 event of 8** and raises seven warnings, every one `unsupported target skipped (material/edge land later in M7)`. The run then completes and reports KPIs, because a dropped event is not a failed run — so a stress test that hit nothing is indistinguishable from a chain that absorbed the shock, unless the reader opens the mapping warnings. **The warning IS surfaced** (`MappingWarningsCard`, on the run panel and the mobile lab), which is what keeps this a usability defect rather than a silent-wrong-number defect; nothing ranks it above the KPIs a reader came for. The same trap is in the shipped Colab notebook, whose §11 and §13 suggest a material code as a disruption target, and in the public API, whose `DisruptionSchema` accepts any 200-character string. **This is D111's real content**: D111 was a page pointed at the wrong artifact, and the right artifact turned out not to work either | `scsim/scsim/io/project_map.py`'s `_map_events` against `src/components/sim/StressTestCard.tsx`'s `STRESS_TESTS`; the classification is derived and pinned in `scripts/data-contract/chains.mjs` (`assertMapperUnchanged`, six anchors) | **OPEN — WP 6.4** *(the decision plane. The fix is a product decision this package does not own: either the presets carry targets resolved from the project at click time, or the mapper learns material, customer and edge targets — the warning's own text says "land later in M7". The manual states the situation on `stress-tests`, `getting-an-api-key` and `endpoints-and-schemas` meanwhile)* |
 | **D98** | **Three CHECK constraints production has were absent from every rehearsed database, and four rehearsal files were asserting over rows production would REFUSE.** D59 said an inline CHECK costs twice; this is the second cost, measured. With the CHECKs restored, `030` inserted `user_files.kind = 'report'` (the vocabulary is `report_xlsx`/`report_pdf`/`export_csv`/`upload`), `110` inserted `ingest_runs.triggered_by = 'schedule'` (`manual`/`scheduled`), `170` inserted an EMAIL into the same column — `triggered_by` is HOW a run started, not WHO started it — and `140` inserted `'{}'::jsonb` into `proposals.provenance`, which is TEXT from a fixed vocabulary and sits next to two jsonb columns. Every one of those rows is one production cannot hold, so every assertion downstream of them was made about a database that could not exist. **No live writer is affected** — `ingest_land_file` writes `'manual'` — so the fix is the four fixture rows, not the constraints. The class is not closed: nothing stops the next rehearsal from seeding a row a CHECK would refuse; what changed is that the rehearsed database now refuses it | `supabase/rehearsal/030`, `110`, `140`, `170` (the four inserts, each now carrying the reason above it) | WP 6.2 ✅ *(slice 9)* |
 | D48 | **A migration aborted in production in 2025 and nothing has ever said so — and it was THREE migrations, not one.** `20250827170942` defines `create_disruption_scenario_v2(uuid, text, text, public.disruption_status, text, text[], jsonb, jsonb, jsonb, uuid, text)` with `p_user_id` and `p_user_email` — neither carrying a default — AFTER `p_status text DEFAULT 'draft'`. PostgreSQL rejects that at CREATE time (`42P13`), so that statement and everything after it in the file never ran. The introspector records the overload from the file regardless, because a static replay cannot execute a definition to find out it is invalid. **The row's cited sibling `20250827190942` DOES NOT EXIST.** The retry is `20250827171106`, **84 seconds** later, which re-issues the same four tables, triggers, policies and RPC and carries the literal comment `-- FIXED: Put all parameters with defaults at the end` — so the migration's own author knew, and only the contract did not. A whole-history scan then found two more: `20250904122241` and `20250904122347` each declare `get_network_nodes`, `get_network_edges` and `get_network_summary` with `p_user_id` after a defaulted `p_plant_name`, the second repeating the first's error exactly as `20250820145155` repeats `20250820145017`'s; `20250904124537` is the definition that works. **The END STATE is fine and the ATTRIBUTION was not**: aborting `20250827170942` re-homes all four `disruption_scenario_*` tables onto the retry, so a reader sent to a file that never ran is now sent to the one that did (§5 T1). **And the open half is answered.** There were never three overloads to choose between — one was a phantom. Of the two that exist, the single call site `DisruptionDialog.tsx:195` sends `p_disruption_start` and `p_disruption_end`, and PostgREST resolves an RPC by NAMED arguments, so it reaches `20250828005114`'s 13-parameter definition. `20250827171106`'s 11-parameter one is live and unreached; dropping it is a migration and is left to whoever wants it. Found by D31's rehearsal; the two extra files and the wrong citation found by WP 6.2 slice 10 | `20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql`; `20250904122241_b65404b9-d4ee-4c58-9518-7a1578f74af8.sql`; `20250904122347_a28da769-734c-4064-8f24-2b8d60ffffa4.sql`; `sql-lex.mjs`'s `firstNonDefaultAfterDefault` | WP 6.2 ✅ *(slice 10)* |
 | D49 | **The introspector records three indexes on columns the tables no longer have — and that is TWO defects with two different causes, not one.** `idx_supply_chain_data_plant` is recorded `ON supply_chain_data (plant)`, and `20250822025432` RENAMEd `plant` to `plant_name`; Postgres renames an index's column reference with the column, so production's index is on `plant_name` and the artifact's is on a column that does not exist. **That cause is right for exactly ONE of the three.** `supply_chain_data_multi_tier` has NEVER had `material_id` or `higher_level_component_id` in any definition — they are `bom_multi_level`'s columns — so no rename can have produced them. `CREATE INDEX IF NOT EXISTS` guards the index NAME, not the column: PostgreSQL raises 42703, and `20250909153130` therefore ABORTED in production, 61 seconds before `20250909153231` re-issued its other four statements without those two lines. That half is D97, and it is D48's class. The rename half is fixed by following a column RENAME into indexes, index predicates and constraints (`renameIdentifier` in `sql-lex.mjs`), which is the same fix as the `RENAME TO` branch that closed D52. `introspectorDependents.test.ts` gates both halves with no database; `supabase/rehearsal/180` §3 and §4 prove them against a real one. Found by D31's rehearsal; the second cause found by WP 6.2 slice 9 | `build/schema.introspected.json` `tables[].indexes`; `20250822025432_cf03eaa2-ae97-4310-80e9-085e3eb03487.sql` (the RENAME); `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` (the two impossible ones) | WP 6.2 ✅ *(slice 9)* |
@@ -2211,6 +2212,20 @@ today (`contract:check` R11 prints the count). Describing them brings them insid
 `dataPlaneAudit.test.ts`'s rule, which is D54's lesson: a deferral hides a table's
 WRITERS from every check scoped to the contract, and WP 4.3 measured what that
 costs when the four deep-tier tables came in.
+
+**ALSO CARRIES D112, ASSIGNED BY WP 5.2j** — *six of the seven stress presets
+name a disruption target the engine cannot resolve, so the run completes with the
+disruption absent.* It lands here rather than on a manual package because the
+fix is a decision about what a target IS: either a preset resolves its target
+from the project at click time — which makes a preset a query rather than a
+literal — or `_map_events` learns material, customer and edge targets, which is
+the "land later in M7" its own warning promises. Both are this plane's question,
+because a disruption schedule is a DECISION recorded against a dataset, and the
+schedule's vocabulary is what this package is describing anyway. **Note what the
+fix must not be**: widening `_map_events` to accept a placeholder silently would
+turn a visible warning into an invisible no-op, which is worse than today. The
+manual states the situation on `stress-tests` meanwhile, derived and pinned so
+it stops saying it the day the mapper changes.
 
 ---
 
@@ -11316,6 +11331,20 @@ that names its unit in the column name against the tier-2 convention.
 
 **── THE BATTERY: READ FROM THE ENGINE, NOT MINED FROM THE ARCHIVE (D106) ──**
 
+> **CORRECTED BY WP 5.2j (D111).** Everything in this block is true and it is
+> true about the WRONG ARTIFACT. `run_st1`/`run_st2` are imported by exactly two
+> files, both inside `scsim/` — its own test and its package `__init__`. Nothing
+> in `src/`, `sim-worker/` or `supabase/functions/` reaches the battery, so
+> "read from the engine rather than mined from the archive" replaced a stale
+> source with a source that describes a **Python library API and not a product
+> feature**. What a user clicks is `StressTestCard.tsx`'s seven presets, which
+> this package never saw. The page was rewritten in WP 5.2j; the battery stays
+> on it, demoted and framed as a library. **The lesson is narrower than "check
+> the source": the generator was sound, the derivation was sound, and neither
+> could tell that nothing in the product called what it described.** E3 — *can a
+> user reach this?* — is the question that would have caught it, and it is now a
+> step of the method rather than a thing an author might think of.
+
 §6.6 lists the ST-1…ST-7 descriptions as narrative worth mining from the
 archived manual. **The archived copy had already drifted** — it carries a
 status column for all seven ("planned · M7") that the engine does not — so
@@ -11610,3 +11639,120 @@ eslint **336/116** and `audit:ui` **8**, at baseline.
    caught the network pages before a reader did. Not added here, because picking
    the number is a judgement about what a short page is allowed to be, and a
    threshold set carelessly is one that gets raised until it means nothing.
+
+### WP 5.2j — The page that documented the wrong feature, the assets nobody pointed at, and the thin half · 2026-09-19 · no migration
+
+**What the previous package promised, and what it missed.** 5.2i closed the
+figure door (D109) and measured the manual honestly: median 805, twenty-three
+pages under 500 words, clustered in §7, §9, §10, §11 and §14. Its gap check
+named the correlation — *where there was no generated fact to render, less was
+written* — and that turned out to predict more than page length.
+
+**── D111: THE PAGE WAS WRONG, AND CONFIRMING IT FOUND SOMETHING WORSE ──**
+
+`stress-tests` documented `scsim/scsim/stress/battery.py`'s ST-1…ST-7 as "the
+standing battery". The reading was careful, the generator was sound, and the
+artifact was wrong: `run_st1`/`run_st2` are imported by exactly two files, the
+engine's own test and `scsim/__init__.py`. The screen offered **Demand surge**
+while the page said ST-5 Demand surge was declared and not implemented.
+
+The page now leads with `StressTestCard.tsx`'s seven presets — derived, the
+schedule rendered rather than summarised — and keeps the battery demoted to what
+it is: a Python library API for somebody importing `scsim`.
+
+**The brief said CONFIRM each preset runs end to end before the page says it
+does, and that is where the real finding is — D112.** Six of the seven never
+reach the engine. A scenario's `disruption_schedule` reaches scsim through
+`project_map.py`'s `_map_events`, which resolves a target against the project's
+own supplier ids or the focal plant and **skips everything else with a mapping
+warning**. The presets ship fixed placeholders — `supplier:primary`,
+`material:critical`, `customer:all`, `edge:inbound`, `node:nexus` — that no real
+project's ids match. Only `node:plant` resolves.
+
+Measured against the real mapper, not reasoned about: running `_map_events` over
+all seven schedules with a two-supplier project returns **1 event mapped of 8**,
+seven warnings, every one of them `unsupported target skipped (material/edge
+land later in M7)`. The run then completes, reports KPIs, and is a baseline with
+the disruption absent.
+
+**The classification is DERIVED and PINNED rather than typed.** `chains.mjs`
+mirrors the mapper's rule and `assertMapperUnchanged` holds six exact anchors in
+`project_map.py` — the plant predicate, the colon strip, the skip branch, the
+warning string, the five-event cap and the `magnitude < 100` branch. A mapper
+that changes makes the generator throw rather than makes the page quietly wrong,
+which is the same discipline `runnable` already used for the battery and the
+reason that discipline was necessary and not sufficient.
+
+**§16 · WP 5.2d is corrected in place**, per §VI-1: it says the battery was read
+"from the engine rather than mined from the archive", which is true and was the
+wrong artifact. The entry is corrected, not deleted.
+
+**── D110: THE ASSETS, DERIVED ──**
+
+Eighty pages pointed at none of the files the product ships. Three derivations
+close it, all from declarations that already existed:
+
+- `deriveUploadAssets` parses `UploadWizard.tsx`'s `templateTypes` →
+  `UPLOAD_ASSETS`. A template renamed in the wizard cannot now leave a dead link
+  on a documentation page.
+- `deriveApiNotebook` reads the notebook href from `DeveloperApi.tsx` rather than
+  from the folder, so the manual can only link a notebook the product offers.
+- `docsAssets.test.ts` resolves **every** derived path against `public/` on disk.
+  A 404 from a documentation page is worse than no link.
+
+**Three counts that were one count until this package separated them.** §4 D110
+says "fourteen CSV templates", which is the count of FILES. The wizard declares
+**thirteen datasets** offering **twelve template files**, because `node_list`
+deliberately offers none — and **two of the fourteen files are reachable from
+nothing in the repository**: `location-dataset-template.csv` and
+`supply-chain-data-template.csv` are referenced by no code, no test and no page.
+Reported by the test rather than failed, because deleting a shipped asset is a
+product decision this package does not own.
+
+**The join needed a route the contract cannot provide, and it is named rather
+than faked.** Nine tables reach their dataset through their own sidecar's
+`ingest_dataset.wizard_id`. The four outside the ingestion contract (D56) carry
+no such block and **must not be given one** — that block is what makes
+`ingest-file` build a parser for a table, and these four reach their tables
+through bulk RPCs. So the binding is declared beside `table` in the docs
+registry, with the same justification `table` already carries, and the test fails
+if one names a dataset the wizard does not offer AND if one restates a binding
+the contract already declares.
+
+**One binding was written and then removed, which is the finding** —
+`multi-tier-suppliers` documents `multi_tier_supply_chain`, and the wizard's
+Tier-2 and Tier-3 datasets write `tier2_suppliers` and `tier3_suppliers`:
+different tables. Binding them would have put a working download on the page for
+a table nothing writes. **D102 and D108 are the same shape seen from two sides**:
+the manual has a page for a table with no writer, and no page for two tables the
+wizard uploads every day.
+
+**── §14, DEEPENED — AND TWO MORE DERIVATIONS ──**
+
+All four Developer API pages were under 500 words for a 1 601-line screen. What
+they omitted was the product: three tabs, two key environments with different
+ceilings, expiry chosen at creation, and a ready-to-run Colab notebook with the
+reader's own project ids patched into it.
+
+Two more facts became generated rather than typed:
+
+- `deriveApiErrors` — **27 stable machine codes** from the dispatcher's own
+  throw sites. The first scan found 23 and missed every 401, because
+  authentication failures go through a local `fail()` that adds the key-guessing
+  throttle first; the scan now reads both forms and **throws if no 401 is in the
+  catalog**, since a public API with no authentication error is a scan that has
+  stopped seeing something.
+- `deriveApiLimits` — the per-environment ceilings, the body cap, the
+  idempotency window, the failed-auth throttle and the paging clamp.
+
+**One divergence the derivations put side by side, which no page could state
+before: the API caps `magnitude_pct` at 100 and the "Lead-time shock" preset
+writes 200.** A scenario the application will create for you is one the public
+API refuses with `invalid_request`. Nothing is lost by sending 100 — the engine
+treats anything at or above 100 as a full outage — but a client round-tripping a
+schedule out of the application is rejected for a reason the error does not give.
+
+**Verified:** `npm test` · `contract:check` · `typecheck` · `check:docs` ·
+`build` — all at the state recorded in this entry's final revision.
+
+**Gap check.** See the entries appended below as this package proceeded.
