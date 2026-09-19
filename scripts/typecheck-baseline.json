@@ -3,8 +3,8 @@
   "$added_by": "Phase 5 / D57 — the gate that did not exist. Sixty-one of the 89 errors here on the day it was written were D57's own, emitted by scripts/data-contract/generate.mjs into a committed artifact since WP 5.2h. Those are fixed; these twenty-eight predate Phase 5 and belong to whoever owns each surface.",
   "files": {
     "src/components/sim/DisruptionScheduleEditor.tsx": {
-      "count": 4,
-      "why": "`target_type` is a `\"node\" | \"edge\"` union in state and plain `string` where it is parsed. §16 · WP 6.4 records that `_targets` has this discriminator and NO validation behind it, so the type error and the missing CHECK are the same defect seen from two sides. WP 6.4's."
+      "count": 2,
+      "why": "`target_type` is a `\"node\" | \"edge\"` union in state and plain `string` where it is parsed. §16 · WP 6.4 records that `_targets` has this discriminator and NO validation behind it, so the type error and the missing CHECK are the same defect seen from two sides. WP 6.4's. This entry held 4 until it was lowered: the other two were `e.target.value` on the Duration and Magnitude handlers, which take a `number`, not a `ChangeEvent` — a real runtime defect (the edit never reached state) parked behind a `why` that described only `target_type`. Fixed; the entry now covers no more than it describes."
     },
     "src/components/trust/TrustReportPanel.tsx": {
       "count": 6,
