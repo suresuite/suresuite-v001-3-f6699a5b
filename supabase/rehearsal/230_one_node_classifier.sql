@@ -259,3 +259,73 @@ BEGIN
     'trigger fires for the first time since 2025-08-29 (D128).';
 END
 $wp81$;
+
+-- ── 6 · WP 8.3 · the READ PATH carries the columns WP 8.1 authored ─────────
+--
+-- `get_node_list`'s fixed `RETURNS TABLE` lists seventeen columns by name and
+-- `CREATE OR REPLACE` cannot change a return type, so the three columns WP 8.1
+-- added were invisible to every page in the product. `get_graph_nodes` is the
+-- additive read path. This section fails if it stops returning an echelon, or if
+-- its ordering stops putting the chain in order.
+--
+-- MUTATIONS THAT MUST MAKE IT FAIL:
+--   * drop `echelon` from `get_graph_nodes`'s RETURNS TABLE → the column check red.
+--   * reverse the ORDER BY's CASE → the sequence check red.
+DO $wp83$
+DECLARE
+  v_org     uuid := '00000000-0000-4000-8000-000000081000';
+  v_actor   uuid := '00000000-0000-4000-8000-000000081001';
+  v_project uuid := '00000000-0000-4000-8000-000000081003';
+  v_seq     text;
+  v_n       integer;
+BEGIN
+  -- The fixture §1–§5 built is still there; this reads it back through the RPC.
+  SELECT count(*) INTO v_n
+    FROM public.get_graph_nodes(v_project, v_actor, 'wp81@example.invalid')
+   WHERE echelon IS NULL;
+  IF v_n <> 0 THEN
+    RAISE EXCEPTION
+      'WP 8.3 §6 — % node(s) come back from `get_graph_nodes` with a NULL echelon. '
+      'Every row was backfilled by `20260919000001`; a NULL here means the read path '
+      'is not reading the column the migration filled.', v_n;
+  END IF;
+
+  -- The chain comes back in chain order, so a page that renders in receive order
+  -- renders the supply chain the right way round.
+  SELECT string_agg(DISTINCT echelon, '' ORDER BY echelon) INTO v_seq
+    FROM public.get_graph_nodes(v_project, v_actor, 'wp81@example.invalid');
+  IF v_seq IS NULL THEN
+    RAISE EXCEPTION 'WP 8.3 §6 — `get_graph_nodes` returned no rows for a project with 7 nodes.';
+  END IF;
+
+  -- `supplier` must arrive before `customer`, which is the claim the ORDER BY makes.
+  SELECT string_agg(echelon, '>' ORDER BY first_seen) INTO v_seq FROM (
+    SELECT echelon, MIN(rn) AS first_seen FROM (
+      SELECT echelon, row_number() OVER () AS rn
+        FROM public.get_graph_nodes(v_project, v_actor, 'wp81@example.invalid')
+    ) numbered GROUP BY echelon
+  ) t;
+  IF position('supplier' in v_seq) = 0 OR position('customer' in v_seq) = 0 THEN
+    RAISE EXCEPTION 'WP 8.3 §6 — the fixture should contain both a supplier and a customer; got %', v_seq;
+  END IF;
+  IF position('supplier' in v_seq) > position('customer' in v_seq) THEN
+    RAISE EXCEPTION
+      'WP 8.3 §6 — `get_graph_nodes` returned customers before suppliers (%). The '
+      'ordering rule lives in the RPC so four components do not each re-derive it; '
+      'if it is wrong here it is wrong everywhere.', v_seq;
+  END IF;
+
+  -- And `bom_depth` survives the trip, which is the column the reported project's
+  -- flattened `level` cannot provide (§4 D125).
+  SELECT bom_depth INTO v_n
+    FROM public.get_graph_nodes(v_project, v_actor, 'wp81@example.invalid')
+   WHERE node_id = 'RAW';
+  IF v_n IS DISTINCT FROM 2 THEN
+    RAISE EXCEPTION 'WP 8.3 §6 — `RAW` comes back with bom_depth %, expected 2.', v_n;
+  END IF;
+
+  RAISE NOTICE
+    'WP 8.3 · 230 §6 — the read path carries `echelon`, `bom_depth` and `supply_tier`, '
+    'and returns the chain in chain order.';
+END
+$wp83$;

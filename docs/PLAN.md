@@ -311,6 +311,8 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D126** | **The live RPC invents a node called `ROOT` where a BOM row has no parent. MEASURED 2026-09-19 (§15 run `35433474185`): latent — 0 `ROOT` edges, 0 `ROOT` rows in `node_list`, 0 parentless `bom_multi_level` rows, across all ten projects.** `COALESCE(b.higher_level_component_id, 'ROOT')` is written into BOTH `to_location` and `path_root`. Where D114's edge function silently drops the edge, this one fabricates its endpoint: the finished product is still severed from its own BOM, and in its place stands a node that no CSV contains, that no user can explain, and that every centrality on the page would be computed over. **T1 in one string** — a node on screen sourced to nothing, which is the same class as D124's "work station" and arrives from SQL instead of from TypeScript. It is latent and it is not closed: the `COALESCE` is what the next parentless row meets, and a probe that counted `''` could never have seen it — which is why WP 8.0 went back for a second §15 run rather than reporting D114 clear | `supabase/migrations/20260915000004_org_identity_dual_read.sql:1978,1980`; §15 run `35433474185` | **WP 8.2** |
 | **D127** | **The graph is never rebuilt when its sources change, and the timestamp that would say so cannot see a delete. MEASURED 2026-09-19 (§15 run `35433474185`): 2 of 10 projects hold an inbound lane that does not match `inbound_logistics`, and the largest gap is on the project a user reported — `Project AA - ver3`, 369 lane rows against 321 source rows.** Neither writer is a trigger on the lane tables: both are invoked by a client (or by the `projects.completed` trigger), so a CSV edited or deleted after the last combine changes the source and leaves the graph exactly as it was. **And the freshness signal reports it fresh**: AA-ver3's lane was written 0.17 s AFTER its `inbound_logistics` was last touched, so every timestamp comparison says up-to-date — because `max(updated_at)` does not move when rows are DELETED. That is D12's lesson arriving in a second place: a timestamp asks whether a clock moved, and 48 rows leaving a table moves no clock. This is the one defect in Phase 8 that a user would describe as "the map looks wrong" with no classifier involved at all, and `project_freshness` is rendered on Product-level and on no other network page | `supabase/migrations/20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql:86-89,133` (the only invoker is a `projects` UPDATE trigger; no trigger watches the lane's own sources); §15 run `35433474185` | **WP 8.2** *(the rebuild) · **WP 8.4** *(the signal, on both pages)* |
 | **D128** | **The trigger that keeps the typed node projection in sync with the graph has never fired once, in thirteen months, and a refresh that does not happen looks exactly like a graph that has not changed.** `auto_refresh_node_list_on_scd_change` is attached `FOR EACH STATEMENT` to `supply_chain_data` and its body is `pid := COALESCE(NEW.project_id, OLD.project_id)`. **A statement-level trigger has no `NEW` and no `OLD`**: PL/pgSQL leaves both unassigned, the field reference yields NULL rather than raising, the `IF pid IS NOT NULL` guard is false, and the function returns having done nothing. **Demonstrated on a real PostgreSQL 16 rather than reasoned about** — a statement trigger with that body prints `NOTICE pid=<NULL>` (§16 · WP 8.1). This is D80's shape (a whole performance migration spent optimising the inputs to a `RAISE LOG`) in the one place it silently degrades user-visible data: `node_list` has been refreshed ONLY by the `projects.completed` row-level trigger and by a one-off backfill loop from 2025-08-31, which is why §15 found **242 `node_list` rows against 294 graph nodes** on the project a user reported. It is also the half of D117 that a widened derivation does not close by itself. **CLOSED (WP 8.1)** with a TRANSITION TABLE — `REFERENCING NEW TABLE`, which is what a statement-level trigger has instead of `NEW`, available since PostgreSQL 10 — on both edge tables, statement level and deliberately not per row (§4 D76 is what row-level costs: 2 129 recomputations of one graph). `supabase/rehearsal/230` §5 writes a lane row with NO explicit refresh call and fails if the node does not reach the projection; the mutation that re-attaches the old function makes it red | `supabase/migrations/20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql:119,135` | **WP 8.1 ✅** *(and the fix made two rehearsals go red with `forbidden`, which is how D66's shape was found in a derivation — see §16)* |
+| **D129** | **`includeTerminals` is INVERTED, so the whole terminal-stop mechanism has been inert since it was written.** The subgraph walk stops at a `stopUp` / `stopDown` level only `if (queryParams.includeTerminals)` — and the default is `false`. So with the flag OFF the traversal walks straight past every terminal, and with it ON the walk stops: the parameter does the opposite of what its name says, and `stopUp: [5, 6]` / `stopDown: [-1]` have never bounded a single walk under their own default. Found while extracting the engine into `src/lib/graph/subgraph.ts`, and **reproduced there rather than fixed**, because the extraction's whole guarantee is parity with the orphaned page it came from and a refactor that also changes behaviour can be verified as neither. `extractSubgraph` takes `respectTerminals` so a caller may opt into the sane reading today; `subgraphParity.test.ts` asserts BOTH — that the default reaches a terminal-level node, which is the defect, and that the option stops at it | `src/pages/InteractiveNetworkSpace.tsx:255-265` | **WP 8.4** *(flip the default when the two pages adopt the engine, which is the first time anything depends on it)* |
+| **D130** | **A function's fixed `RETURNS TABLE` is a SECOND place the schema is authored, and it goes stale the moment a migration widens the table — so three columns that exist, are backfilled and are CHECK-constrained were invisible to every page in the product.** `get_node_list` is the only route to `node_list` from the application and its `RETURNS TABLE(...)` lists seventeen columns BY NAME. WP 8.1 added `echelon`, `bom_depth` and `supply_tier`; `CREATE OR REPLACE FUNCTION` cannot change a return type; nothing failed. **This is `single-source` (I1) broken in SQL rather than in markdown**, which is the same blind spot D101 and D105 came out of — and `contract:validate` cannot see it, because the sidecar describes the TABLE and no rule compares a table's columns with the projections that claim to return them. Closed for this table by an ADDITIVE function rather than by a DROP: `get_node_list` has four live callers and `20260918000003` is the record of what a DROP costs (it takes the function's grants with it, which `rehearsal/210` §2 had to check back as explicit `proacl` grantees). **The CLASS is open**: no gate counts the other fixed `RETURNS TABLE`s in this schema against the tables they project | `supabase/migrations/20250830231617_879246a9-616c-408d-8b71-2b4ff44461ef.sql:106-131` (the seventeen-column projection) | **WP 8.4** *(the class, as a `contract:check` rule — this table's instance is closed by `20260919000002`)* |
 
 ### 4.1 Code map — the data layer
 
@@ -11951,6 +11953,135 @@ D52 exists for · 534 tests ✓ · `typecheck` ✓ 28 of 28 held · `check:docs`
    migration's section 8, and it is reversible only by re-running the old
    classifier, which no longer exists.
 
+
+### WP 8.3 (partial) — The shared graph layer · 2026-09-19 · `20260919000002`
+
+**What the previous package promised.** WP 8.1 closed with a countable handover:
+`echelon` authored once, and "the eight render-time classifiers all still run, so
+the fact is authored once and believed eight times". WP 8.3 was to move the
+readers.
+
+**It also promised "no migration", and that was wrong for a reason nobody could
+have read off the sidecar.** See D130 below.
+
+**── WHAT THIS PACKAGE ORDERED DIFFERENTLY, AND WHY ──**
+
+§18 puts WP 8.2 (one ETL) before WP 8.3, on the premise that the pages need a
+corrected `level`. **After WP 8.1 they do not.** A page reading `echelon` and
+`bom_depth` from `node_list` is independent of
+`supply_chain_data_multi_tier.level` entirely — and `bom_depth` comes from
+`bom_multi_level`, which the flattening D125 describes never touched. So the
+shared layer **fixes the reported map without the ETL being changed at all**, and
+doing it first means WP 8.2 can then change `level` freely because nothing reads
+it. WP 8.2 is also the one package in this phase that alters stored production
+data, which is a reason to take it with the readers already off that column
+rather than before.
+
+**── WHAT LANDED ──**
+
+`src/lib/graph/`, 85 tests. The vocabulary (seven values, compound
+`{ echelon, id }` identity); **one** palette where there were five; the encodings;
+the extracted subgraph engine and focus walk; and the read path.
+
+**Three encoding claims are now tested rather than asserted.** Size scales by
+`sqrt`, so AREA and not diameter carries the value — a diameter-linear scale makes
+a 4× value look 16×, and the test asserts the correction rather than the
+convenience. Edge width is log-scaled, because supply flows span orders of
+magnitude and a linear scale renders everything but the largest as the hairline
+that made a flat 1.5 look acceptable. A **zero-flow arc still draws**, at minimum
+width, because a zero-weighted arc is a real finding (D2/D3) and hiding it is the
+opposite of disclosing it. And a **null metric is not drawn small** — small means
+a low value, null means no value, so it renders uniform and the page marks it.
+
+**`subgraphParity.test.ts` is what makes the extraction a fact rather than a
+hope.** `InteractiveNetworkSpace` is in no menu and reachable only by URL, so
+nobody would notice if the extraction changed its behaviour. The original is
+reproduced VERBATIM as a frozen witness and 21 query cases run through both. It is
+the one place in this repository where a duplicate is right: the copy is not a
+source a reader might follow, it is a recording of the behaviour being preserved.
+It also carries an anti-vacuity check, because a parity suite where both sides
+return nothing for every case passes and proves nothing.
+
+**── TWO DEFECTS FOUND BY EXTRACTING, NOT BY READING ──**
+
+**D129 — `includeTerminals` is inverted.** The walk stops at a `stopUp`/`stopDown`
+level only `if (includeTerminals)`, and the default is `false`. So the parameter
+does the opposite of what its name says and the whole terminal-stop mechanism has
+**never bounded a single walk under its own default**. Reproduced faithfully
+rather than fixed — parity is the extraction's guarantee, and a refactor that also
+changes behaviour can be verified as neither. `respectTerminals` is the opt-in
+fix, and the parity suite asserts BOTH readings so the defect cannot be quietly
+un-reproduced.
+
+**D130 — a fixed `RETURNS TABLE` is a second place the schema is authored.**
+`get_node_list` is the only route to `node_list` from the application, and it lists
+seventeen columns BY NAME. WP 8.1 added three; `CREATE OR REPLACE FUNCTION` cannot
+change a return type; **nothing failed, and a type that was authored, backfilled
+and CHECK-constrained was invisible to every page in the product.** That is
+`single-source` (I1) broken in SQL rather than in markdown — the same blind spot
+D101 and D105 came out of — and `contract:validate` cannot see it, because the
+sidecar describes the TABLE and no rule compares a table's columns against the
+projections claiming to return them.
+
+Closed for this table by an **additive** `get_graph_nodes` rather than by widening
+`get_node_list`: that would be a DROP and CREATE, `get_node_list` has four live
+callers, and `20260918000003` is the record of what a DROP costs — it takes the
+function's grants with it, which `rehearsal/210` §2 had to verify by checking every
+role back as an explicit `proacl` grantee because `has_function_privilege` cannot
+fail while PUBLIC keeps EXECUTE. **The CLASS is open and owned**: no gate counts
+the schema's other fixed `RETURNS TABLE`s against the tables they project.
+
+`get_graph_nodes` deliberately does NOT return the criticality prediction. That is
+analysis output, it belongs to a run, and a page that wants it should ask the
+analysis store rather than read it off an entity row (D19).
+
+**── WHAT DID NOT LAND, AS A NUMBER ──**
+
+**All six `src/` classifiers are still in place, and both gates are RATCHETS
+because of it.** Deleting a page's classifier before `echelon` is populated for
+every project in production is a change nobody can verify, and D88 is what
+shipping the unverifiable half looks like. So the baselines ARE the handover:
+
+| | count |
+|---|---|
+| classifiers in `src/` | **6** — `buildGroupClassification` + `getLocationGroup`, `getNodeTypeFromLevel` + `getDisplayNodeType`, `getTierFromDepth`, `getNodeTypeFromLevel` |
+| colour literals, Product / Process / Firm / Interactive / Map | **11 / 32 / 13 / 16 / 18** |
+
+Both ratchets fail if a number RISES **and** if it falls without the baseline
+falling with it, so neither can go stale the way an assertion of zero would. One
+line of gate per classifier gone is what makes the remaining work countable
+instead of described (D90's lesson).
+
+**Verified:** `contract:check` ✓ · `contract:rehearse` ✓ all three ways ·
+**619 tests ✓ (was 534)** · `typecheck` ✓ 28 of 28 held, over 478 files where it
+was 466 · `check:docs` ✓ · **`eslint` unchanged at 452 problems**, so the module
+added none — the RPC shim is a narrow structural cast rather than the `any` the
+nine existing call sites use · `rehearsal/230` §6 mutation-tested two ways (drop
+`echelon` from the projection → red; reverse the ordering `CASE` → red).
+
+**Gap check.** Four findings.
+
+1. **The layer is built and read by nothing.** That is the honest state and the
+   ratchets say so in numbers rather than in prose. It is also the risk: a module
+   with 85 tests and no caller is a module that can drift from what the pages
+   actually need, and the only cure is migrating one page soon enough to find out.
+2. **D130 is a rule this repository does not have.** `contract:check` compares
+   sidecars against tables and PLAN citations against files; nothing compares a
+   function's declared projection against the table it projects. The instance is
+   closed and the class is one `pg_proc` query away — it is named in §4 rather
+   than written here because a gate added in the same breath as its first instance
+   is a gate tested against exactly one case.
+3. **The parity witness will go stale by design.** It records
+   `InteractiveNetworkSpace` as of today. When WP 8.4 migrates that page to the
+   extracted engine the witness becomes a recording of something no longer in the
+   tree — which is correct (it is a frozen measurement, not a mirror) but the test
+   file must say so at that point or a reader will try to keep them in step.
+4. **The focus walk cannot chain through one echelon.** Each step must ADVANCE
+   along the chain, so three nested sub-assemblies stop the walk after the first.
+   The test asserts that limit explicitly rather than hiding it; fixing it needs
+   `bom_depth` as a tie-break within a band, which is WP 8.4's when a page offers
+   a depth-aware focus.
+
 ---
 
 ## 17. Sequencing
@@ -11965,7 +12096,7 @@ D52 exists for · 534 tests ✓ · `typecheck` ✓ 28 of 28 held · `check:docs`
 | 5 ✅ | 5.1 – 5.3 | lineage + the 80-page manual | 6 | **PHASE COMPLETE.** **5.1 ✅** · **5.3 ✅** · **5.2a–i ✅, all nine** — manual live at `/docs`; tree complete; **ALL FIFTEEN SECTIONS WRITTEN — 80 of 80 pages, zero stubs.** **5.2i** then added what all eighty were missing: a door a FIGURE can come through (**D109**). The manual had none — §6.5 records WP 5.2a declining to link the eleven diagrams in the artifact and drawing three SVGs instead, and 5.2b–g shipped sixty-six pages with zero. Sixteen slots are declared and open, each naming its page, its filename and what the diagram must show. 5.2b shipped twelve of twelve and **did NOT make the reassignment §12 told it to**: all four "unsidecarred" tables had been described by WP 3.2 and WP 4.3, so the instruction was stale rather than the tree wrong. It found that "which columns are computed" was authored TWICE (**D101**) and closed it by declaring `computed_by` in the contract, which `graphHashCoverage.test.ts` now reads instead of its own literal Set — 18 of 18, byte-identical. **D57 closed** alongside, with the typecheck gate the repository never had. **5.2c** renders the chains the SAME derivation `resolutionChains.test.ts` ratchets (`chains.mjs` bundles the module the gate uses), so the manual and the gate cannot disagree about which eleven break — and found that the Trust Report publishes two limits that are no longer true (**D103**). **5.2e** publishes WP 5.1's lineage at TABLE grain only — the one claim the grade supports — and found that three §4 citations became ambiguous the moment the manual gained a page named after a screen (**D104**). **5.2f** states I5 and I8 as unmet in the reader's words rather than describing a record that does not exist, and found `dataset_versions.hash_network`'s own description two tables behind the migration that changed it (**D105**). **5.2d** documents BOTH live disruption models without picking one, reads the stress battery from the engine rather than mining the archive's already-stale copy, and found that the phase brief's own trap list carried a defect WP 4.3 had closed (**D107**), plus the stress battery's absence from the registry export (**D106**). **5.2g** completes the manual and says the four uncomfortable things in the reader's words — client-asserted identity, "RLS: enabled" as a non-assurance with a THIRD indeterminate state, `min_project_role` declared everywhere and read by one path, and an API principal with no person behind it. **WP 5.2's exit gap check ran**: five described tables have no narrative page and `customers` is the one that matters (**D108**) |
 | 6 | 6.1 – 6.4 | policy contract, researcher grade | — | **6.1 ✅** · — · 6.2 grew D47, D48, D49 at the WP 3.0 gap check |
 | 7+ | deferred | observations, estimation, backtesting | — | — |
-| **8** | **8.0 – 8.5** | **the graph layer — one node type, one graph layer** | — | **8.0 ✅** the seven §15 probes, and the numbers are NOT in yet: the package deliberately measures and changes nothing, because the diagnosis branches on a BOM depth no work-package session can read. Thirteen defects opened, **D112–D127**, two of which the measurement then CORRECTED from over-claims to latent (D114, D126). The root cause is in the contract already — there is **no type column on either edge table**, so **eight** classifiers each infer one at render time and disagree by construction, and the single `level` column carries **three** incompatible meanings between its writer, its contract and its reader. Two defects silently destroy data (**D113** a dedup guard testing a key it never writes; **D114** an edge emitted to `''` where the BOM root should be) and one label is fabricated outright (**D124** "work station", from `level === 1`, with no routing table anywhere in the contract). It also found **D123** — §16's last twenty-one entries sat AFTER §17 and so outside the slice every gate reads — and the numbering collision that made this Phase 8 rather than Phase 7 (§14 already owns `WP 7.1`, and D28 is owned by it). `check.mjs` now reads its roadmap from two ranges so a Phase 8 package is gated like a Phase 3 one, proved by making R7 fail with the package named. **AND THE SECOND §15 RUN IS WHY THE PACKAGE MATTERED**: the reported project's BOM is exactly four levels deep, so the ladder defect the brief predicted is LATENT there — and the map is wrong anyway, because **two live ETLs write both edge tables with different `level` rules** (**D125**, the finding of the package, and it rescopes WP 8.2 onto the SQL RPC because the edge function the brief named is the undeployed half). Also **D126** (the RPC invents a node called `ROOT`) and **D127** (nothing rebuilds the lane when its sources change, and every timestamp reports it fresh because a DELETE moves no `updated_at` — D12's lesson in a second place). **WP 8.1 ✅** — one classifier, and it found **D128**: the trigger that keeps the typed node projection in sync with the graph reads `NEW` in a STATEMENT-level context, so it has never fired once since 2025-08-29. Fixing it made two rehearsals go red with `forbidden`, because `rebuild_node_list` AUTHORIZES and a derivation running inside somebody else's INSERT can only refuse a writer the database already allowed — D66's shape in a derivation, closed by splitting discovery from authorization. **D117 closed**; **D112**'s data half landed. **WP 8.2 is next** |
+| **8** | **8.0 – 8.5** | **the graph layer — one node type, one graph layer** | — | **8.0 ✅** the seven §15 probes, and the numbers are NOT in yet: the package deliberately measures and changes nothing, because the diagnosis branches on a BOM depth no work-package session can read. Thirteen defects opened, **D112–D127**, two of which the measurement then CORRECTED from over-claims to latent (D114, D126). The root cause is in the contract already — there is **no type column on either edge table**, so **eight** classifiers each infer one at render time and disagree by construction, and the single `level` column carries **three** incompatible meanings between its writer, its contract and its reader. Two defects silently destroy data (**D113** a dedup guard testing a key it never writes; **D114** an edge emitted to `''` where the BOM root should be) and one label is fabricated outright (**D124** "work station", from `level === 1`, with no routing table anywhere in the contract). It also found **D123** — §16's last twenty-one entries sat AFTER §17 and so outside the slice every gate reads — and the numbering collision that made this Phase 8 rather than Phase 7 (§14 already owns `WP 7.1`, and D28 is owned by it). `check.mjs` now reads its roadmap from two ranges so a Phase 8 package is gated like a Phase 3 one, proved by making R7 fail with the package named. **AND THE SECOND §15 RUN IS WHY THE PACKAGE MATTERED**: the reported project's BOM is exactly four levels deep, so the ladder defect the brief predicted is LATENT there — and the map is wrong anyway, because **two live ETLs write both edge tables with different `level` rules** (**D125**, the finding of the package, and it rescopes WP 8.2 onto the SQL RPC because the edge function the brief named is the undeployed half). Also **D126** (the RPC invents a node called `ROOT`) and **D127** (nothing rebuilds the lane when its sources change, and every timestamp reports it fresh because a DELETE moves no `updated_at` — D12's lesson in a second place). **WP 8.1 ✅** — one classifier, and it found **D128**: the trigger that keeps the typed node projection in sync with the graph reads `NEW` in a STATEMENT-level context, so it has never fired once since 2025-08-29. Fixing it made two rehearsals go red with `forbidden`, because `rebuild_node_list` AUTHORIZES and a derivation running inside somebody else's INSERT can only refuse a writer the database already allowed — D66's shape in a derivation, closed by splitting discovery from authorization. **D117 closed**; **D112**'s data half landed. **WP 8.3 PARTIAL** — `src/lib/graph/` lands with 85 tests: one palette where there were five, encodings that carry data (area-scaled size, log-scaled width, position from the ECHELON and never from `level`), and the subgraph engine EXTRACTED from the orphaned fourth page under a parity suite that runs the original verbatim as a frozen witness. **Taken before WP 8.2 deliberately**: after WP 8.1 a page reading `echelon` and `bom_depth` is independent of `level` entirely, so the layer fixes the reported map without the ETL changing, and WP 8.2 can then alter `level` with nothing reading it. Found **D129** (`includeTerminals` is inverted, so the terminal-stop mechanism has never bounded a walk) and **D130** (a fixed `RETURNS TABLE` is a SECOND authoring of the schema — `get_node_list` could not carry WP 8.1's three columns, so a type that was authored, backfilled and constrained was invisible to every page). **The pages still classify**, and the two gates are RATCHETS that say so in numbers: 6 classifiers, 11/32/13/16/18 colour literals, each may only fall. **WP 8.4 is next** |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -12036,7 +12167,7 @@ is no type column on either edge table.**
 
 The phase authors node identity and node type ONCE, in the data, and then gives
 both pages one shared graph layer so they stop re-deriving the same facts
-differently. It closes D112–D128.
+differently. It closes D112–D130.
 
 **Which invariants it serves.** `single-source` (I1) — a node's role is a prose
 fact about the data layer authored eight times in TypeScript and SQL with nothing
@@ -12185,7 +12316,7 @@ Then, in the one surviving writer:
 > lands only in the edge function changes nothing and must not be reported as
 > success.
 
-### WP 8.3 — The shared graph layer *(no migration)*
+### WP 8.3 — The shared graph layer — PARTIAL *(one additive migration, which the package did not expect: see D130)*
 
 **DECISION 3 — extract `InteractiveNetworkSpace`'s subgraph engine; do not
 rewrite it.** That page is not in the sidebar and is reachable only by URL, and
@@ -12207,13 +12338,50 @@ D120 — the confidence signal that can only say "confident" — is either compu
 honestly (a node whose lane roles disagree genuinely is low-confidence) or
 deleted; a dead amber border is T2 answered with a constant.
 
-**Gate, not a promise**: `oneClassifier.test.ts` fails if a classifier survives
-outside `src/lib/graph/`, and `onePalette.test.ts` fails if a colour literal
-appears in a network page. Eight became one; the gate is what stops one becoming
-nine.
+**Gates, not promises, and they are RATCHETS.** `oneClassifier.test.ts` carries the
+six classifiers still in `src/` and fails if a seventh appears — **and fails if the
+list shrinks without the baseline shrinking with it**, so it cannot go stale the way
+a pass/fail assertion of zero would. `onePalette.test.ts` does the same for colour
+literals, per file. That shape is deliberate: deleting a page's classifier before
+`echelon` is populated for every project in production is a change nobody can
+verify, and D88 is what shipping the unverifiable half looks like. The ratchet makes
+progress countable — one line of gate per classifier gone.
 
-**Exit**: `typecheck` (the baseline may shrink, never grow), `npm test`, the new
-parity tests green.
+**── WHAT LANDED, AND WHAT DID NOT ──**
+
+**Landed:** the module, with 85 tests. `types.ts` (the seven-value vocabulary and
+compound `{ echelon, id }` identity), `palette.ts` (**one** palette where there were
+five), `encoding.ts` (size by metric with `sqrt` so area and not diameter carries the
+value; edge width log-scaled by flow; depth as a lightness ramp; column position
+from the ECHELON and never from `level`), `subgraph.ts` and `focus.ts` (both
+extracted), `useGraphNodes.ts` (the read path), and both ratchets.
+
+**`subgraphParity.test.ts` is what makes the extraction a fact.** The original
+implementation is reproduced verbatim as a FROZEN WITNESS and 21 query cases run
+through both; a difference fails. It is the one place in this repository where a
+duplicate is right — the copy is not a source a reader might follow, it is a
+recording of the behaviour being preserved. It also has an anti-vacuity check, so a
+suite where both sides return nothing cannot pass.
+
+**Two defects found by extracting rather than by reading.** **D129**:
+`includeTerminals` is inverted, so `stopUp` / `stopDown` have never bounded a walk
+under their own default — reproduced faithfully, with `respectTerminals` as the
+opt-in fix, because parity is the extraction's whole guarantee. **D130**: a fixed
+`RETURNS TABLE` is a second authoring of the schema, and `get_node_list`'s could not
+carry WP 8.1's three columns, so a type that was authored, backfilled and
+constrained was **invisible to every page**. Closed for this table by an additive
+`get_graph_nodes` (`20260919000002`) rather than by a DROP that would take four live
+callers' grants with it.
+
+**NOT landed: the pages still classify.** All six `src/` classifiers are in place,
+which is why the gates are ratchets and not assertions of zero. Migrating four files
+of 1 400–1 950 lines each is the rest of this package and the bulk of WP 8.4, and
+the ratchet baselines are the handover: **6 classifiers, and 11 / 32 / 13 / 16 / 18
+colour literals.** Every one of those numbers is countable and may only fall.
+
+**Exit (partial)**: `typecheck` ✓ 28 of 28 held · 619 tests ✓ (was 534) ·
+`contract:rehearse` ✓ all three ways · `eslint` unchanged at 452 problems, so the
+module added none · `rehearsal/230` §6 mutation-tested two ways.
 
 ### WP 8.4 — Close the UI gap, in both directions *(no migration)*
 

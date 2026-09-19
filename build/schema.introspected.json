@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 332,
-  "migrations_applied": 324,
+  "migrations_found": 333,
+  "migrations_applied": 325,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260919000001_one_node_classifier.sql",
+  "last_migration": "20260919000002_graph_nodes_read_path.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 278,
+    "functions": 279,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -22680,6 +22680,20 @@
       "volatility": "STABLE",
       "comment": null,
       "defined_by": "20260829120000_erp_connector_phase1_2.sql"
+    },
+    {
+      "name": "get_graph_nodes",
+      "signature": "get_graph_nodes(uuid, uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_user_id uuid",
+        "p_user_email text"
+      ],
+      "returns": "TABLE( node_id text, echelon text, node_type text, bom_depth integer, supply_tier integer, plant_name text, label text, location_text text, longitude numeric, latitude numeric )",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "WP 8.3 · §4 D112. The read path for `node_list.echelon` / `bom_depth` / ",
+      "defined_by": "20260919000002_graph_nodes_read_path.sql"
     },
     {
       "name": "get_individual_scenario_results",
