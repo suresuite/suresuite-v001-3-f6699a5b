@@ -247,6 +247,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D114** | **Two of the six recovery strategies a scenario offers reach no engine plugin, and the policy grid's own list was corrected for exactly this while the scenario pane's was not.** `project_map.py` turns a recovery response into a plugin: `dual_source_activate` → `backup_supplier`, `capacity_flex` → `short_term_capacity`, `mode_shift`/`reroute` → `expedited_shipments`, `early_warning` → `early_warning_failover`, `allocate_materials` → `material_allocation`. There is **no branch for `safety_stock_drawdown` or `demand_shaping`** — which are two of the six `DisruptionRecoveryPane` offers. They can be switched on, carry their own parameters (`holding_cost_pct`, `allocation_horizon_weeks`, `annual_labor_cost`), are saved with the scenario, show as enabled, and change no number in the run. **Six of the seven built-in policy presets set `safety_stock_drawdown`.** The grid already knows: `MULTI_SELECT_OPTIONS.response` in `schemas.ts` carries the comment *"Restricted to the responses the scsim engine maps to policies"* and lists a DIFFERENT six — `reroute, dual_source_activate, mode_shift, capacity_flex, early_warning, allocate_materials`. So one screen was fixed and the other was not, and nothing compares them. **Two smaller facts in the same join**: `mode_shift` and `reroute` map to the SAME plugin, so "Expedite shipments" and "Network rerouting" are one lever with two names and two descriptions; and the mapper branches on `expedite_freight`, which is not in the `RecoveryResponse` enum, so no saved scenario can contain it — a dead branch, not a missing control | `scsim/scsim/io/project_map.py`'s response-to-plugin branches against `src/components/sim/DisruptionRecoveryPane.tsx`'s `strategyOrder` and `src/lib/policies/schemas.ts`'s `MULTI_SELECT_OPTIONS.response`; derived in `chains.mjs` (`deriveRecoveryLevers`) and rendered on `recovery-playbooks` | **OPEN — WP 6.4** *(the decision plane, which owns `recovery_playbooks`. Two fixes and they are not the same size: narrowing the pane's list to the mapped six is one edit and loses two intents users have recorded; giving `safety_stock_drawdown` and `demand_shaping` engine branches is engine work. The presets need whichever answer follows. The manual marks each lever meanwhile, derived so a marking disappears when its branch lands)* |
 | **D115** | **`experiments-and-comparison` documented three engine library functions and no product feature, and the one screen actually called an experiment is mounted by no route — D111's class, twice, which makes it a class.** The page described synergy decomposition, a portfolio breadth ladder and ST-1/ST-2 supplier rankings. `scsim/scsim/synergy/` is imported by two of the engine's own tests and nothing else — the same shape as `scsim/scsim/stress/` (D111), found by asking E3's question of the next page rather than by a new kind of search. It also sent readers to Simulation Lab's "previews", a mode that does not exist: the word appears once in `src/pages/SimulationLab.tsx` and `src/components/sim/`, in a comment about a recovery calculation. **And `src/components/sim/ExperimentDesigner.tsx` — a complete full-factorial / Latin-hypercube design-of-experiments screen over the `experiments` table, with its own `ExperimentResultsPanel` — is imported by NOTHING.** No route, no menu item, no link. So the `experiments` table has a built UI that no user can open, and `coverage.yaml` defers the table to WP 6.3 with no note that its surface is unreachable. What a user CAN do is stage 5 of Simulation Lab, whose four comparability rules (CRN on, same seed, exactly one of policies-or-world differing, same engine version) and CI-overlap marking were on no page at all. **The lesson is narrower than "check reachability": both pages were written from a real, correct reading of a real artifact. What neither reading could see is that nothing calls it — which is one import scan, and is now step 5 of the method** | `scsim/scsim/synergy/`'s importers (two, both in `scsim/tests/`) and `ExperimentDesigner.tsx`'s importers (zero) against `src/components/sim/CompareScenariosPanel.tsx`, which is what stage 5 mounts | **CLOSED for the manual (Phase 5 / WP 5.2j)** — the page leads with the comparison and its four refusals, and states both unreachable surfaces plainly. **The unreachable designer itself is OPEN, owned by WP 6.4** *(which describes the decision plane: a designer that writes `experiments` is a decision surface, and the choice is to route it or to delete it — a built screen nobody can open is the shape D111 and this row share)* |
 | **D116** | **The ERP connector is documented as "the same path a CSV takes" and it is a different path with four weaker guarantees — on the three pages whose job is that comparison.** `csv-vs-connector` opened *"Both routes land in the same place, are checked by the same rules, are diffed the same way, and are approved by the same person"* and rendered the CSV route's dataset count as if it were both routes'. `reviewing-a-sync` opened *"Nothing from a connected system lands in your data until a person approves it."* Measured against `supabase/functions/erp-sync-orbit-mrp/index.ts` and `mrp_apply_staged_products`: **(1) SCOPE** — the connector stages products and nothing else, against nine CSV datasets, so every other table is a file whether or not a link exists. **(2) APPROVAL** — a link with `auto_apply_threshold_pct > 0` applies its own run when the change is small and nothing failed to map, with no review screen opened; it is attributed (to whoever created the link, since that is when the authorisation happened) and it is not a person present. **(3) THE DIFF** — `diff_state` is `!existing ? "new" : "changed"`, an external-id presence test that compares no values, so `rows_unchanged` is always 0 and a completely unmodified catalogue reports every row as changed; and the promotion does not recompute it, so `diff-before-decision`'s second half does not hold on this path. **(4) WHAT CROSSES** — a staged row carries `unit_of_measure`, `lead_time_days`, `moq`, `unit_cost`, `supplier_name`, `cycle_time_seconds`; the promotion writes `product_id`, `name` and the three source columns. **The economics are staged and never applied**, so a sync populates the product LIST and not the product ECONOMICS, and a synced product with no file behind it reaches the engine on defaults. A `removed_upstream` row is staged and not deleted. **None of the four is a defect in the sync** — each is deliberate and argued in its own source, and WP 4.1 closed the one that was wrong (the unattributed per-row promotion). The defect is that the manual described the CSV path's guarantees and put a connector's name on them, which is the reassurance-shaped failure §5 T1 exists to prevent | `supabase/functions/erp-sync-orbit-mrp/index.ts` (the diff rule, the threshold, the staged columns) against `20260917000003_actor_on_postgrest_writers.sql`'s `mrp_apply_staged_products` (the columns written), read beside `ingest_apply_run`'s own diff-inside-the-promotion | **CLOSED for the manual (Phase 5 / WP 5.2j)** — all three §10 pages corrected, each fact attributed to the path it came from. **The PRODUCT question is OPEN, owned by WP 6.2** *(which already carries the divergences): whether a value-comparing diff and promoting the staged economics are wanted is a product decision, and until one is made `rows_changed` is a number a reader should not act on)* |
+| **D117** | **Deleting a project leaves ten project-scoped tables behind, and the screen says it succeeded before it has started.** Two mechanisms remove a project's data and nothing joins them: 29 of the 49 tables carrying `project_id` cascade from a foreign key, and 8 more are deleted BY NAME in `delete-project/index.ts` because they were created without one. **Ten are reached by neither** — `ai_chat_events`, `ai_usage_logs`, `api_request_logs`, `customers`, `network_summary`, `policy_defaults`, `policy_overrides`, `simulation_job_magnitudes`, `tier2_suppliers`, `tier3_suppliers`. Three of those are logs that are arguably meant to outlive a project. The other seven are not: **`policy_defaults` and `policy_overrides` are the decisions the user typed into the grid**, and `tier2_suppliers`/`tier3_suppliers` are uploaded data with their own wizard datasets. Their rows survive with nothing reading them. Two more facts in the same join: `chat_threads` and `user_files` are `ON DELETE SET NULL`, so they are deliberately DETACHED rather than deleted — correct for something a person owns, and worth saying — and the function **returns HTTP 202 "Deletion started" before touching a row**, runs in the background in batches, and swallows a mid-way failure into `console.error`, so a partial deletion is indistinguishable from a complete one to the person who asked for it. **The manual was asserting the opposite**: `exporting-and-deleting` said *"the relationships between tables are declared in the database, so a deletion follows them rather than relying on anybody remembering which tables were involved"* — on a page whose subject is the fifth transparency commitment. The hand-written list IS the remembering | `build/schema.introspected.json`'s `project_id` references against `supabase/functions/delete-project/index.ts`'s own table list; derived in `chains.mjs` (`deriveProjectDeletion`) and rendered on `exporting-and-deleting` | **OPEN — WP 6.2** *(the divergences package: the fix for the seven data tables is a foreign key each, which is the same class as the rest of it. The confirmation-before-work is separate and smaller — the 202 is right for a long job, and reporting the outcome is what is missing)* |
 | **D98** | **Three CHECK constraints production has were absent from every rehearsed database, and four rehearsal files were asserting over rows production would REFUSE.** D59 said an inline CHECK costs twice; this is the second cost, measured. With the CHECKs restored, `030` inserted `user_files.kind = 'report'` (the vocabulary is `report_xlsx`/`report_pdf`/`export_csv`/`upload`), `110` inserted `ingest_runs.triggered_by = 'schedule'` (`manual`/`scheduled`), `170` inserted an EMAIL into the same column — `triggered_by` is HOW a run started, not WHO started it — and `140` inserted `'{}'::jsonb` into `proposals.provenance`, which is TEXT from a fixed vocabulary and sits next to two jsonb columns. Every one of those rows is one production cannot hold, so every assertion downstream of them was made about a database that could not exist. **No live writer is affected** — `ingest_land_file` writes `'manual'` — so the fix is the four fixture rows, not the constraints. The class is not closed: nothing stops the next rehearsal from seeding a row a CHECK would refuse; what changed is that the rehearsed database now refuses it | `supabase/rehearsal/030`, `110`, `140`, `170` (the four inserts, each now carrying the reason above it) | WP 6.2 ✅ *(slice 9)* |
 | D48 | **A migration aborted in production in 2025 and nothing has ever said so — and it was THREE migrations, not one.** `20250827170942` defines `create_disruption_scenario_v2(uuid, text, text, public.disruption_status, text, text[], jsonb, jsonb, jsonb, uuid, text)` with `p_user_id` and `p_user_email` — neither carrying a default — AFTER `p_status text DEFAULT 'draft'`. PostgreSQL rejects that at CREATE time (`42P13`), so that statement and everything after it in the file never ran. The introspector records the overload from the file regardless, because a static replay cannot execute a definition to find out it is invalid. **The row's cited sibling `20250827190942` DOES NOT EXIST.** The retry is `20250827171106`, **84 seconds** later, which re-issues the same four tables, triggers, policies and RPC and carries the literal comment `-- FIXED: Put all parameters with defaults at the end` — so the migration's own author knew, and only the contract did not. A whole-history scan then found two more: `20250904122241` and `20250904122347` each declare `get_network_nodes`, `get_network_edges` and `get_network_summary` with `p_user_id` after a defaulted `p_plant_name`, the second repeating the first's error exactly as `20250820145155` repeats `20250820145017`'s; `20250904124537` is the definition that works. **The END STATE is fine and the ATTRIBUTION was not**: aborting `20250827170942` re-homes all four `disruption_scenario_*` tables onto the retry, so a reader sent to a file that never ran is now sent to the one that did (§5 T1). **And the open half is answered.** There were never three overloads to choose between — one was a phantom. Of the two that exist, the single call site `DisruptionDialog.tsx:195` sends `p_disruption_start` and `p_disruption_end`, and PostgREST resolves an RPC by NAMED arguments, so it reaches `20250828005114`'s 13-parameter definition. `20250827171106`'s 11-parameter one is live and unreached; dropping it is a migration and is left to whoever wants it. Found by D31's rehearsal; the two extra files and the wrong citation found by WP 6.2 slice 10 | `20250827170942_78bc79b9-38a6-463c-ad66-88d35ef90356.sql`; `20250904122241_b65404b9-d4ee-4c58-9518-7a1578f74af8.sql`; `20250904122347_a28da769-734c-4064-8f24-2b8d60ffffa4.sql`; `sql-lex.mjs`'s `firstNonDefaultAfterDefault` | WP 6.2 ✅ *(slice 10)* |
 | D49 | **The introspector records three indexes on columns the tables no longer have — and that is TWO defects with two different causes, not one.** `idx_supply_chain_data_plant` is recorded `ON supply_chain_data (plant)`, and `20250822025432` RENAMEd `plant` to `plant_name`; Postgres renames an index's column reference with the column, so production's index is on `plant_name` and the artifact's is on a column that does not exist. **That cause is right for exactly ONE of the three.** `supply_chain_data_multi_tier` has NEVER had `material_id` or `higher_level_component_id` in any definition — they are `bom_multi_level`'s columns — so no rename can have produced them. `CREATE INDEX IF NOT EXISTS` guards the index NAME, not the column: PostgreSQL raises 42703, and `20250909153130` therefore ABORTED in production, 61 seconds before `20250909153231` re-issued its other four statements without those two lines. That half is D97, and it is D48's class. The rename half is fixed by following a column RENAME into indexes, index predicates and constraints (`renameIdentifier` in `sql-lex.mjs`), which is the same fix as the `RENAME TO` branch that closed D52. `introspectorDependents.test.ts` gates both halves with no database; `supabase/rehearsal/180` §3 and §4 prove them against a real one. Found by D31's rehearsal; the second cause found by WP 6.2 slice 9 | `build/schema.introspected.json` `tables[].indexes`; `20250822025432_cf03eaa2-ae97-4310-80e9-085e3eb03487.sql` (the RENAME); `20250909153130_bbce47b2-3ba2-4830-b460-ad2b043905c5.sql` (the two impossible ones) | WP 6.2 ✅ *(slice 9)* |
@@ -2084,6 +2085,16 @@ not one: whether the diff should compare values, and whether the staged
 economics should be promoted. Both are product questions; the manual states the
 current behaviour on all three §10 pages meanwhile. What is NOT open is the
 attribution — WP 4.1 closed that half.
+
+**AND D117, THE SAME SHAPE AGAIN**: two mechanisms delete a project's data —
+29 foreign-key cascades and a hand-written list of 8 more — and **ten
+project-scoped tables are reached by neither**, including `policy_defaults` and
+`policy_overrides`, which are the user's own decisions. The fix for the seven
+that are project data is a foreign key each, which is this package's kind of
+work. The other half is smaller and separate: `delete-project` answers 202
+"Deletion started" before touching a row and swallows a mid-way failure, so a
+partial deletion looks exactly like a complete one. The 202 is right for a long
+job; reporting the outcome is what is missing.
 
 **D71 is CLOSED (slices 11 + 12).** Slice 11 took the three of sixteen that cost
 one line each — they already took `p_user_id` and never passed it to the trigger.
@@ -11955,6 +11966,88 @@ pairing was five pairs at creation and is nine now), the proposal statuses and
 provenances, the memory kinds and cap, the plan states, and the budget scopes,
 periods and usage statuses — where `blocked` is not an error but a limit
 refusing a call before it was made.
+
+**── THE LAST SIX PAGES, AND D117 ──**
+
+**`model-validation` said the four-way binding does not exist, and it does.**
+The page read: *"The thing that would make a validation fully trustworthy is a
+binding between the verdict and the four things that decided it … That binding
+— the reproducibility record — is not built yet."* `model_validations` carries
+`dataset_version_id` + `graph_hash`, `policy_version_id` + `policy_hash`,
+`scenario_hash` + `scenario_fingerprint`, `engine_fingerprint` and
+`evidence_run_id`. **`result-binding` (I8) already holds on this one table**, and
+`deriveCredibility` compares all four live to produce the badge every run and
+every scenario carries. So the manual was denying the one place the invariant is
+met. `reproducibility-record` now says the same thing from the other side: a
+validated model IS reproducible; an arbitrary figure is not yet.
+
+**D117 — deleting a project leaves ten project-scoped tables behind.** 29 of the
+49 tables carrying `project_id` cascade; 8 more are swept by name in
+`delete-project`; ten are reached by neither, and they include `policy_defaults`
+and `policy_overrides` — the decisions the user typed. The page had asserted the
+opposite, on the page that carries the fifth transparency commitment. Two more
+facts the join surfaced: `chat_threads` and `user_files` are `SET NULL`, so they
+are deliberately detached rather than deleted, and the function answers 202
+before touching a row and swallows a mid-way failure.
+
+**`admin-screens` listed seven of nine screens by hand** — missing the dashboard
+and the per-user access page, which is where its own worked example about the AI
+allow-list actually lives. Derived now, and the derivation carries what a hand
+list never could: **`PAGE_CAPABILITIES` declares ONE key for the whole
+administrative area**, and `pageKeyForPath` matches the longest prefix, so every
+admin screen is gated by the same grant. "Give them the usage report" is "make
+them an administrator".
+
+**`customer-stage` is the page that answers §XI's question about thin pages.**
+The brief said to verify whether it is thin because the stage is small. It is:
+two columns, both `app-routing` breaks in the derived chains, neither reaching
+the engine — against five on the supplier stage and four on the plant stage.
+The page now leads with that count as the finding and says where the demand-side
+decisions actually are, instead of being padded to a length its subject does not
+support.
+
+**`policy-versions-and-presets` missed what a preset IS.** Each of the eight is
+a `derive(ctx)` function reading measured project facts — demand mean and
+variability, supplier lead-time mean and spread, the top-volume supplier — so
+the same preset is different numbers on two projects, every proposed value
+carries its own `why` on the apply dialog, and **a preset applied to an empty
+project is not the preset** (the dialog says the values are schema defaults).
+The `why` does not survive the apply, which is the sentence a reader needs
+before they click.
+
+**── THE FLOOR IS NOW A GATE (closing 5.2i's third finding) ──**
+
+5.2i left it open on purpose: *"picking the number is a judgement about what a
+short page is allowed to be, and a threshold set carelessly is one that gets
+raised until it means nothing."* That is discharged rather than repeated.
+`pageDepth.test.tsx` fails a page under 500 rendered words unless it is named in
+`SHORT_BY_SUBJECT` **with a reason** — and fails an entry with no reason, and an
+entry for a page that is no longer short, so the list cannot become where thin
+pages go to be forgiven. **It is empty**, which is the strongest statement it can
+make: the floor is where the manual already is, not a ratchet aimed at somebody
+else's work.
+
+**Final distribution: 80 pages, median 1 010 words, shortest 530, zero below
+500** — against 5.2i's median 805 and twenty-three below.
+
+**── ONE GATE WAS RE-RECORDED, AND ONLY HALF OF IT ──**
+
+`audit:bundle` went red: **total JS 1 850.1 kB against a 1 845.0 kB ceiling.**
+Measured rather than assumed — the branch point built at 1 806.5 kB, so this
+package added 43.6 kB, and **all of it is in `DocPage`** (194.9 → 202.0 kB gzip
+on the last increment alone). That is the manual's own content: eighty pages
+roughly doubled in depth plus eleven new generated fact modules, in a route
+chunk nobody downloads unless they open `/docs`.
+
+**`initial-graph` did not move.** 156.6 kB with the growth, 156.6 kB without it —
+the number the gate exists to hold down is untouched.
+
+So `total-js` was re-recorded and **`initial-graph` was deliberately left where
+it was**, at 159 356 bytes, which is ABOVE what the build now produces. Updating
+both — which is what `--update-baseline` does — would have ratcheted the
+important number UP by a kilobyte on growth that never touched it. The baseline
+file's note says which half moved and why, so a future branch that finds
+`total-js` red knows to look at `DocPage` first.
 
 **Verified:** `npm test` · `contract:check` · `typecheck` · `check:docs` ·
 `build` — all at the state recorded in this entry's final revision.

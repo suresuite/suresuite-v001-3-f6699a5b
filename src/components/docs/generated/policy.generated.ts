@@ -2910,5 +2910,375 @@ export const AI_GOVERNANCE: AiGovernance = {
   ]
 };
 
+/**
+ * The policy presets, in the order the dialog offers them.
+ *
+ * `derivesFrom` is the list of MEASURED PROJECT FACTS the preset's own
+ * derivation reads. It is the fact that makes a preset not a fixed set of
+ * values, and no other source carries it: `policy_presets` is deferred in
+ * the contract and the table stores a resolved bundle, not the function.
+ */
+export type PolicyPreset = {
+  slug: string;
+  name: string;
+  description: string;
+  isSystem: boolean;
+  derivesFrom: string[];
+  families: string[];
+};
+
+export const POLICY_PRESETS: PolicyPreset[] = [
+  {
+    "slug": "make_to_stock",
+    "name": "Make-to-Stock",
+    "description": "Produce ahead of demand, hold FG inventory, ship from stock.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "make_to_order",
+    "name": "Make-to-Order",
+    "description": "Zero FG stock, lot-for-lot production, long backorder window.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "lean_jit",
+    "name": "Lean / JIT",
+    "description": "Minimal inventory, daily review, single-source, FTL — fast & cheap when stable.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "supplier_lt_cv",
+      "supplier_lt_mean_days",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "resilient",
+    "name": "Resilient",
+    "description": "Dual-source, 14-day safety stock, mode-shift on disruption.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "supplier_lt_cv",
+      "supplier_lt_mean_days",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "service_first",
+    "name": "Service-first",
+    "description": "99% SLA, large safety stock, fair-share allocation, premium transport.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "cost_optimized",
+    "name": "Cost-optimized",
+    "description": "EOQ inventory, milk-run + LTL, weekly consolidation — lowest landed cost.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "agile_high_mix",
+    "name": "Agile / High-mix",
+    "description": "Multi-source, short review, parcel + LTL mix — adapts to choppy demand.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  },
+  {
+    "slug": "sustainable",
+    "name": "Sustainable",
+    "description": "Sea/rail bias, large batches, carbon-capped routing.",
+    "isSystem": true,
+    "derivesFrom": [
+      "demand_cv",
+      "demand_mean_per_day",
+      "supply_chain_model",
+      "top_supplier"
+    ],
+    "families": [
+      "sourcing",
+      "inventory",
+      "transport",
+      "fulfillment",
+      "production",
+      "demand",
+      "recovery"
+    ]
+  }
+];
+
+/**
+ * What a model-validation card records, from its own CHECK constraints and
+ * columns. `binding` is the four components a verdict is tied to — the one
+ * place in the product where `result-binding` (I8) already holds today.
+ */
+export type ValidationCard = {
+  binding: { component: string; columns: string[] }[];
+  verdicts: string[];
+  bases: string[];
+  statuses: string[];
+  warmupMethods: string[];
+  hasEvidenceRun: boolean;
+  adopts: string[];
+};
+
+export const VALIDATION_CARD: ValidationCard = {
+  "binding": [
+    {
+      "component": "dataset",
+      "columns": [
+        "dataset_version_id",
+        "graph_hash"
+      ]
+    },
+    {
+      "component": "policy",
+      "columns": [
+        "policy_version_id",
+        "policy_hash"
+      ]
+    },
+    {
+      "component": "scenario",
+      "columns": [
+        "scenario_hash",
+        "scenario_fingerprint"
+      ]
+    },
+    {
+      "component": "engine",
+      "columns": [
+        "engine_fingerprint"
+      ]
+    }
+  ],
+  "verdicts": [
+    "validated",
+    "rejected"
+  ],
+  "bases": [
+    "statistical",
+    "face"
+  ],
+  "statuses": [
+    "active",
+    "superseded",
+    "revoked"
+  ],
+  "warmupMethods": [
+    "engine",
+    "welch",
+    "mser5"
+  ],
+  "hasEvidenceRun": true,
+  "adopts": [
+    "adopted_warmup_days",
+    "recommended_replications"
+  ]
+};
+
+/**
+ * What deleting a project reaches, joined across the two mechanisms that do
+ * it: the foreign keys that cascade and the table list the delete function
+ * sweeps by name.
+ *
+ * `neither` is the number worth publishing — project-scoped tables that no
+ * cascade and no sweep removes, so their rows outlive the project.
+ */
+export type ProjectDeletion = {
+  projectScoped: number;
+  cascade: number;
+  detached: string[];
+  sweptOnly: string[];
+  neither: string[];
+  asynchronous: boolean;
+};
+
+export const PROJECT_DELETION: ProjectDeletion = {
+  "projectScoped": 49,
+  "cascade": 29,
+  "detached": [
+    "chat_threads",
+    "user_files"
+  ],
+  "sweptOnly": [
+    "disruption_scenario_profiles",
+    "disruption_scenarios",
+    "network_edges",
+    "network_nodes",
+    "node_list",
+    "simulation_results",
+    "supply_chain_data",
+    "supply_chain_data_multi_tier"
+  ],
+  "neither": [
+    "ai_chat_events",
+    "ai_usage_logs",
+    "api_request_logs",
+    "customers",
+    "network_summary",
+    "policy_defaults",
+    "policy_overrides",
+    "simulation_job_magnitudes",
+    "tier2_suppliers",
+    "tier3_suppliers"
+  ],
+  "asynchronous": true
+};
+
+/**
+ * The administrative routes the router declares, each with the page
+ * capability that gates it — resolved by the same longest-prefix rule the
+ * app itself uses. One gate for all of them is the fact a hand-written list
+ * could not carry.
+ */
+export type AdminScreens = {
+  routes: { path: string; component: string; gate: string | null }[];
+  gates: string[];
+  pageCapabilities: number;
+};
+
+export const ADMIN_SCREENS: AdminScreens = {
+  "routes": [
+    {
+      "path": "/admin",
+      "component": "AdminDashboard",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/users",
+      "component": "AdminUsers",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/users/:userId",
+      "component": "AdminUserAccess",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/roles",
+      "component": "AdminRoles",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/organizations",
+      "component": "AdminOrganizations",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/projects",
+      "component": "AdminProjects",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/models",
+      "component": "AdminModels",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/usage",
+      "component": "AdminUsage",
+      "gate": "/admin"
+    },
+    {
+      "path": "/admin/audit",
+      "component": "AdminAudit",
+      "gate": "/admin"
+    }
+  ],
+  "gates": [
+    "/admin"
+  ],
+  "pageCapabilities": 12
+};
+
 export const CHAIN_COUNT = 38;
 export const BROKEN_COUNT = 11;

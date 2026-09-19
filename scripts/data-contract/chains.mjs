@@ -1134,3 +1134,215 @@ export function deriveAiGovernance(root) {
     modelCostColumns: cost,
   };
 }
+
+/**
+ * The policy presets, and the project facts they derive from — WP 5.2j.
+ *
+ * `policy_presets` is deferred in `coverage.yaml`, so the page describing them
+ * had no column reference and (correctly) wrote none. What it also had no way
+ * to say is the thing that matters most about a preset: **it is not a fixed set
+ * of values.** Each one is a `derive(ctx)` function reading the project's own
+ * measured facts — supplier lead-time mean and spread, demand mean, the
+ * top-volume supplier — so "Resilient" on one project is different numbers from
+ * "Resilient" on another, and every value it proposes carries its own `why`.
+ *
+ * Read from the preset modules themselves: the slug, the name, the description,
+ * whether it ships with the product, and WHICH context facts its derivation
+ * reads. That last one is the fact a reader needs and no other source has.
+ */
+export function derivePresets(root) {
+  const dir = join(root, "src", "lib", "policies", "presets");
+  const index = readFileSync(join(dir, "index.ts"), "utf8");
+  const order = /export const ALL_PRESETS: PresetDefinition\[\] = \[([\s\S]*?)\n\];/.exec(index);
+  if (!order) throw new Error("chains: `ALL_PRESETS` not found in src/lib/policies/presets/index.ts");
+  // The export order IS the order the dialog offers them in.
+  const names = [...order[1].matchAll(/\b(\w+),/g)].map((m) => m[1]);
+  const files = new Map(
+    [...index.matchAll(/import \{ (\w+) \} from "\.\/([\w_]+)";/g)].map((m) => [m[1], m[2]]),
+  );
+  const presets = [];
+  for (const name of names) {
+    const file = files.get(name);
+    if (!file) throw new Error(`chains: ALL_PRESETS names "${name}" and nothing imports it`);
+    const src = readFileSync(join(dir, `${file}.ts`), "utf8");
+    const head =
+      /slug:\s*"([\w-]+)",\s*name:\s*"([^"]+)",\s*description:\s*"((?:[^"\\]|\\.)*)",\s*is_system:\s*(true|false)/.exec(
+        src,
+      );
+    if (!head) throw new Error(`chains: preset "${file}" has no slug/name/description/is_system head`);
+    // Which measured project facts the derivation reads. `ctx.x` and nothing
+    // else — the values it computes from them are per-project and belong on a
+    // screen, not in a manual.
+    const reads = [...new Set([...src.matchAll(/\bctx\.(\w+)/g)].map((m) => m[1]))].sort();
+    presets.push({
+      slug: head[1],
+      name: head[2],
+      description: head[3].replace(/\\"/g, '"'),
+      isSystem: head[4] === "true",
+      derivesFrom: reads,
+      families: [...new Set([...src.matchAll(/^\s{6}(\w+): \{$/gm)].map((m) => m[1]))],
+    });
+  }
+  if (presets.length < 4) throw new Error(`chains: parsed ${presets.length} policy presets`);
+  if (presets.every((p) => p.derivesFrom.length === 0)) {
+    throw new Error(
+      "chains: no preset reads a project fact. Either the derivation stopped being " +
+        "project-aware — in which case the page's central claim must change — or the scan broke.",
+    );
+  }
+  return presets;
+}
+
+/**
+ * The model-validation card's own vocabulary — WP 5.2j.
+ *
+ * `model_validations` is deferred in `coverage.yaml`, and the page describing it
+ * said the four-way binding between a verdict and what produced it "is not built
+ * yet". The table carries `policy_version_id`, `policy_hash`, `dataset_version_id`,
+ * `graph_hash`, `scenario_hash`, `scenario_fingerprint`, `engine_fingerprint` and
+ * `evidence_run_id` — so on this one table the binding exists, and the manual was
+ * telling readers it did not.
+ *
+ * `binding` is derived rather than listed so the claim cannot survive the columns
+ * being removed, and the derivation throws if the card stops carrying a
+ * fingerprint for any of the four components.
+ */
+export function deriveValidationCard(root) {
+  const j = introspected(root);
+  const t = j.tables.find((x) => x.name === "model_validations");
+  if (!t) throw new Error("chains: the introspected schema has no `model_validations` table");
+  const has = (name) => t.columns.some((c) => c.name === name);
+  const binding = [
+    { component: "dataset", columns: ["dataset_version_id", "graph_hash"] },
+    { component: "policy", columns: ["policy_version_id", "policy_hash"] },
+    { component: "scenario", columns: ["scenario_hash", "scenario_fingerprint"] },
+    { component: "engine", columns: ["engine_fingerprint"] },
+  ].map((b) => ({ ...b, columns: b.columns.filter(has) }));
+  for (const b of binding) {
+    if (b.columns.length === 0) {
+      throw new Error(
+        `chains: model_validations no longer records the ${b.component} it was validated against. ` +
+          "The page states the four-way binding as a fact — re-read the table before changing it.",
+      );
+    }
+  }
+  return {
+    binding,
+    verdicts: checkValues(t, "verdict"),
+    bases: checkValues(t, "basis"),
+    statuses: checkValues(t, "status"),
+    warmupMethods: checkValues(t, "warmup_method"),
+    hasEvidenceRun: has("evidence_run_id"),
+    adopts: t.columns
+      .map((c) => c.name)
+      .filter((n) => ["adopted_warmup_days", "recommended_replications"].includes(n)),
+  };
+}
+
+/**
+ * What a project deletion actually reaches — WP 5.2j.
+ *
+ * `exporting-and-deleting` said *"the relationships between tables are declared
+ * in the database, so a deletion follows them rather than relying on anybody
+ * remembering which tables were involved"*. Half of that is true. The other half
+ * is `delete-project/index.ts`, which deletes a HAND-WRITTEN LIST of tables by
+ * name before removing the project row — precisely the remembering the sentence
+ * said was not happening.
+ *
+ * Neither mechanism is wrong. What no page could say is the JOIN: how many
+ * project-scoped tables cascade, how many are swept by the list, which are
+ * deliberately detached instead of deleted, and whether anything is in neither
+ * set. The last number is the one worth publishing, because a table in neither
+ * set keeps its rows after the project that owned them is gone.
+ */
+export function deriveProjectDeletion(root) {
+  const j = introspected(root);
+  const scoped = j.tables.filter((t) => t.columns.some((c) => c.name === "project_id"));
+  if (scoped.length < 20) {
+    throw new Error(`chains: only ${scoped.length} tables carry project_id; the scan has broken`);
+  }
+  const fkTo = (t) => t.columns.find((c) => c.name === "project_id")?.references ?? null;
+
+  const src = readFileSync(join(root, "supabase", "functions", "delete-project", "index.ts"), "utf8");
+  if (!/deleteTableByProjectId\(/.test(src)) {
+    throw new Error(
+      "chains: delete-project no longer sweeps tables by name. Re-read it — the page states " +
+        "which tables are swept explicitly and which rely on a cascade.",
+    );
+  }
+  const swept = new Set([
+    ...[...src.matchAll(/deleteTableByProjectId\('(\w+)'\)/g)].map((m) => m[1]),
+    ...[...src.matchAll(/deleteByIds\('(\w+)'/g)].map((m) => m[1]),
+    // The disruption children are deleted by their profile id, not by project.
+    ...[...src.matchAll(/^\s+'(disruption_scenario_\w+)',$/gm)].map((m) => m[1]),
+  ]);
+  if (swept.size < 5) throw new Error(`chains: parsed ${swept.size} swept tables in delete-project`);
+
+  const cascade = [];
+  const detached = [];
+  const sweptOnly = [];
+  const neither = [];
+  for (const t of scoped) {
+    const r = fkTo(t);
+    const onDelete = r && r.table === "projects" ? String(r.on_delete ?? "").toUpperCase() : null;
+    if (onDelete === "CASCADE") cascade.push(t.name);
+    else if (onDelete === "SET NULL") detached.push(t.name);
+    else if (swept.has(t.name)) sweptOnly.push(t.name);
+    else neither.push(t.name);
+  }
+  return {
+    projectScoped: scoped.length,
+    cascade: cascade.length,
+    detached: detached.sort(),
+    sweptOnly: sweptOnly.sort(),
+    neither: neither.sort(),
+    /** The response is 202 before any row is touched — see the function. */
+    asynchronous: /status: 202/.test(src) && /Deletion started/.test(src),
+  };
+}
+
+/**
+ * The administrative routes, and the single capability that gates all of them —
+ * WP 5.2j.
+ *
+ * `admin-screens` listed seven paths by hand and the router declares nine: it
+ * was missing the dashboard at `/admin` and the per-user page at
+ * `/admin/users/:userId` — which is where the AI allow-list actually is, so the
+ * page pointed at the wrong screen for its own worked example.
+ *
+ * The gate is the fact that hand list could never carry. `PAGE_CAPABILITIES`
+ * declares ONE key for this whole area, and `pageKeyForPath` matches a path to
+ * the longest declared key it starts with — so `/admin/usage` resolves to
+ * `/admin` and every screen is gated by the same grant. Administrative access
+ * is all-or-nothing, and no amount of reading the seven-row table would say so.
+ */
+export function deriveAdminScreens(root) {
+  const app = readFileSync(join(root, "src", "App.tsx"), "utf8");
+  const routes = [...app.matchAll(/<Route path="(\/admin[^"]*)"[\s\S]{0,200}?<(Admin\w+)\s/g)].map(
+    (m) => ({ path: m[1], component: m[2] }),
+  );
+  if (routes.length < 5) {
+    throw new Error(
+      `chains: parsed ${routes.length} /admin routes from src/App.tsx; the router declares more. ` +
+        "Fix the scan rather than publishing a partial list of administrative screens.",
+    );
+  }
+  const caps = readFileSync(join(root, "src", "lib", "capabilities.generated.ts"), "utf8");
+  const pageBlock = /export const PAGE_CAPABILITIES: CapabilityMeta\[\] = \[([\s\S]*?)\n\];/.exec(caps);
+  if (!pageBlock) throw new Error("chains: PAGE_CAPABILITIES not found in capabilities.generated.ts");
+  const pageKeys = [...pageBlock[1].matchAll(/key: '([^']+)'/g)].map((m) => m[1]);
+  // The same longest-prefix rule `pageKeyForPath` uses.
+  const gateFor = (path) =>
+    pageKeys
+      .filter((k) => (k === "/" ? path === "/" : path === k || path.startsWith(k + "/")))
+      .sort((a, b) => b.length - a.length)[0] ?? null;
+  const gates = new Set(routes.map((r) => gateFor(r.path)).filter(Boolean));
+  if (gates.size === 0) {
+    throw new Error("chains: no page capability gates any /admin route — re-read pageKeyForPath");
+  }
+  return {
+    routes: routes.map((r) => ({ ...r, gate: gateFor(r.path) })),
+    gates: [...gates].sort(),
+    pageCapabilities: pageKeys.length,
+  };
+}
