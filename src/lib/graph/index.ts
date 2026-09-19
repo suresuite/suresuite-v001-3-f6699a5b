@@ -23,3 +23,4 @@ export * from './encoding';
 export * from './subgraph';
 export * from './focus';
 export * from './echelon';
+export * from './productGraph';

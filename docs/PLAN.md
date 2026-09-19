@@ -318,7 +318,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D133** | **`supply_chain_data.data_source_group` is documented as the column the network pages filter on, and no writer anywhere sets it.** The ETL never writes it; it is NULL on every row. A documented filter column that is always NULL is **T1** broken — a fact published about data that does not exist. Two honest outcomes, and only two: write it, or delete the column and the contract claim in the same commit | `supabase/functions/combine-project/index.ts:201-214,296-306,371-382` (the three insert shapes, none of which names it); `supabase/contract/supply_chain_data.contract.yaml` | **WP 8.2** |
 | **D134** | **`COALESCE(scdmt.level, 0)` serves an unknown depth to the ladder as `0`, and the ladder calls `0` a PRODUCT.** The multi-tier RPC substitutes zero for NULL in both of its branches. A NULL depth is *unknown*, and the page has an `unknown` case it can never reach, because the RPC answers the question before the page is asked it. **T1**: an unknown is reported as a confident wrong type rather than as unknown | `supabase/migrations/20250909200609_130a2cbf-bd6b-4485-b263-98202ce9c0d7.sql:44,66` | **WP 8.2** |
 | **D135** | **`mappingConfidence` is hardcoded `1.0` at every creation site, so the amber low-confidence border is unreachable dead code — a confidence signal that can only ever say "confident".** Five assignments, one constant. **T2** says substitution is visible at the point of display; a signal wired to a literal is the opposite: it looks like disclosure and carries no information. It CAN be computed honestly — a node whose lane roles disagree is genuinely low-confidence, which is exactly what D127 and D131 are about — so the choice is compute it or delete it | `src/pages/ProcessLevelNetwork.tsx:396,438,510` | **WP 8.3** **CLOSED (WP 8.3)**: it is computed from the one thing that genuinely makes a node's role uncertain — the data not placing it. A node whose echelon resolves to `unknown` carries 0 and every other node carries 1, so the amber border is reachable for the first time and means something when it appears |
-| **D136** | **Intermediate assemblies are discarded from the product graph, and the multi-level path hardcodes a zero consumption rate.** The flat-BOM projection keeps a node only `if (validInboundMaterials.has(nodeKey))` — a material that is purchased. A sub-assembly the plant builds appears in no `inbound_logistics` row, so it is skipped, and the product graph **structurally cannot** show sub-assemblies however deep the BOM is. In the same loop `material_consumption_rate: 0` is written as a literal, where the single-level path writes the real rate — so the same column means "the rate" on one project shape and "nothing" on the other | `supabase/functions/combine-project/index.ts:207,286,301` | **WP 8.2** |
+| **D136** | **"Intermediate assemblies are discarded" was HALF a defect, and the half that matters is the opposite of what this row first said.** The row read the flat-BOM projection's `validInboundMaterials` filter as data loss. **It is the Product-level view's intended abstraction**: that page is Supplier → purchased Material → finished Product → Customer, where the material is the one a supplier actually delivers and the product is the one a customer actually buys, and what the plant builds in between belongs to the Process-level view. Collapsing it is correct. **What was ACTUALLY wrong is the part the row did not name**: the deployed ETL does not collapse at all — it writes the bom lane as `material → IMMEDIATE PARENT`, one row per BOM row, so `supply_chain_data` holds the TREE and the page drew the tree. Every sub-assembly was then both a bom source and a bom target, and the grouping let the LAST ROW WIN, so it landed in the Material or the Product column depending on the order rows came back in. And the quantities were one hop of a path the view no longer draws: `weighted` is total outbound volume × that row's own consumption rate, which ignores the rest of the chain. **CLOSED (WP 8.4)** by `buildProductLevelGraph`: four echelons, the BOM collapsed to purchased-material → finished-product, and the flow PROPAGATED — the product's demand times the product of the consumption rates along every path, summed where a material reaches the same product more than one way. A purchased material that reaches no product is REPORTED to the user rather than dropped (T3). The hardcoded `material_consumption_rate: 0` on the edge function's multi-level path is untouched and still WP 8.2's | `supabase/migrations/20260915000004_org_identity_dual_read.sql:1853-1876` (the live ETL's immediate-parent bom lane); `src/lib/graph/productGraph.ts`; `src/lib/graph/__tests__/productGraph.test.ts` | **WP 8.4 ✅** *(the view; the ETL's own collapse remains WP 8.2's, and until it lands the page computes it)* |
 | **D137** | **Product-level's metrics come from a function that joins the FIRM table to material names on a bare string, and returns products as materials.** `get_network_metrics_for_materials` selects from `network_nodes` — the firm graph, which per D19 holds rows in **one** project — and keeps a row when `nn.uid` matches `from_location` OR `to_location` of a `bom` edge. `bom.to_location` is the finished PRODUCT, so products come back from a function named "for materials"; and `uid` is a firm identifier being matched against material ids, two naming universes with no declared relation between them. The table it reads is also the one D56 calls two tables in one | `supabase/migrations/20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql:51-58`; `src/pages/ProductLevelNetwork.tsx:251,457` | **WP 8.4** |
 | **D138** | **§16 was not contiguous, and its last twenty-one entries sat OUTSIDE the section every gate reads.** `check.mjs`'s `section16()` slices from `## 16.` to `## 17.`, which is correct. The document was not: entries from `WP 6.2 (slice 1)` onward had been appended AFTER §17's sequencing table, so R7's append-only half protected 38 entries and could not see 21, and R7's second half could not have noticed a done package whose entry landed there. It reads exactly like §16 to a person and not at all like §16 to the gate — the same shape as D101 and D105, arriving through a heading's POSITION rather than through a duplicated fact. **Found while placing this phase's own entry**, which is the only reason it was found at all. Closed by moving §17 to the end of the document, so §16 runs to it and Phase 8's section (§18) follows; `contract:check` then reports 59 entries where it reported 38, with no entry added | `scripts/data-contract/check.mjs`'s `section16` against the position of §17 | **WP 8.0 ✅** *(the move; and R7 re-reads 119 revisions of §16 against the new slice and holds)* |
 | **D139** | **"Work station" is fabricated. There is no routing, operation or work-centre table anywhere in `supabase/contract/`, and the label comes purely from `level === 1`.** It is **T1** broken in the plainest possible form: a noun on screen that no table in this database can produce, presented beside real ids. It is also load-bearing for a reader's mental model — a user shown "work station" reasonably concludes the product knows about their operations, and it does not. Deferred, not dropped: §14 carries the routings dataset, and until it lands the page is a multi-level BOM / product-structure view and must say so | `src/pages/ProcessLevelNetwork.tsx:205` | **WP 8.5 ✅ for the LABEL, and the rename is partial** — `getDisplayNodeType` no longer returns "work station"; the page title, the legend heading and the empty-state copy now say **multi-level bill of materials** and **Echelons**, so what a user reads at the point of display no longer asserts a process the data does not describe (T2 — visible where it is used, not in a log). It also stopped asserting `material level N`, because that column is not a depth (D140) and on the measured project it called 260 materials and 66 products "material level 2" at once. **The ROUTE, the sidebar entry and eight manual bodies keep the old name**: renaming those breaks every deep link and re-points eight `DocLink`s, which is D104's class and is named as follow-up in §18 rather than done in the same commit as a label |
@@ -15536,6 +15536,110 @@ commit.
    attempted here; named so the next package that edits a page with lineage entries
    is not surprised.
 
+
+### WP 8.3 + 8.4 — The pages read the data · 2026-09-19 · no migration
+
+**What the previous entry promised, and what a reader said about it.** WP 8.3 shipped
+`src/lib/graph/` with 85 tests and closed with the honest note that "the layer is
+built and read by nothing". A reader then said the only thing that matters:
+*I found no differences in the result, particularly for the deep tier project.*
+
+**They were right, and the cause was not subtle.** Three things were true at once:
+the migration adding `echelon` deploys on MERGE (`supabase-migrations.yml` is
+`branches: [main]`), no page referenced `echelon`, and **nothing imported
+`src/lib/graph/` at all**. Verified all three rather than assumed. A layer with no
+caller renders exactly what it replaced.
+
+**── WHAT THE PROCESS-LEVEL PAGE DOES NOW ──**
+
+It read `supply_chain_data_multi_tier.level` for every node's position, colour and
+label. On the reported project that column says **2 on all 397 bom rows** while
+`bom_multi_level` is four levels deep (§4 D140: two live writers, and the deployed one
+stamps a literal 2). So a four-level product structure rendered as ONE flat column,
+one colour, every node labelled `material level 2`, with suppliers in two columns four
+apart because the inbound lane carries levels 1 AND 5 from a single upload.
+
+Depth now comes from `bom_multi_level` — the table that owns it, which neither writer
+touches. Type comes from the LANE ROLES a node holds. A supplier's position is derived:
+one step beyond the deepest material it feeds, which is what both ETLs were reaching
+for with `max_level + 1` and got wrong only by computing it from the flattened copy.
+
+**── WHAT THE PRODUCT-LEVEL PAGE DOES NOW, AND THE READER SPECIFIED IT ──**
+
+Asked what the page should show, the answer was exact: *the real material from the
+supplier, the final product to the customer, and the edge logic considered
+appropriately.* Four echelons, the BOM collapsed, and the quantities recomputed.
+
+**That closed §4 D136 by inverting it.** The row called the flat projection's
+purchased-material filter data loss. It is the view's intended abstraction. What was
+actually wrong is what the row did not name: the deployed ETL does not collapse at all,
+so the page drew the BOM TREE, every sub-assembly was both a bom source and a bom
+target, and the grouping let the last row win — Material column or Product column
+depending on row order.
+
+**The edges are the half that is easy to get wrong.** Collapsing nodes while keeping
+the old weights leaves every material→product edge describing one BOM hop of a path it
+no longer draws — which is what `outbound_total × that row's own rate` already was.
+`buildProductLevelGraph` propagates the product's demand down the tree and SUMS the
+paths where a material reaches the same product more than one way. `productGraph.test.ts`
+pins it: a 3-deep chain at rates 2, 3, 4 with demand 10 gives **240**, not 20.
+
+**── FOUR CLASSIFIERS DELETED, AND THE RATCHET MADE IT COUNTABLE ──**
+
+`getNodeTypeFromLevel`, `getDisplayNodeType`, `buildGroupClassification`,
+`getLocationGroup`. The ratchet went **6 → 4 → 2** and it refused each step until the
+baseline shrank in the same commit, which is exactly what it was written for. Two
+remain, on `FirmLevelNetwork` and the orphaned `InteractiveNetworkSpace`.
+
+**`typedNodesFromLanes` is a MIRROR, not a ninth classifier.**
+`echelonMirror.test.ts` parses `classify_node_echelon`'s own branch order out of its
+migration and fails if the two diverge. The precedent is
+`ingest_normalize_at_promotion()` restating the generated unit module in SQL because
+SQL cannot import it; this is the inverse direction for the same reason. When the
+migration reaches production both pages swap to `useGraphNodes` and the mirror's
+callers disappear.
+
+**Also closed: D128 and D135.** The dedup guard now tests the key it writes, so
+`levelNodeCounts` counts nodes again — and fixing it exposed a second node-losing
+defect nothing had named: nodes were built from `from_location` in one pass and from
+`to_location` in a second that handled ONLY outbound targets, so **a BOM target that
+was never also a BOM source got no node at all** and every edge into it was skipped
+silently. On the reported project that is invisible purely because its sub-assemblies
+happen to be both. D135: `mappingConfidence` is computed from the one thing that makes
+a role uncertain — the data not placing it — so the amber border is reachable for the
+first time.
+
+**Verified:** `contract:check` ✓ · `contract:rehearse` ✓ 29 assertion files ·
+**902 tests ✓** (was 882) · `typecheck` ✓ 23 of 23 held · `check:docs` ✓ ·
+`vite build` ✓ · eslint **451**, one fewer than baseline, from the deleted classifiers.
+
+**Gap check.** Five findings.
+
+1. **The page computes what the ETL should produce, and that is a stated interim.**
+   Both pages now derive from source tables what a correct `combine` would have
+   written. It is the right place for TODAY — it needs no deploy and no re-run — and
+   the wrong place permanently: two pages each doing it is the shape D127 is about.
+   WP 8.2 moves the collapse and the depth into the one surviving writer, and these
+   derivations become a source swap.
+2. **The reported project's data is still stale and this changes nothing about it.**
+   369 lane rows against 321 source rows — 48 phantom supplier edges from an old
+   combine, with every freshness signal reporting fresh because deleting rows moves no
+   timestamp (D142). A user must re-run Combine, and until WP 8.2 the flattening comes
+   straight back when they do.
+3. **R12 went red twice from editing a page**, once per package, because four then
+   twelve sidecar lineage citations point at line numbers inside it. Caught in seconds
+   rather than in a quarter, which is what R12 is for — but the brittleness is real and
+   the durable fix is anchoring lineage on a TOKEN rather than a line, as §4's own R6
+   already does. Not attempted; named so the next package is not surprised.
+4. **I miscited five D-numbers** in the new comments, written from memory after the
+   renumber. Audited every one against §4's row titles and corrected. A citation
+   written from memory is D21's mechanism with a human in the loop instead of a
+   quarter.
+5. **Neither page has been run against the live database by this session.** Every claim
+   above is a test over the shape §15 measured, plus a clean `vite build`. That is
+   strong evidence about the derivation and no evidence about the render. The exit
+   criterion is a reader opening the preview.
+
 ---
 
 ## 17. Sequencing
@@ -15550,7 +15654,7 @@ commit.
 | 5 ✅ | 5.1 – 5.3 | lineage + the 80-page manual | 6 | **PHASE COMPLETE.** **5.1 ✅** · **5.3 ✅** · **5.2a–i ✅, all nine** — manual live at `/docs`; tree complete; **ALL FIFTEEN SECTIONS WRITTEN — 80 of 80 pages, zero stubs.** **5.2i** then added what all eighty were missing: a door a FIGURE can come through (**D109**). The manual had none — §6.5 records WP 5.2a declining to link the eleven diagrams in the artifact and drawing three SVGs instead, and 5.2b–g shipped sixty-six pages with zero. Sixteen slots are declared and open, each naming its page, its filename and what the diagram must show. 5.2b shipped twelve of twelve and **did NOT make the reassignment §12 told it to**: all four "unsidecarred" tables had been described by WP 3.2 and WP 4.3, so the instruction was stale rather than the tree wrong. It found that "which columns are computed" was authored TWICE (**D101**) and closed it by declaring `computed_by` in the contract, which `graphHashCoverage.test.ts` now reads instead of its own literal Set — 18 of 18, byte-identical. **D57 closed** alongside, with the typecheck gate the repository never had. **5.2c** renders the chains the SAME derivation `resolutionChains.test.ts` ratchets (`chains.mjs` bundles the module the gate uses), so the manual and the gate cannot disagree about which eleven break — and found that the Trust Report publishes two limits that are no longer true (**D103**). **5.2e** publishes WP 5.1's lineage at TABLE grain only — the one claim the grade supports — and found that three §4 citations became ambiguous the moment the manual gained a page named after a screen (**D104**). **5.2f** states I5 and I8 as unmet in the reader's words rather than describing a record that does not exist, and found `dataset_versions.hash_network`'s own description two tables behind the migration that changed it (**D105**). **5.2d** documents BOTH live disruption models without picking one, reads the stress battery from the engine rather than mining the archive's already-stale copy, and found that the phase brief's own trap list carried a defect WP 4.3 had closed (**D107**), plus the stress battery's absence from the registry export (**D106**). **5.2g** completes the manual and says the four uncomfortable things in the reader's words — client-asserted identity, "RLS: enabled" as a non-assurance with a THIRD indeterminate state, `min_project_role` declared everywhere and read by one path, and an API principal with no person behind it. **WP 5.2's exit gap check ran**: five described tables have no narrative page and `customers` is the one that matters (**D108**). **5.2j** closed the three §6.3 said were left — **D111** (`stress-tests` documented an engine library nothing calls), **D110** (eighty pages pointing at none of the templates, guides or the Colab notebook the product ships) and the **23 thin pages** — and in doing so found **seven more defects, six of them one shape**: two declarations, each correct read alone, disagreeing with nothing comparing them. **D112** six of seven stress presets name a disruption target the mapper cannot resolve, so the run completes with the disruption absent; **D113** the results table looks up measures by names the engine does not write, so 2 of 13 rows can appear and the Resilience Index is computed by no run at all; **D114** two of six recovery levers reach no engine plugin, while the policy grid's copy of the same list had already been narrowed; **D115** the synergy decomposition is another unreachable library and `ExperimentDesigner.tsx` has zero importers; **D116** the ERP connector was documented with the CSV path's guarantees; **D117** deleting a project leaves ten project-scoped tables behind, including the user's own policy decisions; **D118** `network_summary` names a `computed_by` that does not write it. **E3 — can a user reach this? — answered NO seven times across the eighty pages**, and is now step 5 of the method rather than something an author might think of. **Zero pages under 500 rendered words** (median 1 012, was 805), and the floor is a gate with an empty exemption list |
 | 6 | **6.1 – 6.5** | policy contract, researcher grade | — | **6.1 ✅** · **6.2 ✅** — twenty slices, eight rows closed that arrived while it ran, and FOUR remedies corrected by measurement rather than satisfied (D66, D87, D90, D96); see §16's closing entry. **6.3's five deliverables are DONE** — A1's vocabulary, A2's value-chain popover, A3's Trust Report through `report-render`, A5's Reproducibility Record and §5.4's acceptance test, plus D113 — **and it is NOT ✅, because `coverage.yaml` defers TEN result tables to it and R8 refused the mark.** That is the gate doing the one thing a habit cannot: a package can finish everything it describes and still not be finished. **6.4** carries six decision tables plus D112, D114 and D115's designer. **6.5 is NEW, created by 6.3's gap check**: two changes whose correctness is a fact about PRODUCTION — publishing `ingest-file` (D123) and dropping the computed entity columns (D88) — each needing a §15 reading either side, which no branch can take because both deploy workflows are `branches: [main]` |
 | 7+ | deferred | observations, estimation, backtesting | — | — |
-| **8** | **8.0 – 8.5** | **the graph layer — one node type, one graph layer** | — | **8.0 ✅** the seven §15 probes, and the numbers are NOT in yet: the package deliberately measures and changes nothing, because the diagnosis branches on a BOM depth no work-package session can read. Thirteen defects opened, **D127–D142**, two of which the measurement then CORRECTED from over-claims to latent (D129, D141). The root cause is in the contract already — there is **no type column on either edge table**, so **eight** classifiers each infer one at render time and disagree by construction, and the single `level` column carries **three** incompatible meanings between its writer, its contract and its reader. Two defects silently destroy data (**D128** a dedup guard testing a key it never writes; **D129** an edge emitted to `''` where the BOM root should be) and one label is fabricated outright (**D139** "work station", from `level === 1`, with no routing table anywhere in the contract). It also found **D138** — §16's last twenty-one entries sat AFTER §17 and so outside the slice every gate reads — and the numbering collision that made this Phase 8 rather than Phase 7 (§14 already owns `WP 7.1`, and D28 is owned by it). `check.mjs` now reads its roadmap from two ranges so a Phase 8 package is gated like a Phase 3 one, proved by making R7 fail with the package named. **AND THE SECOND §15 RUN IS WHY THE PACKAGE MATTERED**: the reported project's BOM is exactly four levels deep, so the ladder defect the brief predicted is LATENT there — and the map is wrong anyway, because **two live ETLs write both edge tables with different `level` rules** (**D140**, the finding of the package, and it rescopes WP 8.2 onto the SQL RPC because the edge function the brief named is the undeployed half). Also **D141** (the RPC invents a node called `ROOT`) and **D142** (nothing rebuilds the lane when its sources change, and every timestamp reports it fresh because a DELETE moves no `updated_at` — D12's lesson in a second place). **WP 8.1 ✅** — one classifier, and it found **D143**: the trigger that keeps the typed node projection in sync with the graph reads `NEW` in a STATEMENT-level context, so it has never fired once since 2025-08-29. Fixing it made two rehearsals go red with `forbidden`, because `rebuild_node_list` AUTHORIZES and a derivation running inside somebody else's INSERT can only refuse a writer the database already allowed — D66's shape in a derivation, closed by splitting discovery from authorization. **D132 closed**; **D127**'s data half landed. **WP 8.3 PARTIAL** — `src/lib/graph/` lands with 85 tests: one palette where there were five, encodings that carry data (area-scaled size, log-scaled width, position from the ECHELON and never from `level`), and the subgraph engine EXTRACTED from the orphaned fourth page under a parity suite that runs the original verbatim as a frozen witness. **Taken before WP 8.2 deliberately**: after WP 8.1 a page reading `echelon` and `bom_depth` is independent of `level` entirely, so the layer fixes the reported map without the ETL changing, and WP 8.2 can then alter `level` with nothing reading it. Found **D144** (`includeTerminals` is inverted, so the terminal-stop mechanism has never bounded a walk) and **D145** (a fixed `RETURNS TABLE` is a SECOND authoring of the schema — `get_node_list` could not carry WP 8.1's three columns, so a type that was authored, backfilled and constrained was invisible to every page). **The pages still classify**, and the two gates are RATCHETS that say so in numbers: 6 classifiers, 11/32/13/16/18 colour literals, each may only fall. **WP 8.5 PARTIAL** — the fabricated label is gone: `getDisplayNodeType` no longer returns "work station" (**D139**, a noun on screen no table in this database can produce), the title and empty state say **multi-level bill of materials**, the legend says **Echelons**, and the node panel labels the lane ordinate as the raw column it is. `material level N` went too, because on the measured project that string called 260 materials and 66 products "material level 2" at once. The ROUTE, the sidebar and eight manual bodies keep the old name deliberately — renaming those is D104's class and is named follow-up. **WP 8.2 and WP 8.4 remain** |
+| **8** | **8.0 – 8.5** | **the graph layer — one node type, one graph layer** | — | **8.0 ✅** the seven §15 probes, and the numbers are NOT in yet: the package deliberately measures and changes nothing, because the diagnosis branches on a BOM depth no work-package session can read. Thirteen defects opened, **D127–D142**, two of which the measurement then CORRECTED from over-claims to latent (D129, D141). The root cause is in the contract already — there is **no type column on either edge table**, so **eight** classifiers each infer one at render time and disagree by construction, and the single `level` column carries **three** incompatible meanings between its writer, its contract and its reader. Two defects silently destroy data (**D128** a dedup guard testing a key it never writes; **D129** an edge emitted to `''` where the BOM root should be) and one label is fabricated outright (**D139** "work station", from `level === 1`, with no routing table anywhere in the contract). It also found **D138** — §16's last twenty-one entries sat AFTER §17 and so outside the slice every gate reads — and the numbering collision that made this Phase 8 rather than Phase 7 (§14 already owns `WP 7.1`, and D28 is owned by it). `check.mjs` now reads its roadmap from two ranges so a Phase 8 package is gated like a Phase 3 one, proved by making R7 fail with the package named. **AND THE SECOND §15 RUN IS WHY THE PACKAGE MATTERED**: the reported project's BOM is exactly four levels deep, so the ladder defect the brief predicted is LATENT there — and the map is wrong anyway, because **two live ETLs write both edge tables with different `level` rules** (**D140**, the finding of the package, and it rescopes WP 8.2 onto the SQL RPC because the edge function the brief named is the undeployed half). Also **D141** (the RPC invents a node called `ROOT`) and **D142** (nothing rebuilds the lane when its sources change, and every timestamp reports it fresh because a DELETE moves no `updated_at` — D12's lesson in a second place). **WP 8.1 ✅** — one classifier, and it found **D143**: the trigger that keeps the typed node projection in sync with the graph reads `NEW` in a STATEMENT-level context, so it has never fired once since 2025-08-29. Fixing it made two rehearsals go red with `forbidden`, because `rebuild_node_list` AUTHORIZES and a derivation running inside somebody else's INSERT can only refuse a writer the database already allowed — D66's shape in a derivation, closed by splitting discovery from authorization. **D132 closed**; **D127**'s data half landed. **WP 8.3 PARTIAL** — `src/lib/graph/` lands with 85 tests: one palette where there were five, encodings that carry data (area-scaled size, log-scaled width, position from the ECHELON and never from `level`), and the subgraph engine EXTRACTED from the orphaned fourth page under a parity suite that runs the original verbatim as a frozen witness. **Taken before WP 8.2 deliberately**: after WP 8.1 a page reading `echelon` and `bom_depth` is independent of `level` entirely, so the layer fixes the reported map without the ETL changing, and WP 8.2 can then alter `level` with nothing reading it. Found **D144** (`includeTerminals` is inverted, so the terminal-stop mechanism has never bounded a walk) and **D145** (a fixed `RETURNS TABLE` is a SECOND authoring of the schema — `get_node_list` could not carry WP 8.1's three columns, so a type that was authored, backfilled and constrained was invisible to every page). **The pages still classify**, and the two gates are RATCHETS that say so in numbers: 6 classifiers, 11/32/13/16/18 colour literals, each may only fall. **WP 8.5 PARTIAL** — the fabricated label is gone: `getDisplayNodeType` no longer returns "work station" (**D139**, a noun on screen no table in this database can produce), the title and empty state say **multi-level bill of materials**, the legend says **Echelons**, and the node panel labels the lane ordinate as the raw column it is. `material level N` went too, because on the measured project that string called 260 materials and 66 products "material level 2" at once. The ROUTE, the sidebar and eight manual bodies keep the old name deliberately — renaming those is D104's class and is named follow-up. **WP 8.3 + 8.4 THEN MADE IT VISIBLE**, after a reader said the one thing that mattered — *no differences in the result*. They were right: the migration deploys on MERGE, no page referenced `echelon`, and nothing imported the layer at all. Now both pages read the data. Process-level takes depth from `bom_multi_level` (so a 4-deep BOM renders as 5 columns instead of 1) and type from the lane roles; Product-level is the four echelons the reader specified — Supplier → purchased Material → finished Product → Customer — with the BOM COLLAPSED and the flow PROPAGATED down the tree rather than one hop of it, plus edge width by flow and arrowheads. **Four classifiers deleted, ratchet 6 → 4 → 2.** **D128, D135, D136 closed** (D136 by inverting it: the collapse is the view's intent, drawing the tree was the bug). **WP 8.2 remains, and it is the one that matters next**: the pages compute what the ETL should write. |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -15837,7 +15941,49 @@ colour literals.** Every one of those numbers is countable and may only fall.
 `contract:rehearse` ✓ all three ways · `eslint` unchanged at 452 problems, so the
 module added none · `rehearsal/300` §6 mutation-tested two ways.
 
-### WP 8.4 — Close the UI gap, in both directions *(no migration)*
+### WP 8.4 — The two views say what they are — PARTIAL *(no migration)*
+
+**SPECIFIED BY THE READER, and the specification is what closed D136.** Asked what
+each page should show for a multi-tier BOM, the answer was exact: *Product-level maps
+the real material from the supplier and the final product to the customer, and the
+edge logic has to be considered appropriately.*
+
+That is four echelons —
+
+```
+Supplier → purchased Material → finished Product → Customer
+```
+
+— where the **material** is the one a supplier actually delivers (the purchased leaf
+of the BOM, not an intermediate the plant builds) and the **product** is the one a
+customer actually buys. Everything in between is the Process-level view's subject and
+is collapsed away here.
+
+**Nothing live produced that.** The deployed ETL writes the bom lane as
+`material → IMMEDIATE PARENT`, one row per BOM row, so `supply_chain_data` holds the
+TREE — and the page drew the tree, with every sub-assembly landing in the Material or
+the Product column depending on the order rows came back in, because the grouping let
+the last row win.
+
+**AND THE EDGES ARE THE HALF THAT IS EASY TO GET WRONG.** Collapsing nodes while
+keeping the old weights leaves every material→product edge describing one BOM hop of
+a path it no longer draws — which is what the ETL's `outbound_total × that row's own
+rate` already was. `buildProductLevelGraph` propagates the product's demand DOWN the
+tree (the product of the consumption rates along every path) and SUMS the paths where
+a material reaches the same product more than one way, because it is needed for all
+of them. A purchased material that reaches no product is reported to the user rather
+than dropped (T3).
+
+**Landed**: the four-echelon view, the collapse, propagated edge flows, **edge width
+by flow** (it was a flat 1.5 while `weighted` was loaded, stored and never rendered)
+and **arrowheads** (the lanes are directed and the graph read as undirected). Both of
+Product-level's classifiers are DELETED, so the ratchet is **2**, and both remaining
+ones are on pages this package did not touch.
+
+**Not landed**: the analytics transfer in the table below, and the encoding work on
+Process-level. Those are the rest of this package.
+
+### WP 8.4 — the gap table, both directions *(the remainder)*
 
 The gap is **not one-directional**, which is the finding the original report
 started from and half of it inverts. Process-level is the LARGER page and has

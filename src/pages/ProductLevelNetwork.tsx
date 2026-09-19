@@ -13,10 +13,12 @@ import {
   Connection,
   NodeMouseHandler,
   Position,
+  MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { supabase } from '@/integrations/supabase/client';
+import { buildProductLevelGraph, edgeWidthForFlow, maxFlow, GRAPH_INK, type FlatLaneRow } from '@/lib/graph';
 import { useAuth } from '@/hooks/useAuth';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -121,33 +123,21 @@ interface NetworkVisualizationProps {
   setIsCollapsed: (value: boolean) => void;
 }
 
-function buildGroupClassification(data: SupplyChainData[]): Record<string, GroupKey> {
-  const locationGroups: Record<string, GroupKey> = {};
-
-  // Group A: from_location where data_source = inbound
-  // Group B: from_location where data_source = BOM
-  // Group C: to_location where data_source = BOM
-  // Group D: to_location where data_source = outbound
-
-  data.forEach((d) => {
-    if (d.data_source === 'inbound') {
-      locationGroups[d.from_location] = 'A';
-      locationGroups[d.to_location] = 'B';
-    } else if (d.data_source === 'bom') {
-      locationGroups[d.from_location] = 'B';
-      locationGroups[d.to_location] = 'C';
-    } else if (d.data_source === 'outbound') {
-      locationGroups[d.from_location] = 'C';
-      locationGroups[d.to_location] = 'D';
-    }
-  });
-
-  return locationGroups;
-}
-
-function getLocationGroup(id: string, groupMap: Record<string, GroupKey>): GroupKey {
-  return groupMap[id] || 'A'; // Default to group A if not found
-}
+/**
+ * The four columns this page draws, DERIVED — WP 8.4 · §4 D127.
+ *
+ * `buildGroupClassification` and `getLocationGroup` used to live here. They assigned a
+ * node to a column by the LANE that produced each row, letting the last row win — so a
+ * sub-assembly, which is a bom source AND a bom target, landed in the Material column
+ * or the Product column depending on the order the rows came back from the database.
+ * `getLocationGroup` then defaulted anything unrecognised to **A, Supplier**, which is
+ * a value displayed for data that does not carry it (T1).
+ *
+ * Both are gone. `buildProductLevelGraph` resolves every node's echelon once, from the
+ * lane ROLES it holds rather than from one row, collapses the bill of materials to
+ * purchased-material → finished-product, and recomputes the edge flows so they describe
+ * the path actually drawn.
+ */
 
 export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: NetworkVisualizationProps) {
   const { user } = useAuth();
@@ -385,9 +375,16 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
           const norm = nodesArr.length > 2 ? 2 / ((nodesArr.length - 1) * (nodesArr.length - 2)) : 1;
           nodesArr.forEach(id => { btw[id] *= norm; });
 
-          // Filter to materials only (group B)
-          const groupMap = buildGroupClassification(rows as any);
-          const materials = nodesArr.filter(id => groupMap[id] === 'B');
+          // Materials only, from the ONE rule (WP 8.4 · §4 D127). This used to call
+          // `buildGroupClassification`, which assigns by lane with the LAST ROW
+          // WINNING — so which nodes counted as materials depended on the order the
+          // rows came back in, and a sub-assembly counted or did not at random.
+          const materialSet = new Set(
+            [...buildProductLevelGraph(rows as unknown as FlatLaneRow[]).nodes]
+              .filter(([, v]) => v.echelon === 'material')
+              .map(([id]) => id),
+          );
+          const materials = nodesArr.filter(id => materialSet.has(id));
           const allIds = nodesArr;
           const maxBtw = Math.max(...allIds.map(id => btw[id] ?? 0), 1);
           const maxClos = Math.max(...allIds.map(id => clos[id] ?? 0), 1);
@@ -568,21 +565,18 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
 
       setSupplierVolumes(aggregateSupplierVolumes(filteredData));
 
-      // Build group classification map based on data source logic
-      const groupMap = buildGroupClassification(filteredData);
-
+      // How many distinct materials each supplier delivers. Read off the INBOUND lane
+      // directly: that lane IS "a supplier delivers this material", so it needs no
+      // classification at all — which is why the group lookup it used to do was both
+      // indirect and order-dependent (§4 D127).
       const supplierMaterialMap: { [key: string]: Set<string> } = {};
       filteredData.forEach((d: SupplyChainData) => {
-        const fromGroup = getLocationGroup(d.from_location, groupMap);
-        const toGroup = getLocationGroup(d.to_location, groupMap);
-        
-        // Group A (inbound suppliers) -> Group B (BOM materials)
-        if (fromGroup === 'A' && toGroup === 'B') {
-          if (!supplierMaterialMap[d.from_location]) {
-            supplierMaterialMap[d.from_location] = new Set();
-          }
-          supplierMaterialMap[d.from_location].add(d.to_location);
-        }
+        if ((d.data_source ?? '').toLowerCase() !== 'inbound') return;
+        const supplier = (d.from_location ?? '').trim();
+        const material = (d.to_location ?? '').trim();
+        if (!supplier || !material) return;
+        if (!supplierMaterialMap[supplier]) supplierMaterialMap[supplier] = new Set();
+        supplierMaterialMap[supplier].add(material);
       });
       setSupplierMaterialCounts(
         Object.entries(supplierMaterialMap)
@@ -599,57 +593,104 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
       setSupplierMetrics(calculatedSupplierMetrics);
       setMaterialMetrics(calculatedMaterialMetrics);
 
+      // ── FOUR ECHELONS, AND THE BOM COLLAPSED (WP 8.4 · §4 D127, D136) ─────
+      //
+      // This page is Supplier → purchased Material → finished Product → Customer, and
+      // nothing else. The material is the one a supplier actually DELIVERS — the
+      // purchased leaf of the bill of materials — and the product is the one a customer
+      // actually BUYS. Everything the plant builds in between belongs to the
+      // Process-level view, and is collapsed away here.
+      //
+      // IT USED TO DRAW THE WHOLE BOM TREE. The deployed ETL writes the bom lane as
+      // `material → IMMEDIATE PARENT`, one row per BOM row, so `supply_chain_data`
+      // holds the tree and this page drew it. Worse, a sub-assembly is a bom
+      // `from_location` (a material) AND a bom `to_location` (a product), and
+      // `buildGroupClassification` assigned groups by lane with the LAST ROW WINNING —
+      // so every sub-assembly landed in the Material column or the Product column
+      // depending on the order the rows came back in.
+      //
+      // AND THE EDGES ARE RECOMPUTED, NOT JUST THE NODES. Collapsing nodes while
+      // keeping the old weights would leave every material→product edge describing one
+      // BOM hop of a path it no longer draws. `buildProductLevelGraph` propagates the
+      // product's demand down the tree — the product of the consumption rates along
+      // every path — and SUMS the paths when a material reaches the same product more
+      // than one way, because it is needed for all of them.
+      const productGraph = buildProductLevelGraph(filteredData);
+
       const nodeMap: { [key: string]: NodeData } = {};
       const edgeMap: { [key: string]: Edge } = {};
 
-      filteredData.forEach((d: SupplyChainData) => {
-        const fromGroup = getLocationGroup(d.from_location, groupMap);
-        const toGroup = getLocationGroup(d.to_location, groupMap);
+      const GROUP_OF_ECHELON: Record<string, GroupKey> = {
+        supplier: 'A',
+        material: 'B',
+        product: 'C',
+        customer: 'D',
+      };
 
-        if (!nodeMap[d.from_location]) {
-          nodeMap[d.from_location] = {
-            label: d.from_location,
-            type: 'location',
-            group: fromGroup,
-            incoming: 0,
-            outgoing: 0,
-            incomingFlow: 0,
-            outgoingFlow: 0,
-          };
-        }
-        if (!nodeMap[d.to_location]) {
-          nodeMap[d.to_location] = {
-            label: d.to_location,
-            type: 'location',
-            group: toGroup,
-            incoming: 0,
-            outgoing: 0,
-            incomingFlow: 0,
-            outgoingFlow: 0,
-          };
-        }
+      for (const [nodeId, { echelon }] of productGraph.nodes) {
+        nodeMap[nodeId] = {
+          label: nodeId,
+          type: 'location',
+          // The page's A/B/C/D columns, now DERIVED from the echelon rather than from
+          // whichever lane row was read last. `subassembly`, `plant` and `unknown`
+          // cannot appear here: this view has no column for them, which is what
+          // collapsing the BOM means.
+          group: GROUP_OF_ECHELON[echelon] ?? 'B',
+          incoming: 0,
+          outgoing: 0,
+          incomingFlow: 0,
+          outgoingFlow: 0,
+        };
+      }
 
-        nodeMap[d.from_location].outgoing++;
-        nodeMap[d.from_location].outgoingFlow += d.weighted;
-        nodeMap[d.to_location].incoming++;
-        nodeMap[d.to_location].incomingFlow += d.weighted;
+      for (const e of productGraph.edges) {
+        const from = nodeMap[e.source];
+        const to = nodeMap[e.target];
+        if (!from || !to) continue;
 
-        const edgeKey = `${d.from_location}-${d.to_location}`;
+        from.outgoing++;
+        from.outgoingFlow += e.flow;
+        to.incoming++;
+        to.incomingFlow += e.flow;
+
+        const edgeKey = `${e.source}-${e.target}`;
         if (!edgeMap[edgeKey]) {
           edgeMap[edgeKey] = {
             id: edgeKey,
-            source: d.from_location,
-            target: d.to_location,
+            source: e.source,
+            target: e.target,
             style: {
-              stroke: '#8C8C8C',
-              strokeWidth: 1.5,
-              strokeOpacity: 0.6,
+              stroke: GRAPH_INK.edge,
+              // WIDTH ENCODES FLOW. It was a flat 1.5 on every edge while `weighted`
+              // was loaded, stored and never rendered — an encoding carrying no data.
+              strokeWidth: edgeWidthForFlow(e.flow, maxFlow(productGraph.edges)),
+              strokeOpacity: 0.65,
             },
             type: 'straight',
-            data: { weight: d.weighted },
+            // DIRECTION IS VISIBLE. These lanes are directed and the graph read as
+            // undirected because nothing drew an arrowhead.
+            markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: GRAPH_INK.edge },
+            data: { weight: e.flow, lane: e.lane },
           };
         }
-      });
+      }
+
+      // T3 — a view states the limit of its own computation, at the point of display.
+      if (productGraph.unreachedMaterials.length > 0) {
+        const sample = productGraph.unreachedMaterials.slice(0, 5).join(', ');
+        toast.warning(
+          `${productGraph.unreachedMaterials.length} purchased material(s) reach no finished ` +
+            `product through the bill of materials, so they connect to nothing on this view: ` +
+            `${sample}${productGraph.unreachedMaterials.length > 5 ? ' …' : ''}. ` +
+            `Either the BOM does not link them, or their product is not in outbound logistics.`,
+          { duration: 10000 },
+        );
+      }
+      console.log(
+        `[ProductLevelNetwork] four echelons · ${Object.keys(nodeMap).length} nodes · ` +
+          `${Object.keys(edgeMap).length} edges · ${productGraph.collapsedIntermediates} ` +
+          `intermediate assemblies collapsed · ${productGraph.unreachedMaterials.length} materials reach no product`,
+      );
 
       // Filter out nodes with zero incoming and outgoing flow
       const originalNodeCount = Object.keys(nodeMap).length;

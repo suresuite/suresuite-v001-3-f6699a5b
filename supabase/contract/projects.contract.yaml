@@ -49,7 +49,7 @@ surfaces:
   - page: "ProductLevelNetwork.tsx"
     via: "rpc list_projects"
     grain: table
-    evidence: "src/pages/ProductLevelNetwork.tsx:206"
+    evidence: "src/pages/ProductLevelNetwork.tsx:196"
     confirmed: true
   - page: "ProjectIntelligence.tsx"
     via: "rpc list_projects"

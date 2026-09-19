@@ -46,7 +46,7 @@ Read follows project reachability. No user-facing write policy; uploads go throu
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:429` | yes |
-| `ProductLevelNetwork.tsx` | rpc get_network_metrics_for_materials | `src/pages/ProductLevelNetwork.tsx:251` | yes |
+| `ProductLevelNetwork.tsx` | rpc get_network_metrics_for_materials | `src/pages/ProductLevelNetwork.tsx:241` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -327,6 +327,6 @@ Upstream or downstream relative to the seed, as uploaded.
 
 ---
 
-*Generated from data contract `b7c6a2233640`, engine `0.2.3`,
+*Generated from data contract `9bd157787aaa`, engine `0.2.3`,
 sidecar `supabase/contract/network_edges.contract.yaml`, table created by `20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

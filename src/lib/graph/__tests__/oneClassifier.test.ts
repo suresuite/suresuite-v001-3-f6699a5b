@@ -33,7 +33,10 @@ const CLASSIFIER_DECL =
 
 /** The state on the day this gate landed. One name per classifier still in place. */
 const BASELINE: Record<string, string[]> = {
-  'src/pages/ProductLevelNetwork.tsx': ['buildGroupClassification', 'getLocationGroup'],
+  // WP 8.4 migrated this page too: both of its classifiers are GONE. It builds the
+  // four-echelon view through `buildProductLevelGraph`, which resolves a node's role
+  // from the lane ROLES it holds rather than from whichever row was read last.
+  'src/pages/ProductLevelNetwork.tsx': [],
   // WP 8.3 migrated this page: both of its classifiers are GONE. It reads `echelon`
   // from `typedNodesFromLanes` (the declared mirror of `classify_node_echelon`) and
   // maps to the legacy vocabulary in one place. Four remain, on three pages.
@@ -115,9 +118,10 @@ describe('one classifier — the ratchet that stops eight becoming nine', () => 
     // SQL's `classify_node_echelon` and the engine's master-table read are the other
     // two of the eight. Six are in `src/`, and this is the number that must fall.
     const total = Object.values(BASELINE).reduce((a, names) => a + names.length, 0);
-    // 6 when this gate landed; 4 since WP 8.3 migrated ProcessLevelNetwork. The number
-    // is asserted rather than described so a migration cannot happen quietly — and so
-    // the remaining work is a count a reader can check in one line.
-    expect(total).toBe(4);
+    // 6 when this gate landed · 4 after WP 8.3 migrated ProcessLevelNetwork · 2 after
+    // WP 8.4 migrated ProductLevelNetwork. Asserted rather than described, so a
+    // migration cannot happen quietly and the remaining work is a number a reader can
+    // check in one line: FirmLevelNetwork and the orphaned InteractiveNetworkSpace.
+    expect(total).toBe(2);
   });
 });

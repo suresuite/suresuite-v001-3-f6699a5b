@@ -52,7 +52,7 @@ surfaces:
   - page: "ProductLevelNetwork.tsx"
     via: "rpc project_freshness"
     grain: table
-    evidence: "src/pages/ProductLevelNetwork.tsx:237"
+    evidence: "src/pages/ProductLevelNetwork.tsx:227"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "rpc project_freshness"
