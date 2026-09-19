@@ -25,7 +25,7 @@ export default function NodeList() {
         </P>
         <P>
           Most of its rows are not typed by hand. They are refreshed from the chain you have already
-          uploaded, so a node appears here because an arc somewhere named it. You then add the parts
+          uploaded, so a node appears here because a lane somewhere named it. You then add the parts
           only you know: a description and a location.
         </P>
         <HowItLoads

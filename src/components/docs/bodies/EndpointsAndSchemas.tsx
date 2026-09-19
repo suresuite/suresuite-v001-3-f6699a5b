@@ -6,6 +6,7 @@
 // API instead of at a table.
 
 import { PageTitle, Section, P, Key, Callout, Prose, Term, DocLink, Provenance } from "@/components/docs/prose";
+import { FROZEN_CELL } from "@/components/shared/frozenCell";
 import { Badge } from "@/components/ui/badge";
 import { API_ERRORS, API_LIMITS, API_ROUTES } from "@/components/docs/generated/policy.generated";
 
@@ -107,7 +108,7 @@ export default function EndpointsAndSchemas() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Status</th>
+                <th className={`px-3 py-2 font-medium ${FROZEN_CELL}`}>Status</th>
                 <th className="px-3 py-2 font-medium">Code</th>
                 <th className="px-3 py-2 font-medium">What it means</th>
               </tr>
@@ -115,7 +116,9 @@ export default function EndpointsAndSchemas() {
             <tbody>
               {API_ERRORS.map((e) => (
                 <tr key={e.code} className="border-b border-border last:border-0 align-top">
-                  <td className="px-3 py-2 font-mono text-[12px] tabular-nums text-muted-foreground">
+                  <td
+                    className={`px-3 py-2 font-mono text-[12px] tabular-nums text-muted-foreground ${FROZEN_CELL}`}
+                  >
                     {e.status}
                   </td>
                   <td className="px-3 py-2 font-mono text-[12px] text-foreground">{e.code}</td>

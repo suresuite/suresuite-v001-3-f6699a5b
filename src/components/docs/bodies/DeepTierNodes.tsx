@@ -48,7 +48,7 @@ export default function DeepTierNodes() {
 
       <Callout title="The engine does not read this table">
         <p>
-          The simulation runs on the tier-2 chain — arcs, BOM, item masters. The deep-tier graph
+          The simulation runs on the tier-2 chain — lanes, BOM, item masters. The deep-tier graph
           feeds the network analyses and the firm-level map, not the simulation. So a change here
           changes centralities and prominence, and it does not change a fill rate.
         </p>

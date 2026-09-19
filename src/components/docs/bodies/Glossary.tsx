@@ -34,6 +34,8 @@ export default function Glossary() {
       <Section id="supply-chain" title="Supply chain and resilience">
         <Defs
           items={[
+            { term: "Lane", def: "One row of Inbound or Outbound Logistics: a supplier who can deliver a material, or a customer who buys a product, with the volume, price and lead time that go with it. A supply lane is inbound and a demand lane is outbound. This manual uses “lane” for those rows everywhere — if you meet “arc”, it is being used in the graph sense below." },
+            { term: "Arc", def: "A connection between two nodes on a network screen. Every lane is an arc, and so is every bill-of-materials row, so “arc” is the wider word and is used only where the subject is the drawn graph rather than the file a row came from." },
             { term: "Bill of materials (BOM)", def: "The list of materials, and how much of each, needed to make one unit of a product. Single-level means products consume materials directly; multi-level means materials consume other materials, to any depth." },
             { term: "Lead time", def: "Elapsed time between placing an order and receiving it. Given in any of the units on Units & conventions, and converted once, on the way in." },
             { term: "MOQ", def: "Minimum order quantity — the smallest amount a supplier will accept on one order. Ordering less is not possible, so a small requirement becomes a larger delivery." },

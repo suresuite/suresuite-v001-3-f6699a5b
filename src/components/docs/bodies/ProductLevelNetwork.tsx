@@ -27,7 +27,7 @@ export default function ProductLevelNetwork() {
         <P>
           Nodes are coloured by group, and the group is not something you set — it is worked out
           from which file the arc came from. A location that appears as the upstream end of an
-          inbound arc is a supplier; the downstream end of that same arc is a material, and so on
+          inbound lane is a supplier; the downstream end of that same arc is a material, and so on
           across the chain.
         </P>
         <Defs
@@ -44,7 +44,7 @@ export default function ProductLevelNetwork() {
               term: "Material",
               def: (
                 <>
-                  The downstream end of an inbound arc, and the upstream end of a{" "}
+                  The downstream end of an inbound lane, and the upstream end of a{" "}
                   <DocLink to="bom-single-level">BOM</DocLink> arc. Materials sit in the middle
                   because they are the only group that is both bought and consumed.
                 </>
@@ -59,7 +59,7 @@ export default function ProductLevelNetwork() {
                 </>
               ),
             },
-            { term: "Customer", def: <>The downstream end of an outbound arc.</> },
+            { term: "Customer", def: <>The downstream end of an outbound lane.</> },
           ]}
         />
         <Callout tone="limit" title="A node's group is inferred, so a mis-typed id becomes a new node">

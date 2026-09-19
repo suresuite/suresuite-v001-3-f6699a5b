@@ -3280,5 +3280,119 @@ export const ADMIN_SCREENS: AdminScreens = {
   "pageCapabilities": 12
 };
 
+/**
+ * Described tables with an unrestricted READ rule, and which roles hold it.
+ *
+ * `RefTable.rls.unrestricted` counts predicate-less policies and cannot say
+ * which command or which role — so a table with an open SELECT beside a
+ * restrictive write looks protected there and is not. §4 D28 records the
+ * class and its standing decision; this is the number a reader needs.
+ */
+export type ReadExposure = {
+  described: number;
+  open: { table: string; roles: string[] }[];
+  signedOut: string[];
+};
+
+export const READ_EXPOSURE: ReadExposure = {
+  "described": 48,
+  "open": [
+    {
+      "table": "approved_users",
+      "roles": [
+        "public"
+      ]
+    },
+    {
+      "table": "bom_multi_level",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "bom_single_level",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "capabilities",
+      "roles": [
+        "public"
+      ]
+    },
+    {
+      "table": "dataset_versions",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "inbound_logistics",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "outbound_logistics",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "policy_defaults",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "policy_overrides",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "project_role_capabilities",
+      "roles": [
+        "public"
+      ]
+    },
+    {
+      "table": "risk_data",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "role_capabilities",
+      "roles": [
+        "public"
+      ]
+    }
+  ],
+  "signedOut": [
+    "approved_users",
+    "bom_multi_level",
+    "bom_single_level",
+    "capabilities",
+    "dataset_versions",
+    "inbound_logistics",
+    "outbound_logistics",
+    "policy_defaults",
+    "policy_overrides",
+    "project_role_capabilities",
+    "risk_data",
+    "role_capabilities"
+  ]
+};
+
 export const CHAIN_COUNT = 38;
 export const BROKEN_COUNT = 11;

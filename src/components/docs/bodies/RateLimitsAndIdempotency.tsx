@@ -1,6 +1,7 @@
 // §6.3 section 14 — rate limits and idempotency.
 
 import { PageTitle, Section, P, Key, Callout, Defs, Term, DocLink, Provenance } from "@/components/docs/prose";
+import { FROZEN_CELL } from "@/components/shared/frozenCell";
 import { UNDESCRIBED } from "@/components/docs/generated/dataModel.generated";
 import { API_LIMITS } from "@/components/docs/generated/policy.generated";
 
@@ -41,7 +42,7 @@ export default function RateLimitsAndIdempotency() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-2 font-medium">If nothing is configured</th>
+                <th className={`px-4 py-2 font-medium ${FROZEN_CELL}`}>If nothing is configured</th>
                 <th className="px-4 py-2 font-medium">Per minute</th>
                 <th className="px-4 py-2 font-medium">Per day</th>
                 <th className="px-4 py-2 font-medium">Runs at once</th>
@@ -50,7 +51,9 @@ export default function RateLimitsAndIdempotency() {
             <tbody>
               {API_LIMITS.envs.map((e) => (
                 <tr key={e.env} className="border-b border-border last:border-0">
-                  <td className="px-4 py-2 font-mono text-[12px] text-foreground">sk_{e.env}_…</td>
+                  <td className={`px-4 py-2 font-mono text-[12px] text-foreground ${FROZEN_CELL}`}>
+                    sk_{e.env}_…
+                  </td>
                   <td className="px-4 py-2 tabular-nums text-muted-foreground">{e.rpm}</td>
                   <td className="px-4 py-2 tabular-nums text-muted-foreground">{e.rpd}</td>
                   <td className="px-4 py-2 tabular-nums text-muted-foreground">{e.maxConcurrentRuns}</td>

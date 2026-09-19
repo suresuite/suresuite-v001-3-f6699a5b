@@ -111,7 +111,7 @@ export default function FirmLevelNetwork() {
 
       <Callout tone="limit" title="The simulation does not read this graph">
         <p>
-          The engine runs on the tier-2 chain — arcs, bills of materials, item masters. The
+          The engine runs on the tier-2 chain — lanes, bills of materials, item masters. The
           deep-tier graph feeds the network analyses and this map, and nothing else. So a change
           here moves a centrality and does not move a fill rate.
         </p>

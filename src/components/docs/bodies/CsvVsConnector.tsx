@@ -48,7 +48,7 @@ export default function CsvVsConnector() {
           The file route loads {datasets} datasets. The connector loads one.
         </Key>
         <P>
-          Uploading covers your whole chain — arcs, bills of materials, item masters, the deep-tier
+          Uploading covers your whole chain — lanes, bills of materials, item masters, the deep-tier
           network. The ERP connector brings across <strong>products</strong>, and nothing else. Every
           other table is a file, whether or not you have a connector configured.
         </P>

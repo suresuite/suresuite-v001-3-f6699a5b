@@ -26,7 +26,7 @@ export default function ConnectingErp() {
         </P>
         <P>
           <strong>One system is supported today and it brings across products.</strong> Your other
-          tables — arcs, bills of materials, materials, suppliers, the deep-tier network — are files
+          tables — lanes, bills of materials, materials, suppliers, the deep-tier network — are files
           whether or not a link exists. <DocLink to="csv-vs-connector">CSV or connector</DocLink>{" "}
           sets out what that means for how you build a model.
         </P>

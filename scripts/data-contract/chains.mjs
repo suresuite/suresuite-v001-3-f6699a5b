@@ -1346,3 +1346,57 @@ export function deriveAdminScreens(root) {
     pageCapabilities: pageKeys.length,
   };
 }
+
+/**
+ * How wide the READ rules actually are — WP 5.2j.
+ *
+ * `who-can-see-your-data` already computes the tables whose rules ALL permit
+ * every row, and reports three. That measure answers "is this table
+ * unprotected", and it is not the question a reader asks. `inbound_logistics`
+ * carries a restrictive write rule beside `FOR SELECT USING (true)` granted to
+ * `authenticated` AND `anon` — so it is not in the three, and every row of it is
+ * readable by anyone holding the key the browser bundle ships.
+ *
+ * §4 D28 already records the class and its standing decision (document, do not
+ * change, until there is an auth model — WP 7.1). What no page had was the READ
+ * number, so the manual's most consequential page reported 3 where a reader's
+ * question answers 12.
+ *
+ * `reference.generated.ts` counts policies and cannot carry this: it records how
+ * many policies have no predicate, not which COMMAND they are for or which role
+ * holds them. Both are in the introspected schema.
+ */
+export function deriveReadExposure(root) {
+  const j = introspected(root);
+  const contract = JSON.parse(readFileSync(join(root, "build", "data-contract.generated.json"), "utf8"));
+  const described = Object.keys(contract.tables ?? {});
+  if (described.length < 20) throw new Error("chains: the generated contract describes too few tables to trust");
+
+  const open = [];
+  for (const name of described) {
+    const t = j.tables.find((x) => x.name === name);
+    if (!t?.rls) continue;
+    const roles = new Set();
+    let unrestrictedRead = false;
+    for (const p of t.rls.policies ?? []) {
+      const cmd = String(p.command ?? "").toUpperCase();
+      if (cmd !== "SELECT" && cmd !== "ALL") continue;
+      if (String(p.using ?? "").trim() !== "true") continue;
+      unrestrictedRead = true;
+      for (const r of p.roles ?? []) roles.add(r);
+      if ((p.roles ?? []).length === 0) roles.add("public");
+    }
+    if (unrestrictedRead) open.push({ table: name, roles: [...roles].sort() });
+  }
+  // A scan that found none would let the page print a reassurance. §4 D28
+  // measured 27 tables with a predicate-less policy across the whole schema, so
+  // zero among the described ones means the scan broke, not that it was fixed.
+  if (open.length === 0) {
+    throw new Error(
+      "chains: no described table has an unrestricted read policy. §4 D28 records this class " +
+        "as open and unchanged — verify against the migrations before letting the page say so.",
+    );
+  }
+  const signedOut = open.filter((t) => t.roles.includes("anon") || t.roles.includes("public"));
+  return { described: described.length, open, signedOut: signedOut.map((t) => t.table) };
+}
