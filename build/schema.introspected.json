@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 339,
-  "migrations_applied": 331,
+  "migrations_found": 340,
+  "migrations_applied": 332,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260919000010_anon_policies_widen.sql",
+  "last_migration": "20260919000011_prefer_the_session.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -22715,11 +22715,11 @@
       "name": "get_current_user_id",
       "signature": "get_current_user_id()",
       "args": [],
-      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "returns": "uuid LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250820170403_a64f741a-c7b6-487d-9467-701e97492d9d.sql"
+      "volatility": "STABLE",
+      "comment": "Resolves the acting user: a Supabase session that names an approved user, else the ",
+      "defined_by": "20260919000011_prefer_the_session.sql"
     },
     {
       "name": "get_current_user_org_id",

@@ -267,9 +267,24 @@ function emitRls(artifact) {
   const out = [];
   for (const t of artifact.tables) {
     const rls = t.rls || {};
-    if (!rls.enabled) continue;
-    out.push(`ALTER TABLE ${q(t.schema)}.${q(t.name)} ENABLE ROW LEVEL SECURITY;`);
-    if (rls.forced) out.push(`ALTER TABLE ${q(t.schema)}.${q(t.name)} FORCE ROW LEVEL SECURITY;`);
+
+    // ENABLING RLS AND CREATING POLICIES ARE TWO DECISIONS, AND THIS USED TO MAKE THEM
+    // ONE (§4 D134). A single `if (!rls.enabled) continue` skipped a table's POLICIES
+    // as well as its `ENABLE ROW LEVEL SECURITY` — so for a table whose RLS state the
+    // introspector cannot determine (`rls.determinate: false`, which it defaults to
+    // `enabled: false`), every policy the artifact records was silently dropped from
+    // every rehearsed database. `materials`, `products` and `suppliers` are exactly
+    // that case, and the consequence is that an assertion about one of their policies
+    // could not fail: the policy was not there to be wrong.
+    //
+    // PostgreSQL is happy to hold a policy on a table with RLS disabled — it simply
+    // does not enforce it — so creating them unconditionally is strictly more faithful
+    // to the artifact, and the `enabled` flag now governs only the ALTER it describes.
+    if (rls.enabled) {
+      out.push(`ALTER TABLE ${q(t.schema)}.${q(t.name)} ENABLE ROW LEVEL SECURITY;`);
+      if (rls.forced) out.push(`ALTER TABLE ${q(t.schema)}.${q(t.name)} FORCE ROW LEVEL SECURITY;`);
+    }
+
     for (const p of rls.policies || []) {
       const to = p.roles && p.roles.length ? ` TO ${p.roles.map(q).join(", ")}` : "";
       const bits = [
