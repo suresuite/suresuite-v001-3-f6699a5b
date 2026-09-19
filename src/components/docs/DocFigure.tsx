@@ -80,6 +80,22 @@ const FILES: Record<string, string> = Object.fromEntries(
  * Raster files still go through `FILES` and stay `<img>`. They have no cascade
  * to join.
  */
+/**
+ * An SVG's comments are for the repository, not for the page.
+ *
+ * Every figure file opens with the sources its elements were taken from —
+ * which generated module, which component, which engine constant — because
+ * that is what makes a drawing checkable rather than merely confident. None of
+ * it belongs in the DOM: it is bytes in the DocPage chunk that no reader can
+ * see, and `bodies.test.tsx` found the sharper reason first. Those citations
+ * name code in backticks, the comments are inlined verbatim by
+ * `dangerouslySetInnerHTML`, and the suite fails a page that prints a raw
+ * backtick outside a `<code>` element — correctly, because a stray backtick in
+ * rendered prose is exactly the markdown-leaking-through defect that rule
+ * exists to catch. So the notes stay in the file and stop at the boundary.
+ */
+const stripComments = (svg: string) => svg.replace(/<!--[\s\S]*?-->/g, "").trim();
+
 const SVG_SOURCE: Record<string, string> = Object.fromEntries(
   Object.entries(
     import.meta.glob("../../assets/manual/*.svg", {
@@ -87,7 +103,7 @@ const SVG_SOURCE: Record<string, string> = Object.fromEntries(
       query: "?raw",
       import: "default",
     }) as Record<string, string>,
-  ).map(([path, src]) => [path.split("/").pop() as string, src]),
+  ).map(([path, src]) => [path.split("/").pop() as string, stripComments(src)]),
 );
 
 /** Slots by id, built from the manifest so an id can only be wrong in one place. */

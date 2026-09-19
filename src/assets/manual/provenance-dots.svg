@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 376" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- A SCHEMATIC of the grid's cells, not a capture of a real project. The dot
+       colours are the product's own (PROVENANCE in policyGridUi.tsx, via LAYER
+       in piUi.tsx) and are fixed hexes rather than theme tokens, because the
+       colour IS the mark. The three-way and two-way shares are the grid's own
+       legend, quoted. -->
+
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">Six cells from the grid, enlarged.</text>
+
+  <!-- ══ the cells ════════════════════════════════════════════════════ -->
+  <!-- 1 · from project data -->
+  <rect x="4" y="26" width="92" height="34" rx="2" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="12" y="48" font-size="12" fill="hsl(var(--foreground))">1 200</text>
+  <circle cx="88" cy="34" r="3.5" fill="#14b8c4"/>
+
+  <!-- 2 · derived fallback -->
+  <rect x="104" y="26" width="92" height="34" rx="2" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="112" y="48" font-size="12" fill="hsl(var(--foreground))">≈ 6.5</text>
+  <circle cx="188" cy="34" r="3.5" fill="#e0930b"/>
+
+  <!-- 3 · saved override -->
+  <rect x="204" y="26" width="92" height="34" rx="2" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="212" y="48" font-size="12" fill="hsl(var(--foreground))">14</text>
+  <circle cx="288" cy="34" r="3.5" fill="#7c3aed"/>
+
+  <!-- 4 · imputed -->
+  <rect x="4" y="68" width="92" height="34" rx="2" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="12" y="90" font-size="12" fill="hsl(var(--foreground))">3.2</text>
+  <circle cx="88" cy="76" r="3.5" fill="#BF2330"/>
+
+  <!-- 5 · declared meaning of empty -->
+  <rect x="104" y="68" width="92" height="34" rx="2" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="112" y="90" font-size="12" fill="hsl(var(--foreground))">∞</text>
+  <circle cx="188" cy="76" r="3.5" fill="#e0930b"/>
+
+  <!-- 6 · bundle default — NO DOT -->
+  <rect x="204" y="68" width="92" height="34" rx="2" fill="hsl(var(--card))" stroke="hsl(var(--destructive))" stroke-width="1.4"/>
+  <text x="212" y="90" font-size="12" fill="hsl(var(--foreground))">7</text>
+
+  <!-- ══ what each one says ══════════════════════════════════════════ -->
+  <line x1="4" y1="116" x2="316" y2="116" stroke="hsl(var(--border))" stroke-width="1"/>
+
+  <circle cx="10" cy="132" r="4" fill="#14b8c4"/>
+  <text x="22" y="136" font-size="12" fill="hsl(var(--foreground))">From project data · from item master</text>
+  <text x="22" y="148" font-size="12" fill="hsl(var(--muted-foreground))">You uploaded it. Two states, one dot.</text>
+
+  <circle cx="10" cy="168" r="4" fill="#e0930b"/>
+  <text x="22" y="172" font-size="12" fill="hsl(var(--foreground))">Derived (≈) · suggested · declared</text>
+  <text x="22" y="184" font-size="12" fill="hsl(var(--foreground))">meaning of empty</text>
+  <text x="22" y="197" font-size="12" fill="hsl(var(--muted-foreground))">We supplied it. THREE states, one dot —</text>
+  <text x="22" y="209" font-size="12" fill="hsl(var(--muted-foreground))">the legend under the grid says which.</text>
+
+  <circle cx="10" cy="229" r="4" fill="#7c3aed"/>
+  <text x="22" y="233" font-size="12" fill="hsl(var(--foreground))">Saved override</text>
+  <text x="22" y="245" font-size="12" fill="hsl(var(--muted-foreground))">You changed it. A re-upload will not.</text>
+
+  <circle cx="10" cy="265" r="4" fill="#BF2330"/>
+  <text x="22" y="269" font-size="12" fill="hsl(var(--foreground))">Imputed project average — verify</text>
+  <text x="22" y="281" font-size="12" fill="hsl(var(--muted-foreground))">An average stood in. Check these.</text>
+
+  <!-- ══ the gap ═════════════════════════════════════════════════════ -->
+  <rect x="4" y="298" width="312" height="72" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--destructive))" stroke-width="1"/>
+  <circle cx="16" cy="316" r="4" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.2" stroke-dasharray="1.5 1.5"/>
+  <text x="30" y="320" font-size="12" fill="hsl(var(--foreground))">No dot at all — bundle default.</text>
+  <text x="12" y="338" font-size="12" fill="hsl(var(--muted-foreground))">The one state with no mark, and the one the</text>
+  <text x="12" y="350" font-size="12" fill="hsl(var(--muted-foreground))">legend does not list. A cell showing a number</text>
+  <text x="12" y="362" font-size="12" fill="hsl(var(--muted-foreground))">nothing in your data produced looks exactly</text>
+  <text x="12" y="374" font-size="12" fill="hsl(var(--muted-foreground))">like a plain cell. That is a real gap.</text>
+</svg>

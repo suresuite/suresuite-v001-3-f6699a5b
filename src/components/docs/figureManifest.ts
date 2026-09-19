@@ -95,7 +95,7 @@ export const FIGURE_SLOTS: FigureSlot[] = [
   {
     id: "chain-shape",
     page: "inbound-logistics",
-    file: null,
+    file: "chain-shape.svg",
     title: "Where an inbound row sits",
     alt:
       "A supply chain drawn left to right — suppliers, materials, the plant, products, " +
@@ -109,7 +109,7 @@ export const FIGURE_SLOTS: FigureSlot[] = [
   {
     id: "two-periods",
     page: "units-and-time-periods",
-    file: null,
+    file: "two-periods.svg",
     title: "time_unit governs volume; lead_time is weeks",
     alt:
       "One inbound row with two period-bearing columns picked out: time_unit pointing only at " +
@@ -123,7 +123,7 @@ export const FIGURE_SLOTS: FigureSlot[] = [
   {
     id: "bom-depth",
     page: "bom-multi-level",
-    file: null,
+    file: "bom-depth.svg",
     title: "The same tree, two files",
     alt:
       "A bill of materials tree with three levels on the left, and the same tree collapsed to " +
@@ -141,7 +141,7 @@ export const FIGURE_SLOTS: FigureSlot[] = [
   {
     id: "resolution-order",
     page: "how-policies-work",
-    file: null,
+    file: "resolution-order.svg",
     title: "What wins",
     alt:
       "The resolver's nine steps as a ladder, checked top to bottom, with the first match " +
@@ -155,46 +155,64 @@ export const FIGURE_SLOTS: FigureSlot[] = [
   {
     id: "provenance-dots",
     page: "where-a-number-came-from",
-    file: null,
+    file: "provenance-dots.svg",
     title: "The marks, on a real grid",
     alt:
-      "A close-up of several policy grid cells, each carrying a different provenance mark, " +
-      "with the meaning of each written beside it.",
-    caption: "A screenshot of the real grid beats any table of colours.",
+      "A DRAWN close-up of six policy-grid cells, each carrying a different provenance mark, " +
+      "with the meaning of each written beside it. Two dots stand for more than one state — " +
+      "teal for both project data and item master, amber for all three of derived, suggested " +
+      "and the declared meaning of empty — and the sixth cell, a bundle default, carries no " +
+      "mark at all.",
+    caption:
+      "The dot colours are the grid's own. Five marks cover eight states, and the ninth — a " +
+      "bundle default — has no mark and no legend entry, so it looks exactly like a plain cell.",
     shows:
-      "Actual cells from /policies at readable size, covering at least: a value from data, a " +
-      "derived fallback, a saved override, and an UNMARKED bundle default — the last one is " +
-      "the gap this page has to make visible.",
+      "A value from data, a derived fallback, a saved override, an imputed average, the " +
+      "declared meaning of an empty cell, and an UNMARKED bundle default — the last is the gap " +
+      "this page has to make visible. **It is a SCHEMATIC and says so (F5): this package could " +
+      "not produce a capture of a real project, and a drawn grid presented as a screenshot is " +
+      "a fabricated record.** Supersede it with a real capture when one exists. Take the dot " +
+      "COLOURS from PROVENANCE in policyGridUi.tsx — they are fixed product hexes rather than " +
+      "theme tokens, because there the colour IS the mark — and take the shares from the " +
+      "grid's own ProvenanceLegend, which already declares them.",
   },
 
   // ── 7 · Experiments & scenarios ─────────────────────────────────────────
   {
     id: "disruption-models",
     page: "disruptions",
-    file: null,
+    file: "disruption-models.svg",
     title: "Two shapes for one idea",
     alt:
-      "Side by side: a single row holding a whole disruption, and the same disruption split " +
-      "into a profile with targets, effects and settings beneath it.",
+      "The two shapes one above the other at the same weight: first a single row holding a " +
+      "whole disruption, then the same disruption split into a profile with targets, effects " +
+      "and settings cascading from it. A crossed-out link at the foot says nothing migrated " +
+      "between them.",
     caption: "Both are live. Neither reads the other.",
     shows:
-      "The one-row shape and the four-table shape beside each other, at the same scale, with " +
+      "The one-row shape and the four-table shape at the same scale and the same weight, with " +
       "NEITHER marked as preferred — the choice has not been made and the drawing must not " +
-      "make it. The cascade from profile to its three children.",
+      "make it. The cascade from profile to its three children. Stacked rather than side by " +
+      "side, because at 320 units two four-row columns cannot hold a table name at 12px, and " +
+      "equal weight is the requirement here, not equal x-position.",
   },
   {
     id: "replications",
     page: "seeds-replications-confidence",
-    file: null,
+    file: "replications.svg",
     title: "Why one run is not an answer",
     alt:
-      "Several simulation runs of the same model plotted together, spreading into a band, " +
-      "with the mean and the confidence interval drawn over them.",
-    caption: "The same model, different draws. The band is the answer; the line alone is not.",
+      "Above: five runs of one model plotted together, spreading into a band, with the mean " +
+      "over them and the warm-up weeks shaded and marked excluded. Below: two models as mean " +
+      "and interval, where B's mean is higher than A's and the two intervals overlap.",
+    caption:
+      "The same model, different draws. The band is the answer; the line alone is not — and " +
+      "where two bands overlap, the better-looking mean is not yet a better model.",
     shows:
-      "Real replication traces if possible, not a schematic. The warm-up period shaded and " +
-      "excluded. Two models whose means are close but whose bands overlap — the case where " +
-      "the difference is not real.",
+      "The warm-up shaded and excluded, the spread of several replications, and the case that " +
+      "matters: two models whose means differ and whose intervals overlap. **DRAWN, and the " +
+      "figure says so (F5)** — real traces would be better and this package had no run to take " +
+      "them from. Supersede it with real ones rather than redrawing it.",
   },
 
   // ── 8 · Networks ────────────────────────────────────────────────────────
@@ -259,7 +277,7 @@ export const FIGURE_SLOTS: FigureSlot[] = [
   {
     id: "series-vs-mean",
     page: "per-item-time-series",
-    file: null,
+    file: "series-vs-mean.svg",
     title: "The shape the average hides",
     alt:
       "Two weekly fill-rate series with the same mean: one flat and slightly short, one " +
@@ -378,7 +396,7 @@ export const FIGURE_SLOTS: FigureSlot[] = [
   {
     id: "three-gates",
     page: "who-can-see-your-data",
-    file: null,
+    file: "three-gates.svg",
     title: "Three gates, two decisions",
     alt:
       "A write passing three checks — the database's row rules, the capability catalog, and " +

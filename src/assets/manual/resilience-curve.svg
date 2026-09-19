@@ -41,7 +41,7 @@
 
   <!-- disruption start -->
   <line x1="106" y1="26" x2="106" y2="156" stroke="hsl(var(--foreground))" stroke-width="1" stroke-dasharray="3 2"/>
-  <text x="103" y="22" text-anchor="end" font-size="12" fill="hsl(var(--foreground))">disruption starts</text>
+  <text x="4" y="22" font-size="12" fill="hsl(var(--foreground))">disruption starts</text>
 
   <!-- the three weeks recovery has to hold for -->
   <path d="M261 46 L261 41 L292 41 L292 46" fill="none" stroke="hsl(var(--foreground))" stroke-width="1.2"/>

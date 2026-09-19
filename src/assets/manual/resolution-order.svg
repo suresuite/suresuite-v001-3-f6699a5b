@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 372" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- The resolver's nine steps, in order. Every step name and gloss is a row of
+       RESOLUTION_ORDER in policy.generated.ts — the resolver's own precedence,
+       not a retelling of it. Drawn as one resolution rather than a list: rung 4
+       answers, so rungs 5-9 are never reached. -->
+
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">Checked top to bottom. First answer wins.</text>
+
+  <!-- ── rungs 1-3: asked, no answer ────────────────────────────────── -->
+  <circle cx="14" cy="38" r="6" fill="none" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="28" y="36" font-size="12" fill="hsl(var(--foreground))">draft</text>
+  <text x="28" y="49" font-size="12" fill="hsl(var(--muted-foreground))">an unsaved edit in this session</text>
+
+  <circle cx="14" cy="70" r="6" fill="none" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="28" y="68" font-size="12" fill="hsl(var(--foreground))">master</text>
+  <text x="28" y="81" font-size="12" fill="hsl(var(--muted-foreground))">a value from an item master file</text>
+
+  <circle cx="14" cy="102" r="6" fill="none" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="28" y="100" font-size="12" fill="hsl(var(--foreground))">derived</text>
+  <text x="28" y="113" font-size="12" fill="hsl(var(--muted-foreground))">worked out from your other uploads</text>
+
+  <line x1="14" y1="44" x2="14" y2="64" stroke="hsl(var(--border))" stroke-width="1.4"/>
+  <line x1="14" y1="76" x2="14" y2="96" stroke="hsl(var(--border))" stroke-width="1.4"/>
+  <line x1="14" y1="108" x2="14" y2="128" stroke="hsl(var(--border))" stroke-width="1.4"/>
+
+  <!-- ── rung 4: the one that answers ───────────────────────────────── -->
+  <rect x="4" y="122" width="312" height="38" rx="3" fill="hsl(var(--muted))" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <circle cx="14" cy="134" r="6" fill="hsl(var(--foreground))"/>
+  <text x="28" y="138" font-size="12" fill="hsl(var(--foreground))">dataRow — the value on the row itself</text>
+  <text x="28" y="153" font-size="12" fill="hsl(var(--foreground))">This one answers. Everything below stops.</text>
+
+  <!-- ── rungs 5-9: never consulted ─────────────────────────────────── -->
+  <circle cx="14" cy="182" r="6" fill="none" stroke="hsl(var(--border))" stroke-width="1.2"/>
+  <text x="28" y="186" font-size="12" fill="hsl(var(--muted-foreground))">savedOverride</text>
+
+  <circle cx="14" cy="208" r="6" fill="none" stroke="hsl(var(--border))" stroke-width="1.2"/>
+  <text x="28" y="212" font-size="12" fill="hsl(var(--muted-foreground))">suggestion</text>
+
+  <circle cx="14" cy="234" r="6" fill="none" stroke="hsl(var(--border))" stroke-width="1.2"/>
+  <text x="28" y="238" font-size="12" fill="hsl(var(--muted-foreground))">bundle.family</text>
+
+  <circle cx="14" cy="260" r="6" fill="none" stroke="hsl(var(--border))" stroke-width="1.2"/>
+  <text x="28" y="264" font-size="12" fill="hsl(var(--muted-foreground))">bundle.families</text>
+
+  <circle cx="14" cy="286" r="6" fill="none" stroke="hsl(var(--border))" stroke-width="1.2"/>
+  <text x="28" y="290" font-size="12" fill="hsl(var(--muted-foreground))">undefined — the cell's own default</text>
+
+  <g stroke="hsl(var(--border))" stroke-width="1.4" stroke-dasharray="3 3">
+    <line x1="14" y1="160" x2="14" y2="176"/>
+    <line x1="14" y1="188" x2="14" y2="202"/>
+    <line x1="14" y1="214" x2="14" y2="228"/>
+    <line x1="14" y1="240" x2="14" y2="254"/>
+    <line x1="14" y1="266" x2="14" y2="280"/>
+  </g>
+
+  <!-- the bracket that says what the greyed rungs mean -->
+  <path d="M170 172 L178 172 L178 296 L170 296" fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="1.2"/>
+  <text x="186" y="222" font-size="12" fill="hsl(var(--muted-foreground))">never</text>
+  <text x="186" y="236" font-size="12" fill="hsl(var(--muted-foreground))">consulted</text>
+  <text x="186" y="250" font-size="12" fill="hsl(var(--muted-foreground))">on this cell</text>
+
+  <!-- ── the consequence ────────────────────────────────────────────── -->
+  <line x1="4" y1="312" x2="316" y2="312" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="330" font-size="12" fill="hsl(var(--foreground))">The row beats the bundle, not the other way</text>
+  <text x="4" y="344" font-size="12" fill="hsl(var(--foreground))">round.</text>
+  <text x="4" y="362" font-size="12" fill="hsl(var(--muted-foreground))">Re-upload a file with that column filled in and</text>
+  <text x="4" y="372" font-size="12" fill="hsl(var(--muted-foreground))">your policy bundle stops being consulted.</text>
+</svg>

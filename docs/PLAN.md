@@ -16459,3 +16459,76 @@ Handoff to next WP:
   - **Check §4's "Closed by" column before drawing any defect a brief names.** Two of
     twelve were stale here. The generated module is the authority for what is true
     today; the brief is a snapshot, and it says so.
+
+### WP 5.2k, group A — the nine declared and bare · 2026-09-19
+
+Preconditions held?      yes. Every one of the nine had a `shows` brief written by
+somebody with the page open, and eight were right. The ninth is below.
+
+Exit checks passed?      yes. `npm test` **868/868, 51 files**, `check:docs` ✓,
+`contract:check` ✓ (same 2 pre-existing warnings), `typecheck` 21 of 21 baseline held,
+`build` ✓, `audit:bundle` **clean — initial graph 156.6 kB unchanged, total JS
+1891.2 kB (up 11.2 kB for nine inlined drawings)**, `audit:ui` **8 — at baseline**,
+eslint **336/116 — at baseline**.
+
+Discovered:
+  - **An existing gate caught a defect this package would otherwise have shipped, and
+    the fix belongs in the door rather than in the files.** `bodies.test.tsx` fails a
+    live page that prints a raw backtick outside a `<code>` element — the
+    markdown-leaking-through rule. Every figure file opens with a comment naming the
+    sources its elements came from, and those citations name code in backticks; the
+    inliner passes the file through verbatim, so the comments were reaching the DOM
+    and `policy-types` went red. The notes are the reason a drawing is checkable
+    rather than merely confident, so they stay in the file — `DocFigure` now strips
+    comments at the boundary. It also stops shipping bytes no reader can see.
+    → affects every later figure → fixed in this commit, no rule weakened.
+  - **The figures needed a gate of their own, and it found seven real faults —
+    including two in the group already committed.** Nothing in this repository can
+    tell that a `<text>` element runs off the edge of its own viewBox: the tests read
+    the manifest and the folder, not the drawings. A width check (average advance
+    against each element's `x`, `font-size` and `text-anchor`) found **seven
+    overflows across seven files**, two of them in A1–A5 — `centralities` ran 48 units
+    past the edge on two panel captions and `resilience-curve` ran 8 units off the
+    left. All seven are fixed. → affects the remaining groups → the check is a
+    scratch script, not a committed gate, and that is a gap this package is choosing
+    to name rather than close: see the handoff.
+  - **`provenance-dots` asked for a screenshot, and the drawing found something the
+    brief did not know.** Nine provenance states map to **five dot colours plus one
+    invisible**: teal is both `data` and `master`, and amber is all three of
+    `derived`, `suggested` and `contract`. The first instinct was to file that as a
+    defect — a dot that cannot be decoded into a state. It is not one, and checking
+    before filing is the same discipline F7 asks for about §4: `ProvenanceLegend`
+    **already declares both shares in as many words** ("derived fallback (≈) ·
+    suggested · declared meaning of empty"). So the figure draws the collision as a
+    stated fact rather than accusing the product of hiding it. What the legend does
+    NOT carry is `default`: it has five entries for eight states, and the ninth has
+    no dot AND no legend line — which is the gap the page's own callout names, and
+    the thing the figure is for.
+  - **Three slots were amended because what could be drawn is not what was asked
+    for (F5).** `provenance-dots` and `replications` both ask for captures of real
+    runs and real grids; this package can produce neither, so both now say in `shows`
+    that they are schematics and ask to be superseded rather than redrawn, and both
+    `alt` texts say "drawn". `disruption-models` asked for the two shapes "side by
+    side" and they are stacked — at 320 units two four-row columns cannot hold a
+    table name at 12 px, and the requirement that actually matters is EQUAL WEIGHT
+    (neither shape marked preferred), which stacking keeps.
+
+Baseline numbers (if run):
+  - figures fill rate → **14 of 21 slots filled, 7 open** (was 5 of 21)
+  - the 7 open are the three with inline fallbacks (`tiers`, `flow`, `boundary` —
+    nothing regresses while they wait) and the four that ask for a capture of a real
+    project (`product-network`, `process-network`, `firm-network`,
+    `interactive-space`)
+
+Handoff to next WP:
+  - **There is no gate on the drawings themselves, and there should be.** The width
+    check found seven faults in fourteen files on its first run, which is a defect
+    rate no unreviewed asset class should carry. It is a scratch script in this
+    session and nothing in CI runs it, so the next figure can ship with a label off
+    the edge and nothing will say so. What it would need to become `figures.test.ts`'s
+    fourth rule: parse each `.svg`, assert a 12 px floor on `font-size`, assert every
+    `<text>` fits its viewBox at the average advance, and assert no `<style>` element
+    and no duplicated `id` across files — the last two being the rules inlining puts
+    on a file, which are documented in the README and enforced by nothing.
+  - **An SVG comment does not reach the browser any more.** Write the sources down in
+    the file anyway; that is what makes F1 checkable a year from now.

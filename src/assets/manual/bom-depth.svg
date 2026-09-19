@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- The same recipe in both files. consumption_rate's own meaning differs
+       between them, and the contract says so in as many words:
+       bom_multi_level  — "how many units of this material one unit of THE
+                           PARENT consumes"
+       bom_single_level — "how many units of the material one unit of THE
+                           PRODUCT consumes" -->
+
+  <!-- ══ left: multi level ═══════════════════════════════════════════ -->
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">BOM — multi level</text>
+  <rect x="4" y="22" width="148" height="188" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+
+  <rect x="44" y="34" width="68" height="26" rx="3" fill="hsl(var(--foreground))"/>
+  <text x="78" y="51" text-anchor="middle" font-size="12" fill="hsl(var(--card))">BIKE</text>
+
+  <line x1="78" y1="60" x2="78" y2="86" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <polygon points="78,90 74.5,83 81.5,83" fill="hsl(var(--foreground))"/>
+  <text x="86" y="78" font-size="12" fill="hsl(var(--foreground))">× 2</text>
+
+  <rect x="44" y="92" width="68" height="26" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="78" y="109" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">WHEEL</text>
+  <text x="8" y="109" font-size="12" fill="hsl(var(--muted-foreground))">level 1</text>
+
+  <line x1="78" y1="118" x2="78" y2="144" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <polygon points="78,148 74.5,141 81.5,141" fill="hsl(var(--foreground))"/>
+  <text x="86" y="136" font-size="12" fill="hsl(var(--foreground))">× 3</text>
+
+  <rect x="44" y="150" width="68" height="26" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="78" y="167" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">SPOKE</text>
+  <text x="8" y="167" font-size="12" fill="hsl(var(--muted-foreground))">level 2</text>
+
+  <text x="10" y="194" font-size="12" fill="hsl(var(--muted-foreground))">Rate is per PARENT:</text>
+  <text x="10" y="206" font-size="12" fill="hsl(var(--muted-foreground))">3 spokes per wheel.</text>
+
+  <!-- ══ right: single level ═════════════════════════════════════════ -->
+  <text x="168" y="14" font-size="12" fill="hsl(var(--foreground))">BOM — single level</text>
+  <rect x="168" y="22" width="148" height="188" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+
+  <rect x="208" y="34" width="68" height="26" rx="3" fill="hsl(var(--foreground))"/>
+  <text x="242" y="51" text-anchor="middle" font-size="12" fill="hsl(var(--card))">BIKE</text>
+
+  <line x1="242" y1="60" x2="242" y2="144" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <polygon points="242,148 238.5,141 245.5,141" fill="hsl(var(--foreground))"/>
+  <text x="250" y="106" font-size="12" fill="hsl(var(--destructive))">× 6</text>
+
+  <!-- the middle stage is gone -->
+  <rect x="208" y="92" width="68" height="26" rx="3" fill="none" stroke="hsl(var(--border))" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="242" y="109" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">no wheel</text>
+
+  <rect x="208" y="150" width="68" height="26" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="242" y="167" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">SPOKE</text>
+
+  <text x="174" y="194" font-size="12" fill="hsl(var(--muted-foreground))">Rate is per PRODUCT:</text>
+  <text x="174" y="206" font-size="12" fill="hsl(var(--muted-foreground))">6 spokes per bike.</text>
+
+  <!-- ══ the point ═══════════════════════════════════════════════════ -->
+  <line x1="4" y1="226" x2="316" y2="226" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="244" font-size="12" fill="hsl(var(--foreground))">Same recipe. Same column name. Two</text>
+  <text x="4" y="258" font-size="12" fill="hsl(var(--foreground))">different numbers, and both are correct.</text>
+  <text x="4" y="276" font-size="12" fill="hsl(var(--muted-foreground))">consumption_rate is per PARENT in the multi-</text>
+  <text x="4" y="290" font-size="12" fill="hsl(var(--muted-foreground))">level file and per FINISHED PRODUCT in the</text>
+  <text x="4" y="304" font-size="12" fill="hsl(var(--muted-foreground))">single-level one. Copy a column from one file</text>
+  <text x="4" y="318" font-size="12" fill="hsl(var(--muted-foreground))">into the other and nothing will complain.</text>
+</svg>
