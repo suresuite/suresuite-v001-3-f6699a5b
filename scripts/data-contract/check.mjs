@@ -29,7 +29,7 @@
 //   R15 a sidecar's prose may not deny a reader its own `surfaces` block confirms
 //       (D58, D101's shape inside one file, WP 6.2)
 //   R16 every §4 D-number is unique, and §4 has no duplicated row (D122's merge, WP 6.3)
-//   R17 every edge function is DEPLOYED or deferred with a named owner (D104, WP 6.3)
+//   R17 every edge function is DEPLOYED or deferred with a named owner (D123, WP 6.3)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -355,10 +355,39 @@ for (let i = secStart; i >= 0 && i < secEnd; i++) {
 // ignore it. CI checks out with full history for exactly this reason.
 
 const PLAN_PATH = "docs/PLAN.md";
+
+// §16 IS NOT CONTIGUOUS, AND THIS FUNCTION USED TO BELIEVE IT WAS — D124.
+//
+// The first version sliced from `## 16.` to `## 17.`, which is correct only while
+// every drift-log entry is written before §17. Entries have been appended PAST it
+// for months: **37 of 69 were visible and 32 were not**, among them every entry of
+// this session. So R7's append-only half was protecting 37 entries, and R7's second
+// half — "a package marked done has a §16 entry" — was answering about 37 while
+// §7–§13 marks 23 packages done. A gate cannot notice an entry it cannot see, so
+// this was two rules quietly scoped to the older half of the log.
+//
+// **The fix is ordering-INDEPENDENT on purpose.** Physically moving §17 to the end
+// of the file also works — a parallel branch did exactly that — but it is six
+// thousand lines of diff and it holds only until the next author appends past
+// whatever is last. This reads §16 as everything from its own heading onward MINUS
+// every later top-level section, and a later section runs from its `## N.` heading
+// to whichever comes first: the next `## ` heading, the next `### ` heading (a
+// drift entry appended past it — §17 has no sub-headings of its own), or EOF.
+// Verified against BOTH document shapes: 69 entries with §17 in the middle, 69 with
+// §17 moved to the end, and §17's own table excluded either way.
 const section16 = (text) => {
   const a = text.indexOf("\n## 16.");
-  const b = text.indexOf("\n## 17.");
-  return a < 0 ? "" : text.slice(a, b < 0 ? undefined : b);
+  if (a < 0) return "";
+  let rest = text.slice(a);
+  for (;;) {
+    const m = /\n## \d+\./.exec(rest.slice(1));
+    if (!m) break;
+    const start = m.index + 1;
+    const after = rest.slice(start + 1);
+    const end = /\n(?=## |### )/.exec(after);
+    rest = rest.slice(0, start) + (end ? after.slice(end.index) : "");
+  }
+  return rest;
 };
 /** The stable identity of an entry: its name, without the trailing date/commit. */
 const entryKey = (heading) =>
@@ -467,7 +496,10 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
                  "A package without a §16 entry is not finished — write the entry, or drop the ✅.");
     }
   } else {
-    console.log(`  R7  every done package has a §16 entry · ${donePackages.length} checked`);
+    console.log(
+      `  R7  every done package has a §16 entry · ${donePackages.length} checked · ` +
+      `${entryHeadings(readFileSync(PLAN, "utf8")).length} §16 entries in scope (D124)`,
+    );
   }
 }
 
@@ -839,7 +871,7 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
 const covered = [...sidecars.keys()].length;
 // ───────── R17: AN EDGE FUNCTION IS DEPLOYED, OR DEFERRED WITH A REASON
 //
-// §4 D104: TWELVE OF EIGHTEEN edge functions were absent from
+// §4 D123: TWELVE OF EIGHTEEN edge functions were absent from
 // `.github/workflows/supabase-functions.yml`. Their code shipped to `main`, CI went
 // green, and they never reached production — and the workflow's history showed
 // SUCCESS on the very commits that shipped them, because `supabase/functions/_shared/**`
@@ -895,7 +927,7 @@ const covered = [...sidecars.keys()].length;
           fail("R17",
             `${fn} has a deploy step and NO path trigger — it redeploys only when some ` +
             "other watched path changes. That is how `_shared/**` made this workflow's " +
-            "history read as success while the functions it did not name went stale (D104). " +
+            "history read as success while the functions it did not name went stale (D123). " +
             `Add 'supabase/functions/${fn}/**' to the push paths.`);
         }
         if (deferredFns.has(fn)) {
@@ -910,7 +942,7 @@ const covered = [...sidecars.keys()].length;
         fail("R17",
           `${fn} exists in supabase/functions/ and the deploy workflow never publishes it, ` +
           "so its code reaches `main` and never production — and CI goes green either way " +
-          "(§4 D104). Add a deploy step AND a path trigger, or defer it in " +
+          "(§4 D123). Add a deploy step AND a path trigger, or defer it in " +
           "coverage.yaml's `functions_not_deployed` with the package that will and why.");
       }
     }
@@ -922,7 +954,7 @@ const covered = [...sidecars.keys()].length;
     console.log(
       `  R17 edge functions reach production · ${present.length} in the repo · ` +
       `${present.filter((f) => deployed.has(f)).length} deployed · ` +
-      `${deferredFns.size} deferred with a named package (D104)`,
+      `${deferredFns.size} deferred with a named package (D123)`,
     );
   }
 }

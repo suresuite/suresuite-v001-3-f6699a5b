@@ -231,7 +231,7 @@ deferred:
 
 # ── EDGE FUNCTIONS: DEPLOYED, OR DEFERRED WITH A REASON ─────────────────────
 #
-# §4 D104: twelve of eighteen edge functions were absent from
+# §4 D123: twelve of eighteen edge functions were absent from
 # `.github/workflows/supabase-functions.yml`, so their code shipped to `main`, went
 # green in CI, and never reached production. Slice 15 added the four analyzers and
 # SIZED the gate without writing it: "Nothing compares the functions the repo holds
@@ -250,6 +250,23 @@ deferred:
 # in WP 6.3 on the opposite argument — a shipped package depends on it and its source
 # is CI-green — and that argument does not extend to these.
 functions_not_deployed:
+  - fn: ingest-file
+    wp: "6.3"
+    why: >-
+      NOT debt and NOT an oversight — a deliberate deferral this package owns.
+      `ingest-file` is WP 3.2's entire deliverable and has never been published,
+      which is why §2.1's `ingestion-contract` (I7) row called it a live second
+      source for four packages while production had no such source (D123). Adding
+      the deploy step is one line; what it does is not small. On merge it switches
+      EVERY upload in production onto the WP 3.2-3.4 landing path at once —
+      server-side parse, tier-0 storage, staged rows, the diff review screen, the
+      promotion with its normalisation and its role gate — and §16 · WP 6.3
+      (slice 16) declined exactly that, asking for a §15 reading either side of
+      the switch. A branch cannot take the second reading, because
+      `supabase-functions.yml` is `branches: [main]`. So the switch is a named
+      deliverable of this package rather than a line added in passing, and the
+      tenth dataset (`customers`, WP 6.2) is unreachable in production until it
+      is made.
   - fn: delete-project
     wp: "7.1"
     why: >-
