@@ -23,6 +23,7 @@
 //   R11 every DEFERRED table says whether it is audited, and is right (D54, WP 4.2)
 //   R13 an IMPLEMENTED policy's declared data requirement is described by the
 //       contract AND reaches a display surface (D94, D112, WP 6.2)
+//   R14 no dynamic RLS statement resolves to zero known tables (D51, WP 6.2)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -830,6 +831,53 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
 // ──────────────────────────────────────────────────────────────────── report
 
 const covered = [...sidecars.keys()].length;
+// ───────── R14: A DYNAMIC RLS STATEMENT MUST NAME SOMETHING
+//
+// §4 D51 — the introspector cannot EVALUATE `EXECUTE format(…)`, and it does not
+// try. What it does is mark every table such a statement touches as
+// `determinate: false`, which the generated page renders as "the migrations do
+// not say" rather than as "off". That flag keys on the names it can see, and when
+// the target arrives through a `%1$s` placeholder there are none — so the three
+// `erp_staged_*` tables were recorded as determinately policy-less, and their
+// pages said so, for the whole of Phase 2. A published falsehood, CI-gated, in
+// the D40 shape pointing the other way.
+//
+// WP 6.2 widened the name scan to the enclosing DO block, where a loop variable
+// is actually bound. That made `20260614000001`'s policy statement resolve — and
+// it had been resolving by ACCIDENT before, because the array literal happened to
+// share a semicolon-fragment with the `ENABLE ROW LEVEL SECURITY` line. Written
+// with the ENABLE outside the loop, all three item masters would have been
+// recorded as determinately policy-less.
+//
+// THIS IS A GATE AND NOT A RATCHET BECAUSE IT IS EMPTY. Every dynamic statement
+// that touches RLS today resolves at least one table this schema has. One that
+// resolves none has marked nothing indeterminate, so the schema's RLS story for
+// its target is whatever other statements happened to say — with nothing
+// recording that a run-time statement also had an opinion. That is exactly the
+// silence D51 was, and it fails here on the commit that introduces it.
+{
+  const unresolved = schema.rls_dynamic_unresolved;
+  if (!Array.isArray(unresolved)) {
+    fail("R14", "build/schema.introspected.json has no `rls_dynamic_unresolved` — " +
+      "re-run `npm run contract:introspect`; a missing list is not an empty one");
+  } else {
+    for (const d of unresolved) {
+      fail("R14",
+        `${d.migration} runs a dynamic statement that touches RLS and names no table ` +
+        `this schema has${d.has_format_placeholder ? " (its target is assembled through a format placeholder)" : ""}. ` +
+        "Nothing is marked indeterminate, so the generated page will state an RLS " +
+        "story the migrations do not support (D51). Name the tables literally, or " +
+        "put the loop's source literal inside the same DO block.\n" +
+        `      ${d.statement}`);
+    }
+    console.log(
+      `  R14 dynamic RLS statements resolve · ${(schema.dynamic_ddl ?? []).filter((d) => d.touches_rls).length} touch RLS · ` +
+      `${unresolved.length} name no known table · ` +
+      `${(schema.dynamic_ddl ?? []).filter((d) => d.named_only_via_block).length} resolved only via the enclosing block (D51)`,
+    );
+  }
+}
+
 // ───────── R13: A DECLARED REQUIREMENT IS DESCRIBED, AND IS NOT SWALLOWED
 //
 // TWO RULES THAT ONLY LOOK LIKE ONE, and the second was found by trying to

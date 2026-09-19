@@ -22,7 +22,7 @@
 // does not exist.
 
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync, statSync } from "node:fs";
-import { join, dirname, relative } from "node:path";
+import { join, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   splitStatements, splitTopLevel, parenBody, readQualifiedName, renameIdentifier, squash,
@@ -30,8 +30,21 @@ import {
 } from "./sql-lex.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const MIGRATIONS = join(ROOT, "supabase", "migrations");
-const OUT = join(ROOT, "build", "schema.introspected.json");
+// OVERRIDABLE SO THE DETECTORS CAN BE TESTED, and for no other reason.
+//
+// `schema.impossible` grew a third and fourth detector in WP 6.2 (§4 D99), and
+// neither fires on this repository's history — which is the right outcome and also
+// means neither had ever been exercised. An assertion that has never failed has
+// never been tested, so `introspectorImpossibleStatements.test.ts` points these two
+// at a fixture directory holding the statements PostgreSQL would reject.
+//
+// CI and every human invocation pass nothing and get the real paths.
+const MIGRATIONS = process.env.CONTRACT_MIGRATIONS_DIR
+  ? resolve(process.env.CONTRACT_MIGRATIONS_DIR)
+  : join(ROOT, "supabase", "migrations");
+const OUT = process.env.CONTRACT_INTROSPECT_OUT
+  ? resolve(process.env.CONTRACT_INTROSPECT_OUT)
+  : join(ROOT, "build", "schema.introspected.json");
 
 // ─────────────────────────────────────────────────────────────── the schema model
 
@@ -240,7 +253,34 @@ function apply(schema, stmt, migration, guarded = false) {
     const open = raw.indexOf(tag);
     const close = raw.lastIndexOf(tag);
     if (close > open) {
-      for (const inner of splitStatements(raw.slice(open + tag.length, close))) {
+      const body = raw.slice(open + tag.length, close);
+      // §4 D51 — THE BLOCK IS THE SCOPE, NOT THE SEMICOLON.
+      //
+      // `splitStatements` cuts at semicolons, and a plpgsql loop binds its
+      // variable in the HEADER while the interesting DDL sits in a later
+      // fragment. So `20260614000001`'s
+      // `FOREACH t IN ARRAY ARRAY['materials','products','suppliers'] LOOP
+      //  EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t)`
+      // carries the three names, and the very next fragment — the one that
+      // DROPs and CREATEs `"%1$s_auth_all"` — carries none.
+      //
+      // The three item masters were therefore marked indeterminate by ACCIDENT:
+      // correct, and only because the array literal happened to share a fragment
+      // with the ENABLE. Written with the ENABLE outside the loop, all three would
+      // have been recorded as determinately policy-less and their generated pages
+      // would have said so — which is D51 exactly, on the three tables the policy
+      // grid reads.
+      //
+      // Every name the BLOCK mentions is therefore in scope for every fragment in
+      // it that assembles a name through a placeholder. That is the same
+      // over-approximation the mentions set already makes, at the scope the loop
+      // variable actually has: an over-broad "we cannot tell" is safe, and a
+      // narrow one is a false claim about governance.
+      const blockLiterals = new Set();
+      for (const m of squash(body).matchAll(/'([a-z_][a-z0-9_]*)'/gi)) {
+        blockLiterals.add(m[1].toLowerCase());
+      }
+      for (const inner of splitStatements(body)) {
         const ddl = unwrapPlpgsql(inner);
         if (ddl) { apply(schema, ddl, migration, true); continue; }
         // NOT silent. `unwrapPlpgsql` returning null used to drop the fragment,
@@ -255,7 +295,7 @@ function apply(schema, stmt, migration, guarded = false) {
         //
         // Recording it does not evaluate it. It marks the tables the block
         // mentions as INDETERMINATE, which is the true answer (§5 T3).
-        noteDynamic(schema, migration, inner);
+        noteDynamic(schema, migration, inner, blockLiterals);
       }
     }
     return;
@@ -426,6 +466,38 @@ function apply(schema, stmt, migration, guarded = false) {
     const t = tid && schema.table(tid.name);
     if (!t) return note(schema, migration, s, `CREATE POLICY on unknown table "${tid?.name}"`);
     const tail = s.slice(tid.end);
+    // §4 D99 · THE FOURTH DETECTOR, AND IT IS DELIBERATELY NARROW.
+    //
+    // A policy predicate naming a column the table does not have raises 42703 at
+    // CREATE time and rolls the file back — D99's third named kind. But a
+    // predicate is an EXPRESSION: bare identifiers there may be columns of this
+    // table, columns of a table in a sub-SELECT, function names, enum labels or
+    // parameters, and a detector that guessed would report a defect on every
+    // policy that calls `get_current_user_id()`.
+    //
+    // So it looks ONLY at references qualified with THIS table's own name —
+    // `customers.project_id` inside a policy on `customers`. Those are
+    // unambiguous by construction: the qualifier says which relation the column
+    // must belong to, so a name that is not a column of it cannot be anything
+    // else. Narrow and certain beats broad and wrong, which is the lesson of the
+    // three over-claims WP 6.1 caught inside itself.
+    const qualified = new Set(
+      [...tail.matchAll(new RegExp(`\\b(?:public\\.)?${t.name}\\.([a-z_][a-z0-9_]*)`, "gi"))]
+        .map((x) => x[1].toLowerCase()),
+    );
+    const absent = [...qualified].filter((col) => !t.columns.some((x) => x.name === col));
+    if (absent.length) {
+      schema.impossible.push({
+        migration,
+        statement: s.slice(0, 220),
+        table: t.name,
+        why:
+          `CREATE POLICY ${pid.name} qualifies ${absent.map((c) => `${t.name}.${c}`).join(", ")}, ` +
+          `which ${t.name} does not have. Postgres raises 42703 and the file's ` +
+          "transaction rolls back.",
+      });
+      return;
+    }
     t.rls.policies.push({
       name: pid.name,
       command: /\bFOR\s+(ALL|SELECT|INSERT|UPDATE|DELETE)\b/i.exec(tail)?.[1]?.toUpperCase() ?? "ALL",
@@ -713,6 +785,36 @@ function applyAlter(schema, t, action, migration, whole) {
     const c = parseTableConstraint(a.slice(m[0].length), migration);
     if (c) {
       if (c.name && t.constraints.some((x) => x.name === c.name)) return;
+      // §4 D99 · THE THIRD DETECTOR. A CONSTRAINT ON A COLUMN THE TABLE DOES NOT
+      // HAVE IS NOT A CONSTRAINT; IT IS AN ERROR, AND EVERY STATEMENT AFTER IT IN
+      // THE FILE NEVER RAN.
+      //
+      // D99 names three statement kinds still unwatched, and this is the first of
+      // them: `ADD CONSTRAINT … FOREIGN KEY (col)` / `PRIMARY KEY (col)` /
+      // `UNIQUE (col)` against a missing column raises 42703 and rolls the file
+      // back. `schema.impossible` was built as a LIST precisely so a detector
+      // could join it (slice 9's `CREATE INDEX`, slice 10's 42P13), and this is
+      // the same shape a third time.
+      //
+      // It reads the constraint's OWN column list and nothing else. A CHECK's
+      // expression and a FOREIGN KEY's target columns are deliberately not
+      // examined: the first would need an expression parser and the second names
+      // ANOTHER table's columns, which this branch cannot resolve without
+      // guessing which side a bare name belongs to (the same limitation
+      // `renameInDependents` states about foreign keys).
+      const ownCols = c.kind === "CHECK" ? [] : (c.columns ?? []);
+      const missing = ownCols.filter((col) => !t.columns.some((x) => x.name === col));
+      if (missing.length) {
+        schema.impossible.push({
+          migration,
+          statement: a.slice(0, 220),
+          table: t.name,
+          why:
+            `ALTER TABLE … ADD ${c.kind} names ${missing.join(", ")}, which ${t.name} ` +
+            "does not have. Postgres raises 42703 and the file's transaction rolls back.",
+        });
+        return;
+      }
       t.constraints.push(c);
     }
     return;
@@ -931,17 +1033,55 @@ const foreignSchema = (id) => id.schema !== null && id.schema !== "public";
  * string literal and every `public.<name>` in the fragment — because an
  * over-broad "we cannot tell" is safe and a narrow one is a false claim.
  */
-function noteDynamic(schema, migration, fragment) {
+function noteDynamic(schema, migration, fragment, blockLiterals = null) {
   const s = squash(fragment);
   if (!/\bEXECUTE\b/i.test(s)) return;   // ordinary control flow
   const mentions = new Set();
   for (const m of s.matchAll(/'([a-z_][a-z0-9_]*)'/gi)) mentions.add(m[1].toLowerCase());
   for (const m of s.matchAll(/\bpublic\.([a-z_][a-z0-9_]*)/gi)) mentions.add(m[1].toLowerCase());
+  const hasPlaceholder = /%(?:[0-9]+\$)?[sIL]/.test(s.replace(/%%/g, ""));
+  // The enclosing block's own literals, in scope because that is where the loop
+  // variable is bound (§4 D51). Only for a fragment that assembles a name — a
+  // fragment naming its target outright is not guessing and needs no widening.
+  if (hasPlaceholder && blockLiterals) {
+    for (const name of blockLiterals) mentions.add(name);
+  }
+  // §4 D51 — A FORMAT PLACEHOLDER IS WHERE THE OVER-APPROXIMATION CAN FAIL.
+  //
+  // `mentions` is deliberately over-broad, and the comment above says why: an
+  // over-broad "we cannot tell" is safe and a narrow one is a false claim. But
+  // over-broad is not the same as never-empty. When the target table arrives
+  // through a `%s` / `%I` / `%1$s` placeholder, whether this pass sees the name
+  // depends entirely on whether the loop's source literal happens to sit inside
+  // the SAME semicolon-delimited fragment. It does for a
+  // `FOREACH t IN ARRAY ARRAY['a','b'] LOOP EXECUTE format(…)`; it does NOT for
+  // `FOR t IN SELECT tablename FROM …`, and it does not when the array is built
+  // one statement earlier.
+  //
+  // D51 is what the second case costs: the three `erp_staged_*` policies were
+  // recorded as determinately absent for the whole of Phase 2 and their generated
+  // pages said so — the D40 shape (a published falsehood, CI-gated) pointing the
+  // other way. The flag never fired because the names it keys on were `%1$s`.
+  //
+  // So the placeholder is recorded as a FACT about the fragment, and the count of
+  // RLS fragments that resolved no known table is a RATCHET in `contract:check`.
+  // A detector that reports beats a resolver that guesses: resolving would mean
+  // following renames and then deciding whether a LATER literal statement settled
+  // what this one left open, and a wrong answer there is a governance claim.
   schema.dynamic.push({
     migration,
     statement: s.slice(0, 400),
     mentions: [...mentions].sort(),
     touches_rls: /ROW\s+LEVEL\s+SECURITY|\bPOLICY\b/i.test(s),
+    // `%s`, `%I`, `%L` and the positional `%1$s` form. `%%` is an escaped percent
+    // and names nothing, so it is excluded rather than counted as a placeholder.
+    has_format_placeholder: hasPlaceholder,
+    // Whether the enclosing block had to supply the names — a fragment that
+    // resolved only through its block is one the semicolon scope could not read,
+    // which is the shape D51 was.
+    named_only_via_block: hasPlaceholder && Boolean(blockLiterals) &&
+      ![...s.matchAll(/'([a-z_][a-z0-9_]*)'/gi)].some((m) => schema.tables.has(m[1].toLowerCase())) &&
+      ![...s.matchAll(/\bpublic\.([a-z_][a-z0-9_]*)/gi)].some((m) => schema.tables.has(m[1].toLowerCase())),
     why: "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it",
   });
 }
@@ -1202,6 +1342,32 @@ function build() {
   for (const t of tables) {
     if (t.rls.indeterminate_from) t.rls.indeterminate_from = [...new Set(t.rls.indeterminate_from)].sort();
   }
+
+  // §4 D51 · THE FRAGMENTS THAT MARKED NOTHING.
+  //
+  // A dynamic fragment that TOUCHES RLS and resolves to zero known tables has
+  // marked nothing indeterminate — so the schema's RLS story for whatever it
+  // targets is whatever OTHER statements happened to say, with nothing recording
+  // that a run-time statement also had an opinion. That is the silence D51 is,
+  // and it is stated here rather than guessed at.
+  //
+  // Each entry says whether a format placeholder is involved, because that
+  // distinguishes the two ways it happens: a placeholder means the name was
+  // assembled and this pass could not see the source; no placeholder means the
+  // fragment genuinely named nothing this schema has, which today is the
+  // `erp_staged_*` case — those three names were RENAMED away by WP 3.1, which
+  // also rewrote their policies as four literal statements and dropped the
+  // dynamic ones by their old names, so nothing is unknown about them any more.
+  schema.rls_dynamic_unresolved = schema.dynamic
+    .filter((d) => d.touches_rls)
+    .filter((d) => !d.mentions.some((name) => schema.tables.has(name)))
+    .map((d) => ({
+      migration: d.migration,
+      has_format_placeholder: d.has_format_placeholder,
+      mentions: d.mentions,
+      statement: d.statement.slice(0, 200),
+    }))
+    .sort((a, b) => a.migration.localeCompare(b.migration));
   for (const v of schema.views.keys()) known.add(v);
 
   const codeRefs = findCodeTableRefs();
@@ -1227,6 +1393,7 @@ function build() {
       unparsed_statements: schema.unparsed.length,
       dynamic_ddl_statements: schema.dynamic.length,
       rls_indeterminate_tables: tables.filter((t) => t.rls.determinate === false).length,
+      rls_dynamic_unresolved: schema.rls_dynamic_unresolved.length,
       orphans: orphans.length,
       aborted_migrations: schema.aborted_migrations.length,
     },
@@ -1252,6 +1419,7 @@ function build() {
       .sort((a, b) => a.table.localeCompare(b.table)),
     unparsed: schema.unparsed,
     dynamic_ddl: schema.dynamic,
+    rls_dynamic_unresolved: schema.rls_dynamic_unresolved,
   };
 }
 
