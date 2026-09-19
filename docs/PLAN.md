@@ -16532,3 +16532,77 @@ Handoff to next WP:
     on a file, which are documented in the README and enforced by nothing.
   - **An SVG comment does not reach the browser any more.** Write the sources down in
     the file anyway; that is what makes F1 checkable a year from now.
+
+### WP 5.2k, B1–B7 — the seven new slots · 2026-09-19
+
+Preconditions held?      **no — two of the seven briefs were written against
+defects that had already been closed**, which the group-A entry predicted from F7's
+instruction to check §4's "Closed by" column first. Both slots are drawn from the
+generated modules as they read today, and both `shows` texts now say so and say what
+they supersede.
+
+Exit checks passed?      yes. `npm test` **868/868**, `check:docs` ✓, `contract:check`
+✓ (same 2 pre-existing warnings), `typecheck` 21 of 21 baseline held, `build` ✓,
+`audit:bundle` **clean — initial graph 156.6 kB unchanged, total JS 1900.2 kB**,
+`audit:ui` **8 — at baseline**, eslint **336/116 — at baseline**.
+
+Discovered:
+  - **`figures.test.ts`'s fourth assertion was VACUOUS, and its own comment said
+    exactly what it was supposed to be doing.** The comment reads *"The manifest says
+    a page has a figure; the body has to actually ask for it. Otherwise a slot is
+    declared, counted as open, briefed — and invisible."* The code under it checked
+    that the page had a body, then asserted `s.page === page` for every slot that had
+    just been filtered out of the manifest BY `s.page === page`. A tautology cannot
+    fail. So a slot could be declared, briefed, counted in the fill rate and rendered
+    by nothing at all — the precise state the comment promises to catch — and this
+    package would have shipped seven of them without noticing, because the seven
+    pages needed a `<DocFigure>` adding and nothing was going to ask. **This is §4
+    D57's shape in a test rather than in a compiler**: a green result that describes
+    nothing. Closed in this commit: the assertion renders the body and looks for the
+    slot's own `figure-<id>` anchor, which `DocFigure` writes whether the slot is
+    filled, falling back or empty — so it fails for a slot nothing asks for and keeps
+    passing while a figure is still being drawn, which is the asymmetry the rest of
+    the file is built on. **Mutation-tested**: removing one `<DocFigure>` turns it
+    red, naming the slot and the page. → affects every later figure package → fixed
+    here, no rule weakened.
+  - **B2's live fact is not the one its brief names, and it is worse.** The brief
+    asks for the §4 D113 picture — the results table's labels against the engine's
+    keys, "two lines, and the emptiness is the point". D113 is **CLOSED (WP 6.3)**:
+    `KpiStatTable` is driven by the run now, so every emitted key appears, under its
+    raw name if nobody has labelled it. Drawing the old emptiness would have published
+    a defect that no longer exists. What IS live, in the same join and undrawn
+    anywhere, is the **objective list**: `RUN_KPIS.objectives` offers five, and
+    **four of them name a measure no run produces** — pick OTIF, Lead time, Profit or
+    Utilization and the run still happens, there is simply no chart at the end of it.
+    That is the lower half of the figure, and it is named rather than counted so the
+    drawing cannot quietly disagree with the page's own rendered sentence.
+  - **B3's brief describes a defect whose closure changed the answer.** It asks for
+    "the fourth group labelled with what is in it. §4 D117" — ten tables reached by
+    neither mechanism. WP 6.2 closed that with a foreign key each, and `PROJECT_
+    DELETION` today reports **three**: `ai_chat_events`, `ai_usage_logs`,
+    `api_request_logs`. All three are facts about the ACCOUNT rather than the
+    project, and `rehearsal/280` §3 fails if one of them starts cascading — so the
+    group is now a DECISION, as hard to lose as the cascade, and the figure draws it
+    that way. The small groups are named rather than counted for the same reason as
+    B2.
+  - **No number is lettered into either figure, and that is F2 applied rather than
+    quoted.** Both pages render their counts from the same generated modules the
+    figures were drawn from, and a total drawn into an SVG goes stale the first time
+    the engine gains a measure or a migration adds a key — silently, because nothing
+    compares a drawing to a module. Blocks and names where the page has numbers.
+
+Baseline numbers (if run):
+  - figures fill rate → **21 of 28 slots filled, 7 open** (was 14 of 21; seven slots
+    added, seven filled)
+  - total JS 1900.2 kB gzip (was 1891.2; +9.0 kB for seven inlined drawings), initial
+    graph unchanged at 156.6 kB
+
+Handoff to next WP:
+  - **The remaining seven are the two groups that cannot be closed by drawing.** Four
+    ask for a capture of a real project (`product-network`, `process-network`,
+    `firm-network`, `interactive-space`) and three already render an inline schematic
+    (`tiers`, `flow`, `boundary`), which nothing regresses while it waits. Neither
+    group is behind on effort; both are waiting on a decision, and F5 is the one to
+    make it against.
+  - **The width check is still not a gate**, and it has now found eight faults across
+    two groups. See the group-A handoff for what it would take.

@@ -1,6 +1,7 @@
 // §6.3 section 12 — getting everything out, and getting it removed.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { COUNTS } from "@/components/docs/generated/dataModel.generated";
 import { PROJECT_DELETION } from "@/components/docs/generated/policy.generated";
 
@@ -51,6 +52,7 @@ export default function ExportingAndDeleting() {
       </Callout>
 
       <Section id="deleting" title="Deleting a project">
+        <DocFigure id="delete-reach" />
         <Key>
           Two mechanisms do it, and knowing which is which tells you what is actually gone.
         </Key>

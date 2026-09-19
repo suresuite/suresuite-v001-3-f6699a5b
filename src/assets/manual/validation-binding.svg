@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 456" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- The four components a validation card binds, each by identity AND by
+       fingerprint, and the three badge states that come of comparing them
+       against the project as it is now. Components and columns are
+       VALIDATION_CARD.binding in policy.generated.ts — the one place in this
+       product where I8 (result-binding) already holds. -->
+
+  <rect x="4" y="4" width="312" height="26" rx="3" fill="hsl(var(--foreground))"/>
+  <text x="160" y="21" text-anchor="middle" font-size="12" fill="hsl(var(--card))">a validation card</text>
+
+  <text x="4" y="48" font-size="12" fill="hsl(var(--muted-foreground))">which one</text>
+  <text x="180" y="48" font-size="12" fill="hsl(var(--muted-foreground))">and whether it moved</text>
+
+  <!-- ══ the four components ══════════════════════════════════════════ -->
+  <rect x="4" y="56" width="160" height="26" rx="2" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="73" font-size="12" fill="hsl(var(--foreground))">dataset_version_id</text>
+  <rect x="172" y="56" width="144" height="26" rx="2" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="180" y="73" font-size="12" fill="hsl(var(--foreground))">graph_hash</text>
+  <text x="4" y="94" font-size="12" fill="hsl(var(--muted-foreground))">the data it ran on</text>
+
+  <rect x="4" y="104" width="160" height="26" rx="2" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="121" font-size="12" fill="hsl(var(--foreground))">policy_version_id</text>
+  <rect x="172" y="104" width="144" height="26" rx="2" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="180" y="121" font-size="12" fill="hsl(var(--foreground))">policy_hash</text>
+  <text x="4" y="142" font-size="12" fill="hsl(var(--muted-foreground))">the decisions it ran under</text>
+
+  <rect x="4" y="152" width="160" height="26" rx="2" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="169" font-size="12" fill="hsl(var(--foreground))">scenario_hash</text>
+  <rect x="172" y="152" width="144" height="26" rx="2" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="180" y="169" font-size="12" fill="hsl(var(--foreground))">scenario_fingerprint</text>
+  <text x="4" y="190" font-size="12" fill="hsl(var(--muted-foreground))">the conditions it was run under</text>
+
+  <rect x="4" y="200" width="160" height="26" rx="2" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="12" y="217" font-size="12" fill="hsl(var(--muted-foreground))">— no identity column</text>
+  <rect x="172" y="200" width="144" height="26" rx="2" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="180" y="217" font-size="12" fill="hsl(var(--foreground))">engine_fingerprint</text>
+  <text x="4" y="238" font-size="12" fill="hsl(var(--muted-foreground))">the build behind the evidence — checked</text>
+  <text x="4" y="250" font-size="12" fill="hsl(var(--muted-foreground))">only AFTER a run, never on a live screen</text>
+
+  <!-- ══ compare ══════════════════════════════════════════════════════ -->
+  <line x1="4" y1="266" x2="316" y2="266" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="284" font-size="12" fill="hsl(var(--foreground))">Compared against your project, now:</text>
+
+  <circle cx="12" cy="304" r="5" fill="none" stroke="hsl(var(--border))" stroke-width="1.4" stroke-dasharray="2 2"/>
+  <text x="26" y="308" font-size="12" fill="hsl(var(--foreground))">unvalidated</text>
+  <text x="26" y="322" font-size="12" fill="hsl(var(--muted-foreground))">No card for the policy version you are on.</text>
+  <text x="26" y="334" font-size="12" fill="hsl(var(--muted-foreground))">Not a criticism — nobody has checked it.</text>
+
+  <circle cx="12" cy="354" r="5" fill="hsl(var(--foreground))"/>
+  <text x="26" y="358" font-size="12" fill="hsl(var(--foreground))">validated</text>
+  <text x="26" y="372" font-size="12" fill="hsl(var(--muted-foreground))">A positive verdict, and not one of the</text>
+  <text x="26" y="384" font-size="12" fill="hsl(var(--muted-foreground))">fingerprints has moved.</text>
+
+  <circle cx="12" cy="404" r="5" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.6"/>
+  <path d="M9 401 L15 407 M15 401 L9 407" stroke="hsl(var(--destructive))" stroke-width="1.4"/>
+  <text x="26" y="408" font-size="12" fill="hsl(var(--foreground))">stale</text>
+  <text x="26" y="422" font-size="12" fill="hsl(var(--muted-foreground))">Something underneath moved, and the</text>
+  <text x="26" y="434" font-size="12" fill="hsl(var(--muted-foreground))">badge names WHICH of the four it was.</text>
+  <text x="26" y="446" font-size="12" fill="hsl(var(--muted-foreground))">An unsaved policy edit counts immediately.</text>
+</svg>

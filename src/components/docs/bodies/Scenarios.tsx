@@ -12,6 +12,7 @@
 // rule 1) without inventing a sidecar the contract has not agreed to.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { UNDESCRIBED } from "@/components/docs/generated/dataModel.generated";
 import { SCENARIO_SETUP } from "@/components/docs/generated/policy.generated";
 
@@ -72,6 +73,7 @@ export default function Scenarios() {
       </Section>
 
       <Section id="the-settings" title="Every setting, and what it starts as">
+        <DocFigure id="scenario-window" />
         <P>
           Stage 1 of <DocLink to="simulation-lab">Simulation Lab</DocLink>, in three groups. The
           value in the right-hand column is what a brand-new scenario carries before you touch

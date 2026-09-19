@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 492" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- The join between what a run writes and what the results screen can name,
+       and the objective list underneath it. Shapes rather than totals: the page
+       renders the counts from RUN_KPIS beside this, and a number lettered in
+       here would go stale the first time the engine gains a measure. The five
+       objective labels ARE the ones ScenarioSetupForm offers. -->
+
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">What a run writes, and what the screen</text>
+  <text x="4" y="28" font-size="12" fill="hsl(var(--foreground))">has a name for.</text>
+
+  <text x="4" y="52" font-size="12" fill="hsl(var(--muted-foreground))">the engine emits</text>
+  <text x="180" y="52" font-size="12" fill="hsl(var(--muted-foreground))">the table can label</text>
+
+  <!-- ══ matched ══════════════════════════════════════════════════════ -->
+  <rect x="4" y="60" width="116" height="66" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <text x="12" y="78" font-size="12" fill="hsl(var(--foreground))">every run</text>
+  <text x="12" y="92" font-size="12" fill="hsl(var(--muted-foreground))">fill_rate, revenue,</text>
+  <text x="12" y="104" font-size="12" fill="hsl(var(--muted-foreground))">the ten cost_*</text>
+  <text x="12" y="116" font-size="12" fill="hsl(var(--muted-foreground))">components, …</text>
+
+  <rect x="180" y="60" width="136" height="66" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <text x="188" y="78" font-size="12" fill="hsl(var(--foreground))">shown</text>
+  <text x="188" y="92" font-size="12" fill="hsl(var(--muted-foreground))">every emitted key</text>
+  <text x="188" y="104" font-size="12" fill="hsl(var(--muted-foreground))">a label, or shows</text>
+  <text x="188" y="116" font-size="12" fill="hsl(var(--muted-foreground))">under its raw key</text>
+
+  <path d="M120 93 L180 93" stroke="hsl(var(--foreground))" stroke-width="1.6" fill="none"/>
+  <polygon points="180,93 173,89.5 173,96.5" fill="hsl(var(--foreground))"/>
+
+  <!-- ══ disruption-only ══════════════════════════════════════════════ -->
+  <rect x="4" y="134" width="116" height="52" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="12" y="152" font-size="12" fill="hsl(var(--foreground))">only if it was</text>
+  <text x="12" y="164" font-size="12" fill="hsl(var(--foreground))">disrupted</text>
+  <text x="12" y="180" font-size="12" fill="hsl(var(--muted-foreground))">ttr, tts, pre-FR</text>
+  <path d="M120 160 L180 160" stroke="hsl(var(--muted-foreground))" stroke-width="1.4" fill="none" stroke-dasharray="4 3"/>
+  <polygon points="180,160 173,156.5 173,163.5" fill="hsl(var(--muted-foreground))"/>
+  <text x="188" y="156" font-size="12" fill="hsl(var(--muted-foreground))">absent on a clean</text>
+  <text x="188" y="168" font-size="12" fill="hsl(var(--muted-foreground))">run, and correctly</text>
+
+  <!-- ══ labels with nothing behind them ══════════════════════════════ -->
+  <rect x="180" y="198" width="136" height="66" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="188" y="216" font-size="12" fill="hsl(var(--foreground))">never shown</text>
+  <text x="188" y="230" font-size="12" fill="hsl(var(--muted-foreground))">otif, lead_time,</text>
+  <text x="188" y="242" font-size="12" fill="hsl(var(--muted-foreground))">profit, turns,</text>
+  <text x="188" y="254" font-size="12" fill="hsl(var(--muted-foreground))">backorder_days, …</text>
+
+  <g stroke="hsl(var(--destructive))" stroke-width="1.4" fill="none">
+    <path d="M150 231 L168 231"/>
+    <path d="M142 223 L142 239"/>
+    <path d="M136 225 L148 237 M148 225 L136 237"/>
+  </g>
+  <text x="4" y="220" font-size="12" fill="hsl(var(--muted-foreground))">nothing</text>
+  <text x="4" y="232" font-size="12" fill="hsl(var(--muted-foreground))">writes</text>
+  <text x="4" y="244" font-size="12" fill="hsl(var(--muted-foreground))">these</text>
+
+  <text x="4" y="282" font-size="12" fill="hsl(var(--muted-foreground))">A row with no data is dropped, not shown as</text>
+  <text x="4" y="294" font-size="12" fill="hsl(var(--muted-foreground))">zero. So this is measure LOSS, not a wrong</text>
+  <text x="4" y="306" font-size="12" fill="hsl(var(--muted-foreground))">number — which is why nobody saw it.</text>
+
+  <!-- ══ the objectives ═══════════════════════════════════════════ -->
+  <line x1="4" y1="316" x2="316" y2="316" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="334" font-size="12" fill="hsl(var(--foreground))">The objective you optimise for</text>
+  <text x="4" y="348" font-size="12" fill="hsl(var(--muted-foreground))">Setup's drop-down offers five. One of them is a</text>
+  <text x="4" y="360" font-size="12" fill="hsl(var(--muted-foreground))">measure a run produces.</text>
+
+  <rect x="4" y="370" width="10" height="10" fill="hsl(var(--foreground))"/>
+  <text x="22" y="379" font-size="12" fill="hsl(var(--foreground))">Fill rate — you get a convergence plot</text>
+
+  <rect x="4" y="388" width="10" height="10" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <line x1="4" y1="398" x2="14" y2="388" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="22" y="397" font-size="12" fill="hsl(var(--foreground))">OTIF</text>
+
+  <rect x="4" y="406" width="10" height="10" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <line x1="4" y1="416" x2="14" y2="406" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="22" y="415" font-size="12" fill="hsl(var(--foreground))">Lead time</text>
+
+  <rect x="4" y="424" width="10" height="10" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <line x1="4" y1="434" x2="14" y2="424" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="22" y="433" font-size="12" fill="hsl(var(--foreground))">Profit</text>
+
+  <rect x="4" y="442" width="10" height="10" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <line x1="4" y1="452" x2="14" y2="442" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="22" y="451" font-size="12" fill="hsl(var(--foreground))">Utilization</text>
+
+  <text x="22" y="470" font-size="12" fill="hsl(var(--muted-foreground))">Pick one of these four and the run happens.</text>
+  <text x="22" y="482" font-size="12" fill="hsl(var(--muted-foreground))">There is simply no chart at the end of it.</text>
+</svg>

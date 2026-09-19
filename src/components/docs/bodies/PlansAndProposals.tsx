@@ -1,6 +1,7 @@
 // §6.3 section 9 — plans and proposals.
 
 import { PageTitle, Section, P, Key, Callout, Steps, Term, DocLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { Badge } from "@/components/ui/badge";
 import { ASSISTANT, INTELLIGENCE } from "@/components/docs/generated/policy.generated";
 
@@ -146,6 +147,7 @@ export default function PlansAndProposals() {
       </Section>
 
       <Section id="lifecycle" title="The states a proposal moves through">
+        <DocFigure id="proposal-lifecycle" />
         <div className="flex flex-wrap gap-1.5">
           {proposal.statuses.map((s) => (
             <Badge key={s} variant="outline" className="font-mono text-[11px]">

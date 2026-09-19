@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 424" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- The six states a proposal can be in, and who causes each move. The states
+       are INTELLIGENCE.proposal.statuses in policy.generated.ts, read from the
+       CHECK constraint on the proposals table; the expiry is that block's
+       expiresAfter. Who causes each transition is the plans-and-proposals page's
+       own account of the flow. -->
+
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">Nothing changes because a model</text>
+  <text x="4" y="28" font-size="12" fill="hsl(var(--foreground))">suggested it.</text>
+
+  <!-- draft -->
+  <rect x="84" y="42" width="152" height="26" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="160" y="59" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">draft</text>
+  <line x1="160" y1="68" x2="160" y2="84" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <polygon points="160,88 156.5,81 163.5,81" fill="hsl(var(--foreground))"/>
+  <text x="168" y="81" font-size="12" fill="hsl(var(--muted-foreground))">the agent files it</text>
+
+  <!-- proposed -->
+  <rect x="84" y="94" width="152" height="26" rx="3" fill="hsl(var(--foreground))"/>
+  <text x="160" y="111" text-anchor="middle" font-size="12" fill="hsl(var(--card))">proposed</text>
+
+  <!-- you approve -->
+  <line x1="160" y1="120" x2="160" y2="146" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <polygon points="160,150 156.5,143 163.5,143" fill="hsl(var(--foreground))"/>
+  <text x="168" y="138" font-size="12" fill="hsl(var(--foreground))">you approve</text>
+
+  <!-- you reject -->
+  <path d="M84 107 L40 107 L40 172" stroke="hsl(var(--foreground))" stroke-width="1.4" fill="none"/>
+  <polygon points="40,176 36.5,169 43.5,169" fill="hsl(var(--foreground))"/>
+  <text x="4" y="140" font-size="12" fill="hsl(var(--foreground))">you</text>
+  <text x="4" y="152" font-size="12" fill="hsl(var(--foreground))">reject</text>
+
+  <!-- approved -->
+  <rect x="84" y="156" width="152" height="26" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="160" y="173" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">approved</text>
+  <line x1="160" y1="182" x2="160" y2="208" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <polygon points="160,212 156.5,205 163.5,205" fill="hsl(var(--foreground))"/>
+  <text x="168" y="200" font-size="12" fill="hsl(var(--foreground))">you apply</text>
+
+  <!-- applied -->
+  <rect x="84" y="218" width="152" height="26" rx="3" fill="hsl(var(--foreground))"/>
+  <text x="160" y="235" text-anchor="middle" font-size="12" fill="hsl(var(--card))">applied</text>
+
+  <!-- rejected -->
+  <rect x="4" y="180" width="72" height="26" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="40" y="197" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">rejected</text>
+  <text x="4" y="220" font-size="12" fill="hsl(var(--muted-foreground))">stays in</text>
+  <text x="4" y="232" font-size="12" fill="hsl(var(--muted-foreground))">the thread,</text>
+  <text x="4" y="244" font-size="12" fill="hsl(var(--muted-foreground))">faded</text>
+
+  <!-- expired: the clock, not a choice -->
+  <path d="M236 107 L280 107 L280 268" stroke="hsl(var(--muted-foreground))" stroke-width="1.4" fill="none" stroke-dasharray="4 3"/>
+  <path d="M236 169 L262 169" stroke="hsl(var(--muted-foreground))" stroke-width="1.4" fill="none" stroke-dasharray="4 3"/>
+  <polygon points="280,272 276.5,265 283.5,265" fill="hsl(var(--muted-foreground))"/>
+
+  <circle cx="280" cy="140" r="13" fill="hsl(var(--card))" stroke="hsl(var(--muted-foreground))" stroke-width="1.4"/>
+  <path d="M280 133 L280 140 L285 143" stroke="hsl(var(--muted-foreground))" stroke-width="1.4" fill="none"/>
+  <text x="280" y="172" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">14 d</text>
+
+  <rect x="228" y="280" width="88" height="26" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="272" y="297" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">expired</text>
+
+  <!-- ══ the two that are not decisions ═══════════════════════════════ -->
+  <line x1="4" y1="324" x2="316" y2="324" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="342" font-size="12" fill="hsl(var(--foreground))">Four of the six you choose. One the agent</text>
+  <text x="4" y="354" font-size="12" fill="hsl(var(--foreground))">chooses. One is the clock.</text>
+  <text x="4" y="372" font-size="12" fill="hsl(var(--muted-foreground))">Expiry is not a state you enter by deciding</text>
+  <text x="4" y="384" font-size="12" fill="hsl(var(--muted-foreground))">something. It is what happens when nothing is</text>
+  <text x="4" y="396" font-size="12" fill="hsl(var(--muted-foreground))">decided — and it is deliberate: a change worked</text>
+  <text x="4" y="408" font-size="12" fill="hsl(var(--muted-foreground))">out against a project you have since edited is</text>
+  <text x="4" y="420" font-size="12" fill="hsl(var(--muted-foreground))">one to redraft, not to apply late.</text>
+</svg>

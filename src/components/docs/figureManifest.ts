@@ -409,6 +409,141 @@ export const FIGURE_SLOTS: FigureSlot[] = [
       "live reader — and the row rules visibly the one that refuses people. The disagreement " +
       "case drawn: an editor who is not the modeler passing one and failing the other.",
   },
+
+  // ── WP 5.2k · B1–B7 — slots this package added ──────────────────────────
+  {
+    id: "scenario-window",
+    page: "scenarios",
+    file: "scenario-window.svg",
+    title: "Days in, weeks out",
+    alt:
+      "A horizon bar with the warm-up shaded at its left and marked excluded, then a day " +
+      "ruler below it on which two different disruption start days — day 28 and day 30 — both " +
+      "round to week 4, with the week-3/week-4 boundary marked.",
+    caption:
+      "The form takes days; the chain's physics are weekly. Two start dates six days apart " +
+      "can be the same run, and nothing on the form says so.",
+    shows:
+      "The horizon with the warm-up shaded and named as excluded, and — the part the prose " +
+      "cannot carry — the rounding, drawn: a day ruler with two start days landing on one " +
+      "week. Take the rule from project_map.py (`round(start_days / 7)`), not from the form. " +
+      "Duration rounds the same way and is worth one line rather than a second ruler.",
+  },
+  {
+    id: "kpi-vocabulary-gap",
+    page: "reading-your-results",
+    file: "kpi-vocabulary-gap.svg",
+    title: "Measures and labels",
+    alt:
+      "Two columns. What the engine emits joins across to what the results table can label, " +
+      "with a second block of labels on the right that nothing writes to, its incoming arrow " +
+      "crossed out. Below, the five objectives the Setup form offers, of which only Fill rate " +
+      "is a measure a run produces.",
+    caption:
+      "A row with no data is dropped rather than shown as zero, so this costs you measures " +
+      "without ever showing a wrong number. Four of the five objectives you can optimise for " +
+      "produce no chart at all.",
+    shows:
+      "The join between the engine's emitted keys and the results table's labels, as BLOCKS " +
+      "rather than lists — and with NO totals lettered in, because the page renders the counts " +
+      "from RUN_KPIS beside the figure and a number drawn here goes stale the first time the " +
+      "engine gains a measure (F2). **This slot's original brief is superseded**: it asked for " +
+      "'two lines' against §4 D113, which WP 6.3 CLOSED — the table is driven by the run now. " +
+      "The live gap is the objective list, and that is what the lower half draws.",
+  },
+  {
+    id: "delete-reach",
+    page: "exporting-and-deleting",
+    file: "delete-reach.svg",
+    title: "What a deletion reaches",
+    alt:
+      "Four groups a project-scoped table can fall into when a project is deleted: gone by " +
+      "cascade, gone because a function deletes it by name, kept and detached, and kept on " +
+      "purpose. The last group is named — the three log tables — and so is the third.",
+    caption:
+      "Three tables outlive a deleted project, and all three are facts about the account " +
+      "rather than the project. That is a decision, and it is as hard to lose as the cascade.",
+    shows:
+      "The four groups, with the SMALL ones named rather than counted so the figure cannot " +
+      "quietly disagree with the page's own rendered numbers. **The original brief is " +
+      "superseded**: it asked for §4 D117's ten-tables-reached-by-neither, and WP 6.2 closed " +
+      "that with a foreign key each — PROJECT_DELETION now reports three, and they are the " +
+      "log tables, kept deliberately. Draw the decision, not the old defect (F7).",
+  },
+  {
+    id: "two-ingest-paths",
+    page: "csv-vs-connector",
+    file: "two-ingest-paths.svg",
+    title: "Where the routes diverge",
+    alt:
+      "The CSV route and the connector route side by side from source to your data. They " +
+      "differ at every step: the file is kept and the sync has nothing to keep, the file is " +
+      "diffed value by value and the sync only asks whether an id is already there, and the " +
+      "connector's path forks — one branch to a person, one branch to nobody.",
+    caption:
+      "Both end in your data, and almost nothing between is shared. The branch with nobody on " +
+      "it is the one to know about.",
+    shows:
+      "The two paths at the same scale, diverging step by step, with the auto-apply branch " +
+      "drawn as a FORK rather than a footnote — a person on one side and nobody on the other. " +
+      "§4 D116. Each fact belongs to the path it came from: the connector's diff is an " +
+      "id-presence test, so `rows_unchanged` is always 0, and that is worth stating on the " +
+      "drawing rather than in prose beside it.",
+  },
+  {
+    id: "capability-layers",
+    page: "roles-and-capabilities",
+    file: "capability-layers.svg",
+    title: "Four layers, two answers",
+    alt:
+      "The four capability layers as a chain — you, your organization, your role, nobody — " +
+      "each with two different exits: a solid arrow out to the side when a row exists, true " +
+      "or false, and a dashed arrow down to the next layer when no row does.",
+    caption:
+      "A denial is not a missing grant. Removing a grant hands the decision back down the " +
+      "chain; setting it to false takes it away outright.",
+    shows:
+      "The four layers narrowest first, and the two kinds of arrow drawn DIFFERENTLY — 'a row " +
+      "exists, so stop' against 'no row, ask the next layer'. That difference is the whole " +
+      "figure, and it is the thing administrators get wrong.",
+  },
+  {
+    id: "validation-binding",
+    page: "model-validation",
+    file: "validation-binding.svg",
+    title: "What a verdict is tied to",
+    alt:
+      "The four components a validation card binds, each shown twice — by identity on the " +
+      "left and by fingerprint on the right — with the engine's identity column drawn as " +
+      "absent. Below, the three badge states that come of comparing them against the project " +
+      "as it is now.",
+    caption:
+      "This is the one place in the product where a result already carries everything that " +
+      "produced it. The badge is what that binding buys you.",
+    shows:
+      "The four components and their columns from VALIDATION_CARD.binding — by identity AND " +
+      "by fingerprint, because the page's point is that the two answer different questions. " +
+      "Draw the engine row's MISSING identity column rather than omitting the row (F6), and " +
+      "keep the three badge states visually distinct by shape as well as by colour.",
+  },
+  {
+    id: "proposal-lifecycle",
+    page: "plans-and-proposals",
+    file: "proposal-lifecycle.svg",
+    title: "Six states, one clock",
+    alt:
+      "The six proposal states with an arrow per transition, each labelled with who causes " +
+      "it: the agent files a draft, you approve, apply or reject, and a dashed path guarded " +
+      "by a fourteen-day timer leads to expired from both proposed and approved.",
+    caption:
+      "Four of the six you choose and one the agent chooses. The sixth is what happens when " +
+      "nothing is decided, and that is deliberate.",
+    shows:
+      "The six statuses from INTELLIGENCE.proposal, an arrow per transition LABELLED WITH WHO " +
+      "causes it, and the expiry drawn as a TIMER on the edge rather than as another box you " +
+      "could walk into — because the point is that nobody decides it. Rejected stays on the " +
+      "diagram, faded, for the same reason it stays in the thread.",
+  },
 ];
 
 /** Slots for one page, in manifest order. */
