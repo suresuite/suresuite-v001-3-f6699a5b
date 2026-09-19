@@ -6,7 +6,7 @@
 > `supabase/contract/`, not these pages.
 
 48 of 81 tables are covered,
-590 columns in all. A table that is not here is listed
+593 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -39,7 +39,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`network_edges`](network_edges.md) | 3 | `analysis` | 15 | One directed relationship between two firms in one project's deep-tier graph. EVERY column is uploaded — nothing computes this table, which is why it gains no `computed_from_hash` in WP 4.3 although it sits in `graphHashCoverage.test.ts`'s DERIVED_AND_OUT list by name. |
 | [`network_nodes`](network_nodes.md) | 3 | `analysis` | 30 | One firm in one project's deep-tier network graph, identified by `uid`. THE TABLE IS TWO THINGS AND THAT IS §4 D56: nine columns a user uploaded and eight an analysis wrote. WP 4.3 gives the computed half a second home in `analysis_results`; WP 5.3 drops it from here, and what is left is a tier-2 input table. |
 | [`network_summary`](network_summary.md) | 3 | `analysis` | 13 | One rolled-up description of one project's deep-tier graph: node and edge counts and a per-depth breakdown. Every value column is derived. |
-| [`node_list`](node_list.md) | 3 | `analysis` | 19 | One node of one project's supply chain, derived from `supply_chain_data` by `refresh_node_list_for_project`. Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others. |
+| [`node_list`](node_list.md) | 3 | `analysis` | 22 | One node of one project's supply chain, derived from BOTH edge tables — `supply_chain_data` AND `supply_chain_data_multi_tier` — by `refresh_node_list_for_project`. The multi-tier half is WP 8.1's widening: until then the derivation read the flat table only, so 104 deep-tier nodes had no row here and therefore no type any page could read (D117). Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others. SCOPE LIMIT, stated because `supply_tier` makes it visible: this is the projection of the two EDGE tables, so a firm that appears only in `tier2_suppliers` / `tier3_suppliers` is not a node here and its tier is reachable only through `node_supply_tier`. Folding the deep-tier FIRM graph in is a different node universe (`network_nodes.uid` against material ids is D122) and is owned by no package yet. |
 | [`org_capabilities`](org_capabilities.md) | G | `platform` | 5 | One grant or denial, for one org_id and one capability. The org layer: a tenant-wide override of the role default. |
 | [`organization_members`](organization_members.md) | G | `platform` | 5 | One user's membership of one organization, and the role they hold IN that organization. Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for. |
 | [`organizations`](organizations.md) | G | `platform` | 8 | One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold. |
@@ -63,4 +63,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `de7031e73047`, engine `0.2.3`.*
+*Generated from data contract `642f96ac7896`, engine `0.2.3`.*

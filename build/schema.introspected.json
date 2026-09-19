@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 331,
-  "migrations_applied": 323,
+  "migrations_found": 332,
+  "migrations_applied": 324,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260918000004_disruption_plane_audited.sql",
+  "last_migration": "20260919000001_one_node_classifier.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 273,
+    "functions": 278,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -11043,6 +11043,42 @@
           "unique": false,
           "references": null,
           "added_by": "20260917000007_analyzer_provenance.sql"
+        },
+        {
+          "name": "echelon",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260919000001_one_node_classifier.sql"
+        },
+        {
+          "name": "bom_depth",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260919000001_one_node_classifier.sql"
+        },
+        {
+          "name": "supply_tier",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260919000001_one_node_classifier.sql"
         }
       ],
       "constraints": [
@@ -11074,6 +11110,20 @@
           ],
           "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
           "added_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
+        },
+        {
+          "name": "node_list_echelon_declared",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (echelon IS NULL OR echelon IN ('customer','product','subassembly','material','supplier','plant','unknown'))",
+          "added_by": "20260919000001_one_node_classifier.sql"
+        },
+        {
+          "name": "node_list_depths_non_negative",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((bom_depth IS NULL OR bom_depth >= 0) AND (supply_tier IS NULL OR supply_tier >= 0))",
+          "added_by": "20260919000001_one_node_classifier.sql"
         }
       ],
       "indexes": [
@@ -21521,13 +21571,23 @@
       "defined_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
     },
     {
+      "name": "auto_refresh_node_list_on_lane_change",
+      "signature": "auto_refresh_node_list_on_lane_change()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "WP 8.1 · §4 D128. Replaces `auto_refresh_node_list_on_scd_change`, whose body ",
+      "defined_by": "20260919000001_one_node_classifier.sql"
+    },
+    {
       "name": "auto_refresh_node_list_on_scd_change",
       "signature": "auto_refresh_node_list_on_scd_change()",
       "args": [],
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
+      "comment": "DEAD as of WP 8.1 — §4 D128. Read NEW/OLD in a STATEMENT-level trigger, so the ",
       "defined_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
     },
     {
@@ -21827,17 +21887,30 @@
       "defined_by": "20260717000002_chat_quick_thread_id_sha256.sql"
     },
     {
+      "name": "classify_node_echelon",
+      "signature": "classify_node_echelon(uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_node_id text"
+      ],
+      "returns": "text LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "WP 8.1 · §4 D112. THE node classifier. Every other one in this repository is ",
+      "defined_by": "20260919000001_one_node_classifier.sql"
+    },
+    {
       "name": "classify_node_type",
       "signature": "classify_node_type(uuid, text)",
       "args": [
         "p_project_id uuid",
         "p_node_id text"
       ],
-      "returns": "text LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250830231617_879246a9-616c-408d-8b71-2b4ff44461ef.sql"
+      "volatility": "STABLE",
+      "comment": "WP 8.1 · §4 D112. The LEGACY four-value vocabulary, now DERIVED from ",
+      "defined_by": "20260919000001_one_node_classifier.sql"
     },
     {
       "name": "cleanup_simulation_cache",
@@ -23513,6 +23586,46 @@
       "defined_by": "20260917000007_analyzer_provenance.sql"
     },
     {
+      "name": "node_bom_depth",
+      "signature": "node_bom_depth(uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_node_id text"
+      ],
+      "returns": "integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20260919000001_one_node_classifier.sql"
+    },
+    {
+      "name": "node_list_discover",
+      "signature": "node_list_discover(uuid, text, uuid)",
+      "args": [
+        "p_project_id uuid",
+        "p_org text",
+        "p_actor uuid"
+      ],
+      "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "WP 8.1 · §4 D117, D66. The node-set discovery, reading BOTH edge tables and ",
+      "defined_by": "20260919000001_one_node_classifier.sql"
+    },
+    {
+      "name": "node_supply_tier",
+      "signature": "node_supply_tier(uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_node_id text"
+      ],
+      "returns": "integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20260919000001_one_node_classifier.sql"
+    },
+    {
       "name": "normalize_node_location_fields",
       "signature": "normalize_node_location_fields()",
       "args": [],
@@ -23619,7 +23732,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20260919000001_one_node_classifier.sql"
     },
     {
       "name": "recompute_project_completion",
@@ -23728,11 +23841,11 @@
         "p_project_id uuid",
         "p_actor_user_id uuid"
       ],
-      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": "WP 4.3 · `refresh_node_list_for_project` with the actor the trigger needs. ",
-      "defined_by": "20260917000007_analyzer_provenance.sql"
+      "comment": "WP 8.1 · §4 D112, D117. Rebuilds the typed node projection from BOTH edge ",
+      "defined_by": "20260919000001_one_node_classifier.sql"
     },
     {
       "name": "refresh_node_list_for_project",
@@ -23740,11 +23853,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20250830231617_879246a9-616c-408d-8b71-2b4ff44461ef.sql"
+      "defined_by": "20260919000001_one_node_classifier.sql"
     },
     {
       "name": "restore_policy_version",

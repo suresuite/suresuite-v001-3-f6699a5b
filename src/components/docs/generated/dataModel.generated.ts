@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "de7031e73047";
+export const CONTRACT_VERSION = "642f96ac7896";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260918000004_disruption_plane_audited.sql";
+export const LAST_MIGRATION = "20260919000001_one_node_classifier.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
   "tablesDescribed": 48,
-  "columnsDescribed": 590,
+  "columnsDescribed": 593,
   "tablesUndescribed": 33
 } as const;
 
@@ -200,8 +200,8 @@ export const TIERS: GlanceTier[] = [
       },
       {
         "table": "node_list",
-        "grain": "One node of one project's supply chain, derived from `supply_chain_data` by `refresh_node_list_for_project`. Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others.",
-        "columns": 19,
+        "grain": "One node of one project's supply chain, derived from BOTH edge tables — `supply_chain_data` AND `supply_chain_data_multi_tier` — by `refresh_node_list_for_project`. The multi-tier half is WP 8.1's widening: until then the derivation read the flat table only, so 104 deep-tier nodes had no row here and therefore no type any page could read (D117). Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others. SCOPE LIMIT, stated because `supply_tier` makes it visible: this is the projection of the two EDGE tables, so a firm that appears only in `tier2_suppliers` / `tier3_suppliers` is not a node here and its tier is reachable only through `node_supply_tier`. Folding the deep-tier FIRM graph in is a different node universe (`network_nodes.uid` against material ids is D122) and is owned by no package yet.",
+        "columns": 22,
         "owner": "analysis"
       },
       {

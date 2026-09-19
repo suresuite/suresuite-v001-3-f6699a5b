@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 590;
+export const REFERENCE_COLUMN_COUNT = 593;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -9928,7 +9928,7 @@ export const REFERENCE_TABLES: RefTable[] = [
     "tier": "3",
     "tierName": "derived — a pure function of tier 2",
     "owner": "analysis",
-    "grain": "One node of one project's supply chain, derived from `supply_chain_data` by `refresh_node_list_for_project`. Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others.",
+    "grain": "One node of one project's supply chain, derived from BOTH edge tables — `supply_chain_data` AND `supply_chain_data_multi_tier` — by `refresh_node_list_for_project`. The multi-tier half is WP 8.1's widening: until then the derivation read the flat table only, so 104 deep-tier nodes had no row here and therefore no type any page could read (D117). Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others. SCOPE LIMIT, stated because `supply_tier` makes it visible: this is the projection of the two EDGE tables, so a firm that appears only in `tier2_suppliers` / `tier3_suppliers` is not a node here and its tier is reachable only through `node_supply_tier`. Folding the deep-tier FIRM graph in is a different node universe (`network_nodes.uid` against material ids is D122) and is owned by no package yet.",
     "naturalKey": [
       "project_id",
       "node_id",
@@ -9938,7 +9938,16 @@ export const REFERENCE_TABLES: RefTable[] = [
       "project_id",
       "node_id"
     ],
-    "checks": [],
+    "checks": [
+      {
+        "name": "node_list_echelon_declared",
+        "definition": "CHECK (echelon IS NULL OR echelon IN ('customer','product','subassembly','material','supplier','plant','unknown'))"
+      },
+      {
+        "name": "node_list_depths_non_negative",
+        "definition": "CHECK ((bom_depth IS NULL OR bom_depth >= 0) AND (supply_tier IS NULL OR supply_tier >= 0))"
+      }
+    ],
     "ingestDataset": null,
     "surfaces": [
       {
@@ -10080,7 +10089,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Supplier, plant, customer — the echelon the node sits in, derived by the refresh.",
+        "meaning": "THE LEGACY FOUR-VALUE VOCABULARY — `customer`, `product`, `material`, `supplier`, plus `unknown`. Since WP 8.1 it is DERIVED from `echelon` rather than computed by a second priority order beside it (`classify_node_type` is now a mapping, not a rule), so the two cannot drift — which is `single-source` (I1) applied to a function instead of to a document. Kept because `MapView` reads it today; WP 8.3 moves the pages to `echelon` and a later package drops it. `subassembly` maps to `material` here: the OLD order answered `product` for such a node, which told the map to draw a thing the plant consumes on the customer side (D112).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -10094,7 +10103,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "identifier",
-        "computedBy": null
+        "computedBy": "classify_node_echelon"
       },
       {
         "name": "node_group",
@@ -10104,7 +10113,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Grouping label for the node, derived by the refresh.",
+        "meaning": "`initcap` of `node_type`, derived by the refresh from the same single rule. It carries no information `node_type` does not; WP 8.3 reads `echelon` and a later package drops both.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -10118,7 +10127,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "identifier",
-        "computedBy": null
+        "computedBy": "classify_node_echelon"
       },
       {
         "name": "description_text",
@@ -10431,6 +10440,78 @@ export const REFERENCE_TABLES: RefTable[] = [
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
         "computedBy": "analysis_mark_critical_nodes"
+      },
+      {
+        "name": "echelon",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "THE node's role in the supply chain, authored once and read rather than re-inferred. CHECK-constrained to `customer`, `product`, `subassembly`, `material`, `supplier`, `plant`, `unknown`. D112 is what it replaces: eight independent classifiers, across SQL, four pages, the map component and the engine, each inferring a type at render time from a different signal because there is no type column on either edge table — and `supply_chain_data.from_location`'s own sidecar says the id alone cannot answer it (\"a supplier, a material, or the plant, depending on which lane produced it\"). TWO KINDS OF NOT-KNOWING, deliberately kept apart: NULL means never derived, and `unknown` means derived and unplaceable. Collapsing them is how \"we have not looked\" becomes \"we looked and found nothing\", which is the substitution T1 forbids. `subassembly` is the value the old vocabulary had no word for — §15 run 35433474185 found 65 nodes that are both a BOM target and a BOM source on one project, every one of which the old rule called a `product`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": "classify_node_echelon"
+      },
+      {
+        "name": "bom_depth",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Depth in the BOM tree, read from `bom_multi_level.level` — the table that OWNS the measurement — and NULL for a node that is in no BOM. This is what `supply_chain_data_multi_tier.level` actually holds on the bom lane, under a name that says so. The rule is MIN, not MAX: a material used by two assemblies at different depths has more than one true depth, and the shallowest is the one that says how close to a finished product it sits; a node that is only ever a PARENT at level 1 is the finished product, depth 0. It is NOT read from the lane's own `level` column, because two live writers disagree about what that column means and one of them discards this very value for a literal 2 (D125).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "node_bom_depth"
+      },
+      {
+        "name": "supply_tier",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Tiers upstream of the focal plant: 0 the plant itself, 1 a direct supplier, 2 and 3 from `tier2_suppliers` / `tier3_suppliers`. NULL when unknown, which includes every material, product and customer — they are not upstream suppliers, and reporting 0 for them would be D119's substitution wearing a different column name. This is what `supply_chain_data_multi_tier.level`'s contract CLAIMED to be, and keeping it apart from `bom_depth` is the whole point: a BOM three levels deep does not mean three tiers of suppliers, and a tier-2 supplier is not \"a material at level 2\". The rule is MIN across the sources, because \"tiers upstream\" means the shortest such path. See the table's `grain` for why 2 and 3 are rarely reachable today.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "level",
+        "computedBy": "node_supply_tier"
       }
     ]
   },

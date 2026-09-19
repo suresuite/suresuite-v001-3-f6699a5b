@@ -9,7 +9,7 @@
 
 **Tier 3** — derived — a pure function of tier 2 · owned by `analysis` · `public.node_list`
 
-**One row is** One node of one project's supply chain, derived from `supply_chain_data` by `refresh_node_list_for_project`. Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others.
+**One row is** One node of one project's supply chain, derived from BOTH edge tables — `supply_chain_data` AND `supply_chain_data_multi_tier` — by `refresh_node_list_for_project`. The multi-tier half is WP 8.1's widening: until then the derivation read the flat table only, so 104 deep-tier nodes had no row here and therefore no type any page could read (D117). Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others. SCOPE LIMIT, stated because `supply_tier` makes it visible: this is the projection of the two EDGE tables, so a firm that appears only in `tier2_suppliers` / `tier3_suppliers` is not a node here and its tier is reachable only through `node_supply_tier`. Folding the deep-tier FIRM graph in is a different node universe (`network_nodes.uid` against material ids is D122) and is owned by no package yet.
 
 ## Uniqueness
 
@@ -23,6 +23,14 @@ database ENFORCES it: `node_list_unique_per_project`. A re-upload of the same ro
 it rather than duplicating it.
 
 ## Constraints
+
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `node_list_echelon_declared` | `CHECK (echelon IS NULL OR echelon IN ('customer','product','subassembly','material','supplier','plant','unknown'))` | `20260919000001_one_node_classifier.sql` |
+| `node_list_depths_non_negative` | `CHECK ((bom_depth IS NULL OR bom_depth >= 0) AND (supply_tier IS NULL OR supply_tier >= 0))` | `20260919000001_one_node_classifier.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
@@ -79,8 +87,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `project_id` | — | `uuid` | — | — | The project this row belongs to. Referenced by uuid and never by a displayable name (`uuid-identity`, G1); cascades on project delete. |
 | `plant_name` | — | `text` | — | — | The plant label the row was uploaded under. NOT a project scope — a plant name is not unique across projects, which is the ambiguity `analysis_mark_critical_nodes` had to work around by deriving the project from the rows it was given. |
 | `node_id` | — | `text` | — | — | The node's identifier within the project, derived by `refresh_node_list_for_project` from `supply_chain_data`. Natural key with `project_id`. |
-| `node_type` | — | `text` | — | — | Supplier, plant, customer — the echelon the node sits in, derived by the refresh. |
-| `node_group` | — | `text` | — | — | Grouping label for the node, derived by the refresh. |
+| `node_type` | — | `text` | — | — | THE LEGACY FOUR-VALUE VOCABULARY — `customer`, `product`, `material`, `supplier`, plus `unknown`. Since WP 8.1 it is DERIVED from `echelon` rather than computed by a second priority order beside it (`classify_node_type` is now a mapping, not a rule), so the two cannot drift — which is `single-source` (I1) applied to a function instead of to a document. Kept because `MapView` reads it today; WP 8.3 moves the pages to `echelon` and a later package drops it. `subassembly` maps to `material` here: the OLD order answered `product` for such a node, which told the map to draw a thing the plant consumes on the customer side (D112). |
+| `node_group` | — | `text` | — | — | `initcap` of `node_type`, derived by the refresh from the same single rule. It carries no information `node_type` does not; WP 8.3 reads `echelon` and a later package drops both. |
 | `description_text` | — | `text` | — | — | Free-text description carried through from the source row. |
 | `location_text` | — | `text` | — | — | The location string the source row carried. `geocode-locations` reads it to produce `latitude`/`longitude`. |
 | `longitude` | — | `numeric` | — | — | ANALYSIS OUTPUT — written by `geocode-locations` from `location_text`, NOT uploaded. It carries no provenance of its own: the geocoder is not yet a registered analysis kind, so `computed_from_hash` on this row describes the CRITICALITY columns only. Named for WP 4.4. |
@@ -94,6 +102,9 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `updated_at` | — | `timestamp with time zone` | — | — | Row update time, maintained by the database. When a row was TOUCHED is not what it SAYS, which is why `input-hash` (I5) is anchored on `computed_from_hash` and not on this (§4 D12). |
 | `computed_from_hash` | — | `text` | — | — | WP 4.3 · the `analysis_runs.input_hash` of the run that wrote this row's computed columns — the world the number came from. NULL means "written before WP 4.3, provenance unknown", which is a reportable state and not a silent default (`declared-fallback`, I6). This is the column invariant `input-hash` (I5) is about. |
 | `computed_at` | — | `timestamp with time zone` | — | — | WP 4.3 · when the run that wrote the computed columns finished. It is provenance, not staleness: staleness is `computed_from_hash <> current_graph_hash()`, which is WP 4.4's one rule, and a timestamp comparison is the thing that rule replaces (§4 D12). |
+| `echelon` | — | `text` | — | — | THE node's role in the supply chain, authored once and read rather than re-inferred. CHECK-constrained to `customer`, `product`, `subassembly`, `material`, `supplier`, `plant`, `unknown`. D112 is what it replaces: eight independent classifiers, across SQL, four pages, the map component and the engine, each inferring a type at render time from a different signal because there is no type column on either edge table — and `supply_chain_data.from_location`'s own sidecar says the id alone cannot answer it ("a supplier, a material, or the plant, depending on which lane produced it"). TWO KINDS OF NOT-KNOWING, deliberately kept apart: NULL means never derived, and `unknown` means derived and unplaceable. Collapsing them is how "we have not looked" becomes "we looked and found nothing", which is the substitution T1 forbids. `subassembly` is the value the old vocabulary had no word for — §15 run 35433474185 found 65 nodes that are both a BOM target and a BOM source on one project, every one of which the old rule called a `product`. |
+| `bom_depth` | — | `integer` | — | — | Depth in the BOM tree, read from `bom_multi_level.level` — the table that OWNS the measurement — and NULL for a node that is in no BOM. This is what `supply_chain_data_multi_tier.level` actually holds on the bom lane, under a name that says so. The rule is MIN, not MAX: a material used by two assemblies at different depths has more than one true depth, and the shallowest is the one that says how close to a finished product it sits; a node that is only ever a PARENT at level 1 is the finished product, depth 0. It is NOT read from the lane's own `level` column, because two live writers disagree about what that column means and one of them discards this very value for a literal 2 (D125). |
+| `supply_tier` | — | `integer` | — | — | Tiers upstream of the focal plant: 0 the plant itself, 1 a direct supplier, 2 and 3 from `tier2_suppliers` / `tier3_suppliers`. NULL when unknown, which includes every material, product and customer — they are not upstream suppliers, and reporting 0 for them would be D119's substitution wearing a different column name. This is what `supply_chain_data_multi_tier.level`'s contract CLAIMED to be, and keeping it apart from `bom_depth` is the whole point: a BOM three levels deep does not mean three tiers of suppliers, and a tier-2 supplier is not "a material at level 2". The rule is MIN across the sources, because "tiers upstream" means the shortest such path. See the table's `grain` for why 2 and 3 are rarely reachable today. |
 
 ## Each column in full
 
@@ -163,7 +174,7 @@ The node's identifier within the project, derived by `refresh_node_list_for_proj
 
 ### `node_type`
 
-Supplier, plant, customer — the echelon the node sits in, derived by the refresh.
+THE LEGACY FOUR-VALUE VOCABULARY — `customer`, `product`, `material`, `supplier`, plus `unknown`. Since WP 8.1 it is DERIVED from `echelon` rather than computed by a second priority order beside it (`classify_node_type` is now a mapping, not a rule), so the two cannot drift — which is `single-source` (I1) applied to a function instead of to a document. Kept because `MapView` reads it today; WP 8.3 moves the pages to `echelon` and a later package drops it. `subassembly` maps to `material` here: the OLD order answered `product` for such a node, which told the map to draw a thing the plant consumes on the customer side (D112).
 
 | | |
 |---|---|
@@ -179,7 +190,7 @@ Supplier, plant, customer — the echelon the node sits in, derived by the refre
 
 ### `node_group`
 
-Grouping label for the node, derived by the refresh.
+`initcap` of `node_type`, derived by the refresh from the same single rule. It carries no information `node_type` does not; WP 8.3 reads `echelon` and a later package drops both.
 
 | | |
 |---|---|
@@ -401,6 +412,54 @@ WP 4.3 · when the run that wrote the computed columns finished. It is provenanc
 
 > Provenance. Not an engine input; it describes where a number came from.
 
+### `echelon`
+
+THE node's role in the supply chain, authored once and read rather than re-inferred. CHECK-constrained to `customer`, `product`, `subassembly`, `material`, `supplier`, `plant`, `unknown`. D112 is what it replaces: eight independent classifiers, across SQL, four pages, the map component and the engine, each inferring a type at render time from a different signal because there is no type column on either edge table — and `supply_chain_data.from_location`'s own sidecar says the id alone cannot answer it ("a supplier, a material, or the plant, depending on which lane produced it"). TWO KINDS OF NOT-KNOWING, deliberately kept apart: NULL means never derived, and `unknown` means derived and unplaceable. Collapsing them is how "we have not looked" becomes "we looked and found nothing", which is the substitution T1 forbids. `subassembly` is the value the old vocabulary had no word for — §15 run 35433474185 found 65 nodes that are both a BOM target and a BOM source on one project, every one of which the old rule called a `product`.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20260919000001_one_node_classifier.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+> The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.
+
+### `bom_depth`
+
+Depth in the BOM tree, read from `bom_multi_level.level` — the table that OWNS the measurement — and NULL for a node that is in no BOM. This is what `supply_chain_data_multi_tier.level` actually holds on the bom lane, under a name that says so. The rule is MIN, not MAX: a material used by two assemblies at different depths has more than one true depth, and the shallowest is the one that says how close to a finished product it sits; a node that is only ever a PARENT at level 1 is the finished product, depth 0. It is NOT read from the lane's own `level` column, because two live writers disagree about what that column means and one of them discards this very value for a literal 2 (D125).
+
+| | |
+|---|---|
+| Type | `integer` |
+| Grain | `level` |
+| Unit | dimensionless |
+| Added by | `20260919000001_one_node_classifier.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+> The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.
+
+### `supply_tier`
+
+Tiers upstream of the focal plant: 0 the plant itself, 1 a direct supplier, 2 and 3 from `tier2_suppliers` / `tier3_suppliers`. NULL when unknown, which includes every material, product and customer — they are not upstream suppliers, and reporting 0 for them would be D119's substitution wearing a different column name. This is what `supply_chain_data_multi_tier.level`'s contract CLAIMED to be, and keeping it apart from `bom_depth` is the whole point: a BOM three levels deep does not mean three tiers of suppliers, and a tier-2 supplier is not "a material at level 2". The rule is MIN across the sources, because "tiers upstream" means the shortest such path. See the table's `grain` for why 2 and 3 are rarely reachable today.
+
+| | |
+|---|---|
+| Type | `integer` |
+| Grain | `level` |
+| Unit | dimensionless |
+| Added by | `20260919000001_one_node_classifier.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+> The engine reads the tier-2 dataset through `datamap.py` and never the deep-tier graph, so no column of this table reaches it. The two centrality ANALYZERS do read some of them — `meaning` says which.
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -411,6 +470,6 @@ WP 4.3 · when the run that wrote the computed columns finished. It is provenanc
 
 ---
 
-*Generated from data contract `de7031e73047`, engine `0.2.3`,
+*Generated from data contract `642f96ac7896`, engine `0.2.3`,
 sidecar `supabase/contract/node_list.contract.yaml`, table created by `20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
