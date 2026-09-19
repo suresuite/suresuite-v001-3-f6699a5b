@@ -71,3 +71,16 @@ verify_jwt = false
 # trust: `ingest_land_file` refuses a landing into a project the asserted user
 # cannot reach. Platform verification stays on, as it is for the three it replaces.
 verify_jwt = true
+
+[functions.session-mint]
+# Phase 7 / WP 7.1 stage 1b. Verification must be OFF, and this is the one function
+# where that is structural rather than a trade-off: it is the endpoint that ISSUES the
+# session token, so requiring a token to reach it is a circle. A caller is by definition
+# unauthenticated.
+#
+# It is not therefore unguarded. It verifies the password ITSELF, server-side, through
+# `authenticate_approved_user` with the service role — it does not accept the client's
+# claim to have already logged in — and it answers 501 while `SUPABASE_JWT_SECRET` is
+# unset, which it is today. A wrong password and an unknown address get the same 401, so
+# the endpoint does not say whether an address is registered.
+verify_jwt = false

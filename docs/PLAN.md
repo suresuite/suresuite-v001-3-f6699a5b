@@ -2647,7 +2647,7 @@ leaves a working product whether or not the next stage ever runs.
 |---|---|---|---|---|
 | **0** ✅ *(run `35466925117`; nine probes — the last two added after reading the first seven)* | **Measure, change nothing.** A §15 read of which policies exist on the live database, which roles hold which grants, and whether any session is reaching a predicate at all — plus, added when the probes were written, **which ROLE each policy is granted to and which privileges `anon` holds that `authenticated` does not** (0.6, 0.7: stage 1's own blast radius, which the rest of this table had not asked — see below) | Nothing — read-only; `assertReadOnly()` refuses anything but `select` | n/a | **DONE, and it moved three of the numbers below**: 48 predicate-less policies over 30 tables (not 27 / 27), 16 of them covering a write (not 7), 86 tables `anon` may write (not 7), and 0 of 14 approved users present in `auth.users`. The repo's 27 / 7 / 7 were from MIGRATION HISTORY and a live read differed by more than an order of magnitude — §4 D43's class, D129 and D130 |
 | **1a** ✅ *(`20260919000010`)* | **Widen the sixteen policies granted to `{anon}` alone** to `TO anon, authenticated`, predicates untouched — so the role change stage 1b causes takes no read away from whoever logged in (D130). `DROP … IF EXISTS` + `CREATE` rather than `ALTER`, because five of the sixteen were in production and in no migration and `ALTER` raises on an absent policy: the statement is total, and the five are adopted in the same commit (D133) | Nothing today — a policy gaining a role takes none away, and no session exists yet | The same sixteen statements with `TO anon` | `rehearsal/300`, three sections, five mutations: §2 proves the MECHANISM on a table it builds (a policy `TO anon` refuses `authenticated` — 0 rows — and widening admits it — 1 row), §1 pins all sixteen with their measured predicates, §3 exercises one shipped policy on a real table with RLS enabled on purpose |
-| **1b** | **Issue a real session at login**, beside the existing one — and STAGE 0 CHANGED WHAT THAT MEANS (D130). There is no identity to attach to: `auth.users` holds 1 row, `approved_users` 14, overlap 0. So stage 1 either imports 14 identities (whose passwords this app does not hold in a form Supabase Auth takes) or **signs a JWT whose `sub` is the `approved_users.id`**, which works because `auth.uid()` reads the claim and not the table. It also begins by widening the **16 policies granted to `{anon}` alone**, because the role change alone would take those reads away from whoever logged in. `authenticate_approved_user` continues to be the authority; a Supabase Auth session is created alongside it so `auth.uid()` starts returning a value. **No policy reads it yet.** | Nothing reads it, so nothing can break. A failure to issue must not fail the login | Stop issuing | A rehearsal that logs in and asserts `auth.uid()` and the GUC resolve to the SAME user |
+| **1b** ✅ *(shipped INERT — `session-mint`, `_shared/mintSessionToken.ts`, `src/lib/auth/sessionMint.ts`)* | **Issue a real session at login**, beside the existing one — and STAGE 0 CHANGED WHAT THAT MEANS (D130). There is no identity to attach to: `auth.users` holds 1 row, `approved_users` 14, overlap 0. So stage 1 either imports 14 identities (whose passwords this app does not hold in a form Supabase Auth takes) or **signs a JWT whose `sub` is the `approved_users.id`**, which works because `auth.uid()` reads the claim and not the table. It also begins by widening the **16 policies granted to `{anon}` alone**, because the role change alone would take those reads away from whoever logged in. `authenticate_approved_user` continues to be the authority; a Supabase Auth session is created alongside it so `auth.uid()` starts returning a value. **No policy reads it yet.** | Nothing reads it, so nothing can break. A failure to issue must not fail the login | Stop issuing | A rehearsal that logs in and asserts `auth.uid()` and the GUC resolve to the SAME user |
 | **2** ✅ *(`20260919000011`)* | **Flip the ORDER inside `get_current_user_id()`**: prefer `auth.uid()`, fall back to the GUC, then the legacy JWT-email lookup. **Taken BEFORE 1b, which §14 had ordered the other way** — and the reason is stronger than "the two agree": `auth.uid()` is NULL for every caller in production today (the browser presents the anon key, whose JWT has a role and no `sub`), so branch 1 cannot fire and this is a no-op until a session exists. **It prefers the session only when the session names an approved user**, because production holds 1 `auth.users` row against 14 `approved_users` with overlap ZERO (D130) — a bare `COALESCE` would resolve a caller to somebody who is in no `approved_users` row, silently, since every predicate downstream compares against that table. Now also `STABLE`, which it always was in fact: 54 policies call it per predicate, it was VOLATILE by omission and therefore evaluated once per ROW, and the change that adds a lookup is the one that makes the lookup free | Nothing today — branch 1 is unreachable until 1b | One `CREATE OR REPLACE` with the previous body | `rehearsal/310`, five sections, four mutations: the session beats a GUC naming somebody else, a session naming a NON-approved uuid is ignored and the GUC still answers, no session behaves exactly as before, **§3b proves it is the GUC branch answering rather than the legacy branch wearing its clothes** (the mutation that deleted the fallback passed the first draft, because branch 3 reads the same GUC), and §4 pins `provolatile = 's'` |
 | **3** | **Add a RESTRICTIVE policy per table** — `AS RESTRICTIVE … USING (auth.uid() IS NOT NULL)`. A restrictive policy **ANDs** with the permissive set, so a predicate-less policy keeps working for a real session and stops working for a genuinely anonymous caller. **48 policies over 30 tables, not 27 over 27** (D129) — and probe 0.8 settled the mechanism's reach: **no table has RLS off**, so every one of them can be ANDed against and stage 3 has no exceptions | A surface that never had a session loses access — which is the point, and is why it is one table per push | `DROP POLICY` restores the previous behaviour EXACTLY, because nothing else changed | A rehearsal per table: one session reads, one anonymous connection is refused |
 | **4** | **Revoke `anon`'s write grants on the ELEVEN tables probe 0.8 measured** — `customers`, `dataset_versions`, `experiments`, `materials`, `policy_versions`, `products`, `run_item_series`, `run_replications`, `scenarios`, `simulation_runs`, `suppliers` — one per push. §14's original seven were seven of these, missing the four tier-2 masters; the 86 grants `anon` holds are mostly inert, because 46 tables' write policies carry a predicate, 23 have no write policy at all (`audit_logs` among them — denied today, not writable) and 6 are views (D129) | A writer still running as `anon` stops writing | `GRANT` it back | A §15 read either side, and the client path exercised once per table |
@@ -2673,17 +2673,53 @@ nothing about what was granted to `authenticated` beside it. Probes 0.6 and 0.7 
 and the widening is additive and revertible, which is the only reason it belongs in this
 sequence rather than ahead of it.
 
-**1b IS WHERE THIS PLAN MEETS SOMETHING NO GATE IN THIS REPOSITORY CAN CHECK.**
-Every other stage is a migration and `contract:rehearse` can execute it against a real
-PostgreSQL 16. Stage 1b is not: minting a session means GoTrue, and the rehearsal harness
-is a bare `postgres:16` with three roles created by hand (`rehearsal-schema.mjs`) and no
-auth server at all. So `SET LOCAL ROLE authenticated` can prove what a policy does with a
-role — `rehearsal/300` §2 does exactly that — and nothing here can prove that a login
-produces a JWT whose `sub` is the right uuid. **Its correctness is only observable in
-production**, which puts it in the same class as WP 6.5's two deliverables rather than in
-the same class as stages 1a, 3, 4, 5 and 6.
+**1b IS SHIPPED AND IT IS INERT. THE ONE THING IT NEEDS IS NOT IN THIS REPOSITORY.**
+The route chosen is the second column below: sign a token over the id that already exists.
+Three pieces, all merged and none of them changing a single login today:
 
-Two routes, and they are not the same size:
+- **`_shared/mintSessionToken.ts`** — HS256 over Web Crypto, no dependency, so the SAME
+  module the edge function imports is importable by `vitest`. `sub` is the
+  `approved_users.id`, `role` and `aud` are `authenticated`, the issuer is the project's
+  auth endpoint, and there is **no refresh token**: GoTrue cannot refresh a subject it has
+  never heard of, and a refresh field that cannot work is the fallback I6 forbids.
+- **`supabase/functions/session-mint`** — verifies the password ITSELF with the service
+  role rather than trusting the client's claim to have already done so, then mints and
+  verifies its own output before returning it. `verify_jwt = false` is declared in
+  `config.toml`, structurally: it is the endpoint that issues the token, so requiring a
+  token to reach it is a circle. **It answers 501 while `SUPABASE_JWT_SECRET` is unset.**
+- **`src/lib/auth/sessionMint.ts`** — `SESSION_MINT_DEFAULT = false`. It touches
+  `supabase.auth` never and re-routes no existing request; the token lives in memory only,
+  not `localStorage`, because a bearer token that outlives the tab is one somebody else can
+  find. `useAuth` calls it after the login is already recorded, inside a `try` that returns
+  success whatever it reports.
+
+**THE ONE MANUAL STEP: `SUPABASE_JWT_SECRET` must be set as a function secret.** It lives
+in the project's API settings and no session in this repository can reach it. Until it is
+set, `session-mint` mints nothing and every login takes exactly today's path.
+
+**Then turn it on in this order**, because the part that cannot be verified here should be
+verified by one person before everybody:
+
+1. **One browser, no deploy** — `localStorage.setItem('session_mint', 'on')`. That person's
+   next login mints a token and asks `get_current_user_id()` who it thinks is acting. The
+   console says `confirmed` with the resolved uuid, `mismatch` (minted, database disagrees —
+   the interesting failure), or `not_configured`.
+2. **Everybody** — flip `SESSION_MINT_DEFAULT` to `true` and deploy.
+
+**WHAT NO GATE HERE CAN CHECK, STATED RATHER THAN IMPLIED.**
+Every other stage is a migration and `contract:rehearse` can execute it against a real
+PostgreSQL 16. This one cannot be: minting a token PostgREST accepts needs the live project
+secret, and the harness is a bare `postgres:16` with three roles created by hand
+(`rehearsal-schema.mjs`), no GoTrue and no PostgREST. `sessionMintToken.test.ts` pins what
+IS checkable — 15 assertions over the signature, the claims, the expiry and the two
+refusals, including that an edited claim no longer verifies — and its last test states in
+the suite itself what the suite does not establish. The step that confirms the rest is
+step 1 above, in production, by one person, reversibly. That is why `mintAndVerifySession`
+asks the database who it thinks is acting and reports the answer: the evidence is the
+deliverable.
+
+**THE TWO ROUTES, AND WHY THE SECOND WAS TAKEN.** They were sized before either was
+written, and the choice is recorded rather than implied:
 
 | | Import 14 identities | Sign a JWT over the id that exists |
 |---|---|---|
@@ -2693,6 +2729,21 @@ Two routes, and they are not the same size:
 | Blast radius | the login path AND the identity store; a botched import is 14 rows to reconcile | the login path only |
 | Revert | delete 14 auth users | stop signing |
 | Also fixes | the eight remaining `auth.users` foreign keys (D131's class) resolve for real users | nothing — those keys still reference rows that do not exist |
+| Verifiable here | no | no — but the token itself is (`sessionMintToken.test.ts`, 15 assertions) |
+| **Chosen** | | **✅ this one** |
+
+**Neither route is verifiable end to end in this repository and the chosen one is at least
+verifiable in part**, which is the tie-break on top of the blast radius: the signing, the
+claims and the refusals are unit-tested against a known secret, and what remains unproven
+is narrowed to "does the live project accept it", which step 1 above answers with one
+person and one browser. The import route's unverifiable surface is the whole of it.
+
+What the chosen route does NOT fix is the eight remaining `auth.users` foreign keys: a
+signed token puts no row in `auth.users`, so those keys still point at rows that do not
+exist for a real user. That is why D131's remedy is to DROP the two that block a live path
+rather than to fill the table — the two answers are independent, and filling the table was
+never the cheaper one.
+
 
 **Neither is obviously right, and the second is what stage 1b will do unless the identity
 import is wanted for its own sake.** It is smaller, reversible, touches no password, and
@@ -15696,3 +15747,92 @@ deletes the branch anyway.
   every base that did not have them. All 30 assertion files pass in all three modes, so
   nothing depended on their absence — but that is measured, not assumed, and it is the
   kind of change that would be invisible if it had broken something subtle.
+
+### WP 7.1 (stage 1b) — the session exists, and it is inert until somebody sets one secret · 2026-09-19 · no migration
+
+**What the previous slice promised.** That stage 1b would be re-planned rather than
+written, that both routes were in §14 with their blast radii, and that the JWT route was
+the smaller one. The route was chosen — sign a token over the id that already exists — and
+this slice ships it whole.
+
+#### A · THREE PIECES, AND NOT ONE LOGIN CHANGES TODAY
+
+- **`_shared/mintSessionToken.ts`** — HS256 over Web Crypto with no dependency, which is
+  also a test decision: the same module the edge function imports is importable by
+  `vitest`, and that is the only part of stage 1b any gate here can check. `sub` is the
+  `approved_users.id`, `role` and `aud` are `authenticated`, the issuer is the project's
+  auth endpoint, and there is **no refresh token** — GoTrue cannot refresh a subject it has
+  never heard of, and a refresh field that cannot work is the fallback I6 forbids. A
+  non-GoTrue `app_identity: "approved_users"` claim says where the subject came from, so a
+  token found in a log is traceable to this path rather than mistaken for one GoTrue issued.
+- **`supabase/functions/session-mint`** — verifies the password ITSELF with the service
+  role. The client has already called `authenticate_approved_user` to log the user in and
+  that is irrelevant: a caller of this endpoint is an unauthenticated request asking for a
+  token, so the password is checked again on this side of the wire. A wrong password and an
+  unknown address return the same 401. It verifies its own output before returning it,
+  because a token it cannot verify is one it should not hand out. `verify_jwt = false` is
+  declared in `config.toml` — structurally, since this is the endpoint that ISSUES the
+  token and requiring a token to reach it is a circle — and declared THERE rather than as
+  `--no-verify-jwt` in the workflow, because config.toml is where this repository states a
+  trust model and a flag in a YAML file is not a declaration anybody reading the function
+  would find.
+- **`src/lib/auth/sessionMint.ts`** — `SESSION_MINT_DEFAULT = false`. It touches
+  `supabase.auth` never and re-routes no existing request, so every call the application
+  makes still goes out as `anon` with the GUC, which is what "beside the existing one"
+  means. The token is held in memory only; a bearer token that outlives the tab is one
+  somebody else can find. `useAuth` calls it after the login is already recorded, inside a
+  `try` that returns success whatever it reports — a session experiment must not be able to
+  cost somebody their login.
+
+#### B · THE ONE MANUAL STEP, AND WHY IT IS A FEATURE OF THIS SLICE
+
+**`SUPABASE_JWT_SECRET` must be set as a function secret.** It lives in the project's API
+settings and no session in this repository can reach it. Without it `session-mint` answers
+**501** — `not_configured`, not an error — and the client records that and falls back to
+today's login.
+
+So the blast radius of merging stage 1b is **zero**, and the blast radius of the secret is a
+decision somebody takes deliberately. That is not a workaround for the missing secret; it is
+the property that makes an unverifiable change safe to land, and it is the same shape as
+`ingest-file`'s deferral (D123) with the switch made explicit instead of implicit.
+
+#### C · WHAT IS CHECKED, AND WHAT IS SAID INSTEAD OF CHECKED
+
+`sessionMintToken.test.ts` holds 15 assertions: three base64url segments, HS256 in the
+header, verification against the right secret, **failure against a wrong one**, **failure
+once a claim is edited** (the assertion that separates a token from a cookie), `sub` /
+`role` / `aud` / `iss`, the issuer with no doubled slash, a one-hour expiry, the ABSENCE of
+a refresh field, and the two refusals (no secret, no user id). Mutation-checked: changing
+`role` to `anon` turns one red.
+
+What it cannot show is that the live project accepts the token, and the suite's last test
+says so in the suite itself rather than leaving a green run to imply otherwise. The step
+that settles it is one person, one browser, `localStorage.setItem('session_mint', 'on')`,
+one login — `mintAndVerifySession` then asks `get_current_user_id()` who it thinks is acting
+and logs `confirmed` with the resolved uuid, or `mismatch`, which is the interesting
+failure. **The evidence is the deliverable**, because this is the one stage whose
+correctness lives in production.
+
+#### D · THE GAP CHECK
+
+- **Stages 3–6 are still blocked, and now on a secret rather than on a decision.** Stage 3's
+  restrictive policies say `auth.uid() IS NOT NULL`, which denies everybody until sessions
+  are actually flowing — not merely available. So the order is: set the secret, confirm with
+  one browser, flip the default, watch, then stage 3. Taking stage 3 before sessions flow
+  would be an outage, and it is worth saying plainly because every remaining stage looks
+  like a small migration and this is the one sequencing rule that matters.
+- **`session-mint` is deployed by the workflow and R17 counts it** (19 functions, 12
+  deployed). D123's lesson applied on the way in rather than after: a function with no push
+  path is a function that ships to `main` and never runs.
+- **The token's acceptance by PostgREST is unproven and unprovable here.** Named in §14, in
+  the test suite, and in this entry — three places, because the failure mode of an
+  unverifiable change is that somebody later reads the green suite as proof.
+- **Nothing revokes a minted token.** There is no refresh and no revocation list, so a
+  stolen token is valid for up to an hour. That is the cost of not using GoTrue, it is
+  bounded by the TTL, and stage 6 is where it should be reconsidered — if sessions become
+  load-bearing, a shorter TTL or a real Auth import becomes the better trade rather than a
+  tidier one.
+- **`useAuth.tsx` carries `@ts-nocheck`**, so the typecheck gate cannot see the code this
+  slice added to it (§16 · WP 5.2e's eighteen files). The logic is three `console` branches
+  inside a `try`, which is the least this could have been, but it is unchecked and saying so
+  is better than a count that implies otherwise.

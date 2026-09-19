@@ -1,6 +1,7 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { mintAndVerifySession } from '@/lib/auth/sessionMint';
 
 interface User {
   id: string;
@@ -116,7 +117,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(userObj);
       localStorage.setItem('auth_user', JSON.stringify(userObj));
       console.log('[AUTH] User stored in localStorage');
-      
+
+      // WP 7.1 stage 1b — ask for a real session BESIDE the one above, never instead of it.
+      //
+      // OFF by default (`SESSION_MINT_DEFAULT`), and a no-op until somebody sets
+      // `SUPABASE_JWT_SECRET` as a function secret. When it does run it mints a token whose
+      // `sub` is this user's id and asks the database who it thinks is acting — the only
+      // evidence stage 1b can produce, because no gate in this repository can mint a token
+      // PostgREST accepts (PLAN.md §14, WP 7.1 stage 1b).
+      //
+      // Deliberately AFTER the login has been recorded and deliberately awaited only for
+      // its outcome: `mintAndVerifySession` never throws, and this block returns success
+      // whatever it reports. A session experiment must not be able to cost somebody their
+      // login, which is the property that makes stages 1a and 1b safe to merge.
+      try {
+        const minted = await mintAndVerifySession(email, password, userData.user_id);
+        if (minted.state === 'confirmed') {
+          console.log('[AUTH] session minted and the database agrees:', minted.resolved);
+        } else if (minted.state === 'mismatch') {
+          console.error(
+            '[AUTH] session minted but the database resolved somebody else — stage 1b is NOT working:',
+            minted,
+          );
+        } else if (minted.state !== 'disabled') {
+          console.log('[AUTH] session not minted:', minted.state);
+        }
+      } catch (mintError) {
+        // Unreachable by contract; here because "never throws" is a claim about a module
+        // somebody may later edit, and this is the login path.
+        console.warn('[AUTH] session mint threw, which it should not:', mintError);
+      }
+
       return { success: true };
     } catch (error) {
       console.error('[AUTH] Login error:', error);
