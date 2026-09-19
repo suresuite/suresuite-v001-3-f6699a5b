@@ -29,7 +29,8 @@ const DATA_LAYER = [
   "project_map.py", "datamap.py", "network.py", "enums.py", "engine.py",
   "item_master", "dataset_versions", "unified_access_control",
   "super_admin_phase1", "erp_connector", "ProductLevelNetwork",
-  "FirmLevelNetwork", "ProcessLevelNetwork", "delete-project",
+  "FirmLevelNetwork", "ProcessLevelNetwork", "InteractiveNetworkSpace",
+  "delete-project",
 ];
 
 const CITATION = /\b([\w./-]+\.(?:ts|tsx|py|sql))\s*:\s*(\d+(?:[-,]\d+)*)/g;

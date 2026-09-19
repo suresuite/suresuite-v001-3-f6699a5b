@@ -1843,6 +1843,331 @@ async function allProjectsSweep() {
     });
 }
 
+// ── WP 8.0: the graph layer, measured BEFORE anything is changed ───────────
+//
+// WHY THIS PROBE EXISTS, and it is the whole of WP 8.0. The diagnosis of the
+// Process- and Product-level network pages BRANCHES on a number nothing in this
+// repository knows: how deep the BOM of the project a user is looking at is.
+//
+// `ProcessLevelNetwork.tsx`'s classifier is a fixed ladder — level 5 means
+// supplier, 2–4 mean material, 1 means "work station" — and the ETL writes
+// `supply_chain_data_multi_tier.level` as BOM TREE DEPTH on the bom lane and as
+// that depth PLUS ONE on the inbound lane (§4 D112). So the ladder is correct on
+// exactly one shape of data: a BOM four levels deep. On any other shape every
+// supplier lands at a level the ladder calls a material, and the page renders
+// and LABELS it as one. Whether that is what a given user is seeing, or a latent
+// defect on their project and something else on their screen, is a fact about
+// production and not about the code — so it is measured here first.
+//
+// Six questions, each one sized rather than described:
+//
+//   1. `projects.bom_level` for EVERY project. `single` writes no multi-tier
+//      rows at all (D115), so a Process page that is empty needs no further
+//      explanation, and one that is full rules the defect out.
+//   2. the `level` histogram per lane. `max(level) = 5` means the ladder
+//      happens to be right; anything else means D112 is live.
+//   3. `to_location = ''` in the multi-tier table — D114, the severed BOM root,
+//      as a row count.
+//   4. one node id at more than one `level` — the blast radius of D113, the
+//      dedup guard that tests a key it never writes.
+//   5. one node id in more than one lane ROLE — D116, the firm that is both a
+//      supplier and a customer and collapses into one node.
+//   6. `node_list` against the multi-tier node set — how much of the graph the
+//      typed projection WP 8.1 extends cannot currently see.
+//
+// Every one is a `select`. None of them needs the project §15 measures, because
+// D42's lesson is that the largest project is the seeded one: all six run across
+// every project in the database and print per-project rows.
+async function graphLayerBefore() {
+  section("WP 8.0 — the graph layer, measured before it is changed (D112–D118)");
+
+  // 1 ── the shape the ladder depends on, per project.
+  const shape = await tryQ(`
+    select p.name as project,
+           coalesce(p.bom_level, '(null)') as bom_level,
+           (select count(*)::int from public.bom_single_level t where t.project_id = p.id) as bom_single,
+           (select count(*)::int from public.bom_multi_level  t where t.project_id = p.id) as bom_multi,
+           (select coalesce(max(t.level), 0)::int from public.bom_multi_level t where t.project_id = p.id) as max_bom_depth,
+           (select count(*)::int from public.inbound_logistics  t where t.project_id = p.id) as inbound,
+           (select count(*)::int from public.outbound_logistics t where t.project_id = p.id) as outbound,
+           (select count(*)::int from public.supply_chain_data t where t.project_id = p.id) as scd_rows,
+           (select count(*)::int from public.supply_chain_data_multi_tier t where t.project_id = p.id) as scdmt_rows
+      from public.projects p order by p.created_at`);
+  report("the shape every classifier depends on, per project (D115, D112)", shape, (rows) => {
+    if (!rows?.length) { out("- No projects."); return; }
+    out(...table(rows));
+    const single = rows.filter((r) => r.bom_level === "single");
+    const singleWithTier = single.filter((r) => Number(r.scdmt_rows) > 0);
+    const singleNoTier = single.filter((r) => Number(r.scdmt_rows) === 0);
+    out("");
+    out(
+      `- **${single.length} of ${rows.length} project(s) are \`bom_level = 'single'\`**, and ${singleNoTier.length} ` +
+        "of those hold ZERO `supply_chain_data_multi_tier` rows. That is **D115** measured: the ETL builds the " +
+        "multi-tier lanes only inside its multi-level branch, so a single-level project's Process-level page is " +
+        "permanently empty and no error says why.",
+    );
+    if (singleWithTier.length) {
+      out(
+        `- **${singleWithTier.length} single-level project(s) DO hold multi-tier rows**, which the current ETL ` +
+          "cannot produce — they predate a change, or were written by another path. Read them before WP 8.2 " +
+          "backfills the lane, because a backfill that assumes the table is empty would double the graph.",
+      );
+    }
+    // THE LADDER'S PRECONDITION, stated per project rather than in general.
+    const deep = rows.filter((r) => Number(r.bom_multi) > 0);
+    const ladderHolds = deep.filter((r) => Number(r.max_bom_depth) === 4);
+    out(
+      `- **${deep.length} project(s) have a multi-level BOM at all; ${ladderHolds.length} of them are exactly ` +
+        "4 levels deep.** `ProcessLevelNetwork.tsx`'s ladder calls level 5 a supplier and the inbound lane writes " +
+        "`max BOM depth + 1`, so the ladder is right on the 4-deep ones and wrong on every other one — suppliers " +
+        "there are rendered and labelled `material level N`. That is **D112** as a count of affected projects.",
+    );
+  });
+
+  // 2 ── the histogram itself, because "max is not 5" does not say what a
+  //      reader would see; the level a supplier actually lands on does.
+  const levels = await tryQ(`
+    select p.name as project, t.data_source, t.level,
+           count(*)::int as rows,
+           count(distinct t.from_location)::int as distinct_from,
+           count(distinct t.to_location)::int   as distinct_to
+      from public.supply_chain_data_multi_tier t
+      join public.projects p on p.id = t.project_id
+     group by 1, 2, 3 order by 1, 2, 3`);
+  report("the `level` histogram per lane — what the ladder is actually reading", levels, (rows) => {
+    if (!rows?.length) { out("- `supply_chain_data_multi_tier` is empty in every project."); return; }
+    out(...table(rows));
+    const inboundLevels = [...new Set(rows.filter((r) => r.data_source === "inbound").map((r) => r.level))].sort();
+    out("");
+    out(
+      `- The inbound lane — every row of which is a SUPPLIER edge by construction — occupies level(s) ` +
+        `**${inboundLevels.join(", ") || "(none)"}**. The ladder recognises a supplier at 5 and above only. Any ` +
+        "other value in that list is a supplier the page types as a material.",
+    );
+  });
+
+  // 3 ── D114, the severed BOM root, in both edge tables. `''` and NULL are
+  //      counted apart because the page's own falsiness test cannot tell them
+  //      apart and a migration would have to.
+  const blanks = await tryQ(`
+    select 'supply_chain_data_multi_tier' as tbl, p.name as project,
+           count(*) filter (where t.to_location = '')::int   as to_empty,
+           count(*) filter (where t.to_location is null)::int as to_null,
+           count(*) filter (where t.from_location = '')::int  as from_empty,
+           count(*) filter (where t.from_location is null)::int as from_null,
+           count(*) filter (where t.data_source = 'bom' and t.level = 1)::int as bom_level_1_rows
+      from public.supply_chain_data_multi_tier t
+      join public.projects p on p.id = t.project_id
+     group by 1, 2
+    union all
+    select 'supply_chain_data', p.name,
+           count(*) filter (where t.to_location = '')::int,
+           count(*) filter (where t.to_location is null)::int,
+           count(*) filter (where t.from_location = '')::int,
+           count(*) filter (where t.from_location is null)::int,
+           count(*) filter (where t.data_source = 'bom')::int
+      from public.supply_chain_data t
+      join public.projects p on p.id = t.project_id
+     group by 1, 2
+     order by 1, 2`);
+  report("D114 — edges pointing at the empty string, where the BOM root should be", blanks, (rows) => {
+    if (!rows?.length) { out("- Both edge tables are empty."); return; }
+    out(...table(rows));
+    const empties = rows.reduce((a, r) => a + Number(r.to_empty || 0) + Number(r.from_empty || 0), 0);
+    out("");
+    out(
+      empties > 0
+        ? `- **${empties} edge endpoint(s) are the empty string.** \`bom_multi_level.higher_level_component_id\` is ` +
+          "blank at the top of the tree, where the parent IS the finished product, and the ETL writes that blank " +
+          "straight through. The page treats `''` as falsy, so it creates no node and skips the edge: every " +
+          "material→finished-product edge is dropped, which is **D114**."
+        : "- **No empty endpoints.** Either the BOM roots reach the product already, or no project has a level-1 " +
+          "BOM row for the defect to act on — the `bom_level_1_rows` column above says which, and a zero there " +
+          "makes D114 latent rather than absent.",
+    );
+  });
+
+  // 4 ── D113. The dedup guard computes `nodeId::level::data_source` and tests
+  //      `nodeMap[dedupKey]` while writing `nodeMap[nodeId]`, so the guard never
+  //      fires and the LAST row read wins the node's level, type and lane. This
+  //      counts the nodes for which "last row wins" is a real choice.
+  const multiLevel = await tryQ(`
+    with per_node as (
+      select t.project_id, n.node_id,
+             count(distinct t.level)::int       as levels,
+             count(distinct t.data_source)::int as lanes,
+             count(*)::int                      as rows
+        from public.supply_chain_data_multi_tier t
+        cross join lateral (values (t.from_location), (t.to_location)) as n(node_id)
+       where n.node_id is not null and n.node_id <> ''
+       group by 1, 2
+    )
+    select p.name as project,
+           count(*)::int                                     as nodes,
+           count(*) filter (where levels > 1)::int            as nodes_at_many_levels,
+           count(*) filter (where lanes  > 1)::int            as nodes_in_many_lanes,
+           sum(rows) filter (where levels > 1)::int           as rows_behind_them,
+           max(levels)::int                                   as worst_level_spread
+      from per_node
+      join public.projects p on p.id = per_node.project_id
+     group by 1 order by 1`);
+  report("D113 — nodes whose level depends on which row was read last", multiLevel, (rows) => {
+    if (!rows?.length) { out("- No multi-tier nodes to count."); return; }
+    out(...table(rows));
+    const affected = rows.reduce((a, r) => a + Number(r.nodes_at_many_levels || 0), 0);
+    out("");
+    out(
+      `- **${affected} node(s) appear at more than one \`level\`.** For every one of them the page's node map is ` +
+        "written by whichever row the loop reached last — its level, its type, its lane and its colour. The guard " +
+        "meant to prevent that tests a key the map is never keyed by, so it has never fired once. `levelNodeCounts` " +
+        "is incremented in the same unreachable-guard block, which is why the legend counts and the \"BOM levels\" " +
+        "tile count ROWS rather than nodes: **D113**.",
+    );
+  });
+
+  // 5 ── D116. Node identity is a bare string shared by three lanes, so a role
+  //      is not part of it. The pairs that matter are the ones a supply-chain
+  //      reader would refuse to merge: a firm that sells to the plant and buys
+  //      from it is two roles on one legal entity, not one node.
+  const roles = await tryQ(`
+    with roles as (
+      select t.project_id,
+             case when t.data_source = 'inbound'  then t.from_location end as supplier,
+             case when t.data_source = 'outbound' then t.to_location   end as customer,
+             case when t.data_source = 'inbound'  then t.to_location   end as material_in,
+             case when t.data_source = 'bom'      then t.from_location end as material_bom,
+             case when t.data_source = 'bom'      then t.to_location   end as product_bom,
+             case when t.data_source = 'outbound' then t.from_location end as product_out
+        from public.supply_chain_data t
+    ), per_node as (
+      select project_id, node_id,
+             bool_or(is_supplier) as is_supplier, bool_or(is_customer) as is_customer,
+             bool_or(is_material) as is_material, bool_or(is_product)  as is_product
+        from (
+          select project_id, supplier    as node_id, true  as is_supplier, false as is_customer, false as is_material, false as is_product from roles where supplier    is not null and supplier    <> ''
+          union all
+          select project_id, customer,               false, true,  false, false from roles where customer    is not null and customer    <> ''
+          union all
+          select project_id, material_in,            false, false, true,  false from roles where material_in is not null and material_in <> ''
+          union all
+          select project_id, material_bom,           false, false, true,  false from roles where material_bom is not null and material_bom <> ''
+          union all
+          select project_id, product_bom,            false, false, false, true  from roles where product_bom is not null and product_bom <> ''
+          union all
+          select project_id, product_out,            false, false, false, true  from roles where product_out is not null and product_out <> ''
+        ) u
+       group by 1, 2
+    )
+    select p.name as project,
+           count(*)::int as nodes,
+           count(*) filter (where is_supplier and is_customer)::int as supplier_and_customer,
+           count(*) filter (where is_supplier and is_material)::int as supplier_and_material,
+           count(*) filter (where is_material and is_product)::int  as material_and_product,
+           count(*) filter (where (is_supplier::int + is_customer::int + is_material::int + is_product::int) > 1)::int as any_dual_role
+      from per_node
+      join public.projects p on p.id = per_node.project_id
+     group by 1 order by 1`);
+  report("D116 / D112 — nodes holding more than one lane role, which eight classifiers resolve eight ways", roles, (rows) => {
+    if (!rows?.length) { out("- `supply_chain_data` is empty in every project."); return; }
+    out(...table(rows));
+    const dual = rows.reduce((a, r) => a + Number(r.any_dual_role || 0), 0);
+    const bothFirm = rows.reduce((a, r) => a + Number(r.supplier_and_customer || 0), 0);
+    const supMat = rows.reduce((a, r) => a + Number(r.supplier_and_material || 0), 0);
+    const matProd = rows.reduce((a, r) => a + Number(r.material_and_product || 0), 0);
+    out("");
+    out(
+      `- **${dual} node(s) hold more than one lane role**, and each one is where the classifiers diverge by ` +
+        "construction: `classify_node_type` resolves a supplier-and-material node to `material` by its priority " +
+        "order, `ProductLevelNetwork` resolves it to A or B depending on which row it read last, " +
+        "`ProcessLevelNetwork` resolves it to `supplier` through its `inbound` override, and `MapView`'s binary " +
+        "supplier-else-customer test drops it from the map. Same node, four answers, one screen apart (**D112**).",
+    );
+    out(
+      `- ${bothFirm} are BOTH a supplier and a customer — **D116**: identity is a bare string with no role in it, ` +
+        `so the two collapse into one node. ${supMat} are a supplier and a material; ${matProd} are a material and ` +
+        "a product, which is the `subassembly` the SQL classifier has no value for and WP 8.1 adds.",
+    );
+  });
+
+  // 6 ── the projection WP 8.1 extends, against the graph it is meant to type.
+  //      `rebuild_node_list` reads `supply_chain_data` ONLY, so every node that
+  //      exists just in the multi-tier lane is outside the typed projection —
+  //      which is why Process-level has nothing to read and infers instead.
+  const projection = await tryQ(`
+    with scdmt_nodes as (
+      select distinct t.project_id, n.node_id
+        from public.supply_chain_data_multi_tier t
+        cross join lateral (values (t.from_location), (t.to_location)) as n(node_id)
+       where n.node_id is not null and n.node_id <> ''
+    ), scd_nodes as (
+      select distinct t.project_id, n.node_id
+        from public.supply_chain_data t
+        cross join lateral (values (t.from_location), (t.to_location)) as n(node_id)
+       where n.node_id is not null and n.node_id <> ''
+    )
+    select p.name as project,
+           (select count(*)::int from public.node_list l where l.project_id = p.id) as node_list_rows,
+           (select count(*)::int from scd_nodes   s where s.project_id = p.id)      as scd_nodes,
+           (select count(*)::int from scdmt_nodes m where m.project_id = p.id)      as scdmt_nodes,
+           (select count(*)::int from scdmt_nodes m
+             where m.project_id = p.id
+               and not exists (select 1 from public.node_list l
+                                where l.project_id = m.project_id and l.node_id = m.node_id)) as scdmt_nodes_untyped,
+           (select count(*)::int from public.node_list l
+             where l.project_id = p.id and (l.node_type is null or l.node_type = 'unknown')) as node_list_untyped
+      from public.projects p order by p.created_at`);
+  report("D117 — how much of the graph the typed projection cannot see", projection, (rows) => {
+    if (!rows?.length) { out("- No projects."); return; }
+    out(...table(rows));
+    const missing = rows.reduce((a, r) => a + Number(r.scdmt_nodes_untyped || 0), 0);
+    const unknown = rows.reduce((a, r) => a + Number(r.node_list_untyped || 0), 0);
+    out("");
+    out(
+      `- **${missing} multi-tier node(s) have no \`node_list\` row.** \`rebuild_node_list\` reads ` +
+        "`supply_chain_data` and nothing else, so the deep-tier half of the graph — the half Process-level renders " +
+        "— is outside the one typed projection this repository has. That is **D117**, and it is why WP 8.1's " +
+        "derivation has to read both edge tables before WP 8.3 can make a page read a type instead of guessing one.",
+    );
+    out(
+      `- ${unknown} \`node_list\` row(s) are typed \`unknown\` or NULL. \`classify_node_type\` returns \`unknown\` ` +
+        "when a node appears in no lane it recognises, and `ProductLevelNetwork.tsx` defaults an unrecognised " +
+        "group to **Supplier** rather than rendering it as unknown — a value displayed for data that does not " +
+        "carry it, which is T1.",
+    );
+  });
+
+  // 7 ── the two columns a page filters on and a report reads, both measured
+  //      rather than assumed: `data_source_group` (D118) and a NULL `level`,
+  //      which `COALESCE(level, 0)` serves to the ladder as a PRODUCT (D119).
+  const columns = await tryQ(`
+    select (select count(*)::int from public.supply_chain_data)                                    as scd_rows,
+           (select count(*)::int from public.supply_chain_data where data_source_group is not null) as scd_group_written,
+           (select count(*)::int from public.supply_chain_data_multi_tier)                          as scdmt_rows,
+           (select count(*)::int from public.supply_chain_data_multi_tier where level is null)      as scdmt_level_null,
+           (select count(*)::int from public.supply_chain_data_multi_tier where level = 0)          as scdmt_level_zero`);
+  report("D118 / D119 — the documented filter column, and the NULL level the RPC types as a product", columns, (rows) => {
+    if (!rows?.length) { out("- No rows returned."); return; }
+    out(...table(rows));
+    const r = rows[0];
+    out("");
+    out(
+      Number(r.scd_group_written) === 0
+        ? `- **\`data_source_group\` is written on 0 of ${r.scd_rows} rows.** Its sidecar says the network pages ` +
+          "filter on it and no writer anywhere sets it, so the filter is a documented fact about a column that is " +
+          "always NULL — **D118**. WP 8.2 writes it or deletes it and its contract claim together; a third option " +
+          "would be leaving T1 broken on purpose."
+        : `- \`data_source_group\` is written on ${r.scd_group_written} of ${r.scd_rows} rows — the sidecar's ` +
+          "claim is partly true, and WP 8.2 owns which rows it is false for.",
+    );
+    out(
+      `- **${r.scdmt_level_null} row(s) carry a NULL \`level\`** and ${r.scdmt_level_zero} carry 0. ` +
+        "`COALESCE(scdmt.level, 0)` in the multi-tier RPC serves a NULL as 0, and the ladder calls 0 a **product**: " +
+        "an unknown depth is answered with a confident wrong type rather than with `unknown` (**D119**). A zero " +
+        "count makes it latent, not closed — nothing stops the next NULL.",
+    );
+  });
+}
+
 async function main() {
   out(`# PLAN.md §15 — verification SQL, executed`);
   out("");
@@ -1861,6 +2186,7 @@ async function main() {
   await wp42Smear();
   await wp42Landed();
   await wp43and44Counts();
+  await graphLayerBefore();
 
   const project = await pickProject();
   if (!project) {

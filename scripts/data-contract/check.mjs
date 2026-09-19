@@ -50,6 +50,34 @@ const PLAN = join(ROOT, "docs", "PLAN.md");
 
 const PLAN_SECTIONS = /\n## (7|8|9|10|11|12|13)\. /;
 
+// THE ROADMAP IS NOT ONE CONTIGUOUS SLICE ANY MORE, and reading it as one is how
+// a whole phase would sit outside every rule that reads ✅ markers.
+//
+// Phases 0–6 are §7–§13, ending where §14's deferred work begins. Phase 8 is §18,
+// which is AFTER §16 and §17 — it had to be, because a phase inserted between §13
+// and §14 would renumber §15 and §16, and this document is cited by section number
+// from the sidecars, from CLAUDE.md and from eleven hundred places in itself.
+//
+// So the roadmap is two ranges, joined. R7 rule 2 (every done package has a §16
+// entry), R8 (nothing open is owned by a finished package) and R10 (§17 agrees
+// with the roadmap) all read THIS, so a Phase 8 package marked ✅ is held to
+// exactly what a Phase 3 package is held to. A gate whose scope stops at the
+// section a phase happens to live in is a gate that a new section walks around.
+const ROADMAP_RANGES = [
+  [PLAN_SECTIONS, "\n## 14."],
+  [/\n## 18\. /, null],
+];
+function roadmapText(planText) {
+  const parts = [];
+  for (const [startRe, endMarker] of ROADMAP_RANGES) {
+    const a = planText.search(startRe);
+    if (a < 0) continue;
+    const b = endMarker ? planText.indexOf(endMarker, a) : -1;
+    parts.push(planText.slice(a, b < 0 ? undefined : b));
+  }
+  return parts.join("\n");
+}
+
 const failures = [];
 const warnings = [];
 const fail = (rule, msg) => failures.push(`${rule}  ${msg}`);
@@ -419,9 +447,7 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
 
 {
   const planText = readFileSync(PLAN, "utf8");
-  const roadmapStart = planText.search(PLAN_SECTIONS);
-  const roadmapEnd = planText.indexOf("\n## 14.");
-  const roadmap = roadmapStart < 0 ? "" : planText.slice(roadmapStart, roadmapEnd < 0 ? undefined : roadmapEnd);
+  const roadmap = roadmapText(planText);
 
   // "### WP 2.3 — Data-plane audit ✅ *(D15 — done …)*" → "WP 2.3 — Data-plane audit"
   const donePackages = roadmap
@@ -475,9 +501,7 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
 
 {
   const planText = readFileSync(PLAN, "utf8");
-  const roadmapStart = planText.search(PLAN_SECTIONS);
-  const roadmapEnd = planText.indexOf("\n## 14.");
-  const roadmap = roadmapStart < 0 ? "" : planText.slice(roadmapStart, roadmapEnd < 0 ? undefined : roadmapEnd);
+  const roadmap = roadmapText(planText);
 
   const headings = roadmap.split("\n").filter((l) => /^### WP /.test(l));
   const donePackages = new Set(
@@ -781,8 +805,7 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
   if (seqStart < 0) {
     fail("R10", "PLAN.md §17 could not be located — the section heading moved");
   } else {
-    const roadmapStart = planText.search(PLAN_SECTIONS);
-    const roadmap = planText.slice(roadmapStart, seqStart);
+    const roadmap = roadmapText(planText);
     const seq = planText.slice(seqStart);
 
     // Packages §7–§13 marks done, by number — from BOTH places the roadmap marks

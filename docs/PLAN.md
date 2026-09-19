@@ -38,6 +38,7 @@ duplicated facts stated here, which is the defect this plan exists to end.)*
 | 15 | Verification SQL |
 | 16 | Drift log |
 | 17 | Sequencing |
+| 18 | Phase 8 — The graph layer |
 
 ---
 
@@ -293,6 +294,19 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D90** | **Nothing declares which policy-bundle keys the engine reads; `project_map.py` is the only evidence for nine of them.** WP 6.1 traced every grid field to the engine and found three doors: the registry's `data_requirements` (`table.column` the engine needs from the dataset), a policy's `params_schema` (80 declared parameters), and — for everything else — **a quoted string in `project_map.py`**. Door 3 is not a contract: it is a text scan over a Python file, it is the only proof those fields reach the engine at all, and `single-source` (I1) says a data fact is authored once, in a place a generator can read. §3's standing law says "the registry export is the single source of truth for policy schemas (§6.2)" — and these keys are outside it, so the law is true of the schemas that exist and silent about the ones that do not. **The measurement is the finding**: of 38 grid fields, the registry declares the engine hop for 29 and a string literal is the only evidence for the rest. **THE COUNT WAS WRONG AND D91 IS WHY** — door 3 also accepted a string literal that says the engine DROPS the field, so one of the nine was not reaching the engine at all. The finding stands and is if anything sharper: door 3 is not merely the weakest evidence, it was evidence in the wrong direction | `scsim/scsim/io/project_map.py` against `supabase/functions/_shared/registry.generated.json`'s `params_schema` blocks; `src/lib/policies/resolutionChains.ts`'s three doors | WP 6.2 *(the fix is in `scsim`, not here: a bundle key the engine reads belongs in a policy's `params_schema`, which `registry_export.py` already generates. Until then `resolutionChains.test.ts` accepts door 3 and SAYS it is the weakest of the three, so the next reader is not told these nine are as well-declared as the other 29)* |
 | **D91** | **WP 6.1's engine scan was wrong in BOTH directions, and the ratchet it produced was two names short.** Door 3 — "the field appears as a quoted key in `project_map.py`" — was the only evidence for nine grid fields, and WP 6.2 re-derived it against the whole engine tree. **Too loose**: `order_up_to` passed door 3 on `project_map.py:865`, a `MappingWarning` whose own text is "legacy absolute order_up_to replaced by coverage-based κ (≈8 weeks)" — the scan accepted the string that says the field is dropped as proof it is consumed, and both stages' `order_up_to` were reported as resolving. A door is now a dict READ (`.get("f")` / `["f"]`), never a mention. **Too narrow**: door 3 read `project_map.py` ALONE, so six of the nine breaks said "read by nothing" about fields that are read — `review_period_days` at `sim-worker/sim_worker/engine.py:323` and `order_up_to` at `:332` by the FROZEN legacy engine, and `primary_source`/`sourcing_firm` by the product itself, which `project_map.py:826` excludes on purpose ("firm-routing hints, never engine params"). **Every one of the nine still breaks** — what changed is the sentence, and `classifyBreak` now sorts them into five shapes with a different remedy each: `unread` (1 — `material_price`, §4 D18, the only one where "read by nothing" was literally true), `overridden` (2 — `reorder_point`, declared in the legacy `InventoryPolicy` schema at `policies.py:41` and consulted by NEITHER engine, because `sim-worker/sim_worker/engine.py:320` computes `RP = avg_lt · avg_d + ss` itself), `legacy-only` (4), `app-routing` (3), `no-target` (1 — D89). **The fifth over-claim this suite has caught in itself**, after 28→11, 11→9, 7→0 and WP 5.1's D82/D83 — and the cheapest check caught all five, which is the lesson worth keeping: a list produced by code is believed because code produced it | `src/lib/policies/resolutionChains.ts`'s `readsKey`/`classifyBreak` against `scsim/scsim/io/project_map.py:826,865`, `sim-worker/sim_worker/engine.py:320,323,332` and `sim-worker/sim_worker/policies.py:41` | **CLOSED (WP 6.2)** — the scan is corrected, the eleven are classified with `file:line` evidence apiece, and the ratchet records the growth as a correction rather than re-basing to hide it |
 | **D92** | **The Parameter Sheet promised a milestone that does not exist, for eight of the eleven.** `fieldStatus.ts::milestoneFor` returned the literal string `"engine catalog — planned"` for any policy family with no row in `PENDING_FAMILY_POLICY`, and every caller treated that string as a milestone — so `ParameterSheet.tsx:74` rendered, of `reorder_point`, **"stored only · activates with engine catalog — planned"**. Nothing is planned. `inventory` and `sourcing` are not in that table, and D91 establishes what those fields actually are: computed and never read, read only by the frozen engine, or read by nothing at all. None is waiting for a policy. The remaining branch said "stored only · not consumed yet", where the word *yet* carries the same promise more quietly. This is T2 at the point of display — the product was inventing a future to avoid saying a field does nothing — and it is `declared-fallback` (I6) pointing at the UI: a substitution absent from the contract may not exist in code, and "we will consume this later" is a substitution for an answer | `src/lib/policies/fieldStatus.ts::milestoneFor`; `src/components/policies/ParameterSheet.tsx:73-75` | **CLOSED (WP 6.2)** — `FieldEngineStatus` gains `stored-only`, `milestoneFor` returns `null` rather than a sentence, and the sheet says "stored only · no engine consumer, none planned" |
+| **D112** | **Node type is inferred at render time, EIGHT different ways, and the one integer they lean on carries three incompatible meanings.** `supply_chain_data.from_location`'s own sidecar says why it has to be inferred: it is *"a supplier, a material, or the plant, **depending on which lane produced it**"* — **there is no type column on either edge table**, so every consumer invents a classifier. The eight: `classify_node_type` in SQL (priority customer > product > material > supplier, and no `subassembly` value at all); `buildGroupClassification` (lane → A/B/C/D, **last write wins**, and an unrecognised id defaults to **Supplier**); `getNodeTypeFromLevel` and `getDisplayNodeType` on the same page, which **disagree with each other** — the first has an `inbound` override, the second reads `level` alone; `getTierFromDepth` (by `depth`, NULL → "Plant"); `MapView`'s binary supplier-else-customer, which **drops** anything that is neither; a fourth page's copy of `getNodeTypeFromLevel` without the override; and the engine's, which reads the tier-2 masters and never the graph. **And `level` means three things.** The ETL writes literal `0` for outbound, the **BOM TREE DEPTH** for bom, and that depth **plus one** for inbound. The contract sidecar says something else — "how many tiers upstream of the plant this edge sits; 2 is a supplier's supplier". The page assumes a third thing, a fixed echelon ladder: `-1` customer, `0` product, `1` "work station", `2`–`4` material, `5` supplier. **So the page is correct only when the BOM is EXACTLY FOUR LEVELS DEEP**, which is the shape of the dataset the layout was last tuned against (`1b90687`). At any other depth every supplier lands below 5 and is rendered AND LABELLED `material level N`. The `dataSource === 'inbound' → supplier` override was added to patch exactly this and rescues only the TYPE — the level still drives the column position, the colour ramp, the legend bucket, the level-connectivity table, the reachability filter and `getDisplayNodeType`. **No document anywhere describes this divergence**, which is why it survived | `supabase/functions/combine-project/index.ts:322,341,405`; `src/pages/ProcessLevelNetwork.tsx:168-199,202-210`; `src/pages/ProductLevelNetwork.tsx:124-150`; `src/pages/FirmLevelNetwork.tsx:156-162`; `src/components/MapView.tsx:415`; `src/pages/InteractiveNetworkSpace.tsx:122-133`; `scsim/scsim/io/project_map.py:566-576`; the contract's own words in `supabase/contract/supply_chain_data_multi_tier.contract.yaml` | **WP 8.1** *(the one classifier and the two honest columns)* · **WP 8.2** *(the ETL)* · **WP 8.3** *(six classifiers deleted, and `oneClassifier.test.ts` so eight cannot become nine)* |
+| **D113** | **The dedup guard tests a key that is never written, so every record overwrites its node and the level histogram counts ROWS.** `const dedupKey = ${'`'}${'$'}{nodeId}::${'$'}{record.level}::${'$'}{record.data_source}${'`'}` then `if (nodeId && !nodeMap[dedupKey])` — and the body writes `nodeMap[nodeId]`. The map is keyed by the bare id, so `nodeMap[dedupKey]` is **always** undefined: the guard has never fired once. Four consequences, all silent. The last row read wins the node's level, type, lane and colour. `levelNodeCounts[level]++` sits inside the same unreachable-guard block and therefore counts rows, not nodes — which inflates the level histogram, the legend counts and the "BOM levels" tile. The `else` branch is dead, so the page's own diagnostic reports a deduplication that never happened. And the defect is INVISIBLE on a graph where no node appears twice, which is why it survived a layout tuning pass | `src/pages/ProcessLevelNetwork.tsx:365-384` | **WP 8.3** *(it disappears with the hand-rolled node map)* |
+| **D114** | **The top of the BOM is severed from the product it belongs to, by an empty string.** `bom_multi_level.higher_level_component_id` is *"empty at the top of the tree, where the parent is the finished product itself"* — its own sidecar says so. The ETL writes `to_location: row.higher_level_component_id \|\| ''` straight through. On the page `''` is falsy, so no node is created and the edge is skipped: **every level-1 BOM edge — material to finished product — is dropped**, and the finished product is severed from its own bill of materials with nothing reporting a loss. The fix is what the sidecar already says the blank MEANS: substitute the finished product, and never emit an edge to `''` | `supabase/functions/combine-project/index.ts:340`; `supabase/contract/bom_multi_level.contract.yaml`'s own `meaning` for the column | **WP 8.2** |
+| **D115** | **A single-level-BOM project writes ZERO multi-tier rows, so its Process-level page is permanently empty and nothing says why.** All three `*TierInserts` arrays are populated inside the `bom_level === 'multi'` branch only; the `'single'` branch fills `supply_chain_data` and leaves `supply_chain_data_multi_tier` untouched. The page then renders its empty state, which reads as "no data uploaded" rather than as "this lane is not built for your project shape" | `supabase/functions/combine-project/index.ts:185,319,385` | **WP 8.2** |
+| **D116** | **Node identity is a bare string shared by three semantically different lanes, so a firm that is both a supplier and a customer collapses into ONE node.** The id carries no role, and the lanes mean different things by the same column: `from_location` is a supplier on inbound, a material on bom and a product on outbound. A supply network has ECHELONS and they are ROLES — a firm that sells to the plant and buys from it is two roles on one legal entity, and merging them invents a cycle the real network does not have, then reports centrality on it. Sized by WP 8.0's probe 5 rather than asserted | `supabase/contract/supply_chain_data.contract.yaml`'s `from_location`; `src/pages/ProductLevelNetwork.tsx:124-145` | **WP 8.1** *(compound identity in the projection)* · **WP 8.3** *(and in the page's node type)* |
+| **D117** | **The one typed node projection this repository has is derived from ONE of the two edge tables, so the half of the graph Process-level renders is outside it.** `rebuild_node_list` reads `supply_chain_data` and nothing else; `node_list` is therefore blind to every node that exists only in `supply_chain_data_multi_tier`. That is the mechanical reason Process-level infers a type instead of reading one — there is nothing for it to read. It is also why `node_list` has never been the obvious answer: it looks like a `supply_chain_data` projection because that is all it has ever been derived from | `supabase/migrations/20260915000004_org_identity_dual_read.sql:2965-2982` | **WP 8.1** |
+| **D118** | **`supply_chain_data.data_source_group` is documented as the column the network pages filter on, and no writer anywhere sets it.** The ETL never writes it; it is NULL on every row. A documented filter column that is always NULL is **T1** broken — a fact published about data that does not exist. Two honest outcomes, and only two: write it, or delete the column and the contract claim in the same commit | `supabase/functions/combine-project/index.ts:201-214,296-306,371-382` (the three insert shapes, none of which names it); `supabase/contract/supply_chain_data.contract.yaml` | **WP 8.2** |
+| **D119** | **`COALESCE(scdmt.level, 0)` serves an unknown depth to the ladder as `0`, and the ladder calls `0` a PRODUCT.** The multi-tier RPC substitutes zero for NULL in both of its branches. A NULL depth is *unknown*, and the page has an `unknown` case it can never reach, because the RPC answers the question before the page is asked it. **T1**: an unknown is reported as a confident wrong type rather than as unknown | `supabase/migrations/20250909200609_130a2cbf-bd6b-4485-b263-98202ce9c0d7.sql:44,66` | **WP 8.2** |
+| **D120** | **`mappingConfidence` is hardcoded `1.0` at every creation site, so the amber low-confidence border is unreachable dead code — a confidence signal that can only ever say "confident".** Five assignments, one constant. **T2** says substitution is visible at the point of display; a signal wired to a literal is the opposite: it looks like disclosure and carries no information. It CAN be computed honestly — a node whose lane roles disagree is genuinely low-confidence, which is exactly what D112 and D116 are about — so the choice is compute it or delete it | `src/pages/ProcessLevelNetwork.tsx:396,438,510` | **WP 8.3** |
+| **D121** | **Intermediate assemblies are discarded from the product graph, and the multi-level path hardcodes a zero consumption rate.** The flat-BOM projection keeps a node only `if (validInboundMaterials.has(nodeKey))` — a material that is purchased. A sub-assembly the plant builds appears in no `inbound_logistics` row, so it is skipped, and the product graph **structurally cannot** show sub-assemblies however deep the BOM is. In the same loop `material_consumption_rate: 0` is written as a literal, where the single-level path writes the real rate — so the same column means "the rate" on one project shape and "nothing" on the other | `supabase/functions/combine-project/index.ts:207,286,301` | **WP 8.2** |
+| **D122** | **Product-level's metrics come from a function that joins the FIRM table to material names on a bare string, and returns products as materials.** `get_network_metrics_for_materials` selects from `network_nodes` — the firm graph, which per D19 holds rows in **one** project — and keeps a row when `nn.uid` matches `from_location` OR `to_location` of a `bom` edge. `bom.to_location` is the finished PRODUCT, so products come back from a function named "for materials"; and `uid` is a firm identifier being matched against material ids, two naming universes with no declared relation between them. The table it reads is also the one D56 calls two tables in one | `supabase/migrations/20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql:51-58`; `src/pages/ProductLevelNetwork.tsx:251,457` | **WP 8.4** |
+| **D123** | **§16 was not contiguous, and its last twenty-one entries sat OUTSIDE the section every gate reads.** `check.mjs`'s `section16()` slices from `## 16.` to `## 17.`, which is correct. The document was not: entries from `WP 6.2 (slice 1)` onward had been appended AFTER §17's sequencing table, so R7's append-only half protected 38 entries and could not see 21, and R7's second half could not have noticed a done package whose entry landed there. It reads exactly like §16 to a person and not at all like §16 to the gate — the same shape as D101 and D105, arriving through a heading's POSITION rather than through a duplicated fact. **Found while placing this phase's own entry**, which is the only reason it was found at all. Closed by moving §17 to the end of the document, so §16 runs to it and Phase 8's section (§18) follows; `contract:check` then reports 59 entries where it reported 38, with no entry added | `scripts/data-contract/check.mjs`'s `section16` against the position of §17 | **WP 8.0 ✅** *(the move; and R7 re-reads 119 revisions of §16 against the new slice and holds)* |
+| **D124** | **"Work station" is fabricated. There is no routing, operation or work-centre table anywhere in `supabase/contract/`, and the label comes purely from `level === 1`.** It is **T1** broken in the plainest possible form: a noun on screen that no table in this database can produce, presented beside real ids. It is also load-bearing for a reader's mental model — a user shown "work station" reasonably concludes the product knows about their operations, and it does not. Deferred, not dropped: §14 carries the routings dataset, and until it lands the page is a multi-level BOM / product-structure view and must say so | `src/pages/ProcessLevelNetwork.tsx:205` | **WP 8.5** |
 
 ### 4.1 Code map — the data layer
 
@@ -2262,6 +2276,28 @@ is blocked by it.
 **Reservations already made** (~2 days, inside Phases 1–6): the `2-O` tier name, the
 `observations` schema name, `grain` per field, open `analysis_kind`, and the
 `estimated` / `contract` provenance states.
+
+### Routings / work centres — the dataset "process level" needs *(D124, WP 8.5)*
+
+**Added at WP 8.0, because D124 needed an owner and "later" is not one.** The
+Process-level page labels every node at `level === 1` a **work station**, and there
+is no routing, operation or work-centre table anywhere in `supabase/contract/`.
+WP 8.5 removes the label and renames the page to what its data is — a multi-level
+BOM / product-structure view. That closes the **T1** breach and it does not give
+the user what the wrong label was promising.
+
+**This is the deferral of the thing itself, stated so it is a decision and not an
+omission.** A true process view needs operations and work centres as a SOURCE, and
+it lands under the ingestion contract like every other one: a CSV template, a
+staging table, `ingest_land_file` (never a client-side write, `no-tier-skip`), a
+tier-2 canonical table with a natural key, a sidecar, and an audit trigger. The
+echelon vocabulary WP 8.1 introduces already reserves room for it — `P-W.x` is
+reserved for the warehouse echelon in the blueprint's policy catalog for the same
+reason, and inventing a value before the data exists is what D124 IS.
+
+**It is deferred, not scheduled, and nothing in Phase 8 is blocked by it.** WP 8.1
+through 8.5 all close with honest naming; this is the package that would let the
+name change back.
 
 ### Engine RFCs — separate `scsim` track, not this plan
 1. **`cost_dist` + `cost_cv` on `SupplierLink`.** Price is a bare scalar; volatility
@@ -9353,63 +9389,6 @@ answer was to give them one that had.
 - Every fix shows up as a name leaving `KNOWN_BREAKS`, so progress is countable
   rather than described.
 
-## 17. Sequencing
-
-| Phase | WPs | Focus | Blocks | Status |
-|---|---|---|---|---|
-| 0 | 0.1 – 0.3 | stabilize, consolidate docs | everything | ✅ done |
-| 1 | 1.1 – 1.4 | contract + CI gate | 2, 3, 5 | ✅ done — `contract:check` green, six commands wired in `data-contract.yml`, three orphans reconciled |
-| 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | ✅ done — uuid identity dual-read, project membership + subtractive delegation, data-plane audit, and the R7 §16 gate. **Reviewed 2026-09-16: still done, but NINE conditions carried, not two** — they are WP 3.0's (§16 · PHASE 2→3 ASSESSMENT) |
-| 3 | **3.0 – 3.4** ✅ | one ingestion contract | 4 | **✅ done — and the phase ends with three of its invariants met under a NAMED condition rather than outright.** **3.0 ✅** the Phase 2 carry-over: eight of nine closed, D35's required-check half is a repository-plan constraint (§16 · WP 3.0 · H); nine migrations, one deploy, zero failures, which is D31 stated as a number. **3.1 ✅** the tables are `ingest_*` and source-agnostic, tier 0 exists and is write-once. **3.2 ✅** the parse is server-side, the landing names its uploader, the client-side `split(',')` is gone. **3.3 ✅** seven natural keys are constraints and R5 is a `fail`, the promotion upserts and normalizes, the item masters land. **3.4 ✅** the diff is computed BEFORE the promotion and again inside it, `diff_state` stopped defaulting to an answer nothing had computed, the five counts are persisted where they were measured, promotion needs role ≥ editor and a rehearsal proves an analyst is refused, and a canonical row names the line of the file it came from (D61–D65 closed, D66 found, D28 given a real owner in §14). **Phase 4 opens with a list, not a discovery** — §16 · WP 3.4's phase handoff names what `no-tier-skip`, `ingestion-contract` and `normalize-at-promotion` still lack and who owns each. **WP 4.1 has run**, and it moved `no-tier-skip` from a property of today's code to a property of the schema for three more write paths — plus a fourth nothing had named: `erp-sync-orbit-mrp` promoted tier 1 → tier 2 without `ingest_apply_run` (§16 · WP 4.1 · D). **WP 4.2 has run**, and **WP 4.3 has run** — it closed `no-tier-skip`'s deep-tier gap by DESCRIBING the four tables rather than by moving them, which brought them inside the audit rule for the first time (D54's largest group). **Phase 4 is complete: WP 4.4 has run.** **WP 5.1, 5.3 and 6.1 have run.** **WP 6.2 is next**
-| 4 | 4.1 – 4.4 ✅ | trust anchor + analysis store + Trust Report | 5 | **PHASE COMPLETE.** **4.1 ✅** — the snapshot covers every tier-2 value column (D11, D67 and D68 closed; the RULE is the fix and `graphHashCoverage.test.ts` is the gate), `hash_inputs`/`hash_network` split under a composite that keeps its name and place, `schema_version` 1 → 2 with the blast radius COUNTED before the deploy rather than after (§15: 0 proposals expired, 0 cards stale, 17 of 17 runs still resolving), and D36's six PostgREST writers each moved into an RPC that takes the actor — proved by reading the audit row back, not by counting lines. **Three findings: D69** (`project_map.py` never loads `customers`, so P-C.2's priorities are inert), **D70** (a `schema_version` bump EXPIRES stored proposals one-way, from a read), **D71** (D36 was one slice of a class of 26 — so `audit-actor` is NOT met and this package says so). **4.2 ✅** — the analysis store (`analysis_runs` + `analysis_results`) with the identity D19 says the centralities never had: a metric belongs to a run, and therefore to an input hash and a code version, so a repeat request is a HIT BY DEFINITION rather than a bet on a timestamp. `supabase/rehearsal/120` was written RED against `main` and holds all five exit checks plus the audit row read back with the GUC POISONED first; the concurrency gap check is proved from TWO REAL SESSIONS because one transaction cannot ask the question. D12's own citation was stale and is corrected against the live definition, measured rather than reasoned about; D54's rule landed as `contract:check` R11 (42 of 42 deferrals now SAY whether they are audited, and 42 of 42 are not); **D56's three-package deferral is decided — `network_nodes` is BOTH, so the answer is a split, deferred to WP 4.3 with its blast radius enumerated.** **Two findings: D72** (`calculate-network-science-metrics` upserts on a unique constraint that does not exist, fails every run, logs and carries on) **D73** (the introspected artifact discarded every `COMMENT ON FUNCTION`, so a base rebuilt from it lost them — D52's class, caught by `--since HEAD` alone) and **D74** (eleven of thirteen generated pages published the OPPOSITE of the truth about the natural key — D40's class, false since WP 3.3 landed the indexes). **4.3 ✅** — the analyzers dual-write, and the package changed shape before it wrote a line. **D75**: `analysis_runs.input_hash` is `current_graph_hash`, which hashes eleven tier-2 tables, and the two centrality analyzers read `network_nodes`/`network_edges` — NEITHER of them. Keying their cache on that anchor serves the PREVIOUS graph's centralities as a hit, which is D19 rebuilt one layer up by the package meant to close it. Mitigated by a declared `topology_digest` in `params` rather than by a `schema_version` bump, because D70 makes a bump unsafe to spend on a day nothing has measured; WP 4.4 takes the real fix. **D56's split executed as far as a package that drops nothing can**: the four deep-tier tables are DESCRIBED at tier 3, which is what the anchor has treated them as since WP 4.1, so they enter the audit rule for the first time and gain three triggers each — **D54's largest remaining group, closed** (38 deferred now, was 42; 22 tables audited by trigger, was 18). **D72 closed with one statement and no dedup**, because the count it needed was already in its own §4 row and the first draft of the migration deferred it anyway — the inverse of the precondition failure the preamble warns about. **Three more found by reading the invocation path nothing had named: D76** (the prominence auto-invoker is `FOR EACH ROW`, so §15's 2 129-edge project fires 2 129 full recomputations of one graph — and the store cannot absorb it, because the digest moves with every inserted row and every request is a genuine cold miss), **D77** (the `pg_net` fallback catches `undefined_function` and the real error is `invalid_schema_name`, so a failed notification ABORTED the write — found by execution, because the rehearsal deliberately does not stub `pg_net`), **D78** (D71's "26 write, TWO attribute" was a text scan's reading: ten writers attribute through `set_current_user_context` and have since 2025-08-20, so the honest figures are 31 and 15 — the invariant does not move, the re-budget shrinks from seventeen live functions to six) and **D79** (the catalog declared `project_ai_health` as an analysis kind and a `threshold` parameter no code takes; §11 named "the four analyzers" and one of the four never was). `supabase/rehearsal/130` holds eleven sections and was mutation-tested — the mutation that deletes the mirror's `assert_writer_may_act` outright passed the first draft, because the poison sat before a call that sets the GUC itself, which is §16 · WP 4.1 · E happening again inside the package that quotes it. **4.3 ✅** and **4.4 ✅** — see §16 for both. 4.4 closed **D70** by SPLITTING rather than deleting: a TTL is a record of something that happened and still persists, while grounding drift became a computed column, so a project that drifts and drifts back leaves its proposals untouched — `rehearsal/140` §3 moves a real project twice, which is the half no source read can settle. It found that **the rule needed a THIRD state** (`unknown` is not `stale`; WP 4.3 shipped the provenance columns nullable, and reporting "we cannot tell" as "out of date" is T1 answered with a guess), that **one of the three ad-hoc mechanisms it was told to delete does not exist** (D81 — the third is a re-entry guard whose comment records the bug that made it one), and that **the trigger at the centre of D12 has never invoked anything** (D80 — `20260712110000` is a whole performance migration spent optimising the inputs to a `RAISE LOG`). The gap check is a GATE: nine of `stalenessOneRule.test.ts`'s ten tests are red without the migration, measured by removing it. **Phase 4 is complete.** **WP 5.1 ✅** — lineage lands with an evidence line per entry that `contract:check` R12 re-opens on every run, three grades that are never blurred (table / column / shell), and the gap check as R12's second half: 17 of 17 pages either carry a non-shell entry or are declared as reading no project data. It found the section's own scope too narrow to see most reads (17 pages, 8 direct table reads between them) and two over-claiming heuristics — **D82** (a 404 page reported as a surface for user data, and an explicit `select` list in a shell module does not save it) and **D83** (979 unverifiable field-page pairs, and zero for the table the policy grid plainly renders). **5.1 ✅** and **5.3 ✅**. 5.3 could not do what its name says and §15 is why: **8 577 of 8 577** derived rows carry no input hash and the store holds **0 runs, 0 results**, so switching readers shows nothing and dropping the columns destroys 8 577 values with no replacement (**D88**, re-homed to WP 6.3 with its unblocking condition stated as a number rather than as prose). What it DID ship is **D75 closed**: the deep-tier topology is in `hash_network`, `schema_version` 2 → 3, taken against a measured blast radius of zero and as the first bump after D70 made a hash change reversible. The fold is BY COLUMN because D88 closed the tier route — and `graphHashCoverage.test.ts` moves from "these four tables are excluded" to "no computed column is hashed", which is what the invariant says. Its gap check found that same suite had been passing 24 assertions about a migration the database no longer runs. **6.1 ✅** — 38 chains DERIVED rather than written (≈120 hand-written chains are true on the day they are typed, which is D21/D22), **9 broken and ratcheted** as WP 6.2's list. Found **D89** (`plant.initial_on_hand` is master-backed by a column `products` does not have — the cell silently falls through to the bundle under a header claiming item-master data) and **D90** (three doors reach the engine and only two are declarations: for nine bundle keys a quoted string in `project_map.py` is the only evidence). **Three over-claims were caught inside the package**, each of which would have shipped a confidently wrong list — 28→11, 11→9, 7→0. Its gap check found eleven tables deferred to it behind an association rather than a plan, now **WP 6.4**. **WP 6.2 is next** |
-| 5 ✅ | 5.1 – 5.3 | lineage + the 80-page manual | 6 | **PHASE COMPLETE.** **5.1 ✅** · **5.3 ✅** · **5.2a–i ✅, all nine** — manual live at `/docs`; tree complete; **ALL FIFTEEN SECTIONS WRITTEN — 80 of 80 pages, zero stubs.** **5.2i** then added what all eighty were missing: a door a FIGURE can come through (**D109**). The manual had none — §6.5 records WP 5.2a declining to link the eleven diagrams in the artifact and drawing three SVGs instead, and 5.2b–g shipped sixty-six pages with zero. Sixteen slots are declared and open, each naming its page, its filename and what the diagram must show. 5.2b shipped twelve of twelve and **did NOT make the reassignment §12 told it to**: all four "unsidecarred" tables had been described by WP 3.2 and WP 4.3, so the instruction was stale rather than the tree wrong. It found that "which columns are computed" was authored TWICE (**D101**) and closed it by declaring `computed_by` in the contract, which `graphHashCoverage.test.ts` now reads instead of its own literal Set — 18 of 18, byte-identical. **D57 closed** alongside, with the typecheck gate the repository never had. **5.2c** renders the chains the SAME derivation `resolutionChains.test.ts` ratchets (`chains.mjs` bundles the module the gate uses), so the manual and the gate cannot disagree about which eleven break — and found that the Trust Report publishes two limits that are no longer true (**D103**). **5.2e** publishes WP 5.1's lineage at TABLE grain only — the one claim the grade supports — and found that three §4 citations became ambiguous the moment the manual gained a page named after a screen (**D104**). **5.2f** states I5 and I8 as unmet in the reader's words rather than describing a record that does not exist, and found `dataset_versions.hash_network`'s own description two tables behind the migration that changed it (**D105**). **5.2d** documents BOTH live disruption models without picking one, reads the stress battery from the engine rather than mining the archive's already-stale copy, and found that the phase brief's own trap list carried a defect WP 4.3 had closed (**D107**), plus the stress battery's absence from the registry export (**D106**). **5.2g** completes the manual and says the four uncomfortable things in the reader's words — client-asserted identity, "RLS: enabled" as a non-assurance with a THIRD indeterminate state, `min_project_role` declared everywhere and read by one path, and an API principal with no person behind it. **WP 5.2's exit gap check ran**: five described tables have no narrative page and `customers` is the one that matters (**D108**) |
-| 6 | 6.1 – 6.4 | policy contract, researcher grade | — | **6.1 ✅** · — · 6.2 grew D47, D48, D49 at the WP 3.0 gap check |
-| 7+ | deferred | observations, estimation, backtesting | — | — |
-
-**27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
-Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
-
-**Effort moved at the Phase 0-1 boundary review.** WP 1.4 is now the largest package
-in Phase 1, not the smallest: it carries its own scope (generator, drift gate, three
-orphan reconciliations, `CLAUDE.md`) plus the CI wiring for **six** commands that no
-workflow runs today (§16 F1) and the orphan fix that `contract:verify` needs to stop
-being red (F4). Budget it as a full session with no headroom for a second package.
-Phase 2 does not start until it is green in CI. **It is** — `contract:check` passes,
-the six commands run on every pull request, and the gate's teeth are proved by a
-throwaway PR that made CI red on an undescribed column (§16 WP 1.4). The four
-NO-GO conditions the boundary review set are all met; Phase 2 is open.
-
-One inherited fact it set was **not** met at the time and WP 2.4 settled it by
-execution rather than by reading: "RLS is OFF on all three item masters" was an
-artifact of a statement the introspector dropped, and the honest state was
-*undetermined*. WP 2.4 executed `20260614000001`'s `FOREACH` block against a local
-PostgreSQL 16 and found the inherited claim wrong in **both** directions — RLS is
-**enabled** on all three, and both policies on each are `USING (true)`, so enabling
-it buys nothing. "RLS: enabled" reads as an assurance it does not provide. See D28
-and §16 · WP 2.4.
-
-**Out of order by design:** WP 5.2a (P1, P5, un-hide `/docs`) needs nothing and can
-ship at any time. It is the cheapest user-visible improvement in the plan.
-
-**What the Phase 2→3 boundary review changed, and it is a method finding.** Phase 2
-closed with "GO, two conditions carried". Checking the handoff against code found
-nine, and seven of them had been carried by pointing at WP 2.4 and WP 2.3 after both
-had shipped ✅ — which is indistinguishable, in the document, from being scheduled.
-The three invariants Phase 2 was to move all moved; two of the three had stale rows
-in CLAUDE.md saying they had not, and the third (`audit-actor`) was recorded as a
-promise in twelve sidecars on the day it stopped being one, which the manual then
-published. **None of it was dishonesty and all of it was undetectable**, so the
-output of the review is three gates rather than three corrections: R7 rule 2 (a done
-package has a §16 entry), R8 (nothing open is owned by a finished package) and R9
-(`governance.audited` matches the triggers).
-
-**And §15 finally ran**, two phases late, on a CI route that had existed since
-WP 2.1 without anyone connecting it. Its first reading said the data layer was
-clean, because §15 told the reader to measure one project and the largest project is
-the one the seeder creates. Sweeping all seven found 96 duplicate keys, 376 null
-volumes and 27 integer `time_unit` values. **The instrument was there, the
-instruction was wrong, and nothing between them would ever have said so.**
-
 ### WP 6.2 (slice 1) — The engine scan, corrected · 2026-09-17 · no migration
 
 **What the previous package promised.** WP 6.1 closed with a countable hand-off:
@@ -11610,3 +11589,385 @@ eslint **336/116** and `audit:ui` **8**, at baseline.
    caught the network pages before a reader did. Not added here, because picking
    the number is a judgement about what a short page is allowed to be, and a
    threshold set carelessly is one that gets raised until it means nothing.
+
+
+### WP 8.0 — The graph layer, measured before it is changed · 2026-09-19 · no migration
+
+**What the previous package promised.** Phase 5 closed with the manual complete
+and its gap check pointing at what eighty pages had no picture of — and four of
+the shortest pages in it were the four **network** pages, "averaging 332 words
+with no picture, describing screens whose entire purpose is visual" (D109's own
+words). That was recorded as a documentation finding. It was not one. A reader
+then said the same thing from the other side: the Process- and Product-level maps
+**look wrong**, and Process-level is missing what Product-level has.
+
+**Both halves of that are true, and the second one inverts.** Process-level is the
+LARGER page — 1 849 lines against 1 412 — and it has affordances Product-level
+lacks: a hover-tooltip node type, an on-canvas legend, a labels toggle, a
+per-depth colour ramp, loading and empty overlays, a level-connectivity table.
+What it has none of is **analytics**: no centrality, no prominence, no map, no
+risk, no provenance strip. The gap runs both ways, which is why WP 8.4 is a table
+with two columns and not a list of things to copy in one direction.
+
+**And the mapping really is wrong, mechanically.** Thirteen defects opened, D112
+to D124. The root cause is one sentence long and it is in the contract already:
+`supply_chain_data.from_location` is *"a supplier, a material, or the plant,
+depending on which lane produced it"* — **there is no type column on either edge
+table**, so eight independent classifiers each invent one at render time, from a
+different signal, and they disagree by construction. A node that is both an
+inbound source and a BOM source is `material` in SQL, either A or B on
+Product-level depending on row order, `supplier` on Process-level, and **dropped
+from the map entirely**.
+
+**── WHY THIS PACKAGE MEASURES AND CHANGES NOTHING ──**
+
+The diagnosis BRANCHES on a number this repository does not hold.
+`ProcessLevelNetwork.tsx`'s ladder calls level 5 a supplier; the ETL writes the
+inbound lane at `max BOM depth + 1`. So the ladder is right on a BOM exactly four
+levels deep and wrong on every other depth — and the layout was last tuned
+against a four-deep dataset (`1b90687`). Whether the reader's project is
+D112 live or D112 latent with something else on screen is a fact about
+**production**, and no work-package session can reach production.
+
+So: **seven probes, every one a `select`, across EVERY project** rather than the
+one §15 names — because D42's lesson is that the largest project in this database
+is the one the seeder creates, and reading it alone reports a clean data layer
+that is not clean. `bom_level` and the source counts (D115); the `level`
+histogram per lane; empty endpoints (D114); nodes at more than one level (D113);
+nodes in more than one lane role (D116); `node_list` against the multi-tier node
+set (D117); `data_source_group` and the NULL level (D118, D119). Each one prints
+per-project rows and a verdict sentence that names the defect it sizes.
+
+**No migration in this push, and none of the three doors touched in it.** §4 D31:
+`supabase-migrations.yml` has no branch filter, so a branch push DEPLOYS, and
+`verification-sql.yml` fires on `.github/verify-request`, on its own workflow file
+AND on the runner. Three §15 runs across two packages have been lost to that race
+— the last one because a package pushed a migration together with four new probes
+in the runner, through a door the rule did not name at the time. This push carries
+the runner change alone; `.github/verify-request` is a second push.
+
+**── D123: §16 WAS NOT §16, AND THIS PACKAGE FOUND IT BY NEEDING TO WRITE IN IT ──**
+
+`check.mjs`'s `section16()` slices from `## 16.` to `## 17.`. The document had been
+appending drift-log entries **after §17's sequencing table** since
+`WP 6.2 (slice 1)`. So R7's append-only half was protecting 38 entries and could
+not see 21, and R7's second half — "every done package has a §16 entry" — would
+have accepted a done package whose entry landed out there.
+
+It reads exactly like §16 to a person and not at all like §16 to the gate. That is
+D101's and D105's shape arriving through a heading's POSITION instead of through a
+duplicated fact, and nothing in the repository could have said so, because the
+rule that reads §16 cannot report on text it does not consider part of §16.
+
+Closed by moving §17 to the end, so §16 runs to it and §18 (Phase 8) follows in
+numeric order. **No entry was added or edited**: `contract:check` now reports
+**59 entries where it reported 38**, and R7's append-only half re-reads **119
+revisions** of the section against the new boundary and holds.
+
+**── WHY PHASE 8 AND NOT PHASE 7, WHICH IS NOT A DETAIL ──**
+
+The plan this package executes called it Phase 7. §14 already contains
+`WP 7.1 — The authentication model`, and §4 D28 is owned by it — an owner added
+deliberately at WP 3.4 *because* D28 had been owned by a finished phase and R8
+could not see it. A second `WP 7.1` puts two packages behind one name in the
+single cell R8 reads to decide whether a defect has an owner at all. That is D104
+happening again by a phase number instead of by a page title, so the phase is
+**8**, and the routings dataset the original plan called Phase 8 is deferred in
+§14 where additive work belongs.
+
+**The gate moved with it, and it has teeth.** A phase inserted between §13 and §14
+would renumber §15 and §16, which are cited by number from the sidecars, from
+CLAUDE.md and from eleven hundred places inside this document — so Phase 8 is
+§18, physically after §17. That put it outside the slice R7, R8 and R10 read.
+`check.mjs` now builds its roadmap from **two ranges** (§7–§13 and §18) through
+one `roadmapText()` helper, so a Phase 8 package is held to exactly what a Phase 3
+package is. **Proved by the case rather than asserted beside it**: marking WP 8.0
+✅ before writing this entry made R7 fail with the package named.
+
+**Verified:** `contract:check` ✓ (R6 resolves all 13 new citations in range, R7
+append-only over 119 revisions, R8 44 packages named, R10 33 cross-checked) ·
+`check:docs` ✓ · `contract:rehearse` ✓ (21 assertion files, unchanged — this
+package adds no migration) · the seven probes `EXPLAIN` and then **execute**
+against the rehearsal database built from the introspected schema, so a column
+name that does not exist fails here rather than in the one workflow pointed at
+production.
+
+**Gap check.** Four findings.
+
+1. **The §15 report is the exit condition and it is not in this push.** Everything
+   above is the instrument; the numbers are the deliverable, and they arrive on the
+   `verification-results` branch after a second push. Until they do, D112–D124 are
+   opened against a **reading of the code**, which is honest evidence for what the
+   code does and no evidence at all for which projects it is doing it to. WP 8.1
+   must not start from the counts in this entry, because there are none.
+2. **`InteractiveNetworkSpace` was outside `check:docs`'s data-layer list**, while
+   the other three network pages were inside it. It is the fourth reader of the
+   same table and the one WP 8.3 lifts its subgraph engine out of, so a citation of
+   it in any document but this one was free to go stale. Added to `DATA_LAYER` in
+   the same commit; the gate stays green because the one place outside §4 that
+   cites it is already allow-listed for owning the mobile-layout subject.
+3. **Seven probes do not measure the thing the user actually reported.** They
+   measure `level`, identity, blanks and the projection. Nobody can currently
+   measure "the map looks wrong", and WP 8.4's exit criterion — the same entity
+   renders as the same node, in the same colour, with legend counts equal to node
+   counts — is the first statement of it that a person can check in one pass. It is
+   an *assertion by a reader*, not a gate, and this package does not pretend
+   otherwise.
+4. **D122 has an owner and no probe.** The function that returns products as
+   materials joins the FIRM table, which per D19 holds rows in exactly one project
+   — so its damage is bounded by a number §15 already measured, and adding an
+   eighth probe would have re-measured it. Stated here so the omission is a
+   decision rather than a gap.
+
+---
+
+## 17. Sequencing
+
+| Phase | WPs | Focus | Blocks | Status |
+|---|---|---|---|---|
+| 0 | 0.1 – 0.3 | stabilize, consolidate docs | everything | ✅ done |
+| 1 | 1.1 – 1.4 | contract + CI gate | 2, 3, 5 | ✅ done — `contract:check` green, six commands wired in `data-contract.yml`, three orphans reconciled |
+| 2 | 2.1 – 2.4 | governance | 3 (promotion needs a role) | ✅ done — uuid identity dual-read, project membership + subtractive delegation, data-plane audit, and the R7 §16 gate. **Reviewed 2026-09-16: still done, but NINE conditions carried, not two** — they are WP 3.0's (§16 · PHASE 2→3 ASSESSMENT) |
+| 3 | **3.0 – 3.4** ✅ | one ingestion contract | 4 | **✅ done — and the phase ends with three of its invariants met under a NAMED condition rather than outright.** **3.0 ✅** the Phase 2 carry-over: eight of nine closed, D35's required-check half is a repository-plan constraint (§16 · WP 3.0 · H); nine migrations, one deploy, zero failures, which is D31 stated as a number. **3.1 ✅** the tables are `ingest_*` and source-agnostic, tier 0 exists and is write-once. **3.2 ✅** the parse is server-side, the landing names its uploader, the client-side `split(',')` is gone. **3.3 ✅** seven natural keys are constraints and R5 is a `fail`, the promotion upserts and normalizes, the item masters land. **3.4 ✅** the diff is computed BEFORE the promotion and again inside it, `diff_state` stopped defaulting to an answer nothing had computed, the five counts are persisted where they were measured, promotion needs role ≥ editor and a rehearsal proves an analyst is refused, and a canonical row names the line of the file it came from (D61–D65 closed, D66 found, D28 given a real owner in §14). **Phase 4 opens with a list, not a discovery** — §16 · WP 3.4's phase handoff names what `no-tier-skip`, `ingestion-contract` and `normalize-at-promotion` still lack and who owns each. **WP 4.1 has run**, and it moved `no-tier-skip` from a property of today's code to a property of the schema for three more write paths — plus a fourth nothing had named: `erp-sync-orbit-mrp` promoted tier 1 → tier 2 without `ingest_apply_run` (§16 · WP 4.1 · D). **WP 4.2 has run**, and **WP 4.3 has run** — it closed `no-tier-skip`'s deep-tier gap by DESCRIBING the four tables rather than by moving them, which brought them inside the audit rule for the first time (D54's largest group). **Phase 4 is complete: WP 4.4 has run.** **WP 5.1, 5.3 and 6.1 have run.** **WP 6.2 is next**
+| 4 | 4.1 – 4.4 ✅ | trust anchor + analysis store + Trust Report | 5 | **PHASE COMPLETE.** **4.1 ✅** — the snapshot covers every tier-2 value column (D11, D67 and D68 closed; the RULE is the fix and `graphHashCoverage.test.ts` is the gate), `hash_inputs`/`hash_network` split under a composite that keeps its name and place, `schema_version` 1 → 2 with the blast radius COUNTED before the deploy rather than after (§15: 0 proposals expired, 0 cards stale, 17 of 17 runs still resolving), and D36's six PostgREST writers each moved into an RPC that takes the actor — proved by reading the audit row back, not by counting lines. **Three findings: D69** (`project_map.py` never loads `customers`, so P-C.2's priorities are inert), **D70** (a `schema_version` bump EXPIRES stored proposals one-way, from a read), **D71** (D36 was one slice of a class of 26 — so `audit-actor` is NOT met and this package says so). **4.2 ✅** — the analysis store (`analysis_runs` + `analysis_results`) with the identity D19 says the centralities never had: a metric belongs to a run, and therefore to an input hash and a code version, so a repeat request is a HIT BY DEFINITION rather than a bet on a timestamp. `supabase/rehearsal/120` was written RED against `main` and holds all five exit checks plus the audit row read back with the GUC POISONED first; the concurrency gap check is proved from TWO REAL SESSIONS because one transaction cannot ask the question. D12's own citation was stale and is corrected against the live definition, measured rather than reasoned about; D54's rule landed as `contract:check` R11 (42 of 42 deferrals now SAY whether they are audited, and 42 of 42 are not); **D56's three-package deferral is decided — `network_nodes` is BOTH, so the answer is a split, deferred to WP 4.3 with its blast radius enumerated.** **Two findings: D72** (`calculate-network-science-metrics` upserts on a unique constraint that does not exist, fails every run, logs and carries on) **D73** (the introspected artifact discarded every `COMMENT ON FUNCTION`, so a base rebuilt from it lost them — D52's class, caught by `--since HEAD` alone) and **D74** (eleven of thirteen generated pages published the OPPOSITE of the truth about the natural key — D40's class, false since WP 3.3 landed the indexes). **4.3 ✅** — the analyzers dual-write, and the package changed shape before it wrote a line. **D75**: `analysis_runs.input_hash` is `current_graph_hash`, which hashes eleven tier-2 tables, and the two centrality analyzers read `network_nodes`/`network_edges` — NEITHER of them. Keying their cache on that anchor serves the PREVIOUS graph's centralities as a hit, which is D19 rebuilt one layer up by the package meant to close it. Mitigated by a declared `topology_digest` in `params` rather than by a `schema_version` bump, because D70 makes a bump unsafe to spend on a day nothing has measured; WP 4.4 takes the real fix. **D56's split executed as far as a package that drops nothing can**: the four deep-tier tables are DESCRIBED at tier 3, which is what the anchor has treated them as since WP 4.1, so they enter the audit rule for the first time and gain three triggers each — **D54's largest remaining group, closed** (38 deferred now, was 42; 22 tables audited by trigger, was 18). **D72 closed with one statement and no dedup**, because the count it needed was already in its own §4 row and the first draft of the migration deferred it anyway — the inverse of the precondition failure the preamble warns about. **Three more found by reading the invocation path nothing had named: D76** (the prominence auto-invoker is `FOR EACH ROW`, so §15's 2 129-edge project fires 2 129 full recomputations of one graph — and the store cannot absorb it, because the digest moves with every inserted row and every request is a genuine cold miss), **D77** (the `pg_net` fallback catches `undefined_function` and the real error is `invalid_schema_name`, so a failed notification ABORTED the write — found by execution, because the rehearsal deliberately does not stub `pg_net`), **D78** (D71's "26 write, TWO attribute" was a text scan's reading: ten writers attribute through `set_current_user_context` and have since 2025-08-20, so the honest figures are 31 and 15 — the invariant does not move, the re-budget shrinks from seventeen live functions to six) and **D79** (the catalog declared `project_ai_health` as an analysis kind and a `threshold` parameter no code takes; §11 named "the four analyzers" and one of the four never was). `supabase/rehearsal/130` holds eleven sections and was mutation-tested — the mutation that deletes the mirror's `assert_writer_may_act` outright passed the first draft, because the poison sat before a call that sets the GUC itself, which is §16 · WP 4.1 · E happening again inside the package that quotes it. **4.3 ✅** and **4.4 ✅** — see §16 for both. 4.4 closed **D70** by SPLITTING rather than deleting: a TTL is a record of something that happened and still persists, while grounding drift became a computed column, so a project that drifts and drifts back leaves its proposals untouched — `rehearsal/140` §3 moves a real project twice, which is the half no source read can settle. It found that **the rule needed a THIRD state** (`unknown` is not `stale`; WP 4.3 shipped the provenance columns nullable, and reporting "we cannot tell" as "out of date" is T1 answered with a guess), that **one of the three ad-hoc mechanisms it was told to delete does not exist** (D81 — the third is a re-entry guard whose comment records the bug that made it one), and that **the trigger at the centre of D12 has never invoked anything** (D80 — `20260712110000` is a whole performance migration spent optimising the inputs to a `RAISE LOG`). The gap check is a GATE: nine of `stalenessOneRule.test.ts`'s ten tests are red without the migration, measured by removing it. **Phase 4 is complete.** **WP 5.1 ✅** — lineage lands with an evidence line per entry that `contract:check` R12 re-opens on every run, three grades that are never blurred (table / column / shell), and the gap check as R12's second half: 17 of 17 pages either carry a non-shell entry or are declared as reading no project data. It found the section's own scope too narrow to see most reads (17 pages, 8 direct table reads between them) and two over-claiming heuristics — **D82** (a 404 page reported as a surface for user data, and an explicit `select` list in a shell module does not save it) and **D83** (979 unverifiable field-page pairs, and zero for the table the policy grid plainly renders). **5.1 ✅** and **5.3 ✅**. 5.3 could not do what its name says and §15 is why: **8 577 of 8 577** derived rows carry no input hash and the store holds **0 runs, 0 results**, so switching readers shows nothing and dropping the columns destroys 8 577 values with no replacement (**D88**, re-homed to WP 6.3 with its unblocking condition stated as a number rather than as prose). What it DID ship is **D75 closed**: the deep-tier topology is in `hash_network`, `schema_version` 2 → 3, taken against a measured blast radius of zero and as the first bump after D70 made a hash change reversible. The fold is BY COLUMN because D88 closed the tier route — and `graphHashCoverage.test.ts` moves from "these four tables are excluded" to "no computed column is hashed", which is what the invariant says. Its gap check found that same suite had been passing 24 assertions about a migration the database no longer runs. **6.1 ✅** — 38 chains DERIVED rather than written (≈120 hand-written chains are true on the day they are typed, which is D21/D22), **9 broken and ratcheted** as WP 6.2's list. Found **D89** (`plant.initial_on_hand` is master-backed by a column `products` does not have — the cell silently falls through to the bundle under a header claiming item-master data) and **D90** (three doors reach the engine and only two are declarations: for nine bundle keys a quoted string in `project_map.py` is the only evidence). **Three over-claims were caught inside the package**, each of which would have shipped a confidently wrong list — 28→11, 11→9, 7→0. Its gap check found eleven tables deferred to it behind an association rather than a plan, now **WP 6.4**. **WP 6.2 is next** |
+| 5 ✅ | 5.1 – 5.3 | lineage + the 80-page manual | 6 | **PHASE COMPLETE.** **5.1 ✅** · **5.3 ✅** · **5.2a–i ✅, all nine** — manual live at `/docs`; tree complete; **ALL FIFTEEN SECTIONS WRITTEN — 80 of 80 pages, zero stubs.** **5.2i** then added what all eighty were missing: a door a FIGURE can come through (**D109**). The manual had none — §6.5 records WP 5.2a declining to link the eleven diagrams in the artifact and drawing three SVGs instead, and 5.2b–g shipped sixty-six pages with zero. Sixteen slots are declared and open, each naming its page, its filename and what the diagram must show. 5.2b shipped twelve of twelve and **did NOT make the reassignment §12 told it to**: all four "unsidecarred" tables had been described by WP 3.2 and WP 4.3, so the instruction was stale rather than the tree wrong. It found that "which columns are computed" was authored TWICE (**D101**) and closed it by declaring `computed_by` in the contract, which `graphHashCoverage.test.ts` now reads instead of its own literal Set — 18 of 18, byte-identical. **D57 closed** alongside, with the typecheck gate the repository never had. **5.2c** renders the chains the SAME derivation `resolutionChains.test.ts` ratchets (`chains.mjs` bundles the module the gate uses), so the manual and the gate cannot disagree about which eleven break — and found that the Trust Report publishes two limits that are no longer true (**D103**). **5.2e** publishes WP 5.1's lineage at TABLE grain only — the one claim the grade supports — and found that three §4 citations became ambiguous the moment the manual gained a page named after a screen (**D104**). **5.2f** states I5 and I8 as unmet in the reader's words rather than describing a record that does not exist, and found `dataset_versions.hash_network`'s own description two tables behind the migration that changed it (**D105**). **5.2d** documents BOTH live disruption models without picking one, reads the stress battery from the engine rather than mining the archive's already-stale copy, and found that the phase brief's own trap list carried a defect WP 4.3 had closed (**D107**), plus the stress battery's absence from the registry export (**D106**). **5.2g** completes the manual and says the four uncomfortable things in the reader's words — client-asserted identity, "RLS: enabled" as a non-assurance with a THIRD indeterminate state, `min_project_role` declared everywhere and read by one path, and an API principal with no person behind it. **WP 5.2's exit gap check ran**: five described tables have no narrative page and `customers` is the one that matters (**D108**) |
+| 6 | 6.1 – 6.4 | policy contract, researcher grade | — | **6.1 ✅** · — · 6.2 grew D47, D48, D49 at the WP 3.0 gap check |
+| 7+ | deferred | observations, estimation, backtesting | — | — |
+| **8** | **8.0 – 8.5** | **the graph layer — one node type, one graph layer** | — | **8.0 ✅** the seven §15 probes, and the numbers are NOT in yet: the package deliberately measures and changes nothing, because the diagnosis branches on a BOM depth no work-package session can read. Thirteen defects opened, **D112–D124**. The root cause is in the contract already — there is **no type column on either edge table**, so **eight** classifiers each infer one at render time and disagree by construction, and the single `level` column carries **three** incompatible meanings between its writer, its contract and its reader. Two defects silently destroy data (**D113** a dedup guard testing a key it never writes; **D114** an edge emitted to `''` where the BOM root should be) and one label is fabricated outright (**D124** "work station", from `level === 1`, with no routing table anywhere in the contract). It also found **D123** — §16's last twenty-one entries sat AFTER §17 and so outside the slice every gate reads — and the numbering collision that made this Phase 8 rather than Phase 7 (§14 already owns `WP 7.1`, and D28 is owned by it). `check.mjs` now reads its roadmap from two ranges so a Phase 8 package is gated like a Phase 3 one, proved by making R7 fail with the package named. **WP 8.1 is next** |
+
+**27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
+Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
+
+**Effort moved at the Phase 0-1 boundary review.** WP 1.4 is now the largest package
+in Phase 1, not the smallest: it carries its own scope (generator, drift gate, three
+orphan reconciliations, `CLAUDE.md`) plus the CI wiring for **six** commands that no
+workflow runs today (§16 F1) and the orphan fix that `contract:verify` needs to stop
+being red (F4). Budget it as a full session with no headroom for a second package.
+Phase 2 does not start until it is green in CI. **It is** — `contract:check` passes,
+the six commands run on every pull request, and the gate's teeth are proved by a
+throwaway PR that made CI red on an undescribed column (§16 WP 1.4). The four
+NO-GO conditions the boundary review set are all met; Phase 2 is open.
+
+One inherited fact it set was **not** met at the time and WP 2.4 settled it by
+execution rather than by reading: "RLS is OFF on all three item masters" was an
+artifact of a statement the introspector dropped, and the honest state was
+*undetermined*. WP 2.4 executed `20260614000001`'s `FOREACH` block against a local
+PostgreSQL 16 and found the inherited claim wrong in **both** directions — RLS is
+**enabled** on all three, and both policies on each are `USING (true)`, so enabling
+it buys nothing. "RLS: enabled" reads as an assurance it does not provide. See D28
+and §16 · WP 2.4.
+
+**Out of order by design:** WP 5.2a (P1, P5, un-hide `/docs`) needs nothing and can
+ship at any time. It is the cheapest user-visible improvement in the plan.
+
+**What the Phase 2→3 boundary review changed, and it is a method finding.** Phase 2
+closed with "GO, two conditions carried". Checking the handoff against code found
+nine, and seven of them had been carried by pointing at WP 2.4 and WP 2.3 after both
+had shipped ✅ — which is indistinguishable, in the document, from being scheduled.
+The three invariants Phase 2 was to move all moved; two of the three had stale rows
+in CLAUDE.md saying they had not, and the third (`audit-actor`) was recorded as a
+promise in twelve sidecars on the day it stopped being one, which the manual then
+published. **None of it was dishonesty and all of it was undetectable**, so the
+output of the review is three gates rather than three corrections: R7 rule 2 (a done
+package has a §16 entry), R8 (nothing open is owned by a finished package) and R9
+(`governance.audited` matches the triggers).
+
+**And §15 finally ran**, two phases late, on a CI route that had existed since
+WP 2.1 without anyone connecting it. Its first reading said the data layer was
+clean, because §15 told the reader to measure one project and the largest project is
+the one the seeder creates. Sweeping all seven found 96 duplicate keys, 376 null
+volumes and 27 integer `time_unit` values. **The instrument was there, the
+instruction was wrong, and nothing between them would ever have said so.**
+
+---
+
+## 18. Phase 8 — The graph layer
+
+**Why this is Phase 8 and not Phase 7.** The plan I was handed called it Phase 7.
+§14 already contains `WP 7.1 — The authentication model`, and §4 D28 is owned by
+it. A second `WP 7.1` would make D28's owner ambiguous — two packages, one name,
+in the one cell R8 reads to decide whether a defect has an owner at all. That is
+D104's class exactly ("three §4 citations became ambiguous the moment the manual
+gained a page named after a screen"), arriving by a phase number instead of by a
+page title. **Names do not collide, so the phase does not reuse one.** The
+routings dataset the original plan called Phase 8 is deferred in §14 instead,
+because it is additive and nothing here is blocked by it.
+
+**What the phase is for.** Three network pages and one orphaned fourth render the
+same supply chain and disagree about what every node in it IS. There are **eight
+independent node-type classifiers** — one in SQL, four in pages, one in the map
+component, one in the engine — and they disagree *by construction*, because none
+of them reads a type: they each infer one, from a different signal, at render
+time. `supply_chain_data.from_location`'s own sidecar says why: it is *"a
+supplier, a material, or the plant, depending on which lane produced it"*. **There
+is no type column on either edge table.**
+
+The phase authors node identity and node type ONCE, in the data, and then gives
+both pages one shared graph layer so they stop re-deriving the same facts
+differently. It closes D112–D124.
+
+**Which invariants it serves.** `single-source` (I1) — a node's role is a prose
+fact about the data layer authored eight times in TypeScript and SQL with nothing
+comparing them, which is D101/D103's class one layer out from markdown. And
+**T1** — "work station" is a label no table in `supabase/contract/` can produce,
+and an unrecognised node group renders as **Supplier** rather than as unknown.
+
+### WP 8.0 — Measure it before changing anything ✅ *(no migration)*
+
+Nothing in this repository knows the shape of the project the report came from,
+and **the diagnosis branches on it**: `ProcessLevelNetwork.tsx`'s ladder is
+correct on a BOM exactly four levels deep and wrong on every other depth, so
+whether a given user is looking at D112 or at something else is a fact about
+production. Seven §15 probes in `scripts/data-contract/verification-sql.mjs`,
+every one a `select`, across EVERY project rather than the one §15 names (D42):
+
+1. `projects.bom_level` and the source-table counts per project — `single` writes
+   no multi-tier rows at all (D115), so an empty Process page needs no further
+   explanation and a full one rules the defect out.
+2. the `level` histogram per lane — which level the inbound lane, every row of
+   which is a supplier edge by construction, actually occupies.
+3. `to_location = ''` in both edge tables — D114, the severed BOM root, counted.
+4. one node id at more than one `level` — the blast radius of D113.
+5. one node id in more than one lane ROLE — D116, and the `subassembly` the SQL
+   classifier has no value for.
+6. `node_list` against the multi-tier node set — D117, how much of the graph the
+   one typed projection cannot see.
+7. `data_source_group` (D118) and the NULL `level` the RPC types as a product (D119).
+
+**Exit**: a §15 report on the `verification-results` branch, the numbers recorded
+in §16, and D112–D120 opened in §4 against whichever branches the data confirms.
+**The push carries no migration and touches neither `.github/verify-request`,
+`verification-sql.yml`, nor the runner in the same push as one** — three §15 runs
+across two packages have been lost to exactly that race (§4 D31).
+
+### WP 8.1 — The classifier and the projection *(migration)*
+
+**DECISION 1 — extend `node_list`; do not invent `graph_nodes`.** The typed node
+projection already exists. `node_list` is keyed `(project_id, node_id)` by
+`node_list_unique_per_project`, carries `node_type` / `node_group`, already has
+`computed_from_hash` / `computed_at`, is tier 3, audited, contract-described, and
+is read by `MapView` and nothing else. A new table would duplicate a table that
+exists, which is the defect `single-source` exists to prevent.
+
+`classify_node_type` gains `subassembly` — a node that is both a BOM target and a
+BOM source — and becomes the single classifier; its priority order is authored in
+the sidecar so §4 can see it. `node_list` gains three columns:
+
+| Column | Meaning |
+|---|---|
+| `echelon` | the supply-chain ROLE, CHECK-constrained: `customer \| product \| subassembly \| material \| supplier \| plant \| unknown`. Replaces the overloaded `node_type`, which cannot express `subassembly` and whose contract claims a `plant` value its only writer cannot produce |
+| `bom_depth` | depth in the BOM tree, NULL for a node that is not in a BOM. The honest name for what `level` holds |
+| `supply_tier` | tiers upstream of the focal plant, NULL when unknown. What `level`'s contract *claimed* to be |
+
+**DECISION 2 — `bom_depth` and `supply_tier` are two columns, not one.** They are
+two different measurements that today's single `level` conflates, and the
+conflation IS the wrong mapping (D112). Naming both, and letting either be NULL,
+is the only way to stop a reader guessing which one they have.
+
+`rebuild_node_list` reads BOTH edge tables, so the deep-tier half of the graph
+enters the projection for the first time (D117).
+
+`supabase/rehearsal/230_one_node_classifier.sql` asserts against a real database:
+a node that is both an inbound source and a BOM source resolves to exactly one
+`echelon`; a BOM node that is both target and source is `subassembly`; the refresh
+is idempotent. **Mutation**: remove the priority `ORDER BY` from
+`classify_node_type` and a dual-role node resolves non-deterministically.
+
+**Exit**: `contract:check` green (R1, R5, R9), `contract:rehearse` green all three
+ways, §16 entry.
+
+### WP 8.2 — The ETL stops lying about `level` *(migration + edge function)*
+
+Closes D114, D115, D118, D119 and the two D112 halves that live in
+`combine-project`: write `bom_depth` explicitly and keep `level` as a deprecated
+alias for one release; substitute the finished product where
+`higher_level_component_id` is blank, which is what the BOM sidecar says that
+blank MEANS, and never emit an edge to `''`; build the multi-tier lanes for
+single-level projects too; write `data_source_group` or delete it and its
+contract claim together; stop discarding intermediate assemblies and stop
+hardcoding a zero consumption rate on the multi-level path; and drop the
+`COALESCE(level, 0)` that serves an unknown depth to the ladder as a product.
+
+`supabase/rehearsal/240_bom_root_reaches_the_product.sql` and
+`250_depth_is_not_tier.sql`, each mutation-tested.
+
+> **RISK, stated rather than assumed.** Per D88, `supabase/functions` are **not
+> deployed by `supabase-functions.yml` and never have been.** An ETL fix that is
+> never deployed changes nothing. **This package must either establish the
+> deployment path or state in §16 that it is blocked on it. It must not report
+> success on an undeployed function.**
+
+### WP 8.3 — The shared graph layer *(no migration)*
+
+**DECISION 3 — extract `InteractiveNetworkSpace`'s subgraph engine; do not
+rewrite it.** That page is not in the sidebar and is reachable only by URL, and
+it already contains what both pages need: a query-parameter shape with direction,
+hop budget, per-direction terminal stops, min-flow pruning and a level range; a
+parsed query DSL; and a real BFS implementing all of it. It is the
+highest-value asset in this area and it is orphaned.
+
+`src/lib/graph/` — `types.ts` (compound identity: a role and an id, so D116's
+firm stays two roles on one entity), `palette.ts` (**one** palette; there are
+five today, four in hex and a fifth in HSL inside the map, deliberately
+different), `encoding.ts` (`sizeForMetric`, `edgeWidthForFlow`, `depthShade` — so
+size and width finally carry data), `subgraph.ts` and `focus.ts` (both extracted),
+and parity tests.
+
+Both pages read `echelon` from `node_list` instead of inferring it. **Six
+classifiers are deleted.** D113 disappears with the hand-rolled node map.
+D120 — the confidence signal that can only say "confident" — is either computed
+honestly (a node whose lane roles disagree genuinely is low-confidence) or
+deleted; a dead amber border is T2 answered with a constant.
+
+**Gate, not a promise**: `oneClassifier.test.ts` fails if a classifier survives
+outside `src/lib/graph/`, and `onePalette.test.ts` fails if a colour literal
+appears in a network page. Eight became one; the gate is what stops one becoming
+nine.
+
+**Exit**: `typecheck` (the baseline may shrink, never grow), `npm test`, the new
+parity tests green.
+
+### WP 8.4 — Close the UI gap, in both directions *(no migration)*
+
+The gap is **not one-directional**, which is the finding the original report
+started from and half of it inverts. Process-level is the LARGER page and has
+affordances Product-level lacks: a hover tooltip node, an on-canvas legend, a
+labels toggle, a per-depth colour ramp, loading and empty overlays, and a
+level-connectivity table. What it has **none** of is analytics — no centrality,
+no prominence, no map, no risk, no provenance strip.
+
+| Moves to Process-level | Moves to Product-level |
+|---|---|
+| the sortable centrality table | the hover tooltip node |
+| the `project_freshness` provenance strip | the on-canvas legend |
+| the risk-data notice | the labels toggle and edge labels |
+| the ML prediction card on desktop | loading and empty overlays |
+| the map-view toggle | the per-depth colour ramp |
+
+Both pages gain, from the shared layer: **node size by metric**, **edge width by
+flow**, **arrowheads** (a directed graph currently reads as undirected),
+neighbour dimming, pane-click deselect, substring search with a result count, the
+k-hop / direction / min-flow control, URL state and export. Two live defects go
+with them: Product-level's selection effect rebuilds from all edges and so
+clobbers its own focus subgraph, and Process-level's labels toggle triggers a full
+refetch.
+
+**Exit**: both pages render the same entity as the same node, in the same colour,
+with the same legend, and the legend counts equal the node counts.
+
+### WP 8.5 — Honest naming, and the routings deferral *(no migration)*
+
+**DECISION 4 — "work station" goes, and the page is renamed to what its data
+is.** There is no routing, operation or work-centre table anywhere in
+`supabase/contract/`. The label is fabricated from `level === 1` and it is **T1**
+broken in the plainest possible way: a noun on screen that no table can produce.
+Until real routing data exists the page is a multi-level BOM / product-structure
+view and must say so.
+
+The true process level is **deferred, not dropped**: §14 carries the routings /
+work-centre dataset, to land under the ingestion contract like any other source
+(`ingest_land_file`, a CSV template, a staging table, a tier-2 table, a sidecar,
+`no-tier-skip` respected). When that data exists the page earns its current name
+back.
+
+**Exit**: no user-visible string asserts a fact the data does not carry; §16 entry.
