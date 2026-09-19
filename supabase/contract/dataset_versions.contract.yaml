@@ -247,9 +247,11 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers`
-      and `multi_tier_supply_chain`. When this moves a multi-tier ANALYSIS is
-      stale; no simulation changes.
+      SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers`,
+      `multi_tier_supply_chain`, and since `schema_version` 3 the deep-tier
+      topology itself: the six columns the two prominence RPCs return from
+      `network_nodes` and `network_edges`. When this moves a multi-tier or
+      deep-tier ANALYSIS is stale; no simulation changes.
     grain: metadata
     engine:
       consumed_by: "current_hash_network() -> staleness display; not read by the engine"
@@ -268,11 +270,16 @@ fields:
         confirmed: true
     resolution: null
     note: >-
-      All three source tables hold ZERO rows in production (§15), so this column
-      is the digest of an empty domain on every project today and the half is
-      UNEXERCISED outside `supabase/rehearsal/110`. A green test on it is not a
-      working path. NULL before WP 4.1, and not backfillable, for the same
-      reason as `hash_inputs`.
+      THIS TEXT SAID THREE TABLES UNTIL WP 5.2f, AND `20260917000009` HAD
+      ADDED TWO MORE. WP 5.3 folded the deep-tier topology in to close §4 D75 —
+      a re-uploaded network was being served the previous graph's centralities
+      as a cache hit, because the anchor could not see the tables the two
+      centrality analyzers read. The sidecar was not updated with the migration,
+      and the manual renders this sentence, so the drift would have been
+      published. The original three source tables hold ZERO rows in production
+      (§15); the two deep-tier tables do not, so the domain is no longer the
+      digest of an empty set on every project. NULL before WP 4.1, and not
+      backfillable, for the same reason as `hash_inputs`.
   author_user_id:
     type: "uuid"
     unit: null
