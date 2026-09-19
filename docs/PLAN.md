@@ -11001,6 +11001,72 @@ and `audit:ui` **8**, both at baseline with no regression to fix this time.
 **Still open in WP 6.2:** D18, D34, D51, D58, D66, D87, D94, D95, D96, D99,
 **D103**.
 
+### WP 6.3 (slice 15) — D88 was never waiting on adoption · 2026-09-19 · no migration
+
+**What slice 14 promised.** That D88's precondition was adoption, not code, and
+needed "one analyzer run against functions deployed after 20:27". That run
+happened. It did not work, and the reason corrects the row rather than
+satisfying it.
+
+**The measurement.** A metrics calculation on the `Aumovio` project, reported by
+its own UI as successful, against edge functions whose workflow had reported
+green at 20:27 (§15 run `35398461411`):
+
+```
+| project  | node_list | network_nodes | network_edges | nodes_with_metrics |
+| Aumovio  | 439       | 439           | 0             | 439                |
+
+analysis_runs 0 · analysis_results 0
+no_provenance 9016 of 9016   (was 8577 of 8577 — the total went UP by Aumovio's 439)
+```
+
+439 rows written AFTER the dual-write shipped, every one carrying computed
+columns, not one carrying `computed_from_hash`, and no run to carry it.
+
+**D104 — twelve of eighteen edge functions never reach production from CI.**
+`supabase-functions.yml` names six and nothing else. The four analyzers are not
+among them. Neither is `ingest-file`, which is WP 3.2's entire deliverable and
+which §2.1 `ingestion-contract` describes as a live second source.
+
+**What hid it for two packages.** `supabase/functions/_shared/**` IS a path
+trigger. A change to `analysisStore.ts` therefore fires this workflow, it handles
+its six and goes green, and the run appears in the history as a success on the
+very commit that shipped the dual-write. An edge function bundles its imports at
+publish time, so the analyzers went on running the `_shared/` of whenever they
+were last pushed by hand. Every signal said it had landed.
+
+**This corrects D88 rather than closing it.** Its owner column reads "the
+unblocking condition is a NUMBER … `analysis_results` non-zero for a project".
+The number is still 0, but not for the reason given: adoption happened and the
+code was never there to adopt.
+
+**Four added here, eight deliberately not.** The analyzers are added because they
+are what D88 waits on and their source is CI-green. The other eight stay off:
+each has been running an unknown build for an unknown time, and pushing
+`delete-project` or `erp-sync-orbit-mrp` sight-unseen is a production change
+whose blast radius nobody has measured. They need diffing against production one
+at a time, which is a package and not a line in a YAML file.
+
+**The gate is unwritten and this slice does not write it.** Nothing compares the
+functions the repo holds against the functions the workflow names. That check is
+the real fix — the same shape as `table-covered`, where a table is either
+described or deferred to a named package — and it would have caught this on the
+day WP 4.3 merged. Sized, not taken.
+
+**A second finding, unrelated to provenance and not chased here.** `Aumovio` has
+439 nodes and **zero** `network_edges`. Degree, betweenness, closeness and
+eigenvector centrality over an edgeless graph are degenerate, so the 439 metrics
+now stored may be numbers with no meaning — T1's own subject. Whether the
+analyzer should refuse an edgeless graph rather than score it belongs with D72.
+
+**Verified:** YAML parses, 14 steps ✓ · `check:docs` ✓ · `contract:check` ✓ ·
+412 tests ✓. Nothing changes in production from this push — the workflow is
+`branches: [main]`, so the four analyzers reach the project on merge, and that
+merge is the first time they have been published in an unknown length of time.
+
+**Still open in WP 6.3:** D39, D88 (now on publication, not adoption), D104's
+other eight functions, the unwritten coverage gate, and the result-binding
+group (I8).
 ### WP 5.2e — Networks and Project Intelligence: the grade that is not blurred · 2026-09-18 · no migration
 
 **What the previous package promised.** 5.2c's gap check named D103 (owned by
