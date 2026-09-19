@@ -886,6 +886,41 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
       }
     }
 
+    // 3 — §17's PROSE, which nothing checked. WP 6.2.
+    //
+    // Rules 1 and 2 ask whether §17's ✅ claims are supported by §7–§13. Neither asks
+    // whether its SENTENCES are: the phase-5 row says "PHASE COMPLETE" while
+    // `### WP 5.2 — The manual (§6.3)` carries no ✅ on its own heading, its ten
+    // sub-packages carrying it instead. That single omission makes two rules dormant
+    // for that package at once — R7 stops demanding a closing §16 entry for it, and R8
+    // stops seeing what is deferred there (17 tables, plus §4 D102 and D104).
+    //
+    // A WARNING and not a failure, deliberately. The fix is either a ✅ plus a closing
+    // entry or a correction to §17, and both belong to that package rather than to
+    // whoever next runs `contract:check`. A gate that fails the build over somebody
+    // else's bookkeeping gets relaxed; a line printed on every run does not go away.
+    // The first cell may carry its own ✅ (`| 5 ✅ |`), which the first draft's regex
+    // refused — and Phase 5 is the one case this check exists for.
+    for (const m of seq.matchAll(/^\|\s*(\d+)\s*[✅\s]*\|[^\n]*?PHASE COMPLETE/gim)) {
+      const ph = m[1];
+      const unmarked = roadmap
+        .split("\n")
+        .filter((l) => new RegExp(`^### WP\\s+${ph}\\.[0-9]+[a-z]?\\s`).test(l) && !l.includes("✅"))
+        .map((l) => l.match(/^### WP\s+([0-9]+\.[0-9]+[a-z]?)/)?.[1])
+        .filter(Boolean);
+      if (unmarked.length === 0) continue;
+      const waiting = [...deferred.entries()].filter(([, wp]) => unmarked.includes(String(wp))).length;
+      // ONLY when the omission is hiding something. Several phases mark their ✅ in
+      // §17's range cell rather than on each heading, and a warning that fired for
+      // every one of them would be noise about a formatting habit. It fires when
+      // tables are waiting on an unmarked package, which is the case it is for.
+      if (waiting === 0) continue;
+      warn("R10",
+        `§17 says Phase ${ph} is COMPLETE and §7–§13 leaves ${unmarked.join(", ")} unmarked. That ` +
+        "makes R7 stop asking for a closing §16 entry and R8 stop seeing what is deferred there — " +
+        `${waiting} table(s) today. Mark it with its entry, or correct §17.`);
+    }
+
     if (!failures.some((f) => f.startsWith("R10"))) {
       console.log(`  R10 §17 agrees with §7–§13 · ${done.size} done package(s) cross-checked`);
     }
