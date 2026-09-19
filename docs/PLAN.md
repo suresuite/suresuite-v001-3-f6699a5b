@@ -15775,7 +15775,17 @@ predicted.
    comment saying so, for the reason WP 8.1 left `auto_refresh_node_list_on_scd_change`:
    a DROP takes the function's grants with it (`rehearsal/210` §2) and a later
    `CREATE OR REPLACE` can resurrect it silently.
-5. **`graphHashCoverage.test.ts`'s `COMPUTED_COLUMNS` is keyed on a COLUMN NAME and
+5. **The §15 probes were rewritten to answer on BOTH sides of the deploy, in a
+   SEPARATE push.** Probe 7 named `data_source_group` unconditionally, so the
+   moment this merges and deploys it would have errored and reported nothing —
+   a probe that cannot survive the change it measures is not a measurement. It
+   detects both columns first and SAYS WHICH SHAPE IT MEASURED, and it gained the
+   number to watch while `level` is deprecated: rows where `level` and `bom_depth`
+   disagree, which must stay 0 or the alias has become a second authoring. Probe 1
+   was corrected too — a single-level project reading ZERO deep-tier rows is no
+   longer D130, it is **adoption**, because the writer is fixed and nothing was
+   backfilled. That distinction is D88's, and it cost three packages to learn.
+6. **`graphHashCoverage.test.ts`'s `COMPUTED_COLUMNS` is keyed on a COLUMN NAME and
    not on `(table, column)`.** Found while considering `computed_by` declarations
    for the two edge tables, and NOT taken for that reason: declaring `weighted` or
    `level` as computed would add those bare names to a set the hash-coverage rule
