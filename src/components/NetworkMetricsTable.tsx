@@ -16,6 +16,75 @@ interface NetworkMetric {
   closeness_centrality: number | null;
   prominence: number | null;
   connection_count: number;
+  /**
+   * WP 6.3 · §4 D88 — WHICH HALF OF THE DUAL READ ANSWERED.
+   *
+   * `store`  — `analysis_results`, from a recorded run: reproducible, and it
+   *            carries the hash of the dataset it was computed from.
+   * `column` — the entity mirror on `network_nodes`, because the store has no row
+   *            for this node. Legacy, written before provenance existed, and
+   *            nothing can say which data produced it.
+   * `none`   — neither half has a number. NOT zero (§4 D17).
+   *
+   * These arrive from `get_network_metrics_for_materials`, which does the
+   * preference in ONE place so no screen has to. Optional on the type because the
+   * page renders before the columns land and a partial dataset must not crash a
+   * table; absent is treated exactly as `none` would be — unknown, said out loud.
+   */
+  metrics_source?: 'store' | 'column' | 'none' | null;
+  run_id?: string | null;
+  computed_from_hash?: string | null;
+  computed_at?: string | null;
+  /** NULL when there is no hash to compare. Unknown is not stale (D70). */
+  hash_is_current?: boolean | null;
+}
+
+/**
+ * The one-line account of where this table's numbers came from — §5 T2, at the
+ * point of display.
+ *
+ * A screen that showed reproducible figures and legacy ones in the same font
+ * would be T1 with the source silently removed, and that is the state every
+ * project is in right now: 439 of 1 824 rows carry a hash and the rest predate
+ * provenance (§15 run 35399391429). The columns cannot be dropped until every
+ * project has been re-run, and the rows cannot be backfilled — inventing a hash is
+ * the fabricated provenance I6 forbids — so the honest move is to SAY which.
+ */
+function provenanceSummary(metrics: NetworkMetric[]): string | null {
+  if (metrics.length === 0) return null;
+  const n = (k: NetworkMetric['metrics_source']) =>
+    metrics.filter((m) => (m.metrics_source ?? 'none') === k).length;
+  const store = n('store');
+  const column = n('column');
+  const none = n('none');
+  // The stale count is only meaningful for rows that HAVE a hash, which is why it
+  // is counted separately rather than folded into `store`.
+  const stale = metrics.filter((m) => m.hash_is_current === false).length;
+  const unknown = metrics.filter(
+    (m) => (m.metrics_source ?? 'none') !== 'none' && m.hash_is_current == null,
+  ).length;
+
+  const parts: string[] = [];
+  if (store > 0) parts.push(`${store} from a recorded analysis run`);
+  if (column > 0) {
+    parts.push(
+      `${column} from values stored before this project tracked provenance — ` +
+        `nothing can say which data produced them`,
+    );
+  }
+  if (none > 0) parts.push(`${none} not computed yet`);
+  if (parts.length === 0) return null;
+
+  let out = `Where these numbers come from: ${parts.join('; ')}.`;
+  if (stale > 0) {
+    out +=
+      ` ${stale} were computed from a different version of this dataset than the ` +
+      `one loaded now — re-run the analysis before quoting them.`;
+  }
+  if (unknown > 0 && column > 0) {
+    out += ` For ${unknown} of them we cannot tell, which is not the same as up to date.`;
+  }
+  return out;
 }
 
 interface NetworkMetricsTableProps {
@@ -130,6 +199,14 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
             : `Top ${Math.min(displayLimit, metrics.length)} of ${metrics.length} material nodes by betweenness centrality.`
           } Higher values indicate more critical positions in the supply network.
         </CardDescription>
+        {/* §4 D88 · T2 — the substitution is visible where the numbers are, not in
+            a log. `provenanceSummary` returns null only when the table is empty,
+            so a populated table always accounts for itself. */}
+        {provenanceSummary(metrics) && (
+          <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+            {provenanceSummary(metrics)}
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <div className="rounded-md border overflow-x-auto">

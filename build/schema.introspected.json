@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 332,
-  "migrations_applied": 324,
+  "migrations_found": 333,
+  "migrations_applied": 325,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260919000001_customers_land.sql",
+  "last_migration": "20260919000002_dual_read_node_metrics.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 273,
+    "functions": 274,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -21273,6 +21273,19 @@
       "defined_by": "20260917000006_analysis_store.sql"
     },
     {
+      "name": "analysis_latest_run",
+      "signature": "analysis_latest_run(uuid, text)",
+      "args": [
+        "_project_id uuid",
+        "_analysis_kind text"
+      ],
+      "returns": "uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "Phase 6 / WP 6.3 (§4 D88) — the SUCCEEDED run whose stored answer a reader ",
+      "defined_by": "20260919000002_dual_read_node_metrics.sql"
+    },
+    {
       "name": "analysis_mark_critical_nodes",
       "signature": "analysis_mark_critical_nodes(uuid, jsonb, uuid)",
       "args": [
@@ -22758,11 +22771,11 @@
         "p_user_id uuid",
         "p_user_email text"
       ],
-      "returns": "TABLE( id uuid, uid text, name text, revenue numeric, degree_centrality numeric, weighted_degree_centrality numeric, eigenvector_centrality numeric, betweenness_centrality numeric, closeness_centrality numeric, prominence numeric, connection_count bigint )",
+      "returns": "TABLE( id uuid, uid text, name text, revenue numeric, degree_centrality numeric, weighted_degree_centrality numeric, eigenvector_centrality numeric, betweenness_centrality numeric, closeness_centrality numeric, prominence numeric, connection_count bigint, metrics_source text, run_id uuid, computed_from_hash text, computed_at timestamptz, hash_is_current boolean )",
       "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql"
+      "volatility": "STABLE",
+      "comment": "Phase 6 / WP 6.3 (§4 D88) — material-node network metrics, DUAL READ: the ",
+      "defined_by": "20260919000002_dual_read_node_metrics.sql"
     },
     {
       "name": "get_network_nodes_for_prominence",
