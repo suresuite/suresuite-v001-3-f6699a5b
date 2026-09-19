@@ -87,6 +87,40 @@ export function ProvenanceDot({ p }: { p: Provenance }) {
   );
 }
 
+/**
+ * The dot AS A BUTTON — A2's trigger (§5.4, WP 6.3).
+ *
+ * The dot itself is 4px, which is not a tap target. The button around it is 24px
+ * with a negative margin, so the hit area grows without moving the dot one pixel:
+ * the grid's column widths are computed from `columnFit` and a trigger that took
+ * layout space would reflow every row.
+ *
+ * Presentational on purpose — it takes an `onClick` and knows nothing about what
+ * opens. `policyGridUi` is the grid's atom set and the read lives in
+ * `ValueChainPopover`, so the atom stays free of a data dependency.
+ *
+ * A column whose provenance state has NO colour (`default`) still gets a button,
+ * because "nothing you supplied is in play" is one of the most useful things A2
+ * can tell a reader, and it is the one state the dot cannot show.
+ */
+export function ProvenanceDotButton({ p, label }: { p: Provenance; label: string }) {
+  const { color, title } = PROVENANCE[p];
+  return (
+    <button
+      type="button"
+      aria-label={`Where did ${label} come from?`}
+      title={`${title} — click for the full chain`}
+      className="absolute right-0 top-0 z-10 flex items-center justify-center p-[6px] leading-none"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <span
+        className="block h-1 w-1 rounded-full"
+        style={{ background: color ?? "#d4d4d4", outline: "1px solid transparent" }}
+      />
+    </button>
+  );
+}
+
 export function ProvenanceLegend({ imputedLines }: { imputedLines?: number }) {
   const items: Array<[string, string]> = [
     ["from project data", LAYER.process],
@@ -298,6 +332,7 @@ export function NumCell({
   unit,
   placeholder = "—",
   title,
+  dot,
 }: {
   value: number | undefined;
   provenance: Provenance;
@@ -325,6 +360,13 @@ export function NumCell({
    * hover with something a person can read; until it does, this is the answer.
    */
   title?: string;
+  /**
+   * The provenance marker to render. Defaults to the plain dot; the grid passes a
+   * popover-wrapped `ProvenanceDotButton` where A2 can answer (§5.4). A SLOT
+   * rather than a callback because the trigger has to BE the element Radix
+   * anchors to, and because it keeps this module presentational.
+   */
+  dot?: React.ReactNode;
 }) {
   const derived = provenance === "derived";
   const formatted = (v: number) =>
@@ -332,7 +374,7 @@ export function NumCell({
   const text = value === undefined || value === null ? "" : (derived ? "≈ " : "") + formatted(value);
   return (
     <>
-      <ProvenanceDot p={provenance} />
+      {dot ?? <ProvenanceDot p={provenance} />}
       <span
         className="grid h-5 items-center"
         style={{ gridTemplateColumns: `minmax(0,1fr) ${unit ? 14 : 0}px`, columnGap: unit ? 3 : 0 }}

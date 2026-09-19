@@ -20,6 +20,7 @@ import {
   FamilyBand,
   FamilyChip,
   NumCell,
+  ProvenanceDotButton,
   POLICY_TYPE_OPTIONS,
   ProvenanceDot,
   ProvenanceLegend,
@@ -55,6 +56,8 @@ import { ParameterSheet } from "./ParameterSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import { useAuth } from "@/hooks/useAuth";
+import { ValueChainPopover, type ValueChainTarget } from "@/components/policies/ValueChainPopover";
+import { sourceFor } from "@/lib/trust/valueChain";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useItemMasters, type ItemMasterTable } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
@@ -1371,21 +1374,56 @@ export function StagePolicyTable({
                 </span>
               )}
 
-              {kind === "number" && (
-                <NumCell
-                  value={(() => {
-                    const n = typeof cellValue === "number" ? cellValue : Number(cellValue);
-                    return cellValue == null || !Number.isFinite(n) ? undefined : n;
-                  })()}
-                  provenance={prov}
-                  decimals={fc.kind === "num" ? (fc.dec ?? 2) : prov === "derived" ? 2 : undefined}
-                  integer={fc.kind === "int"}
-                  unit={fc.unit}
-                  placeholder={cellPlaceholder}
-                  title={placeholderTitle}
-                  onCommit={commit}
-                />
-              )}
+              {kind === "number" && (() => {
+                // A2 (§5.4) — the dot becomes the trigger for the value chain.
+                //
+                // `sourceFor` names the tier-2 table only for a master-backed
+                // column; for everything else it returns null and the popover
+                // renders the bundle-resolution chain, which is that cell's TRUE
+                // answer rather than a gap (§4 D125 says why the lane columns
+                // cannot be named yet).
+                const src = sourceFor(col as { field: string; master?: { table: string; field: string } });
+                const masterRow = src && col.master
+                  ? masterRowById[col.master.table].get(String(r[col.master.idFrom] ?? ""))
+                  : undefined;
+                const target: ValueChainTarget = {
+                  dataset: src?.dataset ?? null,
+                  column: src?.column ?? col.field,
+                  stage: stageKey,
+                  field: col.field,
+                  // The masters have carried `source_row_id` since WP 3.3 and
+                  // `select("*")` has been returning it with nothing reading it.
+                  // This is the reader.
+                  sourceRowId: (masterRow as { source_row_id?: string | null } | undefined)?.source_row_id ?? null,
+                  projectId: projectId ?? null,
+                };
+                const shown = cellValue == null ? (cellPlaceholder ?? "—") : String(cellValue);
+                return (
+                  <NumCell
+                    value={(() => {
+                      const n = typeof cellValue === "number" ? cellValue : Number(cellValue);
+                      return cellValue == null || !Number.isFinite(n) ? undefined : n;
+                    })()}
+                    provenance={prov}
+                    decimals={fc.kind === "num" ? (fc.dec ?? 2) : prov === "derived" ? 2 : undefined}
+                    integer={fc.kind === "int"}
+                    unit={fc.unit}
+                    placeholder={cellPlaceholder}
+                    title={placeholderTitle}
+                    onCommit={commit}
+                    dot={
+                      <ValueChainPopover
+                        target={target}
+                        provenance={prov}
+                        displayed={shown}
+                        userId={user?.id ?? null}
+                      >
+                        <ProvenanceDotButton p={prov} label={col.label} />
+                      </ValueChainPopover>
+                    }
+                  />
+                );
+              })()}
 
               {kind === "text" && (
                 <input

@@ -246,6 +246,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D122** | **A §4 D-number can be duplicated by a MERGE, and every rule that walks §4 keeps whichever it saw last.** Two branches each took "the next free D-number" from the same §4 and each was right on its own. The merge produced §4 with **two D112 rows describing different defects, two D113, two D114 — and four duplicated EXISTING rows (D87-D90)**, because the table's lines merged cleanly line by line while meaning nothing as a table. **NOTHING NOTICED.** R6 resolved both citations, R8 read both owners, `check:docs` passed, and `trustReportLimits.test.ts` built a `Map` keyed by D-number and silently kept the last — so a CLOSED defect and an OPEN one shared a key and the open one won, which is how it was finally found: a test asserting "no published limit cites a closed defect" started failing about a row whose closure was two lines above. A D-number is the identity CLAUDE.md makes every other document cite by ("cite §4 by D-number"), and an identity that can be duplicated is not one. The duplicated pairs also disagreed about their own state — four rows said `WP 6.2` open beside the same rows saying CLOSED — so §4 simultaneously asserted and denied four closures | `docs/PLAN.md` §4's row table against a `git merge` of two branches that each appended to it; `scripts/data-contract/check.mjs`'s R16 | **CLOSED (Phase 6 / WP 6.3)** — R16 fails on a duplicate, names both rows, and prints the next free number so the next author does not have to count. Mutation-tested by reintroducing the exact collision the merge made |
 | **D123** | **Code reaching `main` is not code reaching production, and the deploy workflow named SIX of eighteen edge functions.** `.github/workflows/supabase-functions.yml` carried a deploy step for six; the other twelve shipped to `main`, passed every gate, and kept running whatever build was last pushed by hand — for an unknown length of time. **What hid it is that the workflow's own history read as SUCCESS on the very commits that shipped them**: `supabase/functions/_shared/**` is a push path, so a change there fires the workflow, it deploys the six it names, and the run goes green. An edge function bundles its imports at publish time, so the unnamed ones did not even pick up the `_shared/` change that triggered the run. WP 4.3's dual-write is the headline case — shipped, green, recorded done, absent from production for two packages — and it is why `analysis_results` held 0 rows while D88 read the emptiness as non-adoption. **`ingest-file` is the worse one**: WP 3.2's entire deliverable, which §2.1's `ingestion-contract` (I7) row describes as a live second source on the strength of `supabase/rehearsal/070_ingest_file_landing.sql` — a rehearsal that proves the DATABASE path and says nothing about whether the function reaching it is published. Every CSV upload WP 6.2 added to that path was therefore correct in the repo and unreachable in production. **And the finding had no §4 row at all**: it was recorded in §16 as "D104", a number §4 had already given to the bare-filename citation collision, so for one slice the most-cited new defect in the repository had two meanings and no owner. R16 could not see it — R16 checks that §4's rows do not collide, and this collision was between a §4 row and a §16 entry that never became one. Renumbered to D123 here | `.github/workflows/supabase-functions.yml`'s deploy steps and push paths against the directories in `supabase/functions/`; `scripts/data-contract/check.mjs`'s R17; `scripts/data-contract/coverage.yaml`'s `functions_not_deployed` | **CLOSED AS A GATE (Phase 6 / WP 6.3)** — R17 fails a function that is neither deployed nor deferred, and fails SEPARATELY a function with a deploy step and no push path, which is the half `_shared/**` exploited. Mutation-tested five ways (deploy step removed, push path removed, a deployed function also deferred, a deferral naming no function, a deferral with no owning package). **ELEVEN deployed, SEVEN deferred** — six to WP 7.1 and `ingest-file` to WP 6.3, each with a written reason. **`ingest-file`'s deploy step was added here and then REVERTED**, because restoring the §16 entry D124 exposed found WP 6.3 (slice 16) declining it on purpose: on merge it switches every upload in production onto the landing path Phase 3 built, at once, and that slice asked for a §15 reading either side of the switch. A branch cannot take the second reading, so the switch is a named deliverable rather than a line in a YAML file — and the tenth dataset (`customers`) is unreachable in production until it is made. **AND R17 IS A WEAKER CHECK THAN THIS ROW'S SUBJECT, WHICH IT SAYS RATHER THAN HIDES**: it compares the repository against the WORKFLOW, so it proves a function is NAMED, not that production RUNS it. An undeployed function does not 404 — it answers as its previous version. The check that would close the gap is the one slice 16 sized: list the deployed functions and their versions through the Management API and diff them against `supabase/functions/`. It is not written because §15 is SELECT-only by construction (`assertReadOnly()`) and this would be its first non-SQL probe, which is a decision about what that instrument is |
 | **D124** | **§16 was truncated at §17, so a third of the drift log was invisible to every rule that reads it — 37 of 69 entries.** `section16()` sliced from `## 16.` to `## 17.`, which is right only while every entry is written before §17. Entries have been appended PAST it for months. Two rules were therefore quietly scoped to the older half: R7's append-only half was protecting 37 entries, and R7's second half — a package marked done has an entry — was answering about 37 while the roadmap marks 23 packages done. **The cost is not hypothetical: with the wider scope R7 immediately reported a REAL LOSS.** The entry `WP 6.3 (slice 16) — The analyzers were never deployed` existed at `cda6b57` and was absent from HEAD; it was lost in a merge where another session's own "slice 16" occupied the same heading slot, and R7 — the rule written to refuse precisely that — could not see it. **The lost entry also contained a decision**: it declined to deploy `ingest-file` on purpose, and without it this package deployed the function in passing, which is what D123's tail now records reverting. A drift log is the repository's memory of why, and a third of it was outside the guard | `scripts/data-contract/check.mjs`'s `section16()` against `docs/PLAN.md`'s section order; `entryHeadings()`; R7's two halves | **CLOSED (Phase 6 / WP 6.3)** — `section16()` is now ordering-INDEPENDENT: §16 is everything from its own heading onward minus every later top-level section, and a later section ends at the next `## `, the next `### ` (an entry appended past it) or EOF. Verified against BOTH shapes — 69 entries with §17 mid-document and 69 with §17 moved to the end, §17's own table excluded either way — because a parallel branch fixes the same defect by MOVING §17, and this reader must be right after that lands too. R7 now prints the entry count in scope, so a future truncation is a number that changes rather than silence; with full history it checks 136 revisions against 70 entries. **A parallel branch numbers this same finding differently on its own §4**, which is D122's merge collision arriving on schedule and is what R16 is for |
+| **D125** | **Nothing declares which tier-2 column a LANE grid cell holds, so A2's chain cannot name its own first hop for most of the grid.** `columnSpecs.ts` declares grid field → MASTER column (`ColSpec.master`, seven columns). `dataMap.ts` declares dataset column → ENGINE field. The contract declares tier-2 column → CSV header. **Between grid field and LANE column there is nothing**: the supplier grid's `lead_time_days` is `inbound_logistics.lead_time` × 7 and `volume_per_day` is `volume` through a unit table, and both conversions exist only as expressions inside `useStageRows`'s enrichment. Every other hop of the resolution chain is derived from a declaration and gated; this one is derived from code shape and gated by nothing. It was invisible while no reader needed it — WP 6.1's chains describe the DB hop in prose, which reads correctly without being machine-usable — and A2 is the first artifact that has to ANSWER with it. **The cost, measured**: the value-chain popover traces a master-backed cell to a named line of a named file and cannot do the same for a lane cell, so the majority of the numbers a planner looks at get the bundle-resolution chain instead of their own. **What it must not become is a second copy**: an authored grid-field → lane-column map inside the popover would be `single-source` (I1) broken by the artifact built to explain the data layer, which is D101's shape exactly. The declaration belongs in the sidecar beside `csv_header`, as a `grid_field` (with its conversion), so `resolutionChains` and A2 read one fact | `src/lib/policies/columnSpecs.ts`'s `ColSpec.master` against `src/hooks/useStageRows.tsx`'s enrichment expressions; `src/lib/trust/valueChain.ts`'s `sourceFor`; `src/lib/policies/dataMap.ts` | **WP 6.4** *(it is a contract addition with a generator and a gate behind it — the decision plane package is the next one to touch sidecars, and A2 ships with the gap named in `sourceFor`'s own header rather than guessed around)* |
 | **D110** | **The manual was written from the contract and never from the product's own assets, so eighty pages point at none of them.** Three sets of files exist, are shipped, and are reachable by a user — and no page of the manual links one. (1) **Fourteen CSV templates** in `public/template/`: the actual file a person downloads before filling anything in. §6.3 section 3 asks every table page for a "template" and the pages render a header row synthesised from the contract instead, so a reader of "Inbound Logistics" cannot get `inbound_logistic.csv`. (2) **Three guide documents** in `public/docs/` — `csv-upload-guide.md`, `location-dataset-guide.md`, `nexus-node.md` — which `UploadWizard` already surfaces per dataset as `guideFile`. (3) **A ready-to-run Colab notebook**, `public/notebooks/suresuite_api_quickstart.ipynb`, with a pre-filled CONFIG cell and a poll-a-run recipe, offered on `/developer` beside "Open example in Colab" — and absent from all four Developer API pages. **The mapping is DECLARED, which is what makes this a generator's job rather than a typist's**: `UploadWizard.tsx`'s `templateTypes` pairs every dataset id with its `templateFile` and `guideFile`, so the links derive the same way the stress battery and the API route table do. Two facts a derivation would also carry that no page states today: `node_list` has `templateFile: ''` — there is deliberately no template, the user works from downloaded data — and `deep_tier_json` offers a JSON template rather than a CSV. **The class is the finding, not the three instances**: the manual's rule was "never retype a generated fact", and nothing in it said "and point at what the product already ships". A page can be perfectly sourced and still leave a reader hunting for the file they came for | `public/template/` (14), `public/docs/` (3), `public/notebooks/` (1) against `src/components/docs/bodies/` (0 references); the declared mapping in `src/components/UploadWizard.tsx`'s `templateTypes` | **CLOSED (Phase 5 / WP 5.2j)** — three derivations (`deriveUploadAssets`, `deriveApiNotebook`, and the registry `wizardId` for the four tables outside the ingestion contract), rendered on every §3 table page and on `getting-an-api-key`, with `docsAssets.test.ts` resolving every derived path against `public/` on disk. **Three counts were one count until it separated them**: fourteen FILES, thirteen wizard datasets, twelve offered templates — and **two files reachable from nothing in the repository** (`location-dataset-template.csv`, `supply-chain-data-template.csv`), reported rather than failed because deleting a shipped asset is a product decision |
 | **D111** | **`stress-tests` documents a feature the product cannot reach, using names the user never sees, while the seven presets they actually click are undocumented.** WP 5.2d read the battery from `scsim/scsim/stress/battery.py`'s `ST_DEFINITIONS` — ST-1…ST-7, two runnable — and published it as "the standing battery". **`run_st1`/`run_st2` are imported by exactly two things: the engine's own `scsim/tests/test_stress.py` and `scsim/scsim/__init__.py`.** Nothing in `sim-worker/`, nothing in `supabase/functions/`, nothing in `src/`. The only occurrences of "ST-1" in the application are the documentation page itself and its registry entry. The battery is a **Python library API**, legitimately usable by a researcher importing `scsim`, and it is not a product feature. **What the user is actually offered is `src/components/sim/StressTestCard.tsx`'s seven presets** — `single_supplier_outage`, `plant_shutdown`, `material_shortage`, `lead_time_shock`, `demand_surge`, `multi_hit`, `nexus_attack` — each a pre-built `disruption_schedule` of `{target, target_type, start_day, duration_days, magnitude_pct}` launched down the disruption path, a different mechanism entirely. The contradiction is direct and a user will hit it: the screen offers **Demand surge** and the manual says ST-5 Demand surge is declared and not implemented. **This is the inverse of D21**: not documenting an engine name for a field the user typed, but documenting an engine FEATURE for a screen the user is looking at. The generator was sound and pointed at the wrong artifact, which is why "read it from the engine rather than mining the archive" was necessary and not sufficient | `scsim/scsim/stress/battery.py`'s importers (two, both inside `scsim/`) against `src/components/sim/StressTestCard.tsx`'s `STRESS_TESTS`; `src/components/docs/bodies/StressTests.tsx` | **CLOSED (Phase 5 / WP 5.2j)** — the page leads with the seven presets, derived from the drawer's own literal and rendered as the schedule rather than as prose; the battery stays, demoted to the library API it is. §16 · WP 5.2d is corrected in place. **Confirming the presets run end to end found D112**, which is the larger defect |
 | **D112** | **Six of the seven stress presets never reach the engine, and the run reports KPIs anyway.** A scenario's `disruption_schedule` reaches scsim through `project_map.py`'s `_map_events`, which strips everything before the last colon, accepts the result only if it is one of the project's own supplier ids or the focal plant, and **skips anything else with a mapping warning**. `StressTestCard.tsx`'s presets ship fixed placeholders — `supplier:primary`, `material:critical`, `customer:all`, `edge:inbound`, `node:nexus` — that no real project's ids match. Only `node:plant` resolves. **Measured, not reasoned about**: running `_map_events` over all seven schedules against a two-supplier project maps **1 event of 8** and raises seven warnings, every one `unsupported target skipped (material/edge land later in M7)`. The run then completes and reports KPIs, because a dropped event is not a failed run — so a stress test that hit nothing is indistinguishable from a chain that absorbed the shock, unless the reader opens the mapping warnings. **The warning IS surfaced** (`MappingWarningsCard`, on the run panel and the mobile lab), which is what keeps this a usability defect rather than a silent-wrong-number defect; nothing ranks it above the KPIs a reader came for. The same trap is in the shipped Colab notebook, whose §11 and §13 suggest a material code as a disruption target, and in the public API, whose `DisruptionSchema` accepts any 200-character string. **This is D111's real content**: D111 was a page pointed at the wrong artifact, and the right artifact turned out not to work either | `scsim/scsim/io/project_map.py`'s `_map_events` against `src/components/sim/StressTestCard.tsx`'s `STRESS_TESTS`; the classification is derived and pinned in `scripts/data-contract/chains.mjs` (`assertMapperUnchanged`, six anchors) | **OPEN — WP 6.4** *(the decision plane. The fix is a product decision this package does not own: either the presets carry targets resolved from the project at click time, or the mapper learns material, customer and edge targets — the warning's own text says "land later in M7". The manual states the situation on `stress-tests`, `getting-an-api-key` and `endpoints-and-schemas` meanwhile)* |
@@ -456,7 +457,7 @@ documentation that explains them.**
 | # | Artifact | Answers | State | WP |
 |---|---|---|---|---|
 | A1 | Provenance dot | *Is this real data?* | D16 closed (WP 0.1); D17 open | 0.1 ✅, 6.2 |
-| A2 | Value-chain popover | *Where did THIS number come from?* | missing | 6.3 |
+| A2 | Value-chain popover | *Where did THIS number come from?* | **ships in WP 6.3** — full chain (file, line, uploader, promoter) for the seven master-backed columns; the bundle-resolution chain for the rest, because no declaration names a lane cell's tier-2 column (D125) | 6.3 |
 | A3 | Project Data Trust Report | *Is this model built on good data?* | grading exists, unassembled | 4.4 |
 | A4 | Verifiable export | *Can I check this without your app?* | **exists, strong** | 3.3 extends it |
 | A5 | Reproducibility record | *Can I reproduce this in two years?* | missing | 6.3 |
@@ -13348,6 +13349,124 @@ byte-identical to HEAD.
 **Still open in WP 6.3:** A2 (value-chain popover), A3 (Trust Report via
 `report-render`), the `ingest-file` landing switch with a §15 either side, D123's
 six WP 7.1 deferrals, and D88's drop (waiting on adoption).
+
+### WP 6.3 (slice 26) — A2, and the hop nothing declares · 2026-09-19 · `20260919000003`
+
+**What the previous slice promised.** Slice 25 left A2 and A3 open. This is A2 —
+the value-chain popover — and building it found the one hop of the resolution
+chain that no declaration owns.
+
+#### A · FOUR FACTS WERE ALREADY IN THE DATABASE WITH NO READER
+
+`ingest_files` holds the filename, the bytes' SHA-256 and the uploader.
+`ingest_staged_rows` holds the physical line, the cells AS RECEIVED (`raw`, keyed
+by the header the file carried) and what validation established (`parsed`, keyed
+by tier-2 column). `ingest_runs` holds the promoter and the moment of promotion.
+Every row promoted through the landing path has carried `ingest_run_id` +
+`source_row_id` to reach them since WP 3.3 — and `useItemMasters.tsx`'s own comment
+says what happened next: *"`select("*")` has been returning them ever since without
+anything reading them."* A2 is the reader.
+
+`20260919000003` adds `ingest_value_chain`, and three of its decisions are the
+package:
+
+1. **It takes the STAGED ROW, not a table name and a row id.** The first draft took
+   `(target_table, row_id)` with dynamic SQL, which cannot serve `customers` at all
+   — that table has no surrogate `id`, only its natural key — so it would have
+   answered for nine of ten landable datasets and raised 42703 on the tenth. It
+   would also have been a generic row reader behind a `SECURITY DEFINER` grant.
+   The client already HAS `source_row_id`.
+2. **It returns EXACTLY ONE ROW IN BOTH MODES**, including for a row with no
+   provenance. Zero rows is indistinguishable from a failed load, and 8 577 rows
+   here predate the path: their provenance is UNKNOWN, which is not "there was
+   none". The second mode takes the project and the target instead, so a legacy
+   row still gets the freshness half — *"provenance unknown AND two later uploads
+   of this dataset exist"* is a useful sentence where "unknown" alone is not.
+3. **It does NOT map column to CSV header.** That mapping is authored once in the
+   contract and published as `ingestSpec.generated.ts`, which the wizard already
+   imports, so `raw` and `parsed` come back whole and the caller picks (I1, and
+   D101 is what the second copy costs).
+
+The predicate is `has_project_access`, deliberately not `min_project_role`: D66
+measured the two and they disagree in both directions, so swapping here would
+silently deny an organization admin the provenance of a row they can already see.
+
+#### B · THE REHEARSAL FOUND A REAL BUG, AND A MUTATION FOUND A FAKE ASSERTION
+
+`supabase/rehearsal/260` failed on its first run: after a second applied upload the
+freshness count read 0. `applied_at` defaults to `now()`, which is TRANSACTION start
+time, so two promotions in one transaction carry the SAME timestamp and `>` counted
+neither as later than the other. Now `>=` with the row's own run excluded, and the
+trade is stated in the migration: ties count as later, because over-reporting a
+stale cell by the number of runs sharing an instant is the safe direction and
+under-reporting staleness misleads a reader about their own data.
+
+**Then the mutation round found that one of my own assertions could not fail.** §3
+read `IF v_chain.raw ->> 'priority_weight' <> '' THEN`. The mutation that returns
+`parsed` where `raw` belongs — the exact confusion §3 exists to catch — PASSED it:
+`parsed` has no such key, `->>` gave NULL, `NULL <> ''` is NULL, and `IF NULL` does
+not fire. Every comparison in the file is `IS DISTINCT FROM` now, and the header
+says why. **Five mutations, all caught**: `parsed` for `raw`, the target scope
+dropped from the freshness count, the access gate removed, an inner join in place of
+the LEFT JOIN anchor (zero rows), and a COALESCE inventing `unknown.csv`.
+
+#### C · D125 — THE HOP NOTHING DECLARES
+
+`sourceFor` names a cell's tier-2 table from `ColSpec.master`, which covers SEVEN
+grid columns. For the rest there is nothing to read: `columnSpecs` declares grid
+field → master column, `dataMap` declares dataset column → engine field, the
+contract declares tier-2 column → CSV header, and **between grid field and LANE
+column there is no declaration at all**. `lead_time_days` is
+`inbound_logistics.lead_time` × 7 and `volume_per_day` is `volume` through a unit
+table; both conversions exist only as expressions inside `useStageRows`.
+
+It was invisible while nothing needed it — WP 6.1's chains describe the DB hop in
+prose, which reads correctly without being machine-usable — and A2 is the first
+artifact that has to ANSWER with it. **So A2 ships with the boundary named rather
+than guessed around**: a master-backed cell traces to a named line of a named file;
+every other numeric cell gets the bundle-resolution chain, which for an
+override/default cell is its TRUE answer and not a gap. Writing an authored map
+inside the popover would have been `single-source` broken by the artifact built to
+explain the data layer. **D125 assigns the declaration to WP 6.4**, which is the
+next package to touch sidecars.
+
+#### D · WHAT THE POPOVER SHOWS, AND THE RULE UNDER IT
+
+Six groups — where it came from, who touched it, what it says, what the model does
+with it, since then, what would change it. **Every hop that cannot be answered is
+rendered, italic, with its reason**, because a blank line reads as a complete chain
+that happens to be short. A failed read is a THIRD state, said in its own words, so
+an outage cannot look like missing lineage. And the remedy is per provenance state —
+nine states, nine sentences, gated — because telling someone to re-upload a file for
+a value they typed is worse than saying nothing.
+
+`ProvenanceDotButton` is the trigger: 24px of hit area with 6px padding around the
+4px dot, so the tap target grows without moving the dot a pixel — the grid's column
+widths are computed from `columnFit` and a trigger that took layout space would
+reflow every row.
+
+#### E · WHAT IS NOT DONE
+
+- **A3** (Trust Report via `report-render`) is the remaining §5.4 deliverable.
+- **The lane columns** wait on D125's declaration.
+- **This migration is not deployed.** `supabase-migrations.yml` is `branches: [main]`
+  (D31, corrected in slice 25), so `ingest_value_chain` reaches production on merge.
+  The popover is therefore correct in the repository and will report a failed read
+  until then — which it says in those words rather than showing an empty chain.
+
+**Verified:** `rehearsal/260` green against PostgreSQL 16 and mutation-tested five
+ways · three rehearse modes green (25 assertion files) · `contract:check` R1–R17 ✓
+(R12 caught the `supply_chain_data` surface citation my edit moved — the gate
+working) · 751 tests ✓, 11 new and mutation-tested four ways · typecheck 23 of 23 ✓
+· `check:docs` ✓ · artifacts regenerated (275 functions, was 274) · eslint 336/116 and
+audit:ui 8, byte-identical to HEAD — the popover's RPC is typed by a narrow local
+declaration rather than `(supabase as any)`, which would have grown the count by one.
+**Read, not verified:** that a person can open the popover — no test renders the
+grid, and the display assertions read the component's source.
+
+**Still open in WP 6.3:** A3 (Trust Report via `report-render`), the `ingest-file`
+landing switch with a §15 either side, D123's six WP 7.1 deferrals, D125's
+declaration (WP 6.4), and D88's drop.
 
 ### WP 5.2j — The page that documented the wrong feature, the assets nobody pointed at, and the thin half · 2026-09-19 · no migration
 

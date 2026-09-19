@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 333,
-  "migrations_applied": 325,
+  "migrations_found": 334,
+  "migrations_applied": 326,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260919000002_dual_read_node_metrics.sql",
+  "last_migration": "20260919000003_value_chain.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 274,
+    "functions": 275,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -23293,6 +23293,21 @@
       "volatility": "STABLE",
       "comment": "Phase 3 / WP 3.3 — the columns a promotion upserts on, read from pg_index ",
       "defined_by": "20260916000018_natural_key_unique.sql"
+    },
+    {
+      "name": "ingest_value_chain",
+      "signature": "ingest_value_chain(uuid, uuid, uuid, text)",
+      "args": [
+        "p_user_id uuid",
+        "p_source_row_id uuid DEFAULT NULL",
+        "p_project_id uuid DEFAULT NULL",
+        "p_target_table text DEFAULT NULL"
+      ],
+      "returns": "TABLE ( has_provenance boolean, project_id uuid, target_table text, source_kind text, original_filename text, content_sha256 text, byte_size bigint, source_row_number integer, raw jsonb, parsed jsonb, findings jsonb, diff_state text, uploaded_by_name text, uploaded_by_email text, received_at timestamptz, promoted_by_name text, promoted_by_email text, promoted_at timestamptz, run_status text, later_uploads integer, latest_upload_at timestamptz )",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "§5.4 A2 — the value chain for ONE tier-2 row, expanded from its `source_row_id`: ",
+      "defined_by": "20260919000003_value_chain.sql"
     },
     {
       "name": "is_stale",

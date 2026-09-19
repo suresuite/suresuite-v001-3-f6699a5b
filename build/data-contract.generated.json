@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 333,
-      "migrations_applied": 325,
-      "last_migration": "20260919000002_dual_read_node_metrics.sql"
+      "migrations_found": 334,
+      "migrations_applied": 326,
+      "last_migration": "20260919000003_value_chain.sql"
     },
     "sidecars": 48,
     "registry": {
@@ -23276,7 +23276,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc assign_material_supplier",
           "grain": "table",
-          "evidence": "src/components/policies/StagePolicyTable.tsx:239",
+          "evidence": "src/components/policies/StagePolicyTable.tsx:242",
           "confirmed": true
         },
         {
@@ -26810,5 +26810,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "ae6769db99b6"
+  "contract_version": "6305d7ea6f57"
 }
