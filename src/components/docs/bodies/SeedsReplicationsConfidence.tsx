@@ -1,6 +1,7 @@
 // §6.3 section 7 — seeds, replications and confidence. Marked G*.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 
 export default function SeedsReplicationsConfidence() {
   return (
@@ -19,6 +20,7 @@ export default function SeedsReplicationsConfidence() {
           means something quite different if the runs ranged from 93 to 95 than if they ranged from
           78 to 99, and the mean alone cannot tell you which you have.
         </P>
+              <DocFigure id="replications" />
       </Section>
 
       <Section id="seeds" title="Seeds">

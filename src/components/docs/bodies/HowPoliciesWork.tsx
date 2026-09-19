@@ -3,6 +3,7 @@
 // WHOLE MEANING and a prose ordering drifts the first time a branch moves.
 
 import { PageTitle, Section, P, Key, Callout, Prose, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { RESOLUTION_ORDER, RESOLUTION_ORDER_SOURCE, CHAIN_COUNT, BROKEN_COUNT } from "@/components/docs/generated/policy.generated";
 import { STAGES } from "@/lib/policies/stages";
 
@@ -26,6 +27,7 @@ export default function HowPoliciesWork() {
           They are kept apart on purpose. Re-uploading your data does not change your decisions, and
           changing a decision does not touch your data.
         </Key>
+              <DocFigure id="resolution-order" />
       </Section>
 
       <Section id="stages" title="The three stages">

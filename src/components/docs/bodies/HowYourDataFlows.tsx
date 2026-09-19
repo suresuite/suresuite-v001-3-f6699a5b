@@ -1,4 +1,5 @@
-import { PageTitle, Section, P, Key, Callout, Figure, DocLink, Term } from "@/components/docs/prose";
+import { PageTitle, Section, P, Key, Callout, DocLink, Term } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { DataFlow } from "@/components/docs/figures";
 
 export default function HowYourDataFlows() {
@@ -15,9 +16,7 @@ export default function HowYourDataFlows() {
           <DocLink to="how-suresuite-is-designed">How SuReSuite is designed</DocLink>. Nothing skips
           a hop, and nothing moves backwards.
         </P>
-        <Figure caption="From an uploaded file to a stamped result. The tier on the right is where each step's output lives.">
-          <DataFlow />
-        </Figure>
+        <DocFigure id="flow" fallback={<DataFlow />} />
       </Section>
 
       <Section id="upload" title="1. You upload a file">
