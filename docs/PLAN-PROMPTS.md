@@ -699,111 +699,221 @@ Gap check for every sub-package: diff §6.3 against the live schema and App.tsx.
 table or route with no page and no internal-only justification is a finding.
 ```
 
-### WP 5.2j — Depth, and the assets the manual never points at  (closes D110)
+### WP 5.2j — Every thin page, the assets, and the page that documents the wrong feature  (closes D110, D111)
 
-*Run this AFTER 5.2a–i. All eighty pages exist and pass every gate; this package
-is about whether they are worth reading. Budget it as a full session per
-section-group — do NOT try to do all four in one.*
+*ONE package, ONE prompt, all of it. Run it after 5.2a–i. All eighty pages
+exist and pass every gate; this is about whether they are worth reading.*
 
 ```
-Implement WP 5.2j from docs/PLAN.md (§6.3, §12; findings in §16 · WP 5.2i).
+Implement WP 5.2j from docs/PLAN.md (§6.3, §12; §4 D110, D111; §16 · WP 5.2i).
 
-The manual is COMPLETE and parts of it are THIN. Two measured problems:
+The manual is COMPLETE and it is not yet USEFUL ENOUGH. Three measured
+problems, in the order they cost a reader:
 
-A. 23 of 80 pages render under 500 words, and they CLUSTER — sections 9, 10,
-   11 and 14 (the assistant, connectors, results, the API). The correlation is
-   the finding: where there was no generated fact to render, less was written.
-   The generated reference pages are fine; a generator cannot be lazy.
+  1. D111 — one page documents a feature the product cannot reach.
+  2. D110 — eighty pages point at none of the files the product ships.
+  3. 23 of 80 pages render under 500 words, and they cluster where there was
+     no generated fact to render.
 
-B. D110 — eighty pages point at NONE of the files the product ships:
-     · 14 CSV templates in public/template/
-     · 3 guides in public/docs/ (csv-upload-guide, location-dataset-guide,
-       nexus-node)
-     · public/notebooks/suresuite_api_quickstart.ipynb — a ready-to-run Colab
-       notebook offered on /developer
-   A page can be perfectly sourced and still leave a reader hunting for the
-   file they came for.
+Fix all three. Do not split this package.
 
-══ DO B FIRST. It is smaller, it is mechanical, and it is the half that saves
-   the most support time per hour spent.
+════════════════════════════════════════════════════════════════════════
+1 · D111 — THE STRESS-TESTS PAGE IS DOCUMENTING THE WRONG THING
+════════════════════════════════════════════════════════════════════════
+Verified: `run_st1`/`run_st2` are imported by exactly two files, both inside
+scsim/ — its own test and its package __init__. Nothing in sim-worker/,
+supabase/functions/ or src/ reaches the engine battery. The only "ST-1" in the
+application is the doc page and its registry entry.
 
-B — DERIVE THE LINKS, DO NOT TYPE THEM.
-  UploadWizard.tsx's `templateTypes` already pairs every dataset id with its
-  `templateFile` and `guideFile`. Parse it in scripts/data-contract/chains.mjs
-  the way deriveStressTests and deriveApiRoutes do, emit into
-  policy.generated.ts, and render on each table page. Then a template renamed
-  in the wizard cannot leave a dead link in the manual.
+What the user actually clicks is src/components/sim/StressTestCard.tsx's seven
+presets, each a pre-built disruption_schedule:
+
+  single_supplier_outage · plant_shutdown · material_shortage ·
+  lead_time_shock · demand_surge · multi_hit · nexus_attack
+
+The screen offers "Demand surge"; the page says ST-5 Demand surge is declared
+and not implemented. A user WILL hit that.
+
+Rewrite the page around the seven presets: what each hits, when, for how long,
+how hard — the schedule IS the description, and the component already spells
+it. Keep the engine battery, demoted and correctly framed: a Python library API
+for somebody importing scsim, NOT a product feature, and say which it is.
+Render both from their sources; neither list is typed.
+
+Then re-read §16 · WP 5.2d, which claims the battery was read "from the engine
+rather than mined from the archive". That is true and it was the wrong
+artifact. Correct the entry — do not delete it.
+
+════════════════════════════════════════════════════════════════════════
+2 · D110 — DERIVE THE ASSET LINKS, DO NOT TYPE THEM
+════════════════════════════════════════════════════════════════════════
+Three sets of shipped files, zero references from 80 pages:
+  · public/template/      14 CSV templates — the file a person downloads
+  · public/docs/          3 guides (csv-upload, location-dataset, nexus-node)
+  · public/notebooks/     suresuite_api_quickstart.ipynb — a ready-to-run
+                          Colab notebook, offered on /developer
+
+UploadWizard.tsx's `templateTypes` already pairs every dataset id with its
+templateFile and guideFile. Parse it in scripts/data-contract/chains.mjs the
+way deriveStressTests and deriveApiRoutes do, emit into policy.generated.ts,
+render on each table page. A template renamed in the wizard then cannot leave a
+dead link in the manual.
   · Throw if the parse yields fewer than 10 datasets (the vacuity rule, D57).
-  · A test must assert every derived path EXISTS under public/. A 404 from a
-    documentation page is worse than no link.
-  · Two facts the derivation carries that no page states today, and both must
-    survive onto the page: node_list has templateFile: '' — there is
-    deliberately no template, the user works from downloaded data — and
-    deep_tier_json offers a .json template, not a .csv.
-  · The notebook is section 14's. Put it on `getting-an-api-key`, which is
-    where somebody who wants to call the API actually starts.
+  · A test must assert every derived path resolves to a file that EXISTS under
+    public/. A 404 from a documentation page is worse than no link.
+  · Two facts the derivation carries that no page states: node_list has
+    templateFile: '' — deliberately no template, the user works from
+    downloaded data — and deep_tier_json offers .json, not .csv.
+  · The notebook belongs on `getting-an-api-key`, where somebody who wants to
+    call the API actually starts.
 
-A — THE METHOD, and it is the point of this package.
-  Do NOT "write more". For each thin page, run this and let it produce the
-  content:
+════════════════════════════════════════════════════════════════════════
+3 · THE 23 THIN PAGES — THE METHOD, AND IT IS THE POINT
+════════════════════════════════════════════════════════════════════════
+Do NOT "write more". For every page below, run this:
 
-    1. Open the product surface the page documents (its route in App.tsx, or
-       the module named in the page's own lineage block).
-    2. ENUMERATE what it offers: every control, filter, panel, toggle, badge,
-       empty state and error state. Read the UI strings and the state hooks.
-    3. DIFF that against the page. Every item the page does not mention is
-       either (a) missing content, or (b) a deliberate omission — and if it is
-       (b), say so on the page rather than leaving silence.
-    4. For each item you add, answer the question the user will actually have:
-       not "there is a filter" but "it is ON by default and it hides exactly
-       the rows worth auditing".
+  1. Open the surface it documents — its route in App.tsx, or the components
+     that route imports.
+  2. ENUMERATE what it offers: every control, filter, panel, toggle, badge,
+     preset, empty state and error state. Read the UI strings and the state.
+  3. DIFF against the page. Every item the page does not mention is either
+     missing content or a deliberate omission — and a deliberate omission gets
+     SAID, not left as silence.
+  4. For each item, answer the question the reader will actually have. Not
+     "there is a filter" but "it is ON by default and hides exactly the rows
+     worth auditing".
 
-  This method is not theoretical — it is what the four network pages were
-  rewritten with, and it found: inferred node groups (so a mis-typed id
-  silently becomes a fifth node), the zero-flow filter's default, single-source
-  risk, revenue coverage as the figure that qualifies every weighted measure,
-  and what a one-node BOM level means. None of that was in the contract; all of
-  it was on screen.
+That method is what rewrote the four network pages. It found inferred node
+groups, the zero-flow default, single-source risk, revenue coverage as the
+figure that qualifies every weighted measure, and what a one-node BOM level
+means — none of it in the contract, all of it on screen.
 
-  WORK IN THIS ORDER — highest support-cost first:
-    §14 Developer API (4 pages, +notebook) · §11 Results (5) ·
-    §10 Connectors (3) · §9 Project Intelligence (4) · then the rest.
+THE PAGES, WITH THE SURFACE EACH ONE IS MISSING (verified, treat as leads):
 
-══ THE RULES THAT DO NOT RELAX ══
+ §7 Experiments — SimulationLab imports 13 components; the section names ~3.
+   simulation-lab 448w        RunGate, PreRunValidationPanel, RunProgressPanel,
+                              RunQueueConsole (filter, cancel, clear finished),
+                              StageRail, ScenarioRail
+   scenarios 299w             ScenarioLibraryPanel — a scenario LIBRARY with
+                              categories (Supplier, Logistics, Production,
+                              Geopolitical) and "Use this scenario".
+                              ScenarioSetupForm. The page mentions no library.
+   stress-tests 417w          see section 1 above
+   experiments-and-comparison 432w
+                              ExperimentDesigner, ExperimentResultsPanel,
+                              CompareScenariosPanel — including "Paired
+                              comparison" and "Not a paired experiment", which
+                              is the whole CRN argument made concrete on screen
+   recovery-playbooks 280w    PlaybookPicker, PlaybookSaveDialog,
+                              RecoveryImpactCard ("Recovery playbook impact",
+                              "Utilization by class"), DisruptionRecoveryPane
+   seeds-replications-confidence 495w
+                              ReplicationSeedExplorer (Isolated vs Overlaid,
+                              across fill rate, cost of resilience, lost sales,
+                              max backlog, on-hand value, revenue, backlog),
+                              ConvergencePlot, CredibilityBadge
 
+ §11 Results
+   reading-your-results 375w  ResultsDashboard, KpiStatTable, resultTables,
+                              UtilizationHeatmap, "Engine conversion notes"
+   per-item-time-series 453w  ItemSeriesExplorer exposes SEVEN series per item
+                              per week — on hand, in transit, backlog, orders
+                              placed, production, fulfillment, lost units. The
+                              page names none of them.
+   performance-and-caching 530w  RunQueueConsole; what a queued run means
+   reports-and-files 310w     the real report surface, and user_files
+   kpis-and-resilience-index  fine on facts; check it against KpiStatTable's
+                              actual presentation
+
+ §14 Developer API — /developer is 1601 lines and the section describes a
+     fraction of it.
+   getting-an-api-key 413w    Create key, copy-once, scopes, environment,
+                              organization keys, "Key hygiene", "Revoke
+                              immediately", Requests 30d, Last used
+   endpoints-and-schemas 367w "Ready-to-run quickstart", "Begin here", the
+                              CONFIG cell, "List your projects", "Poll a run
+                              until it finishes", "Ids the notebook needs"
+   rate-limits-and-idempotency 465w   headers are documented; the /developer
+                              page's own guidance is not
+   request-log 378w           Requests 30d, Last used, Status — as SHOWN
+
+ §9 Project Intelligence
+   ai-assistant 343w          ChatWorkspace: "Choose an agent", "Clear the
+                              agent", full screen vs "Fit to the SuReSuite app
+                              screen", SuggestedActions, ChatComposer
+   project-memory 361w        SidebarPanels: "Add memory", "Archive this
+                              memory", "How memory works", "My files",
+                              Download — the page describes none of it
+   plans-and-proposals 390w   the real review-and-apply surface
+   models-budgets-limits 446w /profile's "AI models you can use" and "All
+                              enabled models are available to you" — which is
+                              D34 (an empty allow-list means EVERYTHING)
+                              rendered as a sentence the user reads about
+                              THEMSELVES. Both pages must agree.
+
+ §5 · §6 · §10 · §12 · §13
+   policy-versions-and-presets 395w
+                              PolicyVersionSheets: "Save model version",
+                              "Model version history", "Current (live working
+                              copy)", "Edit notes", "Delete this version".
+                              ApplyPresetDialog's six families.
+   customer-stage 455w        thin because the stage is small — verify that,
+                              and if true SAY it rather than padding
+   model-validation 357w      check against what the product actually offers
+   csv-vs-connector 381w      ErpConnectionsPanel, and the sync review surface
+   exporting-and-deleting 451w  VerifiableExportsSection; AdminUsage's
+                              "Export CSV", "Kept size", "Total size"
+   admin-screens 399w         AdminUsage: Freshness, Completion, "Below
+                              target", Measured, Export CSV
+   roles-and-capabilities 450w  AdminRoles' capability grid as rendered
+
+════════════════════════════════════════════════════════════════════════
+THE RULES THAT DO NOT RELAX
+════════════════════════════════════════════════════════════════════════
 1. NEVER RETYPE A GENERATED FACT. Columns, units, substitutions, chains, KPIs,
-   policy params, analysis kinds, API routes and stress tests are all already
-   generated. Depth means MORE OF THE PRODUCT, never a hand-copied fact.
-2. Every claim about behaviour is read from the code that implements it, and
-   the page says where when it is not a contract fact. A confident sentence you
-   did not verify is worse than a short page.
-3. PUBLISH THE BLIND SPOTS. §4 is the authority; a brief is a snapshot. Two
-   defects in this phase were named as live by a brief AFTER they were closed
-   (D107) — check §4's "Closed by" before you repeat any warning.
-4. Do not add or renumber pages. If a page needs to exist, that is a finding
-   for §16 and §6.3, not an edit.
-5. FIGURES: 16 slots are declared and open in figureManifest.ts. If a page you
-   are deepening plainly needs a diagram and has no slot, ADD the slot with its
-   `shows` brief. Do not draw it. Do not remove a slot to make a page look
+   policy params, analysis kinds, API routes are generated already. Depth means
+   MORE OF THE PRODUCT — never a hand-copied fact.
+2. Document the surface the USER reaches. D111 is what happens when a page
+   documents a real artifact the product cannot run. Before describing any
+   feature, confirm a user can get to it, and say so if they cannot.
+3. Every behavioural claim is read from the code that implements it. A
+   confident sentence you did not verify is worse than a short page.
+4. §4 is the authority; a brief is a snapshot. TWO defects this phase were
+   named live by a brief after they were closed (D107). Check §4's "Closed by"
+   before repeating any warning — including the ones in this prompt.
+5. Do not add or renumber pages. A page that should exist is a finding for §16
+   and §6.3, not an edit.
+6. FIGURES: 16 slots are declared and open in figureManifest.ts. If a page you
+   deepen plainly needs a diagram and has no slot, ADD the slot with its
+   `shows` brief. Do not draw it. Do not delete a slot to make a page look
    finished.
+7. Mobile reads the same payload. No second content tree, no device branch.
 
-══ EXIT ══
+════════════════════════════════════════════════════════════════════════
+EXIT — every one, before the PR
+════════════════════════════════════════════════════════════════════════
   npm run lint · npm test · npm run check:docs · npm run contract:check
   npm run typecheck · npm run build && npm run audit:bundle
-  registry.test.ts · bodies.test.tsx · figures.test.ts all green
-  eslint 336/116 and audit:ui 8 — AT BASELINE, not improved, not worse
+  registry.test.ts · bodies.test.tsx · figures.test.ts green
   every derived template/guide/notebook path resolves to a file that exists
-  no page under 500 rendered words in the section-group you took
+  no page under 500 rendered words, or a §16 finding saying why that one is
+  eslint 336/116 and audit:ui 8 — AT BASELINE. Not improved, not worse.
 
-  `npm run lint` CANNOT pass: eslint (336) and audit:ui (8) predate this phase.
-  "At baseline, all four gates ran" is the honest report. Do not weaken them to
-  make it green, and do not claim it went green.
+  `npm run lint` CANNOT pass: eslint (336 errors) and audit:ui (8) predate this
+  phase and belong to nobody in it. "At baseline, all four gates ran" is the
+  honest report. Do not weaken a gate to go green and do not claim it went.
 
-══ GAP CHECK ══
-  Re-measure the word counts (render each body, strip tags, count) and put the
-  new distribution in §16 beside 5.2i's. If a page is still thin AFTER the
-  method was applied honestly, that is a finding about the PRODUCT surface
-  being thin, not about the page — say which, and say so plainly.
+════════════════════════════════════════════════════════════════════════
+GAP CHECK
+════════════════════════════════════════════════════════════════════════
+Re-measure: render every body, strip tags, count words, and put the new
+distribution in §16 beside 5.2i's. A page still thin after the method was
+applied honestly is a finding about a THIN PRODUCT SURFACE, not a thin page —
+name which, and say it plainly.
+
+Then ask D111's question of every remaining page: does a user have a route to
+the thing this page describes? One page got that wrong. Assume it is not the
+only one until you have checked.
 ```
 
 ### WP 5.3 — Pages read analysis_results; drop entity columns
