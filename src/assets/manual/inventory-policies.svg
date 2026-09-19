@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 384" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- Four replenishment types on one demand sequence, with the parameters each
+       one asks you for. Types and parameter vectors: INVENTORY_TYPES in
+       src/lib/policies/registryPolicyTypes.ts (the grid's own library, read
+       from the engine registry). Whether a parameter reaches the engine: the
+       resolution chains in policy.generated.ts (CHAINS). -->
+
+  <text x="6" y="14" font-size="12" fill="hsl(var(--foreground))">Same demand, same axis — only the rule differs.</text>
+  <text x="6" y="30" font-size="12" fill="hsl(var(--muted-foreground))">On-hand units over 12 weeks.</text>
+
+  <!-- ══ 1 · Min-max (s, S) ═══════════════════════════════════════════ -->
+  <text x="6" y="44" font-size="12" fill="hsl(var(--foreground))">Min-max (s, S)</text>
+  <line x1="6" y1="100" x2="142" y2="100" stroke="hsl(var(--border))" stroke-width="1"/>
+  <line x1="6" y1="52.3" x2="142" y2="52.3" stroke="hsl(var(--muted-foreground))" stroke-width="1" stroke-dasharray="3 2.5"/>
+  <line x1="6" y1="82.7" x2="142" y2="82.7" stroke="hsl(var(--muted-foreground))" stroke-width="1" stroke-dasharray="3 2.5"/>
+  <text x="142" y="50" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">S</text>
+  <text x="142" y="80" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">s</text>
+  <polyline fill="none" stroke="hsl(var(--foreground))" stroke-width="1.8" stroke-linejoin="round"
+            points="12,52.3 22,59.3 32,64.5 42,72.3 52,78.3 62,85.3 62,52.3 72,57.5 82,65.3 92,71.4 102,78.3 112,83.5 112,52.3 122,60.1 132,66.2"/>
+  <text x="6" y="114" font-size="12" fill="hsl(var(--muted-foreground))">Order when it drops to s. Refill to S.</text>
+  <rect x="6" y="120" width="9" height="9" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <line x1="6" y1="129" x2="15" y2="120" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="21" y="128" font-size="12" fill="hsl(var(--foreground))">reorder_point</text>
+  <rect x="6" y="134" width="9" height="9" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <line x1="6" y1="143" x2="15" y2="134" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="21" y="142" font-size="12" fill="hsl(var(--foreground))">order_up_to</text>
+  <rect x="6" y="148" width="9" height="9" fill="hsl(var(--foreground))"/>
+  <text x="21" y="156" font-size="12" fill="hsl(var(--foreground))">basis</text>
+
+  <!-- ══ 2 · Base stock (S) ══════════════════════════════════════════ -->
+  <text x="170" y="44" font-size="12" fill="hsl(var(--foreground))">Base stock (S)</text>
+  <line x1="170" y1="100" x2="306" y2="100" stroke="hsl(var(--border))" stroke-width="1"/>
+  <line x1="170" y1="52.3" x2="306" y2="52.3" stroke="hsl(var(--muted-foreground))" stroke-width="1" stroke-dasharray="3 2.5"/>
+  <text x="306" y="50" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">S</text>
+  <polyline fill="none" stroke="hsl(var(--foreground))" stroke-width="1.8" stroke-linejoin="round"
+            points="176,52.3 186,59.3 186,52.3 196,57.5 196,52.3 206,60.1 206,52.3 216,58.4 216,52.3 226,59.3 226,52.3 236,57.5 236,52.3 246,60.1 246,52.3 256,58.4 256,52.3 266,59.3 266,52.3 276,57.5 276,52.3 286,60.1 286,52.3 296,58.4 296,52.3"/>
+  <text x="170" y="114" font-size="12" fill="hsl(var(--muted-foreground))">Order every week. Always refill to S.</text>
+  <rect x="170" y="120" width="9" height="9" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <line x1="170" y1="129" x2="179" y2="120" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="185" y="128" font-size="12" fill="hsl(var(--foreground))">order_up_to</text>
+  <rect x="170" y="134" width="9" height="9" fill="hsl(var(--foreground))"/>
+  <text x="185" y="142" font-size="12" fill="hsl(var(--foreground))">basis</text>
+
+  <!-- ══ 3 · (R, Q) ══════════════════════════════════════════════════ -->
+  <text x="6" y="182" font-size="12" fill="hsl(var(--foreground))">(R, Q)</text>
+  <line x1="6" y1="238" x2="142" y2="238" stroke="hsl(var(--border))" stroke-width="1"/>
+  <line x1="6" y1="220.7" x2="142" y2="220.7" stroke="hsl(var(--muted-foreground))" stroke-width="1" stroke-dasharray="3 2.5"/>
+  <text x="142" y="218" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">R</text>
+  <polyline fill="none" stroke="hsl(var(--foreground))" stroke-width="1.8" stroke-linejoin="round"
+            points="12,190.3 22,197.3 32,202.5 42,210.3 52,216.3 62,223.3 62,197.3 72,202.5 82,210.3 92,216.3 102,223.3 102,197.3 112,202.5 122,210.3 132,216.3"/>
+  <!-- the fixed order quantity, drawn as the equal height of every jump -->
+  <path d="M66 223.3 L71 223.3 M66 197.3 L71 197.3 M68.5 223.3 L68.5 197.3"
+        stroke="hsl(var(--muted-foreground))" stroke-width="1" fill="none"/>
+  <text x="74" y="214" font-size="12" fill="hsl(var(--muted-foreground))">Q</text>
+  <text x="6" y="252" font-size="12" fill="hsl(var(--muted-foreground))">Order when it drops to R. Always Q.</text>
+  <rect x="6" y="258" width="9" height="9" fill="hsl(var(--foreground))"/>
+  <text x="21" y="266" font-size="12" fill="hsl(var(--foreground))">rop_q_quantity</text>
+  <rect x="6" y="272" width="9" height="9" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <line x1="6" y1="281" x2="15" y2="272" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="21" y="280" font-size="12" fill="hsl(var(--foreground))">reorder_point</text>
+  <rect x="6" y="286" width="9" height="9" fill="hsl(var(--foreground))"/>
+  <text x="21" y="294" font-size="12" fill="hsl(var(--foreground))">basis</text>
+
+  <!-- ══ 4 · Periodic review (T, S) ══════════════════════════════════ -->
+  <text x="170" y="182" font-size="12" fill="hsl(var(--foreground))">Periodic review (T, S)</text>
+  <line x1="170" y1="238" x2="306" y2="238" stroke="hsl(var(--border))" stroke-width="1"/>
+  <line x1="170" y1="190.3" x2="306" y2="190.3" stroke="hsl(var(--muted-foreground))" stroke-width="1" stroke-dasharray="3 2.5"/>
+  <text x="306" y="188" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">S</text>
+  <!-- the review dates: the only weeks an order can be placed -->
+  <g stroke="hsl(var(--muted-foreground))" stroke-width="1" stroke-dasharray="2 2">
+    <line x1="216" y1="190" x2="216" y2="242"/>
+    <line x1="256" y1="190" x2="256" y2="242"/>
+    <line x1="296" y1="190" x2="296" y2="242"/>
+  </g>
+  <text x="216" y="252" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">T</text>
+  <text x="256" y="252" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">T</text>
+  <text x="296" y="252" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">T</text>
+  <polyline fill="none" stroke="hsl(var(--foreground))" stroke-width="1.8" stroke-linejoin="round"
+            points="176,190.3 186,197.3 196,202.5 206,210.3 216,216.3 216,190.3 226,197.3 236,202.5 246,210.3 256,216.3 256,190.3 266,197.3 276,202.5 286,210.3 296,216.3 296,190.3"/>
+  <text x="170" y="266" font-size="12" fill="hsl(var(--muted-foreground))">Look every T weeks. Refill to S then.</text>
+  <rect x="170" y="272" width="9" height="9" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <line x1="170" y1="281" x2="179" y2="272" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="185" y="280" font-size="12" fill="hsl(var(--foreground))">review_period_days</text>
+  <rect x="170" y="286" width="9" height="9" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <line x1="170" y1="295" x2="179" y2="286" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="185" y="294" font-size="12" fill="hsl(var(--foreground))">order_up_to</text>
+  <rect x="170" y="300" width="9" height="9" fill="hsl(var(--foreground))"/>
+  <text x="185" y="308" font-size="12" fill="hsl(var(--foreground))">basis</text>
+
+  <!-- ══ the one key ═════════════════════════════════════════════════ -->
+  <line x1="6" y1="322" x2="314" y2="322" stroke="hsl(var(--border))" stroke-width="1"/>
+  <rect x="6" y="332" width="9" height="9" fill="hsl(var(--foreground))"/>
+  <text x="21" y="340" font-size="12" fill="hsl(var(--foreground))">the strategic engine reads your value</text>
+  <rect x="6" y="348" width="9" height="9" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <line x1="6" y1="357" x2="15" y2="348" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="21" y="356" font-size="12" fill="hsl(var(--foreground))">stored, versioned, hashed — not read.</text>
+  <text x="21" y="370" font-size="12" fill="hsl(var(--muted-foreground))">reorder_point: the engine computes it</text>
+  <text x="21" y="382" font-size="12" fill="hsl(var(--muted-foreground))">itself. The other two: frozen engine only.</text>
+</svg>

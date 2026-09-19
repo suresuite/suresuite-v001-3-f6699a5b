@@ -270,6 +270,110 @@ export const FIGURE_SLOTS: FigureSlot[] = [
       "This is the page's whole argument in one picture.",
   },
 
+  // ── 5 · Policies (WP 5.2k) ──────────────────────────────────────────────
+  {
+    id: "inventory-policies",
+    page: "policy-types",
+    file: "inventory-policies.svg",
+    title: "Four rules, one demand",
+    alt:
+      "Four small inventory-over-time charts on the same demand and the same axis — min-max, " +
+      "base stock, (R, Q) and periodic review — each labelled with the parameters that type " +
+      "uses. Four of the six parameters are marked as stored but never read by the engine.",
+    caption:
+      "The shapes are what you are choosing between. The marks are which of the numbers you " +
+      "type actually reach the simulation — and on three of the four types, none of the " +
+      "sizing parameters do.",
+    shows:
+      "The four types side by side on ONE demand sequence so the shapes compare, each marked " +
+      "with the parameters that type uses — read from INVENTORY_TYPES, which is the grid's " +
+      "own library. And the half the page's prose already carries: which of those parameters " +
+      "the strategic engine consults, read from CHAINS, because `reorder_point` is overridden " +
+      "and `order_up_to`/`review_period_days` reach the frozen engine only.",
+  },
+
+  // ── 7 · Experiments & scenarios (WP 5.2k) ───────────────────────────────
+  {
+    id: "run-sequence",
+    page: "simulation-lab",
+    file: "run-sequence.svg",
+    title: "Five stages, one gate",
+    alt:
+      "The five run stages in order — Setup, Recovery playbook, Run, Results, Compare — with " +
+      "the gate drawn between stages 2 and 3. The gate has three exits: clear runs, warnings " +
+      "run once acknowledged, and blocking findings do not run at all. A fourth state is " +
+      "marked, in which the Run button is disabled while the gate still reads clear.",
+    caption:
+      "The gate is the only place the sequence can stop. Its reason is always on screen beside " +
+      "the button — except in the fourth case, where the readout and the button disagree.",
+    shows:
+      "The five stages from buildStages, the gate between 2 and 3, and its three exits with " +
+      "the literal button text each produces. STRUCTURE only — every sub-label on the real " +
+      "screen is a live fact about the reader's own scenario, so no value is invented. The " +
+      "fourth state is drawn because it is a disagreement the screen can actually show.",
+  },
+  {
+    id: "lever-map",
+    page: "recovery-playbooks",
+    file: "lever-map.svg",
+    title: "Which levers reach the engine",
+    alt:
+      "Six recovery levers on the left joined to engine plugins on the right. Four reach a " +
+      "plugin, two of those reach the same one, and two — Safety stock and Material " +
+      "reallocation — reach nothing at all. Two plugins on the right have no incoming arrow.",
+    caption:
+      "Two of the six change no number in the run, and two of the engine's plugins cannot be " +
+      "reached from this screen at all. The lists disagree in both directions.",
+    shows:
+      "The join in RECOVERY_LEVERS, drawn: six levers, their plugins, the two nulls and the " +
+      "two that share `expedited_shipments`. Draw the ABSENCES — a lever reaching nothing and " +
+      "a plugin nothing reaches — because the absence is the finding (§4 D114). Use the pane's " +
+      "own labels, not the enum keys, for the levers.",
+  },
+
+  // ── 8 · Networks (WP 5.2k) ──────────────────────────────────────────────
+  {
+    id: "centralities",
+    page: "network-science-metrics",
+    file: "centralities.svg",
+    title: "Four answers, one graph",
+    alt:
+      "The same eleven-firm graph drawn four times. Degree picks firm C, betweenness picks B, " +
+      "eigenvector picks G and closeness picks I — four different firms. In each copy the " +
+      "second-placed firm is ringed, and C is second on two of the other three measures.",
+    caption:
+      "The most critical firm is a property of the question, not of the chain. Ask a different " +
+      "measure and a different firm comes back.",
+    shows:
+      "ONE graph, four copies, identical layout, the top-scoring node filled in each. It must " +
+      "be a graph where the four genuinely disagree — verify the values rather than assuming " +
+      "a shape does it. Ring the runner-up too, so a near-tie reads as a near-tie instead of " +
+      "as a verdict.",
+  },
+
+  // ── 11 · Results & statistics (WP 5.2k) ─────────────────────────────────
+  {
+    id: "resilience-curve",
+    page: "kpis-and-resilience-index",
+    file: "resilience-curve.svg",
+    title: "Three measures as regions",
+    alt:
+      "One weekly fill-rate trace through a disruption. TTS is the span before service falls " +
+      "out of the pre-disruption band; TTR is the span to the first week that then stays " +
+      "inside it for three weeks; the service-loss area is the whole shaded region between " +
+      "the undisrupted run and this one. Two weeks that look recovered are circled and do " +
+      "not count, because service fell out of the band again afterwards.",
+    caption:
+      "Three of the engine's measures are regions on this picture rather than facts about a " +
+      "single week. The three-week rule is why the first week that looks fine is usually not " +
+      "the recovery.",
+    shows:
+      "The three geometric KPIs on one trace, with the band and the 3-week sustained-recovery " +
+      "rule visible — read FR_BAND_PP and TTR_SUSTAIN_WEEKS from the engine rather than from " +
+      "memory. Draw a FALSE recovery: without one, the 3-week rule looks like a formality " +
+      "instead of the thing that decides the answer.",
+  },
+
   // ── 13 · Access & administration ────────────────────────────────────────
   {
     id: "three-gates",

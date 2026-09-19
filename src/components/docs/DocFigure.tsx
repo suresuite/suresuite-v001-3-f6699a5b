@@ -40,6 +40,56 @@ const FILES: Record<string, string> = Object.fromEntries(
   ).map(([path, url]) => [path.split("/").pop() as string, url]),
 );
 
+/**
+ * The same folder again, as SOURCE TEXT rather than a URL — for `.svg` only.
+ *
+ * ── WHY A SECOND GLOB, AND WHY WP 5.2k HAD TO WIDEN THIS DOOR ─────────────
+ *
+ * WP 5.2i rendered every figure as `<img src={url}>`, and an `<img>`-referenced
+ * SVG is an ISOLATED DOCUMENT. The page's stylesheet does not reach it, its
+ * CSS custom properties do not reach it, and `currentColor` inside it resolves
+ * against the SVG's own initial `color` — not the colour of the text it sits
+ * beside. So a drawing loaded that way cannot follow the theme by any means,
+ * and the drawing standard WP 5.2k works to ("use `currentColor` and the CSS
+ * custom properties the manual already defines") was not reachable through the
+ * door the previous package built. Nothing failed; the first figure would
+ * simply have been drawn in colours that ignore `--border`, `--card` and
+ * `--foreground` and gone dark-on-dark the day anything sets `.dark`.
+ *
+ * `prefers-color-scheme` inside the file is NOT the fix, and is worse than
+ * doing nothing: `tailwind.config.ts` sets `darkMode: ["class"]`, so the theme
+ * here is a class on an ancestor. A figure keyed to the OS preference would
+ * invert itself underneath a page that had not.
+ *
+ * Inlining the markup puts the drawing in the page's own cascade, which is how
+ * `figures.tsx`'s three schematics have always worked — they are JSX, so they
+ * were never `<img>` and never had this problem. This makes a `.svg` FILE
+ * behave the same way, so the two routes to a figure now theme identically.
+ *
+ * ── WHAT THIS COSTS, AND THE RULES IT PUTS ON A FILE ──────────────────────
+ *
+ * `dangerouslySetInnerHTML` is safe here for a reason worth stating: these are
+ * repository files resolved at BUILD time by `import.meta.glob`, not content
+ * from a user, a database or a network. The set of strings that can appear
+ * here is exactly the set of files in `src/assets/manual/`, and changing one is
+ * a reviewable diff. `src/assets/manual/README.md` carries the two rules an
+ * inlined file must follow — no `<style>` element (an inline SVG's styles are
+ * DOCUMENT-scoped and would leak to the whole page) and no `id` that another
+ * figure could also define.
+ *
+ * Raster files still go through `FILES` and stay `<img>`. They have no cascade
+ * to join.
+ */
+const SVG_SOURCE: Record<string, string> = Object.fromEntries(
+  Object.entries(
+    import.meta.glob("../../assets/manual/*.svg", {
+      eager: true,
+      query: "?raw",
+      import: "default",
+    }) as Record<string, string>,
+  ).map(([path, src]) => [path.split("/").pop() as string, src]),
+);
+
 /** Slots by id, built from the manifest so an id can only be wrong in one place. */
 const FIGURE_BY_ID: Record<string, FigureSlot> = Object.fromEntries(
   FIGURE_SLOTS.map((s) => [s.id, s]),
@@ -105,18 +155,39 @@ export function DocFigure({ id, fallback }: { id: string; fallback?: ReactNode }
     return <EmptySlot slot={slot} />;
   }
 
+  const inline = SVG_SOURCE[slot.file];
   return (
     <figure id={`figure-${slot.id}`} className="scroll-mt-20 space-y-2">
       <div className="overflow-x-auto rounded-sm border border-border bg-card p-4 shadow-xs">
-        <img
-          src={FILES[slot.file]}
-          alt={slot.alt}
-          // Height auto with a width cap rather than fixed dimensions: the
-          // figures are diagrams of unknown aspect and the manual is read on a
-          // phone as often as a laptop.
-          className="mx-auto block h-auto w-full max-w-3xl"
-          loading="lazy"
-        />
+        {inline ? (
+          // `role="img"` + `aria-label` on the WRAPPER, because an inlined
+          // drawing has no `alt`. The slot's alt text is what a screen reader
+          // says, exactly as it would through an `<img>`, and the SVG itself is
+          // hidden from the tree by the `aria-hidden` on its own root element
+          // so the label is not read twice.
+          //
+          // 480px, not `max-w-3xl`. Every manual figure is authored on a
+          // 320-unit grid so that one unit is about one CSS pixel at 360px
+          // viewport width — which is what lets the drawing standard forbid
+          // horizontal scrolling and hold a 11px floor on type at the same
+          // time. Letting it stretch to 768px would scale a 12px label to 29px.
+          <div
+            role="img"
+            aria-label={slot.alt}
+            className="mx-auto block w-full max-w-[480px] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+            dangerouslySetInnerHTML={{ __html: inline }}
+          />
+        ) : (
+          <img
+            src={FILES[slot.file]}
+            alt={slot.alt}
+            // Height auto with a width cap rather than fixed dimensions: the
+            // figures are diagrams of unknown aspect and the manual is read on a
+            // phone as often as a laptop.
+            className="mx-auto block h-auto w-full max-w-3xl"
+            loading="lazy"
+          />
+        )}
       </div>
       <figcaption className="text-xs leading-relaxed text-muted-foreground">
         {slot.caption}

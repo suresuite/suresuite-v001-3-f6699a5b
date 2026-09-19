@@ -329,6 +329,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D144** | **`includeTerminals` is INVERTED, so the whole terminal-stop mechanism has been inert since it was written.** The subgraph walk stops at a `stopUp` / `stopDown` level only `if (queryParams.includeTerminals)` — and the default is `false`. So with the flag OFF the traversal walks straight past every terminal, and with it ON the walk stops: the parameter does the opposite of what its name says, and `stopUp: [5, 6]` / `stopDown: [-1]` have never bounded a single walk under their own default. Found while extracting the engine into `src/lib/graph/subgraph.ts`, and **reproduced there rather than fixed**, because the extraction's whole guarantee is parity with the orphaned page it came from and a refactor that also changes behaviour can be verified as neither. `extractSubgraph` takes `respectTerminals` so a caller may opt into the sane reading today; `subgraphParity.test.ts` asserts BOTH — that the default reaches a terminal-level node, which is the defect, and that the option stops at it | `src/pages/InteractiveNetworkSpace.tsx:255-265` | **WP 8.4** *(flip the default when the two pages adopt the engine, which is the first time anything depends on it)* |
 | **D145** | **A function's fixed `RETURNS TABLE` is a SECOND place the schema is authored, and it goes stale the moment a migration widens the table — so three columns that exist, are backfilled and are CHECK-constrained were invisible to every page in the product.** `get_node_list` is the only route to `node_list` from the application and its `RETURNS TABLE(...)` lists seventeen columns BY NAME. WP 8.1 added `echelon`, `bom_depth` and `supply_tier`; `CREATE OR REPLACE FUNCTION` cannot change a return type; nothing failed. **This is `single-source` (I1) broken in SQL rather than in markdown**, which is the same blind spot D101 and D105 came out of — and `contract:validate` cannot see it, because the sidecar describes the TABLE and no rule compares a table's columns with the projections that claim to return them. Closed for this table by an ADDITIVE function rather than by a DROP: `get_node_list` has four live callers and `20260918000003` is the record of what a DROP costs (it takes the function's grants with it, which `rehearsal/210` §2 had to check back as explicit `proacl` grantees). **The CLASS is open**: no gate counts the other fixed `RETURNS TABLE`s in this schema against the tables they project | `supabase/migrations/20250830231617_879246a9-616c-408d-8b71-2b4ff44461ef.sql:106-131` (the seventeen-column projection) | **WP 8.4** *(the class, as a `contract:check` rule — this table's instance is closed by `20260919000002`)* |
 | **D146** | **A MERGE gave seven defects two meanings each, then a second merge did it again with eight more — and BOTH branches had independently built the gate for it.** Phase 8 and WP 5.2j each opened the next free §4 id in good faith and shipped **D112–D118** for entirely different defects; `git merge` joined them with no conflict, because the two sets of rows never touched the same lines. Phase 8 renumbered to D119–D137 — and the next merge brought WP 6.2/6.3/6.4's **D119–D126**, colliding with eight of them. Renumbered again to **D127–D146**, above §4's actual maximum. **The instructive part is that WP 6.3 had already closed this as `contract:check` R16** (its own merge, D122) while Phase 8 was closing it as R13 in parallel: two branches, one defect, two gates, and neither could see the other. On merge the duplicate rule was dropped and R16 kept — a rule authored twice is `single-source` broken in the gate layer, which is the layer that exists to catch it. **What Phase 8 contributed that R16 does not cover is R19**: `## 4.`, `## 16.` and `## 17. Sequencing` must each appear EXACTLY ONCE. The same merge produced TWO `## 17. Sequencing` headings, because one branch had moved the section to the end so §16 would run to it and the other had edited it in place. `section16()` keys on the first, so forty-two drift-log entries fell outside §16 — which is **D124** reopened by a merge after being closed by an edit. §4 also gained a second **rehearsal numbered 230** the same way, renumbered to 300. **CLOSED (WP 8.0)**: R16 (main's) + R19 (this package's) + `section16()` now excluding a PHASE section WHOLE rather than at its first `### ` heading, because §18's six package headings were being read as §16 entries and R7 reported a LOSS whenever one was edited | `scripts/data-contract/check.mjs`'s R16, R19 and `section16` against the two merge commits | **WP 8.0 ✅** *(and a Phase 8 citation in any commit message before this reads up to fifteen lower than the row it points at)* |
+| **D147** | **The run gate has a FOURTH state, and in it the rail says "clear — run allowed" while the Run button is disabled — the readout, the stage 3 sub-label and the button disagree three ways about the same screen. Found by reading the gate for the `run-sequence` figure (WP 5.2k), not by a test.** `runBlockedReason` has four branches and the first of them is the CAPABILITY check — an account that may open `/simulation-lab` but lacks the `simulation_lab` FEATURE gets a non-null reason with `gateBlocks = 0` and `gateWarns = 0`. `buildStages`'s `gateReadout` branches on `gate.blocks > 0`, then on `gate.warns > 0 && gate.reason`, then falls through to `{ value: "clear", tail: "— run allowed" }` — so it reads CLEAR. `runStageSub` branches on `gate.reason` first and then on `gate.blocks > 0`, so stage 3's sub-label reads **"0 warnings — ack required"**, describing an acknowledgement that would change nothing. `GateBar` computes `canRun = !reason` and disables the button, correctly, with the correct reason in visible text beside it. So the one component that reads `reason` DIRECTLY is right and the two that re-derive a summary FROM `blocks`/`warns` are both wrong, because the fourth reason is carried by neither count. **The page and the feature are separate capability kinds** (`pages` vs `features` in `roleFallbackCapabilities`), and an org or user override can grant one and deny the other, so the state is reachable rather than theoretical — and the branch exists precisely because its author expected it to be. This is D113's shape one layer out: not a wrong number, but a SUMMARY derived from the wrong inputs, agreeing with itself and disagreeing with the thing it summarises | `src/pages/SimulationLab.tsx`'s `runBlockedReason` against `buildStages`'s `gateReadout` and `runStageSub` in `src/components/sim/StageRail.tsx`, read beside `GateBar`'s `canRun` in `src/components/sim/RunGate.tsx` | **OPEN — WP 6.4** *(the decision plane, which owns the run gate's surface. The fix is one shape: give the readout the REASON rather than the two counts, so a fourth reason cannot fall through to "clear". Drawn in the `run-sequence` figure meanwhile, because a disagreement a reader can hit is one §5.3 T3 says we publish rather than wait to fix)* |
 
 ### 4.1 Code map — the data layer
 
@@ -16340,3 +16341,121 @@ eleven joins can establish — true. What is owed, in the order it costs:
   unreachable but which are somebody's to route or delete rather than to
   document. The manual states each one plainly; that is the most a manual can do
   about a feature that is not there.
+
+### WP 5.2k — The figures: A1–A5 · 2026-09-19
+
+Preconditions held?      **no, and the miss was structural.** The brief's drawing
+standard D2 says a figure must read in both themes using `currentColor` and the CSS
+custom properties the manual already defines. That was not reachable through the door
+WP 5.2i built. `DocFigure` rendered every slot as `<img src={url}>`, and an
+`<img>`-referenced SVG is an **isolated document**: the page's stylesheet does not
+reach it, `--border`/`--card`/`--foreground` do not reach it, and `currentColor`
+inside it resolves against the SVG's own initial `color` rather than the text it sits
+beside. Nothing would have failed — the first figure would simply have been drawn in
+colours that ignore the theme, and gone dark-on-dark the day anything sets `.dark`.
+`prefers-color-scheme` inside the file is not the fix and is worse than nothing:
+`tailwind.config.ts` is `darkMode: ["class"]`, so a figure keyed to the OS preference
+would invert itself underneath a page that had not. Closed by giving `DocFigure` a
+second `import.meta.glob` at `?raw` and inlining `.svg` markup into the page's own
+cascade — which is how `figures.tsx`'s three schematics have always worked, because
+they are JSX and were never `<img>`. Raster files still go through the URL glob.
+A `.svg` FILE and an inline schematic now theme identically.
+
+Exit checks passed?      yes, for the four that can run here. `npm test` 285/285
+(docs suite), `check:docs` ✓, `contract:check` ✓ (2 pre-existing warnings, R10 and
+R13, neither this package's), `typecheck` ✓ (21 of 21 held in the baseline — the
+number is 21 here, not the 28 the brief quotes; the baseline file has moved since it
+was written), `build` ✓, `audit:bundle` **clean — initial graph 156.6 kB, total JS
+1880.0 kB, nothing above the baseline**, `audit:ui` **8 — at baseline**, eslint
+**336 errors / 116 warnings — at baseline**. `npm run lint` still cannot pass, for
+the reason the brief states.
+
+Discovered:
+  - **The drawing standard and the manual's existing schematics disagree about
+    phone width, and the brief's rule is the stricter one.** `figures.tsx` gives its
+    three SVGs `min-w-[640px]` and lets the wrapper scroll horizontally, with a
+    comment arguing that a wide diagram *should* scroll on a phone. The brief's D3
+    forbids exactly that. D3 wins for anything drawn here, and satisfying it is a
+    measurable constraint rather than a preference: at a 360 px viewport the manual's
+    gutter (`--m-gutter`, 14.8 px each side) plus the figure card's `p-4` leave
+    **298 px** of drawing width, so a label at font-size *F* in a viewBox *W* units
+    wide renders at *F × 298/W* — and the 11 px floor means *F/W ≥ 0.0369*. Every
+    figure in this package is therefore authored on a **320-unit grid with a 12 px
+    minimum**, which renders at 11.2 px on a phone, and `DocFigure` caps an inlined
+    figure at **480 px** rather than `max-w-3xl` so the same label does not become
+    29 px on a desktop. → affects the remaining WP 5.2k groups → recorded here rather
+    than in the manifest, because it is a property of the page, not of any one slot.
+  - **§4 D147 — the run gate has a fourth state, and two of its three readouts are
+    wrong in it.** Found by opening `RunGate.tsx` and `StageRail.tsx` to draw the
+    `run-sequence` figure's three exits (brief F3: behaviour is read, not inferred).
+    `runBlockedReason` has FOUR branches and the first is the capability check, which
+    produces a non-null reason with zero blocking findings and zero warnings. The rail
+    readout and the stage-3 sub-label are both re-derived from `blocks`/`warns`, so
+    they cannot see it: the rail reads "clear — run allowed" and stage 3 reads "0
+    warnings — ack required" while the button is correctly disabled. The component
+    that reads `reason` directly is right; the two that summarise from the counts are
+    both wrong. → affects **WP 6.4**, which owns the decision plane → §4 row added in
+    this commit, owner WP 6.4, and the fourth state is drawn in the figure meanwhile
+    (T3: publish the blind spot in the picture).
+  - **Two of this brief's twelve new-slot specifications are written against defects
+    that are already closed, which is the check F7 asks for and the reason it asks.**
+    **B2 (`kpi-vocabulary-gap`)** is specified as "two columns … with lines between
+    the ones that match. Two lines. §4 D113, and the emptiness is the point." D113 is
+    **CLOSED (WP 6.3)** and the closure removed the emptiness: `KpiStatTable` is now
+    driven by the run rather than by a hand-written display list, so the two-line
+    picture would publish a defect that no longer exists — exactly what F7 says two
+    packages have already done. The live fact in the same join is *different and
+    sharper*: `RUN_KPIS` carries **24 emitted keys** (three of them only on a
+    disrupted run), **34 display labels** of which **10 are never emitted**, and —
+    the part no page draws — **5 scenario objectives of which 4 name a measure no run
+    produces**. **B3 (`delete-reach`)** is specified around "the fourth group labelled
+    with what is in it. §4 D117." D117 is **CLOSED (WP 6.2)**, and its own closure
+    corrected the split it was measured on: `PROJECT_DELETION` today reads cascade
+    **39**, swept-only **5**, detached **2**, reached by neither **3** — and the three
+    are the log tables, which are a decision (`rehearsal/280` §3 fails if one of them
+    starts cascading) rather than the omission the brief describes. → affects WP 5.2k
+    group B1–B7 → both slots will be briefed and drawn from the generated modules as
+    they read today, and the `shows` text will say so.
+  - **A2 is a stronger figure than its brief, and the strength is a defect the page
+    already carries in prose.** The brief asks for the four inventory types with "the
+    parameters that policy actually uses" marked. Joining `INVENTORY_TYPES` to
+    `CHAINS` shows that of the five distinct parameters across the four types, **three
+    never reach the strategic engine**: `reorder_point` is `overridden` (the engine
+    computes the same quantity and never consults yours) and `order_up_to` and
+    `review_period_days` are `legacy-only`. So **min-max's two sizing parameters are
+    both dead, base stock's only one is dead, and periodic review's review interval is
+    dead** — `(R, Q)` is the single type with a sizing parameter the engine reads.
+    Drawn, because a reader choosing between four rules is choosing between four sets
+    of numbers and three of those sets change nothing.
+  - **A near-tie had to be drawn as a near-tie.** A3 asks for a graph where the four
+    centralities disagree. Random search does not produce one: over ~10⁶ sampled
+    graphs at n = 8–10 the winners tie on degree (an integer measure) or collapse onto
+    one node. The graph used is 11 nodes and 16 edges, found by hill-climbing and then
+    **re-verified by a second, independent implementation** — brute-force enumeration
+    of every shortest path rather than Brandes — because F1 makes every element of a
+    diagram a fact with a source and the source here is the definition, not a library.
+    Degree picks C, betweenness B, eigenvector G, closeness I. But the eigenvector
+    margin is 4.7 % (G 0.442 against C 0.421) and the closeness margin 5.6 %, so the
+    figure **rings the runner-up in every panel**: a highlight alone would assert a
+    verdict where the data supports a ranking, and the runner-up mark is what makes
+    "C is never far behind" visible instead of hidden.
+
+Baseline numbers (if run):
+  - figures fill rate → **5 of 21 slots filled, 16 open** (was 0 of 16; five slots
+    added by this group, five filled)
+  - eslint → 336 errors / 116 warnings · audit:ui → 8 violations · typecheck → 21 of
+    21 baseline errors held · audit:bundle → initial graph 156.6 kB, total JS 1880.0 kB
+
+Handoff to next WP:
+  - **Author on the 320-unit grid, 12 px minimum type, and let `DocFigure` cap the
+    width.** The arithmetic is above. A figure that needs more than 320 units of
+    horizontal room is two figures (brief D3/D7), and stacking vertically is almost
+    always the answer — every figure in this group is taller than it is wide.
+  - **An inlined SVG is in the page's document, which puts two rules on a file.** No
+    `<style>` element (an inline SVG's styles are document-scoped and would leak to
+    the whole manual) and no `id` another figure could also define — which is why
+    these files draw arrowheads as explicit polygons rather than reusing a `<marker>`
+    from `<defs>`. Both rules are in `src/assets/manual/README.md`.
+  - **Check §4's "Closed by" column before drawing any defect a brief names.** Two of
+    twelve were stale here. The generated module is the authority for what is true
+    today; the brief is a snapshot, and it says so.

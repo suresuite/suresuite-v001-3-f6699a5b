@@ -10,6 +10,7 @@ import { PageTitle, Section, P, Key, Callout, Term, DocLink, Provenance } from "
 import { Badge } from "@/components/ui/badge";
 import { policyCategories, type RegistryParam } from "@/lib/policies/registryPolicyTypes";
 import { chainFor } from "@/components/docs/stageFacts";
+import { DocFigure } from "@/components/docs/DocFigure";
 
 function Param({ p }: { p: RegistryParam }) {
   return (
@@ -68,6 +69,7 @@ export default function PolicyTypes() {
           The types, their parameters and every default below are read from the engine's own export.
           If the engine gains a parameter, it appears here without anyone editing this page.
         </Key>
+        <DocFigure id="inventory-policies" />
       </Section>
 
       {categories.map((cat) => (
