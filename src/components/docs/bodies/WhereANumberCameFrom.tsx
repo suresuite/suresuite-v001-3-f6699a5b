@@ -7,6 +7,7 @@
 // for whom T2 is not met.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { PROVENANCE, type Provenance as ProvenanceKind } from "@/components/policies/policyGridUi";
 
 /** Reader-facing order: what came from you, then what we worked out, then what we assumed. */
@@ -56,6 +57,7 @@ export default function WhereANumberCameFrom() {
           to go looking for is a substitution most people never find, and a model built on numbers
           nobody checked is the failure this product is designed around.
         </P>
+              <DocFigure id="provenance-dots" />
       </Section>
 
       <Section id="the-dots" title="The marks">

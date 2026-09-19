@@ -1,4 +1,5 @@
-import { PageTitle, Section, P, Key, Callout, Defs, Figure, DocLink, Term } from "@/components/docs/prose";
+import { PageTitle, Section, P, Key, Callout, Defs, DocLink, Term } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { SystemBoundaryFigure } from "@/components/docs/figures";
 
 export default function SystemBoundary() {
@@ -18,9 +19,7 @@ export default function SystemBoundary() {
       </Section>
 
       <Section id="the-layers" title="The four layers">
-        <Figure caption="Each layer talks only to the one below it. Nothing skips a layer.">
-          <SystemBoundaryFigure />
-        </Figure>
+        <DocFigure id="boundary" fallback={<SystemBoundaryFigure />} />
         <Defs
           items={[
             {

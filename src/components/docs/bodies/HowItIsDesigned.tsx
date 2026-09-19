@@ -1,4 +1,5 @@
-import { PageTitle, Section, P, Key, Callout, Defs, Figure, DocLink, Term } from "@/components/docs/prose";
+import { PageTitle, Section, P, Key, Callout, Defs, DocLink, Term } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { TierJourney } from "@/components/docs/figures";
 
 export default function HowItIsDesigned() {
@@ -14,9 +15,7 @@ export default function HowItIsDesigned() {
           That description is useless to the person who wants to know whether a number on a screen
           can be trusted. So this one is described by what happens to your data, in order.
         </P>
-        <Figure caption="The six tiers. Data enters at the left and never moves backwards; governance applies at every stage.">
-          <TierJourney />
-        </Figure>
+        <DocFigure id="tiers" fallback={<TierJourney />} />
         <Defs
           items={[
             {

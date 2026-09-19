@@ -14,6 +14,7 @@
 // hiding that it had.
 
 import { PageTitle, Section, P, Key, Callout, Prose, Term, DocLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { refTable } from "@/components/docs/tableFacts";
 import { SuppliedAndComputed, DatabaseRules } from "@/components/docs/tableRef";
 
@@ -63,6 +64,7 @@ export default function Disruptions() {
         </P>
         <SuppliedAndComputed table={inline} />
         <DatabaseRules table={inline} />
+              <DocFigure id="disruption-models" />
       </Section>
 
       <Section id="the-split" title="The redesign — a profile, and three tables under it">

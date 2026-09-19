@@ -1,6 +1,7 @@
 // §6.3 section 11 — per-item time series.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { UNDESCRIBED } from "@/components/docs/generated/dataModel.generated";
 
 export default function PerItemTimeSeries() {
@@ -20,6 +21,7 @@ export default function PerItemTimeSeries() {
           first is a chain running slightly short; the second is a chain that failed and recovered.
           They need different responses and the aggregate cannot distinguish them.
         </P>
+              <DocFigure id="series-vs-mean" />
       </Section>
 
       <Section id="what-is-in-it" title="What is in a series">

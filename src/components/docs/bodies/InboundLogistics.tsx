@@ -6,6 +6,7 @@
 // warnings a column's `meaning` cannot carry; it types no data fact.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { HowItLoads, TypedColumns, FilledColumns, DatabaseRules, TemplateHeaders } from "@/components/docs/tableRef";
 import { refTable } from "@/components/docs/tableFacts";
 
@@ -31,6 +32,7 @@ export default function InboundLogistics() {
           regardless of what they are delivering. Upload both.
         </P>
         <HowItLoads table={t} />
+              <DocFigure id="chain-shape" />
       </Section>
 
       <Section id="columns" title="The columns you type">
