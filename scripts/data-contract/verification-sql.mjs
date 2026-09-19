@@ -1425,6 +1425,47 @@ async function wp71Stage0() {
       );
     }
   });
+
+  // 10 · THE SIXTEEN, BY NAME — stage 1's first migration, written from the database.
+  //
+  // 0.6 counted them. Stage 1 has to RECREATE each one `TO anon, authenticated`, and
+  // that needs the name, the table, the command and both expressions — because
+  // PostgreSQL has no `ALTER POLICY … ADD ROLE`: widening a policy's roles means
+  // `ALTER POLICY … TO anon, authenticated`, which keeps the predicates, and getting
+  // the list from `grep 'TO anon'` is exactly the mistake D129 was.
+  //
+  // The expressions are printed so the migration can be checked against them rather
+  // than trusted: `ALTER POLICY … TO` preserves USING and WITH CHECK, and this is what
+  // they must still be afterwards.
+  const anonOnly = await tryQ(`
+    select tablename, policyname, cmd, permissive,
+           coalesce(qual, '—') as using_expr,
+           coalesce(with_check, '—') as with_check_expr
+      from pg_policies
+     where schemaname = 'public' and roles = '{anon}'
+     order by tablename, policyname`);
+  report("stage 0.10 — the sixteen `anon`-only policies, by name (stage 1's worklist)", anonOnly, (rows) => {
+    out(...table(rows, ["tablename", "policyname", "cmd", "permissive"]));
+    out("");
+    out("**The predicates each one must still have afterwards:**");
+    for (const r of rows) {
+      out(
+        "",
+        `- \`${r.tablename}\` · \`${r.policyname}\` (${r.cmd})`,
+        `  - USING: \`${String(r.using_expr).replace(/`/g, "'").slice(0, 300)}\``,
+        `  - WITH CHECK: \`${String(r.with_check_expr).replace(/`/g, "'").slice(0, 300)}\``,
+      );
+    }
+    out(
+      "",
+      `- **${rows.length} policy/policies.** Each becomes \`ALTER POLICY <name> ON <table>`,
+      "  TO anon, authenticated\\` — additive, since a policy gaining a role takes none",
+      "  away, and revertible by the same statement with `TO anon`.",
+      "- **This must land BEFORE stage 1 issues a session.** Until it does, every one of",
+      "  these reads is available to an anonymous caller and refused to an authenticated",
+      "  one, which is the inversion nothing in §14 had pointed at (D130).",
+    );
+  });
 }
 
 async function wp62and64Before() {

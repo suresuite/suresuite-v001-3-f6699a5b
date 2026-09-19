@@ -128,3 +128,24 @@ tables `anon` may write not 7 — §4 D129; and 0 of 14 approved users present i
 
 No migration in this push; the other two doors are untouched. The migration fence
 added in the previous push should again read unmoved at 20260919000007.
+
+────────────────────────────────────────────────────────────────────────────────
+WP 7.1 STAGE 1, first half — the sixteen policies, by name
+2026-09-19, no migration in this push.
+
+Stage 1 cannot issue a session until the 16 policies granted to `{anon}` ALONE also
+name `authenticated`, or the role change refuses those reads to exactly the people
+who logged in (§4 D130). Writing that migration needs their names, and D129 is the
+reason not to take them from `grep 'TO anon'`: the last list assembled that way was
+the wrong list to the wrong question.
+
+  0.10 every policy whose `roles` is exactly `{anon}` — table, name, command, and
+       BOTH expressions printed, so the migration can be checked against them
+       rather than trusted. `ALTER POLICY … TO anon, authenticated` preserves
+       USING and WITH CHECK, and this is what they must still be afterwards.
+
+Expect the run to be RED again on probe 0.9 (D131, `ingest_runs`' two keys to
+`auth.users`) — that is the standing ratchet and not a new finding. The fence should
+read unmoved at 20260919000007.
+
+No migration in this push; the other two doors are untouched.
