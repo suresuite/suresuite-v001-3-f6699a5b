@@ -40,7 +40,14 @@ import { join } from "node:path";
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
 const PLAN = readFileSync(join(ROOT, "docs", "PLAN.md"), "utf8");
-const REPORT = readFileSync(join(ROOT, "src", "lib", "trust", "trustReport.ts"), "utf8");
+// WP 6.3 moved the module to `supabase/functions/_shared/` so A3 can be computed
+// where the data is (`src/lib/trust/trustReport.ts` is now a re-export). This test
+// reads the SOURCE, so it followed — and it is the gate that noticed the move,
+// which is the behaviour a source-reading assertion is for.
+const REPORT = readFileSync(
+  join(ROOT, "supabase", "functions", "_shared", "trustReport.ts"),
+  "utf8",
+);
 
 /**
  * §4's rows, by D-number, with the "Closed by" cell.

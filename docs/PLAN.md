@@ -458,7 +458,7 @@ documentation that explains them.**
 |---|---|---|---|---|
 | A1 | Provenance dot | *Is this real data?* | D16 closed (WP 0.1); D17 open | 0.1 ✅, 6.2 |
 | A2 | Value-chain popover | *Where did THIS number come from?* | **ships in WP 6.3** — full chain (file, line, uploader, promoter) for the seven master-backed columns; the bundle-resolution chain for the rest, because no declaration names a lane cell's tier-2 column (D125) | 6.3 |
-| A3 | Project Data Trust Report | *Is this model built on good data?* | grading exists, unassembled | 4.4 |
+| A3 | Project Data Trust Report | *Is this model built on good data?* | **assembled in WP 4.4, and rendered in WP 6.3** — the `data-trust` report template resolves eight sections through one registered read tool, so the document cannot disagree with the database it cites; the screen also downloads the JSON artifact. The RENDERED report carries the coverage section the screen cannot, because the tool grades the dataset server-side while the panel has findings and no manifest | 4.4, 6.3 |
 | A4 | Verifiable export | *Can I check this without your app?* | **exists, strong** | 3.3 extends it |
 | A5 | Reproducibility record | *Can I reproduce this in two years?* | missing | 6.3 |
 
@@ -13467,6 +13467,118 @@ grid, and the display assertions read the component's source.
 **Still open in WP 6.3:** A3 (Trust Report via `report-render`), the `ingest-file`
 landing switch with a §15 either side, D123's six WP 7.1 deferrals, D125's
 declaration (WP 6.4), and D88's drop.
+
+### WP 6.3 (slice 27) — A3, computed where the data is · 2026-09-19 · no migration
+
+**What the previous slice promised.** Slice 26 left A3 as the remaining §5.4
+deliverable. This is A3, and the interesting part is not the report — WP 4.4 built
+that — it is WHERE it gets computed.
+
+#### A · THE MODULE MOVED, BECAUSE A PDF BUILT FROM A BROWSER'S NUMBERS IS A CLAIM ABOUT A BROWSER
+
+`trustReport.ts`'s own header has said since WP 4.4 that it is a pure module so
+WP 6.3 can emit the report "through `report-render` without a second
+implementation". `report-render` is a Deno edge function, and the module lived under
+`src/lib/trust/`, where only the browser could reach it. Two ways out: write a
+server copy, or move it. A server copy is `single-source` (I1) broken in the module
+whose job is to state what can be trusted — D101's shape, in the worst possible
+place.
+
+So it moved to `supabase/functions/_shared/trustReport.ts`, which both sides already
+import (`grading.ts`, `ingestSpec.generated.ts`), and `src/lib/trust/trustReport.ts`
+is now a re-export so no consumer changed. The type import moved with it: the shapes
+come from `grading.ts` directly, instead of from `gradingTypes.ts`, which existed to
+mirror them across a boundary this module no longer sits on.
+
+**`trustReportLimits.test.ts` caught the move**, because it reads the SOURCE rather
+than importing it — which is what a source-reading assertion is for.
+
+#### B · A3 IS A READ TOOL AND A TEMPLATE, BECAUSE THAT IS THE RENDER PATH'S LAW
+
+`report-render`'s rule (ai-agents.md §16.1) is that a decision report is a SPEC and
+never the file: a deterministic section carries a registered read tool plus args and
+the data is resolved AT RENDER TIME, so a rendered document cannot disagree with the
+database it cites. A3 obeys it rather than working around it, which is exactly what
+a Trust Report should do.
+
+- **`get_data_trust_report`** (`_shared/trustReportTool.ts`) assembles the report
+  server-side from three sources the product already uses: the grader behind the
+  pre-run gate, `project_freshness`, and `ingest_runs`. It is registered into the
+  shared `executeTool` registry and added to `REPORT_SOURCE_TOOLS`, the closed set
+  the render path will accept.
+- **`_shared/trustReportSections.ts`** turns a `TrustReport` into eight
+  `{columns, rows}` tables, so the screen, the PDF and the JSON render ONE section
+  list rather than holding three opinions about what a Trust Report contains.
+- **The `data-trust` template** builds its sections from
+  `TRUST_REPORT_SECTION_IDS.map(...)` rather than a hand-written list. A hand-written
+  list is how a report comes to omit the section that admits its own gaps: add a
+  section to the report and the document would silently not carry it.
+
+#### C · THE RENDERED REPORT IS MORE COMPLETE THAN THE SCREEN, AND SAYS SO
+
+`TrustReportPanel.tsx` passes `graded: null` and explains why: the /policies surface
+holds the gate's findings but not the graded manifest behind them, so coverage is
+DECLARED unavailable rather than rendered as an empty table. The tool HAS the
+manifest — it grades the dataset itself — so the rendered report carries the
+coverage section the screen cannot.
+
+That difference is published rather than hidden. The JSON artifact's `complete` flag
+is **computed** from whether coverage has rows, the screen's download button says
+*"This copy has no coverage section — ask for the 'Data trust report' document to
+include it"*, and a mutation that asserts `complete: true` fails.
+
+#### D · EVERY EMPTY SECTION SAYS WHY IT IS EMPTY
+
+A coverage table with no rows reads as "nothing is missing"; a findings table with
+no rows reads as "nothing is wrong". One is usually true and the other usually is
+not, and a grid cannot tell them apart. So every section carries the sentence it
+prints INSTEAD of a blank table, and two of them are the lessons of this plan:
+
+- **coverage** — *"an empty table here does not mean nothing is missing"*;
+- **runs** — *"every computed figure in this project predates the run store"*, which
+  is D88's whole lesson. Three §15 sections read an empty run store as user
+  behaviour; the cause was code that was never deployed.
+
+The **limits** section is last and unconditional, and when it is empty it says that
+for this codebase that would be a defect in the report rather than a clean bill.
+§5.4: *"a trust report that does not state its own limits is marketing."*
+
+#### E · FAILURE MODES, EACH ITS OWN SENTENCE
+
+- **Freshness unreadable** → NO verdict, and the message says *"the absence of
+  findings is not evidence that there are none"*. The panel's rule, server side.
+- **Grading fails** → `graded` stays null, which `buildTrustReport` turns into a
+  DECLARED limit rather than an empty coverage table. Freshness, runs and upload
+  history are still true, so the report is not thrown away.
+- **Ingest read fails** → `null`, not `[]`. "Could not look" and "nothing recorded"
+  are different facts and `knownLimits` turns the second into a declared limit.
+
+#### F · WHAT IS NOT DONE
+
+- **The browser cannot trigger a render.** `report-render`'s render action is
+  service-key only by design (§8 S1); the user-facing route is the agent's report
+  flow, where `data-trust` is now a selectable template, and the JSON download is
+  the direct path. Opening the render endpoint to the browser is a trust-model
+  change, not a feature, and it is not made here.
+- **Nothing reaches production until merge**, for `report-render` and
+  `project-ai-chat` alike. Both ARE named in `supabase-functions.yml` (R17's
+  subject), so the deploy covers them — but a `_shared/` change only deploys the
+  functions the workflow names, which is D123's mechanism and worth re-stating.
+- **No rehearsal**, deliberately: this slice adds no SQL. The report's correctness
+  is arithmetic over rows the database already returns, and the assertions that
+  matter are about what a reader is told.
+
+**Verified:** 764 tests ✓ (13 new, mutation-tested five ways — limits section
+dropped, coverage's empty note turned into a clean bill, the finding's `policyRef`
+read in place of `policy`, the template's section list hand-written, `complete`
+asserted) · `contract:check` R1–R17 ✓ · `check:docs` ✓ · typecheck 23 of 23 ✓ ·
+eslint 336/116 and audit:ui 8, byte-identical to HEAD — the tool's client is a narrow
+interface rather than `any`, which had grown the count by two.
+**Read, not verified:** that a rendered `data-trust` PDF looks right. Nothing in this
+repository executes `report-render`; the sections are asserted, the writers are not.
+
+**Still open in WP 6.3:** the `ingest-file` landing switch with a §15 either side,
+D123's six WP 7.1 deferrals, D125's declaration (WP 6.4), and D88's drop.
 
 ### WP 5.2j — The page that documented the wrong feature, the assets nobody pointed at, and the thin half · 2026-09-19 · no migration
 
