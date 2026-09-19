@@ -296,7 +296,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D92** | **The Parameter Sheet promised a milestone that does not exist, for eight of the eleven.** `fieldStatus.ts::milestoneFor` returned the literal string `"engine catalog — planned"` for any policy family with no row in `PENDING_FAMILY_POLICY`, and every caller treated that string as a milestone — so `ParameterSheet.tsx:74` rendered, of `reorder_point`, **"stored only · activates with engine catalog — planned"**. Nothing is planned. `inventory` and `sourcing` are not in that table, and D91 establishes what those fields actually are: computed and never read, read only by the frozen engine, or read by nothing at all. None is waiting for a policy. The remaining branch said "stored only · not consumed yet", where the word *yet* carries the same promise more quietly. This is T2 at the point of display — the product was inventing a future to avoid saying a field does nothing — and it is `declared-fallback` (I6) pointing at the UI: a substitution absent from the contract may not exist in code, and "we will consume this later" is a substitution for an answer | `src/lib/policies/fieldStatus.ts::milestoneFor`; `src/components/policies/ParameterSheet.tsx:73-75` | **CLOSED (WP 6.2)** — `FieldEngineStatus` gains `stored-only`, `milestoneFor` returns `null` rather than a sentence, and the sheet says "stored only · no engine consumer, none planned" |
 | **D112** | **Node type is inferred at render time, EIGHT different ways, and the one integer they lean on carries three incompatible meanings.** `supply_chain_data.from_location`'s own sidecar says why it has to be inferred: it is *"a supplier, a material, or the plant, **depending on which lane produced it**"* — **there is no type column on either edge table**, so every consumer invents a classifier. The eight: `classify_node_type` in SQL (priority customer > product > material > supplier, and no `subassembly` value at all); `buildGroupClassification` (lane → A/B/C/D, **last write wins**, and an unrecognised id defaults to **Supplier**); `getNodeTypeFromLevel` and `getDisplayNodeType` on the same page, which **disagree with each other** — the first has an `inbound` override, the second reads `level` alone; `getTierFromDepth` (by `depth`, NULL → "Plant"); `MapView`'s binary supplier-else-customer, which **drops** anything that is neither; a fourth page's copy of `getNodeTypeFromLevel` without the override; and the engine's, which reads the tier-2 masters and never the graph. **And `level` means three things.** The ETL writes literal `0` for outbound, the **BOM TREE DEPTH** for bom, and that depth **plus one** for inbound. The contract sidecar says something else — "how many tiers upstream of the plant this edge sits; 2 is a supplier's supplier". The page assumes a third thing, a fixed echelon ladder: `-1` customer, `0` product, `1` "work station", `2`–`4` material, `5` supplier. **So the page is correct only when the BOM is EXACTLY FOUR LEVELS DEEP**, which is the shape of the dataset the layout was last tuned against (`1b90687`). At any other depth every supplier lands below 5 and is rendered AND LABELLED `material level N`. The `dataSource === 'inbound' → supplier` override was added to patch exactly this and rescues only the TYPE — the level still drives the column position, the colour ramp, the legend bucket, the level-connectivity table, the reachability filter and `getDisplayNodeType`. **No document anywhere describes this divergence**, which is why it survived | `supabase/functions/combine-project/index.ts:322,341,405`; `src/pages/ProcessLevelNetwork.tsx:168-199,202-210`; `src/pages/ProductLevelNetwork.tsx:124-150`; `src/pages/FirmLevelNetwork.tsx:156-162`; `src/components/MapView.tsx:415`; `src/pages/InteractiveNetworkSpace.tsx:122-133`; `scsim/scsim/io/project_map.py:566-576`; the contract's own words in `supabase/contract/supply_chain_data_multi_tier.contract.yaml` | **WP 8.1** *(the one classifier and the two honest columns)* · **WP 8.2** *(the ETL)* · **WP 8.3** *(six classifiers deleted, and `oneClassifier.test.ts` so eight cannot become nine)* |
 | **D113** | **The dedup guard tests a key that is never written, so every record overwrites its node and the level histogram counts ROWS.** `const dedupKey = ${'`'}${'$'}{nodeId}::${'$'}{record.level}::${'$'}{record.data_source}${'`'}` then `if (nodeId && !nodeMap[dedupKey])` — and the body writes `nodeMap[nodeId]`. The map is keyed by the bare id, so `nodeMap[dedupKey]` is **always** undefined: the guard has never fired once. Four consequences, all silent. The last row read wins the node's level, type, lane and colour. `levelNodeCounts[level]++` sits inside the same unreachable-guard block and therefore counts rows, not nodes — which inflates the level histogram, the legend counts and the "BOM levels" tile. The `else` branch is dead, so the page's own diagnostic reports a deduplication that never happened. And the defect is INVISIBLE on a graph where no node appears twice, which is why it survived a layout tuning pass | `src/pages/ProcessLevelNetwork.tsx:365-384` | **WP 8.3** *(it disappears with the hand-rolled node map)* |
-| **D114** | **The top of the BOM is severed from the product it belongs to, by an empty string.** `bom_multi_level.higher_level_component_id` is *"empty at the top of the tree, where the parent is the finished product itself"* — its own sidecar says so. The ETL writes `to_location: row.higher_level_component_id \|\| ''` straight through. On the page `''` is falsy, so no node is created and the edge is skipped: **every level-1 BOM edge — material to finished product — is dropped**, and the finished product is severed from its own bill of materials with nothing reporting a loss. The fix is what the sidecar already says the blank MEANS: substitute the finished product, and never emit an edge to `''` | `supabase/functions/combine-project/index.ts:340`; `supabase/contract/bom_multi_level.contract.yaml`'s own `meaning` for the column | **WP 8.2** |
+| **D114** | **Two writers both fail to connect the top of the BOM to its finished product, and NEITHER does it the way the code reads. MEASURED 2026-09-19 (§15 run `35433474185`, every project): the defect is LATENT — `bom_multi_level` holds ZERO rows with a blank `higher_level_component_id` in any of the ten projects, and both edge tables hold zero empty endpoints.** `bom_multi_level.higher_level_component_id` is *"empty at the top of the tree, where the parent is the finished product itself"* — its own sidecar says so, and **production has never contained such a row**, which is a claim about the contract as much as about the data. What the two writers do when they meet one is still wrong and still different: the edge function writes `to_location: higher_level_component_id || ''`, but the row never reaches the table at all — the demand walk looks up `plant::<blank>`, finds no parent demand, gives the child no root, and the emit loop skips it. So the mechanism a reader sees first (`''` is falsy on the page) is not the mechanism: the edge is lost one stage earlier, in the ETL, and a count of `''` can never see it. The SQL RPC does something worse — see D126. **The first draft of this row asserted "every level-1 BOM edge is dropped" from a code read, and §15 says no such edge exists to drop.** That correction is the loop rule this plan repeats since WP 5.1: sanity-check the count before believing it | `supabase/functions/combine-project/index.ts:340` (the `|| ''`) and `:249-284` (the demand walk that drops it first); `supabase/contract/bom_multi_level.contract.yaml`'s own `meaning`; §15 run `35433474185` | **WP 8.2** *(and its exit check is a rehearsal, not a count — the rows do not exist to regress)* |
 | **D115** | **A single-level-BOM project writes ZERO multi-tier rows, so its Process-level page is permanently empty and nothing says why.** All three `*TierInserts` arrays are populated inside the `bom_level === 'multi'` branch only; the `'single'` branch fills `supply_chain_data` and leaves `supply_chain_data_multi_tier` untouched. The page then renders its empty state, which reads as "no data uploaded" rather than as "this lane is not built for your project shape" | `supabase/functions/combine-project/index.ts:185,319,385` | **WP 8.2** |
 | **D116** | **Node identity is a bare string shared by three semantically different lanes, so a firm that is both a supplier and a customer collapses into ONE node.** The id carries no role, and the lanes mean different things by the same column: `from_location` is a supplier on inbound, a material on bom and a product on outbound. A supply network has ECHELONS and they are ROLES — a firm that sells to the plant and buys from it is two roles on one legal entity, and merging them invents a cycle the real network does not have, then reports centrality on it. Sized by WP 8.0's probe 5 rather than asserted | `supabase/contract/supply_chain_data.contract.yaml`'s `from_location`; `src/pages/ProductLevelNetwork.tsx:124-145` | **WP 8.1** *(compound identity in the projection)* · **WP 8.3** *(and in the page's node type)* |
 | **D117** | **The one typed node projection this repository has is derived from ONE of the two edge tables, so the half of the graph Process-level renders is outside it.** `rebuild_node_list` reads `supply_chain_data` and nothing else; `node_list` is therefore blind to every node that exists only in `supply_chain_data_multi_tier`. That is the mechanical reason Process-level infers a type instead of reading one — there is nothing for it to read. It is also why `node_list` has never been the obvious answer: it looks like a `supply_chain_data` projection because that is all it has ever been derived from | `supabase/migrations/20260915000004_org_identity_dual_read.sql:2965-2982` | **WP 8.1** |
@@ -307,6 +307,9 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D122** | **Product-level's metrics come from a function that joins the FIRM table to material names on a bare string, and returns products as materials.** `get_network_metrics_for_materials` selects from `network_nodes` — the firm graph, which per D19 holds rows in **one** project — and keeps a row when `nn.uid` matches `from_location` OR `to_location` of a `bom` edge. `bom.to_location` is the finished PRODUCT, so products come back from a function named "for materials"; and `uid` is a firm identifier being matched against material ids, two naming universes with no declared relation between them. The table it reads is also the one D56 calls two tables in one | `supabase/migrations/20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql:51-58`; `src/pages/ProductLevelNetwork.tsx:251,457` | **WP 8.4** |
 | **D123** | **§16 was not contiguous, and its last twenty-one entries sat OUTSIDE the section every gate reads.** `check.mjs`'s `section16()` slices from `## 16.` to `## 17.`, which is correct. The document was not: entries from `WP 6.2 (slice 1)` onward had been appended AFTER §17's sequencing table, so R7's append-only half protected 38 entries and could not see 21, and R7's second half could not have noticed a done package whose entry landed there. It reads exactly like §16 to a person and not at all like §16 to the gate — the same shape as D101 and D105, arriving through a heading's POSITION rather than through a duplicated fact. **Found while placing this phase's own entry**, which is the only reason it was found at all. Closed by moving §17 to the end of the document, so §16 runs to it and Phase 8's section (§18) follows; `contract:check` then reports 59 entries where it reported 38, with no entry added | `scripts/data-contract/check.mjs`'s `section16` against the position of §17 | **WP 8.0 ✅** *(the move; and R7 re-reads 119 revisions of §16 against the new slice and holds)* |
 | **D124** | **"Work station" is fabricated. There is no routing, operation or work-centre table anywhere in `supabase/contract/`, and the label comes purely from `level === 1`.** It is **T1** broken in the plainest possible form: a noun on screen that no table in this database can produce, presented beside real ids. It is also load-bearing for a reader's mental model — a user shown "work station" reasonably concludes the product knows about their operations, and it does not. Deferred, not dropped: §14 carries the routings dataset, and until it lands the page is a multi-level BOM / product-structure view and must say so | `src/pages/ProcessLevelNetwork.tsx:205` | **WP 8.5** |
+| **D125** | **There are TWO live ETLs writing both edge tables, they disagree about what `level` means, and you can tell which one ran by looking at the histogram. FOUND BY §15, not by reading: nothing in this phase's brief named the second one.** `combine_project_into_supply_chain` is a SQL RPC called from three client sites — the policy grid and the data manager twice — plus the `projects` completion trigger. It DELETEs both tier-3 tables and rebuilds them, exactly as the edge function does, and it writes `level` by a fourth rule: outbound `0`, `bom_single_level` a literal `1`, **`bom_multi_level` a literal `2` — `b.level` is never read** — and inbound `GREATEST(1, COALESCE(max_level, 0) + 1)`. **MEASURED 2026-09-19 (§15 run `35433474185`)**: two projects hold the SAME 396-row `bom_multi_level`, four levels deep. `Project 2`'s bom lane carries levels **1,2,3,4** — the edge function's `row.level || 1`. `Project AA - ver3`'s carries **2, and only 2**, for all 397 rows — the RPC's literal. So a 4-deep BOM renders FLAT, its 260 materials and 66 products share one column and one colour, and the page's ladder labels every one of them `material level 2`. Its inbound lane splits **1,5**: a supplier of a material absent from the BOM lands at 1, which the ladder calls a material, and one at depth 4 lands at 5, which it calls a supplier — two suppliers from one upload, four levels apart. **This is D112 one layer down and it is the more serious half**: D112 is eight readers disagreeing about what the column SAYS; this is two writers disagreeing about what it MEANS, so no reader can be correct. **It also rescopes WP 8.2**: that package was written to fix the edge function, which per D88 `supabase-functions.yml` does not deploy. The RPC is the live path. A fix to the undeployed half would have changed nothing and reported success | `supabase/migrations/20260915000004_org_identity_dual_read.sql:1918-2032` (the RPC's four level rules) against `supabase/functions/combine-project/index.ts:322,341,405`; callers at `src/pages/DataManager.tsx:650,797` and `src/components/policies/StagePolicyTable.tsx:284`; §15 run `35433474185` | **WP 8.2** *(one writer, or two that agree — and the decision about which one lives is the package's first act, not its last)* |
+| **D126** | **The live RPC invents a node called `ROOT` where a BOM row has no parent. MEASURED 2026-09-19 (§15 run `35433474185`): latent — 0 `ROOT` edges, 0 `ROOT` rows in `node_list`, 0 parentless `bom_multi_level` rows, across all ten projects.** `COALESCE(b.higher_level_component_id, 'ROOT')` is written into BOTH `to_location` and `path_root`. Where D114's edge function silently drops the edge, this one fabricates its endpoint: the finished product is still severed from its own BOM, and in its place stands a node that no CSV contains, that no user can explain, and that every centrality on the page would be computed over. **T1 in one string** — a node on screen sourced to nothing, which is the same class as D124's "work station" and arrives from SQL instead of from TypeScript. It is latent and it is not closed: the `COALESCE` is what the next parentless row meets, and a probe that counted `''` could never have seen it — which is why WP 8.0 went back for a second §15 run rather than reporting D114 clear | `supabase/migrations/20260915000004_org_identity_dual_read.sql:1978,1980`; §15 run `35433474185` | **WP 8.2** |
+| **D127** | **The graph is never rebuilt when its sources change, and the timestamp that would say so cannot see a delete. MEASURED 2026-09-19 (§15 run `35433474185`): 2 of 10 projects hold an inbound lane that does not match `inbound_logistics`, and the largest gap is on the project a user reported — `Project AA - ver3`, 369 lane rows against 321 source rows.** Neither writer is a trigger on the lane tables: both are invoked by a client (or by the `projects.completed` trigger), so a CSV edited or deleted after the last combine changes the source and leaves the graph exactly as it was. **And the freshness signal reports it fresh**: AA-ver3's lane was written 0.17 s AFTER its `inbound_logistics` was last touched, so every timestamp comparison says up-to-date — because `max(updated_at)` does not move when rows are DELETED. That is D12's lesson arriving in a second place: a timestamp asks whether a clock moved, and 48 rows leaving a table moves no clock. This is the one defect in Phase 8 that a user would describe as "the map looks wrong" with no classifier involved at all, and `project_freshness` is rendered on Product-level and on no other network page | `supabase/migrations/20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql:86-89,133` (the only invoker is a `projects` UPDATE trigger; no trigger watches the lane's own sources); §15 run `35433474185` | **WP 8.2** *(the rebuild) · **WP 8.4** *(the signal, on both pages)* |
 
 ### 4.1 Code map — the data layer
 
@@ -11638,13 +11641,18 @@ nodes in more than one lane role (D116); `node_list` against the multi-tier node
 set (D117); `data_source_group` and the NULL level (D118, D119). Each one prints
 per-project rows and a verdict sentence that names the defect it sizes.
 
-**No migration in this push, and none of the three doors touched in it.** §4 D31:
-`supabase-migrations.yml` has no branch filter, so a branch push DEPLOYS, and
-`verification-sql.yml` fires on `.github/verify-request`, on its own workflow file
-AND on the runner. Three §15 runs across two packages have been lost to that race
-— the last one because a package pushed a migration together with four new probes
-in the runner, through a door the rule did not name at the time. This push carries
-the runner change alone; `.github/verify-request` is a second push.
+**No migration in these pushes — and the standing rule about the three doors is
+now WEAKER than it reads, which this package had to establish before following
+it.** `supabase-migrations.yml` was scoped to `branches: [main]` on 2026-09-18,
+which closes §4 D31's first half: a feature-branch push no longer deploys, so the
+race that lost three §15 runs across two packages cannot happen off `main` at all.
+CLAUDE.md still describes the old behaviour. **A second consequence nobody had
+written down**: because `verification-sql.yml` fires on the runner's own path, a
+push that changes probes IS the verify request — no `.github/verify-request` touch
+is needed, and this package's two §15 runs were both triggered that way. The rule
+that matters now is narrower and still worth keeping: a push carrying a migration
+must not also change the runner, because a `main` merge would then order two
+workflows with nothing between them.
 
 **── D123: §16 WAS NOT §16, AND THIS PACKAGE FOUND IT BY NEEDING TO WRITE IN IT ──**
 
@@ -11684,6 +11692,77 @@ one `roadmapText()` helper, so a Phase 8 package is held to exactly what a Phase
 package is. **Proved by the case rather than asserted beside it**: marking WP 8.0
 ✅ before writing this entry made R7 fail with the package named.
 
+**── THE NUMBERS, AND THEY MOVED THE DIAGNOSIS TWICE ──**
+
+Two §15 runs, both on this branch: `35433237514` (probes 1–7) and `35433474185`
+(probes 8–10, written BECAUSE of what the first one said). Ten projects.
+
+**The reported project's BOM is exactly four levels deep, so the defect the brief
+predicted is LATENT there — and the map is still wrong, for a reason nothing in
+the brief named.** `Project AA - ver3`: `bom_level = multi`, 396
+`bom_multi_level` rows, `max(level) = 4`. On the brief's reading the ladder should
+be correct. It is not, and probe 8 says why:
+
+| | `bom_multi_level` | bom lane levels | inbound lane levels |
+|---|---|---|---|
+| `Project 2` | 396 rows, 4 deep | **1, 2, 3, 4** | 5 |
+| `Project AA - ver3` | 396 rows, 4 deep | **2, and only 2** (397 rows) | **1, 5** |
+
+Same BOM. Incompatible lanes. **There are two live ETLs** — that is D125, and it
+is the finding of the package. `combine_project_into_supply_chain`, a SQL RPC
+called from the policy grid, the data manager twice and the `projects` completion
+trigger, writes `bom_multi_level` rows with a **literal `level = 2`** and never
+reads `b.level`. The edge function writes `row.level || 1`. So AA-ver3's 4-deep
+BOM renders FLAT — 260 materials and 66 products in one column, one colour, every
+one labelled `material level 2` — and its suppliers split across level 1 (16 rows,
+which the ladder calls a material) and level 5 (353 rows, which it calls a
+supplier). **Two suppliers from one upload, four levels apart.** And WP 8.2 was
+scoped to fix the edge function, which per D88 is not deployed: the live path is
+the RPC, and a fix to the other half would have changed nothing and reported
+success.
+
+**D112 is live on AA-ver3 and on no other project.** 65 nodes are both a BOM
+material and a BOM source — genuine **sub-assemblies**. `classify_node_type`
+resolves all 65 to `product` by its priority order; the page resolves them to
+`material level 2`. Sixty-five nodes, two confident answers, one screen apart.
+AA-ver3 is also the only project with any untyped nodes: **29 `node_list` rows are
+`unknown` or NULL**, and `ProductLevelNetwork` renders an unrecognised group as
+**Supplier**.
+
+**D127, which no code read predicted and which a user would call "the map looks
+wrong" with no classifier involved.** AA-ver3's inbound lane holds **369 rows
+against 321 in `inbound_logistics`** — 48 source rows left after the last combine
+and nothing rebuilt the graph, because neither writer is a trigger on the lane's
+sources. **And every freshness signal reports it fresh**: the lane was written
+0.17 s AFTER `inbound_logistics` was last touched, because `max(updated_at)` does
+not move when rows are DELETED. That is D12's lesson in a second place — a
+timestamp asks whether a clock moved, and 48 rows leaving a table moves no clock.
+
+**Two rows this package opened were OVER-CLAIMS, and §15 is what said so.**
+
+- **D114 is latent.** Zero `bom_multi_level` rows have a blank
+  `higher_level_component_id` in any project, and both edge tables hold zero empty
+  endpoints — so there is no material→finished-product edge to drop. The sidecar
+  says the column is *"empty at the top of the tree"* and production has never
+  contained such a row, which is a finding about the contract as much as the data.
+  The mechanism was also wrong: the row is lost in the **demand walk**, one stage
+  before the `|| ''` a reader sees first, so a count of `''` could never have
+  found it either way.
+- **D126 is latent for the same reason** — 0 `ROOT` edges, 0 `ROOT` rows in
+  `node_list` — and it was only found because the first report's zero empty
+  endpoints looked too clean. The live RPC writes
+  `COALESCE(higher_level_component_id, 'ROOT')` into both the edge endpoint and
+  `path_root`: where the edge function drops the edge, this one **fabricates a
+  node that no CSV contains**. T1 in one string, the same class as D124's "work
+  station", arriving from SQL instead of TypeScript.
+
+**D115 and D118 are live and exactly as predicted.** Three single-level projects
+hold zero multi-tier rows (`Project 1`: 123 inbound rows, 0 lane rows — a
+permanently empty Process page); `data_source_group` is written on **0 of 5 445**
+rows. **D113 is live at scale**: **466 nodes** appear at more than one `level`, so
+for 466 nodes the page's map is written by whichever row the loop read last.
+**D117**: **104** multi-tier nodes have no `node_list` row at all.
+
 **Verified:** `contract:check` ✓ (R6 resolves all 13 new citations in range, R7
 append-only over 119 revisions, R8 44 packages named, R10 33 cross-checked) ·
 `check:docs` ✓ · `contract:rehearse` ✓ (21 assertion files, unchanged — this
@@ -11694,12 +11773,15 @@ production.
 
 **Gap check.** Four findings.
 
-1. **The §15 report is the exit condition and it is not in this push.** Everything
-   above is the instrument; the numbers are the deliverable, and they arrive on the
-   `verification-results` branch after a second push. Until they do, D112–D124 are
-   opened against a **reading of the code**, which is honest evidence for what the
-   code does and no evidence at all for which projects it is doing it to. WP 8.1
-   must not start from the counts in this entry, because there are none.
+1. **The instrument was wrong about the question TWICE, and both times the report
+   is what corrected it — not a re-read of the code.** Probes 1–7 were written from
+   a careful reading and they measured the right columns for the wrong hypothesis:
+   they established that AA-ver3's BOM is four levels deep, which on the brief's
+   reading makes the ladder correct, and the map is still wrong. Probes 8–10 exist
+   only because two projects with identical BOM tables disagreed about their own
+   lane in the first report's output. **The lesson is the cost of a single
+   measurement pass**: WP 8.1 should assume its own reading is a hypothesis, and the
+   §15 door is cheap enough to use twice in one package.
 2. **`InteractiveNetworkSpace` was outside `check:docs`'s data-layer list**, while
    the other three network pages were inside it. It is the fourth reader of the
    same table and the one WP 8.3 lifts its subgraph engine out of, so a citation of
@@ -11733,7 +11815,7 @@ production.
 | 5 ✅ | 5.1 – 5.3 | lineage + the 80-page manual | 6 | **PHASE COMPLETE.** **5.1 ✅** · **5.3 ✅** · **5.2a–i ✅, all nine** — manual live at `/docs`; tree complete; **ALL FIFTEEN SECTIONS WRITTEN — 80 of 80 pages, zero stubs.** **5.2i** then added what all eighty were missing: a door a FIGURE can come through (**D109**). The manual had none — §6.5 records WP 5.2a declining to link the eleven diagrams in the artifact and drawing three SVGs instead, and 5.2b–g shipped sixty-six pages with zero. Sixteen slots are declared and open, each naming its page, its filename and what the diagram must show. 5.2b shipped twelve of twelve and **did NOT make the reassignment §12 told it to**: all four "unsidecarred" tables had been described by WP 3.2 and WP 4.3, so the instruction was stale rather than the tree wrong. It found that "which columns are computed" was authored TWICE (**D101**) and closed it by declaring `computed_by` in the contract, which `graphHashCoverage.test.ts` now reads instead of its own literal Set — 18 of 18, byte-identical. **D57 closed** alongside, with the typecheck gate the repository never had. **5.2c** renders the chains the SAME derivation `resolutionChains.test.ts` ratchets (`chains.mjs` bundles the module the gate uses), so the manual and the gate cannot disagree about which eleven break — and found that the Trust Report publishes two limits that are no longer true (**D103**). **5.2e** publishes WP 5.1's lineage at TABLE grain only — the one claim the grade supports — and found that three §4 citations became ambiguous the moment the manual gained a page named after a screen (**D104**). **5.2f** states I5 and I8 as unmet in the reader's words rather than describing a record that does not exist, and found `dataset_versions.hash_network`'s own description two tables behind the migration that changed it (**D105**). **5.2d** documents BOTH live disruption models without picking one, reads the stress battery from the engine rather than mining the archive's already-stale copy, and found that the phase brief's own trap list carried a defect WP 4.3 had closed (**D107**), plus the stress battery's absence from the registry export (**D106**). **5.2g** completes the manual and says the four uncomfortable things in the reader's words — client-asserted identity, "RLS: enabled" as a non-assurance with a THIRD indeterminate state, `min_project_role` declared everywhere and read by one path, and an API principal with no person behind it. **WP 5.2's exit gap check ran**: five described tables have no narrative page and `customers` is the one that matters (**D108**) |
 | 6 | 6.1 – 6.4 | policy contract, researcher grade | — | **6.1 ✅** · — · 6.2 grew D47, D48, D49 at the WP 3.0 gap check |
 | 7+ | deferred | observations, estimation, backtesting | — | — |
-| **8** | **8.0 – 8.5** | **the graph layer — one node type, one graph layer** | — | **8.0 ✅** the seven §15 probes, and the numbers are NOT in yet: the package deliberately measures and changes nothing, because the diagnosis branches on a BOM depth no work-package session can read. Thirteen defects opened, **D112–D124**. The root cause is in the contract already — there is **no type column on either edge table**, so **eight** classifiers each infer one at render time and disagree by construction, and the single `level` column carries **three** incompatible meanings between its writer, its contract and its reader. Two defects silently destroy data (**D113** a dedup guard testing a key it never writes; **D114** an edge emitted to `''` where the BOM root should be) and one label is fabricated outright (**D124** "work station", from `level === 1`, with no routing table anywhere in the contract). It also found **D123** — §16's last twenty-one entries sat AFTER §17 and so outside the slice every gate reads — and the numbering collision that made this Phase 8 rather than Phase 7 (§14 already owns `WP 7.1`, and D28 is owned by it). `check.mjs` now reads its roadmap from two ranges so a Phase 8 package is gated like a Phase 3 one, proved by making R7 fail with the package named. **WP 8.1 is next** |
+| **8** | **8.0 – 8.5** | **the graph layer — one node type, one graph layer** | — | **8.0 ✅** the seven §15 probes, and the numbers are NOT in yet: the package deliberately measures and changes nothing, because the diagnosis branches on a BOM depth no work-package session can read. Thirteen defects opened, **D112–D127**, two of which the measurement then CORRECTED from over-claims to latent (D114, D126). The root cause is in the contract already — there is **no type column on either edge table**, so **eight** classifiers each infer one at render time and disagree by construction, and the single `level` column carries **three** incompatible meanings between its writer, its contract and its reader. Two defects silently destroy data (**D113** a dedup guard testing a key it never writes; **D114** an edge emitted to `''` where the BOM root should be) and one label is fabricated outright (**D124** "work station", from `level === 1`, with no routing table anywhere in the contract). It also found **D123** — §16's last twenty-one entries sat AFTER §17 and so outside the slice every gate reads — and the numbering collision that made this Phase 8 rather than Phase 7 (§14 already owns `WP 7.1`, and D28 is owned by it). `check.mjs` now reads its roadmap from two ranges so a Phase 8 package is gated like a Phase 3 one, proved by making R7 fail with the package named. **AND THE SECOND §15 RUN IS WHY THE PACKAGE MATTERED**: the reported project's BOM is exactly four levels deep, so the ladder defect the brief predicted is LATENT there — and the map is wrong anyway, because **two live ETLs write both edge tables with different `level` rules** (**D125**, the finding of the package, and it rescopes WP 8.2 onto the SQL RPC because the edge function the brief named is the undeployed half). Also **D126** (the RPC invents a node called `ROOT`) and **D127** (nothing rebuilds the lane when its sources change, and every timestamp reports it fresh because a DELETE moves no `updated_at` — D12's lesson in a second place). **WP 8.1 is next** |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -11804,7 +11886,7 @@ is no type column on either edge table.**
 
 The phase authors node identity and node type ONCE, in the data, and then gives
 both pages one shared graph layer so they stop re-deriving the same facts
-differently. It closes D112–D124.
+differently. It closes D112–D127.
 
 **Which invariants it serves.** `single-source` (I1) — a node's role is a prose
 fact about the data layer authored eight times in TypeScript and SQL with nothing
@@ -11834,11 +11916,22 @@ every one a `select`, across EVERY project rather than the one §15 names (D42):
    one typed projection cannot see.
 7. `data_source_group` (D118) and the NULL `level` the RPC types as a product (D119).
 
-**Exit**: a §15 report on the `verification-results` branch, the numbers recorded
-in §16, and D112–D120 opened in §4 against whichever branches the data confirms.
-**The push carries no migration and touches neither `.github/verify-request`,
-`verification-sql.yml`, nor the runner in the same push as one** — three §15 runs
-across two packages have been lost to exactly that race (§4 D31).
+**It took TWO runs, and the second one is where the package earned its keep.**
+Probes 1–7 established that the reported project's BOM is exactly four levels
+deep — which on the brief's reading makes the page's ladder correct — and two
+projects with the SAME 396-row, 4-deep BOM still disagreed about their own lane.
+Probes 8–10 found why: **a second live ETL** (D125), a node the RPC invents
+(D126), and a lane nothing rebuilds when its sources change while every timestamp
+reports it fresh (D127). Three more probes, all `select`, all every-project.
+
+**Exit ✅**: two §15 reports on the `verification-results` branch (runs
+`35433237514` and `35433474185`), the numbers in §16, **sixteen** defects opened
+D112–D127 — and **two of them corrected from over-claims by the measurement**
+(D114 and D126 are latent: zero parentless BOM rows in any project). Neither push
+carried a migration. Note for the next package: because `verification-sql.yml`
+fires on the runner's own path, **a push that changes probes IS the verify
+request** — no `.github/verify-request` touch is needed, and CLAUDE.md's
+three-doors paragraph predates `supabase-migrations.yml` being scoped to `main`.
 
 ### WP 8.1 — The classifier and the projection *(migration)*
 
@@ -11876,26 +11969,54 @@ is idempotent. **Mutation**: remove the priority `ORDER BY` from
 **Exit**: `contract:check` green (R1, R5, R9), `contract:rehearse` green all three
 ways, §16 entry.
 
-### WP 8.2 — The ETL stops lying about `level` *(migration + edge function)*
+### WP 8.2 — ONE ETL, and it stops lying about `level` *(migration + edge function)*
 
-Closes D114, D115, D118, D119 and the two D112 halves that live in
-`combine-project`: write `bom_depth` explicitly and keep `level` as a deprecated
-alias for one release; substitute the finished product where
-`higher_level_component_id` is blank, which is what the BOM sidecar says that
-blank MEANS, and never emit an edge to `''`; build the multi-tier lanes for
-single-level projects too; write `data_source_group` or delete it and its
-contract claim together; stop discarding intermediate assemblies and stop
-hardcoding a zero consumption rate on the multi-level path; and drop the
-`COALESCE(level, 0)` that serves an unknown depth to the ladder as a product.
+**RESCOPED BY WP 8.0's MEASUREMENT, before a line was written.** This package was
+scoped to fix `combine-project/index.ts`. §15 found that **there are two live
+ETLs** writing both edge tables with different `level` rules (D125), and that the
+one the brief named is the one `supabase-functions.yml` does not deploy (D88). So
+the package's FIRST act is the decision it cannot avoid: **which writer lives.**
+
+The recommendation, stated so the next session argues with it rather than
+rediscovering it: **keep the SQL RPC and delete the edge function's lane build.**
+The RPC is the deployed path, it is reached by the `projects` completion trigger
+as well as by three client sites, it already runs inside one transaction with a
+DELETE of both tables, and per `no-tier-skip` a derivation belongs in the database
+rather than behind an HTTP function whose deployment nothing gates. The edge
+function's demand walk is the better *algorithm* — it propagates root demand down
+the tree, which the RPC does not — so the work is porting that walk into SQL, not
+choosing the RPC's arithmetic.
+
+Then, in the one surviving writer:
+
+- **`bom_depth` from `bom_multi_level.level`**, which the RPC currently discards
+  for a literal `2` (D125) and the edge function reads (D112). `level` stays as a
+  deprecated alias for one release.
+- **Rebuild on source change.** D127: no trigger watches the lane's sources, so a
+  deleted CSV row leaves 48 stale edges and every timestamp says fresh. A
+  statement-level trigger on the four source tables, or an explicit staleness row
+  the pages can render — **not** a timestamp comparison, which is the mechanism
+  D12 and D127 both defeat.
+- **The finished product, where a BOM row has no parent** (D114, D126). Both
+  latent today — zero such rows in production — so the exit check is a rehearsal
+  against a constructed row, not a count. Never `''`, and never `'ROOT'`.
+- **The multi-tier lane for single-level projects** (D115): three projects have a
+  permanently empty Process page and one of them holds 123 inbound rows.
+- **`data_source_group`** (D118): written on 0 of 5 445 rows. Write it, or delete
+  the column and its contract claim in the same commit.
+- **Intermediate assemblies and the hardcoded zero rate** (D121), and the
+  `COALESCE(level, 0)` the RPC serves as a product (D119).
 
 `supabase/rehearsal/240_bom_root_reaches_the_product.sql` and
 `250_depth_is_not_tier.sql`, each mutation-tested.
 
-> **RISK, stated rather than assumed.** Per D88, `supabase/functions` are **not
-> deployed by `supabase-functions.yml` and never have been.** An ETL fix that is
-> never deployed changes nothing. **This package must either establish the
-> deployment path or state in §16 that it is blocked on it. It must not report
-> success on an undeployed function.**
+> **THE RISK IS NOW MEASURED RATHER THAN STATED.** D88 says
+> `supabase-functions.yml` does not deploy `supabase/functions`, and §15 says the
+> edge function's fingerprint is on ONE project's lane, last written 2025-10-10,
+> while the RPC's is on the project a user reported, written 2026-07-05. **Both
+> writers have run in production and the deployed one is the RPC.** A fix that
+> lands only in the edge function changes nothing and must not be reported as
+> success.
 
 ### WP 8.3 — The shared graph layer *(no migration)*
 

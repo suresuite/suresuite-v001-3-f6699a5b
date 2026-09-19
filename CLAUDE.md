@@ -156,18 +156,19 @@ No work-package session can run it — the egress proxy denies CONNECT. Touch
 with CI's `SUPABASE_ACCESS_TOKEN` and publishes the report to the
 `verification-results` branch.
 
-**NEVER in the same push as a migration — AND THE TRIGGER HAS THREE DOORS.**
-`supabase-migrations.yml` has no branch filter (§4 D31), so a branch push DEPLOYS —
-and both workflows fire on that push with no ordering between them.
+**THE TRIGGER HAS THREE DOORS, AND THE RULE ABOUT THEM IS NARROWER THAN IT WAS.**
 `verification-sql.yml` fires on `.github/verify-request`, on the workflow file, AND
-on `scripts/data-contract/verification-sql.mjs`. WP 3.4 pushed a migration together
-with four new probes in the runner and lost the run that way — the fourth loss in
-three packages, and the first through a door the rule did not name. **A push that
-carries a migration must change none of the three.** A §15 run that races a deploy reports a database
-that changed underneath it: WP 3.3's first after-run read 1 787 rows in its lane
-sweep and a total of 1 691 in a later query of the same report. Push the migration,
-wait for `Deploy Supabase Migrations` to finish, THEN touch `.github/verify-request`
-in a second push. Three runs across two packages have been lost to this. **Measure every project, never just one** — the
+on `scripts/data-contract/verification-sql.mjs`. **So a push that changes a probe IS
+the verify request** — you do not need to touch `.github/verify-request` at all, and
+WP 8.0's two runs were both triggered that way.
+`supabase-migrations.yml` was scoped to `branches: [main]` on 2026-09-18, which
+closes §4 D31's first half: **a feature-branch push no longer deploys**, so the race
+that lost four runs in three packages cannot happen off `main`. What remains worth
+keeping: **a push that carries a migration must change none of the three doors**,
+because a `main` merge then fires both workflows with no ordering between them, and
+a §15 run that races a deploy reports a database that changed underneath it (WP
+3.3's first after-run read 1 787 rows in its lane sweep and 1 691 in a later query
+of the same report). Migration first, then the probes, in separate pushes. Three runs across two packages have been lost to this. **Measure every project, never just one** — the
 largest project in this database is the one `seed-project.yml` seeds, and reading it
 alone reports a clean data layer that is not clean (PLAN.md §4 D42).
 
