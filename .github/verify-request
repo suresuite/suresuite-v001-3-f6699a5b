@@ -1,11 +1,26 @@
 # Touch this file to trigger `.github/workflows/verification-sql.yml`.
-# NEVER in the same push as a migration: `supabase-migrations.yml` has no branch
+#
+# THE RULE ABOVE THIS LINE CHANGED ON 2026-09-18 AND THE OLD TEXT IS BELOW IT,
+# struck through rather than deleted, because a reader who remembers the old rule
+# needs to know it moved rather than to wonder whether they misread it.
+#
+# `supabase-migrations.yml` is `branches: [main]` since 2026-09-18 (§4 D31's first
+# half), so on a feature branch a migration does NOT deploy and the two workflows
+# cannot race. What replaces the race matters more: YOUR BRANCH'S MIGRATIONS ARE
+# NOT IN THE DATABASE THIS RUN READS. They deploy on merge. So a probe against a
+# column your branch adds comes back empty or errors, and that is a fact about the
+# sequence rather than a finding — say which shape you measured.
+#
+# The trigger still has THREE doors — this file, the workflow, and
+# `scripts/data-contract/verification-sql.mjs` — and a probe you add still travels
+# in its own push, which is why WP 3.4 lost a run: it shipped four new probes
+# beside a migration.
+#
+# ~~NEVER in the same push as a migration: `supabase-migrations.yml` has no branch
 # filter (§4 D31), so a branch push DEPLOYS, both workflows fire on that push
 # with no ordering between them, and a §15 run that races a deploy reports a
 # database that changed underneath it. FIVE runs have been lost to this across
-# three packages. And the trigger has THREE doors — this file, the workflow, and
-# `scripts/data-contract/verification-sql.mjs`. A push carrying a migration must
-# change NONE of them.
+# three packages.~~ — superseded above; on `main` the race is still live.
 #
 # READ THE REPORT, NOT THE EXIT CODE. The runner is tolerant: WP 3.4 shipped a
 # probe that ordered by a column that does not exist, printed QUERY FAILED, and
@@ -19,3 +34,26 @@ they describe. Functions carrying WP 4.3's dual-write have been live since
 Deploy Supabase Functions #47 (2026-09-17T22:17Z, success); #50 at 20:27Z today
 is the latest. This asks the same questions again so the store can be read after
 the fact rather than reasoned about. No migration in this push.
+
+────────────────────────────────────────────────────────────────────────────────
+WP 6.4 exit read — 2026-09-19. Phase 6's measurement, and it reads production
+WITHOUT this branch's seven migrations, which is the point: it is the BEFORE half
+of two readings that straddle a merge.
+
+What it is asked to answer:
+
+  1. D88's unblocking condition, again and for the record: `analysis_runs` /
+     `analysis_results` counts, and `computed_from_hash IS NULL` per derived
+     table. WP 6.5 (b) cannot start until this number falls.
+  2. D117's orphans, BEFORE the cascade lands: how many rows in `customers`,
+     `network_summary`, `policy_defaults`, `policy_overrides`,
+     `simulation_job_magnitudes`, `tier2_suppliers` and `tier3_suppliers` belong
+     to a project that no longer exists. `20260919000005` deletes exactly those,
+     prints each count on deploy, and this is the number to compare it against.
+  3. D126: whether `policy_presets` holds rows at all — a seeded catalog nothing
+     reads is a different finding from an empty table nothing reads.
+  4. The ingestion path, unchanged from the last read: `ingest_files`,
+     `ingest_staged_rows` and `ingest_runs` are expected EMPTY, because
+     `ingest-file` has never been deployed (D123) and WP 6.5 (a) is the switch.
+
+No migration in this push and none of the other two doors touched.

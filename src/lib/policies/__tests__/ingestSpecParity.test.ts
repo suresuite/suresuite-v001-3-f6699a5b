@@ -68,15 +68,27 @@ describe("the promotable-target list exists twice and must agree", () => {
       .toEqual([...PROMOTABLE_TARGETS].sort());
   });
 
-  it("covers every CSV dataset the contract describes — nine since WP 3.3", () => {
+  it("covers every CSV dataset the contract describes — TEN since WP 6.2", () => {
     // Six from WP 3.2, plus the three item masters (D55). They were left out
     // deliberately then: `bulk_upsert_*` already upserted on their composite
     // primary key, and a landing whose promotion was an INSERT would have been a
     // regression. The promotion upserts now, so the landing is strictly better
     // and they joined it.
+    //
+    // `customers` is the TENTH, and WP 6.2 did not choose to add it — a gate did.
+    // WP 6.1 built "no engine-read field is unreachable by both the grid and
+    // every upload" as a GATE because it was empty; §4 D94's declaration of
+    // `P-C.2`'s two `Customer` reads made it fire, and the only way to satisfy it
+    // was to give the table the surface it had never had (§4 D108).
+    //
+    // THIS ASSERTION IS WHY THE NUMBER IS IN THE TITLE. §4 D101's lesson is that
+    // a gate pinned to a value a migration moves has to move with it in the same
+    // commit; naming the count out loud is what makes a stale one obvious rather
+    // than arithmetic nobody re-reads.
     expect(PROMOTABLE_TARGETS).toEqual([
       "bom_multi_level",
       "bom_single_level",
+      "customers",
       "inbound_logistics",
       "materials",
       "outbound_logistics",
@@ -85,6 +97,7 @@ describe("the promotable-target list exists twice and must agree", () => {
       "tier2_suppliers",
       "tier3_suppliers",
     ]);
+    expect(PROMOTABLE_TARGETS).toHaveLength(10);
   });
 
   it("no CSV dataset writes tier 2 from the browser any more (no-tier-skip, I2)", () => {

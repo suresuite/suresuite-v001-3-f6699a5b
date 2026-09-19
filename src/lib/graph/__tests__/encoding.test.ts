@@ -116,7 +116,7 @@ describe('depthShade — depth is a lightness ramp inside one category', () => {
   });
 
   it('an UNKNOWN depth returns the base unmixed — it must not read as a depth', () => {
-    // This is §4 D126 in the visual layer: `COALESCE(level, 0)` answers an unknown
+    // This is §4 D134 in the visual layer: `COALESCE(level, 0)` answers an unknown
     // with a confident 0, and the page then renders that 0 as a real position.
     expect(depthShade('#facc15', null, 4)).toBe('#facc15');
   });
@@ -145,7 +145,7 @@ describe('columnForNode — position encodes structure, from the ECHELON', () =>
 
   it('spreads a multi-level BOM into sub-columns by DEPTH, not by `level`', () => {
     // The fix for the reported map, stated as a test. On that project every BOM row
-    // carries `supply_chain_data_multi_tier.level = 2` (§4 D132), so a 4-deep BOM
+    // carries `supply_chain_data_multi_tier.level = 2` (§4 D140), so a 4-deep BOM
     // rendered as one flat column. `bomDepth` comes from `bom_multi_level` and is
     // unaffected, so these four are four positions.
     const cols = [1, 2, 3, 4].map((d) =>

@@ -265,6 +265,11 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
   const UNATTRIBUTED = [
     "analysis_mark_critical_nodes", "create_default_policy_defaults",
     "etl_replace_supply_chain", "mrp_apply_staged_products",
+    // WP 6.4 — describing the six decision tables brought SIX more writers into this
+    // scan's scope, which is D54's lesson for the third time: a deferral hides a
+    // table's WRITERS from every rule scoped to the contract. Five of the six took
+    // the line in `20260919000007`; this is the sixth.
+    "sync_disruption_to_sim_scenario",
   ];
 
   /**
@@ -283,7 +288,17 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
    * a related reason: the call-site counter looks for RPC names, and a trigger
    * is wired by `EXECUTE FUNCTION` rather than called by name.
    */
-  const TRIGGER_FUNCTIONS = new Set(["create_default_policy_defaults"]);
+  /**
+   * `sync_disruption_to_sim_scenario` joins it for the same reason, found the same
+   * way. It `RETURNS trigger`, so PostgreSQL refuses it declared arguments, and it
+   * fires inside someone else's statement where `app.current_user_id` already holds
+   * whatever that statement established. The rule is not "a trigger is exempt" — it
+   * is that naming the actor is the CALLER's job, and a trigger has no caller of its
+   * own to take it from.
+   */
+  const TRIGGER_FUNCTIONS = new Set([
+    "create_default_policy_defaults", "sync_disruption_to_sim_scenario",
+  ]);
 
   const VIA_SHARED_PREAMBLE = new Set([
     "analysis_mark_critical_nodes", "etl_replace_supply_chain", "mrp_apply_staged_products",

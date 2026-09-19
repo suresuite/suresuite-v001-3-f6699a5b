@@ -183,7 +183,7 @@ function getNodeTypeFromLevel(level: number, dataSource: string, position: 'from
   }
   
   // Level 1 used to be labelled "work station" for display. It is not one — see
-  // `getDisplayNodeType` below and §4 D131. A BOM row is a material either way.
+  // `getDisplayNodeType` below and §4 D139. A BOM row is a material either way.
   if (level === 1) return 'material';
   
   // Level 2-4: Material Levels
@@ -202,7 +202,7 @@ function getNodeTypeFromLevel(level: number, dataSource: string, position: 'from
 /**
  * The label a user reads for a node.
  *
- * TWO FABRICATIONS WERE REMOVED HERE (WP 8.5 · §4 D131, D132).
+ * TWO FABRICATIONS WERE REMOVED HERE (WP 8.5 · §4 D139, D140).
  *
  * 1. `level === 1` used to render as **"work station"**. There is no routing,
  *    operation or work-centre table anywhere in `supabase/contract/` — the label
@@ -214,7 +214,7 @@ function getNodeTypeFromLevel(level: number, dataSource: string, position: 'from
  *
  * 2. `material level N` asserted a BOM DEPTH, and this column is not one.
  *    `supply_chain_data_multi_tier.level` has two live writers that disagree
- *    (§4 D132): one stamps every `bom_multi_level` row with a literal 2 and never
+ *    (§4 D140): one stamps every `bom_multi_level` row with a literal 2 and never
  *    reads the real depth. §15 measured a project whose BOM is four levels deep
  *    and whose entire bom lane sits at level 2 — so "material level 2" was a
  *    confident statement about 260 materials and 66 products at once, and it was
@@ -1614,7 +1614,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                       <span className="font-medium text-right break-all">{selectedNode.data.label as string}</span>
                     </div> */}
                     <div className="flex justify-between">
-                      {/* WP 8.5 · §4 D132. This is the lane's own `level`
+                      {/* WP 8.5 · §4 D140. This is the lane's own `level`
                           ordinate, and TWO live writers disagree about what it
                           means — so it is labelled as the raw column it is rather
                           than as a process level or a BOM depth, neither of which
@@ -1691,7 +1691,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
               </Card>
             )}
 
-            {/* WP 8.5 · §4 D131 — these buckets are echelons in a bill of
+            {/* WP 8.5 · §4 D139 — these buckets are echelons in a bill of
                 materials, not process levels. Nothing in this database describes a
                 process. */}
             <Card>

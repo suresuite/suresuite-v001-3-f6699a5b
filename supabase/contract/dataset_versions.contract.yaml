@@ -20,7 +20,7 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc record_model_validation"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:398"
+    evidence: "src/hooks/useModelValidation.tsx:406"
     confirmed: true
   - page: "DeveloperApi.tsx"
     via: "rpc list_dataset_versions"
@@ -35,12 +35,12 @@ surfaces:
   - page: "ProjectPolicies.tsx"
     via: "rpc record_model_validation"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:398"
+    evidence: "src/hooks/useModelValidation.tsx:406"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "rpc record_model_validation"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:398"
+    evidence: "src/hooks/useModelValidation.tsx:406"
     confirmed: true
 
 governance:
@@ -87,7 +87,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        evidence: "src/hooks/useVerifiableExports.tsx:117"
         confirmed: true
     resolution: null
   project_id:
@@ -128,7 +128,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        evidence: "src/hooks/useVerifiableExports.tsx:117"
         confirmed: true
     resolution: null
     note: >-
@@ -155,7 +155,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        evidence: "src/hooks/useVerifiableExports.tsx:117"
         confirmed: true
     resolution: null
     note: >-
@@ -193,7 +193,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        evidence: "src/hooks/useVerifiableExports.tsx:117"
         confirmed: true
     resolution: null
     note: >-
@@ -233,7 +233,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        evidence: "src/hooks/useVerifiableExports.tsx:117"
         confirmed: true
     resolution: null
     note: >-
@@ -266,7 +266,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        evidence: "src/hooks/useVerifiableExports.tsx:117"
         confirmed: true
     resolution: null
     note: >-
@@ -343,6 +343,6 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:100"
+        evidence: "src/hooks/useVerifiableExports.tsx:117"
         confirmed: true
     resolution: null

@@ -1,6 +1,5 @@
 import { Badge } from "@/components/ui/badge";
 import { KpiStatTable } from "./KpiStatTable";
-import { UtilizationHeatmap } from "./UtilizationHeatmap";
 import { ConvergencePlot } from "./ConvergencePlot";
 import { ItemSeriesExplorer } from "./ItemSeriesExplorer";
 import { ReplicationSeedExplorer } from "./ReplicationSeedExplorer";
@@ -150,7 +149,16 @@ export function ResultsDashboard({
         warmupWeeks={run.warmup_detected_at}
       />
       <KpiStatTable reps={reps} primaryKpi={primaryKpi} />
-      <UtilizationHeatmap reps={reps} />
+      {/* `UtilizationHeatmap` WAS HERE AND IS REMOVED — §4 D113.
+          It read a per-node `utilization` series from each replication and NO
+          ENGINE WRITES ONE: `extra_series` carries exactly the four
+          `ReplicationSeedExplorer` offers. So it rendered "Run a simulation that
+          emits per-node utilization to see it here" on every run, forever — a
+          sentence that reads as something a different run could fix. A panel that
+          can only ever be empty is a placeholder, not a state, and removing it is
+          a smaller change than emitting a series no policy needs. The run-level
+          measure exists and now renders in the table above, as
+          `capacity_utilization`, which the same defect had been hiding. */}
       {/* Per-item weekly series (W3 / G17): inspection runs only — renders
           nothing when the run persisted no run_item_series rows. */}
       <ItemSeriesExplorer runId={run.id} warmupWeeks={run.warmup_detected_at} />

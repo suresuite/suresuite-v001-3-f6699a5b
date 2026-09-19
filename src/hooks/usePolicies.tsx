@@ -556,6 +556,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       const { error } = await sb.rpc("update_policy_version_notes", {
         p_version_id: versionId,
         p_notes: notes,
+        _actor_user_id: user?.id ?? null,   // WP 6.4 · §4 D71
       });
       if (error) {
         console.error("updateVersionNotes failed", error);
@@ -565,7 +566,10 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       toast.success("Notes saved");
       void refreshVersions();
     },
-    [refreshVersions],
+    // `user?.id` and not `user`: without it the callback closes over whoever was
+    // signed in at first render, so a session change would attribute this write to
+    // the previous person (WP 6.2 slice 12's lesson, ten arrays over).
+    [refreshVersions, user?.id],
   );
 
   // 6.D — delete a saved version. The RPC refuses (foreign_key_violation) when
@@ -576,7 +580,10 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     async (versionId: string): Promise<boolean> => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
-      const { error } = await sb.rpc("delete_policy_version", { p_version_id: versionId });
+      const { error } = await sb.rpc("delete_policy_version", {
+        p_version_id: versionId,
+        _actor_user_id: user?.id ?? null,   // WP 6.4 · §4 D71
+      });
       if (error) {
         console.error("deleteVersion failed", error);
         toast.error(error.message ?? "Could not delete this version");
@@ -587,7 +594,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       void refreshVersions();
       return true;
     },
-    [selectedVersionId, refreshVersions],
+    [selectedVersionId, refreshVersions, user?.id],
   );
 
   // 6.D + W2/G17 — download a saved version's policy bundle as an .xlsx

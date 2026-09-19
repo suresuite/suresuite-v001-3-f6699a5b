@@ -20,6 +20,7 @@ import {
   FamilyBand,
   FamilyChip,
   NumCell,
+  ProvenanceDotButton,
   POLICY_TYPE_OPTIONS,
   ProvenanceDot,
   ProvenanceLegend,
@@ -55,6 +56,8 @@ import { ParameterSheet } from "./ParameterSheet";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import { useAuth } from "@/hooks/useAuth";
+import { ValueChainPopover, type ValueChainTarget } from "@/components/policies/ValueChainPopover";
+import { sourceFor } from "@/lib/trust/valueChain";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useItemMasters, type ItemMasterTable } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
@@ -69,7 +72,22 @@ interface Props {
   defaults: PolicyBundle;
   overrides: OverrideRow[];
   fulfillmentStrategy: FulfillmentStrategy;
-  bulkUpsertOverrides: (rows: OverrideRow[]) => Promise<void>;
+  /**
+   * WP 6.3 · THE OPTIONS ARGUMENT WAS MISSING FROM THIS TYPE, AND ITS LAZY FIX
+   * WOULD HAVE BEEN A SILENT DATA DEFECT.
+   *
+   * `usePolicies` declares `(rows, opts?: { seeded?: boolean })`; this prop
+   * declared one parameter, so line 936's `bulkUpsertOverrides(toUpsert,
+   * { seeded: true })` was a type error — baselined as debt on this surface.
+   *
+   * `{ seeded: true }` is WP 4.4's `seeded_from_hash`: the flag that makes a
+   * prefilled override report itself STALE after a re-upload, because the engine
+   * reads overrides rather than the grid. Deleting the second argument would have
+   * made the error go away and stopped that flag being stamped — a green
+   * typecheck bought by turning off D70's staleness machinery. The type widens to
+   * match the hook instead.
+   */
+  bulkUpsertOverrides: (rows: OverrideRow[], opts?: { seeded?: boolean }) => Promise<void>;
   deleteOverride?: (scope: "node" | "edge", targetKey: string, family: PolicyFamily) => Promise<void>;
   /** Save a policy version snapshot — offered after saving grid edits. */
   saveSnapshot?: (label?: string) => Promise<string | null>;
@@ -1356,21 +1374,56 @@ export function StagePolicyTable({
                 </span>
               )}
 
-              {kind === "number" && (
-                <NumCell
-                  value={(() => {
-                    const n = typeof cellValue === "number" ? cellValue : Number(cellValue);
-                    return cellValue == null || !Number.isFinite(n) ? undefined : n;
-                  })()}
-                  provenance={prov}
-                  decimals={fc.kind === "num" ? (fc.dec ?? 2) : prov === "derived" ? 2 : undefined}
-                  integer={fc.kind === "int"}
-                  unit={fc.unit}
-                  placeholder={cellPlaceholder}
-                  title={placeholderTitle}
-                  onCommit={commit}
-                />
-              )}
+              {kind === "number" && (() => {
+                // A2 (§5.4) — the dot becomes the trigger for the value chain.
+                //
+                // `sourceFor` names the tier-2 table only for a master-backed
+                // column; for everything else it returns null and the popover
+                // renders the bundle-resolution chain, which is that cell's TRUE
+                // answer rather than a gap (§4 D125 says why the lane columns
+                // cannot be named yet).
+                const src = sourceFor(col as { field: string; master?: { table: string; field: string } });
+                const masterRow = src && col.master
+                  ? masterRowById[col.master.table].get(String(r[col.master.idFrom] ?? ""))
+                  : undefined;
+                const target: ValueChainTarget = {
+                  dataset: src?.dataset ?? null,
+                  column: src?.column ?? col.field,
+                  stage: stageKey,
+                  field: col.field,
+                  // The masters have carried `source_row_id` since WP 3.3 and
+                  // `select("*")` has been returning it with nothing reading it.
+                  // This is the reader.
+                  sourceRowId: (masterRow as { source_row_id?: string | null } | undefined)?.source_row_id ?? null,
+                  projectId: projectId ?? null,
+                };
+                const shown = cellValue == null ? (cellPlaceholder ?? "—") : String(cellValue);
+                return (
+                  <NumCell
+                    value={(() => {
+                      const n = typeof cellValue === "number" ? cellValue : Number(cellValue);
+                      return cellValue == null || !Number.isFinite(n) ? undefined : n;
+                    })()}
+                    provenance={prov}
+                    decimals={fc.kind === "num" ? (fc.dec ?? 2) : prov === "derived" ? 2 : undefined}
+                    integer={fc.kind === "int"}
+                    unit={fc.unit}
+                    placeholder={cellPlaceholder}
+                    title={placeholderTitle}
+                    onCommit={commit}
+                    dot={
+                      <ValueChainPopover
+                        target={target}
+                        provenance={prov}
+                        displayed={shown}
+                        userId={user?.id ?? null}
+                      >
+                        <ProvenanceDotButton p={prov} label={col.label} />
+                      </ValueChainPopover>
+                    }
+                  />
+                );
+              })()}
 
               {kind === "text" && (
                 <input

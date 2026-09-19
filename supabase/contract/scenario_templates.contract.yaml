@@ -1,0 +1,235 @@
+# AUTHORED — the data contract's sidecar for `scenario_templates`.
+table: scenario_templates
+tier: '4'
+schema_name: public
+grain: >-
+  One shipped starting point for a scenario: a named disruption shape with its schedule, its
+  suggested playbook and the run settings that go with it. A template is not a scenario —
+  applying one WRITES a scenario, and the two diverge from that moment.
+owner: engine
+
+natural_key_unique:
+  - source: PRIMARY KEY constraint
+    columns: [id]
+    name: scenario_templates_pkey
+  - source: UNIQUE constraint
+    columns: [slug]
+    name: null
+
+governance:
+  read: null
+  write: null
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the dataset they
+    chose it over and the result it produced. `result-binding` (I8) needs all three, which is
+    why WP 6.3 keeps the results and this package takes the decisions. Audited from WP 6.4: the
+    three statement-grain triggers land beside this sidecar, because `dataPlaneAudit.test.ts`
+    scopes its rule to tables IN the contract and a deferred table's writes are unaudited with
+    nothing to notice (D54). **Every row is a system row (`is_system` defaults true) and there
+    is no user-facing write path**, so `write` is null and the audit triggers guard a table only
+    a migration changes — which is the point: a change to the shipped catalog is exactly the
+    kind of change nobody notices. **Six of the seven presets name a disruption target the
+    mapper cannot resolve (§4 D112)**, so a run from one of them completes with the disruption
+    ABSENT rather than failing, and that is the open question this package carries.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  slug:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The template's stable name, UNIQUE across the catalog. What a preset is cited by.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      What a person reads.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  description:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      One sentence on the scenario it sets up. Defaults to the empty string rather than NULL.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  category:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Which family of disruption this is. Free text with no vocabulary table behind it, so a
+      typo creates a category rather than failing — the same shape
+      `disruption_scenario_settings.key` carries (§16 · WP 6.4 slice 13).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  severity:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      How hard the shipped version of this scenario hits. A label on the template, not a
+      parameter the engine reads.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  icon:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The glyph the picker draws. NULL where none was chosen.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  disruption_schedule:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      THE DECISION SHAPE — the events, their timing and their targets, copied into a scenario
+      when the template is applied. **This is where D112 lives**: six of seven name a target
+      `_map_events` cannot resolve.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  suggested_playbook_name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The recovery playbook this scenario is usually paired with, BY NAME rather than by id. A
+      name is not a join key (G1) and this one is resolved at apply time, so a renamed playbook
+      silently stops matching — recorded here rather than fixed, because the fix is a decision
+      about what a suggestion IS.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  horizon_days:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      How long the shipped run covers, in days. The scenario gets its own copy and may be
+      changed after.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  warmup_days:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      How much of that horizon is discarded before measurement.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  replications:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      How many replications the shipped version runs.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  seed:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      The root seed, so two people applying the same template get the same draws.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  is_system:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      TRUE for every row today. The column exists so a user template could be told apart from a
+      shipped one, and nothing writes a user template.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was created. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+surfaces:
+  - page: "SimulationLab.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/hooks/useScenarioTemplates.ts:35"
+    confirmed: true

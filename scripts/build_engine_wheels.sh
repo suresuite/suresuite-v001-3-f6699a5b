@@ -77,7 +77,29 @@ cp "$TMP"/scsim-*.whl "$TMP"/sim_worker-*.whl "$OUT"/
 # Manifest the frontend reads to know the exact wheel filenames + engine version.
 SCSIM_WHL="$(cd "$OUT" && ls scsim-*.whl)"
 WORKER_WHL="$(cd "$OUT" && ls sim_worker-*.whl)"
-SCSIM_VER="$(python -c 'import scsim,sys; sys.stdout.write(scsim.ENGINE_VERSION)' 2>/dev/null || echo unknown)"
+# §4 D87 — THE `cd` ABOVE IS WHY THIS USED TO WRITE "unknown", AND IT WAS NOT PyPI.
+#
+# We are in the repo root, where `./scsim/` is a DIRECTORY named `scsim`. Python
+# picks it up as a namespace package before any installed distribution, and that
+# namespace has no `ENGINE_VERSION` — so `import scsim` succeeds, the attribute
+# lookup fails, and `|| echo unknown` silently wrote "unknown" into a manifest
+# whose own docstring says the version "is embedded in every result". That
+# happened with `scsim` fully installed; the recorded cause (an egress proxy
+# denying PyPI) was a different session's symptom attached to this one.
+#
+# So the import runs with the cwd OUTSIDE the repo, and a failure is FATAL rather
+# than defaulted. A wheel set whose version says "unknown" is worse than no wheel
+# set: every result it produces claims an engine nobody can identify (§5 T4).
+SCSIM_VER="$(cd / && python -c 'import scsim,sys; sys.stdout.write(scsim.ENGINE_VERSION)')" || {
+  echo "❌ cannot read scsim.ENGINE_VERSION — install the engine first (\`pip install ./scsim\`)." >&2
+  echo "   Refusing to write a manifest with engine_version=unknown: T4 says a figure" >&2
+  echo "   leaving this system carries the engine version that produced it." >&2
+  exit 1
+}
+if [[ -z "$SCSIM_VER" || "$SCSIM_VER" == "unknown" ]]; then
+  echo "❌ scsim.ENGINE_VERSION resolved to \"$SCSIM_VER\" — refusing to write the manifest." >&2
+  exit 1
+fi
 cat > "$OUT/manifest.json" <<JSON
 {
   "engine_version": "${SCSIM_VER}",

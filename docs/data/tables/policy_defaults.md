@@ -26,6 +26,10 @@ partially or get corrected — the write fails.
 |---|---|---|
 | `policy_defaults_strategy_chk` | `CHECK (fulfillment_strategy IN ('make_to_stock','make_to_order','assemble_to_order','engineer_to_order','configure_to_order'))` | `20260607133944_444b6c58-6239-4b6d-89e3-deb6d075de97.sql` |
 
+| Constraint | Kind | Definition |
+|---|---|---|
+| `policy_defaults_project_fk` | FOREIGN KEY | `FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE` |
+
 ## Governance
 
 | | |
@@ -339,6 +343,6 @@ When the preset was last applied.
 
 ---
 
-*Generated from data contract `f8416eccc038`, engine `0.2.3`,
+*Generated from data contract `8c56366d1bc3`, engine `0.2.3`,
 sidecar `supabase/contract/policy_defaults.contract.yaml`, table created by `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

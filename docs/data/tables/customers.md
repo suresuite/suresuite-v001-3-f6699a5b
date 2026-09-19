@@ -28,6 +28,8 @@ it rather than duplicating it.
 | Constraint | Kind | Definition |
 |---|---|---|
 | `customers_project_customer_key` | UNIQUE | `UNIQUE (project_id, customer_id)` |
+| `customers_source_row_fk` | FOREIGN KEY | `FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED` |
+| `customers_project_fk` | FOREIGN KEY | `FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE` |
 
 ## Governance
 
@@ -59,13 +61,15 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | Column | CSV header | Type | Unit | Required in CSV | Meaning |
 |---|---|---|---|---|---|
 | `project_id` | — | `uuid` | — | — | The project this customer belongs to. Scoping is what makes `customer_id` a key: the same company in two projects is two rows, and merging them would merge two customers' models. |
-| `customer_id` | — | `text` | — | — | The customer's identifier as the source file spells it. Joins to `outbound_logistics.customer_id`, which is the only place the identifier is used today — and the join is by string, untrimmed, which is D8's shape. |
-| `name` | — | `text` | — | — | The customer's display name. Nullable; never a join key (G1). |
-| `segment` | — | `text` | — | — | The customer's service segment, the axis the customer-echelon allocation policies tier on (`P-C.x`, blueprint §4.2 and Appendix A). NOT a closed vocabulary yet — there is no CHECK, because the policy that reads it does not exist, and inventing the set before the reader is how a column gets a constraint nobody can satisfy. |
-| `priority_weight` | — | `numeric` | — | — | Relative allocation priority when demand exceeds supply. Dimensionless and relative — only the RATIO between two customers means anything, so a row at 1.0 is not "one unit" of anything. |
+| `customer_id` | `customer_id` | `text` | — | **yes** | The customer's identifier as the source file spells it. Joins to `outbound_logistics.customer_id`, which is the only place the identifier is used today — and the join is by string, untrimmed, which is D8's shape. IT IS ALSO THE UPLOAD KEY since WP 6.2 (§4 D108): the same string the outbound file spells, so a customer row and its lanes meet on the value the user typed rather than on a normalisation neither file performed. |
+| `name` | `name` | `text` | — | no | The customer's display name. Nullable; never a join key (G1). |
+| `segment` | `segment` | `text` | — | no | The customer's service segment, the axis the customer-echelon allocation policies tier on (`P-C.x`, blueprint §4.2 and Appendix A). NOT a closed vocabulary yet — there is no CHECK, because the set a CHECK would name is the user's own segmentation and inventing it before anybody can write the table is how a column gets a constraint nobody can satisfy. |
+| `priority_weight` | `priority_weight` | `numeric` | — | no | Relative allocation priority when demand exceeds supply. Dimensionless and relative — only the RATIO between two customers means anything, so a row at 1.0 is not "one unit" of anything. |
 | `sla_fill_floor_pct` | — | `numeric` | — | — | The minimum fill rate the customer is contracted to receive, as a percentage. NULLABLE, and the null means "no contracted floor" — not zero. A reader that coerces it to 0 turns "unconstrained" into "no service required", which is D17's error in the other direction. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the row was last modified. Server-stamped. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the row was first inserted. Server-stamped. |
+| `ingest_run_id` | — | `uuid` | — | — | The ingestion run that last wrote this row (WP 6.2, §4 D108), and through it the file, the uploader and who approved the promotion. NULL for every row that predates the CSV landing path — and on THIS table that is every row written before `20260919000001`, because until then nothing in the product wrote it at all: the only way a row got here was a hand at the database. A null means the provenance is unknown, never that there was none. |
+| `source_row_id` | — | `uuid` | — | — | The tier-1 staged row this was promoted from (WP 6.2). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the LINE rather than told a file name. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and a customer belongs to the project rather than to the run. |
 
 ## Each column in full
 
@@ -85,7 +89,7 @@ The project this customer belongs to. Scoping is what makes `customer_id` a key:
 
 ### `customer_id`
 
-The customer's identifier as the source file spells it. Joins to `outbound_logistics.customer_id`, which is the only place the identifier is used today — and the join is by string, untrimmed, which is D8's shape.
+The customer's identifier as the source file spells it. Joins to `outbound_logistics.customer_id`, which is the only place the identifier is used today — and the join is by string, untrimmed, which is D8's shape. IT IS ALSO THE UPLOAD KEY since WP 6.2 (§4 D108): the same string the outbound file spells, so a customer row and its lanes meet on the value the user typed rather than on a normalisation neither file performed.
 
 | | |
 |---|---|
@@ -94,7 +98,7 @@ The customer's identifier as the source file spells it. Joins to `outbound_logis
 | Unit | dimensionless |
 | Added by | `20260916000003_adopt_customers_drop_product_code_map.sql` |
 | Read by the engine | **not traced** |
-| Validated at ingest | — |
+| Validated at ingest | non-empty; unique within the project |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 ### `name`
@@ -108,12 +112,12 @@ The customer's display name. Nullable; never a join key (G1).
 | Unit | dimensionless |
 | Added by | `20260916000003_adopt_customers_drop_product_code_map.sql` |
 | Read by the engine | **not traced** |
-| Validated at ingest | — |
+| Validated at ingest | optional; display only |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 ### `segment`
 
-The customer's service segment, the axis the customer-echelon allocation policies tier on (`P-C.x`, blueprint §4.2 and Appendix A). NOT a closed vocabulary yet — there is no CHECK, because the policy that reads it does not exist, and inventing the set before the reader is how a column gets a constraint nobody can satisfy.
+The customer's service segment, the axis the customer-echelon allocation policies tier on (`P-C.x`, blueprint §4.2 and Appendix A). NOT a closed vocabulary yet — there is no CHECK, because the set a CHECK would name is the user's own segmentation and inventing it before anybody can write the table is how a column gets a constraint nobody can satisfy.
 
 | | |
 |---|---|
@@ -121,11 +125,12 @@ The customer's service segment, the axis the customer-echelon allocation policie
 | Grain | `level` |
 | Unit | dimensionless |
 | Added by | `20260916000003_adopt_customers_drop_product_code_map.sql` |
-| Read by the engine | **not traced** |
-| Validated at ingest | — |
+| Read by the engine | `P-C.2 customer_allocation — Customer.segment, the axis `sla_tiers` keys its fill floors by, and what the `fill_rate_segment_<segment>` KPIs are named after` |
+| When NULL, the engine uses | "default" (Customer.segment's own default) — every customer in one segment, so no `sla_tiers` key can match and every declared floor resolves to 0.0 |
+| Validated at ingest | optional; any string. Blank lands NOTHING and the column's own DEFAULT 'default' stands in — which is a value and not an absence, so the landing reports it as a substitution rather than leaving the cell silent (T2). |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
-> DEFAULT 'default' is production's own default, adopted rather than chosen. It is a value, not an absence, and a later reader must not treat it as "unsegmented" without saying so at the point of display (§5 T2). TRACED IN WP 6.2 (§4 D69). This is the column whose absence was silent in a second way: `P-C.2`'s `sla_tiers` guarantees a fill floor PER SEGMENT, and the mapper gave every customer the entity default `"default"`, so no tier could ever match and every floor was 0.0. The engine already warned (`unknown_sla_segment` in P-C.2's feasibility) — the warning named the symptom while nothing named the cause, because the segments it compared against were a constant.
+> DEFAULT 'default' is production's own default, adopted rather than chosen. It is a value, not an absence, and a later reader must not treat it as "unsegmented" without saying so at the point of display (§5 T2). DECLARED IN WP 6.2 (§4 D94), which is what closed the blank above rather than the trace alone. `p_c2_customer_allocation.data_requirements` named one field — `outbound_logistics.volume` — while reading this column and `priority_weight` on every run, so `consumed_by: null` here had nothing to contradict it. The requirement is declared now, at level `defaulted` because `Customer` carries a default, and the gate that fell out of it is the inverse of the one `contract:generate` already enforces: an IMPLEMENTED policy's declared data requirement may not be `consumed_by: null` in the sidecar. TRACED IN WP 6.2 (§4 D69). This is the column whose absence was silent in a second way: `P-C.2`'s `sla_tiers` guarantees a fill floor PER SEGMENT, and the mapper gave every customer the entity default `"default"`, so no tier could ever match and every floor was 0.0. The engine already warned (`unknown_sla_segment` in P-C.2's feasibility) — the warning named the symptom while nothing named the cause, because the segments it compared against were a constant.
 
 ### `priority_weight`
 
@@ -139,10 +144,10 @@ Relative allocation priority when demand exceeds supply. Dimensionless and relat
 | Added by | `20260916000003_adopt_customers_drop_product_code_map.sql` |
 | Read by the engine | `P-C.2 customer_allocation — Customer.priority_weight, the fallback ordering under the `priority` rule wherever the `priority_weights` param does not name the customer` |
 | When NULL, the engine uses | 1.0 (Customer.priority_weight's own default) — every customer equal, so the `priority` rule cannot order anything |
-| Validated at ingest | — |
+| Validated at ingest | optional; >= 0. ZERO IS ALLOWED AND MEANS SOMETHING: only the ratio between two customers matters, so 0 is the lowest priority there is — served last, and only out of what is left. `exclusive_min` would reject a value the engine reads correctly. Blank lands nothing and the DEFAULT 1.0 stands in, which makes the `priority` rule inert for that customer. |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
-> TRACED IN WP 6.2 (§4 D69), AND THE PREVIOUS NOTE'S REASON WAS FALSE. It read: "`scsim` has no customer-priority concept today … none of [the `P-C.x` policies] is implemented". `p_c2_customer_allocation` is `status: implemented` in the registry export and has always read `Customer.priority_weight`. What was true is the CONSEQUENCE — nothing reached it — but the cause was the mapper never loading this table, not an absent policy, and the stated reason sent the next reader to the blueprint instead of to `project_map.py`. The blank was still correct while it lasted: `from_project_data` built `Customer(id=c, name=c)` from the outbound arcs, so every customer arrived at 1.0 whatever this column held. The mapper now reads it.
+> TRACED IN WP 6.2 (§4 D69), AND THE PREVIOUS NOTE'S REASON WAS FALSE. It read: "`scsim` has no customer-priority concept today … none of [the `P-C.x` policies] is implemented". `p_c2_customer_allocation` is `status: implemented` in the registry export and has always read `Customer.priority_weight`. What was true is the CONSEQUENCE — nothing reached it — but the cause was the mapper never loading this table, not an absent policy, and the stated reason sent the next reader to the blueprint instead of to `project_map.py`. The blank was still correct while it lasted: `from_project_data` built `Customer(id=c, name=c)` from the outbound arcs, so every customer arrived at 1.0 whatever this column held. The mapper now reads it. AND IT IS DECLARED SINCE WP 6.2 (§4 D94). The mapper reading a column is the hop; the registry DECLARING it is what every tool deriving "what the engine reads" was missing — this sidecar, `project_map`'s requirement list and WP 6.1's resolution-chain door 1 were all blind to a field the engine consumes on every run.
 
 ### `sla_fill_floor_pct`
 
@@ -188,8 +193,37 @@ When the row was first inserted. Server-stamped.
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `ingest_run_id`
+
+The ingestion run that last wrote this row (WP 6.2, §4 D108), and through it the file, the uploader and who approved the promotion. NULL for every row that predates the CSV landing path — and on THIS table that is every row written before `20260919000001`, because until then nothing in the product wrote it at all: the only way a row got here was a hand at the database. A null means the provenance is unknown, never that there was none.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20260919000001_customers_land.sql` |
+| References | `public.ingest_runs(id)` ON DELETE SET NULL |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `source_row_id`
+
+The tier-1 staged row this was promoted from (WP 6.2). Its `source_row_number` is the physical line of the uploaded file, header = line 1, so a person can be shown the LINE rather than told a file name. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and a customer belongs to the project rather than to the run.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20260919000001_customers_land.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ---
 
-*Generated from data contract `f8416eccc038`, engine `0.2.3`,
+*Generated from data contract `8c56366d1bc3`, engine `0.2.3`,
 sidecar `supabase/contract/customers.contract.yaml`, table created by `20260916000003_adopt_customers_drop_product_code_map.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -97,7 +97,7 @@ END;
 $function$;
 
 COMMENT ON FUNCTION public.get_graph_nodes(uuid, uuid, text) IS
-  'WP 8.3 · §4 D119. The read path for `node_list.echelon` / `bom_depth` / '
+  'WP 8.3 · §4 D127. The read path for `node_list.echelon` / `bom_depth` / '
   '`supply_tier`. It exists because `get_node_list`''s fixed RETURNS TABLE could '
   'not carry them and `CREATE OR REPLACE` cannot change a return type — so a '
   'column that was authored, backfilled and constrained was invisible to every '

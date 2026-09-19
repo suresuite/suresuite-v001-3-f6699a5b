@@ -817,6 +817,9 @@ async function ingestNetworkEvidence(
       ...(title ? { doc_title: title } : {}),
     };
     const { data, error } = await ctx.supabase.rpc("record_external_evidence", {
+      // WP 6.4 · §4 D71. NULL when the agent turn carries no user, and that NULL
+      // is the honest answer rather than a fabricated actor (D28).
+      _actor_user_id: ctx.userId ?? null,
       p_project_id: ctx.projectId,
       p_source_id: entry.source_id,
       p_url_or_ref: url ?? title,

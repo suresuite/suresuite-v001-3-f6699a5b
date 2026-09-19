@@ -15,7 +15,7 @@
  *   WIDTH  flat 1.5 at 0.6 opacity on every edge, on both pages. `weighted` was
  *          loaded, stored on the edge, and never rendered.
  *   DEPTH  shaded on one page only, keyed on `supply_chain_data_multi_tier.level`,
- *          which two live writers disagree about (§4 D132) — so the ramp read a
+ *          which two live writers disagree about (§4 D140) — so the ramp read a
  *          4-deep BOM as flat on the project a user reported.
  */
 import type { Echelon, GraphEdge, GraphNode } from './types';
@@ -98,7 +98,7 @@ export function maxFlow(edges: ReadonlyArray<Pick<GraphEdge, 'flow'>>): number {
  *
  * `null` depth returns the base colour unmixed: an unknown depth must not read as
  * a particular depth, which is exactly what `COALESCE(level, 0)` does in SQL
- * (§4 D126).
+ * (§4 D134).
  */
 export function depthShade(baseColor: string, depth: number | null, maxDepth: number): string {
   if (depth === null || !Number.isFinite(depth) || maxDepth <= 0) return baseColor;
@@ -114,7 +114,7 @@ export function depthShade(baseColor: string, depth: number | null, maxDepth: nu
  *
  * Derived from the ECHELON, never from `supply_chain_data_multi_tier.level`. That
  * is the single change that fixes the map a user reported: the level column is a
- * literal 2 for every BOM row on that project (§4 D132), so a 4-deep BOM rendered
+ * literal 2 for every BOM row on that project (§4 D140), so a 4-deep BOM rendered
  * as one flat column of 260 materials and 66 products. The echelon is read from
  * `node_list` and the depth from `bom_multi_level`, and neither is affected.
  */

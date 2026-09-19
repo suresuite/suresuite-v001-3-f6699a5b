@@ -1,0 +1,4 @@
+customer_id,name,segment,priority_weight
+C0001,Northern Retail Group,strategic,3.0
+C0002,Midlands Distribution,standard,1.0
+C0003,Coastal Wholesale,,

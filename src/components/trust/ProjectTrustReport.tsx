@@ -7,14 +7,43 @@
  * inputs by `knownLimits()` — so it changes with the project rather than being a
  * fixed disclaimer.
  *
- * The assembly is a pure module (`src/lib/trust/trustReport.ts`) so WP 6.3 can
- * emit the same report as PDF/JSON through `report-render` without a second
- * implementation of it.
+ * The assembly is a pure module so WP 6.3 can emit the same report as PDF/JSON
+ * through `report-render` without a second implementation of it. **WP 6.3 did**:
+ * the module moved to `supabase/functions/_shared/trustReport.ts` — because the PDF
+ * has to be computed where the data is, not from numbers a browser asserted — and
+ * `trustReportSections.ts` turns it into the `{columns, rows}` tables both the
+ * document and this screen render. The JSON download below is the same object.
+ *
+ * **THE DOWNLOAD SAYS WHAT THIS COPY IS MISSING.** This screen builds the report
+ * with `graded: null` (the /policies surface has the gate's findings but not the
+ * manifest behind them), so its coverage section is empty and the JSON's
+ * `complete` flag is false. The `data-trust` report template grades the dataset
+ * server-side and carries that section. A download that did not admit the
+ * difference would be a partial report with a complete-looking filename.
  */
-import { AlertTriangle, FileWarning, Info } from "lucide-react";
+import { AlertTriangle, Download, FileWarning, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { TrustReport } from "@/lib/trust/trustReport";
+import { trustReportJson } from "../../../supabase/functions/_shared/trustReportSections";
+
+/**
+ * The JSON artifact, downloaded. A4's rule applied to A3: a figure that leaves the
+ * system carries what produced it, so the file holds the hash, the measurement
+ * time, every section and the report's own limits — restated at the top level so a
+ * reader who opens it sees them before the numbers.
+ */
+function downloadJson(report: TrustReport) {
+  const body = JSON.stringify(trustReportJson(report), null, 2);
+  const url = URL.createObjectURL(new Blob([body], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  // The SHORT hash in the filename, so two downloads of two dataset versions do
+  // not overwrite each other in a downloads folder.
+  a.download = `data-trust-${report.projectName.replace(/[^\w.-]+/g, "-")}-${report.graphHashShort || "nohash"}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const stateCls: Record<string, string> = {
   fresh: "text-emerald-700",
@@ -40,6 +69,21 @@ export function ProjectTrustReport({ report }: { report: TrustReport }) {
           <p className={report.blocking.length ? "font-medium text-destructive" : "font-medium"}>
             {report.headline}
           </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => downloadJson(report)}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-sm border border-[--zinc-border] px-2 py-1 text-xs hover:bg-[#fafafa] md:min-h-0"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download JSON
+            </button>
+            <span className="text-[11px] text-muted-foreground">
+              {report.coverage.length === 0
+                ? "This copy has no coverage section — ask for the “Data trust report” document to include it."
+                : "Includes every section and this report's own limits."}
+            </span>
+          </div>
           <p className="text-xs text-muted-foreground">
             Measured {new Date(report.measuredAt).toLocaleString()}. Freshness is
             computed at read time — producing this report wrote nothing.

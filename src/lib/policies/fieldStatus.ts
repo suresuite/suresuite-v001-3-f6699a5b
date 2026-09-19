@@ -41,8 +41,17 @@ const PENDING_FAMILY_POLICY: Partial<Record<PolicyFamily, string[]>> = {
  * — and nothing is planned. `inventory` and `sourcing` are not in the table
  * above, and WP 6.2 established what those fields actually are: `reorder_point`
  * is COMPUTED by both engines and never read, `review_period_days` and
- * `order_up_to` are read only by the frozen legacy engine, `material_price` is
- * read by nothing at all (§4 D18, D91). None of them is waiting for a policy.
+ * `order_up_to` are read only by the frozen legacy engine, and `material_price`
+ * was read by nothing at all (§4 D18, D91). None of them is waiting for a policy.
+ *
+ * `material_price` LEFT THAT LIST IN WP 6.2, and how it left is the useful part.
+ * It is not consumed and it never was — but the cell was SEEDED FROM
+ * `inbound_logistics.unit_price`, which the engine does read, so the number on
+ * screen was right and only the edit went nowhere. It is `readOnly` now, so it is
+ * not a stored-only field a user can type into; it is the engine's own number with
+ * the inbound file named as the place to change it. A field whose VALUE reaches the
+ * engine and whose EDIT does not is a third state neither `pending` nor
+ * `stored-only` describes, and read-only is how this grid says it.
  *
  * Returning `null` here is what makes the difference sayable: a field with a
  * milestone is `pending`, a field without one is `stored-only`, and the product

@@ -29,6 +29,7 @@ it rather than duplicating it.
 | Constraint | Kind | Definition |
 |---|---|---|
 | `tier2_suppliers_source_row_fk` | FOREIGN KEY | `FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED` |
+| `tier2_suppliers_project_fk` | FOREIGN KEY | `FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE` |
 
 ## Governance
 
@@ -304,6 +305,6 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `f8416eccc038`, engine `0.2.3`,
+*Generated from data contract `8c56366d1bc3`, engine `0.2.3`,
 sidecar `supabase/contract/tier2_suppliers.contract.yaml`, table created by `20250903080405_20fc5df9-f98e-4fa3-a7bd-98fc7a2e7d23.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

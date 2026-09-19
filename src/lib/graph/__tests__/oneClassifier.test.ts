@@ -1,6 +1,6 @@
 /**
  * EIGHT BECAME ONE, AND THIS IS WHAT STOPS ONE BECOMING NINE.
- * Phase 8 / WP 8.3 / §4 D119.
+ * Phase 8 / WP 8.3 / §4 D127.
  *
  * A node's type was authored eight times — once in SQL, four times across the
  * network pages, once in the map component, once in the engine — and the eight
@@ -66,7 +66,7 @@ describe('one classifier — the ratchet that stops eight becoming nine', () => 
         added,
         `${path} declares a node-type classifier that is not in this gate's baseline. ` +
           `A node's type is authored once, in \`node_list.echelon\` (WP 8.1) — read it, ` +
-          `do not infer it. §4 D119 is what eight of these cost: the same node resolves ` +
+          `do not infer it. §4 D127 is what eight of these cost: the same node resolves ` +
           `to four different types on four screens, and §15 measured 65 nodes on one ` +
           `project where it actually happens.`,
       ).toEqual([]);
@@ -108,7 +108,7 @@ describe('one classifier — the ratchet that stops eight becoming nine', () => 
     expect('const t = getNodeTypeFromLevel(3, "bom", "from");'.match(CLASSIFIER_DECL)).toBeNull();
   });
 
-  it('the baseline totals the eight D119 counts, minus the two that are not in src/', () => {
+  it('the baseline totals the eight D127 counts, minus the two that are not in src/', () => {
     // SQL's `classify_node_echelon` and the engine's master-table read are the other
     // two of the eight. Six are in `src/`, and this is the number that must fall.
     const total = Object.values(BASELINE).reduce((a, names) => a + names.length, 0);

@@ -19,14 +19,14 @@ grain: >-
   `supply_chain_data` AND `supply_chain_data_multi_tier` — by
   `refresh_node_list_for_project`. The multi-tier half is WP 8.1's widening:
   until then the derivation read the flat table only, so 104 deep-tier nodes
-  had no row here and therefore no type any page could read (D124). Like
+  had no row here and therefore no type any page could read (D132). Like
   `network_nodes` it is two things (D56): the derivation and the geocoder
   write some columns, the criticality prediction others. SCOPE LIMIT, stated
   because `supply_tier` makes it visible: this is the projection of the two
   EDGE tables, so a firm that appears only in `tier2_suppliers` /
   `tier3_suppliers` is not a node here and its tier is reachable only through
   `node_supply_tier`. Folding the deep-tier FIRM graph in is a different node
-  universe (`network_nodes.uid` against material ids is D129) and is owned by
+  universe (`network_nodes.uid` against material ids is D137) and is owned by
   no package yet.
 owner: analysis
 natural_key_unique:
@@ -190,7 +190,7 @@ fields:
       pages to `echelon` and a later package drops it. `subassembly` maps to
       `material` here: the OLD order answered `product` for such a node,
       which told the map to draw a thing the plant consumes on the
-      customer side (D119).
+      customer side (D127).
     grain: identifier
     engine:
       consumed_by: null
@@ -566,7 +566,7 @@ fields:
     meaning: >-
       THE node's role in the supply chain, authored once and read rather
       than re-inferred. CHECK-constrained to `customer`, `product`,
-      `subassembly`, `material`, `supplier`, `plant`, `unknown`. D119 is
+      `subassembly`, `material`, `supplier`, `plant`, `unknown`. D127 is
       what it replaces: eight independent classifiers, across SQL, four
       pages, the map component and the engine, each inferring a type at
       render time from a different signal because there is no type column
@@ -613,7 +613,7 @@ fields:
       is the finished product, depth 0. It is NOT read from the lane's own
       `level` column, because two live writers disagree about what that
       column means and one of them discards this very value for a literal 2
-      (D132).
+      (D140).
     grain: level
     engine:
       consumed_by: null
@@ -641,7 +641,7 @@ fields:
       supplier, 2 and 3 from `tier2_suppliers` / `tier3_suppliers`. NULL
       when unknown, which includes every material, product and customer —
       they are not upstream suppliers, and reporting 0 for them would be
-      D126's substitution wearing a different column name. This is what
+      D134's substitution wearing a different column name. This is what
       `supply_chain_data_multi_tier.level`'s contract CLAIMED to be, and
       keeping it apart from `bom_depth` is the whole point: a BOM three
       levels deep does not mean three tiers of suppliers, and a tier-2

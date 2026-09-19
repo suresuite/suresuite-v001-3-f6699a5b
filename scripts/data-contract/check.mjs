@@ -16,13 +16,23 @@
 //   R6  every file:line in PLAN.md §4 resolves and is in bounds
 //   R7  §16 is append-only — no drift-log entry may vanish from history, AND
 //       every work package marked done in §7–§13 has a §16 entry
-//   R8  no open defect, unmet invariant or table deferral is owned by a FINISHED package,
+//   R8  no open defect, unmet invariant, table deferral or undeployed edge function is
+//       owned by a FINISHED package,
 //       a FINISHED PHASE, or a package the plan does not contain (WP 3.4)
 //   R9  `governance.audited` matches the audit triggers the migrations create
 //   R10 §17's sequencing table agrees with §7–§13's ✅ markers (WP 3.3)
 //   R11 every DEFERRED table says whether it is audited, and is right (D54, WP 4.2)
-//   R13 §4's defect ids are UNIQUE, and §16 has exactly one Sequencing section
-//       (WP 8.0 — both were broken by a MERGE, not by an edit)
+//   R12 every §5.1 lineage row resolves to a real page and a real read, and every
+//       page in src/pages is accounted for (WP 5.2e)
+//   R13 an IMPLEMENTED policy's declared data requirement is described by the
+//       contract AND reaches a display surface (D94, D112, WP 6.2)
+//   R14 no dynamic RLS statement resolves to zero known tables (D51, WP 6.2)
+//   R15 a sidecar's prose may not deny a reader its own `surfaces` block confirms
+//       (D58, D101's shape inside one file, WP 6.2)
+//   R16 every §4 D-number is unique, and §4 has no duplicated row (D122's merge, WP 6.3)
+//   R17 every edge function is DEPLOYED or deferred with a named owner (D123, WP 6.3)
+//   R18 a `computed_by` names a writer that is CALLED, or declares why not (D118, WP 6.2)
+//   R19 §4, §16 and §17 each have exactly ONE heading (D146's merge, WP 8.0)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -49,6 +59,7 @@ const ROOT = join(HERE, "..", "..");
 const INTROSPECTED = join(ROOT, "build", "schema.introspected.json");
 const COVERAGE = join(HERE, "coverage.yaml");
 const PLAN = join(ROOT, "docs", "PLAN.md");
+const GENERATED = join(ROOT, "build", "data-contract.generated.json");
 
 const PLAN_SECTIONS = /\n## (7|8|9|10|11|12|13)\. /;
 
@@ -375,10 +386,63 @@ for (let i = secStart; i >= 0 && i < secEnd; i++) {
 // ignore it. CI checks out with full history for exactly this reason.
 
 const PLAN_PATH = "docs/PLAN.md";
+
+// §16 IS NOT CONTIGUOUS, AND THIS FUNCTION USED TO BELIEVE IT WAS — D124.
+//
+// The first version sliced from `## 16.` to `## 17.`, which is correct only while
+// every drift-log entry is written before §17. Entries have been appended PAST it
+// for months: **37 of 69 were visible and 32 were not**, among them every entry of
+// this session. So R7's append-only half was protecting 37 entries, and R7's second
+// half — "a package marked done has a §16 entry" — was answering about 37 while
+// §7–§13 marks 23 packages done. A gate cannot notice an entry it cannot see, so
+// this was two rules quietly scoped to the older half of the log.
+//
+// **The fix is ordering-INDEPENDENT on purpose.** Physically moving §17 to the end
+// of the file also works — a parallel branch did exactly that — but it is six
+// thousand lines of diff and it holds only until the next author appends past
+// whatever is last. This reads §16 as everything from its own heading onward MINUS
+// every later top-level section, and a later section runs from its `## N.` heading
+// to whichever comes first: the next `## ` heading, the next `### ` heading (a
+// drift entry appended past it — §17 has no sub-headings of its own), or EOF.
+// Verified against BOTH document shapes: 69 entries with §17 in the middle, 69 with
+// §17 moved to the end, and §17's own table excluded either way.
+//
+// ── AND A PHASE SECTION IS EXCLUDED WHOLE, WHICH THE `###` RULE ALONE CANNOT DO
+//    (WP 8.0, §4 D146's merge).
+//
+// The rule above stops a later section at its first `### ` heading, on the stated
+// assumption that such a section "has no sub-headings of its own" — true of §17,
+// whose body is one table. It is NOT true of a PHASE section: §7–§13 and §18 each
+// carry a `### WP N.M — …` heading per package, and those are ROADMAP headings, not
+// drift-log entries. With §18 at the end of the document the older rule read its six
+// package headings as six §16 entries, and R7's append-only half then reported a
+// LOSS every time one of their titles was edited — a gate crying wolf about the one
+// section it should never have been looking at.
+//
+// So a later section runs to the next `## ` heading when it is a phase section, and
+// to the next `## ` OR `### ` otherwise. Both halves keep their reason: an entry
+// appended past §17 is still recovered, and a phase's packages are never entries.
+//
+// Rejected: filtering entry headings on the `·` that carries their date. It is a
+// real discriminator for 82 of the 90 headings in scope and it drops
+// `### PHASE 3 → 4 HANDOFF`, a genuine entry with no date — so it would trade a
+// false positive for a silent false negative on exactly the kind of entry that
+// matters most.
 const section16 = (text) => {
   const a = text.indexOf("\n## 16.");
-  const b = text.indexOf("\n## 17.");
-  return a < 0 ? "" : text.slice(a, b < 0 ? undefined : b);
+  if (a < 0) return "";
+  let rest = text.slice(a);
+  for (;;) {
+    const m = /\n## \d+\./.exec(rest.slice(1));
+    if (!m) break;
+    const start = m.index + 1;
+    const after = rest.slice(start + 1);
+    const heading = /^[^\n]*/.exec(after)[0];
+    const isPhase = /^## \d+\.\s+Phase\b/.test(heading);
+    const end = isPhase ? /\n(?=## )/.exec(after) : /\n(?=## |### )/.exec(after);
+    rest = rest.slice(0, start) + (end ? after.slice(end.index) : "");
+  }
+  return rest;
 };
 /** The stable identity of an entry: its name, without the trailing date/commit. */
 const entryKey = (heading) =>
@@ -485,7 +549,10 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
                  "A package without a §16 entry is not finished — write the entry, or drop the ✅.");
     }
   } else {
-    console.log(`  R7  every done package has a §16 entry · ${donePackages.length} checked`);
+    console.log(
+      `  R7  every done package has a §16 entry · ${donePackages.length} checked · ` +
+      `${entryHeadings(readFileSync(PLAN, "utf8")).length} §16 entries in scope (D124)`,
+    );
   }
 }
 
@@ -633,6 +700,30 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
       fail("R8", `coverage.yaml defers "${table}" to WP ${wp}, which §7–§13 marks ✅ done. ` +
                  "Write the sidecar, or move the deferral to a package that has not run. " +
                  "A table waiting on a finished package is a table nobody has decided about.");
+    }
+  }
+
+  // AND THE SAME RULE FOR AN UNDEPLOYED FUNCTION — WP 6.3, and the gap was mine.
+  //
+  // R17 gave `functions_not_deployed` the shape `table-covered` has: a function is
+  // deployed or deferred to a named package. It did NOT give it R8's half, so a
+  // function could be deferred to a package that had already shipped — a function
+  // nobody has decided about, which is the same defect one row down, and this
+  // package created the register that made it possible. `ingest-file` was deferred
+  // to WP 6.3 by WP 6.3, which is precisely the state R8 exists to refuse; WP 6.5
+  // was written so the deferral has an owner that has not run.
+  for (const row of coverage.functions_not_deployed ?? []) {
+    const wp = String(row.wp ?? "");
+    if (donePackages.has(wp)) {
+      orphaned += 1;
+      fail("R8", `coverage.yaml defers the edge function "${row.fn}" to WP ${wp}, which §7–§13 ` +
+                 "marks ✅ done. Deploy it, or move the deferral to a package that has not run — " +
+                 "an undeployed function waiting on a finished package is code nobody has decided " +
+                 "about, and its absence from production is invisible (§4 D123).");
+    } else if (wp && !knownPackages.has(wp)) {
+      orphaned += 1;
+      fail("R8", `coverage.yaml defers the edge function "${row.fn}" to WP ${wp}, which the plan ` +
+                 "does not contain. Name a package that exists, or write one.");
     }
   }
 
@@ -843,73 +934,586 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
       }
     }
 
+    // 3 — §17's PROSE, which nothing checked. WP 6.2.
+    //
+    // Rules 1 and 2 ask whether §17's ✅ claims are supported by §7–§13. Neither asks
+    // whether its SENTENCES are: the phase-5 row says "PHASE COMPLETE" while
+    // `### WP 5.2 — The manual (§6.3)` carries no ✅ on its own heading, its ten
+    // sub-packages carrying it instead. That single omission makes two rules dormant
+    // for that package at once — R7 stops demanding a closing §16 entry for it, and R8
+    // stops seeing what is deferred there (17 tables, plus §4 D102 and D104).
+    //
+    // A WARNING and not a failure, deliberately. The fix is either a ✅ plus a closing
+    // entry or a correction to §17, and both belong to that package rather than to
+    // whoever next runs `contract:check`. A gate that fails the build over somebody
+    // else's bookkeeping gets relaxed; a line printed on every run does not go away.
+    // The first cell may carry its own ✅ (`| 5 ✅ |`), which the first draft's regex
+    // refused — and Phase 5 is the one case this check exists for.
+    for (const m of seq.matchAll(/^\|\s*(\d+)\s*[✅\s]*\|[^\n]*?PHASE COMPLETE/gim)) {
+      const ph = m[1];
+      const unmarked = roadmap
+        .split("\n")
+        .filter((l) => new RegExp(`^### WP\\s+${ph}\\.[0-9]+[a-z]?\\s`).test(l) && !l.includes("✅"))
+        .map((l) => l.match(/^### WP\s+([0-9]+\.[0-9]+[a-z]?)/)?.[1])
+        .filter(Boolean);
+      if (unmarked.length === 0) continue;
+      const waiting = [...deferred.entries()].filter(([, wp]) => unmarked.includes(String(wp))).length;
+      // ONLY when the omission is hiding something. Several phases mark their ✅ in
+      // §17's range cell rather than on each heading, and a warning that fired for
+      // every one of them would be noise about a formatting habit. It fires when
+      // tables are waiting on an unmarked package, which is the case it is for.
+      if (waiting === 0) continue;
+      warn("R10",
+        `§17 says Phase ${ph} is COMPLETE and §7–§13 leaves ${unmarked.join(", ")} unmarked. That ` +
+        "makes R7 stop asking for a closing §16 entry and R8 stop seeing what is deferred there — " +
+        `${waiting} table(s) today. Mark it with its entry, or correct §17.`);
+    }
+
     if (!failures.some((f) => f.startsWith("R10"))) {
       console.log(`  R10 §17 agrees with §7–§13 · ${done.size} done package(s) cross-checked`);
     }
   }
 }
 
-// ───────── R13: A DEFECT ID IS A NAME, AND TWO DEFECTS CANNOT SHARE ONE
+// ───────── R19: A SECTION SLICE KEYS ON THE FIRST HEADING, SO THERE IS ONE
 //
-// THE FAILURE THIS CATCHES CANNOT BE MADE BY AN EDIT, WHICH IS WHY NOTHING SAW IT.
-// Two branches each opened the next free §4 id in good faith — one shipped D112–D118
-// for the documentation defects it found, the other D112–D118 for the graph layer's
-// — and `git merge` produced a §4 with SEVEN duplicated ids and no conflict marker,
-// because the two sets of rows never touched the same lines.
+// FOUND BY THE SAME MERGE R16 WAS, AND IT IS THE HALF R16 DOES NOT COVER (§4 D146).
 //
-// A duplicated id is worse than a missing one. Every rule in this repository that
-// resolves a defect — R6's citations, R8's owners, CLAUDE.md's invariant table, the
-// generated manual, and every `§4 D112` in a migration header — silently picks
-// whichever row it finds first. That is D104's class (a citation that became
-// ambiguous when a page was renamed) arriving through a merge instead of a rename,
-// and it makes every reference to the colliding number a coin toss.
+// One branch had moved `## 17. Sequencing` to the end of the document so that §16
+// would run to it; the other had edited §17 in place. Both were right on their own,
+// the lines never collided, and the merge produced a PLAN.md with TWO
+// `## 17. Sequencing` headings.
 //
-// The second half is the same story in the same commit: the merge produced TWO
-// `## 17. Sequencing` headings, because one branch had moved the section to the end
-// and the other had edited it in place. `section16()` slices from `## 16.` to the
-// FIRST `## 17.`, so twenty-two drift-log entries fell outside §16 again — D142
-// exactly, reintroduced by a merge after being closed by an edit.
+// `section16()` slices from `## 16.` to the FIRST `## 17.`, and §4's own slice does
+// the same between `## 4.` and `## 4.1`. So twenty-two drift-log entries fell
+// outside §16 — which is D139 reopened four commits after it was closed, by a merge
+// rather than by an edit. R7's append-only half could not see them, and R7's second
+// half would have accepted a done package whose entry landed out there.
+//
+// R16 makes a defect's identity unique. This makes a SECTION's identity unique, for
+// the same reason: everything that reads this document reads it by slicing on a
+// heading, and a slice that keys on the first of two is a slice that silently drops
+// everything after the second.
 {
   const planText = readFileSync(PLAN, "utf8");
-
-  const s4start = planText.indexOf("\n## 4. ");
-  const s4end = planText.indexOf("\n### 4.1 ");
-  const section4 = s4start < 0 ? "" : planText.slice(s4start, s4end < 0 ? undefined : s4end);
-
-  const seen = new Map();   // id -> how many rows carry it
-  for (const line of section4.split("\n")) {
-    const m = line.match(/^\|\s*\*{0,2}(D[0-9]+)\*{0,2}\s*\|/);
-    if (!m) continue;
-    seen.set(m[1], (seen.get(m[1]) ?? 0) + 1);
-  }
-  const dupes = [...seen.entries()].filter(([, n]) => n > 1).map(([id]) => id);
-  if (dupes.length) {
-    fail("R13", `§4 gives ${dupes.length} id(s) to more than one defect: ${dupes.join(", ")}. ` +
-                "Two branches opened the same next-free number and the merge produced no conflict, " +
-                "because the rows never touched the same lines. Every rule that resolves a defect " +
-                "silently picks the first match — renumber one set, contiguously, above the other.");
-  }
-
-  // Headings that must appear EXACTLY ONCE, because a slice keyed on the first
-  // occurrence is a slice that quietly loses everything after the second.
   const singletons = ["## 4. ", "## 16. ", "## 17. Sequencing"];
+  let duplicated = 0;
   for (const heading of singletons) {
-    const count = planText.split("\n").filter((l) => l.startsWith(heading.trim())).length;
+    const count = planText.split("\n").filter((l) => l.startsWith(heading.trimEnd())).length;
     if (count !== 1) {
-      fail("R13", `PLAN.md has ${count} "${heading.trim()}" heading(s) and must have exactly 1. ` +
+      duplicated += 1;
+      fail("R19", `PLAN.md has ${count} "${heading.trimEnd()}" heading(s) and must have exactly 1. ` +
                   "`section16()` and §4's own slice key on the FIRST occurrence, so a duplicate " +
-                  "silently drops everything between the second one and the end of the section.");
+                  "silently drops everything between the second one and the end of the section — " +
+                  "which is how a merge reopened §4 D139 (see §4 D146).");
     }
   }
-
-  if (!failures.some((f) => f.startsWith("R13"))) {
-    console.log(`  R13 §4 ids are unique · ${seen.size} defect(s), no id shared, no duplicated section heading`);
-  }
+  if (!duplicated)
+    console.log(`  R19 §4, §16 and §17 each have exactly one heading · ${singletons.length} checked`);
 }
 
 // ──────────────────────────────────────────────────────────────────── report
 
 const covered = [...sidecars.keys()].length;
+// ───────── R17: AN EDGE FUNCTION IS DEPLOYED, OR DEFERRED WITH A REASON
+//
+// §4 D123: TWELVE OF EIGHTEEN edge functions were absent from
+// `.github/workflows/supabase-functions.yml`. Their code shipped to `main`, CI went
+// green, and they never reached production — and the workflow's history showed
+// SUCCESS on the very commits that shipped them, because `supabase/functions/_shared/**`
+// IS a path trigger: a change there fires the workflow, it deploys the functions it
+// names, and reports success. An edge function bundles its imports at publish time,
+// so the unnamed ones kept running the `_shared/` of whenever they were last pushed
+// by hand. **Every signal said it had landed.**
+//
+// WP 4.3's dual-write is the headline case: shipped, green, recorded as done, and
+// absent from production for two packages. `ingest-file` is the worse one — WP 3.2's
+// entire deliverable, which §2.1's `ingestion-contract` (I7) row described as "a live
+// second source" on the strength of `rehearsal/070`. That rehearsal proves the
+// DATABASE path and says nothing about whether the function reaching it is published.
+//
+// Slice 15 named this gate and did not write it: "the same shape as `table-covered`,
+// where a table is either described or deferred to a named package — and it would
+// have caught this on the day WP 4.3 merged." This is it. A function is deployed or
+// it is in `coverage.yaml`'s `functions_not_deployed` with an owner and a reason.
+// There is no third option, which is what R1 took away from tables.
+{
+  const fnDir = join(ROOT, "supabase", "functions");
+  const wfPath = join(ROOT, ".github", "workflows", "supabase-functions.yml");
+  if (!existsSync(fnDir) || !existsSync(wfPath)) {
+    fail("R17", "supabase/functions or the deploy workflow is missing — cannot check deployment coverage");
+  } else {
+    const wf = readFileSync(wfPath, "utf8");
+    const deployed = new Set(
+      [...wf.matchAll(/functions deploy ([a-z0-9-]+)/g)].map((m) => m[1]),
+    );
+    // The PATH TRIGGER matters as much as the deploy step: a function deployed by a
+    // step whose path is not watched only redeploys when something else changes it.
+    // That is how `_shared/**` made the history read as success.
+    const watched = new Set(
+      [...wf.matchAll(/supabase\/functions\/([a-z0-9-]+)\/\*\*/g)].map((m) => m[1]),
+    );
+    const present = readdirSync(fnDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && !d.name.startsWith("_"))
+      .map((d) => d.name)
+      .sort();
+
+    const deferredFns = new Map();
+    for (const row of coverage.functions_not_deployed ?? []) {
+      if (!row.fn || !row.wp || !row.why) {
+        fail("R17", `a functions_not_deployed row is missing fn, wp or why: ${JSON.stringify(row)}`);
+        continue;
+      }
+      deferredFns.set(row.fn, row);
+    }
+
+    for (const fn of present) {
+      if (deployed.has(fn)) {
+        if (!watched.has(fn)) {
+          fail("R17",
+            `${fn} has a deploy step and NO path trigger — it redeploys only when some ` +
+            "other watched path changes. That is how `_shared/**` made this workflow's " +
+            "history read as success while the functions it did not name went stale (D123). " +
+            `Add 'supabase/functions/${fn}/**' to the push paths.`);
+        }
+        if (deferredFns.has(fn)) {
+          fail("R17",
+            `${fn} is deployed AND listed in functions_not_deployed — pick one. A stale ` +
+            "deferral records work that is already done, which is the defect R8 exists for.");
+        }
+        continue;
+      }
+      const row = deferredFns.get(fn);
+      if (!row) {
+        fail("R17",
+          `${fn} exists in supabase/functions/ and the deploy workflow never publishes it, ` +
+          "so its code reaches `main` and never production — and CI goes green either way " +
+          "(§4 D123). Add a deploy step AND a path trigger, or defer it in " +
+          "coverage.yaml's `functions_not_deployed` with the package that will and why.");
+      }
+    }
+    for (const fn of deferredFns.keys()) {
+      if (!present.includes(fn)) {
+        fail("R17", `functions_not_deployed names "${fn}", which is not a function in the repo`);
+      }
+    }
+    console.log(
+      `  R17 edge functions reach production · ${present.length} in the repo · ` +
+      `${present.filter((f) => deployed.has(f)).length} deployed · ` +
+      `${deferredFns.size} deferred with a named package (D123)`,
+    );
+  }
+}
+
+// ───────── R18: A DECLARED WRITER HAS TO BE A WRITER SOMEBODY CALLS
+//
+// §4 D118: `network_summary` declared `computed_by: combine-project` on five columns
+// and that function never touches the table. Its whole write surface is
+// `etl_replace_supply_chain` and `refresh_node_list_for_project`. The only statement
+// that can insert a row is `bulk_insert_network_summary`, and NO CALL SITE EXISTS —
+// not in `src/`, not in `supabase/functions/`. So a project created today has an
+// empty `network_summary` and it stays empty, while the generated reference page
+// marked every value column "written by combine-project".
+//
+// **THE SHAPE WAS RIGHT AND THE CONTENT WAS WRONG, WHICH IS THE ONE KIND OF WRONG A
+// GENERATOR CANNOT CATCH.** `computed_by` is load-bearing since D101 —
+// `graphHashCoverage.test.ts` derives the computed-column set from it instead of a
+// literal Set — so every gate downstream believed it. It was also the only one of the
+// five tables declaring `computed_by` that was wrong, which is how long a single
+// wrong value survives when nothing compares it to the tree.
+//
+// TWO THINGS THIS RULE LEARNED FROM ITS OWN FIRST RUN, both worth keeping:
+//
+//   * **A declared writer is resolved against the writers that EXIST** — the edge
+//     function directories and the SQL functions the artifact knows — rather than
+//     pattern-matched out of the text. One sidecar's value is
+//     `"calculate-node-prominence (and calculate-network-science-metrics)"`, prose
+//     naming two real functions, and a rule that treated the whole string as one
+//     identifier called both of them missing.
+//   * **A function's own DEFINITION is not a call site.** `bulk_insert_network_summary`
+//     appears in `20250905160724` because that migration creates it, and the first
+//     draft read that as "something refers to it" — which would have passed the exact
+//     value D118 is about. `CREATE`/`DROP`/`ALTER`/`COMMENT ON`/`GRANT`/`REVOKE` lines
+//     are excluded, so what is left is somebody using it.
+//
+// An unreachable writer is ALLOWED — `bulk_insert_network_summary` is one, and naming
+// it is more honest than naming a live function that does not write the table — but it
+// has to be DECLARED, with `computed_by_unreachable` and a reason the reference page
+// prints. A stale exemption fails too: telling a reader a live writer is dead is its
+// own defect.
+//
+// **WHAT THIS RULE DOES NOT CHECK, AND IT IS THE HALF D118 ACTUALLY WAS.** It answers
+// "does this writer exist, and does anything call it" — not "does it write THIS
+// table". Naming `combine-project` on a `network_summary` column would still pass on
+// its own terms, because that function exists and is called; what catches it now is
+// the STALE EXEMPTION (the note says the writer is dead, the writer is live), and that
+// is a second-order catch rather than the thing itself. Checking the write surface
+// means parsing every branch of a 1 000-line edge function for the tables it touches,
+// which is a static analysis this repository does not have and should not fake. Named,
+// not taken — and the reason it is tolerable is that a wrong-but-live writer is now
+// visible in the reference page as a declared claim a reader can check, where before
+// it was invisible.
+{
+  const walk = (dir, out = []) => {
+    if (!existsSync(dir)) return out;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) {
+        if (e.name === "node_modules" || e.name === "__tests__") continue;
+        walk(full, out);
+      } else if (/\.(ts|tsx|sql|py)$/.test(e.name)) out.push(full);
+    }
+    return out;
+  };
+
+  // WHICH WRITERS EXIST. Edge functions are directories; SQL functions come from the
+  // introspected artifact, which is the schema's own account of itself.
+  const edgeFns = existsSync(join(ROOT, "supabase", "functions"))
+    ? readdirSync(join(ROOT, "supabase", "functions"), { withFileTypes: true })
+        .filter((d) => d.isDirectory() && !d.name.startsWith("_"))
+        .map((d) => d.name)
+    : [];
+  const sqlFns = (schema.functions ?? []).map((f) => f.name).filter(Boolean);
+  const knownWriters = [...new Set([...edgeFns, ...sqlFns])].sort((a, b) => b.length - a.length);
+
+  // The tree a CALLER lives in. Deliberately NOT the sidecars or the generated
+  // artifacts: a name that appears only in the contract and in the file the contract
+  // generated is a name nothing calls, which is the whole subject.
+  const callerFiles = [
+    ...walk(join(ROOT, "src")),
+    ...walk(join(ROOT, "supabase", "functions")),
+    ...walk(join(ROOT, "supabase", "migrations")),
+    ...walk(join(ROOT, "sim-worker")),
+    ...walk(join(ROOT, "scsim")),
+  ].filter((f) => !/\.generated\.|generated[/\\]/.test(f));
+  const callerLines = callerFiles
+    .flatMap((f) => readFileSync(f, "utf8").split("\n"))
+    // A definition, a grant or a COMMENT is not a call — and the comment half is not
+    // hypothetical: `20250905160724`'s first line is
+    // `-- Fix the bulk_insert_network_summary function …`, so prose about a dead
+    // function would have counted as somebody calling it, which is the exact value
+    // §4 D118 is about passing its own gate.
+    .filter((l) => !/\b(CREATE|DROP|ALTER|COMMENT\s+ON|GRANT|REVOKE)\b/i.test(l))
+    .filter((l) => !/^\s*(--|\/\/|\*|#)/.test(l));
+  const calledSomewhere = (name) => {
+    const re = new RegExp(`\\b${name.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`);
+    return callerLines.some((l) => re.test(l));
+  };
+
+  let declared = 0;
+  let exempt = 0;
+  let unresolved = 0;
+  // `sidecars` maps a table name to its PATH, not to parsed YAML — the same trap R9's
+  // first version fell into, which "found every table undeclared, which happens to be
+  // the answer it expected." This rule's first version reported 0 declarations for the
+  // same reason, and 0 of 0 passes.
+  for (const [table, path] of sidecars) {
+    const sc = load(readFileSync(join(ROOT, path), "utf8"));
+    for (const [field, spec] of Object.entries(sc.fields ?? {})) {
+      const value = spec?.computed_by;
+      if (!value) continue;
+      declared += 1;
+      const note = spec?.computed_by_unreachable;
+      const named = knownWriters.filter((w) => value.includes(w));
+      if (named.length === 0) {
+        unresolved += 1;
+        fail("R18",
+          `${table}.${field} declares \`computed_by: ${value}\`, which names no function this ` +
+          "repository contains — not an edge function directory and not a SQL function in the " +
+          "introspected schema. A declared producer that does not exist is a fact with the right " +
+          "shape and no content (§4 D118).");
+        continue;
+      }
+      const dead = named.filter((w) => !calledSomewhere(w));
+      if (dead.length === 0) {
+        if (note) {
+          fail("R18",
+            `${table}.${field} declares \`computed_by_unreachable\` and every writer it names ` +
+            `(${named.join(", ")}) IS called somewhere. A stale exemption is worse than none: it ` +
+            "tells a reader the writer is dead when it is live. Remove the note.");
+        }
+        continue;
+      }
+      if (!note) {
+        fail("R18",
+          `${table}.${field} declares \`computed_by: ${value}\` and ${dead.join(", ")} is called ` +
+          "NOWHERE a caller could live — not in src/, supabase/functions/, supabase/migrations/, " +
+          "sim-worker/ or scsim/, counting a definition or a grant as not a call. So nothing runs " +
+          "it and the column is permanently empty. Name the real writer, or declare " +
+          "`computed_by_unreachable` with the reason (§4 D118).");
+        continue;
+      }
+      exempt += 1;
+    }
+  }
+  if (!unresolved)
+    console.log(
+      `  R18 every declared writer is reachable or says why not · ${declared} \`computed_by\` ` +
+      `declaration(s) over ${knownWriters.length} known writer(s) · ${exempt} declared unreachable (D118)`,
+    );
+}
+
+// ───────── R16: A D-NUMBER IS AN IDENTITY, SO IT HAS TO BE UNIQUE
+//
+// FOUND BY A MERGE, WHICH IS THE ONLY WAY IT COULD BE FOUND (WP 6.3).
+//
+// Two branches each took "the next free D-number" from the same §4 and each was
+// right on its own. The merge produced §4 with TWO D112 rows describing different
+// defects, TWO D113, TWO D114 — and, worse, duplicated four EXISTING rows (D87-D90)
+// because the table's lines merged cleanly line by line while meaning nothing as a
+// table.
+//
+// NOTHING NOTICED. Every rule that walks §4 iterates rows: R6 resolved both
+// citations, R8 read both owners, and `trustReportLimits.test.ts` built a Map keyed
+// by D-number and silently kept whichever came last — so a closed defect and an
+// open one shared a key and the open one won. A D-number is the identity CLAUDE.md
+// makes every other document cite by ("cite §4 by D-number"), and an identity that
+// can be duplicated is not one.
+//
+// The rule is the cheapest possible and it would have gone red on the merge commit.
+{
+  const plan4 = readFileSync(PLAN, "utf8");
+  const s4start = plan4.indexOf("\n## 4. ");
+  const s4end = plan4.indexOf("\n### 4.1 ");
+  const section4 = s4start < 0 ? "" : plan4.slice(s4start, s4end < 0 ? undefined : s4end);
+  const seen = new Map();
+  for (const line of section4.split("\n")) {
+    const m = /^\|\s*\*{0,2}(D[0-9]+)\*{0,2}\s*\|/.exec(line);
+    if (!m) continue;
+    const id = m[1];
+    if (seen.has(id)) {
+      fail("R16",
+        `§4 has more than one ${id} row. A D-number is the identity every other ` +
+        "document cites by, so a duplicate is two defects with one name — and every " +
+        "rule that walks §4 silently keeps whichever it saw last. Renumber the newer " +
+        "row (§4's highest number + 1) and update its references, or delete the " +
+        "duplicate if a merge produced it.\n" +
+        `      first:  ${seen.get(id).slice(0, 120)}\n` +
+        `      second: ${line.slice(0, 120)}`);
+      continue;
+    }
+    seen.set(id, line);
+  }
+  // A number may be SKIPPED — a row can be deleted — but the count is printed so a
+  // gap is visible rather than discovered by the next author picking a used number.
+  const nums = [...seen.keys()].map((d) => Number(d.slice(1))).sort((a, b) => a - b);
+  const highest = nums.length ? nums[nums.length - 1] : 0;
+  const gaps = [];
+  for (let i = 1; i <= highest; i++) if (!nums.includes(i)) gaps.push(`D${i}`);
+  console.log(
+    `  R16 §4 D-numbers are unique · ${seen.size} row(s) · highest D${highest}` +
+    (gaps.length ? ` · ${gaps.length} unused (${gaps.slice(0, 8).join(", ")}${gaps.length > 8 ? ", …" : ""})` : " · none unused") +
+    ` · next free is D${highest + 1}`,
+  );
+}
+
+// ───────── R15: A SIDECAR MAY NOT CONTRADICT ITSELF ABOUT ITS OWN READERS
+//
+// §4 D58, and it is §4 D101's shape one scope tighter — not two files disagreeing,
+// ONE FILE disagreeing with itself.
+//
+// `multi_tier_supply_chain.contract.yaml` carried a `surfaces` entry naming
+// `DataManager.tsx` via `rpc delete_project_dataset` with `confirmed: true`, and
+// twenty lines later a prose note reading "no RPC writes it … no application code
+// in `src/` or `supabase/functions/` mentions it". Both were authored by hand, both
+// describe what reaches the table, and nothing compared them. **The generated page
+// renders the PROSE**, so the manual told users nothing touches a table that the
+// project manager's "Delete ALL data" button empties.
+//
+// The rule is narrow on purpose. It does not try to read prose in general — it looks
+// for the specific CLAIM OF ABSENCE that `surfaces` can refute, in a table that has
+// `surfaces` entries. A sidecar is free to say a table has no UPLOAD, no WRITER, or
+// no engine consumer; it may not say nothing REACHES it while its own lineage block
+// names something that does.
+{
+  const contract = JSON.parse(readFileSync(GENERATED, "utf8"));
+  // Phrases that deny any application path at all. Each is a sentence a reader
+  // would take as "no code touches this", which `surfaces` is the authority on.
+  const DENIES_ALL_ACCESS = [
+    /no\s+application\s+code[^.]{0,80}mentions\s+it/i,
+    /nothing\s+(?:reads|touches|reaches)\s+it\b/i,
+    /no\s+reader\s+and\s+no\s+writer/i,
+  ];
+  let checked = 0;
+  let cleared = 0;
+  for (const t of Object.values(contract.tables)) {
+    const surfaces = t.surfaces ?? [];
+    const confirmed = surfaces.filter((x) => x.confirmed && x.via);
+    if (confirmed.length === 0) continue;
+    checked++;
+    const note = String(t.note ?? "");
+    if (!note) continue;
+    const denial = DENIES_ALL_ACCESS.find((re) => re.test(note));
+    if (!denial) { cleared++; continue; }
+    // The denial stands ONLY if the note also accounts for the surface — naming
+    // the path, or the rule, somewhere in its own text. That is the correction
+    // D58 took: keep the claim, and say what the exception is.
+    const accounted = confirmed.every((x) => {
+      const rpc = /rpc\s+([a-z_][a-z0-9_]*)/i.exec(String(x.via))?.[1];
+      return rpc ? note.includes(rpc) : note.includes(String(x.via));
+    });
+    if (accounted) { cleared++; continue; }
+    fail("R15",
+      `${t.table}'s note claims nothing in the application reaches it, and its own ` +
+      `\`surfaces\` block confirms ${confirmed.length}: ` +
+      `${confirmed.map((x) => `${x.page} via ${x.via}`).join("; ")}. ` +
+      "One file, two statements of one fact, and the generated page renders the " +
+      "prose — so the contradiction is published to users (D58, D101's shape). " +
+      "Name the path in the note, or stop claiming the absence.");
+  }
+  console.log(
+    `  R15 no sidecar denies a reader it confirms · ${checked} table(s) with a confirmed surface · ` +
+    `${cleared} whose note is consistent with it (D58)`,
+  );
+}
+
+// ───────── R14: A DYNAMIC RLS STATEMENT MUST NAME SOMETHING
+//
+// §4 D51 — the introspector cannot EVALUATE `EXECUTE format(…)`, and it does not
+// try. What it does is mark every table such a statement touches as
+// `determinate: false`, which the generated page renders as "the migrations do
+// not say" rather than as "off". That flag keys on the names it can see, and when
+// the target arrives through a `%1$s` placeholder there are none — so the three
+// `erp_staged_*` tables were recorded as determinately policy-less, and their
+// pages said so, for the whole of Phase 2. A published falsehood, CI-gated, in
+// the D40 shape pointing the other way.
+//
+// WP 6.2 widened the name scan to the enclosing DO block, where a loop variable
+// is actually bound. That made `20260614000001`'s policy statement resolve — and
+// it had been resolving by ACCIDENT before, because the array literal happened to
+// share a semicolon-fragment with the `ENABLE ROW LEVEL SECURITY` line. Written
+// with the ENABLE outside the loop, all three item masters would have been
+// recorded as determinately policy-less.
+//
+// THIS IS A GATE AND NOT A RATCHET BECAUSE IT IS EMPTY. Every dynamic statement
+// that touches RLS today resolves at least one table this schema has. One that
+// resolves none has marked nothing indeterminate, so the schema's RLS story for
+// its target is whatever other statements happened to say — with nothing
+// recording that a run-time statement also had an opinion. That is exactly the
+// silence D51 was, and it fails here on the commit that introduces it.
+{
+  const unresolved = schema.rls_dynamic_unresolved;
+  if (!Array.isArray(unresolved)) {
+    fail("R14", "build/schema.introspected.json has no `rls_dynamic_unresolved` — " +
+      "re-run `npm run contract:introspect`; a missing list is not an empty one");
+  } else {
+    for (const d of unresolved) {
+      fail("R14",
+        `${d.migration} runs a dynamic statement that touches RLS and names no table ` +
+        `this schema has${d.has_format_placeholder ? " (its target is assembled through a format placeholder)" : ""}. ` +
+        "Nothing is marked indeterminate, so the generated page will state an RLS " +
+        "story the migrations do not support (D51). Name the tables literally, or " +
+        "put the loop's source literal inside the same DO block.\n" +
+        `      ${d.statement}`);
+    }
+    console.log(
+      `  R14 dynamic RLS statements resolve · ${(schema.dynamic_ddl ?? []).filter((d) => d.touches_rls).length} touch RLS · ` +
+      `${unresolved.length} name no known table · ` +
+      `${(schema.dynamic_ddl ?? []).filter((d) => d.named_only_via_block).length} resolved only via the enclosing block (D51)`,
+    );
+  }
+}
+
+// ───────── R13: A DECLARED REQUIREMENT IS DESCRIBED, AND IS NOT SWALLOWED
+//
+// TWO RULES THAT ONLY LOOK LIKE ONE, and the second was found by trying to
+// satisfy the first.
+//
+// (1) §4 D94 — `contract:generate` already refuses a `base_data_requirements`
+// field the contract has no column for. Its INVERSE had nobody: an IMPLEMENTED
+// policy could read an entity field, declare nothing, and the sidecar would
+// record `consumed_by: null` with nothing to contradict it. That is exactly how
+// `P-C.2`'s two `Customer` reads survived a trace, a sidecar rewrite and a
+// resolution-chain package. So: a requirement declared by a policy whose
+// `status` is `implemented` must name a column the contract describes, and that
+// column's `engine.consumed_by` may not be null.
+//
+// (2) §4 D112 — a requirement the GRADER has no binding for is dropped, in
+// silence, on every surface: `grading.ts::flattenFindings`, `validationService
+// .ts::compileRequiredDataFindings` and `trustReport.ts` each skip a field whose
+// `evaluable` is false, and `itemMasterCandidates.ts` twice more. Thirteen of
+// thirteen declared fields were bound when WP 6.2 looked, which is why nothing
+// had ever noticed: the FIRST declaration for a table the grader does not load
+// would have been declared in the engine, described in the contract, and
+// invisible to every reader — T1's "no number without a source" inverted into a
+// source with no number. A binding is `FIELD_BINDINGS` in the shared grader, and
+// this rule counts the fields that have none so the next one cannot vanish.
+{
+  const registryPath = join(ROOT, "src", "lib", "policies", "registry.generated.json");
+  const gradingPath = join(ROOT, "supabase", "functions", "_shared", "grading.ts");
+  if (!existsSync(registryPath) || !existsSync(gradingPath)) {
+    fail("R13", "the registry snapshot or the shared grader is missing — cannot check declared requirements");
+  } else {
+    const registry = JSON.parse(readFileSync(registryPath, "utf8"));
+    const grading = readFileSync(gradingPath, "utf8");
+    // `FIELD_BINDINGS` keys, read from the grader itself rather than listed here:
+    // a second list of the same fact is the defect this rule is about.
+    const boundFields = new Set(
+      [...grading.matchAll(/"([a-z_]+\.[a-z_]+)":\s*\{\s*rows:/g)].map((m) => m[1]),
+    );
+    if (boundFields.size === 0) {
+      fail("R13", "no FIELD_BINDINGS parsed out of grading.ts — fix the scan rather than reporting zero");
+    }
+    const contract = JSON.parse(readFileSync(GENERATED, "utf8"));
+    const declared = new Map();
+    const note = (req, who) => {
+      const prev = declared.get(req.field);
+      declared.set(req.field, prev ? { ...prev, by: `${prev.by}, ${who}` } : { req, by: who });
+    };
+    for (const req of registry.base_data_requirements ?? []) note(req, "the engine");
+    for (const pol of registry.policies ?? []) {
+      // Only an IMPLEMENTED policy's requirement is a fact about running code. A
+      // `planned` policy declaring a field it will one day read is a design note,
+      // and holding the contract to it would be the mirror of D95: giving a
+      // column a reason that belongs to a different column.
+      if (pol.status !== "implemented") continue;
+      for (const req of pol.data_requirements ?? []) note(req, pol.catalog_ref ?? pol.id);
+    }
+
+    let unbound = 0;
+    const unboundFields = [];
+    for (const [field, { by }] of declared) {
+      // Counted BEFORE the resolution checks below, which `continue`. A count
+      // that only sees the fields that resolved is a count that reports zero on
+      // the day everything breaks.
+      if (!boundFields.has(field)) { unbound++; unboundFields.push(field); }
+      const [table, column] = field.split(".");
+      const described = contract.tables?.[table];
+      if (!described) {
+        fail("R13",
+          `the engine declares "${field}" (${by}) and the contract describes no table "${table}" — ` +
+          "describe it or stop declaring the field; a requirement nothing can resolve is D95's shape");
+        continue;
+      }
+      const col = (described.columns ?? []).find((c) => c.name === column);
+      if (!col) {
+        fail("R13",
+          `the engine declares "${field}" (${by}) and "${table}" has no column "${column}"`);
+        continue;
+      }
+      if (!col.engine || col.engine.consumed_by === null || col.engine.consumed_by === undefined) {
+        fail("R13",
+          `"${field}" is a declared data requirement of ${by} and its sidecar says ` +
+          "`consumed_by: null` — the engine and the contract disagree about whether anything reads it (D94)");
+      }
+    }
+
+    // The count is printed rather than failed. A binding needs the table in
+    // `GradingDataset`, which is a loader change in two runtimes, so a
+    // declaration may legitimately land one commit ahead of it — but it may not
+    // land SILENTLY, which is the whole of D112.
+    if (unbound > 0) {
+      warn("R13", `${unbound} declared requirement(s) have no FIELD_BINDINGS entry, so every ` +
+        "grading surface drops them (`evaluable: false`). Add the binding or record the gap (D112): " +
+        unboundFields.join(", "));
+    }
+    console.log(
+      `  R13 declared requirements resolve · ${declared.size} declared by implemented policies + the engine · ` +
+      `${declared.size - unbound} gradeable, ${unbound} not (D94, D112)`,
+    );
+  }
+}
+
 // ───────── R12: LINEAGE MUST RESOLVE, AND EVERY PAGE MUST BE ACCOUNTED FOR
 //
 // WP 5.1 fills `surfaces`, and its brief is one sentence long about why this

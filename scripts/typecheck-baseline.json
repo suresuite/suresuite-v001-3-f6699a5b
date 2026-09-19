@@ -1,18 +1,10 @@
 {
-  "$doc": "The ratchet `npm run typecheck` enforces. One entry per file that had type errors when the gate was added (Phase 5 / D57). It may SHRINK and may not GROW: a new error in any file, or one more error in a listed file, fails. So does one FEWER, which asks for the number to be lowered \u2014 a baseline that records paid debt is a baseline nobody trusts.",
-  "$added_by": "Phase 5 / D57 \u2014 the gate that did not exist. Sixty-one of the 89 errors here on the day it was written were D57's own, emitted by scripts/data-contract/generate.mjs into a committed artifact since WP 5.2h. Those are fixed; these twenty-eight predate Phase 5 and belong to whoever owns each surface.",
+  "$doc": "The ratchet `npm run typecheck` enforces. One entry per file that had type errors when the gate was added (Phase 5 / D57). It may SHRINK and may not GROW: a new error in any file, or one more error in a listed file, fails. So does one FEWER, which asks for the number to be lowered — a baseline that records paid debt is a baseline nobody trusts.",
+  "$added_by": "Phase 5 / D57 — the gate that did not exist. Sixty-one of the 89 errors here on the day it was written were D57's own, emitted by scripts/data-contract/generate.mjs into a committed artifact since WP 5.2h. Those are fixed; these twenty-eight predate Phase 5 and belong to whoever owns each surface.",
   "files": {
-    "src/components/policies/StagePolicyTable.tsx": {
-      "count": 2,
-      "why": "The policy grid's numeric cell takes a `title` prop the component does not declare, and one call passes two arguments to a one-argument function. WP 6.2's surface."
-    },
-    "src/components/policies/policyGridUi.tsx": {
-      "count": 2,
-      "why": "The provenance legend declares a `contract` dot the `Provenance` union does not carry, and reads `title` off a props type that has none. Same surface as the two above \u2014 the union is WP 6.2's (D91's neighbourhood)."
-    },
     "src/components/sim/DisruptionScheduleEditor.tsx": {
       "count": 4,
-      "why": "`target_type` is a `\"node\" | \"edge\"` union in state and plain `string` where it is parsed. \u00a716 \u00b7 WP 6.4 records that `_targets` has this discriminator and NO validation behind it, so the type error and the missing CHECK are the same defect seen from two sides. WP 6.4's."
+      "why": "`target_type` is a `\"node\" | \"edge\"` union in state and plain `string` where it is parsed. §16 · WP 6.4 records that `_targets` has this discriminator and NO validation behind it, so the type error and the missing CHECK are the same defect seen from two sides. WP 6.4's."
     },
     "src/components/trust/TrustReportPanel.tsx": {
       "count": 6,
@@ -20,15 +12,11 @@
     },
     "src/components/trust/useProjectFreshness.ts": {
       "count": 1,
-      "why": "`.rpc('project_freshness')` \u2014 the same stale client types as above, on the RPC side."
+      "why": "`.rpc('project_freshness')` — the same stale client types as above, on the RPC side."
     },
     "src/hooks/useErpConnections.tsx": {
       "count": 7,
       "why": "Same cause again, and the largest instance: `project_erp_links` and `ingest_runs` are absent from the generated client types, so two casts are reported as non-overlapping and two more instantiations run away. WP 7.1's connector surface."
-    },
-    "src/lib/policies/resolveEffective.ts": {
-      "count": 1,
-      "why": "The resolver returns a wider provenance union than `Provenance` declares \u2014 the same missing member policyGridUi.tsx names. One fix closes both; it is WP 6.2's to make."
     },
     "src/lib/policies/__tests__/dataPlaneAudit.test.ts": {
       "count": 1,
@@ -50,5 +38,6 @@
       "count": 1,
       "why": "Unused `@ts-expect-error`, as in dataPlaneAudit.test.ts."
     }
-  }
+  },
+  "$paid_down": "Phase 6 / WP 6.3 (A1): five errors across three files, all one surface — the `Provenance` union did not carry `contract`, `NumCell` did not declare the `title` it reads, and the `bulkUpsertOverrides` prop type dropped WP 4.4's `{ seeded }` options argument. 28 -> 23."
 }

@@ -19,6 +19,12 @@ import { executeTool, type ToolContext } from "../project-ai-chat/tools.ts";
 // executeTool registry (bridge 2) — the data-readiness template resolves
 // through it, the same grader the pre-run gate uses.
 import "../project-ai-chat/draftTools.ts";
+// And trustReportTool registers get_data_trust_report — §5.4 A3. The Trust Report
+// obeys the same law as every other deterministic section: the template names a
+// read tool, the data is resolved at render time, and the rendered PDF therefore
+// cannot disagree with the database it cites (WP 6.3).
+import "./trustReportTool.ts";
+import { TRUST_REPORT_SECTION_IDS } from "./trustReportTool.ts";
 
 export const REPORT_TEMPLATE_IDS = [
   "risk-posture",
@@ -26,6 +32,7 @@ export const REPORT_TEMPLATE_IDS = [
   "run-comparison",
   "disruption-brief",
   "data-readiness",
+  "data-trust",
 ] as const;
 
 export type ReportTemplateId = (typeof REPORT_TEMPLATE_IDS)[number];
@@ -57,6 +64,7 @@ export const REPORT_SOURCE_TOOLS: readonly string[] = [
   "get_material_risk",
   "get_procurement_spend",
   "get_data_completeness",
+  "get_data_trust_report",
 ];
 
 /** A run id the template demands, with the role name refusals use
@@ -92,6 +100,24 @@ const clampTopN = (v: unknown, fallback = 10): number => {
 };
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
+
+/**
+ * The section titles the DOCUMENT prints. Kept beside the template rather than
+ * imported from `trustReportSections.ts` for one reason: that module's titles are
+ * the SCREEN's, and a document heading is allowed to be longer. Both are keyed by
+ * the same ids, and `trustReportSections.test.ts` fails if an id exists in one and
+ * not the other — so they can differ in wording and cannot differ in coverage.
+ */
+const TRUST_SECTION_TITLES: Record<string, string> = {
+  headline: "Verdict",
+  coverage: "Coverage per engine-read field",
+  blocking: "Blocking findings",
+  substitutions: "Substituted values, and the rule that supplied each",
+  freshness: "Freshness per table",
+  runs: "Latest analysis runs",
+  ingest: "Upload history",
+  limits: "Known limits of this report",
+};
 
 export const REPORT_TEMPLATES: Record<ReportTemplateId, ReportTemplateSpec> = {
   "risk-posture": {
@@ -198,6 +224,31 @@ export const REPORT_TEMPLATES: Record<ReportTemplateId, ReportTemplateSpec> = {
         source: { tool: "get_supplier_risk", args: { top_n: clampTopN(args.top_n) } },
       },
     ],
+  },
+  /**
+   * §5.4 A3 — the Project Data Trust Report.
+   *
+   * ONE SECTION PER PART, and the LIMITS SECTION IS LAST AND UNCONDITIONAL. §5.4:
+   * "a trust report that does not state its own limits is marketing." The section
+   * list is built from `TRUST_REPORT_SECTION_IDS` rather than written out here, so
+   * a section added to the report cannot be silently absent from the document —
+   * which is how a report comes to omit the part that admits its own gaps.
+   */
+  "data-trust": {
+    id: "data-trust",
+    label: "Data trust report",
+    summary:
+      "the §5.4 A3 Project Data Trust Report — verdict, coverage per engine-read field, blocking findings, substitutions, freshness, analysis runs, upload history, and the report's own known limits (no run required)",
+    requiredArgs: [],
+    optionalArgs: [],
+    narrativeRequired: false,
+    requiredRuns: () => [],
+    build: () =>
+      TRUST_REPORT_SECTION_IDS.map((section) => ({
+        kind: "table" as const,
+        title: TRUST_SECTION_TITLES[section],
+        source: { tool: "get_data_trust_report", args: { section } },
+      })),
   },
   "data-readiness": {
     id: "data-readiness",

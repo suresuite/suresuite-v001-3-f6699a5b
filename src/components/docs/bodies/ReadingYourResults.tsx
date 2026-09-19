@@ -132,7 +132,22 @@ export default function ReadingYourResults() {
             </p>
           </div>
 
-          {!SERIES.heatmapEverRenders && (
+          {SERIES.heatmapRemoved ? (
+            <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
+              <div className="text-sm font-semibold text-foreground">
+                Utilization heatmap — removed
+              </div>
+              <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+                If you remember a node × time heatmap here, it is gone. It read a per-node{" "}
+                <Term>{SERIES.heatmapWants}</Term> series that <strong>no engine writes</strong> —
+                the four series a replication carries are listed above — so it was empty on every
+                run, forever, under a caption that read as something a different run could fix. A
+                panel that can only ever be empty is a placeholder, not a state. The measure itself
+                is not lost: <Term>capacity_utilization</Term> is a run-level KPI and appears in the
+                summary table above, which the same defect had been hiding.
+              </p>
+            </div>
+          ) : !SERIES.heatmapEverRenders && (
             <div className="rounded-sm border border-destructive/40 bg-card p-4 shadow-xs">
               <div className="text-sm font-semibold text-foreground">
                 Utilization heatmap — permanently empty

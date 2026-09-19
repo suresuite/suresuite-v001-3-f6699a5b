@@ -1,5 +1,5 @@
 /**
- * ONE palette — Phase 8 / WP 8.3 / §4 D119.
+ * ONE palette — Phase 8 / WP 8.3 / §4 D127.
  *
  * There were FIVE before this file, and they disagreed about every colour:
  *

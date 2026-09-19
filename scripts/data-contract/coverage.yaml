@@ -92,30 +92,6 @@ deferred:
     audited:
       model_validations: false
 
-  - wp: "6.4"
-    why: >-
-      MOVED FROM WP 6.1 BY WP 6.1 ITSELF. §13 scopes that package to resolution
-      chains — "CSV column → DB column → RPC → hook → substitution → engine field
-      → unit at each hop" — and says nothing about describing tables. Eleven
-      tables were waiting on it anyway, which is the R8 finding WP 4.4 hit from
-      the other side: an owner nothing behind it ever agreed to.
-      They go to a NEW package rather than onto WP 6.3, and the reason is budget
-      honesty: WP 6.3 already carries A2, A3, A5, the provenance vocabulary and
-      the eleven result-binding tables WP 4.4 re-homed to it. Twenty-two tables
-      under one package is a number that misrepresents what it costs, and
-      misrepresented budget is what boundary reviews exist to catch (§16 · Phase
-      2→3). See §14 · WP 6.4.
-      Original note follows.
-      `external_evidence` is the AGENT's evidence store — retrieved URLs, content
-      hashes and confidence behind a proposal — and it belongs with the decision
-      plane rather than with analysis output. Same regrouping as
-      `model_validations` above: it was in the WP 4.2 bucket because nobody had
-      looked at it, which is exactly what D54 says a deferral list does when it is
-      allowed to decide by omission.
-    tables: [external_evidence]
-    audited:
-      external_evidence: false
-
   - wp: "6.3"
     why: >-
       Runs and results (tier 5). Invariant `result-binding` is the claim these
@@ -155,33 +131,6 @@ deferred:
       simulation_cache: false
       simulation_performance_metrics: false
       experiments: false
-
-  - wp: "6.4"
-    why: >-
-      Decisions (tier 4) beyond the two policy tables the contract already
-      covers.
-      MOVED FROM WP 6.1 BY WP 6.1 ITSELF, with `external_evidence` above. This
-      row's own reasoning is what gave it away: "WP 6.1 pins the resolution
-      chains … the scenario and disruption tables are the surface those chains
-      resolve against". Being the surface a package READS is not the same as
-      being a package's deliverable, and §13's WP 6.1 never claimed them — it
-      traced 38 grid fields and described no table at all. Ten tables sat behind
-      a sentence that reads like a plan and is an association.
-      WP 6.4 owns them with `external_evidence`: together they are the DECISION
-      PLANE — what a person or an agent chose, and what a result must bind to
-      under `result-binding` (I8). See §14 · WP 6.4.
-    tables:
-      - policy_versions
-      - policy_presets
-      - scenarios
-      - scenario_templates
-      - recovery_playbooks
-    audited:
-      policy_versions: false
-      policy_presets: false
-      scenarios: false
-      scenario_templates: false
-      recovery_playbooks: false
 
   - wp: "5.2"
     why: >-
@@ -228,3 +177,84 @@ deferred:
       project_memory: false
       proposals: false
       user_files: false
+
+# ── EDGE FUNCTIONS: DEPLOYED, OR DEFERRED WITH A REASON ─────────────────────
+#
+# §4 D123: twelve of eighteen edge functions were absent from
+# `.github/workflows/supabase-functions.yml`, so their code shipped to `main`, went
+# green in CI, and never reached production. Slice 15 added the four analyzers and
+# SIZED the gate without writing it: "Nothing compares the functions the repo holds
+# against the functions the workflow names. That check is the real fix — the same
+# shape as `table-covered`, where a table is either described or deferred to a named
+# package — and it would have caught this on the day WP 4.3 merged."
+#
+# This is that register, and `contract:check` R17 is that check. A function in
+# `supabase/functions/` must either be deployed by the workflow or listed here with
+# an owner and a reason. There is no third option, which is exactly what
+# `table-covered` (R1) took away from tables.
+#
+# WHY THESE SIX ARE NOT SIMPLY ADDED. Slice 15's argument holds: each has been
+# running an unknown build for an unknown time, and pushing one sight-unseen is a
+# production change whose blast radius nobody has measured. `ingest-file` was added
+# in WP 6.3 on the opposite argument — a shipped package depends on it and its source
+# is CI-green — and that argument does not extend to these.
+functions_not_deployed:
+  - fn: ingest-file
+    wp: "6.5"
+    why: >-
+      NOT debt and NOT an oversight — a deliberate deferral, and WP 6.5 exists
+      because of it.
+      `ingest-file` is WP 3.2's entire deliverable and has never been published,
+      which is why §2.1's `ingestion-contract` (I7) row called it a live second
+      source for four packages while production had no such source (D123). Adding
+      the deploy step is one line; what it does is not small. On merge it switches
+      EVERY upload in production onto the WP 3.2-3.4 landing path at once —
+      server-side parse, tier-0 storage, staged rows, the diff review screen, the
+      promotion with its normalisation and its role gate — and §16 · WP 6.3
+      (slice 16) declined exactly that, asking for a §15 reading either side of
+      the switch. A branch cannot take the second reading, because
+      `supabase-functions.yml` is `branches: [main]`. So the switch is a named
+      deliverable of this package rather than a line added in passing, and the
+      tenth dataset (`customers`, WP 6.2) is unreachable in production until it
+      is made.
+  - fn: delete-project
+    wp: "7.1"
+    why: >-
+      DESTRUCTIVE AND UNDIFFED. It deletes a project and, per §4 D117, leaves ten
+      project-scoped tables behind — including the user's own policy decisions. The
+      repo's copy and production's copy have not been compared, and deploying a
+      newer delete path sight-unseen is the one case where being wrong is not
+      recoverable. It also writes through `delete_project_dataset`, whose
+      `multi_tier` branch WP 6.2 verified is live (§4 D58). The auth package owns it
+      because the grants it runs under are the same question.
+  - fn: erp-sync-orbit-mrp
+    wp: "7.1"
+    why: >-
+      WP 4.1 found it promoting `ingest_staged_products` to `products` WITHOUT
+      `ingest_apply_run` — per row, with no actor and no role — and closed that in
+      the database. Whether production's deployed copy is the one WP 4.1 read is
+      unknown, so a deploy could either fix the path or replace a working connector
+      with an untested one. Diffing it against production is the prerequisite.
+  - fn: get-mapbox-token
+    wp: "7.1"
+    why: >-
+      Hands out a token. It is the smallest of the six and the one whose blast
+      radius is a credential, so it belongs with the package that owns the grant
+      surface rather than with a data-layer slice.
+  - fn: ingest-bom-multi-level
+    wp: "7.1"
+    why: >-
+      One of the three legacy `ingest-*` functions WP 4.1 routed through
+      `ingest_legacy_upsert_lane`, whose target list is a whitelist in a migration.
+      The DATABASE half is closed and gated; whether the deployed function calls the
+      lane or still holds a PostgREST client is exactly what has not been checked.
+  - fn: ingest-inbound-logistics
+    wp: "7.1"
+    why: >-
+      See `ingest-bom-multi-level` — the same three-function group, the same
+      unanswered question about which build production is running.
+  - fn: ingest-outbound-logistics
+    wp: "7.1"
+    why: >-
+      See `ingest-bom-multi-level` — the same three-function group, the same
+      unanswered question about which build production is running.

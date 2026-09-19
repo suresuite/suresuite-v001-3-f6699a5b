@@ -12,9 +12,30 @@ import { LAYER, tint } from "@/components/intelligence/piUi";
 
 /* ── provenance ──────────────────────────────────────────────────────── */
 
+/**
+ * THE A1 PROVENANCE VOCABULARY (§5.4), COMPLETED IN WP 6.3.
+ *
+ * §5.4 names ten states: `data · master · contract · estimated · imputed ·
+ * derived · suggested · override · edited · default`. This union carried EIGHT.
+ * `contract` was in the `PROVENANCE` record below and not in the type, which
+ * TypeScript reported and `scripts/typecheck-baseline.json` recorded as debt on
+ * "WP 6.2's surface" — so the state that exists to make a substitution visible
+ * (§4 D17) was itself invisible to the type system. It is declared now.
+ *
+ * `estimated` IS DELIBERATELY ABSENT AND THAT IS THE POINT. §14 reserves it for
+ * the observations track: a value fitted from recorded history, with an n, a
+ * window and a fit quality behind it. Nothing produces one today, and a state in
+ * this union with no producer is a dot the grid could never draw — a promise, not
+ * a vocabulary (the `seeded_from_hash` lesson: a column nothing fills). It joins
+ * when an estimator does, and `provenanceVocabulary.test.ts` holds §5.4's list
+ * against this union so the omission stays deliberate instead of becoming a gap.
+ *
+ * The rule every state answers to: NO DOT MAY CLAIM MORE THAN IT KNOWS (D16).
+ */
 export type Provenance =
   | "data"      // from project data
   | "master"    // from item master
+  | "contract"  // EMPTY, and the schema declares what empty means (§4 D17)
   | "imputed"   // imputed project average — verify
   | "derived"   // derived fallback (≈)
   | "suggested" // this stage's own routing suggestion, ranked from uploaded volumes
@@ -63,6 +84,40 @@ export function ProvenanceDot({ p }: { p: Provenance }) {
       className="absolute right-[2px] top-[2px] h-1 w-1 rounded-full"
       style={{ background: color }}
     />
+  );
+}
+
+/**
+ * The dot AS A BUTTON — A2's trigger (§5.4, WP 6.3).
+ *
+ * The dot itself is 4px, which is not a tap target. The button around it is 24px
+ * with a negative margin, so the hit area grows without moving the dot one pixel:
+ * the grid's column widths are computed from `columnFit` and a trigger that took
+ * layout space would reflow every row.
+ *
+ * Presentational on purpose — it takes an `onClick` and knows nothing about what
+ * opens. `policyGridUi` is the grid's atom set and the read lives in
+ * `ValueChainPopover`, so the atom stays free of a data dependency.
+ *
+ * A column whose provenance state has NO colour (`default`) still gets a button,
+ * because "nothing you supplied is in play" is one of the most useful things A2
+ * can tell a reader, and it is the one state the dot cannot show.
+ */
+export function ProvenanceDotButton({ p, label }: { p: Provenance; label: string }) {
+  const { color, title } = PROVENANCE[p];
+  return (
+    <button
+      type="button"
+      aria-label={`Where did ${label} come from?`}
+      title={`${title} — click for the full chain`}
+      className="absolute right-0 top-0 z-10 flex items-center justify-center p-[6px] leading-none"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <span
+        className="block h-1 w-1 rounded-full"
+        style={{ background: color ?? "#d4d4d4", outline: "1px solid transparent" }}
+      />
+    </button>
   );
 }
 
@@ -277,6 +332,7 @@ export function NumCell({
   unit,
   placeholder = "—",
   title,
+  dot,
 }: {
   value: number | undefined;
   provenance: Provenance;
@@ -295,6 +351,22 @@ export function NumCell({
   integer?: boolean;
   /** Unit glyph rendered in its own fixed gutter, never inside the value text. */
   unit?: string;
+  /**
+   * The cell's own hover text, which the caller assembles from the resolved
+   * provenance — where the number came from, and what stood in for it if nothing
+   * did. DECLARED IN WP 6.3: the component already read it and the props type did
+   * not carry it, so the one string that answers "where did THIS number come
+   * from" was, to the type system, not a prop at all. A2's popover replaces the
+   * hover with something a person can read; until it does, this is the answer.
+   */
+  title?: string;
+  /**
+   * The provenance marker to render. Defaults to the plain dot; the grid passes a
+   * popover-wrapped `ProvenanceDotButton` where A2 can answer (§5.4). A SLOT
+   * rather than a callback because the trigger has to BE the element Radix
+   * anchors to, and because it keeps this module presentational.
+   */
+  dot?: React.ReactNode;
 }) {
   const derived = provenance === "derived";
   const formatted = (v: number) =>
@@ -302,7 +374,7 @@ export function NumCell({
   const text = value === undefined || value === null ? "" : (derived ? "≈ " : "") + formatted(value);
   return (
     <>
-      <ProvenanceDot p={provenance} />
+      {dot ?? <ProvenanceDot p={provenance} />}
       <span
         className="grid h-5 items-center"
         style={{ gridTemplateColumns: `minmax(0,1fr) ${unit ? 14 : 0}px`, columnGap: unit ? 3 : 0 }}

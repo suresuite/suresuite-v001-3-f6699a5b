@@ -1,0 +1,162 @@
+# AUTHORED — the data contract's sidecar for `policy_presets`.
+table: policy_presets
+tier: '4'
+schema_name: public
+grain: >-
+  One named policy bundle a user can apply to a project — the DECISION plane's
+  catalog of starting points. A system preset (`is_system`) ships with the
+  product; a user preset belongs to its `owner_id`.
+owner: policy-ui
+
+natural_key_unique:
+  - source: UNIQUE constraint
+    columns: [slug, owner_id]
+    name: null
+  - source: PRIMARY KEY constraint
+    columns: [id]
+    name: policy_presets_pkey
+
+governance:
+  read: null
+  write: null
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    Tier 4 — the DECISION plane: a preset is a choice a person can make, not a
+    fact about their supply chain. Audited from WP 6.4, with the three
+    statement-grain triggers landing beside this sidecar, because
+    `dataPlaneAudit.test.ts` scopes its rule to tables IN the contract and a
+    deferred table's writes are unaudited with nothing to notice (D54).
+    **`write` is null because NO USER-FACING WRITE PATH EXISTS — and neither
+    does a read path (§4 D126).** The table is granted `SELECT` to `anon` under
+    a permissive policy and nothing in `src/`, in an RPC or in an edge function
+    reads it; the presets a user actually sees come from TypeScript modules under
+    `src/lib/policies/presets/`. So this row's governance describes a table that
+    is reachable and unread, which is a different statement from "restricted",
+    and saying it plainly is the point of the block.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. The natural key is (slug, owner_id) below.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  slug:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The preset's stable name — `lean_jit`, `make_to_order`. Half the natural
+      key, so one owner may not hold two presets under one slug while two owners
+      may each hold their own.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      What a person reads — "Lean / JIT". The slug is the key; this is the label.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  description:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      One sentence on what the preset does to a project. NULL where nobody wrote
+      one; there is no default sentence, because an invented description of a
+      decision is worse than none.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  is_system:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      TRUE for a preset that ships with the product and FALSE for one a user
+      saved. It is the only thing separating a catalog entry from somebody's own
+      work, and `owner_id` is NULL on the system rows.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  owner_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user whose preset this is, or NULL for a system preset. Half the
+      natural key — and the NULL half, which is why the pair behaves the way
+      `NULLS NOT DISTINCT` indexes elsewhere in this contract had to be made to
+      behave (§4 D5): without that, two system presets could share a slug.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  bundle:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      THE DECISION ITSELF — a partial policy bundle, keyed by family, merged over
+      a project's defaults when the preset is applied. Partial on purpose: a
+      preset that carried every field would overwrite choices it has no opinion
+      about.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was written. Server-stamped, never the client's clock.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it was last changed. Maintained by a trigger where one exists; with no
+      writer at all today (D126) it equals `created_at` on every row.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+surfaces: []

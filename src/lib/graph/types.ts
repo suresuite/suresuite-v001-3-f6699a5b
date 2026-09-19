@@ -1,5 +1,5 @@
 /**
- * The graph layer's vocabulary — Phase 8 / WP 8.3 / §4 D119.
+ * The graph layer's vocabulary — Phase 8 / WP 8.3 / §4 D127.
  *
  * WHY THIS FILE EXISTS. Four network pages, a map component, one SQL function and
  * the engine each decided independently what a node IS, and they disagreed by
@@ -21,7 +21,7 @@
 
 /**
  * A node's ROLE in the supply chain. A role, not a depth — that distinction is
- * the whole of D119: a BOM three levels deep does not mean three tiers of
+ * the whole of D127: a BOM three levels deep does not mean three tiers of
  * suppliers, and a tier-2 supplier is not "a material at level 2".
  *
  * `unknown` is a real value and is NOT the same as an absent one. The database
@@ -52,7 +52,7 @@ export function asEchelon(value: string | null | undefined): Echelon | null {
  * The order the chain runs in, outside-in from supply to demand. Used for column
  * position and for sorting a legend, and it is the ONLY place that order is
  * written down — `ProcessLevelNetwork` sorts its legend by `level`, which is the
- * column D119 is about.
+ * column D127 is about.
  *
  * `plant` sits between what it consumes and what it ships; `unknown` sorts last
  * so an unplaceable node is visibly at the end rather than silently mixed in.
@@ -70,7 +70,7 @@ export const ECHELON_ORDER: Record<Echelon, number> = {
 /**
  * A node of a project's supply graph, as the pages read it.
  *
- * IDENTITY IS `{ echelon, id }` AND NOT `id` ALONE. §4 D123: the id is a bare
+ * IDENTITY IS `{ echelon, id }` AND NOT `id` ALONE. §4 D131: the id is a bare
  * string shared by three semantically different lanes, so a firm that both
  * supplies the plant and buys from it collapses into one node and the graph
  * acquires a cycle the real network does not have. §15 measured zero such firms in
@@ -91,7 +91,7 @@ export interface GraphNode {
    * the table that owns the measurement. `null` for a node in no BOM.
    *
    * NOT `supply_chain_data_multi_tier.level`, which two live writers disagree
-   * about (§4 D132) and one of which discards the real depth for a literal 2.
+   * about (§4 D140) and one of which discards the real depth for a literal 2.
    */
   bomDepth: number | null;
   /** Tiers upstream of the plant, from `node_list.supply_tier`. `null` = unknown. */

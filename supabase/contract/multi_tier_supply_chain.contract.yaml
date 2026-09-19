@@ -186,19 +186,63 @@ note: >-
   DESCRIBED IN PHASE 3 / WP 3.2, AND THE DESCRIPTION IS MOSTLY A LIST OF ABSENCES.
   The deferral that pointed here called these "the other inbound datasets, each
   with its own bespoke upload path". `tier2_suppliers` and `tier3_suppliers` are
-  that; this table is not. IT HAS NO UPLOAD PATH AT ALL, and no reader either:
-  `UploadWizard` offers no template for it, no RPC writes it, no edge function
-  writes it, and outside the generated documentation modules no application code
-  in `src/` or `supabase/functions/` mentions it. Every occurrence is in
+  that; this table is not. NO APPLICATION PATH PUTS A ROW IN IT: `UploadWizard`
+  offers no template, no screen and no edge function writes it, and no CSV names a
+  column of it — which is why every `ingest.csv_header` above is null.
+  THE DATABASE HAS A WRITE PATH ANYWAY, and the third correction WP 6.2 made is
+  this one. `bulk_insert_multi_tier_supply_chain` exists, it is already on
+  `dataPlaneAudit.test.ts`'s list of tier-2 writers, and it works — `rehearsal/240`
+  §6c calls it and reads the row back. What is true is that NOTHING CALLS IT: no
+  file in `src/` or `supabase/functions/` names it, which is why the reader below is
+  answered with an empty array on every real project. But an RPC with no caller is
+  not an absent write path. This application runs as `anon` against permissive
+  grants (D28), so anyone holding a PostgREST client is one call away from writing
+  this table — the same sentence WP 4.1 wrote about the three legacy `ingest-*`
+  functions before `ingest_legacy_upsert_lane` turned their target list into a
+  whitelist in a migration. The claim is APPLICATION-level; the grant surface is
+  WP 7.1's.
+  AND "NO READER AND NO WRITER" WAS FALSE IN BOTH DIRECTIONS, WHICH THIS FILE HAD
+  ALREADY RECORDED AND ITS OWN PROSE DENIED. The `surfaces` block above lists THREE
+  confirmed entries, and WP 6.2 verified all of them against a real database:
+  · `get_project_datasets` SELECTs this table and returns its rows, and
+    `projectLanes.ts` calls it from `/policies` and `/simulation-lab` — so it HAS a
+    live reader, feeding two pages.
+  · `delete_project_dataset` has a `multi_tier` branch AND deletes from this table
+    in its `'all'` branch, which is what the "Delete ALL data" button on the project
+    manager invokes — so it has a live path that EMPTIES it.
+  Two statements of one fact, in ONE FILE, disagreeing, with nothing comparing them:
+  §4 D101's shape one scope tighter, and the generated page renders the PROSE half,
+  so the contradiction was published to users. `supabase/rehearsal/240` §6 inserts a
+  row, reads it back through the reader and watches the button's RPC remove it.
+  `contract:check` R15 now refuses a note that denies a surface the same file
+  confirms. What is true, stated once: nothing WRITES it, two pages READ it, and one
+  button CLEARS it. Every occurrence is in
   migrations — created 2025-08-20, carried through RLS rewrites since, most
   recently by `20260915000004`'s organization dual read, which rewrote policies
   governing access to a table nobody can reach. EVERY `ingest.csv_header` ABOVE IS
   NULL FOR THAT REASON: there is no CSV to name a column of. It is described here
   rather than deferred again because a deferral is a promise that someone will
   look, and five packages of looking have now established what there is to see.
-  DROPPING IT IS NOT THIS PACKAGE'S CALL — a table is not removed by the package
-  that happened to notice. WP 3.2's gap check added the count to §15 so that the
-  package which does decide is deciding against a number, AND THE NUMBER IS ZERO:
-  run `35143830532`, 2026-09-16, reports 0 rows across 0 projects. So it is not a
-  table whose data nobody reads; it is a table with no data, no reader and no
-  writer. Recorded here and as D58 rather than acted on.
+  DROPPING IT WAS NOT WP 3.2'S CALL — a table is not removed by the package that
+  happened to notice. Its gap check added the count to §15 so that the package which
+  does decide is deciding against a number, AND THE NUMBER IS ZERO: run
+  `35143830532`, 2026-09-16, reports 0 rows across 0 projects, and run
+  `35399391429`, 2026-09-19, agrees.
+  WP 6.2 IS THE DECIDING PACKAGE AND ITS DECISION IS TO KEEP THE TABLE. The number
+  says the benefit of dropping it is removing an empty relation. The cost, measured:
+  rewriting `delete_project_dataset` — a live RPC behind a user-facing button —
+  rewriting both dataset-snapshot builders, bumping `hash_network`'s
+  `schema_version` 3 -> 4, which invalidates every stored network digest, deleting a
+  published manual page and its registry entry, and updating four test files and a
+  rehearsal — AND, found by the gate above, rewriting `get_project_datasets`, which
+  two pages call on every load. That is a large and IRREVERSIBLE production change
+  whose only gain is tidiness, taken against a row count measured days earlier. The
+  table contributes an empty array to every project's `hash_network` today and costs
+  nothing measurable.
+  THE DECISION RESTS ON THE CORRECTED FACTS AND NOT THE ROW'S. §4 D58 argued from
+  "no reader and no writer", and had the drop been taken on that premise it would
+  have broken a reader two pages use. The number was right and the sentence beside
+  it was not, which is the whole reason a decision waits for a measurement.
+  What WAS wrong is the published claim, and that is corrected above rather than
+  left standing: a page telling users nothing touches this table, while a button
+  does, is the same defect as D103.

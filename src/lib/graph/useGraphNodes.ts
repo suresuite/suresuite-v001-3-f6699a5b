@@ -1,5 +1,5 @@
 /**
- * Read the typed node projection — Phase 8 / WP 8.3 / §4 D119.
+ * Read the typed node projection — Phase 8 / WP 8.3 / §4 D127.
  *
  * THE ONE PLACE A PAGE GETS A NODE'S TYPE FROM. `node_list.echelon` is authored
  * once by `classify_node_echelon` (WP 8.1) and reached through
@@ -8,7 +8,7 @@
  * `CREATE OR REPLACE` cannot change a return type.
  *
  * A page that uses this hook does not classify anything. That is the point: the
- * eight classifiers §4 D119 counts all existed because there was nothing to read.
+ * eight classifiers §4 D127 counts all existed because there was nothing to read.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
