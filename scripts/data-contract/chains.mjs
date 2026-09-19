@@ -540,3 +540,189 @@ export function deriveApiLimits(root) {
     defaultPageSize: Number(page[2]),
   };
 }
+
+/**
+ * The per-item weekly series an inspection run produces — WP 5.2j.
+ *
+ * `run_item_series` is deferred in `coverage.yaml`, so the contract describes
+ * none of this and the manual had nothing to render: the page named zero of the
+ * measures a reader sees on the chart. They are declared twice and neither copy
+ * is the whole fact, so both are read and joined here.
+ *
+ *   · `scsim/scsim/core/engine.py` says WHICH ITEM KIND each measure belongs to
+ *     — its keys are `material.on_hand`, `product.backlog` and so on, and that
+ *     prefix is the reason a material shows three lines and a product five.
+ *   · `ItemSeriesExplorer.tsx`'s `SERIES_LABEL` says what the READER sees in the
+ *     legend, which is the name §6.1 rule 1 says must lead.
+ *
+ * A measure the engine writes with no label, or a label for a measure the
+ * engine does not write, throws: the first renders as a raw key on the chart and
+ * the second is a legend entry for a line that never appears, and both are
+ * things nobody would notice from either file alone.
+ */
+export function deriveItemSeries(root) {
+  const engine = readFileSync(join(root, "scsim", "scsim", "core", "engine.py"), "utf8");
+  const block = /item_series = \{([\s\S]*?)\n\s{8}\}/.exec(engine);
+  if (!block) {
+    throw new Error(
+      "chains: the `item_series` dict was not found in scsim/scsim/core/engine.py. " +
+        "Fix the scan rather than shipping a page that names no measure at all, " +
+        "which is what the page did before this existed.",
+    );
+  }
+  const pairs = [];
+  const row = /"(material|product)\.(\w+)":/g;
+  let m;
+  while ((m = row.exec(block[1]))) pairs.push({ kind: m[1], key: m[2] });
+
+  const ui = readFileSync(join(root, "src", "components", "sim", "ItemSeriesExplorer.tsx"), "utf8");
+  const labelBlock = /const SERIES_LABEL: Record<string, string> = \{([\s\S]*?)\n\};/.exec(ui);
+  if (!labelBlock) {
+    throw new Error("chains: `SERIES_LABEL` was not found in src/components/sim/ItemSeriesExplorer.tsx");
+  }
+  const labels = new Map();
+  const lrow = /(\w+):\s*"([^"]+)"/g;
+  while ((m = lrow.exec(labelBlock[1]))) labels.set(m[1], m[2]);
+
+  const series = pairs.map(({ kind, key }) => {
+    const label = labels.get(key);
+    if (!label) {
+      throw new Error(
+        `chains: the engine writes "${kind}.${key}" and ItemSeriesExplorer has no label for it. ` +
+          "It renders on the chart as a raw key — add the label rather than documenting one.",
+      );
+    }
+    return { kind, key, label };
+  });
+  const written = new Set(series.map((s) => s.key));
+  for (const key of labels.keys()) {
+    if (!written.has(key)) {
+      throw new Error(
+        `chains: ItemSeriesExplorer labels "${key}" and the engine never writes it — a legend ` +
+          "entry for a line that cannot appear. Remove the label or fix the scan.",
+      );
+    }
+  }
+  if (series.length < 5) {
+    throw new Error(`chains: parsed ${series.length} item series; the engine writes more`);
+  }
+  return series;
+}
+
+/**
+ * What a replication row actually carries, against what the results table looks
+ * for — WP 5.2j.
+ *
+ * §6.3 marks "Reading your results" **G\***, generated from the engine registry,
+ * and the KPI page does render the engine's own dictionary. The results SCREEN
+ * does not read that dictionary: `KpiStatTable` maps over `KPI_DISPLAY` in
+ * `src/lib/sim/kpiDisplay.ts` and looks each key up on the replication rows, so
+ * a measure the engine emits under a different name simply never gets a row.
+ *
+ * That is §4 D21 at the results layer — one quantity, two names, and the name
+ * the screen uses is not the name the engine writes. It cannot be seen from
+ * either file: `kpiDisplay.ts` is a plausible list of supply-chain measures and
+ * `compute.py` is a plausible set of engine outputs. Only the JOIN shows that
+ * two of thirteen display rows can ever appear.
+ *
+ * So the join is computed here and the page renders it. If somebody aligns the
+ * two lists, the page says so on the next regenerate without being edited.
+ */
+export function deriveRunKpis(root) {
+  const compute = readFileSync(join(root, "scsim", "scsim", "kpi", "compute.py"), "utf8");
+  const rowBlock = /row: dict\[str, float\] = \{([\s\S]*?)\n\s{4}\}/.exec(compute);
+  if (!rowBlock) {
+    throw new Error(
+      "chains: the per-replication KPI row was not found in scsim/scsim/kpi/compute.py. " +
+        "Fix the scan rather than publishing a claim about which measures a run carries.",
+    );
+  }
+  const emitted = [];
+  const key = /"(\w+)":/g;
+  let m;
+  while ((m = key.exec(rowBlock[1]))) emitted.push({ key: m[1], always: true });
+
+  // The cost breakdown is a loop, not a literal: `row[f"cost_{name}"]`.
+  if (/row\[f"cost_\{name\}"\] = costs\[name\]/.test(compute)) {
+    const ctx = readFileSync(join(root, "scsim", "scsim", "core", "context.py"), "utf8");
+    const costs = /COST_COMPONENTS: tuple\[str, \.\.\.\] = \(([\s\S]*?)\n\)/.exec(ctx);
+    if (!costs) throw new Error("chains: COST_COMPONENTS not found in scsim/scsim/core/context.py");
+    const comp = /"(\w+)"/g;
+    while ((m = comp.exec(costs[1]))) emitted.push({ key: `cost_${m[1]}`, always: true });
+  }
+
+  // The disruption measures exist only on a run that had an event.
+  const eventBlock = /if events:([\s\S]*?)\n    return row/.exec(compute);
+  if (eventBlock) {
+    const ekey = /row\["(\w+)"\]/g;
+    while ((m = ekey.exec(eventBlock[1]))) emitted.push({ key: m[1], always: false });
+  }
+  if (emitted.length < 15) {
+    throw new Error(`chains: parsed ${emitted.length} engine KPI keys; a replication row carries more`);
+  }
+
+  const display = readFileSync(join(root, "src", "lib", "sim", "kpiDisplay.ts"), "utf8");
+  const dBlock = /export const KPI_DISPLAY: KpiDisplay\[\] = \[([\s\S]*?)\n\];/.exec(display);
+  if (!dBlock) throw new Error("chains: KPI_DISPLAY not found in src/lib/sim/kpiDisplay.ts");
+  const rows = [];
+  const drow = /\{\s*key:\s*"(\w+)",\s*label:\s*"([^"]+)"/g;
+  while ((m = drow.exec(dBlock[1]))) rows.push({ key: m[1], label: m[2] });
+  if (rows.length < 5) throw new Error(`chains: parsed ${rows.length} KPI_DISPLAY rows`);
+
+  const emittedKeys = new Set(emitted.map((e) => e.key));
+  return {
+    emitted,
+    display: rows.map((r) => ({ ...r, emitted: emittedKeys.has(r.key) })),
+  };
+}
+
+/**
+ * The weekly series a replication row carries, and the one the utilization
+ * heatmap looks for — WP 5.2j.
+ *
+ * Same join, one layer down. `ReplicationSeedExplorer` declares four series and
+ * gets all four. `UtilizationHeatmap` reads `time_series.utilization`, which no
+ * engine writes — so it renders its own empty state on every run, forever, and
+ * the empty state reads as though a run could be made to produce it.
+ */
+export function deriveReplicationSeries(root) {
+  const engine = readFileSync(join(root, "scsim", "scsim", "core", "engine.py"), "utf8");
+  const extra = /extra_series=\{([\s\S]*?)\n\s{8}\}/.exec(engine);
+  if (!extra) throw new Error("chains: `extra_series` not found in scsim/scsim/core/engine.py");
+  // `fill_rate` is the series the bridge always writes, beside the extras.
+  const bridge = readFileSync(join(root, "sim-worker", "sim_worker", "scsim_bridge.py"), "utf8");
+  if (!/ts = \{"fill_rate":/.test(bridge)) {
+    throw new Error(
+      "chains: the bridge no longer writes `fill_rate` as the base weekly series. " +
+        "Re-read it rather than publishing a list of series a run may not carry.",
+    );
+  }
+  const written = ["fill_rate"];
+  const k = /"(\w+)":/g;
+  let m;
+  while ((m = k.exec(extra[1]))) written.push(m[1]);
+
+  const ui = readFileSync(join(root, "src", "components", "sim", "ReplicationSeedExplorer.tsx"), "utf8");
+  const sBlock = /export const REPLICATION_SERIES = \[([\s\S]*?)\n\] as const;/.exec(ui);
+  if (!sBlock) throw new Error("chains: REPLICATION_SERIES not found in ReplicationSeedExplorer.tsx");
+  const offered = [];
+  const orow = /\{\s*key:\s*"(\w+)",\s*label:\s*"([^"]+)",\s*unit:\s*"([^"]*)"/g;
+  while ((m = orow.exec(sBlock[1]))) offered.push({ key: m[1], label: m[2], unit: m[3] });
+
+  const heatmap = readFileSync(join(root, "src", "components", "sim", "UtilizationHeatmap.tsx"), "utf8");
+  const wants = /\?\.(\w+) as\s*\|\s*Record<string, number\[\]>/.exec(heatmap)?.[1]
+    ?? /\)\?\.(\w+) as/.exec(heatmap)?.[1]
+    ?? null;
+  if (!wants) {
+    throw new Error(
+      "chains: could not read which series UtilizationHeatmap looks for. Re-read the " +
+        "component rather than dropping the claim that it never finds one.",
+    );
+  }
+  return {
+    written,
+    offered: offered.map((o) => ({ ...o, written: written.includes(o.key) })),
+    heatmapWants: wants,
+    heatmapEverRenders: written.includes(wants),
+  };
+}

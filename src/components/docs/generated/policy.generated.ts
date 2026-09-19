@@ -2127,5 +2127,287 @@ export const API_LIMITS: ApiLimits = {
   "defaultPageSize": 20
 };
 
+/**
+ * The weekly measures an inspection run keeps, per item.
+ *
+ * `run_item_series` is deferred in the contract, so this is joined from the
+ * two places that declare it: the engine (which item kind each measure
+ * belongs to) and the explorer's legend (the name the reader sees). The
+ * derivation throws on either half missing a measure the other has.
+ */
+export type ItemSeries = { kind: string; key: string; label: string };
+
+export const ITEM_SERIES: ItemSeries[] = [
+  {
+    "kind": "material",
+    "key": "on_hand",
+    "label": "On hand"
+  },
+  {
+    "kind": "material",
+    "key": "in_transit",
+    "label": "In transit"
+  },
+  {
+    "kind": "material",
+    "key": "orders",
+    "label": "Orders placed"
+  },
+  {
+    "kind": "product",
+    "key": "demand",
+    "label": "Demand"
+  },
+  {
+    "kind": "product",
+    "key": "production",
+    "label": "Production"
+  },
+  {
+    "kind": "product",
+    "key": "fulfillment",
+    "label": "Fulfillment"
+  },
+  {
+    "kind": "product",
+    "key": "backlog",
+    "label": "Backlog"
+  },
+  {
+    "kind": "product",
+    "key": "lost_units",
+    "label": "Lost units"
+  }
+];
+
+/**
+ * What a replication row carries, against what the results table looks for.
+ *
+ * `emitted` is the engine's own per-replication row; `always: false` means
+ * the measure exists only on a run that had a disruption. `display` is the
+ * results screen's vocabulary with a flag saying whether the engine ever
+ * writes that key — §4 D21 at the results layer, visible only in the join.
+ */
+export type RunKpis = {
+  emitted: { key: string; always: boolean }[];
+  display: { key: string; label: string; emitted: boolean }[];
+};
+
+export const RUN_KPIS: RunKpis = {
+  "emitted": [
+    {
+      "key": "fill_rate",
+      "always": true
+    },
+    {
+      "key": "demand_value",
+      "always": true
+    },
+    {
+      "key": "produced_value",
+      "always": true
+    },
+    {
+      "key": "revenue",
+      "always": true
+    },
+    {
+      "key": "lost_sales_value",
+      "always": true
+    },
+    {
+      "key": "lost_units",
+      "always": true
+    },
+    {
+      "key": "max_backlog",
+      "always": true
+    },
+    {
+      "key": "lost_inbound_units",
+      "always": true
+    },
+    {
+      "key": "avg_on_hand_value",
+      "always": true
+    },
+    {
+      "key": "capacity_utilization",
+      "always": true
+    },
+    {
+      "key": "cost_of_resilience",
+      "always": true
+    },
+    {
+      "key": "cost_ss_holding",
+      "always": true
+    },
+    {
+      "key": "cost_backup_premium",
+      "always": true
+    },
+    {
+      "key": "cost_multi_sourcing_premium",
+      "always": true
+    },
+    {
+      "key": "cost_expediting",
+      "always": true
+    },
+    {
+      "key": "cost_overtime",
+      "always": true
+    },
+    {
+      "key": "cost_lost_sales",
+      "always": true
+    },
+    {
+      "key": "cost_allocation_labor",
+      "always": true
+    },
+    {
+      "key": "cost_fg_ss_holding",
+      "always": true
+    },
+    {
+      "key": "cost_backorder_penalty",
+      "always": true
+    },
+    {
+      "key": "cost_monitoring",
+      "always": true
+    },
+    {
+      "key": "ttr_weeks",
+      "always": false
+    },
+    {
+      "key": "tts_weeks",
+      "always": false
+    },
+    {
+      "key": "pre_disruption_fill_rate",
+      "always": false
+    }
+  ],
+  "display": [
+    {
+      "key": "fill_rate",
+      "label": "Fill rate (α)",
+      "emitted": true
+    },
+    {
+      "key": "fill_rate_beta",
+      "label": "Fill rate (β)",
+      "emitted": false
+    },
+    {
+      "key": "otif",
+      "label": "OTIF",
+      "emitted": false
+    },
+    {
+      "key": "lead_time_days",
+      "label": "Lead time (days)",
+      "emitted": false
+    },
+    {
+      "key": "lead_time_p95",
+      "label": "Lead time p95",
+      "emitted": false
+    },
+    {
+      "key": "revenue",
+      "label": "Revenue",
+      "emitted": true
+    },
+    {
+      "key": "cost",
+      "label": "Cost",
+      "emitted": false
+    },
+    {
+      "key": "profit",
+      "label": "Profit",
+      "emitted": false
+    },
+    {
+      "key": "utilization",
+      "label": "Utilization (avg)",
+      "emitted": false
+    },
+    {
+      "key": "inventory_turns",
+      "label": "Inventory turns",
+      "emitted": false
+    },
+    {
+      "key": "backorder_days",
+      "label": "Backorder days",
+      "emitted": false
+    },
+    {
+      "key": "ttr_days",
+      "label": "Time-to-recover",
+      "emitted": false
+    },
+    {
+      "key": "resilience_index",
+      "label": "Resilience index",
+      "emitted": false
+    }
+  ]
+};
+
+/**
+ * The weekly series a replication carries, and the one panel that looks for
+ * a series nothing writes.
+ */
+export type ReplicationSeries = {
+  written: string[];
+  offered: { key: string; label: string; unit: string; written: boolean }[];
+  heatmapWants: string;
+  heatmapEverRenders: boolean;
+};
+
+export const REPLICATION_SERIES_FACTS: ReplicationSeries = {
+  "written": [
+    "fill_rate",
+    "backlog_units",
+    "on_hand_value",
+    "revenue_value"
+  ],
+  "offered": [
+    {
+      "key": "fill_rate",
+      "label": "Fill rate",
+      "unit": "fraction",
+      "written": true
+    },
+    {
+      "key": "backlog_units",
+      "label": "Backlog",
+      "unit": "units",
+      "written": true
+    },
+    {
+      "key": "on_hand_value",
+      "label": "On-hand value",
+      "unit": "€",
+      "written": true
+    },
+    {
+      "key": "revenue_value",
+      "label": "Revenue",
+      "unit": "€/week",
+      "written": true
+    }
+  ],
+  "heatmapWants": "utilization",
+  "heatmapEverRenders": false
+};
+
 export const CHAIN_COUNT = 38;
 export const BROKEN_COUNT = 11;
