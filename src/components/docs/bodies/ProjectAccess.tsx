@@ -55,12 +55,45 @@ export default function ProjectAccess() {
         <SuppliedAndComputed table={grants} />
       </Section>
 
-      <Callout tone="limit" title="Neither table can be written from the application">
+      <Callout tone="limit" title="Read this first: there is no screen for any of this">
         <p>
-          There is no write rule on the membership or delegation tables, so changes go through a
-          function that enforces the two rules above rather than through a direct write. That is
-          deliberate and it is also a limit: it means these are not surfaces a project owner edits
-          casually.
+          <strong>Nothing in the application adds a member to a project, and nothing delegates a
+          role.</strong> There is no menu item, no dialog and no button — no part of the product
+          reads or writes either table. What exists is the database design above and one automatic
+          rule: creating a project makes you its owner.
+        </p>
+        <p>
+          So the consultant in the paragraph above is a case this is <em>designed</em> for and not
+          one you can set up today. Adding somebody to a project is a request to whoever operates
+          this deployment, not something a project owner can do.
+        </p>
+        <p>
+          We are saying it here because a reference page describing two tables, their columns and
+          their rules reads as a description of a feature, and a reader would reasonably go looking
+          for the screen.
+        </p>
+      </Callout>
+
+      <Callout tone="limit" title="And membership is not what decides who can read your rows">
+        <p>
+          Project membership answers <em>which rooms</em> in the design. In the database today, one
+          live path checks a project role — the promotion that lands reviewed data — and every other
+          read and write is decided by the row rules, which ask about your organization and the
+          project's modeler instead.
+        </p>
+        <p>
+          <DocLink to="who-can-see-your-data">Who can see your data</DocLink> has the measured
+          version of this, including how many tables are readable regardless of either. Read it
+          before relying on membership to separate two pieces of work.
+        </p>
+      </Callout>
+
+      <Callout title="The write path is a function, not a table rule">
+        <p>
+          Neither table carries a write rule, so any change goes through a function that enforces
+          subtraction and expiry rather than through a direct write. That is the right design — it
+          means the two rules above cannot be bypassed by writing the row another way — and it is
+          why there is nothing to add a member <em>with</em> until something calls it.
         </p>
       </Callout>
 
@@ -85,7 +118,7 @@ export default function ProjectAccess() {
         </P>
       </Section>
 
-      <Provenance from="the project_members and delegation_grants sidecars, joined to the schema" />
+      <Provenance from="the project_members and delegation_grants sidecars joined to the schema; the absence of a surface is an import scan over src/, where neither table appears outside this manual" />
     </>
   );
 }

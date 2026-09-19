@@ -1,7 +1,7 @@
 // §6.3 section 3 — Deep-Tier Edges. Generated reference, authored narrative.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
-import { HowItLoads, SuppliedAndComputed, DatabaseRules } from "@/components/docs/tableRef";
+import { HowItLoads, SuppliedAndComputed, DatabaseRules, TemplateHeaders } from "@/components/docs/tableRef";
 import { refTable, computedColumns } from "@/components/docs/tableFacts";
 
 export default function DeepTierEdges() {
@@ -55,6 +55,21 @@ export default function DeepTierEdges() {
           </p>
         </Callout>
       )}
+
+      <Section id="template" title="The file you upload">
+        <TemplateHeaders table={t} />
+        <P>
+          Upload it from <AppLink to="/project-manager">Project Manager</AppLink> under the Deep
+          Tier Network tab. Upload the <DocLink to="deep-tier-nodes">nodes file</DocLink> first: an
+          edge whose <Term>src_uid</Term> or <Term>dst_uid</Term> names a firm with no node row has
+          nothing to connect, and nothing tells you that happened.
+        </P>
+        <P>
+          The JSON alternative on the same tab carries both halves in one file. It is a different
+          template — <Term>summary.json</Term> rather than a pair of CSVs — and the tab's format
+          switch is what chooses between them.
+        </P>
+      </Section>
 
       <DatabaseRules table={t} />
 

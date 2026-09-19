@@ -109,7 +109,7 @@ export default function UploadingData() {
       <Section id="what-happens-after" title="What happens after the file is accepted">
         <P>
           The rows become part of your project and the derived layer is rebuilt from them — sourcing
-          shares, effective arcs, network structure. The project's completion status is updated, and
+          shares, effective lanes, network structure. The project's completion status is updated, and
           if this was the dataset it was waiting for, it becomes ready to simulate.
         </P>
         <P>

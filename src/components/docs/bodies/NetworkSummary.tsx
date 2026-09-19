@@ -33,14 +33,36 @@ export default function NetworkSummary() {
           table={t}
           instead={
             <p>
-              Written by the graph build over the deep-tier tables. Nothing uploads it and nothing
-              edits it.
+              Nothing uploads it and nothing edits it. The contract names the ETL as what computes
+              it — and see the box below, because that is not what happens today.
             </p>
           }
         />
       </Section>
 
+      <Callout tone="limit" title="Nothing writes this table today">
+        <p>
+          The columns below are marked as computed by the ETL that rebuilds your chain. <strong>That
+          ETL does not write this table.</strong> It writes the sourcing shares and it refreshes the
+          node list, and it never touches the summary.
+        </p>
+        <p>
+          The only thing that can write a row here is a bulk-insert function, and{" "}
+          <strong>nothing calls it</strong> — no screen, no upload, no edge function, no job. So on
+          a project created today this table is empty, and it stays empty.
+        </p>
+        <p>
+          We are saying it because the reference below reads as a description of something that gets
+          filled in. If you have rows here, they predate this and were written by something that no
+          longer runs; read them as a historical artifact rather than as a current count.
+        </p>
+      </Callout>
+
       <Section id="columns" title="Every column, and who wrote it">
+        <P>
+          The “written by” marks below are the contract's declaration, not an observation. Read them
+          as what each column is <em>for</em>, given the box above.
+        </P>
         <SuppliedAndComputed table={t} />
       </Section>
 
@@ -85,7 +107,7 @@ export default function NetworkSummary() {
         </P>
       </Section>
 
-      <Provenance from="supabase/contract/network_summary.contract.yaml, joined to the schema" />
+      <Provenance from="supabase/contract/network_summary.contract.yaml joined to the schema; the absence of a live writer is a call-site scan over src/ and supabase/functions/, where the table's only writing function has none" />
     </>
   );
 }

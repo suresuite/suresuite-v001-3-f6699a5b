@@ -22,6 +22,7 @@ import { PageTitle, Section, P, Key, Callout, Term, DocLink, Provenance } from "
 import { DocFigure } from "@/components/docs/DocFigure";
 import { REFERENCE_TABLES } from "@/components/docs/generated/reference.generated";
 import { COUNTS } from "@/components/docs/generated/dataModel.generated";
+import { READ_EXPOSURE } from "@/components/docs/generated/policy.generated";
 
 export default function WhoCanSeeYourData() {
   const described = REFERENCE_TABLES.length;
@@ -32,6 +33,7 @@ export default function WhoCanSeeYourData() {
   );
   const audited = REFERENCE_TABLES.filter((t) => t.governance?.audited).length;
   const withRead = REFERENCE_TABLES.filter((t) => t.governance?.read).length;
+  const exposure = READ_EXPOSURE;
 
   return (
     <>
@@ -121,6 +123,54 @@ export default function WhoCanSeeYourData() {
         <p>
           So the useful question is never “is RLS enabled”. It is “what does the rule say”, and that
           is on each table's own reference page.
+        </p>
+      </Callout>
+
+      <Callout tone="limit" title={`And the count above answers the wrong question: ${exposure.open.length} tables are readable by everybody`}>
+        <p>
+          The {allOpen.length} above are tables whose <em>every</em> rule permits every row. That
+          measures whether a table is unprotected, and it is not what you came here to ask. Asking
+          instead <strong>which tables have a READ rule that permits every row</strong> — leaving
+          their write rules as strict as they are — answers{" "}
+          <strong>{exposure.open.length} of {exposure.described}</strong>.
+        </p>
+        <p>
+          <strong>
+            {exposure.signedOut.length === exposure.open.length
+              ? "Every one of them"
+              : `${exposure.signedOut.length} of them`}{" "}
+            is readable without signing in at all
+          </strong>{" "}
+          — by the key this application's own browser bundle carries, which is to say by anybody who
+          loads the site. They are:
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {exposure.open.map((t) => (
+            <span
+              key={t.table}
+              className="rounded-sm border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+            >
+              {t.table}
+            </span>
+          ))}
+        </div>
+        <p>
+          That list includes your inbound and outbound lanes, both bills of materials, and your
+          policy defaults and overrides. <strong>Your chain's structure and your decisions are not
+          hidden from other organizations by a row rule today.</strong> Writing them is restricted;
+          reading them is not.
+        </p>
+        <p>
+          <strong>This is known, recorded and deliberately unchanged.</strong> The application
+          itself runs under that same key with no signed-in database session, so revoking the reads
+          stops the product working — the fix is an authentication model rather than a policy edit,
+          and it is scheduled as its own piece of work. A test fails if the set grows.
+        </p>
+        <p>
+          What it means for you today: treat anything in those tables as visible to everyone who can
+          reach this deployment, and do not rely on project or organization boundaries to separate
+          two clients' structural data. If that is not acceptable for a piece of work, the answer is
+          a separate deployment, not a setting.
         </p>
       </Callout>
 

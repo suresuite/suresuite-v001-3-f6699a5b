@@ -61,6 +61,13 @@ export default function ReproducibilityRecord() {
           metadata, and a reader can confirm the three belong together. That is most of the record,
           assembled by hand, with nothing checking that you assembled it completely.
         </p>
+        <p>
+          <strong>One conclusion already has all four, and it is the exception worth knowing.</strong>{" "}
+          A <DocLink to="model-validation">model-validation card</DocLink> records the dataset, the
+          policy set, the scenario and the engine build it was reached under — each by identity and
+          by fingerprint — and names the run that was its evidence. So a validated model IS
+          reproducible today. What is missing is the same binding on an ordinary figure.
+        </p>
       </Callout>
 
       <Section id="the-stamps-that-do-exist" title="What is in place">

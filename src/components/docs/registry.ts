@@ -47,6 +47,28 @@ export type DocPage = {
    */
   table?: string;
   /**
+   * The upload wizard's dataset id, for the four pages the CONTRACT cannot
+   * answer for — WP 5.2j, §4 D110.
+   *
+   * Every §3 page offers the template a reader downloads, and that pairing is
+   * declared once, in `UploadWizard.tsx`'s `templateTypes`, and derived into
+   * `UPLOAD_ASSETS`. Nine tables reach it through their own sidecar's
+   * `ingest_dataset.wizard_id`, which is the right route and the only one a
+   * page should use where it exists.
+   *
+   * `node_list`, `network_nodes`, `network_edges` and `multi_tier_supply_chain`
+   * carry no `ingest_dataset` block, and must not be given one: that block is
+   * what makes `ingest-file` build a parser for a table, and these four reach
+   * their tables through bulk RPCs instead (§4 D56). Declaring it would assert
+   * a landing path they do not have.
+   *
+   * So the binding lives here, with `table`, for the same reason `table` does:
+   * it is an editorial cross-reference between two ids, not a data fact.
+   * `docsAssets.test.ts` fails if one names a dataset the wizard does not
+   * offer, AND if one restates a binding the contract already declares.
+   */
+  wizardId?: string;
+  /**
    * How the page's facts are produced, per §6.3's legend:
    *   "contract" — G,  generated from the data contract
    *   "registry" — G*, generated from the engine registry (gen_docs.py)
@@ -176,9 +198,9 @@ export const DOC_GROUPS: DocGroup[] = [
       { ...live, slug: "materials", table: "materials", title: "Materials", summary: "The economics the simulation reads for each material.", keywords: "materials cost holding cost moq initial on hand lead time distribution cv", source: "contract" },
       { ...live, slug: "products", table: "products", title: "Products", summary: "Price, capacity, fulfilment mode and the shape of demand.", keywords: "products sell price production capacity fulfillment mode demand distribution mean cv", source: "contract" },
       { ...live, slug: "suppliers", table: "suppliers", title: "Suppliers", summary: "Capacity and reliability, beyond the arcs that connect a supplier to materials.", keywords: "suppliers capacity per week reliability score", source: "contract" },
-      { ...live, slug: "node-list", table: "node_list", title: "Node List", summary: "Named locations and their coordinates.", keywords: "node list location longitude latitude description map", source: "contract" },
-      { ...live, slug: "deep-tier-nodes", table: "network_nodes", title: "Deep-Tier Nodes", summary: "Firms discovered beyond tier one, with the attributes known about each.", keywords: "network nodes deep tier firm depth country industry employees revenue seed", source: "contract" },
-      { ...live, slug: "deep-tier-edges", table: "network_edges", title: "Deep-Tier Edges", summary: "Relationships between deep-tier firms, and their direction.", keywords: "network edges deep tier relation type relative revenue direction depth", source: "contract" },
+      { ...live, slug: "node-list", wizardId: "node_list", table: "node_list", title: "Node List", summary: "Named locations and their coordinates.", keywords: "node list location longitude latitude description map", source: "contract" },
+      { ...live, slug: "deep-tier-nodes", wizardId: "network_nodes", table: "network_nodes", title: "Deep-Tier Nodes", summary: "Firms discovered beyond tier one, with the attributes known about each.", keywords: "network nodes deep tier firm depth country industry employees revenue seed", source: "contract" },
+      { ...live, slug: "deep-tier-edges", wizardId: "network_edges", table: "network_edges", title: "Deep-Tier Edges", summary: "Relationships between deep-tier firms, and their direction.", keywords: "network edges deep tier relation type relative revenue direction depth", source: "contract" },
       { ...live, slug: "multi-tier-suppliers", table: "multi_tier_supply_chain", title: "Multi-Tier Suppliers", summary: "The firm-to-firm supply relationships that make up the deep chain.", keywords: "multi tier supply chain from firm to firm tier relationship", source: "contract" },
       { ...live, slug: "units-and-time-periods", title: "Units and time periods", summary: "The page that settles time_unit against lead_time, once.", keywords: "units time period week day lead time unit conversion normalization" },
     ],
@@ -231,7 +253,7 @@ export const DOC_GROUPS: DocGroup[] = [
       { ...live, slug: "recovery-playbooks", title: "Recovery playbooks", summary: "What the chain does once something has gone wrong.", keywords: "recovery playbooks response mitigation strategy" },
       { ...live, slug: "experiments-and-comparison", title: "Experiments & comparison", summary: "Ranking strategies against each other.", keywords: "experiments comparison compare ranking portfolio synergy" },
       { ...live, slug: "seeds-replications-confidence", title: "Seeds, replications & confidence", summary: "Why the same run gives a range, and how wide that range is.", keywords: "seeds replications confidence intervals crn warmup bootstrap statistics", source: "registry" },
-      { ...live, slug: "stress-tests", title: "Stress tests", summary: "The standing stress-test battery and what each one probes.", keywords: "stress tests battery st1 st7 robustness" },
+      { ...live, slug: "stress-tests", title: "Stress tests", summary: "The seven one-click presets, what each fills in, and which of them the engine acts on.", keywords: "stress tests presets single supplier outage plant shutdown material shortage lead time shock demand surge multi hit nexus attack disruption schedule battery st1 st7 robustness", related: ["disruptions", "simulation-lab", "experiments-and-comparison"] },
     ],
   },
   {

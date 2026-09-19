@@ -78,7 +78,7 @@ export default function HowYourDataFlows() {
       <Section id="compute" title="4. We compute from it">
         <P>
           With your data in place, the derived layer is built: sourcing shares, effective
-          product-to-material arcs collapsed out of a deep bill of materials, expanded supply paths,
+          product-to-material rows collapsed out of a deep bill of materials, expanded supply paths,
           network summaries and structural metrics.
         </P>
         <P>

@@ -15,18 +15,18 @@ export default function InboundLogistics() {
 
   return (
     <>
-      <PageTitle lead="Supply arcs: which supplier delivers which material, at what price and lead time.">
+      <PageTitle lead="Supply lanes: which supplier delivers which material, at what price and lead time.">
         Inbound Logistics
       </PageTitle>
 
       <Section id="what-it-is" title="What this file is">
         <P>
-          One row per <em>supply arc</em> — a supplier who can deliver a material. It is the file
+          One row per <em>supply lane</em> — a supplier who can deliver a material. It is the file
           that tells the model where a material can come from, so a material with no inbound row is
           a material nothing can supply, and the simulation will say so.
         </P>
         <P>
-          Arcs are not the same thing as suppliers. This file says <em>this supplier can deliver
+          Lanes are not the same thing as suppliers. This file says <em>this supplier can deliver
           this material, at this price, in this time</em>; the{" "}
           <DocLink to="suppliers">Suppliers</DocLink> file says what is true of the supplier
           regardless of what they are delivering. Upload both.
