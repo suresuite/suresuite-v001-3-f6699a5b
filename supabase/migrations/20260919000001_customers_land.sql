@@ -105,7 +105,7 @@ COMMENT ON FUNCTION public.ingest_target_is_promotable(text) IS
   '`customers` joined here because P-C.2 reads two of its columns on every run '
   'and no surface in the product could set either (§4 D94).';
 
--- ── 3 · D113 · A BLANK OPTIONAL CELL MUST NOT ABORT THE WHOLE PROMOTION ─────
+-- ── 3 · D120 · A BLANK OPTIONAL CELL MUST NOT ABORT THE WHOLE PROMOTION ─────
 --
 -- FOUND BY `supabase/rehearsal/230`, ON ITS FIRST RUN, AND IT IS NOT THIS
 -- PACKAGE'S DEFECT — IT IS LIVE ON `suppliers` AND HAS BEEN SINCE WP 3.3.
@@ -276,7 +276,7 @@ REVOKE ALL ON FUNCTION public.ingest_promotion_plan(uuid,text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.ingest_promotion_plan(uuid,text) TO service_role;
 
 COMMENT ON FUNCTION public.ingest_promotion_plan(uuid,text) IS
-  'Phase 6 / WP 6.2 (§4 D113) — the columns a promotion of this run into this '
+  'Phase 6 / WP 6.2 (§4 D120) — the columns a promotion of this run into this '
   'target would write, and the expression for each. One list serves the whole '
   'run, so a column ONE row supplies is written for every row; a NOT NULL column '
   'carrying a DEFAULT is therefore wrapped in COALESCE against its OWN default, '

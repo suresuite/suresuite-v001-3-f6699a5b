@@ -16,6 +16,11 @@ import {
   type RunScenarioMeta,
 } from "@/lib/policies/verifiableExports";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
+import {
+  buildReproducibilityRecord,
+  type AnalysisBinding,
+} from "@/lib/trust/reproducibilityRecord";
+import { knownLimits } from "@/lib/trust/trustReport";
 
 export interface ExportableRun {
   id: string;
@@ -176,11 +181,116 @@ export function useVerifiableExports(
             .maybeSingle();
           versionLabel = (ver?.label as string | null) ?? null;
         }
+        // ── A5 · THE REPRODUCIBILITY RECORD (§5.4, I8) ────────────────────
+        //
+        // A4's sheets bind this RUN. The record adds what a reader in two years
+        // also needs and the run row cannot supply: which ANALYSIS runs produced
+        // the network figures — they come from `analysis_runs` and not from a
+        // simulation — the hash ALGORITHM version behind `graph_hash`, and the
+        // known limits of the whole thing.
+        //
+        // EVERY QUERY HERE IS ALLOWED TO FAIL, and a failure becomes an absent
+        // binding with a stated reason rather than an aborted export. A reviewer
+        // holding a workbook with six of nine bindings and three explanations is
+        // better served than one holding an error toast.
+        const runRow = run as SimulationRun & {
+          dataset_version_id?: string | null;
+          graph_hash?: string | null;
+        };
+        const { data: dsv } = await sb
+          .from("dataset_versions")
+          .select("id,graph_hash,schema_version")
+          .eq("id", runRow.dataset_version_id ?? "00000000-0000-0000-0000-000000000000")
+          .maybeSingle();
+        const { data: analysisRows } = await sb
+          .from("analysis_runs")
+          .select("id,analysis_kind,code_version,input_hash,params_hash,finished_at,status")
+          .eq("project_id", projectId)
+          .eq("status", "succeeded")
+          .order("started_at", { ascending: false });
+
+        // The LATEST succeeded run per kind — the one a screen's dual read would
+        // have preferred. Listing every historical run would make the record a log
+        // rather than a binding.
+        const latestByKind = new Map<string, AnalysisBinding>();
+        for (const a of (analysisRows ?? []) as Array<Record<string, unknown>>) {
+          const kind = String(a.analysis_kind ?? "");
+          if (!kind || latestByKind.has(kind)) continue;
+          const inputHash = (a.input_hash as string | null) ?? null;
+          latestByKind.set(kind, {
+            kind,
+            runId: (a.id as string | null) ?? null,
+            codeVersion: (a.code_version as string | null) ?? null,
+            inputHash,
+            paramsHash: (a.params_hash as string | null) ?? null,
+            finishedAt: (a.finished_at as string | null) ?? null,
+            // Compared against the DATASET VERSION the run was taken over, not
+            // against "now": this workbook is a record of a run, and a hash that
+            // was current then is the fact being recorded. NULL when either side
+            // is unknown — unknown is not stale (D70).
+            inputHashIsCurrent:
+              inputHash == null || !runRow.graph_hash ? null : inputHash === runRow.graph_hash,
+          });
+        }
+
+        // The browser engine's own version, from the manifest the frontend ships.
+        // A separate binding from the worker's `code_version` because the wheels
+        // are committed and the two CAN differ (§4 D87).
+        let browserEngineVersion: string | null = null;
+        try {
+          const res = await fetch("/engine/manifest.json");
+          if (res.ok) {
+            const manifest = (await res.json()) as { engine_version?: string };
+            // "unknown" is what the build script used to write when its version
+            // lookup failed. It is not a version and must not be bound as one.
+            const v = manifest.engine_version;
+            browserEngineVersion = v && v !== "unknown" ? v : null;
+          }
+        } catch {
+          browserEngineVersion = null;
+        }
+
+        const record = buildReproducibilityRecord({
+          projectId,
+          projectName: runRow.scenario_id ? `project ${projectId.slice(0, 8)}` : projectId,
+          graphHash: runRow.graph_hash ?? (dsv?.graph_hash as string | null) ?? null,
+          datasetVersionId: runRow.dataset_version_id ?? (dsv?.id as string | null) ?? null,
+          hashSchemaVersion: (dsv?.schema_version as number | null) ?? null,
+          policyVersionId: (run as SimulationRun).policy_version_id ?? null,
+          policyHash: (run as SimulationRun).policy_hash ?? null,
+          scenarioId: (scenario?.id as string | null) ?? (run as SimulationRun).scenario_id ?? null,
+          scenarioSeed: (scenario?.seed as number | null) ?? null,
+          engineCodeVersion: (run as SimulationRun).code_version ?? null,
+          browserEngineVersion,
+          analyses: [...latestByKind.values()],
+          // VERBATIM from the Trust Report's own computation — §4 D103 is what a
+          // second copy of a limits list costs. `graded: null` is honest here: this
+          // export has the run, not the graded manifest, and `knownLimits` turns
+          // that into a declared limit of its own.
+          limits: knownLimits({
+            projectName: projectId,
+            freshness: {
+              project_id: projectId,
+              graph_hash: runRow.graph_hash ?? null,
+              graph_hash_short: (runRow.graph_hash ?? "").slice(0, 12),
+              dataset_version: null,
+              measured_at: new Date().toISOString(),
+              tables: {},
+              latest_runs: [],
+            },
+            graded: null,
+            findings: [],
+            ingestHistory: [],
+          }),
+          measuredAt: new Date().toISOString(),
+        });
+
         const wb = buildRunResultsWorkbook(
           run as SimulationRun,
           (scenario ?? null) as RunScenarioMeta | null,
           (reps ?? []) as Replication[],
           versionLabel,
+          record,
         );
         downloadWorkbook(wb, `run-results-${runId.slice(0, 8)}.xlsx`);
         toast.success("Run results exported");

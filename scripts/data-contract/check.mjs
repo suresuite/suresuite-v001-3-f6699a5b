@@ -26,6 +26,7 @@
 //   R14 no dynamic RLS statement resolves to zero known tables (D51, WP 6.2)
 //   R15 a sidecar's prose may not deny a reader its own `surfaces` block confirms
 //       (D58, D101's shape inside one file, WP 6.2)
+//   R16 every §4 D-number is unique, and §4 has no duplicated row (D121's merge, WP 6.3)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -833,6 +834,60 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
 // ──────────────────────────────────────────────────────────────────── report
 
 const covered = [...sidecars.keys()].length;
+// ───────── R16: A D-NUMBER IS AN IDENTITY, SO IT HAS TO BE UNIQUE
+//
+// FOUND BY A MERGE, WHICH IS THE ONLY WAY IT COULD BE FOUND (WP 6.3).
+//
+// Two branches each took "the next free D-number" from the same §4 and each was
+// right on its own. The merge produced §4 with TWO D112 rows describing different
+// defects, TWO D113, TWO D114 — and, worse, duplicated four EXISTING rows (D87-D90)
+// because the table's lines merged cleanly line by line while meaning nothing as a
+// table.
+//
+// NOTHING NOTICED. Every rule that walks §4 iterates rows: R6 resolved both
+// citations, R8 read both owners, and `trustReportLimits.test.ts` built a Map keyed
+// by D-number and silently kept whichever came last — so a closed defect and an
+// open one shared a key and the open one won. A D-number is the identity CLAUDE.md
+// makes every other document cite by ("cite §4 by D-number"), and an identity that
+// can be duplicated is not one.
+//
+// The rule is the cheapest possible and it would have gone red on the merge commit.
+{
+  const plan4 = readFileSync(PLAN, "utf8");
+  const s4start = plan4.indexOf("\n## 4. ");
+  const s4end = plan4.indexOf("\n### 4.1 ");
+  const section4 = s4start < 0 ? "" : plan4.slice(s4start, s4end < 0 ? undefined : s4end);
+  const seen = new Map();
+  for (const line of section4.split("\n")) {
+    const m = /^\|\s*\*{0,2}(D[0-9]+)\*{0,2}\s*\|/.exec(line);
+    if (!m) continue;
+    const id = m[1];
+    if (seen.has(id)) {
+      fail("R16",
+        `§4 has more than one ${id} row. A D-number is the identity every other ` +
+        "document cites by, so a duplicate is two defects with one name — and every " +
+        "rule that walks §4 silently keeps whichever it saw last. Renumber the newer " +
+        "row (§4's highest number + 1) and update its references, or delete the " +
+        "duplicate if a merge produced it.\n" +
+        `      first:  ${seen.get(id).slice(0, 120)}\n` +
+        `      second: ${line.slice(0, 120)}`);
+      continue;
+    }
+    seen.set(id, line);
+  }
+  // A number may be SKIPPED — a row can be deleted — but the count is printed so a
+  // gap is visible rather than discovered by the next author picking a used number.
+  const nums = [...seen.keys()].map((d) => Number(d.slice(1))).sort((a, b) => a - b);
+  const highest = nums.length ? nums[nums.length - 1] : 0;
+  const gaps = [];
+  for (let i = 1; i <= highest; i++) if (!nums.includes(i)) gaps.push(`D${i}`);
+  console.log(
+    `  R16 §4 D-numbers are unique · ${seen.size} row(s) · highest D${highest}` +
+    (gaps.length ? ` · ${gaps.length} unused (${gaps.slice(0, 8).join(", ")}${gaps.length > 8 ? ", …" : ""})` : " · none unused") +
+    ` · next free is D${highest + 1}`,
+  );
+}
+
 // ───────── R15: A SIDECAR MAY NOT CONTRADICT ITSELF ABOUT ITS OWN READERS
 //
 // §4 D58, and it is §4 D101's shape one scope tighter — not two files disagreeing,

@@ -23267,7 +23267,7 @@
       "returns": null,
       "security_definer": false,
       "volatility": "STABLE",
-      "comment": "Phase 6 / WP 6.2 (§4 D113) — the columns a promotion of this run into this ",
+      "comment": "Phase 6 / WP 6.2 (§4 D120) — the columns a promotion of this run into this ",
       "defined_by": "20260919000001_customers_land.sql"
     },
     {

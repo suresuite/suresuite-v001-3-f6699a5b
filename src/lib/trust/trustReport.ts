@@ -231,14 +231,14 @@ export function knownLimits(input: TrustReportInput): KnownLimit[] {
     });
   }
 
-  // §4 D112 — a requirement the grader has no binding for is `evaluable: false`,
+  // §4 D119 — a requirement the grader has no binding for is `evaluable: false`,
   // and every surface DROPPED it in silence until WP 6.2. Reporting it here is
   // T3 applied to the report's own inputs: the engine reads this field, and this
   // report cannot tell you how well it is covered.
   const unevaluable = (input.graded ?? []).filter((g) => !g.evaluable);
   if (unevaluable.length > 0) {
     out.push({
-      ref: "§4 D112 (closed — this is the measurement it made visible)",
+      ref: "§4 D119 (closed — this is the measurement it made visible)",
       limit:
         `${unevaluable.length} field(s) the engine reads are not measurable on ` +
         `this report: ${unevaluable.map((g) => g.field).join(", ")}.`,

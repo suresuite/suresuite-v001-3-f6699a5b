@@ -42,7 +42,15 @@ const ROOT = join(__dirname, "..", "..", "..", "..");
 const PLAN = readFileSync(join(ROOT, "docs", "PLAN.md"), "utf8");
 const REPORT = readFileSync(join(ROOT, "src", "lib", "trust", "trustReport.ts"), "utf8");
 
-/** §4's rows, by D-number, with the "Closed by" cell. */
+/**
+ * §4's rows, by D-number, with the "Closed by" cell.
+ *
+ * The closed marker is matched as `\u2705` rather than as the glyph itself:
+ * `npm run audit:ui` §3.5 forbids an emoji literal in source
+ * (`docs/mobile-ui-spec.md`), and it is right to — this file is not product copy,
+ * but a rule that made an exception for "tests" would stop being a rule. The
+ * assertion is identical; only the spelling changes.
+ */
 function planDefects(): Map<string, string> {
   const start = PLAN.indexOf("\n## 4. Confirmed defects");
   const end = PLAN.indexOf("\n## 5. ", start);
@@ -112,7 +120,7 @@ describe("the Trust Report's known limits (§4 D103)", () => {
   it("it publishes no limit that cites a CLOSED defect as though it were open", () => {
     // THE ONE EXEMPTION, AND WHY IT IS NOT A LOOPHOLE.
     //
-    // Closing a defect can CREATE a measurement. §4 D112 was "an unevaluable
+    // Closing a defect can CREATE a measurement. §4 D119 was "an unevaluable
     // requirement is dropped in silence"; closing it means the Trust Report now
     // reports how many such fields there are — a live number whose existence is
     // owed to a closed defect. So a ref may name a closed row, and only if the
@@ -126,7 +134,7 @@ describe("the Trust Report's known limits (§4 D103)", () => {
       .filter((r) => !/\bclosed\b/i.test(r))
       .map((r) => /§4\s+(D\d+)/.exec(r)?.[1])
       .filter((d): d is string => !!d)
-      .filter((d) => /CLOSED|✅/.test(defects.get(d) ?? ""));
+      .filter((d) => /CLOSED|\u2705/.test(defects.get(d) ?? ""));
     expect(
       stale,
       "these limits describe defects §4 records as CLOSED, without saying so. A " +
@@ -145,7 +153,7 @@ describe("the Trust Report's known limits (§4 D103)", () => {
       .filter((r) => /\bclosed\b/i.test(r))
       .map((r) => /§4\s+(D\d+)/.exec(r)?.[1])
       .filter((d): d is string => !!d)
-      .filter((d) => !/CLOSED|✅/.test(defects.get(d) ?? ""));
+      .filter((d) => !/CLOSED|\u2705/.test(defects.get(d) ?? ""));
     expect(
       lying,
       "a limit's ref calls these §4 defects closed and §4 does not. §4 is the " +

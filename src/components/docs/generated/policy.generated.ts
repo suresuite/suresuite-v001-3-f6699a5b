@@ -1874,6 +1874,13 @@ export const UPLOAD_ASSETS: UploadAsset[] = [
     "guideFile": "/docs/csv-upload-guide.md"
   },
   {
+    "id": "item_master_customers",
+    "name": "Customers Master",
+    "description": "Per-customer segment and allocation priority the simulation reads under scarcity",
+    "templateFile": "/template/customers.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
     "id": "node_list",
     "name": "Node List",
     "description": "Node list data with locations and descriptions",

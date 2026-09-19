@@ -16,6 +16,7 @@
 // src/hooks/useVerifiableExports.tsx.
 
 import * as XLSX from "xlsx";
+import { recordRows, type ReproducibilityRecord } from "@/lib/trust/reproducibilityRecord";
 import {
   DEFAULT_BUNDLE,
   FIELD_LABELS,
@@ -375,6 +376,22 @@ export function buildRunResultsWorkbook(
   scenario: RunScenarioMeta | null,
   reps: Replication[],
   policyVersionLabel?: string | null,
+  /**
+   * A5 — the Reproducibility Record (§5.4), appended as its own sheet.
+   *
+   * A4 already binds four of I8's five for a simulation run, and it binds them for
+   * THIS RUN. A5 adds the two things a reader in two years also needs and this
+   * workbook could not supply: the ANALYSIS runs behind the network figures, which
+   * come from `analysis_runs` and not from a simulation at all, and the DECLARED
+   * LIMITS of the whole record.
+   *
+   * OPTIONAL, AND ITS ABSENCE IS A SHEET RATHER THAN A MISSING ONE. A caller that
+   * cannot assemble the record still gets a `reproducibility` sheet saying so —
+   * because a workbook silently lacking the sheet is indistinguishable from one
+   * whose record was complete, which is the over-claim T1 forbids and the exact
+   * shape §4 D103 was.
+   */
+  record?: ReproducibilityRecord | null,
 ): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
   const done = reps
@@ -471,6 +488,27 @@ export function buildRunResultsWorkbook(
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), `series_${key}`.slice(0, 31));
   }
+
+  // A5 · the reproducibility record, or the stated reason there is none.
+  XLSX.utils.book_append_sheet(
+    wb,
+    XLSX.utils.aoa_to_sheet(
+      record
+        ? recordRows(record)
+        : [
+            ["SuReSuite — REPRODUCIBILITY RECORD (A5)"],
+            [
+              "NOT SUPPLIED",
+              "The surface that produced this workbook did not assemble a " +
+                "reproducibility record, so this sheet is empty. That is NOT evidence " +
+                "the run is reproducible: the bindings above cover the simulation " +
+                "inputs, and the analysis runs behind any network figure — and the " +
+                "known limits of all of it — are unrecorded here.",
+            ],
+          ],
+    ),
+    "reproducibility",
+  );
 
   return wb;
 }

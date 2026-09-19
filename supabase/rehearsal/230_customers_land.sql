@@ -256,9 +256,9 @@ BEGIN
     WHEN invalid_parameter_value THEN NULL;   -- the guard fired, which is the assertion
   END;
 
-  -- ── 9 · D113 · THE SAME CASE ON A LIVE DATASET, WHICH IS WHY IT MATTERS ──
+  -- ── 9 · D120 · THE SAME CASE ON A LIVE DATASET, WHICH IS WHY IT MATTERS ──
   --
-  -- This section is the reason §4 D113 is a defect and not a note about a new
+  -- This section is the reason §4 D120 is a defect and not a note about a new
   -- table. `suppliers` has been landable since WP 3.3 and
   -- `suppliers.reliability_score` is NOT NULL DEFAULT 1.0 with
   -- `required: false` — so a file where ONE row leaves it blank aborted the
@@ -295,7 +295,7 @@ BEGIN
     v_res := public.ingest_apply_run(v_sup_run, v_user);
 
     IF (v_res ->> 'rows_promoted')::int <> 2 THEN
-      RAISE EXCEPTION 'WP 6.2 / D113: a suppliers file with one blank reliability_score promoted % row(s), expected 2',
+      RAISE EXCEPTION 'WP 6.2 / D120: a suppliers file with one blank reliability_score promoted % row(s), expected 2',
         v_res ->> 'rows_promoted';
     END IF;
 
@@ -303,7 +303,7 @@ BEGIN
     SELECT reliability_score INTO v_num FROM public.suppliers
      WHERE project_id = v_sup_project AND supplier_id = 'S0001';
     IF round(v_num, 4) <> 0.98 THEN
-      RAISE EXCEPTION 'WP 6.2 / D113: S0001 declared 0.98 and holds % — the COALESCE swallowed a real value', v_num;
+      RAISE EXCEPTION 'WP 6.2 / D120: S0001 declared 0.98 and holds % — the COALESCE swallowed a real value', v_num;
     END IF;
 
     -- …and the blank one takes the column's OWN default, not a number typed
@@ -313,13 +313,13 @@ BEGIN
     SELECT reliability_score INTO v_num FROM public.suppliers
      WHERE project_id = v_sup_project AND supplier_id = 'S0002';
     IF v_num IS NULL THEN
-      RAISE EXCEPTION 'WP 6.2 / D113: S0002 holds NULL in a NOT NULL column — impossible, so the plan changed shape';
+      RAISE EXCEPTION 'WP 6.2 / D120: S0002 holds NULL in a NOT NULL column — impossible, so the plan changed shape';
     END IF;
     IF v_num <> (SELECT (pg_get_expr(ad.adbin, ad.adrelid))::numeric
                    FROM pg_attrdef ad
                    JOIN pg_attribute a ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
                   WHERE ad.adrelid = 'public.suppliers'::regclass AND a.attname = 'reliability_score') THEN
-      RAISE EXCEPTION 'WP 6.2 / D113: S0002 left the cell blank and holds %, which is not the column''s own DEFAULT', v_num;
+      RAISE EXCEPTION 'WP 6.2 / D120: S0002 left the cell blank and holds %, which is not the column''s own DEFAULT', v_num;
     END IF;
   END;
 
@@ -357,5 +357,5 @@ BEGIN
     END IF;
   END;
 
-  RAISE NOTICE 'WP 6.2 · 230: customers lands, promotes, upserts and attributes; D113 on suppliers too — 10 section(s)';
+  RAISE NOTICE 'WP 6.2 · 230: customers lands, promotes, upserts and attributes; D120 on suppliers too — 10 section(s)';
 END $wp62cust$;
