@@ -69,7 +69,22 @@ interface Props {
   defaults: PolicyBundle;
   overrides: OverrideRow[];
   fulfillmentStrategy: FulfillmentStrategy;
-  bulkUpsertOverrides: (rows: OverrideRow[]) => Promise<void>;
+  /**
+   * WP 6.3 · THE OPTIONS ARGUMENT WAS MISSING FROM THIS TYPE, AND ITS LAZY FIX
+   * WOULD HAVE BEEN A SILENT DATA DEFECT.
+   *
+   * `usePolicies` declares `(rows, opts?: { seeded?: boolean })`; this prop
+   * declared one parameter, so line 936's `bulkUpsertOverrides(toUpsert,
+   * { seeded: true })` was a type error — baselined as debt on this surface.
+   *
+   * `{ seeded: true }` is WP 4.4's `seeded_from_hash`: the flag that makes a
+   * prefilled override report itself STALE after a re-upload, because the engine
+   * reads overrides rather than the grid. Deleting the second argument would have
+   * made the error go away and stopped that flag being stamped — a green
+   * typecheck bought by turning off D70's staleness machinery. The type widens to
+   * match the hook instead.
+   */
+  bulkUpsertOverrides: (rows: OverrideRow[], opts?: { seeded?: boolean }) => Promise<void>;
   deleteOverride?: (scope: "node" | "edge", targetKey: string, family: PolicyFamily) => Promise<void>;
   /** Save a policy version snapshot — offered after saving grid edits. */
   saveSnapshot?: (label?: string) => Promise<string | null>;

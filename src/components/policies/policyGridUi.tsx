@@ -12,9 +12,30 @@ import { LAYER, tint } from "@/components/intelligence/piUi";
 
 /* ── provenance ──────────────────────────────────────────────────────── */
 
+/**
+ * THE A1 PROVENANCE VOCABULARY (§5.4), COMPLETED IN WP 6.3.
+ *
+ * §5.4 names ten states: `data · master · contract · estimated · imputed ·
+ * derived · suggested · override · edited · default`. This union carried EIGHT.
+ * `contract` was in the `PROVENANCE` record below and not in the type, which
+ * TypeScript reported and `scripts/typecheck-baseline.json` recorded as debt on
+ * "WP 6.2's surface" — so the state that exists to make a substitution visible
+ * (§4 D17) was itself invisible to the type system. It is declared now.
+ *
+ * `estimated` IS DELIBERATELY ABSENT AND THAT IS THE POINT. §14 reserves it for
+ * the observations track: a value fitted from recorded history, with an n, a
+ * window and a fit quality behind it. Nothing produces one today, and a state in
+ * this union with no producer is a dot the grid could never draw — a promise, not
+ * a vocabulary (the `seeded_from_hash` lesson: a column nothing fills). It joins
+ * when an estimator does, and `provenanceVocabulary.test.ts` holds §5.4's list
+ * against this union so the omission stays deliberate instead of becoming a gap.
+ *
+ * The rule every state answers to: NO DOT MAY CLAIM MORE THAN IT KNOWS (D16).
+ */
 export type Provenance =
   | "data"      // from project data
   | "master"    // from item master
+  | "contract"  // EMPTY, and the schema declares what empty means (§4 D17)
   | "imputed"   // imputed project average — verify
   | "derived"   // derived fallback (≈)
   | "suggested" // this stage's own routing suggestion, ranked from uploaded volumes
@@ -295,6 +316,15 @@ export function NumCell({
   integer?: boolean;
   /** Unit glyph rendered in its own fixed gutter, never inside the value text. */
   unit?: string;
+  /**
+   * The cell's own hover text, which the caller assembles from the resolved
+   * provenance — where the number came from, and what stood in for it if nothing
+   * did. DECLARED IN WP 6.3: the component already read it and the props type did
+   * not carry it, so the one string that answers "where did THIS number come
+   * from" was, to the type system, not a prop at all. A2's popover replaces the
+   * hover with something a person can read; until it does, this is the answer.
+   */
+  title?: string;
 }) {
   const derived = provenance === "derived";
   const formatted = (v: number) =>
