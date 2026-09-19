@@ -6,10 +6,14 @@ table: supply_chain_data
 tier: "3"
 schema_name: public
 grain: >-
-  One edge of the project's computed supply graph: material flows from this
-  node to that one, carrying this weighted volume and this share of the
-  destination's sourcing. Derived from the four lane tables by the ETL and
-  always safe to drop and rebuild.
+  One edge of the project's PRODUCT-LEVEL supply graph — four echelons with the
+  BILL OF MATERIALS COLLAPSED: supplier → purchased material → finished product →
+  customer. A bom edge here runs from a material the plant BUYS to the product it
+  ends up in, however many assemblies lie between them;
+  `supply_chain_data_multi_tier` is the same network with the tree intact.
+  Derived from the four lane tables by `rebuild_supply_chain_lanes` and always
+  safe to drop and rebuild — which since WP 8.2 it IS, on every change to any of
+  those four tables (§4 D142).
 owner: etl
 
 natural_key_unique:
@@ -21,7 +25,7 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc combine_project_into_supply_chain"
     grain: table
-    evidence: "src/pages/DataManager.tsx:650"
+    evidence: "src/pages/DataManager.tsx:656"
     confirmed: true
   - page: "FirmLevelNetwork.tsx"
     via: "rpc get_prediction_stats"
@@ -94,8 +98,11 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The upstream end of the edge — a supplier, a material, or the plant,
-      depending on which lane produced it.
+      The upstream end of the edge — a supplier, a PURCHASED material, or a
+      finished product, depending on which lane produced it. THIS SENTENCE IS
+      WHY §4 D127 EXISTS: the column carries no role, so every consumer infers
+      one at render time and eight of them disagree. The role is authored once
+      now, on `node_list.echelon`, and read rather than inferred.
     grain: identifier
     engine:
       consumed_by: "network pages and the analyzers; not read by the engine mapping"
@@ -113,11 +120,13 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The downstream end of the edge.
+      The downstream end of the edge — a customer, a FINISHED PRODUCT, or a
+      purchased material, by lane. On the bom lane it is always a finished
+      product, never an intermediate assembly: this lane is the collapsed graph.
     grain: identifier
     engine:
       consumed_by: "network pages and the analyzers; not read by the engine mapping"
-      transform: "copied from the lane row's id column"
+      transform: "the customer, the root product of the demand walk, or the material"
       missing_default: null
     substitutions: []
     ingest:
@@ -158,7 +167,7 @@ fields:
     grain: rate
     engine:
       consumed_by: "the analyzers and the policy grid's volume basis; not the engine mapping"
-      transform: "weeklyVolume(volume, time_unit) in _shared/laneVolumes.ts, over grading.ts's one unit table"
+      transform: "`rate_to_weekly(volume, time_unit)` in `rebuild_supply_chain_lanes`, over the one unit table"
       missing_default: "0"
     substitutions: []
     ingest:
@@ -177,12 +186,17 @@ fields:
     unit: "units of upstream per unit of downstream"
     unit_source: derived
     meaning: >-
-      How much of the upstream item one unit of the downstream item consumes,
-      carried through from the BOM.
+      How much of the upstream item one unit of the downstream item consumes.
+      On a bom edge that is the EFFECTIVE rate through the collapsed tree — the
+      sum over every path of the product of the rates along it, which on a
+      single-level BOM is exactly the uploaded `consumption_rate`. Before WP 8.2
+      the multi-level path wrote a literal 0 here while the single-level path
+      wrote the real number, so one column meant two things depending on the
+      project's shape (§4 D136).
     grain: level
     engine:
       consumed_by: "the analyzers and the network pages; not the engine mapping"
-      transform: "copied from bom consumption_rate, multiplied down multi-level chains"
+      transform: "weighted / the product's weekly demand — the rates multiplied down every path"
       missing_default: null
     substitutions: []
     ingest:
@@ -388,24 +402,6 @@ fields:
     grain: metadata
     engine:
       consumed_by: "the network pages, to colour and filter edges by origin"
-      transform: "set by the ETL per lane"
-      missing_default: null
-    substitutions: []
-    ingest:
-      csv_header: null
-      required: false
-      validate: null
-    surfaces: []
-    resolution: null
-  data_source_group:
-    type: "text"
-    unit: null
-    unit_source: none
-    meaning: >-
-      A coarser grouping of `data_source`, for filtering.
-    grain: metadata
-    engine:
-      consumed_by: "the network pages' filters"
       transform: "set by the ETL per lane"
       missing_default: null
     substitutions: []

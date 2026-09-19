@@ -227,11 +227,21 @@ BEGIN
       v_row.hash_is_current, v_hash, public.current_graph_hash(v_project);
   END IF;
 
-  -- Move the dataset. One inbound arc is enough: `current_graph_hash` covers
+  -- Move the dataset. One deep-tier arc is enough: `current_graph_hash` covers
   -- eleven tier-2 tables and this is one of them.
-  INSERT INTO public.inbound_logistics
-    (project_id, plant_name, supplier_id, material_id, volume, time_unit)
-    VALUES (v_project, 'WP63D', 'SUP-NEW', 'MAT-NEW', 5, 'week');
+  --
+  -- IT USED TO BE AN `inbound_logistics` ROW, AND WP 8.2 IS WHY IT IS NOT. That
+  -- table is one of the four the lane-rebuild trigger watches, so writing to it
+  -- now rebuilds `supply_chain_data` from its real sources — and `N-STORE` is a
+  -- HAND-WRITTEN lane row, which the derivation correctly does not reproduce.
+  -- The fixture vanished and the assertion below read NULL where it expects
+  -- false. That is not a defect in either side: a derived table stops holding
+  -- what a test typed into it the moment its inputs move, which is the whole of
+  -- §4 D142. `tier2_suppliers` is hashed and is NOT a lane source, so it moves
+  -- the anchor and leaves the fixture standing.
+  INSERT INTO public.tier2_suppliers
+    (project_id, plant_name, supplier_id, upstream_supplier_id, material_id)
+    VALUES (v_project, 'WP63D', 'SUP-NEW', 'SUP-UP', 'MAT-NEW');
 
   SELECT * INTO v_row FROM public.get_network_metrics_for_materials(
     v_project, v_user, 'wp63dr@example.invalid') WHERE uid = 'N-STORE';

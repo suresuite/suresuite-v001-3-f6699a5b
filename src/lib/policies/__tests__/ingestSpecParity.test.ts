@@ -388,10 +388,21 @@ describe("the legacy ingest functions write through the RPC, not through PostgRE
  * nothing else in the repository would notice.
  */
 describe("D36's remaining three write through an RPC that names the actor", () => {
-  const MOVED: Array<[string, string, string[]]> = [
-    ["combine-project", "etl_replace_supply_chain", ["supply_chain_data", "supply_chain_data_multi_tier"]],
-    ["predict-critical-nodes", "analysis_mark_critical_nodes", ["supply_chain_data"]],
-    ["erp-sync-orbit-mrp", "mrp_apply_staged_products", ["products"]],
+  // The actor parameter is per-RPC, and WP 8.2 is why it has to be. `combine-project`
+  // no longer calls `etl_replace_supply_chain`: §4 D140 left ONE ETL and it is the
+  // SQL one, so the edge function calls `combine_project_into_supply_chain`, whose
+  // actor parameter is `p_user_id` — it authorizes under that identity and passes it
+  // to `rebuild_supply_chain_lanes`, which names it on every tier-3 statement. What
+  // this suite is FOR is unchanged and still enforced below: no edge function writes
+  // a tier-2/3 table over PostgREST, and whatever RPC it calls instead is handed a
+  // person. `rehearsal/310` §10 reads the audit row back with the session actor
+  // deliberately blanked first.
+  const MOVED: Array<[string, string, string[], RegExp]> = [
+    ["combine-project", "combine_project_into_supply_chain",
+     ["supply_chain_data", "supply_chain_data_multi_tier"], /p_user_id:/],
+    ["predict-critical-nodes", "analysis_mark_critical_nodes",
+     ["supply_chain_data"], /_actor_user_id:/],
+    ["erp-sync-orbit-mrp", "mrp_apply_staged_products", ["products"], /_actor_user_id:/],
   ];
 
   const codeOf = (fn: string) =>
@@ -401,10 +412,10 @@ describe("D36's remaining three write through an RPC that names the actor", () =
       .join("\n");
 
   it("each one calls its RPC and passes an actor", () => {
-    for (const [fn, rpc] of MOVED) {
+    for (const [fn, rpc, , actorParam] of MOVED) {
       const code = codeOf(fn);
       expect(code, `${fn} does not call ${rpc}`).toContain(rpc);
-      expect(code, `${fn} calls ${rpc} without an actor`).toMatch(/_actor_user_id:/);
+      expect(code, `${fn} calls ${rpc} without an actor`).toMatch(actorParam);
     }
   });
 

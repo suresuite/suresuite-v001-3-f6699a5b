@@ -160,13 +160,24 @@ serve(async (req) => {
         await deleteTableByProjectId('network_edges');
         await deleteTableByProjectId('network_nodes');
 
-        // 4) Derived node list
-        await deleteTableByProjectId('node_list');
+        // ── WP 8.2 · SOURCES BEFORE DERIVED, WHICH IS THE ORDER THAT WAS
+        //    ALWAYS RIGHT AND IS NOW LOAD-BEARING ────────────────────────────
+        //
+        // This block used to delete `node_list` and `supply_chain_data` FIRST and
+        // the four source lanes after. Deleting derived data before the data it
+        // is derived from is backwards on any reading; since `20260919000008`
+        // (§4 D142) it is also wrong, because the four source tables carry a
+        // statement trigger that REBUILDS both edge tables. Deleting a source
+        // would have re-derived the graph a moment after the graph was deleted,
+        // and `node_list` and `supply_chain_data_multi_tier` carry NO cascade
+        // from `projects` (D117 took seven tables and not these two), so the
+        // resurrected rows would have outlived the project.
+        //
+        // In the new order the source deletes leave the lanes EMPTY BY
+        // CONSTRUCTION — a rebuild from empty sources writes nothing — and the
+        // explicit deletes below are the belt to that braces.
 
-        // 5) Combined supply chain data
-        await deleteTableByProjectId('supply_chain_data');
-
-        // 6) Source datasets and related tables
+        // 4) Source datasets and related tables
         // If "force" or complex, we make sure to clear all regardless
         await deleteTableByProjectId('inbound_logistics');
         await deleteTableByProjectId('outbound_logistics');
@@ -177,7 +188,14 @@ serve(async (req) => {
         // exists in no migration, so this call could only ever fail. A delete of a
         // table that does not exist is not harmless bookkeeping — it is a line
         // that makes the list look complete.
+
+        // 5) Combined supply chain data — both lanes, now that nothing can
+        //    re-derive them.
+        await deleteTableByProjectId('supply_chain_data');
         await deleteTableByProjectId('supply_chain_data_multi_tier');
+
+        // 6) Derived node list, last: the lane deletes above refresh it.
+        await deleteTableByProjectId('node_list');
 
         // 7) Views and legacy tables (if present in older data)
         // Note: simulation_result_scenarios is a view, may not need deletion

@@ -42,6 +42,7 @@ DECLARE
   v_v2       uuid;
   v_n        integer;
   v_before   integer;
+  v_lane_before integer;
   v_res      jsonb;
   v_scores   jsonb;
   v_txt      text;
@@ -522,6 +523,17 @@ BEGIN
   SELECT count(*) INTO v_before FROM public.audit_logs
    WHERE plane = 'data' AND target_type = 'supply_chain_data';
 
+  -- MEASURED, not literal, since WP 8.2. This used to assert `deleted = 1`
+  -- because the only row in the lane was the `STALE` one written two lines up.
+  -- It is no longer: WP 8.2 put a rebuild trigger on the four source tables, and
+  -- this file loaded `inbound_logistics` and `bom_multi_level` at section 1, so
+  -- the derivation has already filled the lane. What the assertion is ABOUT is
+  -- that the replace deletes the project's rows and inserts exactly the payload
+  -- — so it compares against the count that was there, which is the stronger
+  -- statement and the one that does not depend on what else wrote the table.
+  SELECT count(*) INTO v_lane_before FROM public.supply_chain_data
+   WHERE project_id = v_project;
+
   PERFORM set_config('app.current_user_id', v_analyst::text, true);
   v_res := public.etl_replace_supply_chain(
     v_project, v_editor,
@@ -535,9 +547,15 @@ BEGIN
                          'from_location','S2','to_location','S1','level',2,'weighted',5,
                          'organization','WP41 Org')));
 
-  IF (v_res ->> 'deleted')::int <> 1 OR (v_res ->> 'inserted')::int <> 2
+  IF (v_res ->> 'deleted')::int <> v_lane_before OR (v_res ->> 'inserted')::int <> 2
      OR (v_res ->> 'multi_tier_inserted')::int <> 1 THEN
-    RAISE EXCEPTION 'WP 4.1: the ETL replace reported %, expected 1 deleted / 2 inserted / 1 multi-tier.', v_res;
+    RAISE EXCEPTION 'WP 4.1: the ETL replace reported %, expected % deleted / 2 inserted / 1 multi-tier.',
+      v_res, v_lane_before;
+  END IF;
+  IF v_lane_before < 1 THEN
+    RAISE EXCEPTION
+      'WP 4.1: the lane held no rows before the replace, so `deleted = %s` proves '
+      'nothing. The `STALE` row inserted above must be in it.', v_lane_before;
   END IF;
 
   SELECT count(*) INTO v_n FROM public.supply_chain_data

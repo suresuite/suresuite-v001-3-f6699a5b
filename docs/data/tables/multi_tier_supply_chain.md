@@ -50,7 +50,7 @@ Two policies through the project's organization, the same pair `tier2_suppliers`
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DataManager.tsx` | rpc delete_project_dataset | `src/pages/DataManager.tsx:712` | yes |
+| `DataManager.tsx` | rpc delete_project_dataset | `src/pages/DataManager.tsx:718` | yes |
 | `ProjectPolicies.tsx` | rpc get_project_datasets | `src/lib/policies/projectLanes.ts:82` | yes |
 | `SimulationLab.tsx` | rpc get_project_datasets | `src/lib/policies/projectLanes.ts:82` | yes |
 
@@ -218,6 +218,6 @@ When the row was last written. Server-stamped by trigger.
 
 ---
 
-*Generated from data contract `8c56366d1bc3`, engine `0.2.3`,
+*Generated from data contract `dc1618b7df79`, engine `0.2.3`,
 sidecar `supabase/contract/multi_tier_supply_chain.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 340,
-  "migrations_applied": 332,
+  "migrations_found": 341,
+  "migrations_applied": 333,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260919000007_decision_plane_actor.sql",
+  "last_migration": "20260919000008_one_etl.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 282,
+    "functions": 283,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -18963,18 +18963,6 @@
           "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
         },
         {
-          "name": "data_source_group",
-          "quoted": false,
-          "type": "text",
-          "type_raw": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql"
-        },
-        {
           "name": "is_zero_flow_filtered",
           "quoted": false,
           "type": "boolean",
@@ -19430,6 +19418,18 @@
           "unique": false,
           "references": null,
           "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql"
+        },
+        {
+          "name": "bom_depth",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260919000008_one_etl.sql"
         }
       ],
       "constraints": [
@@ -21689,6 +21689,16 @@
       "defined_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
     },
     {
+      "name": "auto_rebuild_supply_chain_lanes",
+      "signature": "auto_rebuild_supply_chain_lanes()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "WP 8.2 · §4 D142. Rebuilds both edge tables when any of the four source lanes ",
+      "defined_by": "20260919000008_one_etl.sql"
+    },
+    {
       "name": "auto_refresh_node_list_on_lane_change",
       "signature": "auto_refresh_node_list_on_lane_change()",
       "args": [],
@@ -22064,8 +22074,8 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "comment": "WP 8.2 · §4 D140. The AUTHORIZING wrapper over `rebuild_supply_chain_lanes`. ",
+      "defined_by": "20260919000008_one_etl.sql"
     },
     {
       "name": "create_agent_proposal",
@@ -22638,8 +22648,8 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260917000003_actor_on_postgrest_writers.sql"
+      "comment": "WP 4.1's atomic tier-3 replace. DEAD as of WP 8.2 — its one caller was ",
+      "defined_by": "20260919000008_one_etl.sql"
     },
     {
       "name": "expire_agent_proposals",
@@ -22860,11 +22870,11 @@
         "p_user_id uuid",
         "p_user_email text"
       ],
-      "returns": "TABLE( id uuid, project_id uuid, plant_name text, from_location text, to_location text, level integer, material_consumption_rate numeric, sourcing_ratio numeric, weighted numeric, data_source text, data_source_group text, path_root text, uploaded_by uuid, organization text, created_at timestamp with time zone, updated_at timestamp with time zone )",
+      "returns": "TABLE( id uuid, project_id uuid, plant_name text, from_location text, to_location text, level integer, bom_depth integer, material_consumption_rate numeric, sourcing_ratio numeric, weighted numeric, data_source text, path_root text, uploaded_by uuid, organization text, created_at timestamp with time zone, updated_at timestamp with time zone )",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "comment": "WP 8.2 · §4 D147. `InteractiveNetworkSpace`'s fallback read. It projected a ",
+      "defined_by": "20260919000008_one_etl.sql"
     },
     {
       "name": "get_my_capabilities",
@@ -23169,25 +23179,11 @@
         "p_limit integer DEFAULT NULL",
         "p_offset integer DEFAULT 0"
       ],
-      "returns": "TABLE( id uuid, project_id uuid, plant_name text, data_source text, from_location text, to_location text, level integer, material_consumption_rate numeric, sourcing_ratio numeric, weighted numeric, path_root text, organization text, uploaded_by uuid, created_at timestamptz, updated_at timestamptz )",
+      "returns": "TABLE( id uuid, project_id uuid, plant_name text, data_source text, from_location text, to_location text, level integer, bom_depth integer, material_consumption_rate numeric, sourcing_ratio numeric, weighted numeric, path_root text, organization text, uploaded_by uuid, created_at timestamptz, updated_at timestamptz )",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20250909200609_130a2cbf-bd6b-4485-b263-98202ce9c0d7.sql"
-    },
-    {
-      "name": "get_supply_chain_data_multi_tier",
-      "signature": "get_supply_chain_data_multi_tier(uuid, uuid, text)",
-      "args": [
-        "p_project_id uuid",
-        "p_user_id uuid",
-        "p_user_email text"
-      ],
-      "returns": "TABLE( id uuid, project_id uuid, plant_name text, data_source text, from_location text, to_location text, level integer, material_consumption_rate numeric, sourcing_ratio numeric, weighted numeric, path_root text, organization text, uploaded_by uuid, created_at timestamp with time zone, updated_at timestamp with time zone )",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250909193139_fcec2e35-2771-4faa-b148-14bba20ebcac.sql"
+      "comment": "WP 8.2 · §4 D134, D140. The deep lane's read path. Returns `bom_depth` beside ",
+      "defined_by": "20260919000008_one_etl.sql"
     },
     {
       "name": "get_supply_chain_data",
@@ -23757,8 +23753,8 @@
       "returns": "integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
-      "comment": null,
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "comment": "WP 8.1 · §4 D140. THE node BOM-depth rule, now reading BOTH bom tables (WP 8.2, ",
+      "defined_by": "20260919000008_one_etl.sql"
     },
     {
       "name": "node_list_discover",
@@ -23895,6 +23891,19 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260919000001_one_node_classifier.sql"
+    },
+    {
+      "name": "rebuild_supply_chain_lanes",
+      "signature": "rebuild_supply_chain_lanes(uuid, uuid)",
+      "args": [
+        "p_project_id uuid",
+        "p_actor_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "WP 8.2 · §4 D140. THE supply-chain lane derivation — the ONE writer of both ",
+      "defined_by": "20260919000008_one_etl.sql"
     },
     {
       "name": "recompute_project_completion",

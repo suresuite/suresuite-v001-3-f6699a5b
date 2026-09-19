@@ -25,9 +25,9 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "8c56366d1bc3";
+export const CONTRACT_VERSION = "dc1618b7df79";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260919000007_decision_plane_actor.sql";
+export const LAST_MIGRATION = "20260919000008_one_etl.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
@@ -206,14 +206,14 @@ export const TIERS: GlanceTier[] = [
       },
       {
         "table": "supply_chain_data",
-        "grain": "One edge of the project's computed supply graph: material flows from this node to that one, carrying this weighted volume and this share of the destination's sourcing. Derived from the four lane tables by the ETL and always safe to drop and rebuild.",
-        "columns": 22,
+        "grain": "One edge of the project's PRODUCT-LEVEL supply graph — four echelons with the BILL OF MATERIALS COLLAPSED: supplier → purchased material → finished product → customer. A bom edge here runs from a material the plant BUYS to the product it ends up in, however many assemblies lie between them; `supply_chain_data_multi_tier` is the same network with the tree intact. Derived from the four lane tables by `rebuild_supply_chain_lanes` and always safe to drop and rebuild — which since WP 8.2 it IS, on every change to any of those four tables (§4 D142).",
+        "columns": 21,
         "owner": "etl"
       },
       {
         "table": "supply_chain_data_multi_tier",
-        "grain": "One edge of the DEEP supply graph — tier-2 and tier-3 suppliers behind the direct ones. Computed by the same ETL, read by the network pages, and NOT propagated into the simulation: the engine models a single focal plant with three echelons (blueprint §2.4).",
-        "columns": 15,
+        "grain": "One edge of the REAL BOM TREE, at the BOM's own depth — where `supply_chain_data` is the same network with the BOM COLLAPSED to purchased-material → finished-product. A bom edge appears once per root product, so `(from_location, to_location, path_root)` is its grain and not `(from_location, to_location)`. Read by the network pages, and NOT propagated into the simulation: the engine models a single focal plant with three echelons (blueprint §2.4). WP 8.2 REWROTE THIS LINE. It said \"tier-2 and tier-3 suppliers behind the direct ones\", which is `tier2_suppliers` / `tier3_suppliers` and a different node universe — and it is where `level`'s \"tiers upstream\" claim came from (§4 D140). Nothing has ever written a tier-2 supplier into this table.",
+        "columns": 16,
         "owner": "etl"
       }
     ]

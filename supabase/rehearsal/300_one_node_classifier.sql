@@ -58,6 +58,27 @@ BEGIN
 
   PERFORM public.set_current_user_context(v_actor, 'wp81@example.invalid');
 
+  -- THE SOURCE TABLES FIRST, AND WP 8.2 IS WHY THE ORDER MATTERS NOW. The four
+  -- lane sources carry a rebuild trigger since `20260919000008` (§4 D142), so a
+  -- `bom_multi_level` INSERT rebuilds `supply_chain_data` from its real inputs —
+  -- which DELETES anything written into it by hand. Loading the BOM before the
+  -- lane fixture is the whole fix; loading it after silently emptied the fixture
+  -- and every echelon below came back `unknown`.
+  --
+  -- The BOM, which is where `bom_depth` comes from — NOT from the lane's `level`,
+  -- which two live writers disagreed about until WP 8.2 (§4 D140).
+  INSERT INTO public.bom_multi_level
+    (project_id, plant_name, material_id, level, higher_level_component_id, consumption_rate)
+  VALUES
+    (v_project, v_plant, 'SUBASM', 1, 'PROD',   1),
+    (v_project, v_plant, 'RAW',    2, 'SUBASM', 3),
+    (v_project, v_plant, 'DUAL',   1, 'PROD',   2);
+
+  -- The upstream tiers, which is where `supply_tier` comes from.
+  INSERT INTO public.tier2_suppliers
+    (project_id, plant_name, supplier_id, upstream_supplier_id, material_id)
+  VALUES (v_project, v_plant, 'SUP1', 'SUP2', 'RAW');
+
   -- The graph. `SUBASM` is deliberately BOTH a bom target and a bom source: the
   -- plant builds it from RAW and consumes it into PROD. `DUAL` is deliberately
   -- both an inbound source (a supplier) and a bom source (a material) — the exact
@@ -71,20 +92,6 @@ BEGIN
     (v_project, v_plant, 'bom',      'DUAL',   'PROD',    2),
     (v_project, v_plant, 'inbound',  'SUP1',   'RAW',     7),
     (v_project, v_plant, 'inbound',  'DUAL',   'RAW',     1);
-
-  -- The BOM, which is where `bom_depth` comes from — NOT from the lane's `level`,
-  -- which two live writers disagree about (§4 D140).
-  INSERT INTO public.bom_multi_level
-    (project_id, plant_name, material_id, level, higher_level_component_id, consumption_rate)
-  VALUES
-    (v_project, v_plant, 'SUBASM', 1, 'PROD',   1),
-    (v_project, v_plant, 'RAW',    2, 'SUBASM', 3),
-    (v_project, v_plant, 'DUAL',   1, 'PROD',   2);
-
-  -- The upstream tiers, which is where `supply_tier` comes from.
-  INSERT INTO public.tier2_suppliers
-    (project_id, plant_name, supplier_id, upstream_supplier_id, material_id)
-  VALUES (v_project, v_plant, 'SUP1', 'SUP2', 'RAW');
 
   PERFORM public.refresh_node_list_for_project(v_project, v_actor);
 
