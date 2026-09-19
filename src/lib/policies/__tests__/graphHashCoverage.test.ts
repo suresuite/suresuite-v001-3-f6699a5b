@@ -133,9 +133,38 @@ function snapshotDomains(): Record<"inputs" | "network", Record<string, Set<stri
   // coverage assertion below would pass over an empty set. Parsing only v2 would
   // miss the fold. Both, unioned on the `network` domain, is the shape that is
   // actually hashed.
-  const base = sql.slice(
-    sql.lastIndexOf("CREATE OR REPLACE FUNCTION public._build_dataset_snapshot_v2(p_project_id"),
+  // BOUNDED AT ITS OWN `$$;`, AND THE FIRST VERSION WAS NOT — WP 6.3 found it.
+  //
+  // `base` used to run from v2's `CREATE` to the END of every concatenated
+  // migration, so `base.slice(networkAt)` swept up every
+  // `FROM public.<table> <alias> WHERE` in every file that comes after
+  // `20260917000009`. Nothing had that shape until WP 6.3's dual read, whose
+  // `FROM public.analysis_runs r WHERE r.id = v_run` promptly appeared in the
+  // `network` domain — and `analysis_runs` is the analysis STORE, so the
+  // assertion below reported the anchor as hashing its own results.
+  //
+  // It was wrong from the commit that wrote it and could only be found by a later
+  // migration happening to match, which is the same accident that made §4 D51's
+  // flag fire for the right reason. Every coverage assertion in this file reads
+  // `hashed`, so an unbounded slice does not merely add a table: it can add
+  // COLUMNS to a real table's set and make a missing-coverage check pass.
+  const baseAt = sql.lastIndexOf(
+    "CREATE OR REPLACE FUNCTION public._build_dataset_snapshot_v2(p_project_id",
   );
+  expect(baseAt, "no `_build_dataset_snapshot_v2`").toBeGreaterThan(-1);
+  const baseEnd = sql.indexOf("$$;", baseAt);
+  expect(baseEnd, "v2's body is unterminated").toBeGreaterThan(baseAt);
+  const base = sql.slice(baseAt, baseEnd);
+  // THE BOUND IS ASSERTED, not trusted. Without this, re-unbounding `base` is
+  // caught only if some later migration happens to match the block regex — which
+  // is how it went unnoticed for two packages. `analysis_runs` is the store, so
+  // its name appearing inside the snapshot builder means the slice has escaped.
+  expect(
+    base,
+    "`base` has escaped v2's body and is reading later migrations — every " +
+      "coverage assertion in this file then reads columns the snapshot does not hash",
+  ).not.toContain("analysis_runs");
+  expect(base).not.toContain("CREATE OR REPLACE FUNCTION public._build_dataset_snapshot(p_project_id");
   const inputsAt = base.indexOf("'inputs', jsonb_build_object");
   const networkAt = base.indexOf("'network', jsonb_build_object");
   expect(inputsAt, "the snapshot has no `inputs` domain").toBeGreaterThan(-1);

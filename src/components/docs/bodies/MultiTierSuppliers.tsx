@@ -1,10 +1,34 @@
 // §6.3 section 3 — Multi-Tier Suppliers.
 //
-// THE HONEST PAGE. This table has no upload, no reader and no writer (§4 D58),
-// and the last measurement of production found zero rows across every project.
-// A page that described it as a working feature would be the manual's own
-// version of the defect this programme exists to end, so it describes what is
-// actually there instead.
+// THE HONEST PAGE, AND WP 6.2 HAD TO CORRECT ITS HONESTY (§4 D58).
+//
+// This table has no upload and no reader, and the last measurement of production
+// found zero rows across every project. A page that described it as a working
+// feature would be the manual's own version of the defect this programme exists to
+// end, so it describes what is actually there instead.
+//
+// What the first version of this page ALSO said — "No part of the application
+// writes a row here, and no part reads one" — was false in BOTH directions, and
+// the sidecar it is generated from had recorded the truth twenty lines from the
+// sentence that denied it (three confirmed `surfaces` entries). `contract:check`
+// R15 refuses that disagreement now.
+//
+// Verified against a real database (`supabase/rehearsal/240` §6):
+//   · `get_project_datasets` SELECTs this table and returns its rows, and
+//     `projectLanes.ts` calls it from /policies and /simulation-lab — a live
+//     READER feeding two pages;
+//   · `delete_project_dataset` empties it in its `'all'` branch, which is the
+//     "Delete ALL data" button on the project manager.
+//
+// No application code writes it; one RPC could and nothing calls it
+// (`bulk_insert_multi_tier_supply_chain`, which §6c of the rehearsal exercises);
+// two pages READ it; one button CLEARS it. The scan behind the original claim
+// looked in the right places — `src/` and `supabase/functions/` do not name this
+// table — and every reference is one call away, inside SQL.
+//
+// The page does not mention the uncalled RPC. A reader cannot invoke it from this
+// product, so telling them about it would describe the grant surface rather than
+// the feature, and that is §4 D28's subject, not this page's.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, Provenance } from "@/components/docs/prose";
 import { HowItLoads, SuppliedAndComputed, DatabaseRules } from "@/components/docs/tableRef";
@@ -21,9 +45,16 @@ export default function MultiTierSuppliers() {
 
       <Callout tone="limit" title="Read this first: nothing writes to this table">
         <p>
-          <strong>There is no upload for it and no screen that fills it in.</strong> No part of the
-          application writes a row here, and no part reads one. The last count taken against the
-          production database found zero rows, across every project.
+          <strong>There is no upload for it and no screen that fills it in.</strong> Nothing in the
+          application puts a row here. The last count taken against the production database found
+          zero rows, across every project.
+        </p>
+        <p>
+          Two things do reach it, and neither can give it data. The project loader reads this table
+          on <Term>/policies</Term> and <Term>/simulation-lab</Term> — it comes back empty, every
+          time, because nothing fills it. And <Key>Delete all data</Key> on the project manager
+          clears it along with the rest, so if rows ever did arrive here by hand, that button
+          removes them.
         </p>
         <p>
           The table exists, it has a shape, and it has been carried through every access-control
@@ -49,9 +80,10 @@ export default function MultiTierSuppliers() {
           table={t}
           instead={
             <p>
-              Nothing writes it at all, so there is no route to describe. It is documented here
-              because it exists in the database and you may meet it in an export or a schema
-              listing.
+              Nothing puts rows in it, so there is no loading route to describe. It is documented
+              here because it exists in the database, because the project loader asks for it on two
+              screens and is answered with nothing, and because <Key>Delete all data</Key> clears
+              it — so you may meet its name in an export, a schema listing or a delete count.
             </p>
           }
         />

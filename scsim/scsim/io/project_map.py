@@ -249,6 +249,121 @@ class MappingResult:
 # migrate onto those plugins. Exported to the frontend/edge validators via
 # registry_export.build_registry()["base_data_requirements"].
 
+# ── §4 D90 · THE POLICY-BUNDLE KEYS, DECLARED ───────────────────────────────
+#
+# WP 6.1 traced every /policies grid field to the engine and found THREE doors:
+# the registry's `data_requirements` (`table.column` the engine needs from the
+# dataset), a policy's `params_schema` (80 declared parameters), and — for
+# everything else — A QUOTED STRING IN THIS FILE.
+#
+# Door 3 is not a contract. It is a text scan over Python, it was the only proof
+# those fields reach the engine at all, and `single-source` (I1) says a data fact
+# is authored once somewhere a generator can read. §3's standing law — "the
+# registry export is the single source of truth for policy schemas" — was true of
+# the schemas that exist and silent about these.
+#
+# §4 D90 said the fix belongs here and deferred it on "it needs a session that can
+# run Python", the same premise D94 and D106 were deferred on and which WP 6.2
+# found false.
+#
+# WHAT THIS IS AND IS NOT. It is not a second copy of the mapping: the mapper
+# below is still the only code that performs it, and this table makes no runtime
+# decision. It declares WHICH POLICY PARAMETER OR ENTITY FIELD each bundle key
+# feeds, so a reader outside Python can answer "does this grid cell reach the
+# engine, and as what" without scanning for a dict read. `registry_export`
+# publishes it and `resolutionChains` reads it as door 3 proper.
+#
+# `parity` is what keeps it from drifting into fiction: every key here must be
+# READ by this module, and every bundle key this module reads must be here —
+# `scsim/tests/test_registry_io.py` asserts both directions against the source.
+#
+# NINE KEYS, ELEVEN CHAINS: `type` and `safety_stock_days` are rendered by both
+# the supplier and the plant stage, so the grid has eleven cells for nine keys.
+POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
+    {
+        "key": "supply_share",
+        "family": "sourcing",
+        "target": "proactive_multi_sourcing.weights",
+        "catalog_ref": "P-S.2",
+        "transform": "fraction x 100 into the material's weight map, keyed by supplier; "
+                     "only for a supplier the material actually has a link to",
+    },
+    {
+        "key": "type",
+        "family": "inventory",
+        "target": "inventory_control.policy_type",
+        "catalog_ref": "P-X.1",
+        "transform": "enum map — min_max/s_S/continuous_review -> min_max, base_stock -> "
+                     "base_stock, rop -> rop_q, periodic_review -> periodic; anything "
+                     "unrecognised falls back to min_max",
+    },
+    {
+        "key": "safety_stock_days",
+        "family": "inventory",
+        "target": "safety_stock_materials.fixed_days_cover",
+        "catalog_ref": "P-X.2",
+        "transform": "days, clamped 0-84. Only when `safety_stock_method` is neither "
+                     "service_level/demand_variability nor king_method — those two take "
+                     "a different classification and this key is not read",
+    },
+    {
+        "key": "service_level_target",
+        "family": "inventory",
+        "target": "safety_stock_materials.uniform_service_level",
+        "catalog_ref": "P-X.2",
+        "transform": "fraction x 100, clamped 80.0-99.9. Read only when "
+                     "`safety_stock_method` is service_level or demand_variability",
+    },
+    {
+        "key": "capacity_units_per_day",
+        "family": "production",
+        # NOT a policy parameter. This one lands on an ENTITY field, which is why
+        # door 2 could never have declared it and why the row needed this table
+        # rather than a Params addition.
+        "target": "Product.production_capacity",
+        "catalog_ref": None,
+        "transform": "units/day x 7 x utilization_cap_pct (default 0.85) -> units/week. "
+                     "The MASTER `products.production_capacity` shadows it entirely when "
+                     "present, and the mapper warns that the grid entry is not applied",
+    },
+    {
+        "key": "fg_safety_stock",
+        "family": "inventory",
+        "target": "fg_safety_stock.sizing",
+        "catalog_ref": "P-P.4",
+        "transform": "enum — 'none' skips the policy; 'service_level' selects "
+                     "service-level sizing; anything else selects fixed_days. Gated on the "
+                     "engine's own `has_mts`, not on the policy's fulfillment_strategy string",
+    },
+    {
+        "key": "fg_service_level_target",
+        "family": "inventory",
+        "target": "fg_safety_stock.service_level_pct",
+        "catalog_ref": "P-P.4",
+        "transform": "fraction x 100, clamped 80.0-99.9. Read only when `fg_safety_stock` "
+                     "is service_level",
+    },
+    {
+        "key": "fg_safety_stock_days",
+        "family": "inventory",
+        "target": "fg_safety_stock.fixed_days_cover",
+        "catalog_ref": "P-P.4",
+        "transform": "days, clamped 0-12. Read only when `fg_safety_stock` selects "
+                     "fixed_days sizing",
+    },
+    {
+        "key": "allocation_priority_weight",
+        "family": "production",
+        "target": "material_allocation.priority_weights",
+        "catalog_ref": "P-X.3",
+        "transform": "per-product weight, collected from composite `node:<node>::<product>` "
+                     "override keys. Read only when the scenario asks for "
+                     "`allocate_materials`, and its presence switches the objective to "
+                     "priority_weighted",
+    },
+)
+
+
 def base_data_requirements() -> tuple:
     # Imported lazily: scsim.policies pulls in scsim.core, which imports this
     # module's package — a top-level import here would be circular.

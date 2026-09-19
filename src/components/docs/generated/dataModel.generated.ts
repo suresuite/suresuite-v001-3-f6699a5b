@@ -25,15 +25,15 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "de7031e73047";
+export const CONTRACT_VERSION = "898095dabbaa";
 export const ENGINE_VERSION = "0.2.3";
-export const LAST_MIGRATION = "20260918000004_disruption_plane_audited.sql";
+export const LAST_MIGRATION = "20260919000007_decision_plane_actor.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
-  "tablesDescribed": 48,
-  "columnsDescribed": 590,
-  "tablesUndescribed": 33
+  "tablesDescribed": 54,
+  "columnsDescribed": 669,
+  "tablesUndescribed": 27
 } as const;
 
 /** Described tables, grouped by the tier their data sits in. */
@@ -105,7 +105,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "customers",
         "grain": "One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows.",
-        "columns": 8,
+        "columns": 10,
         "owner": "data-ingestion"
       },
       {
@@ -253,6 +253,12 @@ export const TIERS: GlanceTier[] = [
         "owner": "policy-ui"
       },
       {
+        "table": "external_evidence",
+        "grain": "One retrieved external claim about a supply chain, as a subject–predicate–object triple with the source it came from, the confidence attached to it and the hash of the content it was read from. The network cartographer's evidence store: what an agent FOUND, kept apart from what a person entered.",
+        "columns": 9,
+        "owner": "platform"
+      },
+      {
         "table": "policy_defaults",
         "grain": "One row per project: the policy each family runs with unless a specific node overrides it. The bundle, in other words — and the thing a policy_override is a patch against.",
         "columns": 15,
@@ -263,6 +269,36 @@ export const TIERS: GlanceTier[] = [
         "grain": "One patch against the project bundle, for one target: this supplier, this material, this customer/product pair. The only tier-4 table with a real natural key — (project, scope, target, family) is UNIQUE, so a target cannot hold two conflicting patches for the same family.",
         "columns": 10,
         "owner": "policy-ui"
+      },
+      {
+        "table": "policy_presets",
+        "grain": "One named policy bundle a user can apply to a project — the DECISION plane's catalog of starting points. A system preset (`is_system`) ships with the product; a user preset belongs to its `owner_id`.",
+        "columns": 9,
+        "owner": "policy-ui"
+      },
+      {
+        "table": "policy_versions",
+        "grain": "One saved snapshot of a project's whole policy bundle, with the bundle it replaced and the hash of both. The audit trail of the /policies grid: what the policies WERE at a moment somebody chose to record, which is what makes a simulation result reproducible from the policy side.",
+        "columns": 13,
+        "owner": "policy-ui"
+      },
+      {
+        "table": "recovery_playbooks",
+        "grain": "One named recovery strategy a scenario can apply after a disruption — the levers, their order and their parameters. A system playbook (`is_system`, `project_id` NULL) ships with the product; a project playbook belongs to one project.",
+        "columns": 9,
+        "owner": "engine"
+      },
+      {
+        "table": "scenario_templates",
+        "grain": "One shipped starting point for a scenario: a named disruption shape with its schedule, its suggested playbook and the run settings that go with it. A template is not a scenario — applying one WRITES a scenario, and the two diverge from that moment.",
+        "columns": 15,
+        "owner": "engine"
+      },
+      {
+        "table": "scenarios",
+        "grain": "One what-if a person set up and can run: the horizon, the warm-up, the replications, the seed, the demand model, the disruption schedule and the recovery overrides. The scenario half of `result-binding` (I8) — a run cites one of these rows, and the export reads it back whole.",
+        "columns": 22,
+        "owner": "engine"
       }
     ]
   },
@@ -495,42 +531,6 @@ export const UNDESCRIBED: UndescribedGroup[] = [
       {
         "table": "simulation_runs",
         "columns": 24
-      }
-    ]
-  },
-  {
-    "wp": "6.4",
-    "why": "MOVED FROM WP 6.1 BY WP 6.1 ITSELF. §13 scopes that package to resolution chains — \"CSV column → DB column → RPC → hook → substitution → engine field → unit at each hop\" — and says nothing about describing tables. Eleven tables were waiting on it anyway, which is the R8 finding WP 4.4 hit from the other side: an owner nothing behind it ever agreed to. They go to a NEW package rather than onto WP 6.3, and the reason is budget honesty: WP 6.3 already carries A2, A3, A5, the provenance vocabulary and the eleven result-binding tables WP 4.4 re-homed to it. Twenty-two tables under one package is a number that misrepresents what it costs, and misrepresented budget is what boundary reviews exist to catch (§16 · Phase 2→3). See §14 · WP 6.4. Original note follows. `external_evidence` is the AGENT's evidence store — retrieved URLs, content hashes and confidence behind a proposal — and it belongs with the decision plane rather than with analysis output. Same regrouping as `model_validations` above: it was in the WP 4.2 bucket because nobody had looked at it, which is exactly what D54 says a deferral list does when it is allowed to decide by omission.",
-    "tables": [
-      {
-        "table": "external_evidence",
-        "columns": 9
-      }
-    ]
-  },
-  {
-    "wp": "6.4",
-    "why": "Decisions (tier 4) beyond the two policy tables the contract already covers. MOVED FROM WP 6.1 BY WP 6.1 ITSELF, with `external_evidence` above. This row's own reasoning is what gave it away: \"WP 6.1 pins the resolution chains … the scenario and disruption tables are the surface those chains resolve against\". Being the surface a package READS is not the same as being a package's deliverable, and §13's WP 6.1 never claimed them — it traced 38 grid fields and described no table at all. Ten tables sat behind a sentence that reads like a plan and is an association. WP 6.4 owns them with `external_evidence`: together they are the DECISION PLANE — what a person or an agent chose, and what a result must bind to under `result-binding` (I8). See §14 · WP 6.4.",
-    "tables": [
-      {
-        "table": "policy_presets",
-        "columns": 9
-      },
-      {
-        "table": "policy_versions",
-        "columns": 13
-      },
-      {
-        "table": "recovery_playbooks",
-        "columns": 9
-      },
-      {
-        "table": "scenario_templates",
-        "columns": 15
-      },
-      {
-        "table": "scenarios",
-        "columns": 22
       }
     ]
   }

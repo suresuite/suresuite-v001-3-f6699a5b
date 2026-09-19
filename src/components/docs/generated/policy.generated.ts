@@ -140,8 +140,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:832"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → proactive_multi_sourcing.weights (P-S.2). Transform: fraction x 100 into the material's weight map, keyed by supplier; only for a supplier the material actually has a link to",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -167,17 +167,10 @@ export const CHAINS: PolicyChain[] = [
         "kind": "rpc",
         "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
         "evidence": null
-      },
-      {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 0` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
       }
     ],
-    "breaks": [
-      "is read by NO consumer anywhere — not scsim, not the frozen legacy engine, and by nothing in the product beyond the grid that renders it. Editable, stored, versioned and hashed into `policy_hash`, and the only thing that ever happens to the value is that it is shown back. This is §4 D18's exact shape."
-    ],
-    "breakClass": "unread",
+    "breaks": [],
+    "breakClass": null,
     "breakEvidence": []
   },
   {
@@ -342,8 +335,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:974"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic; anything unrecognised falls back to min_max",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -579,8 +572,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:988"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → safety_stock_materials.fixed_days_cover (P-X.2). Transform: days, clamped 0-84. Only when `safety_stock_method` is neither service_level/demand_variability nor king_method — those two take a different classification and this key is not read",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -814,8 +807,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:634"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → Product.production_capacity — an ENTITY field, not a policy parameter. Transform: units/day x 7 x utilization_cap_pct (default 0.85) -> units/week. The MASTER `products.production_capacity` shadows it entirely when present, and the mapper warns that the grid entry is not applied",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -844,8 +837,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:974"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.policy_type (P-X.1). Transform: enum map — min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic; anything unrecognised falls back to min_max",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1075,8 +1068,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:988"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → safety_stock_materials.fixed_days_cover (P-X.2). Transform: days, clamped 0-84. Only when `safety_stock_method` is neither service_level/demand_variability nor king_method — those two take a different classification and this key is not read",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1145,8 +1138,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:980"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → safety_stock_materials.uniform_service_level (P-X.2). Transform: fraction x 100, clamped 80.0-99.9. Read only when `safety_stock_method` is service_level or demand_variability",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1175,8 +1168,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:1040"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → fg_safety_stock.sizing (P-P.4). Transform: enum — 'none' skips the policy; 'service_level' selects service-level sizing; anything else selects fixed_days. Gated on the engine's own `has_mts`, not on the policy's fulfillment_strategy string",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1210,8 +1203,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:1049"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → fg_safety_stock.service_level_pct (P-P.4). Transform: fraction x 100, clamped 80.0-99.9. Read only when `fg_safety_stock` is service_level",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1245,8 +1238,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:1055"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → fg_safety_stock.fixed_days_cover (P-P.4). Transform: days, clamped 0-12. Read only when `fg_safety_stock` selects fixed_days sizing",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1280,8 +1273,8 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "read by `project_map.py` as a bundle key — and by NOTHING that declares it. The registry neither requires it as data nor declares it as a parameter, so the only evidence it reaches the engine is a dict read in a Python file (WP 6.1, §4 D90).",
-        "evidence": "scsim/scsim/io/project_map.py:1098"
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → material_allocation.priority_weights (P-X.3). Transform: per-product weight, collected from composite `node:<node>::<product>` override keys. Read only when the scenario asks for `allocate_materials`, and its presence switches the objective to priority_weighted",
+        "evidence": null
       }
     ],
     "breaks": [],
@@ -1356,9 +1349,6 @@ export const BREAKS_BY_CLASS: Record<string, string[]> = {
     "supplier.primary_source",
     "customer.primary_source",
     "customer.sourcing_firm"
-  ],
-  "unread": [
-    "supplier.material_price"
   ],
   "overridden": [
     "supplier.reorder_point",
@@ -1460,54 +1450,71 @@ export const ANALYSIS_KINDS: AnalysisKind[] = [
 ];
 
 /**
- * The stress-test battery, READ FROM THE ENGINE SOURCE.
+ * The stress-test battery, READ FROM THE ENGINE'S OWN DECLARATION.
  *
- * This is §4 D90's weakest door — a text scan over a Python literal — and
- * the page that renders it says so. The battery is not in
- * `registry_export.py`, which is where a declaration belongs; until it is,
- * a scan that goes red when the literal moves beats a hand copy that goes
- * quietly wrong (§4 D22, and the archived copy already had).
+ * WP 5.2d parsed the `ST_DEFINITIONS` dict literal out of
+ * `scsim/scsim/stress/battery.py` — §4 D90's WEAKEST door, a quoted string
+ * in a Python file as the only evidence — and recorded why: the declaration
+ * belongs in `registry_export.py` and regenerating that needs PyPI, which §4
+ * D94 recorded as unreachable. WP 6.2 found that premise false. The battery
+ * is declared in the registry export now (§4 D106), this reads it, and the
+ * scan is deleted rather than kept beside it — two readers of one fact is
+ * `single-source` (I1) broken.
  *
- * `runnable` is derived from a `_run_battery(..., "ST-n", ...)` call site,
- * not from the module docstring that claims the same thing.
+ * `entrypoint` is the module-level callable Python itself resolved, so
+ * `runnable` answers "is there something to call" rather than "does a
+ * docstring claim one". It also says WHERE the battery lives: these are
+ * `scsim` library entry points and not a screen in this product (§4 D111).
  */
-export type StressTest = { id: string; description: string; runnable: boolean };
+export type StressTest = {
+  id: string;
+  description: string;
+  runnable: boolean;
+  entrypoint: string | null;
+};
 
 export const STRESS_TESTS: StressTest[] = [
   {
     "id": "ST-1",
     "description": "Supplier outage sweep (manuscript): each supplier × LT-extension × Δt {5,8,10}.",
-    "runnable": true
+    "runnable": true,
+    "entrypoint": "scsim.stress.run_st1"
   },
   {
     "id": "ST-2",
     "description": "Supplier capacity-cut sweep: each supplier × φ {0.75,0.5,0.25,0} × {4,8} wks.",
-    "runnable": true
+    "runnable": true,
+    "entrypoint": "scsim.stress.run_st2"
   },
   {
     "id": "ST-3",
     "description": "Material shortage sweep (M7: material-scoped capacity).",
-    "runnable": false
+    "runnable": false,
+    "entrypoint": null
   },
   {
     "id": "ST-4",
     "description": "Edge/lane shock (M7: edge split).",
-    "runnable": false
+    "runnable": false,
+    "entrypoint": null
   },
   {
     "id": "ST-5",
     "description": "Demand surge (M7: demand-side events).",
-    "runnable": false
+    "runnable": false,
+    "entrypoint": null
   },
   {
     "id": "ST-6",
     "description": "Compound: ST-1 ∩ ST-5 (M7).",
-    "runnable": false
+    "runnable": false,
+    "entrypoint": null
   },
   {
     "id": "ST-7",
     "description": "Nexus-node attack: top-k ML-critical (M7; ml-service integration).",
-    "runnable": false
+    "runnable": false,
+    "entrypoint": null
   }
 ];
 
@@ -1864,6 +1871,13 @@ export const UPLOAD_ASSETS: UploadAsset[] = [
     "name": "Suppliers Master",
     "description": "Per-supplier capacity and reliability the simulation reads",
     "templateFile": "/template/suppliers.csv",
+    "guideFile": "/docs/csv-upload-guide.md"
+  },
+  {
+    "id": "item_master_customers",
+    "name": "Customers Master",
+    "description": "Per-customer segment and allocation priority the simulation reads under scarcity",
+    "templateFile": "/template/customers.csv",
     "guideFile": "/docs/csv-upload-guide.md"
   },
   {
@@ -2301,6 +2315,121 @@ export const RUN_KPIS: RunKpis = {
       "emitted": true
     },
     {
+      "key": "revenue",
+      "label": "Revenue",
+      "emitted": true
+    },
+    {
+      "key": "demand_value",
+      "label": "Demand (value)",
+      "emitted": true
+    },
+    {
+      "key": "produced_value",
+      "label": "Produced (value)",
+      "emitted": true
+    },
+    {
+      "key": "lost_sales_value",
+      "label": "Lost sales (value)",
+      "emitted": true
+    },
+    {
+      "key": "lost_units",
+      "label": "Lost units",
+      "emitted": true
+    },
+    {
+      "key": "lost_inbound_units",
+      "label": "Lost inbound units",
+      "emitted": true
+    },
+    {
+      "key": "max_backlog",
+      "label": "Peak backlog (units)",
+      "emitted": true
+    },
+    {
+      "key": "avg_on_hand_value",
+      "label": "Average on-hand (value)",
+      "emitted": true
+    },
+    {
+      "key": "capacity_utilization",
+      "label": "Capacity utilization",
+      "emitted": true
+    },
+    {
+      "key": "cost_of_resilience",
+      "label": "Cost of resilience",
+      "emitted": true
+    },
+    {
+      "key": "cost_ss_holding",
+      "label": "Cost · safety-stock holding",
+      "emitted": true
+    },
+    {
+      "key": "cost_backup_premium",
+      "label": "Cost · backup supplier premium",
+      "emitted": true
+    },
+    {
+      "key": "cost_multi_sourcing_premium",
+      "label": "Cost · multi-sourcing premium",
+      "emitted": true
+    },
+    {
+      "key": "cost_expediting",
+      "label": "Cost · expediting freight",
+      "emitted": true
+    },
+    {
+      "key": "cost_overtime",
+      "label": "Cost · overtime capacity",
+      "emitted": true
+    },
+    {
+      "key": "cost_lost_sales",
+      "label": "Cost · lost sales",
+      "emitted": true
+    },
+    {
+      "key": "cost_allocation_labor",
+      "label": "Cost · allocation labour",
+      "emitted": true
+    },
+    {
+      "key": "cost_fg_ss_holding",
+      "label": "Cost · finished-goods safety stock",
+      "emitted": true
+    },
+    {
+      "key": "cost_backorder_penalty",
+      "label": "Cost · backorder penalty",
+      "emitted": true
+    },
+    {
+      "key": "cost_monitoring",
+      "label": "Cost · supplier monitoring",
+      "emitted": true
+    },
+    {
+      "key": "ttr_weeks",
+      "label": "Time to recover (weeks)",
+      "emitted": true
+    },
+    {
+      "key": "tts_weeks",
+      "label": "Time to survive (weeks)",
+      "emitted": true
+    },
+    {
+      "key": "pre_disruption_fill_rate",
+      "label": "Fill rate before the disruption",
+      "emitted": true
+    },
+    {
       "key": "fill_rate_beta",
       "label": "Fill rate (β)",
       "emitted": false
@@ -2321,11 +2450,6 @@ export const RUN_KPIS: RunKpis = {
       "emitted": false
     },
     {
-      "key": "revenue",
-      "label": "Revenue",
-      "emitted": true
-    },
-    {
       "key": "cost",
       "label": "Cost",
       "emitted": false
@@ -2337,7 +2461,7 @@ export const RUN_KPIS: RunKpis = {
     },
     {
       "key": "utilization",
-      "label": "Utilization (avg)",
+      "label": "Utilization (avg) · legacy",
       "emitted": false
     },
     {
@@ -2352,12 +2476,7 @@ export const RUN_KPIS: RunKpis = {
     },
     {
       "key": "ttr_days",
-      "label": "Time-to-recover",
-      "emitted": false
-    },
-    {
-      "key": "resilience_index",
-      "label": "Resilience index",
+      "label": "Time-to-recover (days) · legacy",
       "emitted": false
     }
   ],
@@ -2397,6 +2516,9 @@ export const RUN_KPIS: RunKpis = {
 export type ReplicationSeries = {
   written: string[];
   offered: { key: string; label: string; unit: string; written: boolean }[];
+  /** WP 6.3 removed the panel (§4 D113). The manual says which state it is in,
+   *  rather than falling silent about a panel a reader may remember. */
+  heatmapRemoved: boolean;
   heatmapWants: string;
   heatmapEverRenders: boolean;
 };
@@ -2434,6 +2556,7 @@ export const REPLICATION_SERIES_FACTS: ReplicationSeries = {
       "written": true
     }
   ],
+  "heatmapRemoved": true,
   "heatmapWants": "utilization",
   "heatmapEverRenders": false
 };
@@ -3184,32 +3307,22 @@ export type ProjectDeletion = {
 
 export const PROJECT_DELETION: ProjectDeletion = {
   "projectScoped": 49,
-  "cascade": 29,
+  "cascade": 39,
   "detached": [
     "chat_threads",
     "user_files"
   ],
   "sweptOnly": [
-    "disruption_scenario_profiles",
     "disruption_scenarios",
     "network_edges",
     "network_nodes",
-    "node_list",
     "simulation_results",
-    "supply_chain_data",
     "supply_chain_data_multi_tier"
   ],
   "neither": [
     "ai_chat_events",
     "ai_usage_logs",
-    "api_request_logs",
-    "customers",
-    "network_summary",
-    "policy_defaults",
-    "policy_overrides",
-    "simulation_job_magnitudes",
-    "tier2_suppliers",
-    "tier3_suppliers"
+    "api_request_logs"
   ],
   "asynchronous": true
 };
@@ -3295,7 +3408,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 48,
+  "described": 54,
   "open": [
     {
       "table": "approved_users",
@@ -3331,6 +3444,13 @@ export const READ_EXPOSURE: ReadExposure = {
       ]
     },
     {
+      "table": "external_evidence",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
       "table": "inbound_logistics",
       "roles": [
         "anon",
@@ -3359,9 +3479,28 @@ export const READ_EXPOSURE: ReadExposure = {
       ]
     },
     {
+      "table": "policy_presets",
+      "roles": [
+        "anon"
+      ]
+    },
+    {
+      "table": "policy_versions",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
       "table": "project_role_capabilities",
       "roles": [
         "public"
+      ]
+    },
+    {
+      "table": "recovery_playbooks",
+      "roles": [
+        "authenticated"
       ]
     },
     {
@@ -3376,6 +3515,13 @@ export const READ_EXPOSURE: ReadExposure = {
       "roles": [
         "public"
       ]
+    },
+    {
+      "table": "scenarios",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
     }
   ],
   "signedOut": [
@@ -3384,15 +3530,19 @@ export const READ_EXPOSURE: ReadExposure = {
     "bom_single_level",
     "capabilities",
     "dataset_versions",
+    "external_evidence",
     "inbound_logistics",
     "outbound_logistics",
     "policy_defaults",
     "policy_overrides",
+    "policy_presets",
+    "policy_versions",
     "project_role_capabilities",
     "risk_data",
-    "role_capabilities"
+    "role_capabilities",
+    "scenarios"
   ]
 };
 
 export const CHAIN_COUNT = 38;
-export const BROKEN_COUNT = 11;
+export const BROKEN_COUNT = 10;

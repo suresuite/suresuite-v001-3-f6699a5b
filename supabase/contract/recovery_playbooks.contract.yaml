@@ -1,0 +1,157 @@
+# AUTHORED — the data contract's sidecar for `recovery_playbooks`.
+table: recovery_playbooks
+tier: '4'
+schema_name: public
+grain: >-
+  One named recovery strategy a scenario can apply after a disruption — the levers, their order
+  and their parameters. A system playbook (`is_system`, `project_id` NULL) ships with the
+  product; a project playbook belongs to one project.
+owner: engine
+
+natural_key_unique:
+  - source: PRIMARY KEY constraint
+    columns: [id]
+    name: recovery_playbooks_pkey
+
+governance:
+  read: null
+  write: data_edit_policies
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the dataset they
+    chose it over and the result it produced. `result-binding` (I8) needs all three, which is
+    why WP 6.3 keeps the results and this package takes the decisions. Audited from WP 6.4: the
+    three statement-grain triggers land beside this sidecar, because `dataPlaneAudit.test.ts`
+    scopes its rule to tables IN the contract and a deferred table's writes are unaudited with
+    nothing to notice (D54). **Two of the six recovery strategies a scenario can name reach no
+    engine plugin (§4 D114)**, so a playbook's `config` can record an intent the run will not
+    act on. The row is stored faithfully either way; what is missing is a reader that says so,
+    and the manual states it meanwhile.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. There is no natural key: two playbooks may share a name, in one project or
+      across projects, and the product treats that as legitimate rather than as a collision.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this playbook belongs to, or NULL for a system playbook. Nullable on purpose —
+      that NULL is what makes a row part of the shipped catalog, and it is read as such by
+      `useRecoveryPlaybooks`'s `is_system.eq.true,project_id.eq.<id>` filter.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      What a person reads in the picker. Not a key; see `id`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  description:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      One sentence on what the playbook does. Defaults to the empty string rather than NULL, so
+      a reader gets a blank rather than the word `null` — and a blank here means nobody wrote
+      one, not that the playbook does nothing.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  is_system:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      TRUE for a playbook that ships with the product. The only thing separating the catalog
+      from a user's own work, and the first sort key in the picker.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  config:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      THE DECISION ITSELF — which levers, in what order, with what parameters. Free-form JSON:
+      the levers are validated where they are USED rather than where they are stored, which is
+      why D114's two unmapped strategies can be saved at all.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_by:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user who created it, where one is recorded. NULL on system rows and on anything
+      written before the column existed — unknown, not nobody.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was created. Server-stamped, never the client's clock.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it was last changed, server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+surfaces:
+  - page: "SimulationLab.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/hooks/useRecoveryPlaybooks.tsx:26"
+    confirmed: true

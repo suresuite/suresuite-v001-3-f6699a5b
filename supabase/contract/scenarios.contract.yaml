@@ -1,0 +1,333 @@
+# AUTHORED — the data contract's sidecar for `scenarios`.
+table: scenarios
+tier: '4'
+schema_name: public
+grain: >-
+  One what-if a person set up and can run: the horizon, the warm-up, the replications, the seed,
+  the demand model, the disruption schedule and the recovery overrides. The scenario half of
+  `result-binding` (I8) — a run cites one of these rows, and the export reads it back whole.
+owner: engine
+
+natural_key_unique:
+  - source: PRIMARY KEY constraint
+    columns: [id]
+    name: scenarios_pkey
+
+governance:
+  read: null
+  write: data_edit_policies
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the dataset they
+    chose it over and the result it produced. `result-binding` (I8) needs all three, which is
+    why WP 6.3 keeps the results and this package takes the decisions. Audited from WP 6.4: the
+    three statement-grain triggers land beside this sidecar, because `dataPlaneAudit.test.ts`
+    scopes its rule to tables IN the contract and a deferred table's writes are unaudited with
+    nothing to notice (D54). **This is the widest decision row in the product** — twenty-two
+    columns, seven of them the engine reads directly — and it is the one a reproducibility
+    record quotes rather than summarises, because a scenario summarised is a scenario that
+    cannot be re-run. **Three settings are a name rather than an id** (`primary_kpi`,
+    `time_step`, `warmup_mode`), which is legitimate for an enum and is the reason D113's KPI
+    vocabulary mattered: a `primary_kpi` naming a measure the engine never emits is a scenario
+    whose objective no run can report.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. A run binds to this, and so does the reproducibility record.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project this what-if belongs to.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      What a person called it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  description:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Their own note about it. Defaults to the empty string rather than NULL.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  horizon_days:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      How long the simulated world runs, in days. The engine's own clock is weekly, so this is
+      divided at the boundary rather than stored twice — `normalize-at-promotion` (I3) applied
+      to a decision.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  time_step:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The granularity the scenario was set up at — `day` by default. A NAME, from a small fixed
+      vocabulary, with no table behind it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  warmup_mode:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether the warm-up is detected or fixed. `auto` means the run decides and writes
+      `warmup_detected_at`; `fixed` means `warmup_days` below is used verbatim.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  warmup_days:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      The fixed warm-up, in days. Read only when `warmup_mode` is not `auto` — so a non-default
+      value here with `auto` set is a setting that does nothing, and nothing says so.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  replications:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      How many independent runs. The KPI table's `n` column is the count that ACTUALLY
+      completed, which is a different number whenever a replication fails.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  seed:
+    type: bigint
+    unit: null
+    unit_source: none
+    meaning: >-
+      The root seed. With `crn` below, this is what makes two runs of one scenario comparable
+      rather than merely similar.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  crn:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      Common random numbers: whether two scenarios draw the same randomness so their difference
+      is the POLICY and not the dice. Default true, and turning it off makes a comparison a
+      different kind of claim.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  demand_model:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      How demand is generated when the project's own data does not supply it — kind plus
+      parameters, as JSON. A DECLARED substitution (T2) rather than a silent default, and the
+      default is a Poisson.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  disruption_schedule:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      THE WHAT-IF ITSELF — the events, their timing and their targets. Copied from a template
+      when one is applied and diverging from that moment. §4 D112's unresolvable targets arrive
+      here.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  recovery_overrides:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      Per-lever changes to the chosen playbook, so a scenario can adjust a strategy without
+      forking the playbook.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  stopping_rule:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the run stops — a fixed horizon by default, as JSON so a precision-based rule can be
+      expressed without a migration.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  primary_kpi:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The objective this scenario is judged on. A KEY, not a label, and it must be one the
+      engine emits: `fill_rate` by default (§4 D113).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_by:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user who set it up, where recorded. NULL is unknown, not nobody.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it was created. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it was last changed, server-stamped. A scenario is mutable, which is why a run binds
+      to a scenario ID AND carries its own copy of what it ran.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  recovery_playbook_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The playbook this scenario applies, by id. The one place a playbook is referenced by key
+      rather than by name, which is what `scenario_templates.suggested_playbook_name` is not.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  from_network:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      TRUE when the scenario was created from a network screen rather than from the simulation
+      lab. It records the door a decision came through, which nothing else does.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  inherited_validation_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The validation run this scenario inherited its data-readiness verdict from, so a re-run
+      does not re-grade an unchanged dataset. NULL where it was never graded — and that is
+      different from graded-and-clean.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+surfaces:
+  - page: "SimulationLab.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/hooks/useScenarios.tsx:70"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "table read"
+    grain: column
+    evidence: "src/hooks/useVerifiableExports.tsx:213"
+    confirmed: true

@@ -90,6 +90,33 @@ class CustomerAllocation(PolicyPlugin):
                    "between (the policy is inert below two customers).",
             fallback=None,
         ),
+        # §4 D94 — these two were READ on every run and DECLARED nowhere, so
+        # every tool that derives "what the engine reads" from the registry was
+        # blind to them: the `customers` sidecar recorded `consumed_by: null`
+        # with nothing to contradict it, and `project_map` omitted the table with
+        # no requirement naming what it failed to supply. `level="defaulted"`
+        # rather than `recommended`: `Customer` carries a default for both, so an
+        # absent value is a substitution to REPORT (T2), never a blocked run.
+        DataRequirement(
+            field="customers.priority_weight", level="defaulted",
+            reason="The `priority` rule orders customers by this weight wherever "
+                   "the `priority_weights` param does not name the customer "
+                   "(SimContext.cust_priority). Only the RATIO between two "
+                   "customers means anything, so a table where every row is "
+                   "unset cannot order anything.",
+            fallback="Customer.priority_weight's own default, 1.0 — every "
+                     "customer equal, which makes the `priority` rule inert",
+        ),
+        DataRequirement(
+            field="customers.segment", level="defaulted",
+            reason="`sla_tiers` maps segment → fill floor %, so the segment is "
+                   "the axis the `sla_tier` rule tiers on "
+                   "(SimContext.cust_segment). It is also what the "
+                   "`fill_rate_segment_<segment>` KPIs are keyed by.",
+            fallback="Customer.segment's own default, \"default\" — every "
+                     "customer in one segment, so no `sla_tiers` key can match "
+                     "and every declared floor resolves to 0.0",
+        ),
     )
 
     @property

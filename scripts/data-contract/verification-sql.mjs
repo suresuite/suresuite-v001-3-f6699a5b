@@ -1006,6 +1006,98 @@ async function wp42Smear() {
  * MEASURE EVERY PROJECT. §4 D42: the largest project here is the one the seeder
  * creates, and reading it alone reports a clean data layer that is not clean.
  */
+/**
+ * WP 6.2 / 6.4 — the BEFORE numbers for two changes this branch makes, and one
+ * question a sidecar could not answer.
+ *
+ * READ AGAINST PRODUCTION WITHOUT THIS BRANCH'S MIGRATIONS. `supabase-migrations.yml`
+ * is `branches: [main]`, so the seven migrations here deploy on MERGE — which makes
+ * this the BEFORE half of two readings that straddle it, rather than a measurement of
+ * something already done.
+ *
+ * SELECT ONLY, like every probe in this file (`assertReadOnly`).
+ */
+async function wp62and64Before() {
+  section("§15 · WP 6.2 / 6.4 — before the cascade, and the catalog nothing reads");
+
+  // 1 · D117's orphans. `20260919000005` DELETES exactly these rows before it can
+  // add each foreign key, and prints every count on deploy. This is the number to
+  // compare that output against — and if it is large, it is also the answer to
+  // "how long has deleting a project not deleted the project".
+  const orphans = await tryQ(`
+    select 'customers' as tbl, count(*)::int as orphan_rows from public.customers t
+      where not exists (select 1 from public.projects p where p.id = t.project_id)
+    union all select 'network_summary', count(*)::int from public.network_summary t
+      where not exists (select 1 from public.projects p where p.id = t.project_id)
+    union all select 'policy_defaults', count(*)::int from public.policy_defaults t
+      where not exists (select 1 from public.projects p where p.id = t.project_id)
+    union all select 'policy_overrides', count(*)::int from public.policy_overrides t
+      where not exists (select 1 from public.projects p where p.id = t.project_id)
+    union all select 'simulation_job_magnitudes', count(*)::int from public.simulation_job_magnitudes t
+      where not exists (select 1 from public.projects p where p.id = t.project_id)
+    union all select 'tier2_suppliers', count(*)::int from public.tier2_suppliers t
+      where not exists (select 1 from public.projects p where p.id = t.project_id)
+    union all select 'tier3_suppliers', count(*)::int from public.tier3_suppliers t
+      where not exists (select 1 from public.projects p where p.id = t.project_id)
+     order by 1`);
+  report("§4 D117 — rows whose project no longer exists (the cascade's before number)", orphans, (rows) => {
+    out(...table(rows));
+    const total = rows.reduce((n, r) => n + Number(r.orphan_rows ?? 0), 0);
+    out(
+      `- **${total} row(s)** belong to a project that has been deleted. No screen can`,
+      `  reach them — every read is \`WHERE project_id = <a project you can open>\` —`,
+      `  and nothing has ever removed them.`,
+      `- \`policy_defaults\` and \`policy_overrides\` are the sharp ones: those rows are`,
+      `  the decisions a user typed into the grid.`,
+      `- \`20260919000005\` deletes exactly these and then adds seven \`ON DELETE CASCADE\``,
+      `  keys, so the same query must return 0 everywhere after the merge.`,
+    );
+  });
+
+  // 2 · D126. A seeded catalog nothing reads is a different finding from an empty
+  // table nothing reads, and only the database can say which this is.
+  const presets = await tryQ(`
+    select count(*)::int as rows,
+           count(*) filter (where is_system)::int as system_rows,
+           count(distinct slug)::int as slugs,
+           count(*) filter (where owner_id is not null)::int as user_rows
+      from public.policy_presets`);
+  report("§4 D126 — `policy_presets`: is there a catalog nobody reads?", presets, (rows) => {
+    out(...table(rows));
+    const n = Number(rows[0]?.rows ?? 0);
+    // Two different findings, and the report says which rather than printing a
+    // number and leaving the reader to decide what it means.
+    out(...(n === 0
+      ? ["- The table is EMPTY. Nothing reads it and nothing ever filled it, so D126 is",
+         "  a dead table rather than an unread catalog — which makes deleting it the",
+         "  cheaper of the two answers."]
+      : [`- **${n} row(s)** are seeded here and NO code reads them: not \`src/\`, not an`,
+         "  RPC, not an edge function. The presets a user applies are compiled into the",
+         "  bundle under `src/lib/policies/presets/`, so this catalog cannot be edited",
+         "  into effect — changing a preset needs a deploy."]));
+  });
+
+  // 3 · The six tables WP 6.4 describes, as rows. A described table with no rows is
+  // still described — but the reader of this report deserves to know which of the
+  // six the product has actually been using.
+  const decisions = await tryQ(`
+    select 'policy_versions' as tbl, count(*)::int as rows from public.policy_versions
+    union all select 'policy_presets', count(*)::int from public.policy_presets
+    union all select 'scenarios', count(*)::int from public.scenarios
+    union all select 'scenario_templates', count(*)::int from public.scenario_templates
+    union all select 'recovery_playbooks', count(*)::int from public.recovery_playbooks
+    union all select 'external_evidence', count(*)::int from public.external_evidence
+     order by 1`);
+  report("WP 6.4 — the decision plane, as rows", decisions, (rows) => {
+    out(...table(rows));
+    out(
+      "- Every one of these is now described, governed and audited by three triggers.",
+      "- A table with 0 rows here is not a finding on its own: `external_evidence` fills",
+      "  only when an agent has run, and `policy_presets` is D126's subject.",
+    );
+  });
+}
+
 async function wp43and44Counts() {
   section("WP 4.3 / 4.4 — provenance coverage, and D70's realised damage");
 
@@ -1861,6 +1953,7 @@ async function main() {
   await wp42Smear();
   await wp42Landed();
   await wp43and44Counts();
+  await wp62and64Before();
 
   const project = await pickProject();
   if (!project) {

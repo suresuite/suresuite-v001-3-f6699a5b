@@ -20,7 +20,7 @@ on:
       - 'supabase/functions/calculate-node-prominence/**'
       - 'supabase/functions/predict-critical-nodes/**'
       - 'supabase/functions/combine-project/**'
-      # THE FOUR ANALYZERS (§4 D104). They were absent from this list and
+      # THE FOUR ANALYZERS (§4 D123). They were absent from this list and
       # from the deploy steps below, so WP 4.3's dual-write shipped to `main`,
       # went green in CI and was recorded as done — while the functions
       # carrying it were never deployed. `_shared/**` triggers this workflow
@@ -199,6 +199,16 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # `ingest-file` IS DELIBERATELY NOT DEPLOYED HERE — §4 D123, deferred to
+      # WP 6.3's own landing switch. It is WP 3.2's entire deliverable and has
+      # never been published, and adding the step is a one-line change; what it is
+      # NOT is a small one. On merge it activates the WP 3.2–3.4 landing path in
+      # production for EVERY upload at once — server-side parse, tier-0 storage,
+      # staged rows, the diff screen, the promotion — and §16 · WP 6.3 (slice 16)
+      # declined it for that reason, asking for a §15 reading either side of the
+      # switch. That reading cannot be taken from a branch. The deferral is
+      # registered in `scripts/data-contract/coverage.yaml`, so R17 counts it
+      # rather than being satisfied by a step added in passing.
       # ── The four analysis functions (D105) ────────────────────────────────
       #
       # NEVER DEPLOYED BY THIS WORKFLOW UNTIL NOW, and not once in its history —
@@ -221,7 +231,7 @@ jobs:
       # deploy reads — `calculate-node-prominence` is `false` because a database
       # trigger reaches it through `pg_net` with no user JWT; the other three are
       # browser-invoked with the anon key and stay on.
-      # ── THE FOUR ANALYZERS (§4 D104) ──────────────────────────────────────
+      # ── THE FOUR ANALYZERS (§4 D123) ──────────────────────────────────────
       #
       # Measured, not assumed: on 2026-09-18 a metrics run on the `Aumovio`
       # project wrote 439 `network_nodes` rows, every one carrying computed

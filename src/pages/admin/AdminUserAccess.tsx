@@ -59,6 +59,9 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
   const [monthly, setMonthly] = useState(''); const [daily, setDaily] = useState('');
   const [tokenLimit, setTokenLimit] = useState(''); const [rpm, setRpm] = useState(''); const [rpd, setRpd] = useState('');
   const [savingBudget, setSavingBudget] = useState(false);
+  // §4 D34 — armed when the next uncheck would empty the allow-list, which
+  // GRANTS every model rather than revoking them.
+  const [pendingClearAll, setPendingClearAll] = useState(false);
 
   const load = useCallback(async () => {
     if (!actor?.id) return;
@@ -101,13 +104,54 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
     const fallback_id = next.fallback_id !== undefined ? next.fallback_id : data.models.fallback_id;
     setData((prev) => prev ? { ...prev, models: { ...prev.models, allowed_ids, default_id, fallback_id, all_allowed: allowed_ids.length === 0 } } : prev);
     const { error: err } = await db.rpc('admin_set_user_models', { p_actor_id: actor.id, p_actor_email: actor.email, p_target_user_id: data.user_id, p_allowed_model_ids: allowed_ids, p_default_model_id: default_id, p_fallback_model_id: fallback_id });
-    if (err) { toast.error(err.message); load(); } else toast.success('AI models updated');
+    if (err) { toast.error(err.message); load(); }
+    // The message says the EFFECT and not that a write happened. "AI models
+    // updated" is true of a save that granted every model and of one that
+    // restricted to a single model, which makes it useless at exactly the
+    // moment D34 is about.
+    else if (allowed_ids.length === 0) {
+      toast.success('Allow-list cleared — EVERY model is now allowed for this user');
+    } else {
+      toast.success(`AI models updated — ${allowed_ids.length} model(s) allowed`);
+    }
   };
+  /**
+   * §4 D34 — AN EMPTY ALLOW-LIST MEANS EVERYTHING, AND NOTHING SAID SO HERE.
+   *
+   * `capabilities_for_user()` sets `all_allowed` true when `allowed_model_ids` is
+   * empty OR the user has no row. That is deliberate — it preserves the behaviour
+   * every user had before the column existed — but it INVERTS how an allow-list
+   * reads. An administrator unchecking the last model to revoke access granted all
+   * of it instead, and the only thing on screen was a badge reading "No
+   * restriction" that appeared AFTER the save.
+   *
+   * What was missing is a warning at the point of the ACTION (§5 T2: a
+   * substitution is visible where it happens, not in a log). So the last uncheck
+   * does not save — it arms a confirmation that states the inversion and names the
+   * control that actually revokes, which is the `ai_chat` FEATURE in the section
+   * above. A warning that does not say what to do instead is a warning an
+   * administrator clicks past.
+   */
   const toggleModel = (id: string, checked: boolean) => {
     if (!data) return;
     const set = new Set(data.models.allowed_ids);
     checked ? set.add(id) : set.delete(id);
-    saveModels({ allowed_ids: Array.from(set) });
+    const next = Array.from(set);
+    // Only the transition INTO empty is intercepted. A list that is already empty
+    // is already "everything", so checking the first box RESTRICTS and needs no
+    // confirmation — the dangerous direction is one-way.
+    if (next.length === 0 && data.models.allowed_ids.length > 0) {
+      setPendingClearAll(true);
+      return;
+    }
+    setPendingClearAll(false);
+    saveModels({ allowed_ids: next });
+  };
+
+  /** The administrator has read the inversion and meant it. */
+  const confirmClearAll = () => {
+    setPendingClearAll(false);
+    saveModels({ allowed_ids: [] });
   };
 
   const saveBudgets = async () => {
@@ -175,8 +219,57 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
             <Section title="Pages"><CapMatrix rows={pages} isSuper={isSuper} onSet={setOverride} /></Section>
             <Section title="Features"><CapMatrix rows={features} isSuper={isSuper} onSet={setOverride} /></Section>
 
-            <Section title="AI models" badge={isSuper ? 'All enabled' : data.models.all_allowed ? 'No restriction' : undefined}>
+            {/* §4 D34 — the badge no longer says "No restriction", which reads as
+                a neutral absence. An empty list is not the absence of a rule; it
+                is the rule "every model", and the chip has to say which. */}
+            <Section
+              title="AI models"
+              badge={isSuper
+                ? 'All enabled'
+                : data.models.all_allowed
+                  ? 'Empty list = ALL allowed'
+                  : `${data.models.allowed_ids.length} allowed`}
+            >
               <div className="space-y-4">
+                {/* §4 D34 · THE WARNING AT THE POINT OF THE ACTION.
+                    Armed by the uncheck that would empty the list, and it does two
+                    things a badge cannot: it states the inversion BEFORE the write,
+                    and it names the control that actually revokes. */}
+                {pendingClearAll && (
+                  <div
+                    role="alertdialog"
+                    aria-label="Clearing the allow-list grants every model"
+                    className="rounded-sm border border-[#bf2330]/40 bg-[#bf2330]/10 p-3 text-sm"
+                  >
+                    <div className="font-semibold text-[#bf2330]">
+                      That last box was the only restriction.
+                    </div>
+                    <p className="mt-1.5 text-[13px] leading-snug">
+                      An <strong>empty allow-list means EVERY model is allowed</strong>,
+                      not none. Clearing it here does not revoke this user's AI
+                      access — it removes the limit on which models they may use.
+                    </p>
+                    <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground">
+                      To take AI away from this user, deny the{' '}
+                      <strong>AI chat</strong> feature in <strong>Features</strong> above.
+                      To restrict them to specific models, leave at least one box
+                      checked.
+                    </p>
+                    <div className="mt-2.5 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={HDR_OUTLINE_BUTTON}
+                        onClick={() => setPendingClearAll(false)}
+                      >
+                        Keep the restriction
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={confirmClearAll}>
+                        I understand — allow every model
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 {modelsByProvider.map(([provider, models]) => (
                   <div key={provider}>
                     <div className={`${KX} mb-1.5`}>{provider}</div>

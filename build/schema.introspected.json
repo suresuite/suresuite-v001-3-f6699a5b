@@ -1,20 +1,21 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 331,
-  "migrations_applied": 323,
+  "migrations_found": 338,
+  "migrations_applied": 330,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260918000004_disruption_plane_audited.sql",
+  "last_migration": "20260919000007_decision_plane_actor.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 273,
+    "functions": 276,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
     "dynamic_ddl_statements": 36,
     "rls_indeterminate_tables": 4,
+    "rls_dynamic_unresolved": 0,
     "orphans": 0,
     "aborted_migrations": 8
   },
@@ -4869,6 +4870,37 @@
           "unique": false,
           "references": null,
           "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        },
+        {
+          "name": "ingest_run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "ingest_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260919000001_customers_land.sql"
+        },
+        {
+          "name": "source_row_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260919000001_customers_land.sql"
         }
       ],
       "constraints": [
@@ -4881,6 +4913,24 @@
           ],
           "definition": "UNIQUE (project_id, customer_id)",
           "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+        },
+        {
+          "name": "customers_source_row_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "source_row_id"
+          ],
+          "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
+          "added_by": "20260919000001_customers_land.sql"
+        },
+        {
+          "name": "customers_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [],
@@ -10757,6 +10807,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+        },
+        {
+          "name": "network_summary_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [],
@@ -12143,6 +12202,15 @@
           "columns": [],
           "definition": "CHECK (fulfillment_strategy IN ('make_to_stock','make_to_order','assemble_to_order','engineer_to_order','configure_to_order'))",
           "added_by": "20260607133944_444b6c58-6239-4b6d-89e3-deb6d075de97.sql"
+        },
+        {
+          "name": "policy_defaults_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [],
@@ -12380,6 +12448,15 @@
           "columns": [],
           "definition": "CHECK (family IN ('sourcing','inventory','transport','fulfillment','production','recovery','demand'))",
           "added_by": "20260609040000_consolidated_safe.sql"
+        },
+        {
+          "name": "policy_overrides_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [
@@ -16994,6 +17071,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250917214434_0124e19b-fd0b-4bb1-9dad-0a449d321c0a.sql"
+        },
+        {
+          "name": "simulation_job_magnitudes_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [
@@ -19656,6 +19742,15 @@
           ],
           "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
           "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "tier2_suppliers_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [
@@ -19933,6 +20028,15 @@
           ],
           "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
           "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "tier3_suppliers_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [
@@ -21232,6 +21336,19 @@
       "defined_by": "20260917000006_analysis_store.sql"
     },
     {
+      "name": "analysis_latest_run",
+      "signature": "analysis_latest_run(uuid, text)",
+      "args": [
+        "_project_id uuid",
+        "_analysis_kind text"
+      ],
+      "returns": "uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "Phase 6 / WP 6.3 (§4 D88) — the SUCCEEDED run whose stored answer a reader ",
+      "defined_by": "20260919000002_dual_read_node_metrics.sql"
+    },
+    {
       "name": "analysis_mark_critical_nodes",
       "signature": "analysis_mark_critical_nodes(uuid, jsonb, uuid)",
       "args": [
@@ -21358,16 +21475,17 @@
     },
     {
       "name": "apply_validation_to_scenario",
-      "signature": "apply_validation_to_scenario(uuid, uuid)",
+      "signature": "apply_validation_to_scenario(uuid, uuid, uuid)",
       "args": [
         "p_scenario_id uuid",
-        "p_validation_id uuid"
+        "p_validation_id uuid",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260710000001_model_validations.sql"
+      "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
       "name": "approved_users_stamp_organization_id",
@@ -22294,15 +22412,16 @@
     },
     {
       "name": "delete_policy_version",
-      "signature": "delete_policy_version(uuid)",
+      "signature": "delete_policy_version(uuid, uuid)",
       "args": [
-        "p_version_id uuid"
+        "p_version_id uuid",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000005_policy_version_notes_delete.sql"
+      "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
       "name": "delete_project_dataset",
@@ -22717,11 +22836,11 @@
         "p_user_id uuid",
         "p_user_email text"
       ],
-      "returns": "TABLE( id uuid, uid text, name text, revenue numeric, degree_centrality numeric, weighted_degree_centrality numeric, eigenvector_centrality numeric, betweenness_centrality numeric, closeness_centrality numeric, prominence numeric, connection_count bigint )",
+      "returns": "TABLE( id uuid, uid text, name text, revenue numeric, degree_centrality numeric, weighted_degree_centrality numeric, eigenvector_centrality numeric, betweenness_centrality numeric, closeness_centrality numeric, prominence numeric, connection_count bigint, metrics_source text, run_id uuid, computed_from_hash text, computed_at timestamptz, hash_is_current boolean )",
       "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250925154019_c846dd00-c018-407f-8aa6-f6ce2915f6f6.sql"
+      "volatility": "STABLE",
+      "comment": "Phase 6 / WP 6.3 (§4 D88) — material-node network metrics, DUAL READ: the ",
+      "defined_by": "20260919000002_dual_read_node_metrics.sql"
     },
     {
       "name": "get_network_nodes_for_prominence",
@@ -23213,8 +23332,22 @@
       "returns": null,
       "security_definer": false,
       "volatility": "STABLE",
-      "comment": "Phase 3 / WP 3.4 — the columns a promotion of this run into this target ",
-      "defined_by": "20260917000001_diff_before_promotion.sql"
+      "comment": "Phase 6 / WP 6.2 (§4 D120) — the columns a promotion of this run into this ",
+      "defined_by": "20260919000001_customers_land.sql"
+    },
+    {
+      "name": "ingest_row_provenance",
+      "signature": "ingest_row_provenance(uuid, uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_user_id uuid",
+        "p_target_table text"
+      ],
+      "returns": "TABLE ( natural_key jsonb, has_provenance boolean, source_row_number integer, original_filename text, content_sha256 text, uploaded_by_email text, received_at timestamptz, promoted_by_email text, promoted_at timestamptz )",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "§5.4's acceptance test, export side (WP 6.3): one row per tier-2 row of a ",
+      "defined_by": "20260919000004_row_provenance.sql"
     },
     {
       "name": "ingest_target_is_promotable",
@@ -23225,8 +23358,8 @@
       "returns": "boolean LANGUAGE sql IMMUTABLE SET search_path",
       "security_definer": false,
       "volatility": "IMMUTABLE",
-      "comment": null,
-      "defined_by": "20260916000020_item_masters_land.sql"
+      "comment": "Phase 6 / WP 6.2 (§4 D108) — the TEN tables a staged row may be promoted ",
+      "defined_by": "20260919000001_customers_land.sql"
     },
     {
       "name": "ingest_target_natural_key",
@@ -23239,6 +23372,21 @@
       "volatility": "STABLE",
       "comment": "Phase 3 / WP 3.3 — the columns a promotion upserts on, read from pg_index ",
       "defined_by": "20260916000018_natural_key_unique.sql"
+    },
+    {
+      "name": "ingest_value_chain",
+      "signature": "ingest_value_chain(uuid, uuid, uuid, text)",
+      "args": [
+        "p_user_id uuid",
+        "p_source_row_id uuid DEFAULT NULL",
+        "p_project_id uuid DEFAULT NULL",
+        "p_target_table text DEFAULT NULL"
+      ],
+      "returns": "TABLE ( has_provenance boolean, project_id uuid, target_table text, source_kind text, original_filename text, content_sha256 text, byte_size bigint, source_row_number integer, raw jsonb, parsed jsonb, findings jsonb, diff_state text, uploaded_by_name text, uploaded_by_email text, received_at timestamptz, promoted_by_name text, promoted_by_email text, promoted_at timestamptz, run_status text, later_uploads integer, latest_upload_at timestamptz )",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "§5.4 A2 — the value chain for ONE tier-2 row, expanded from its `source_row_id`: ",
+      "defined_by": "20260919000003_value_chain.sql"
     },
     {
       "name": "is_stale",
@@ -23666,7 +23814,7 @@
     },
     {
       "name": "record_external_evidence",
-      "signature": "record_external_evidence(uuid, text, text, text, numeric, jsonb, text)",
+      "signature": "record_external_evidence(uuid, text, text, text, numeric, jsonb, text, uuid)",
       "args": [
         "p_project_id uuid",
         "p_source_id text",
@@ -23674,13 +23822,14 @@
         "p_content_hash text",
         "p_confidence numeric",
         "p_triple jsonb",
-        "p_lei text DEFAULT NULL"
+        "p_lei text DEFAULT NULL",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260727000001_network_cartographer.sql"
+      "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
       "name": "record_model_validation",
@@ -24107,7 +24256,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000005_policy_version_notes_delete.sql"
+      "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
       "name": "supersede_agent_proposal",
@@ -24172,16 +24321,17 @@
     },
     {
       "name": "update_policy_version_notes",
-      "signature": "update_policy_version_notes(uuid, text)",
+      "signature": "update_policy_version_notes(uuid, text, uuid)",
       "args": [
         "p_version_id uuid",
-        "p_notes text"
+        "p_notes text",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
-      "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000005_policy_version_notes_delete.sql"
+      "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
       "name": "update_project_completion_status",
@@ -24592,13 +24742,26 @@
         "simulation_runs"
       ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260609010118_e03bff33-fd91-4376-8a39-06a9950e15d3.sql",
       "statement": "EXECUTE format('GRANT ALL ON public.%I TO service_role', t)",
-      "mentions": [],
+      "mentions": [
+        "experiments",
+        "policy_defaults",
+        "policy_overrides",
+        "policy_presets",
+        "recovery_playbooks",
+        "run_replications",
+        "scenarios",
+        "simulation_runs"
+      ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24615,13 +24778,26 @@
         "simulation_runs"
       ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260609040000_consolidated_safe.sql",
       "statement": "EXECUTE format('GRANT ALL ON public.%I TO service_role', t)",
-      "mentions": [],
+      "mentions": [
+        "experiments",
+        "policy_defaults",
+        "policy_overrides",
+        "policy_presets",
+        "recovery_playbooks",
+        "run_replications",
+        "scenarios",
+        "simulation_runs"
+      ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24633,41 +24809,73 @@
         "suppliers"
       ],
       "touches_rls": true,
+      "has_format_placeholder": true,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260614000001_item_master.sql",
       "statement": "EXECUTE format($f$ DROP POLICY IF EXISTS \"%1$s_auth_all\" ON public.%1$s; CREATE POLICY \"%1$s_auth_all\" ON public.%1$s FOR ALL TO authenticated USING (true) WITH CHECK (true); DROP POLICY IF EXISTS \"%1$s_anon_read\" ON public.%1$s; CREATE POLICY \"%1$s_anon_read\" ON public.%1$s FOR SELECT TO anon USING (true); $f$, t)",
-      "mentions": [],
+      "mentions": [
+        "materials",
+        "products",
+        "suppliers"
+      ],
       "touches_rls": true,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260614000001_item_master.sql",
       "statement": "EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated;', t)",
-      "mentions": [],
+      "mentions": [
+        "materials",
+        "products",
+        "suppliers"
+      ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260614000001_item_master.sql",
       "statement": "EXECUTE format('GRANT SELECT ON public.%I TO anon;', t)",
-      "mentions": [],
+      "mentions": [
+        "materials",
+        "products",
+        "suppliers"
+      ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260614000001_item_master.sql",
       "statement": "EXECUTE format('GRANT ALL ON public.%I TO service_role;', t)",
-      "mentions": [],
+      "mentions": [
+        "materials",
+        "products",
+        "suppliers"
+      ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260614000001_item_master.sql",
       "statement": "EXECUTE format('ALTER TABLE public.%I REPLICA IDENTITY FULL;', t)",
-      "mentions": [],
+      "mentions": [
+        "materials",
+        "products",
+        "suppliers"
+      ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24682,6 +24890,8 @@
         "user_ai_permissions"
       ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24695,12 +24905,17 @@
         "user_capabilities"
       ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260712100000_arc_write_performance.sql",
       "statement": "BEGIN FOR t, legacy_trigger IN SELECT * FROM (VALUES ('bom_single_level', 'bom_sl_completion'), ('bom_multi_level', 'bom_ml_completion'), ('inbound_logistics', 'inbound_completion'), ('outbound_logistics', 'outbound_completion'), ('multi_tier_supply_chain', 'multi_tier_completion') ) AS v(tbl, trg) LOOP EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', legacy_trigger, t)",
       "mentions": [
+        "_del",
+        "_ins",
+        "_upd",
         "bom_ml_completion",
         "bom_multi_level",
         "bom_single_level",
@@ -24713,53 +24928,125 @@
         "outbound_logistics"
       ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260712100000_arc_write_performance.sql",
       "statement": "EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', legacy_trigger || '_ins', t)",
       "mentions": [
-        "_ins"
+        "_del",
+        "_ins",
+        "_upd",
+        "bom_ml_completion",
+        "bom_multi_level",
+        "bom_single_level",
+        "bom_sl_completion",
+        "inbound_completion",
+        "inbound_logistics",
+        "multi_tier_completion",
+        "multi_tier_supply_chain",
+        "outbound_completion",
+        "outbound_logistics"
       ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260712100000_arc_write_performance.sql",
       "statement": "EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', legacy_trigger || '_upd', t)",
       "mentions": [
-        "_upd"
+        "_del",
+        "_ins",
+        "_upd",
+        "bom_ml_completion",
+        "bom_multi_level",
+        "bom_single_level",
+        "bom_sl_completion",
+        "inbound_completion",
+        "inbound_logistics",
+        "multi_tier_completion",
+        "multi_tier_supply_chain",
+        "outbound_completion",
+        "outbound_logistics"
       ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260712100000_arc_write_performance.sql",
       "statement": "EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', legacy_trigger || '_del', t)",
       "mentions": [
-        "_del"
+        "_del",
+        "_ins",
+        "_upd",
+        "bom_ml_completion",
+        "bom_multi_level",
+        "bom_single_level",
+        "bom_sl_completion",
+        "inbound_completion",
+        "inbound_logistics",
+        "multi_tier_completion",
+        "multi_tier_supply_chain",
+        "outbound_completion",
+        "outbound_logistics"
       ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260712100000_arc_write_performance.sql",
       "statement": "EXECUTE format( 'CREATE TRIGGER %I AFTER INSERT ON public.%I ' 'REFERENCING NEW TABLE AS affected ' 'FOR EACH STATEMENT EXECUTE FUNCTION public.update_project_completion_stmt()', legacy_trigger || '_ins', t)",
       "mentions": [
+        "_del",
         "_ins",
+        "_upd",
+        "bom_ml_completion",
+        "bom_multi_level",
+        "bom_single_level",
+        "bom_sl_completion",
+        "inbound_completion",
+        "inbound_logistics",
+        "multi_tier_completion",
+        "multi_tier_supply_chain",
+        "outbound_completion",
+        "outbound_logistics",
         "update_project_completion_stmt"
       ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260712100000_arc_write_performance.sql",
       "statement": "EXECUTE format( 'CREATE TRIGGER %I AFTER UPDATE ON public.%I ' 'REFERENCING NEW TABLE AS affected ' 'FOR EACH STATEMENT EXECUTE FUNCTION public.update_project_completion_stmt()', legacy_trigger || '_upd', t)",
       "mentions": [
+        "_del",
+        "_ins",
         "_upd",
+        "bom_ml_completion",
+        "bom_multi_level",
+        "bom_single_level",
+        "bom_sl_completion",
+        "inbound_completion",
+        "inbound_logistics",
+        "multi_tier_completion",
+        "multi_tier_supply_chain",
+        "outbound_completion",
+        "outbound_logistics",
         "update_project_completion_stmt"
       ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24767,9 +25054,23 @@
       "statement": "EXECUTE format( 'CREATE TRIGGER %I AFTER DELETE ON public.%I ' 'REFERENCING OLD TABLE AS affected ' 'FOR EACH STATEMENT EXECUTE FUNCTION public.update_project_completion_stmt()', legacy_trigger || '_del', t)",
       "mentions": [
         "_del",
+        "_ins",
+        "_upd",
+        "bom_ml_completion",
+        "bom_multi_level",
+        "bom_single_level",
+        "bom_sl_completion",
+        "inbound_completion",
+        "inbound_logistics",
+        "multi_tier_completion",
+        "multi_tier_supply_chain",
+        "outbound_completion",
+        "outbound_logistics",
         "update_project_completion_stmt"
       ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24779,6 +25080,8 @@
         "workspace"
       ],
       "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24792,20 +25095,34 @@
         "project_erp_links"
       ],
       "touches_rls": true,
+      "has_format_placeholder": true,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260829120000_erp_connector_phase1_2.sql",
       "statement": "EXECUTE format('GRANT ALL ON public.%I TO service_role;', t)",
-      "mentions": [],
+      "mentions": [
+        "erp_staged_bom_lines",
+        "erp_staged_bom_versions",
+        "erp_staged_products"
+      ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260829120000_erp_connector_phase1_2.sql",
       "statement": "EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO authenticated;', t)",
-      "mentions": [],
+      "mentions": [
+        "erp_staged_bom_lines",
+        "erp_staged_bom_versions",
+        "erp_staged_products"
+      ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24815,6 +25132,8 @@
         "risk_data"
       ],
       "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24824,6 +25143,8 @@
         "risk_data"
       ],
       "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24833,6 +25154,8 @@
         "risk_data"
       ],
       "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24843,6 +25166,8 @@
         "unrecorded"
       ],
       "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24852,6 +25177,8 @@
         "risk_data"
       ],
       "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24862,6 +25189,8 @@
         "risk_data"
       ],
       "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24872,6 +25201,8 @@
         "risk_data_country_normalized"
       ],
       "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24885,6 +25216,8 @@
         "risk_data_risk_class_known"
       ],
       "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24895,6 +25228,8 @@
         "risk_data_country_key"
       ],
       "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24904,6 +25239,8 @@
         "ingest"
       ],
       "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
@@ -24916,21 +25253,38 @@
         "node_list"
       ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260917000007_analyzer_provenance.sql",
       "statement": "EXECUTE format('DROP TRIGGER IF EXISTS audit_%1$s_update ON public.%1$I', t)",
-      "mentions": [],
+      "mentions": [
+        "network_edges",
+        "network_nodes",
+        "network_summary",
+        "node_list"
+      ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     },
     {
       "migration": "20260917000007_analyzer_provenance.sql",
       "statement": "EXECUTE format('DROP TRIGGER IF EXISTS audit_%1$s_delete ON public.%1$I', t)",
-      "mentions": [],
+      "mentions": [
+        "network_edges",
+        "network_nodes",
+        "network_summary",
+        "node_list"
+      ],
       "touches_rls": false,
+      "has_format_placeholder": true,
+      "named_only_via_block": true,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     }
-  ]
+  ],
+  "rls_dynamic_unresolved": []
 }

@@ -1,0 +1,216 @@
+# AUTHORED — the data contract's sidecar for `policy_versions`.
+table: policy_versions
+tier: '4'
+schema_name: public
+grain: >-
+  One saved snapshot of a project's whole policy bundle, with the bundle it replaced and the
+  hash of both. The audit trail of the /policies grid: what the policies WERE at a moment
+  somebody chose to record, which is what makes a simulation result reproducible from the policy
+  side.
+owner: policy-ui
+
+natural_key_unique:
+  - source: PRIMARY KEY constraint
+    columns: [id]
+    name: policy_versions_pkey
+
+governance:
+  read: null
+  write: data_edit_policies
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the dataset they
+    chose it over and the result it produced. `result-binding` (I8) needs all three, which is
+    why WP 6.3 keeps the results and this package takes the decisions. Audited from WP 6.4: the
+    three statement-grain triggers land beside this sidecar, because `dataPlaneAudit.test.ts`
+    scopes its rule to tables IN the contract and a deferred table's writes are unaudited with
+    nothing to notice (D54). **This is the one decision table `result-binding` (I8) already
+    reaches**: a run stores `policy_version_id` and the verifiable export reads the row back, so
+    the policy half of a reproducibility record is bound where the dataset half has to be
+    reconstructed. The row carries THREE author columns beside `created_by`, which is a
+    denormalised copy of a person rather than a second identity (G1) — kept because a version
+    outlives an account and a deleted user should not erase who made a decision.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. A run binds to this, so it is the id that makes a result reproducible from
+      the policy side.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project whose policies these are.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  label:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      What a person called this version. NULL where it was saved automatically; there is no
+      generated label, because an invented name for somebody's decision is worse than none.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  snapshot:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      THE DECISION ITSELF — the full policy bundle as it stood. Whole rather than a diff, so
+      reading one row reconstructs the state without replaying a chain.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_by:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The user who saved it, by uuid. The three `author_*` columns beside it are the
+      denormalised copy that survives the account.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it was saved. Server-stamped, never the client's clock.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  author_user_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The author's uuid, recorded a second time. It duplicates `created_by` by design — one of
+      the two came first and neither was removed, and a version row is append-only, so they
+      cannot drift after the write.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  author_email:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The author's email AT THE MOMENT OF SAVING. A denormalised copy, not a join key (G1): the
+      account may be renamed or deleted and the decision still has to say who made it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  author_name:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The author's display name at the moment of saving, for the same reason as `author_email`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  parent_version_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The version this one followed, so the chain can be walked. NULL on the first version of a
+      project — and NULL is also what a version saved before this column existed carries, so an
+      absent parent is `unknown`, not `first`.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  previous_snapshot:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      The bundle this version REPLACED, stored beside the new one. It makes a diff readable from
+      one row rather than two, and it is what lets a restore know what it is undoing.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  policy_hash:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The hash of `snapshot`. What a reproducibility record carries so a reader can check that a
+      bundle they hold is the one a run used, without trusting the id.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  notes:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Free text a person wrote about why. The only column here that carries a REASON rather than
+      a state, and nothing reads it today.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+surfaces:
+  - page: "ProjectPolicies.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/hooks/usePolicies.tsx:458"
+    confirmed: true
+  - page: "SimulationLab.tsx"
+    via: "table read"
+    grain: column
+    evidence: "src/hooks/useVerifiableExports.tsx:226"
+    confirmed: true

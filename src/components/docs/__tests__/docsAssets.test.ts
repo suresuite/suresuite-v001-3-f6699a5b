@@ -32,17 +32,28 @@ const PUBLIC = join(__dirname, "..", "..", "..", "..", "public");
 const resolve = (href: string) => join(PUBLIC, href.replace(/^\//, ""));
 
 describe("every asset the manual links exists", () => {
-  it("derived the thirteen datasets the wizard declares", () => {
+  it("derived the FOURTEEN datasets the wizard declares", () => {
     // The vacuity rule (§4 D57): a scan that matched nothing would make every
     // assertion below pass over an empty list.
     //
-    // Thirteen, not fourteen. §4 D110 says "fourteen CSV templates" and that is
-    // the count of FILES in `public/template/`; the wizard declares thirteen
-    // datasets offering twelve template files, because `node_list` deliberately
-    // offers none. The two numbers were the same number until this test
-    // separated them, which is the last orphan check below.
-    expect(UPLOAD_ASSETS.length).toBe(13);
-    expect(UPLOAD_ASSETS.filter((a) => a.templateFile).length).toBe(12);
+    // THIRTEEN WHEN THIS TEST WAS WRITTEN, FOURTEEN SINCE WP 6.2 — and the way it
+    // moved is §4 D39 exactly. WP 5.2j added this assertion while WP 6.2 added the
+    // `item_master_customers` dataset (§4 D108: `P-C.2` reads two `customers`
+    // columns and nothing in the product could set either). NEITHER BRANCH WAS RED
+    // ALONE: this test did not exist on one, and the dataset did not exist on the
+    // other. The merge is where the two facts met, and `contract:check` on the
+    // merge result is the only thing that could have seen it.
+    //
+    // The count stays SPELLED OUT rather than derived from `UPLOAD_ASSETS.length`,
+    // which would make the assertion vacuous — and it is named in the title so a
+    // stale one is obvious rather than arithmetic nobody re-reads (D101's lesson).
+    //
+    // Fourteen datasets, thirteen template FILES: §4 D110's "fourteen CSV
+    // templates" counts files in `public/template/`, and the two numbers are still
+    // different because `node_list` deliberately offers no template while
+    // `customers.csv` added one. They were equal by coincidence before.
+    expect(UPLOAD_ASSETS.length).toBe(14);
+    expect(UPLOAD_ASSETS.filter((a) => a.templateFile).length).toBe(13);
   });
 
   it.each(UPLOAD_ASSETS.filter((a) => a.templateFile).map((a) => [a.id, a.templateFile!]))(
