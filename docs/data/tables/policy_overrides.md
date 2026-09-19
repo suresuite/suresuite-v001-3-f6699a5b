@@ -52,7 +52,7 @@ partially or get corrected — the write fails.
 > product intends to check, not what the database enforces:
 >
 > - `Authenticated users can read policy overrides` — `SELECT` to `authenticated`
-> - `Anon can read policy overrides` — `SELECT` to `anon`
+> - `Anon can read policy overrides` — `SELECT` to `anon`, `authenticated`
 >
 > See PLAN.md D28: the application runs as the
 > `anon` role with no auth session and the anon key ships in the frontend bundle, so
@@ -66,7 +66,7 @@ partially or get corrected — the write fails.
 | Authenticated users can insert policy overrides | INSERT | authenticated | `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql` |
 | Authenticated users can update policy overrides | UPDATE | authenticated | `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql` |
 | Authenticated users can delete policy overrides | DELETE | authenticated | `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql` |
-| Anon can read policy overrides | SELECT | anon | `20260609040000_consolidated_safe.sql` |
+| Anon can read policy overrides | SELECT | anon, authenticated | `20260919000010_anon_policies_widen.sql` |
 
 </details>
 
@@ -266,6 +266,6 @@ WP 4.4 · the `current_graph_hash` of the moment this override was SEEDED from p
 
 ---
 
-*Generated from data contract `898095dabbaa`, engine `0.2.3`,
+*Generated from data contract `c56d99b9d2e1`, engine `0.2.3`,
 sidecar `supabase/contract/policy_overrides.contract.yaml`, table created by `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -36,7 +36,7 @@ Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the d
 > product intends to check, not what the database enforces:
 >
 > - `scenarios_auth_all` — `ALL` to `authenticated`
-> - `scenarios_anon_all` — `ALL` to `anon`
+> - `scenarios_anon_all` — `ALL` to `anon`, `authenticated`
 >
 > Some of these permit **writes**. See PLAN.md D28: the application runs as the
 > `anon` role with no auth session and the anon key ships in the frontend bundle, so
@@ -47,7 +47,7 @@ Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the d
 | Policy | Command | Roles | Added by |
 |---|---|---|---|
 | scenarios_auth_all | ALL | authenticated | `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql` |
-| scenarios_anon_all | ALL | anon | `20260610000002_scenarios_anon_grants.sql` |
+| scenarios_anon_all | ALL | anon, authenticated | `20260919000010_anon_policies_widen.sql` |
 
 </details>
 
@@ -416,6 +416,6 @@ The validation run this scenario inherited its data-readiness verdict from, so a
 
 ---
 
-*Generated from data contract `898095dabbaa`, engine `0.2.3`,
+*Generated from data contract `c56d99b9d2e1`, engine `0.2.3`,
 sidecar `supabase/contract/scenarios.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

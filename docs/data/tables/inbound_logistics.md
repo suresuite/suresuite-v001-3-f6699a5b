@@ -54,7 +54,7 @@ partially or get corrected — the write fails.
 > product intends to check, not what the database enforces:
 >
 > - `inbound_logistics_auth_read` — `SELECT` to `authenticated`
-> - `inbound_logistics_anon_read` — `SELECT` to `anon`
+> - `inbound_logistics_anon_read` — `SELECT` to `anon`, `authenticated`
 >
 > See PLAN.md D28: the application runs as the
 > `anon` role with no auth session and the anon key ships in the frontend bundle, so
@@ -65,9 +65,9 @@ partially or get corrected — the write fails.
 | Policy | Command | Roles | Added by |
 |---|---|---|---|
 | inbound_logistics_auth_read | SELECT | authenticated | `20260705000001_open_logistics_reads.sql` |
-| inbound_logistics_anon_read | SELECT | anon | `20260705000001_open_logistics_reads.sql` |
 | Inbound: modifiers only | ALL | all | `20260915000004_org_identity_dual_read.sql` |
 | Inbound: organization access | SELECT | all | `20260915000004_org_identity_dual_read.sql` |
+| inbound_logistics_anon_read | SELECT | anon, authenticated | `20260919000010_anon_policies_widen.sql` |
 
 </details>
 
@@ -440,6 +440,6 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `898095dabbaa`, engine `0.2.3`,
+*Generated from data contract `c56d99b9d2e1`, engine `0.2.3`,
 sidecar `supabase/contract/inbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

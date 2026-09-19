@@ -314,6 +314,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D130** | **Stage 1 assumed a session could be minted for an existing user id, and 0 of 14 approved users exist in `auth.users` — while sixteen policies are granted to `anon` ALONE, so issuing one would break reads for exactly the people who logged in.** §15 run `35466925117`: `auth.users` holds **1** row, `approved_users` holds **14**, and the overlap is **0**. So `auth.uid()` has never returned an id this application recognises, which is why 13 policies naming it are effectively dead and 54 read the GUC instead. Two consequences the staged plan did not contain. **(1) Stage 1 is not plumbing.** It cannot attach a session to an existing identity because there is no identity to attach to; it must either create 14 auth identities (whose passwords this application does not hold in a form Supabase Auth can take — `approved_users.password_hash` is its own scheme) or mint a JWT whose `sub` is the `approved_users.id` and skip `auth.users` altogether, which works because `auth.uid()` reads the JWT claim and not the table. **(2) The role change is itself a blast radius.** 16 policies are granted to `{anon}` alone; the moment a request arrives as `authenticated` they stop applying to it and RLS denies by default, so those reads fail for authenticated users only — a failure mode nothing in §14 pointed at. 103 policies are `TO public` and are unaffected; 12 name both roles. The grant half is clean: **0** privileges are held by `anon` and not by `authenticated` | §15 run `35466925117`, sections "stage 0.5", "0.6" and "0.7" | **OPEN — WP 7.1, and stage 1 is re-planned before it is written.** The widening of the 16 is additive and revertible, so it belongs at the head of stage 1 rather than ahead of the sequence. **The identity question is the larger one and it is D28's, arriving with a number**: this application authenticates against `approved_users`, and the choice between importing 14 identities and signing a JWT over the id they already have is the choice between changing how people log in and changing only what the database is told about it. The second is smaller, reversible and does not touch a password — and it is what stage 1 will do unless the identity import is wanted for its own sake |
 | **D131** | **The CSV landing path cannot run in production: `ingest_land_file` must name its uploader, writes that uploader into a column still keyed to `auth.users`, and no approved user exists there.** Three facts that are each correct alone. **(1)** `ingest_land_file` RAISES `null_value_not_allowed` when `_actor_user_id` is NULL — deliberately, with the invariant named in the message, because an unattributed file landing is the thing `audit-actor` (G4) exists to forbid. **(2)** It writes that actor into `ingest_runs.triggered_by_user_id`, and `ingest_apply_run` writes it into `applied_by_user_id`; both columns still carry a foreign key to `auth.users`, under the pre-rename names `erp_sync_runs_triggered_by_user_id_fkey` and `erp_sync_runs_applied_by_user_id_fkey` (`20260829120000`, where the comment reads *"null for scheduled runs"* — written when the actor was expected to be a Supabase Auth user). **(3)** §15 run `35466925117`: `auth.users` holds 1 row, `approved_users` 14, overlap **0**. So the function cannot pass NULL and cannot pass a real uploader either, and **every CSV landing by a real user would abort on a foreign-key violation**. **Why nothing caught it**: every rehearsal that exercises the path INSERTs its actor into `auth.users` first — `050`, `060`, `070`, `080`, `090`, `100`, `110`, `120` all do — so each proves the landing against a world in which `approved_users.id ∈ auth.users.id`, which production has never been. That is the sharpest instance yet of a fixture establishing the premise the assertion needs. **It is LATENT, not live**: `ingest-file` is not deployed (D123), so nothing can reach the path today — which is why it reads as a blocker rather than an outage, and why it was findable before it cost a user anything | §15 run `35467412134`, probe 0.9 (`pg_constraint`, 8 keys to `auth.users`) against `supabase/migrations/20260916000015_ingest_landing.sql`'s NULL-actor `RAISE` and its `ingest_runs` INSERT; the actor INSERTs in `supabase/rehearsal/050`–`120` | **OPEN — WP 6.5 (a), as its PRECONDITION rather than a note.** The switch that package owns is publishing `ingest-file`, and publishing it without dropping these two keys turns every upload in production into a foreign-key error. **The remedy has a pattern in this repository**: `20260613000001_fix_snapshot_created_by.sql` hit exactly this in June for `policy_versions.created_by`, dropped the key, and said why — *"the app authenticates against public.approved_users (custom auth), so the user id passed to snapshot_policy is NOT an auth.users id"*. Two `ALTER TABLE … DROP CONSTRAINT`, and the columns keep storing an `approved_users` id exactly as `ingest_files.uploaded_by` already does (that one was keyed correctly from the start, which is why the file half never failed). **Probe 0.9 FAILS the §15 run while the keys exist**, so §15 is red until WP 6.5 (a) acts — an intended ratchet on a latent defect, and the one thing that stops this being rediscovered by a user |
 | **D132** | **The introspected artifact believes in a foreign key production dropped in June, because `contract:introspect` does not follow `ALTER TABLE … DROP CONSTRAINT` for an implicitly-named key.** The artifact records **nine** columns as `REFERENCES auth.users(id)`; `pg_constraint` holds **eight** (§15 run `35467412134`, probe 0.9). The difference is `policy_versions.created_by`, whose `policy_versions_created_by_fkey` was dropped by `20260613000001_fix_snapshot_created_by.sql`. The FK was declared INLINE on the column in `20260609000002`, so it lives in the artifact as `column.references`; the DROP names the constraint PostgreSQL generated implicitly, and the introspector does not connect the two. **The cost is small here and the class is not**: a rehearsed database gets a key production does not have, so an assertion about what happens when that key fires is made against a constraint that is only present in the rehearsal — the mirror image of D53, where the key existed in production and was silently SKIPPED in every rehearsal. Both directions are the same defect: the artifact is the only account of the schema that the rehearsals read, and a DROP it cannot see makes that account fiction in one row. **Found only because probe 0.9 asked `pg_constraint` instead of trusting the artifact**, which is the whole argument for §15 having a schema probe at all (D43) | `build/schema.introspected.json`'s `policy_versions.created_by.references` against `20260613000001_fix_snapshot_created_by.sql`'s `DROP CONSTRAINT IF EXISTS policy_versions_created_by_fkey`; §15 run `35467412134` probe 0.9 | **OPEN — WP 7.1, joining D99's list of the introspector's blind spots** *(D99 already owns that class under this package and names four detectors of three kinds; this is a fifth kind and the first found by the DATABASE disagreeing with the artifact rather than by a statement PostgreSQL would reject. The fix: an `ALTER TABLE … DROP CONSTRAINT <name>` must clear a matching inline `references`, which means synthesising PostgreSQL's implicit name — `<table>_<column>_fkey` — to match it. That is the same synthesis D59 and D60 needed for other inline declarations, so it is one helper rather than a special case. Not taken in stage 0 because rebuilding the artifact touches every table and its blast radius is the whole rehearsal suite, which is not a thing to fold into a read-only measurement. **The number is pinned meanwhile**: probe 0.9 prints 8 against 9 every run, so a second divergence cannot arrive quietly)* |
+| **D133** | **Five of the sixteen `anon`-only policies exist in production and in NO migration — and every gate that counts a policy reads the migrations, so none of them can see these five.** `customers_anon_read`, `materials_anon_read`, `products_anon_read`, `suppliers_anon_read` and `policy_versions_anon_insert` appear in no migration, no script and no source file; §15 run `35467910110` printed all sixteen from `pg_policies` and the introspected artifact holds **11 of the 16** (it records what the migrations say, per table, under `rls.policies`). **This is `no-orphan-table`'s subject one level down**: `contract:check` R4 and `verify:sql`'s schema probe both key on RELATIONS, and nothing in this repository asks whether production carries a POLICY no migration creates — while RLS is the whole of this product's row-level access control. **It explains part of D129's gap**: `governanceEnforcement.test.ts` pins 27 predicate-less policies *read from the migrations* and production has 48, and some of the difference is simply policies the migrations never mentioned. **And it changed how stage 1's migration had to be written**: `ALTER POLICY … TO anon, authenticated` is the precise statement for widening, and it raises on a policy that does not exist — so an ALTER migration would have deployed cleanly to production and failed on every rehearsed database, which is this plan's most familiar shape pointing the other way | §15 run `35467910110` probe 0.10 (sixteen from `pg_policies`) against a repository-wide search for each name, and against `build/schema.introspected.json`'s per-table `rls.policies` (11 of 16) | **THE FIVE ARE ADOPTED ✅ (Phase 7 / WP 7.1 stage 1)** — `20260919000010` is `DROP POLICY IF EXISTS` + `CREATE POLICY` for all sixteen, which is total on a database that has one and on a database that does not, so the five enter the repository at the same moment the widening happens. That is WP 1.4's move for the `risk_data` table (D43), one object class down. `rehearsal/300` §1 fails if any of the sixteen is missing, mutation-tested. **THE CLASS IS NOT CLOSED and it is the part worth carrying**: nothing yet compares `pg_policies` against the policies the migrations declare, so a sixth undeclared policy would arrive exactly as these five did. The probe exists (0.10 reads `pg_policies`) and the comparison does not, because the artifact's per-table list is keyed by name while production's is keyed by name AND table AND command — one rule, owned by **WP 7.1 stage 5**, which is the stage that deletes predicate-less policies and therefore has to know which ones the repository believes in |
 
 ### 4.1 Code map — the data layer
 
@@ -2644,7 +2645,8 @@ leaves a working product whether or not the next stage ever runs.
 | # | What it does | What it breaks if wrong | Revert | What proves it |
 |---|---|---|---|---|
 | **0** ✅ *(run `35466925117`; nine probes — the last two added after reading the first seven)* | **Measure, change nothing.** A §15 read of which policies exist on the live database, which roles hold which grants, and whether any session is reaching a predicate at all — plus, added when the probes were written, **which ROLE each policy is granted to and which privileges `anon` holds that `authenticated` does not** (0.6, 0.7: stage 1's own blast radius, which the rest of this table had not asked — see below) | Nothing — read-only; `assertReadOnly()` refuses anything but `select` | n/a | **DONE, and it moved three of the numbers below**: 48 predicate-less policies over 30 tables (not 27 / 27), 16 of them covering a write (not 7), 86 tables `anon` may write (not 7), and 0 of 14 approved users present in `auth.users`. The repo's 27 / 7 / 7 were from MIGRATION HISTORY and a live read differed by more than an order of magnitude — §4 D43's class, D129 and D130 |
-| **1** | **Issue a real session at login**, beside the existing one — and STAGE 0 CHANGED WHAT THAT MEANS (D130). There is no identity to attach to: `auth.users` holds 1 row, `approved_users` 14, overlap 0. So stage 1 either imports 14 identities (whose passwords this app does not hold in a form Supabase Auth takes) or **signs a JWT whose `sub` is the `approved_users.id`**, which works because `auth.uid()` reads the claim and not the table. It also begins by widening the **16 policies granted to `{anon}` alone**, because the role change alone would take those reads away from whoever logged in. `authenticate_approved_user` continues to be the authority; a Supabase Auth session is created alongside it so `auth.uid()` starts returning a value. **No policy reads it yet.** | Nothing reads it, so nothing can break. A failure to issue must not fail the login | Stop issuing | A rehearsal that logs in and asserts `auth.uid()` and the GUC resolve to the SAME user |
+| **1a** ✅ *(`20260919000010`)* | **Widen the sixteen policies granted to `{anon}` alone** to `TO anon, authenticated`, predicates untouched — so the role change stage 1b causes takes no read away from whoever logged in (D130). `DROP … IF EXISTS` + `CREATE` rather than `ALTER`, because five of the sixteen were in production and in no migration and `ALTER` raises on an absent policy: the statement is total, and the five are adopted in the same commit (D133) | Nothing today — a policy gaining a role takes none away, and no session exists yet | The same sixteen statements with `TO anon` | `rehearsal/300`, three sections, five mutations: §2 proves the MECHANISM on a table it builds (a policy `TO anon` refuses `authenticated` — 0 rows — and widening admits it — 1 row), §1 pins all sixteen with their measured predicates, §3 exercises one shipped policy on a real table with RLS enabled on purpose |
+| **1b** | **Issue a real session at login**, beside the existing one — and STAGE 0 CHANGED WHAT THAT MEANS (D130). There is no identity to attach to: `auth.users` holds 1 row, `approved_users` 14, overlap 0. So stage 1 either imports 14 identities (whose passwords this app does not hold in a form Supabase Auth takes) or **signs a JWT whose `sub` is the `approved_users.id`**, which works because `auth.uid()` reads the claim and not the table. It also begins by widening the **16 policies granted to `{anon}` alone**, because the role change alone would take those reads away from whoever logged in. `authenticate_approved_user` continues to be the authority; a Supabase Auth session is created alongside it so `auth.uid()` starts returning a value. **No policy reads it yet.** | Nothing reads it, so nothing can break. A failure to issue must not fail the login | Stop issuing | A rehearsal that logs in and asserts `auth.uid()` and the GUC resolve to the SAME user |
 | **2** | **Flip the ORDER inside `get_current_user_id()`**: prefer `auth.uid()`, fall back to the GUC. Behaviour is identical while the two agree, which stage 1 proved | A user whose session did not issue falls back exactly as today | One `CREATE OR REPLACE` | The stage-1 rehearsal, re-run; plus a rehearsal where the GUC is POISONED with a second user and the predicate still answers for the session |
 | **3** | **Add a RESTRICTIVE policy per table** — `AS RESTRICTIVE … USING (auth.uid() IS NOT NULL)`. A restrictive policy **ANDs** with the permissive set, so a predicate-less policy keeps working for a real session and stops working for a genuinely anonymous caller. **48 policies over 30 tables, not 27 over 27** (D129) — and probe 0.8 settled the mechanism's reach: **no table has RLS off**, so every one of them can be ANDed against and stage 3 has no exceptions | A surface that never had a session loses access — which is the point, and is why it is one table per push | `DROP POLICY` restores the previous behaviour EXACTLY, because nothing else changed | A rehearsal per table: one session reads, one anonymous connection is refused |
 | **4** | **Revoke `anon`'s write grants on the ELEVEN tables probe 0.8 measured** — `customers`, `dataset_versions`, `experiments`, `materials`, `policy_versions`, `products`, `run_item_series`, `run_replications`, `scenarios`, `simulation_runs`, `suppliers` — one per push. §14's original seven were seven of these, missing the four tier-2 masters; the 86 grants `anon` holds are mostly inert, because 46 tables' write policies carry a predicate, 23 have no write policy at all (`audit_logs` among them — denied today, not writable) and 6 are views (D129) | A writer still running as `anon` stops writing | `GRANT` it back | A §15 read either side, and the client path exercised once per table |
@@ -2669,6 +2671,34 @@ nothing about what was granted to `authenticated` beside it. Probes 0.6 and 0.7 
 **If either is non-zero, stage 1 acquires a widening migration and stage 2 waits on it** —
 and the widening is additive and revertible, which is the only reason it belongs in this
 sequence rather than ahead of it.
+
+**1b IS WHERE THIS PLAN MEETS SOMETHING NO GATE IN THIS REPOSITORY CAN CHECK.**
+Every other stage is a migration and `contract:rehearse` can execute it against a real
+PostgreSQL 16. Stage 1b is not: minting a session means GoTrue, and the rehearsal harness
+is a bare `postgres:16` with three roles created by hand (`rehearsal-schema.mjs`) and no
+auth server at all. So `SET LOCAL ROLE authenticated` can prove what a policy does with a
+role — `rehearsal/300` §2 does exactly that — and nothing here can prove that a login
+produces a JWT whose `sub` is the right uuid. **Its correctness is only observable in
+production**, which puts it in the same class as WP 6.5's two deliverables rather than in
+the same class as stages 1a, 3, 4, 5 and 6.
+
+Two routes, and they are not the same size:
+
+| | Import 14 identities | Sign a JWT over the id that exists |
+|---|---|---|
+| What changes | `auth.users` gains a row per approved user, with the SAME uuid | nothing in the database |
+| The credential | `approved_users.password_hash` is this application's own scheme and GoTrue cannot take it, so each imported user needs a server-held password | the project's JWT secret, server-side only |
+| Who can mint a session | GoTrue, after a password it holds | an edge function, after `authenticate_approved_user` has verified the user's real password |
+| Blast radius | the login path AND the identity store; a botched import is 14 rows to reconcile | the login path only |
+| Revert | delete 14 auth users | stop signing |
+| Also fixes | the eight remaining `auth.users` foreign keys (D131's class) resolve for real users | nothing — those keys still reference rows that do not exist |
+
+**Neither is obviously right, and the second is what stage 1b will do unless the identity
+import is wanted for its own sake.** It is smaller, reversible, touches no password, and
+`auth.uid()` reads the JWT claim rather than the table, so every predicate that names it
+starts working. What it does NOT do is make the eight `auth.users` foreign keys usable —
+those stay broken for a real user, which is why D131's remedy is to drop the two that
+block a live path rather than to populate the table.
 
 **Stage 3 is the load-bearing idea.** The instinct is to rewrite each permissive policy
 into a scoped one; that is 27 edits, each of which can be wrong in its own way, and none
@@ -15470,3 +15500,103 @@ which is the whole argument for a read-only stage existing.
   Had stage 0 stopped at seven probes, the twelve-fold error and the `audit_logs` alarm
   would both have entered the plan as facts. The instruction that produced the
   correction is the one worth keeping: read your own output before you believe it.
+
+### WP 7.1 (stage 1a) — the sixteen learn the second role, and five of them join the repository · 2026-09-19 · `20260919000010`
+
+**What the previous slice promised.** That stage 1 would be re-planned from stage 0's
+numbers rather than written against §14's, and that probe 0.10 would name the sixteen
+policies so the migration could be built from the database. Run `35467910110` printed
+all sixteen with both expressions. This slice ships the widening.
+
+#### A · WHAT IT DOES, AND WHY IT IS STAGE 1's FIRST HALF RATHER THAN A FOOTNOTE
+
+Sixteen policies gain `authenticated` beside `anon`. Predicates untouched — fifteen
+`USING (true)` and one `WITH CHECK (true)`, exactly as measured — so each permits
+precisely what it permitted before, to one more role. Nothing tightens here; that is
+stage 3's job with a RESTRICTIVE policy on top, and conflating an additive change with a
+subtractive one is how a staged plan stops being revertible.
+
+It has to land before any session is issued. A policy's `TO` clause keys on the ROLE,
+and the moment a request arrives as `authenticated` a policy granted to `{anon}` alone
+stops applying to it — RLS then denies, because no policy applies. So stage 1b without
+stage 1a would break these sixteen reads **for the users who logged in** and leave them
+working for everybody who did not, on the read path, where nobody would look for an
+authentication bug. §14's own "what it breaks if wrong" column said "nothing reads it,
+so nothing can break".
+
+`rehearsal/300` proves the mechanism rather than citing it: §2 builds a table, gives it
+one policy `TO anon`, and shows `anon` reading 1 row and `authenticated` reading **0**;
+then widens that policy and shows the same caller reading 1. That is the assertion the
+whole stage rests on, and it was a documentation claim until this file ran.
+
+#### B · D133 — FIVE OF THE SIXTEEN WERE NOT IN THIS REPOSITORY
+
+`customers_anon_read`, `materials_anon_read`, `products_anon_read`, `suppliers_anon_read`
+and `policy_versions_anon_insert` exist in production and in no migration, no script and
+no source file. The artifact holds 11 of the 16, for the same reason.
+
+**Nothing could have seen them.** `contract:check` R4 and `verify:sql`'s schema probe key
+on RELATIONS; no rule asks whether production carries a POLICY no migration creates —
+while RLS is the whole of this product's row-level access control.
+`governanceEnforcement.test.ts` pins 27 predicate-less policies *read from the
+migrations*, and production has 48; part of D129's gap is simply this.
+
+**It changed the migration's construction, which is the useful part.** `ALTER POLICY …
+TO anon, authenticated` is the precise statement and it raises on a policy that does not
+exist — so an ALTER migration would have deployed cleanly to production and failed on
+every rehearsed database. `DROP POLICY IF EXISTS` + `CREATE POLICY` is total on both, and
+it ADOPTS the five in the same commit: WP 1.4's move for the `risk_data` table, one
+object class down.
+
+**The class is not closed.** Nothing compares `pg_policies` against the policies the
+migrations declare, so a sixth undeclared policy would arrive exactly as these five did.
+The probe exists and the comparison does not; it is owned by stage 5, which is the stage
+that deletes predicate-less policies and therefore has to know which ones the repository
+believes in.
+
+#### C · A CLAIM OF MINE THAT WAS WRONG, CORRECTED BEFORE IT SHIPPED
+
+The migration header and the rehearsal's own note first said the artifact has "no
+`policies` key at all", so the base carried none of the sixteen. It records them per
+table under `rls.policies` and holds eleven. The correct count is **five absent, not
+four** — the first search tested four names and `products_anon_read` was the fifth. Both
+files were corrected before the commit, and the count is now measured in the one place it
+is stated. Worth recording because the wrong version was more dramatic and would have
+read as a bigger finding.
+
+#### D · MUTATIONS
+
+Five, each caught: one policy left `TO anon` (§1's role check), a predicate quietly
+tightened to `project_id IS NOT NULL` (§1's predicate check — a roles-only assertion
+would have passed it), the policy dropped just before §3 (proving §3 measures RLS on a
+real table rather than reading through a disabled one), the §2 control granted to both
+roles from the start (proving §2 would notice if the premise were wrong), and one policy
+removed from the migration entirely (§1's existence check, which is also D133's adoption
+half).
+
+#### E · THE GAP CHECK
+
+- **Stage 1b is not started, and it is the one stage no gate here can check.** Minting a
+  session means GoTrue; the rehearsal harness is a bare `postgres:16` with three
+  hand-made roles and no auth server. §14 now carries both routes with their blast radii
+  and names the JWT route as the smaller one. Its correctness is observable only in
+  production, which puts it with WP 6.5's deliverables rather than with stages 3–6.
+- **The eight remaining `auth.users` foreign keys are untouched** and stay broken for a
+  real user whichever route 1b takes — the JWT route does not populate `auth.users`. That
+  is why D131's remedy is to drop the two keys that block a live path rather than to fill
+  the table.
+- **`governanceEnforcement.test.ts` still pins 27** and production has 48. The test is
+  not wrong about the migrations; it is answering a question about the repository while
+  reading as though it answered one about production. Stage 3 has to reconcile them, and
+  the honest fix is for the test to say which it means.
+- **The D28 truth table grew by four names and the exposure did not.**
+  `governanceEnforcement.test.ts` failed the moment the migration adopted the five
+  undeclared policies — which is the gate working, since its message is "if that is
+  intended, add it here deliberately and say why in §16". `customers`, `materials`,
+  `products` and `suppliers` are now named; `policy_versions` was already there for a
+  different policy. **Every one of those four policies has existed in production for an
+  unknown length of time**, so 27 → 31 is a visibility change, not a tightening failure,
+  and the test's comment now says so at the point somebody reads the number. It also
+  states what is still missing: the list is only as complete as the migrations, and
+  nothing compares it against `pg_policies`.
+- **§15 remains red** on D131's ratchet. Unchanged by this slice.

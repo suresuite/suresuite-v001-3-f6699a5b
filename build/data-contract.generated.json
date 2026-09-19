@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 338,
-      "migrations_applied": 330,
-      "last_migration": "20260919000007_decision_plane_actor.sql"
+      "migrations_found": 339,
+      "migrations_applied": 331,
+      "last_migration": "20260919000010_anon_policies_widen.sql"
     },
     "sidecars": 54,
     "registry": {
@@ -2505,16 +2505,6 @@
             "added_by": "20260705000001_open_logistics_reads.sql"
           },
           {
-            "name": "bom_multi_level_anon_read",
-            "command": "SELECT",
-            "roles": [
-              "anon"
-            ],
-            "using": "true",
-            "with_check": "true",
-            "added_by": "20260705000001_open_logistics_reads.sql"
-          },
-          {
             "name": "BOM Multi: modifiers only",
             "command": "ALL",
             "roles": [],
@@ -2529,6 +2519,17 @@
             "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "bom_multi_level_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -3112,16 +3113,6 @@
             "added_by": "20260705000001_open_logistics_reads.sql"
           },
           {
-            "name": "bom_single_level_anon_read",
-            "command": "SELECT",
-            "roles": [
-              "anon"
-            ],
-            "using": "true",
-            "with_check": "true",
-            "added_by": "20260705000001_open_logistics_reads.sql"
-          },
-          {
             "name": "BOM Single: modifiers only",
             "command": "ALL",
             "roles": [],
@@ -3136,6 +3127,17 @@
             "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "bom_single_level_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -3937,6 +3939,17 @@
             "using": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = customers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin'))",
             "with_check": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = customers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin'))",
             "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+          },
+          {
+            "name": "customers_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -7980,16 +7993,6 @@
             "added_by": "20260705000001_open_logistics_reads.sql"
           },
           {
-            "name": "inbound_logistics_anon_read",
-            "command": "SELECT",
-            "roles": [
-              "anon"
-            ],
-            "using": "true",
-            "with_check": "true",
-            "added_by": "20260705000001_open_logistics_reads.sql"
-          },
-          {
             "name": "Inbound: modifiers only",
             "command": "ALL",
             "roles": [],
@@ -8004,6 +8007,17 @@
             "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "inbound_logistics_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -12453,7 +12467,19 @@
       "rls": {
         "enabled": false,
         "forced": false,
-        "policies": [],
+        "policies": [
+          {
+            "name": "materials_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
+          }
+        ],
         "determinate": false,
         "indeterminate_from": [
           "20260614000001_item_master.sql"
@@ -17651,16 +17677,6 @@
             "added_by": "20260705000001_open_logistics_reads.sql"
           },
           {
-            "name": "outbound_logistics_anon_read",
-            "command": "SELECT",
-            "roles": [
-              "anon"
-            ],
-            "using": "true",
-            "with_check": "true",
-            "added_by": "20260705000001_open_logistics_reads.sql"
-          },
-          {
             "name": "Outbound: modifiers only",
             "command": "ALL",
             "roles": [],
@@ -17675,6 +17691,17 @@
             "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "outbound_logistics_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -18353,11 +18380,12 @@
             "name": "Anon can read policy defaults",
             "command": "SELECT",
             "roles": [
-              "anon"
+              "anon",
+              "authenticated"
             ],
             "using": "true",
             "with_check": "true",
-            "added_by": "20260609040000_consolidated_safe.sql"
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -18992,11 +19020,12 @@
             "name": "Anon can read policy overrides",
             "command": "SELECT",
             "roles": [
-              "anon"
+              "anon",
+              "authenticated"
             ],
             "using": "true",
             "with_check": "true",
-            "added_by": "20260609040000_consolidated_safe.sql"
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -19486,11 +19515,12 @@
             "name": "Anon can read policy presets",
             "command": "SELECT",
             "roles": [
-              "anon"
+              "anon",
+              "authenticated"
             ],
             "using": "true",
             "with_check": "true",
-            "added_by": "20260609040000_consolidated_safe.sql"
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -19887,6 +19917,17 @@
             "using": "true",
             "with_check": "true",
             "added_by": "20260612000001_policy_version_snapshots.sql"
+          },
+          {
+            "name": "policy_versions_anon_insert",
+            "command": "INSERT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -20398,7 +20439,19 @@
       "rls": {
         "enabled": false,
         "forced": false,
-        "policies": [],
+        "policies": [
+          {
+            "name": "products_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
+          }
+        ],
         "determinate": false,
         "indeterminate_from": [
           "20260614000001_item_master.sql"
@@ -25182,11 +25235,12 @@
             "name": "scenarios_anon_all",
             "command": "ALL",
             "roles": [
-              "anon"
+              "anon",
+              "authenticated"
             ],
             "using": "true",
             "with_check": "true",
-            "added_by": "20260610000002_scenarios_anon_grants.sql"
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -25992,7 +26046,19 @@
       "rls": {
         "enabled": false,
         "forced": false,
-        "policies": [],
+        "policies": [
+          {
+            "name": "suppliers_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
+          }
+        ],
         "determinate": false,
         "indeterminate_from": [
           "20260614000001_item_master.sql"
@@ -30108,5 +30174,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "898095dabbaa"
+  "contract_version": "c56d99b9d2e1"
 }

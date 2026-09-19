@@ -2434,8 +2434,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "rls": {
       "enabled": true,
       "determinate": true,
-      "policies": 2,
-      "unrestricted": 0
+      "policies": 3,
+      "unrestricted": 1
     },
     "columns": [
       {
@@ -8007,8 +8007,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "rls": {
       "enabled": false,
       "determinate": false,
-      "policies": 0,
-      "unrestricted": 0
+      "policies": 1,
+      "unrestricted": 1
     },
     "columns": [
       {
@@ -12763,8 +12763,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "rls": {
       "enabled": true,
       "determinate": true,
-      "policies": 2,
-      "unrestricted": 2
+      "policies": 3,
+      "unrestricted": 3
     },
     "columns": [
       {
@@ -13132,8 +13132,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "rls": {
       "enabled": false,
       "determinate": false,
-      "policies": 0,
-      "unrestricted": 0
+      "policies": 1,
+      "unrestricted": 1
     },
     "columns": [
       {
@@ -16828,8 +16828,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "rls": {
       "enabled": false,
       "determinate": false,
-      "policies": 0,
-      "unrestricted": 0
+      "policies": 1,
+      "unrestricted": 1
     },
     "columns": [
       {
