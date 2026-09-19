@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 336,
-  "migrations_applied": 328,
+  "migrations_found": 338,
+  "migrations_applied": 330,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260919000005_project_cascade.sql",
+  "last_migration": "20260919000007_decision_plane_actor.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -21475,16 +21475,17 @@
     },
     {
       "name": "apply_validation_to_scenario",
-      "signature": "apply_validation_to_scenario(uuid, uuid)",
+      "signature": "apply_validation_to_scenario(uuid, uuid, uuid)",
       "args": [
         "p_scenario_id uuid",
-        "p_validation_id uuid"
+        "p_validation_id uuid",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260710000001_model_validations.sql"
+      "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
       "name": "approved_users_stamp_organization_id",
@@ -22411,15 +22412,16 @@
     },
     {
       "name": "delete_policy_version",
-      "signature": "delete_policy_version(uuid)",
+      "signature": "delete_policy_version(uuid, uuid)",
       "args": [
-        "p_version_id uuid"
+        "p_version_id uuid",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000005_policy_version_notes_delete.sql"
+      "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
       "name": "delete_project_dataset",
@@ -23812,7 +23814,7 @@
     },
     {
       "name": "record_external_evidence",
-      "signature": "record_external_evidence(uuid, text, text, text, numeric, jsonb, text)",
+      "signature": "record_external_evidence(uuid, text, text, text, numeric, jsonb, text, uuid)",
       "args": [
         "p_project_id uuid",
         "p_source_id text",
@@ -23820,13 +23822,14 @@
         "p_content_hash text",
         "p_confidence numeric",
         "p_triple jsonb",
-        "p_lei text DEFAULT NULL"
+        "p_lei text DEFAULT NULL",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260727000001_network_cartographer.sql"
+      "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
       "name": "record_model_validation",
@@ -24253,7 +24256,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000005_policy_version_notes_delete.sql"
+      "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
       "name": "supersede_agent_proposal",
@@ -24318,16 +24321,17 @@
     },
     {
       "name": "update_policy_version_notes",
-      "signature": "update_policy_version_notes(uuid, text)",
+      "signature": "update_policy_version_notes(uuid, text, uuid)",
       "args": [
         "p_version_id uuid",
-        "p_notes text"
+        "p_notes text",
+        "_actor_user_id uuid DEFAULT NULL"
       ],
-      "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000005_policy_version_notes_delete.sql"
+      "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
       "name": "update_project_completion_status",

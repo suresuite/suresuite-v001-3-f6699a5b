@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 // Model-validation cards — Phase B0 / G13 / §9.5.
 // Loads the project's model_validations rows (the persisted V&V credibility
@@ -208,6 +209,9 @@ interface UseModelValidationResult {
 export function useModelValidation(
   projectId: string | null | undefined,
 ): UseModelValidationResult {
+  // WP 6.4 · §4 D71 — `apply_validation_to_scenario` writes `scenarios`, a described
+  // tier-4 table since this package, so its audit row has to name somebody.
+  const { user } = useAuth();
   const [allCards, setAllCards] = useState<ModelValidationCard[]>([]);
   const [currentPolicyHash, setCurrentPolicyHash] = useState<string | null>(null);
   const [currentGraphHash, setCurrentGraphHash] = useState<string | null>(null);
@@ -381,6 +385,7 @@ export function useModelValidation(
       const { error } = await sb.rpc("apply_validation_to_scenario", {
         p_scenario_id: scenario.id,
         p_validation_id: card.id,
+        _actor_user_id: user?.id ?? null,   // WP 6.4 · §4 D71
       });
       if (error) {
         console.error("apply_validation_to_scenario failed", error);
@@ -388,7 +393,10 @@ export function useModelValidation(
       }
       return card.id;
     },
-    [cards, currentGraphHash],
+    // `user?.id` and not `user`: without it the callback closes over the person who
+    // was signed in at first render, so a session change would attribute this write
+    // to the previous one (WP 6.2 slice 12's lesson, ten arrays over).
+    [cards, currentGraphHash, user?.id],
   );
 
   const record = useCallback(

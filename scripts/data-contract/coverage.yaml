@@ -92,30 +92,6 @@ deferred:
     audited:
       model_validations: false
 
-  - wp: "6.4"
-    why: >-
-      MOVED FROM WP 6.1 BY WP 6.1 ITSELF. §13 scopes that package to resolution
-      chains — "CSV column → DB column → RPC → hook → substitution → engine field
-      → unit at each hop" — and says nothing about describing tables. Eleven
-      tables were waiting on it anyway, which is the R8 finding WP 4.4 hit from
-      the other side: an owner nothing behind it ever agreed to.
-      They go to a NEW package rather than onto WP 6.3, and the reason is budget
-      honesty: WP 6.3 already carries A2, A3, A5, the provenance vocabulary and
-      the eleven result-binding tables WP 4.4 re-homed to it. Twenty-two tables
-      under one package is a number that misrepresents what it costs, and
-      misrepresented budget is what boundary reviews exist to catch (§16 · Phase
-      2→3). See §14 · WP 6.4.
-      Original note follows.
-      `external_evidence` is the AGENT's evidence store — retrieved URLs, content
-      hashes and confidence behind a proposal — and it belongs with the decision
-      plane rather than with analysis output. Same regrouping as
-      `model_validations` above: it was in the WP 4.2 bucket because nobody had
-      looked at it, which is exactly what D54 says a deferral list does when it is
-      allowed to decide by omission.
-    tables: [external_evidence]
-    audited:
-      external_evidence: false
-
   - wp: "6.3"
     why: >-
       Runs and results (tier 5). Invariant `result-binding` is the claim these
@@ -155,33 +131,6 @@ deferred:
       simulation_cache: false
       simulation_performance_metrics: false
       experiments: false
-
-  - wp: "6.4"
-    why: >-
-      Decisions (tier 4) beyond the two policy tables the contract already
-      covers.
-      MOVED FROM WP 6.1 BY WP 6.1 ITSELF, with `external_evidence` above. This
-      row's own reasoning is what gave it away: "WP 6.1 pins the resolution
-      chains … the scenario and disruption tables are the surface those chains
-      resolve against". Being the surface a package READS is not the same as
-      being a package's deliverable, and §13's WP 6.1 never claimed them — it
-      traced 38 grid fields and described no table at all. Ten tables sat behind
-      a sentence that reads like a plan and is an association.
-      WP 6.4 owns them with `external_evidence`: together they are the DECISION
-      PLANE — what a person or an agent chose, and what a result must bind to
-      under `result-binding` (I8). See §14 · WP 6.4.
-    tables:
-      - policy_versions
-      - policy_presets
-      - scenarios
-      - scenario_templates
-      - recovery_playbooks
-    audited:
-      policy_versions: false
-      policy_presets: false
-      scenarios: false
-      scenario_templates: false
-      recovery_playbooks: false
 
   - wp: "5.2"
     why: >-

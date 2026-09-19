@@ -3408,7 +3408,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 48,
+  "described": 54,
   "open": [
     {
       "table": "approved_users",
@@ -3444,6 +3444,13 @@ export const READ_EXPOSURE: ReadExposure = {
       ]
     },
     {
+      "table": "external_evidence",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
       "table": "inbound_logistics",
       "roles": [
         "anon",
@@ -3472,9 +3479,28 @@ export const READ_EXPOSURE: ReadExposure = {
       ]
     },
     {
+      "table": "policy_presets",
+      "roles": [
+        "anon"
+      ]
+    },
+    {
+      "table": "policy_versions",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
       "table": "project_role_capabilities",
       "roles": [
         "public"
+      ]
+    },
+    {
+      "table": "recovery_playbooks",
+      "roles": [
+        "authenticated"
       ]
     },
     {
@@ -3489,6 +3515,13 @@ export const READ_EXPOSURE: ReadExposure = {
       "roles": [
         "public"
       ]
+    },
+    {
+      "table": "scenarios",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
     }
   ],
   "signedOut": [
@@ -3497,13 +3530,17 @@ export const READ_EXPOSURE: ReadExposure = {
     "bom_single_level",
     "capabilities",
     "dataset_versions",
+    "external_evidence",
     "inbound_logistics",
     "outbound_logistics",
     "policy_defaults",
     "policy_overrides",
+    "policy_presets",
+    "policy_versions",
     "project_role_capabilities",
     "risk_data",
-    "role_capabilities"
+    "role_capabilities",
+    "scenarios"
   ]
 };
 

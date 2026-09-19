@@ -5,11 +5,11 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 336,
-      "migrations_applied": 328,
-      "last_migration": "20260919000005_project_cascade.sql"
+      "migrations_found": 338,
+      "migrations_applied": 330,
+      "last_migration": "20260919000007_decision_plane_actor.sql"
     },
-    "sidecars": 48,
+    "sidecars": 54,
     "registry": {
       "engine_version": "0.2.3",
       "policies": 23
@@ -17,9 +17,9 @@
   },
   "counts": {
     "tables_in_schema": 81,
-    "tables_covered": 48,
-    "columns_covered": 592,
-    "check_constraints": 41,
+    "tables_covered": 54,
+    "columns_covered": 669,
+    "check_constraints": 47,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -4346,7 +4346,7 @@
           "page": "DataManager.tsx",
           "via": "rpc record_model_validation",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:398",
+          "evidence": "src/hooks/useModelValidation.tsx:406",
           "confirmed": true
         },
         {
@@ -4367,14 +4367,14 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc record_model_validation",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:398",
+          "evidence": "src/hooks/useModelValidation.tsx:406",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc record_model_validation",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:398",
+          "evidence": "src/hooks/useModelValidation.tsx:406",
           "confirmed": true
         }
       ],
@@ -7453,6 +7453,443 @@
         }
       ],
       "note": "TWO DISRUPTION MODELS ARE LIVE AT ONCE AND NEITHER READS THE OTHER. This table is the 2025-08-26 shape — one row per node, capacity and delay inline. The `disruption_scenario_profiles`/`_targets`/`_effects`/`_settings` group is the 2025-08-27 redesign that normalises the same idea. Nothing migrated the rows and nothing deprecates either, so a project can hold disruptions in both and a reader of one sees half the picture. Naming that is this sidecar's job; deciding it is not, and it belongs with WP 6.4's gap check.",
+      "analysis_kinds": null
+    },
+    "external_evidence": {
+      "table": "external_evidence",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "One retrieved external claim about a supply chain, as a subject–predicate–object triple with the source it came from, the confidence attached to it and the hash of the content it was read from. The network cartographer's evidence store: what an agent FOUND, kept apart from what a person entered.",
+      "owner": "platform",
+      "created_by": "20260727000001_network_cartographer.sql",
+      "sidecar": "supabase/contract/external_evidence.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "external_evidence_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "project_id",
+            "source_id",
+            "content_hash",
+            "md5(triple::text)"
+          ],
+          "name": "external_evidence_dedupe_uq"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the dataset they chose it over and the result it produced. `result-binding` (I8) needs all three, which is why WP 6.3 keeps the results and this package takes the decisions. Audited from WP 6.4: the three statement-grain triggers land beside this sidecar, because `dataPlaneAudit.test.ts` scopes its rule to tables IN the contract and a deferred table's writes are unaudited with nothing to notice (D54). **Its writers are edge functions, not the browser** — `project-ai- chat`'s cartographer and sentinel tools — so the audit trigger names whoever the function's transaction has set, and an agent write with no actor is the D28 question this table inherits rather than answers. The dedupe index is what makes a re-read of the same page a no-op instead of a second claim."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "external_evidence_read_all",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260727000001_network_cartographer.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "external_evidence_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260727000001_network_cartographer.sql"
+        },
+        {
+          "name": "external_evidence_source_id_check",
+          "kind": "CHECK",
+          "columns": [
+            "source_id"
+          ],
+          "definition": "CHECK (char_length(source_id) BETWEEN 1 AND 80)",
+          "implicit": true,
+          "added_by": "20260727000001_network_cartographer.sql"
+        },
+        {
+          "name": "external_evidence_content_hash_check",
+          "kind": "CHECK",
+          "columns": [
+            "content_hash"
+          ],
+          "definition": "CHECK (char_length(content_hash) BETWEEN 8 AND 128)",
+          "implicit": true,
+          "added_by": "20260727000001_network_cartographer.sql"
+        },
+        {
+          "name": "external_evidence_confidence_check",
+          "kind": "CHECK",
+          "columns": [
+            "confidence"
+          ],
+          "definition": "CHECK (confidence >= 0 AND confidence <= 1)",
+          "implicit": true,
+          "added_by": "20260727000001_network_cartographer.sql"
+        },
+        {
+          "name": "external_evidence_lei_check",
+          "kind": "CHECK",
+          "columns": [
+            "lei"
+          ],
+          "definition": "CHECK (lei IS NULL OR lei ~ '^[A-Z0-9]{20}$')",
+          "implicit": true,
+          "added_by": "20260727000001_network_cartographer.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "external_evidence_dedupe_uq",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "source_id",
+            "content_hash",
+            "md5(triple::text)"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260727000001_network_cartographer.sql"
+        },
+        {
+          "name": "external_evidence_project_idx",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "retrieved_at DESC"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260727000001_network_cartographer.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260727000001_network_cartographer.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate key. The dedupe key is the four-column unique index below.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260727000001_network_cartographer.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project the claim is about.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "source_id",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260727000001_network_cartographer.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Which source produced it — a registry, a filing, a page. CHECK-constrained, so a claim cannot arrive from a source the system does not name.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "url_or_ref",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260727000001_network_cartographer.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Where a person can go and look. NULL where the source has no addressable reference, which is a real state for a registry lookup and not a missing value.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "content_hash",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260727000001_network_cartographer.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The hash of the content the claim was read from. Part of the dedupe key, so the same bytes re-read produce no second row — and a CHANGED page produces a new claim rather than overwriting the old one.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "retrieved_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260727000001_network_cartographer.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was fetched. The claim is about the world at that moment, and nothing refreshes it.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "confidence",
+          "type": "numeric",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260727000001_network_cartographer.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How much weight the extractor put on this claim, CHECK-constrained to its range. It is the EXTRACTOR's number, not a person's, and no surface today turns it into a decision.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "triple",
+          "type": "jsonb",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260727000001_network_cartographer.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "THE CLAIM — subject, predicate, object as JSON. Hashed into the dedupe key through `md5(triple::text)`, which is why an expression index appears in the natural key above.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "lei",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260727000001_network_cartographer.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The Legal Entity Identifier the claim is about, where one resolved. CHECK-constrained to the LEI shape, and NULL where the subject is not a registered entity — a great many suppliers are not.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
       "analysis_kinds": null
     },
     "inbound_logistics": {
@@ -18964,6 +19401,964 @@
       "note": null,
       "analysis_kinds": null
     },
+    "policy_presets": {
+      "table": "policy_presets",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "One named policy bundle a user can apply to a project — the DECISION plane's catalog of starting points. A system preset (`is_system`) ships with the product; a user preset belongs to its `owner_id`.",
+      "owner": "policy-ui",
+      "created_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql",
+      "sidecar": "supabase/contract/policy_presets.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "slug",
+            "owner_id"
+          ],
+          "name": null
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "policy_presets_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Tier 4 — the DECISION plane: a preset is a choice a person can make, not a fact about their supply chain. Audited from WP 6.4, with the three statement-grain triggers landing beside this sidecar, because `dataPlaneAudit.test.ts` scopes its rule to tables IN the contract and a deferred table's writes are unaudited with nothing to notice (D54). **`write` is null because NO USER-FACING WRITE PATH EXISTS — and neither does a read path (§4 D126).** The table is granted `SELECT` to `anon` under a permissive policy and nothing in `src/`, in an RPC or in an edge function reads it; the presets a user actually sees come from TypeScript modules under `src/lib/policies/presets/`. So this row's governance describes a table that is reachable and unread, which is a different statement from \"restricted\", and saying it plainly is the point of the block."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Anyone signed in can read system presets",
+            "command": "SELECT",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "is_system = true OR owner_id = auth.uid()",
+            "with_check": "is_system = true OR owner_id = auth.uid()",
+            "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql"
+          },
+          {
+            "name": "Users can create their own presets",
+            "command": "INSERT",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "owner_id = auth.uid() AND is_system = false",
+            "with_check": "owner_id = auth.uid() AND is_system = false",
+            "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql"
+          },
+          {
+            "name": "Users can update their own presets",
+            "command": "UPDATE",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "owner_id = auth.uid()",
+            "with_check": "owner_id = auth.uid()",
+            "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql"
+          },
+          {
+            "name": "Users can delete their own presets",
+            "command": "DELETE",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "owner_id = auth.uid()",
+            "with_check": "owner_id = auth.uid()",
+            "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql"
+          },
+          {
+            "name": "Anon can read policy presets",
+            "command": "SELECT",
+            "roles": [
+              "anon"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260609040000_consolidated_safe.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": null,
+          "kind": "UNIQUE",
+          "columns": [
+            "slug",
+            "owner_id"
+          ],
+          "definition": "UNIQUE (slug, owner_id)",
+          "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql"
+        },
+        {
+          "name": "policy_presets_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate key. The natural key is (slug, owner_id) below.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The preset's stable name — `lean_jit`, `make_to_order`. Half the natural key, so one owner may not hold two presets under one slug while two owners may each hold their own.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What a person reads — \"Lean / JIT\". The slug is the key; this is the label.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "One sentence on what the preset does to a project. NULL where nobody wrote one; there is no default sentence, because an invented description of a decision is worse than none.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "is_system",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "TRUE for a preset that ships with the product and FALSE for one a user saved. It is the only thing separating a catalog entry from somebody's own work, and `owner_id` is NULL on the system rows.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "auth",
+            "table": "users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user whose preset this is, or NULL for a system preset. Half the natural key — and the NULL half, which is why the pair behaves the way `NULLS NOT DISTINCT` indexes elsewhere in this contract had to be made to behave (§4 D5): without that, two system presets could share a slug.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "bundle",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "THE DECISION ITSELF — a partial policy bundle, keyed by family, merged over a project's defaults when the preset is applied. Partial on purpose: a preset that carried every field would overwrite choices it has no opinion about.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row was written. Server-stamped, never the client's clock.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was last changed. Maintained by a trigger where one exists; with no writer at all today (D126) it equals `created_at` on every row.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
+      "analysis_kinds": null
+    },
+    "policy_versions": {
+      "table": "policy_versions",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "One saved snapshot of a project's whole policy bundle, with the bundle it replaced and the hash of both. The audit trail of the /policies grid: what the policies WERE at a moment somebody chose to record, which is what makes a simulation result reproducible from the policy side.",
+      "owner": "policy-ui",
+      "created_by": "20260609000002_policy_versions.sql",
+      "sidecar": "supabase/contract/policy_versions.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "policy_versions_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/usePolicies.tsx:458",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "table read",
+          "grain": "column",
+          "evidence": "src/hooks/useVerifiableExports.tsx:226",
+          "confirmed": true
+        }
+      ],
+      "governance": {
+        "read": null,
+        "write": "data_edit_policies",
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the dataset they chose it over and the result it produced. `result-binding` (I8) needs all three, which is why WP 6.3 keeps the results and this package takes the decisions. Audited from WP 6.4: the three statement-grain triggers land beside this sidecar, because `dataPlaneAudit.test.ts` scopes its rule to tables IN the contract and a deferred table's writes are unaudited with nothing to notice (D54). **This is the one decision table `result-binding` (I8) already reaches**: a run stores `policy_version_id` and the verifiable export reads the row back, so the policy half of a reproducibility record is bound where the dataset half has to be reconstructed. The row carries THREE author columns beside `created_by`, which is a denormalised copy of a person rather than a second identity (G1) — kept because a version outlives an account and a deleted user should not erase who made a decision."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "policy_versions_read_all",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260612000001_policy_version_snapshots.sql"
+          },
+          {
+            "name": "policy_versions_insert_all",
+            "command": "INSERT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260612000001_policy_version_snapshots.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "policy_versions_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260609000002_policy_versions.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_policy_versions_project",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "created_at DESC"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260609000002_policy_versions.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000002_policy_versions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate key. A run binds to this, so it is the id that makes a result reproducible from the policy side.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260609000002_policy_versions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project whose policies these are.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000002_policy_versions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What a person called this version. NULL where it was saved automatically; there is no generated label, because an invented name for somebody's decision is worse than none.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "snapshot",
+          "type": "jsonb",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000002_policy_versions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "THE DECISION ITSELF — the full policy bundle as it stood. Whole rather than a diff, so reading one row reconstructs the state without replaying a chain.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "auth",
+            "table": "users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260609000002_policy_versions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user who saved it, by uuid. The three `author_*` columns beside it are the denormalised copy that survives the account.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000002_policy_versions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was saved. Server-stamped, never the client's clock.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "author_user_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260612000001_policy_version_snapshots.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The author's uuid, recorded a second time. It duplicates `created_by` by design — one of the two came first and neither was removed, and a version row is append-only, so they cannot drift after the write.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "author_email",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260612000001_policy_version_snapshots.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The author's email AT THE MOMENT OF SAVING. A denormalised copy, not a join key (G1): the account may be renamed or deleted and the decision still has to say who made it.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "author_name",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260612000001_policy_version_snapshots.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The author's display name at the moment of saving, for the same reason as `author_email`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "parent_version_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "policy_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260612000001_policy_version_snapshots.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The version this one followed, so the chain can be walked. NULL on the first version of a project — and NULL is also what a version saved before this column existed carries, so an absent parent is `unknown`, not `first`.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "previous_snapshot",
+          "type": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260612000001_policy_version_snapshots.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The bundle this version REPLACED, stored beside the new one. It makes a diff readable from one row rather than two, and it is what lets a restore know what it is undoing.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "policy_hash",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260612000001_policy_version_snapshots.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The hash of `snapshot`. What a reproducibility record carries so a reader can check that a bundle they hold is the one a run used, without trusting the id.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260711000005_policy_version_notes_delete.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Free text a person wrote about why. The only column here that carries a REASON rather than a state, and nothing reads it today.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
+      "analysis_kinds": null
+    },
     "products": {
       "table": "products",
       "schema_name": "public",
@@ -22004,6 +23399,433 @@
       "note": "`natural_key_intended` is `(organization_id, name)` and the declared constraint is `(modeler_id, plant_name, name)` — they are different claims, and the declared one is the weaker: two modellers in one organization may each hold a project called the same thing for the same plant. Changing it is not WP 2.1's to do; `natural-key` (§2.1 I4) lands in WP 3.3 and this row is one of its inputs. Recorded here so the gap has an owner rather than being noticed again in a quarter.",
       "analysis_kinds": null
     },
+    "recovery_playbooks": {
+      "table": "recovery_playbooks",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "One named recovery strategy a scenario can apply after a disruption — the levers, their order and their parameters. A system playbook (`is_system`, `project_id` NULL) ships with the product; a project playbook belongs to one project.",
+      "owner": "engine",
+      "created_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql",
+      "sidecar": "supabase/contract/recovery_playbooks.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "recovery_playbooks_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "SimulationLab.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/useRecoveryPlaybooks.tsx:26",
+          "confirmed": true
+        }
+      ],
+      "governance": {
+        "read": null,
+        "write": "data_edit_policies",
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the dataset they chose it over and the result it produced. `result-binding` (I8) needs all three, which is why WP 6.3 keeps the results and this package takes the decisions. Audited from WP 6.4: the three statement-grain triggers land beside this sidecar, because `dataPlaneAudit.test.ts` scopes its rule to tables IN the contract and a deferred table's writes are unaudited with nothing to notice (D54). **Two of the six recovery strategies a scenario can name reach no engine plugin (§4 D114)**, so a playbook's `config` can record an intent the run will not act on. The row is stored faithfully either way; what is missing is a reader that says so, and the manual states it meanwhile."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "playbooks_select_all_auth",
+            "command": "SELECT",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql"
+          },
+          {
+            "name": "playbooks_insert_own",
+            "command": "INSERT",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "is_system = false AND project_id IS NOT NULL AND created_by = auth.uid()",
+            "with_check": "is_system = false AND project_id IS NOT NULL AND created_by = auth.uid()",
+            "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql"
+          },
+          {
+            "name": "playbooks_update_own",
+            "command": "UPDATE",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "is_system = false AND created_by = auth.uid()",
+            "with_check": "is_system = false AND created_by = auth.uid()",
+            "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql"
+          },
+          {
+            "name": "playbooks_delete_own",
+            "command": "DELETE",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "is_system = false AND created_by = auth.uid()",
+            "with_check": "is_system = false AND created_by = auth.uid()",
+            "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "recovery_playbooks_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "recovery_playbooks_project_idx",
+          "unique": false,
+          "columns": [
+            "project_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql"
+        },
+        {
+          "name": "recovery_playbooks_system_idx",
+          "unique": false,
+          "columns": [
+            "is_system"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate key. There is no natural key: two playbooks may share a name, in one project or across projects, and the product treats that as legitimate rather than as a collision.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project this playbook belongs to, or NULL for a system playbook. Nullable on purpose — that NULL is what makes a row part of the shipped catalog, and it is read as such by `useRecoveryPlaybooks`'s `is_system.eq.true,project_id.eq.<id>` filter.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What a person reads in the picker. Not a key; see `id`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": false,
+          "default": "''",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "One sentence on what the playbook does. Defaults to the empty string rather than NULL, so a reader gets a blank rather than the word `null` — and a blank here means nobody wrote one, not that the playbook does nothing.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "is_system",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "TRUE for a playbook that ships with the product. The only thing separating the catalog from a user's own work, and the first sort key in the picker.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "config",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "THE DECISION ITSELF — which levers, in what order, with what parameters. Free-form JSON: the levers are validated where they are USED rather than where they are stored, which is why D114's two unmapped strategies can be saved at all.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "auth",
+            "table": "users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user who created it, where one is recorded. NULL on system rows and on anything written before the column existed — unknown, not nobody.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row was created. Server-stamped, never the client's clock.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was last changed, server-stamped.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
+      "analysis_kinds": null
+    },
     "risk_data": {
       "table": "risk_data",
       "schema_name": "public",
@@ -22707,6 +24529,1428 @@
         }
       ],
       "note": "WP 2.2 seeded `data_edit_inputs` and `data_edit_policies` into this table from whatever `data_editing` already said, so effective access on the day of deploy was identical to the day before. `data_editing` is deliberately still here: it is removed when the last call site has moved to one of the new keys, not before.",
+      "analysis_kinds": null
+    },
+    "scenario_templates": {
+      "table": "scenario_templates",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "One shipped starting point for a scenario: a named disruption shape with its schedule, its suggested playbook and the run settings that go with it. A template is not a scenario — applying one WRITES a scenario, and the two diverge from that moment.",
+      "owner": "engine",
+      "created_by": "20260609000022_scenario_templates.sql",
+      "sidecar": "supabase/contract/scenario_templates.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "scenario_templates_pkey"
+        },
+        {
+          "source": "column UNIQUE",
+          "columns": [
+            "slug"
+          ],
+          "name": "scenario_templates_slug_key"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "SimulationLab.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/useScenarioTemplates.ts:35",
+          "confirmed": true
+        }
+      ],
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the dataset they chose it over and the result it produced. `result-binding` (I8) needs all three, which is why WP 6.3 keeps the results and this package takes the decisions. Audited from WP 6.4: the three statement-grain triggers land beside this sidecar, because `dataPlaneAudit.test.ts` scopes its rule to tables IN the contract and a deferred table's writes are unaudited with nothing to notice (D54). **Every row is a system row (`is_system` defaults true) and there is no user-facing write path**, so `write` is null and the audit triggers guard a table only a migration changes — which is the point: a change to the shipped catalog is exactly the kind of change nobody notices. **Six of the seven presets name a disruption target the mapper cannot resolve (§4 D112)**, so a run from one of them completes with the disruption ABSENT rather than failing, and that is the open question this package carries."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "Anyone authenticated can read system templates",
+            "command": "SELECT",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "is_system = true",
+            "with_check": "is_system = true",
+            "added_by": "20260609040000_consolidated_safe.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "scenario_templates_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260609000022_scenario_templates.sql"
+        },
+        {
+          "name": "scenario_templates_slug_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "slug"
+          ],
+          "definition": "UNIQUE (slug)",
+          "implicit": true,
+          "added_by": "20260609000022_scenario_templates.sql"
+        },
+        {
+          "name": "scenario_templates_category_check",
+          "kind": "CHECK",
+          "columns": [
+            "category"
+          ],
+          "definition": "CHECK (category IN ('supplier','logistics','demand','production','geopolitical'))",
+          "implicit": true,
+          "added_by": "20260609000022_scenario_templates.sql"
+        },
+        {
+          "name": "scenario_templates_severity_check",
+          "kind": "CHECK",
+          "columns": [
+            "severity"
+          ],
+          "definition": "CHECK (severity IN ('low','medium','high','extreme'))",
+          "implicit": true,
+          "added_by": "20260609000022_scenario_templates.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate key.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": true,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The template's stable name, UNIQUE across the catalog. What a preset is cited by.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What a person reads.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": false,
+          "default": "''",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "One sentence on the scenario it sets up. Defaults to the empty string rather than NULL.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Which family of disruption this is. Free text with no vocabulary table behind it, so a typo creates a category rather than failing — the same shape `disruption_scenario_settings.key` carries (§16 · WP 6.4 slice 13).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "severity",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How hard the shipped version of this scenario hits. A label on the template, not a parameter the engine reads.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "icon",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The glyph the picker draws. NULL where none was chosen.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "disruption_schedule",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "THE DECISION SHAPE — the events, their timing and their targets, copied into a scenario when the template is applied. **This is where D112 lives**: six of seven name a target `_map_events` cannot resolve.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "suggested_playbook_name",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The recovery playbook this scenario is usually paired with, BY NAME rather than by id. A name is not a join key (G1) and this one is resolved at apply time, so a renamed playbook silently stops matching — recorded here rather than fixed, because the fix is a decision about what a suggestion IS.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "horizon_days",
+          "type": "integer",
+          "nullable": false,
+          "default": "91",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How long the shipped run covers, in days. The scenario gets its own copy and may be changed after.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "warmup_days",
+          "type": "integer",
+          "nullable": false,
+          "default": "14",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How much of that horizon is discarded before measurement.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "replications",
+          "type": "integer",
+          "nullable": false,
+          "default": "30",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How many replications the shipped version runs.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "seed",
+          "type": "integer",
+          "nullable": false,
+          "default": "42",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The root seed, so two people applying the same template get the same draws.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "is_system",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "TRUE for every row today. The column exists so a user template could be told apart from a shipped one, and nothing writes a user template.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000022_scenario_templates.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row was created. Server-stamped.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
+      "analysis_kinds": null
+    },
+    "scenarios": {
+      "table": "scenarios",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "One what-if a person set up and can run: the horizon, the warm-up, the replications, the seed, the demand model, the disruption schedule and the recovery overrides. The scenario half of `result-binding` (I8) — a run cites one of these rows, and the export reads it back whole.",
+      "owner": "engine",
+      "created_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+      "sidecar": "supabase/contract/scenarios.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "scenarios_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "SimulationLab.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/useScenarios.tsx:70",
+          "confirmed": true
+        },
+        {
+          "page": "SimulationLab.tsx",
+          "via": "table read",
+          "grain": "column",
+          "evidence": "src/hooks/useVerifiableExports.tsx:213",
+          "confirmed": true
+        }
+      ],
+      "governance": {
+        "read": null,
+        "write": "data_edit_policies",
+        "min_project_role": "editor",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the dataset they chose it over and the result it produced. `result-binding` (I8) needs all three, which is why WP 6.3 keeps the results and this package takes the decisions. Audited from WP 6.4: the three statement-grain triggers land beside this sidecar, because `dataPlaneAudit.test.ts` scopes its rule to tables IN the contract and a deferred table's writes are unaudited with nothing to notice (D54). **This is the widest decision row in the product** — twenty-two columns, seven of them the engine reads directly — and it is the one a reproducibility record quotes rather than summarises, because a scenario summarised is a scenario that cannot be re-run. **Three settings are a name rather than an id** (`primary_kpi`, `time_step`, `warmup_mode`), which is legitimate for an enum and is the reason D113's KPI vocabulary mattered: a `primary_kpi` naming a measure the engine never emits is a scenario whose objective no run can report."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "scenarios_auth_all",
+            "command": "ALL",
+            "roles": [
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+          },
+          {
+            "name": "scenarios_anon_all",
+            "command": "ALL",
+            "roles": [
+              "anon"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260610000002_scenarios_anon_grants.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "scenarios_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "scenarios_project_idx",
+          "unique": false,
+          "columns": [
+            "project_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate key. A run binds to this, and so does the reproducibility record.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project this what-if belongs to.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What a person called it.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true,
+          "default": "''",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Their own note about it. Defaults to the empty string rather than NULL.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "horizon_days",
+          "type": "integer",
+          "nullable": false,
+          "default": "90",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How long the simulated world runs, in days. The engine's own clock is weekly, so this is divided at the boundary rather than stored twice — `normalize-at-promotion` (I3) applied to a decision.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "time_step",
+          "type": "text",
+          "nullable": false,
+          "default": "'day'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The granularity the scenario was set up at — `day` by default. A NAME, from a small fixed vocabulary, with no table behind it.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "warmup_mode",
+          "type": "text",
+          "nullable": false,
+          "default": "'auto'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Whether the warm-up is detected or fixed. `auto` means the run decides and writes `warmup_detected_at`; `fixed` means `warmup_days` below is used verbatim.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "warmup_days",
+          "type": "integer",
+          "nullable": false,
+          "default": "14",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The fixed warm-up, in days. Read only when `warmup_mode` is not `auto` — so a non-default value here with `auto` set is a setting that does nothing, and nothing says so.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "replications",
+          "type": "integer",
+          "nullable": false,
+          "default": "10",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How many independent runs. The KPI table's `n` column is the count that ACTUALLY completed, which is a different number whenever a replication fails.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "seed",
+          "type": "bigint",
+          "nullable": false,
+          "default": "42",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The root seed. With `crn` below, this is what makes two runs of one scenario comparable rather than merely similar.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "crn",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Common random numbers: whether two scenarios draw the same randomness so their difference is the POLICY and not the dice. Default true, and turning it off makes a comparison a different kind of claim.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "demand_model",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{\"kind\":\"poisson\",\"lambda\":50}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How demand is generated when the project's own data does not supply it — kind plus parameters, as JSON. A DECLARED substitution (T2) rather than a silent default, and the default is a Poisson.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "disruption_schedule",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "THE WHAT-IF ITSELF — the events, their timing and their targets. Copied from a template when one is applied and diverging from that moment. §4 D112's unresolvable targets arrive here.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "recovery_overrides",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Per-lever changes to the chosen playbook, so a scenario can adjust a strategy without forking the playbook.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "stopping_rule",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{\"kind\":\"fixed_horizon\",\"max_wall_seconds\":600}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the run stops — a fixed horizon by default, as JSON so a precision-based rule can be expressed without a migration.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "primary_kpi",
+          "type": "text",
+          "nullable": false,
+          "default": "'fill_rate'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The objective this scenario is judged on. A KEY, not a label, and it must be one the engine emits: `fill_rate` by default (§4 D113).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "auth",
+            "table": "users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The user who set it up, where recorded. NULL is unknown, not nobody.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was created. Server-stamped.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was last changed, server-stamped. A scenario is mutable, which is why a run binds to a scenario ID AND carries its own copy of what it ran.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "recovery_playbook_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "recovery_playbooks",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The playbook this scenario applies, by id. The one place a playbook is referenced by key rather than by name, which is what `scenario_templates.suggested_playbook_name` is not.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "from_network",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260609000021_fix_disruption_bridge.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "TRUE when the scenario was created from a network screen rather than from the simulation lab. It records the door a decision came through, which nothing else does.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "inherited_validation_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "model_validations",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The validation run this scenario inherited its data-readiness verdict from, so a re-run does not re-grade an unchanged dataset. NULL where it was never graded — and that is different from graded-and-clean.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
       "analysis_kinds": null
     },
     "suppliers": {
@@ -26864,5 +30108,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "95677333b6dd"
+  "contract_version": "898095dabbaa"
 }

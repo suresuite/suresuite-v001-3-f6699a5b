@@ -1,0 +1,157 @@
+# AUTHORED — the data contract's sidecar for `external_evidence`.
+table: external_evidence
+tier: '4'
+schema_name: public
+grain: >-
+  One retrieved external claim about a supply chain, as a subject–predicate–object triple with
+  the source it came from, the confidence attached to it and the hash of the content it was read
+  from. The network cartographer's evidence store: what an agent FOUND, kept apart from what a
+  person entered.
+owner: platform
+
+natural_key_unique:
+  - source: PRIMARY KEY constraint
+    columns: [id]
+    name: external_evidence_pkey
+  - source: UNIQUE index
+    columns: [project_id, source_id, content_hash, md5(triple::text)]
+    name: external_evidence_dedupe_uq
+
+governance:
+  read: null
+  write: null
+  min_project_role: editor
+  audited: true
+  rls_enabled: true
+  note: >-
+    Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the dataset they
+    chose it over and the result it produced. `result-binding` (I8) needs all three, which is
+    why WP 6.3 keeps the results and this package takes the decisions. Audited from WP 6.4: the
+    three statement-grain triggers land beside this sidecar, because `dataPlaneAudit.test.ts`
+    scopes its rule to tables IN the contract and a deferred table's writes are unaudited with
+    nothing to notice (D54). **Its writers are edge functions, not the browser** — `project-ai-
+    chat`'s cartographer and sentinel tools — so the audit trigger names whoever the function's
+    transaction has set, and an agent write with no actor is the D28 question this table
+    inherits rather than answers. The dedupe index is what makes a re-read of the same page a
+    no-op instead of a second claim.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. The dedupe key is the four-column unique index below.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project the claim is about.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  source_id:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Which source produced it — a registry, a filing, a page. CHECK-constrained, so a claim
+      cannot arrive from a source the system does not name.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  url_or_ref:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      Where a person can go and look. NULL where the source has no addressable reference, which
+      is a real state for a registry lookup and not a missing value.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  content_hash:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The hash of the content the claim was read from. Part of the dedupe key, so the same bytes
+      re-read produce no second row — and a CHANGED page produces a new claim rather than
+      overwriting the old one.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  retrieved_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it was fetched. The claim is about the world at that moment, and nothing refreshes
+      it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  confidence:
+    type: numeric
+    unit: null
+    unit_source: none
+    meaning: >-
+      How much weight the extractor put on this claim, CHECK-constrained to its range. It is the
+      EXTRACTOR's number, not a person's, and no surface today turns it into a decision.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  triple:
+    type: jsonb
+    unit: null
+    unit_source: none
+    meaning: >-
+      THE CLAIM — subject, predicate, object as JSON. Hashed into the dedupe key through
+      `md5(triple::text)`, which is why an expression index appears in the natural key above.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  lei:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The Legal Entity Identifier the claim is about, where one resolved. CHECK-constrained to
+      the LEI shape, and NULL where the subject is not a registered entity — a great many
+      suppliers are not.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+
+surfaces: []
