@@ -2168,6 +2168,158 @@ async function graphLayerBefore() {
   });
 }
 
+// ── WP 8.0, probes 8–11: WHICH ETL wrote this project's graph? ──────────────
+//
+// THE FIRST SEVEN PROBES ANSWERED A QUESTION THAT TURNED OUT TO BE THE WRONG ONE,
+// and the report is what said so. Run 35433237514 read the `level` histogram and
+// two projects with the SAME 396-row, 4-deep `bom_multi_level` disagreed about
+// their own lane: one held bom levels 1, 2, 3 and 4 as the ETL's `row.level || 1`
+// would write them, and the other held **397 bom rows all at level 2**, with its
+// inbound lane split across levels 1 and 5.
+//
+// No reading of `combine-project/index.ts` can produce that, because a second
+// ETL exists. `combine_project_into_supply_chain` is a SQL RPC called from three
+// client sites, it writes BOTH edge tables, and it writes `level` by a fourth
+// rule that is nothing like the edge function's: outbound `0`, `bom_single_level`
+// a literal `1`, **`bom_multi_level` a literal `2` — ignoring `b.level`
+// entirely** — and inbound `GREATEST(1, max_level + 1)` per material. That is
+// D125, and it is the ninth classifier of the eight D112 counts, one layer down:
+// two live writers disagreeing about what the column MEANS, where D112 is eight
+// live readers disagreeing about what it SAYS.
+//
+// It also changes D114 from "an edge is dropped" to something worse. The RPC
+// writes `COALESCE(b.higher_level_component_id, 'ROOT')` — so where the BOM root
+// has no parent it does not drop the edge, it **invents a node called `ROOT`** and
+// points every root material at it. The first seven probes found zero empty
+// endpoints and read that as D114 being latent. It is not latent; it is a
+// different shape, and a count of `''` could never have seen it.
+//
+// So: four more probes, all `select`, all every-project. Which writer wrote each
+// lane (probe 8), whether `ROOT` is in the data (probe 9), whether the lane still
+// agrees with the tables it was derived from (probe 10), and how many BOM roots
+// there are for the defect to act on (probe 11).
+async function graphLayerWhoWroteIt() {
+  section("WP 8.0 — WHICH ETL wrote this graph, and what it invented (D125, D126)");
+
+  // 8 ── the signature. The two writers leave different fingerprints in the bom
+  //      lane, and the BOM's own depth is the control.
+  const signature = await tryQ(`
+    select p.name as project,
+           (select coalesce(max(b.level), 0)::int from public.bom_multi_level b where b.project_id = p.id) as bom_table_max_depth,
+           (select count(distinct b.level)::int    from public.bom_multi_level b where b.project_id = p.id) as bom_table_depths,
+           (select string_agg(distinct t.level::text, ',' order by t.level::text)
+              from public.supply_chain_data_multi_tier t
+             where t.project_id = p.id and t.data_source = 'bom')      as lane_bom_levels,
+           (select string_agg(distinct t.level::text, ',' order by t.level::text)
+              from public.supply_chain_data_multi_tier t
+             where t.project_id = p.id and t.data_source = 'inbound')  as lane_inbound_levels
+      from public.projects p order by p.created_at`);
+  report("D125 — the bom lane's levels against the BOM table's own depths", signature, (rows) => {
+    if (!rows?.length) { out("- No projects."); return; }
+    out(...table(rows));
+    const withLane = rows.filter((r) => r.lane_bom_levels);
+    const flattened = withLane.filter((r) => Number(r.bom_table_depths) > 1 && r.lane_bom_levels === "2");
+    const laddered = withLane.filter((r) => (r.lane_bom_levels ?? "").includes(","));
+    out("");
+    out(
+      `- **${flattened.length} project(s) have a multi-depth BOM whose entire bom lane sits at level 2**, and ` +
+        `${laddered.length} carry a ladder of several levels. Those are the two ETLs' fingerprints: the SQL RPC ` +
+        "writes a LITERAL `2` for every `bom_multi_level` row and the edge function writes `row.level || 1`, so the " +
+        "histogram says which one last ran — and a page reading a fixed echelon ladder is reading a column whose " +
+        "meaning depends on that. **D125**: two live writers, one column, two definitions.",
+    );
+    out(
+      "- The `lane_inbound_levels` column is the same story on the other lane. Both writers use a `max BOM depth + 1` " +
+        "shape there, so a material absent from `bom_multi_level` lands at **1** and one at depth 4 lands at **5** — " +
+        "two suppliers, four levels apart, in the same upload. The page's ladder calls the first a material.",
+    );
+  });
+
+  // 9 ── the invented node. `'ROOT'` is not a material, a product, a supplier or
+  //      a customer; it is a string the RPC substitutes for a missing parent.
+  const root = await tryQ(`
+    select p.name as project,
+           (select count(*)::int from public.supply_chain_data_multi_tier t
+             where t.project_id = p.id and (t.to_location = 'ROOT' or t.from_location = 'ROOT')) as scdmt_root_edges,
+           (select count(*)::int from public.supply_chain_data t
+             where t.project_id = p.id and (t.to_location = 'ROOT' or t.from_location = 'ROOT')) as scd_root_edges,
+           (select count(*)::int from public.node_list l
+             where l.project_id = p.id and l.node_id = 'ROOT')                                    as node_list_root,
+           (select count(*)::int from public.bom_multi_level b
+             where b.project_id = p.id
+               and (b.higher_level_component_id is null or btrim(b.higher_level_component_id) = '')) as bom_roots
+      from public.projects p order by p.created_at`);
+  report("D126 — `ROOT`, the node no upload contains", root, (rows) => {
+    if (!rows?.length) { out("- No projects."); return; }
+    out(...table(rows));
+    const edges = rows.reduce((a, r) => a + Number(r.scdmt_root_edges || 0) + Number(r.scd_root_edges || 0), 0);
+    const typed = rows.reduce((a, r) => a + Number(r.node_list_root || 0), 0);
+    const roots = rows.reduce((a, r) => a + Number(r.bom_roots || 0), 0);
+    out("");
+    out(
+      edges > 0
+        ? `- **${edges} edge(s) name a node called \`ROOT\`, and ${typed} of them reached \`node_list\` as a typed ` +
+          "node.** `COALESCE(b.higher_level_component_id, 'ROOT')` invents it where the BOM root has no parent — the " +
+          "place the sidecar says the parent IS the finished product. So the finished product is still severed from " +
+          "its own BOM, and in its place there is a node that no CSV contains, that no user can explain, and that " +
+          "every centrality on the page is computed over. **T1 in one string**: a node on screen sourced to nothing."
+        : `- **No \`ROOT\` edges.** The substitution is in the live RPC and has produced nothing measurable — either ` +
+          `no project has a parentless BOM row (the \`bom_roots\` column says: ${roots} across all projects), or the ` +
+          "lane predates it. A zero here makes D126 latent, not absent: the `COALESCE` is still what the next " +
+          "parentless row meets.",
+    );
+    out(
+      `- ${roots} \`bom_multi_level\` row(s) have no parent at all, which is how many finished-product edges the ` +
+        "two writers have to get right. The edge function drops them (the demand walk finds no parent, so the child " +
+        "gets no root and the row is never emitted); the RPC points them at `ROOT`. **Neither writes the product** — " +
+        "which is D114, restated against what the data actually shows rather than against the `|| ''` a reader sees " +
+        "first.",
+    );
+  });
+
+  // 10 ── is the lane still true? Neither writer is triggered by an upload, so a
+  //       later CSV changes the source tables and leaves the graph alone.
+  const stale = await tryQ(`
+    select p.name as project,
+           (select count(*)::int from public.inbound_logistics  s where s.project_id = p.id) as inbound_src,
+           (select count(*)::int from public.supply_chain_data_multi_tier t
+             where t.project_id = p.id and t.data_source = 'inbound')                        as inbound_lane,
+           (select count(*)::int from public.outbound_logistics s where s.project_id = p.id) as outbound_src,
+           (select count(*)::int from public.supply_chain_data_multi_tier t
+             where t.project_id = p.id and t.data_source = 'outbound')                       as outbound_lane,
+           (select count(*)::int from public.bom_multi_level b where b.project_id = p.id)
+             + (select count(*)::int from public.bom_single_level b where b.project_id = p.id) as bom_src,
+           (select count(*)::int from public.supply_chain_data_multi_tier t
+             where t.project_id = p.id and t.data_source = 'bom')                            as bom_lane,
+           (select max(t.updated_at) from public.supply_chain_data_multi_tier t where t.project_id = p.id) as lane_written,
+           (select max(s.updated_at) from public.inbound_logistics s where s.project_id = p.id)            as inbound_touched
+      from public.projects p order by p.created_at`);
+  report("D127 — the lane against the tables it was derived from", stale, (rows) => {
+    if (!rows?.length) { out("- No projects."); return; }
+    out(...table(rows));
+    const drifted = rows.filter(
+      (r) => Number(r.inbound_lane) > 0 && Number(r.inbound_lane) !== Number(r.inbound_src),
+    );
+    out("");
+    out(
+      drifted.length
+        ? `- **${drifted.length} project(s) have an inbound lane whose row count does not match ` +
+          "`inbound_logistics`.** Neither writer is a trigger: both are invoked by a client, so a CSV uploaded after " +
+          "the last combine changes the source table and leaves the graph exactly as it was. The page then renders a " +
+          "graph of a world that no longer exists, with no staleness signal on it — **D127**, and it is the one " +
+          "defect in this phase that a user would describe as \"the map looks wrong\" without any classifier being " +
+          "involved at all."
+        : "- Every non-empty inbound lane matches its source row count. That does not make the lane fresh — a " +
+          "same-size edit moves no count — but it removes the largest and cheapest explanation.",
+    );
+    out(
+      "- `lane_written` beside `inbound_touched` is the direct comparison. A source touched AFTER the lane was " +
+        "written is a graph derived from data that has since changed, and `project_freshness` is shown on " +
+        "Product-level and on no other network page.",
+    );
+  });
+}
+
 async function main() {
   out(`# PLAN.md §15 — verification SQL, executed`);
   out("");
@@ -2187,6 +2339,7 @@ async function main() {
   await wp42Landed();
   await wp43and44Counts();
   await graphLayerBefore();
+  await graphLayerWhoWroteIt();
 
   const project = await pickProject();
   if (!project) {
