@@ -310,8 +310,10 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D92** | **The Parameter Sheet promised a milestone that does not exist, for eight of the eleven.** `fieldStatus.ts::milestoneFor` returned the literal string `"engine catalog — planned"` for any policy family with no row in `PENDING_FAMILY_POLICY`, and every caller treated that string as a milestone — so `ParameterSheet.tsx:74` rendered, of `reorder_point`, **"stored only · activates with engine catalog — planned"**. Nothing is planned. `inventory` and `sourcing` are not in that table, and D91 establishes what those fields actually are: computed and never read, read only by the frozen engine, or read by nothing at all. None is waiting for a policy. The remaining branch said "stored only · not consumed yet", where the word *yet* carries the same promise more quietly. This is T2 at the point of display — the product was inventing a future to avoid saying a field does nothing — and it is `declared-fallback` (I6) pointing at the UI: a substitution absent from the contract may not exist in code, and "we will consume this later" is a substitution for an answer | `src/lib/policies/fieldStatus.ts::milestoneFor`; `src/components/policies/ParameterSheet.tsx:73-75` | **CLOSED ✅ (WP 6.2)** — `FieldEngineStatus` gains `stored-only`, `milestoneFor` returns `null` rather than a sentence, and the sheet says "stored only · no engine consumer, none planned" |
 | **D127** | **The cascade migration promised the deploy log a number and the deploy log records nothing — and the migration contradicts itself three lines apart.** `20260919000005`'s header says *"**Each delete prints its count**, so the deploy log records what was removed rather than leaving it to be inferred"*, and §4 D117 repeated it as the reason its after-reading would have *"a number to match rather than a claim to accept"*. **Both are false about the shipped file.** Its own section comment, twenty lines later, says the opposite — *"One statement per table, each printing nothing"* — and that one is right: the seven statements are plain `DELETE`s with no `RAISE NOTICE`, a `DELETE`'s row count is a command tag rather than a message, and `supabase db push` forwards neither. The published log for run `35466205181` is eleven lines of `Applying migration …` and a `Finished`. **What it cost is the evidence itself**: D117's before-reading is 43 orphans (§15 run `35443390928`) and its after-reading had to be INFERRED from a raced report rather than read from the deploy. **The class is a promise about EVIDENCE, and it is worse than a wrong fact**: a wrong fact is checkable, while a claim that a log will contain something is believed until somebody opens the log — and `check:docs`, R16 and every contract rule are about facts the repository states, not about facts it says an external artifact will state. Nothing in this repository compares a migration's comment to what its deploy actually printed | `supabase/migrations/20260919000005_project_cascade.sql` line 39 against the same file's line 60, and the published `migration-results` log for run `35466205181` | **STATED, NOT FIXED IN THE MIGRATION — deliberately.** The file is APPLIED in production; a comment cannot change behaviour but editing an applied migration to make its own history read better is the habit that makes migration files untrustworthy, so the correction lives here and in D117 instead. **A `RAISE NOTICE` would not have worked either**, which is the part worth carrying forward: `db push` does not forward notices, so a migration that wants to report a number must write it somewhere a later `SELECT` can read — a row in a table, not a line in a log. The next migration that deletes rows should do that; this one's number came from §15 on both sides instead |
 | **D128** | **The rule "never request §15 in the same push as a migration" is satisfiable on a branch and UNSATISFIABLE at the merge, so every merge that carries both produces a raced report — and run `35466205199` is one.** `supabase-migrations.yml` is `branches: [main]` (D31's first half) and `verification-sql.yml` has **no branch filter at all**, firing on any push that touches `.github/verify-request`, the workflow, or `verification-sql.mjs`. A branch can therefore obey the rule commit by commit — WP 6.4 did: the migrations went in `686df8e` and the probe in `2d54cef`, two separate pushes — and the MERGE COMMIT then carries every door at once. On `32e581c` both workflows started at 20:03:17Z: the report is stamped 20:03:28Z, the seven migrations applied at 20:04:11–13Z, and 74 statements ran across that boundary. **So the report straddles two schemas and cannot say which section got which**, which is exactly the damage the habit exists to prevent, arriving through the one push no session writes by hand. It is the FIFTH §15 run compromised by this rule's older forms (§16 records four lost across three packages) and the first where obeying the rule was not enough. **The affected number is D117's after-reading**: 0 orphans in all seven tables, against 43 before. The inference that the 0 is post-sweep is sound — nothing else deletes those rows, which is D117's own finding — but an inference is not a reading, and this plan does not accept one where a measurement was promised | `.github/workflows/verification-sql.yml`'s `on.push.paths` (no `branches:`) against `supabase-migrations.yml`'s `branches: [main]`; run `35466205181`'s step timings against run `35466205199`'s report header | **CLOSED ✅ AS A GATE (Phase 7 / WP 7.1 stage 0) — the instrument detects it instead of the author remembering.** `verification-sql.mjs` reads `max(version)` and the applied count from `supabase_migrations.schema_migrations` BEFORE the first probe and again AFTER the last one; if either moved, the run pushes a `gateFailures` entry and exits non-zero, so the workflow goes red and the report says at the bottom that its counts describe two databases. Both halves of the key are compared because a `migration repair` can re-apply an older version and move the COUNT without moving the max. Every `### ` heading also carries an HTML-comment timestamp, so a raced report is still readable — the boundary is visible rather than guessed. **What the gate does NOT do is prevent the race**, and that is a workflow decision rather than a script one: scoping `verification-sql.yml` to `branches: [main]` would stop a branch requesting a read at all, and a `paths-ignore` on `supabase/migrations/**` would silently skip the door a session just touched. Detecting it and failing loudly is the honest instrument; the fix for the SEQUENCE is to request the read in a push that follows the merge, which is what stage 0 does |
-| **D129** | **§14's stage 4 counted `anon`'s write GRANTS by reading a list of predicate-less write POLICIES, and production grants `anon` INSERT/UPDATE/DELETE on 86 tables rather than 7 — including `audit_logs`.** The staged plan named seven tables (`dataset_versions`, `experiments`, `policy_versions`, `run_item_series`, `run_replications`, `scenarios`, `simulation_runs`) as "`anon`'s 7 write grants". That is not what they are: it is the set of tables carrying a predicate-less policy whose `cmd` includes a write, which is a different question with a different answer. §15 run `35466925117` read `information_schema.role_table_grants` and `anon` holds a write privilege on **86** relations — essentially the whole schema, views included — while `authenticated` holds 87 and `service_role` 88. **The policy counts were wrong too, in the same direction**: 48 predicate-less policies of 168, over 30 tables, and 16 of them cover a write, against §14's 27 / 27 / 7. **`audit_logs` is on the writable list, which is worth stating on its own**: the table every `audit-actor` (G4) claim rests on carries INSERT, UPDATE and DELETE for the role the browser runs as. **The grant is not the whole gate** — RLS still has to permit the statement, and most of the 86 are held behind a policy that refuses every write — which is exactly why counting grants alone was not the answer either, and why stage 0 gained a probe that intersects grant × RLS × policy before stage 4 is written | §15 run `35466925117`, sections "stage 0.1" through "0.4", against §14's stage table as written in `1661aa5` | **OPEN — WP 7.1, and it re-sizes stages 3 and 4 before either is written.** The plan's own instruction is that a number from migration history is a guess (D43); this row is the first time that instruction was applied to ACCESS rather than to tables, and it found a twelve-fold error. Stage 4's list is replaced by probe 0.8's intersection, and the tables where RLS is OFF go to the FRONT of it — stage 3's restrictive-policy mechanism cannot help a table with no policies to AND against |
+| **D129** | **§14's stage 4 counted `anon`'s write GRANTS by reading a list of predicate-less write POLICIES, and production grants `anon` INSERT/UPDATE/DELETE on 86 tables rather than 7 — including `audit_logs`.** The staged plan named seven tables (`dataset_versions`, `experiments`, `policy_versions`, `run_item_series`, `run_replications`, `scenarios`, `simulation_runs`) as "`anon`'s 7 write grants". That is not what they are: it is the set of tables carrying a predicate-less policy whose `cmd` includes a write, which is a different question with a different answer. §15 run `35466925117` read `information_schema.role_table_grants` and `anon` holds a write privilege on **86** relations — essentially the whole schema, views included — while `authenticated` holds 87 and `service_role` 88. **The policy counts were wrong too, in the same direction**: 48 predicate-less policies of 168, over 30 tables, and 16 of them cover a write, against §14's 27 / 27 / 7. **AND THIS ROW OVERSTATED IT, WHICH ITS OWN FOLLOW-UP PROBE FOUND WITHIN THE HOUR — read the second half as the correction.** The grant is not the gate: RLS still has to permit the statement, and probe 0.8 (§15 run `35467412134`) intersected all three terms. **The genuinely writable number is ELEVEN**, not 86 and not 16: `customers`, `dataset_versions`, `experiments`, `materials`, `policy_versions`, `products`, `run_item_series`, `run_replications`, `scenarios`, `simulation_runs`, `suppliers`. 46 tables have a write policy with a predicate, 23 have NO write policy and are therefore denied today, and 6 of the 86 are VIEWS whose RLS lives on the base table. **`audit_logs` is in the denied-today group**, so the alarming version of this row — "the table every `audit-actor` claim rests on is writable by the browser's role" — is WRONG: the grant exists and RLS refuses every write for want of a permissive policy. **So §14's seven were seven of the eleven**, missing the four tier-2 masters (`customers`, `materials`, `products`, `suppliers`) — an undercount of four, not of seventy-nine. What survives of this row is that the plan answered a question it was not asking and got a number that happened to be nearly right; what does not survive is the twelve-fold error. **One further measurement makes stage 3 safe**: NO table has RLS off, so the restrictive-policy mechanism reaches every one of the eleven and stage 4 is tidying rather than repair | §15 run `35466925117`, sections "stage 0.1" through "0.4", against §14's stage table as written in `1661aa5` | **OPEN — WP 7.1, and it re-sizes stages 3 and 4 before either is written, SMALLER rather than larger.** The plan's own instruction is that a number from migration history is a guess (D43), and this is the first time it was applied to ACCESS rather than to tables. **The lesson is not the one the first draft of this row drew.** A grant count is as wrong an answer as a policy count; the exposure is the intersection, and reading two of the three terms produced an alarm (86 tables, `audit_logs` among them) that the third term dissolved. Stage 3 covers all eleven, because no table has RLS off; stage 4 is eleven revocations, not 86 and not 7 |
 | **D130** | **Stage 1 assumed a session could be minted for an existing user id, and 0 of 14 approved users exist in `auth.users` — while sixteen policies are granted to `anon` ALONE, so issuing one would break reads for exactly the people who logged in.** §15 run `35466925117`: `auth.users` holds **1** row, `approved_users` holds **14**, and the overlap is **0**. So `auth.uid()` has never returned an id this application recognises, which is why 13 policies naming it are effectively dead and 54 read the GUC instead. Two consequences the staged plan did not contain. **(1) Stage 1 is not plumbing.** It cannot attach a session to an existing identity because there is no identity to attach to; it must either create 14 auth identities (whose passwords this application does not hold in a form Supabase Auth can take — `approved_users.password_hash` is its own scheme) or mint a JWT whose `sub` is the `approved_users.id` and skip `auth.users` altogether, which works because `auth.uid()` reads the JWT claim and not the table. **(2) The role change is itself a blast radius.** 16 policies are granted to `{anon}` alone; the moment a request arrives as `authenticated` they stop applying to it and RLS denies by default, so those reads fail for authenticated users only — a failure mode nothing in §14 pointed at. 103 policies are `TO public` and are unaffected; 12 name both roles. The grant half is clean: **0** privileges are held by `anon` and not by `authenticated` | §15 run `35466925117`, sections "stage 0.5", "0.6" and "0.7" | **OPEN — WP 7.1, and stage 1 is re-planned before it is written.** The widening of the 16 is additive and revertible, so it belongs at the head of stage 1 rather than ahead of the sequence. **The identity question is the larger one and it is D28's, arriving with a number**: this application authenticates against `approved_users`, and the choice between importing 14 identities and signing a JWT over the id they already have is the choice between changing how people log in and changing only what the database is told about it. The second is smaller, reversible and does not touch a password — and it is what stage 1 will do unless the identity import is wanted for its own sake |
+| **D131** | **The CSV landing path cannot run in production: `ingest_land_file` must name its uploader, writes that uploader into a column still keyed to `auth.users`, and no approved user exists there.** Three facts that are each correct alone. **(1)** `ingest_land_file` RAISES `null_value_not_allowed` when `_actor_user_id` is NULL — deliberately, with the invariant named in the message, because an unattributed file landing is the thing `audit-actor` (G4) exists to forbid. **(2)** It writes that actor into `ingest_runs.triggered_by_user_id`, and `ingest_apply_run` writes it into `applied_by_user_id`; both columns still carry a foreign key to `auth.users`, under the pre-rename names `erp_sync_runs_triggered_by_user_id_fkey` and `erp_sync_runs_applied_by_user_id_fkey` (`20260829120000`, where the comment reads *"null for scheduled runs"* — written when the actor was expected to be a Supabase Auth user). **(3)** §15 run `35466925117`: `auth.users` holds 1 row, `approved_users` 14, overlap **0**. So the function cannot pass NULL and cannot pass a real uploader either, and **every CSV landing by a real user would abort on a foreign-key violation**. **Why nothing caught it**: every rehearsal that exercises the path INSERTs its actor into `auth.users` first — `050`, `060`, `070`, `080`, `090`, `100`, `110`, `120` all do — so each proves the landing against a world in which `approved_users.id ∈ auth.users.id`, which production has never been. That is the sharpest instance yet of a fixture establishing the premise the assertion needs. **It is LATENT, not live**: `ingest-file` is not deployed (D123), so nothing can reach the path today — which is why it reads as a blocker rather than an outage, and why it was findable before it cost a user anything | §15 run `35467412134`, probe 0.9 (`pg_constraint`, 8 keys to `auth.users`) against `supabase/migrations/20260916000015_ingest_landing.sql`'s NULL-actor `RAISE` and its `ingest_runs` INSERT; the actor INSERTs in `supabase/rehearsal/050`–`120` | **OPEN — WP 6.5 (a), as its PRECONDITION rather than a note.** The switch that package owns is publishing `ingest-file`, and publishing it without dropping these two keys turns every upload in production into a foreign-key error. **The remedy has a pattern in this repository**: `20260613000001_fix_snapshot_created_by.sql` hit exactly this in June for `policy_versions.created_by`, dropped the key, and said why — *"the app authenticates against public.approved_users (custom auth), so the user id passed to snapshot_policy is NOT an auth.users id"*. Two `ALTER TABLE … DROP CONSTRAINT`, and the columns keep storing an `approved_users` id exactly as `ingest_files.uploaded_by` already does (that one was keyed correctly from the start, which is why the file half never failed). **Probe 0.9 FAILS the §15 run while the keys exist**, so §15 is red until WP 6.5 (a) acts — an intended ratchet on a latent defect, and the one thing that stops this being rediscovered by a user |
+| **D132** | **The introspected artifact believes in a foreign key production dropped in June, because `contract:introspect` does not follow `ALTER TABLE … DROP CONSTRAINT` for an implicitly-named key.** The artifact records **nine** columns as `REFERENCES auth.users(id)`; `pg_constraint` holds **eight** (§15 run `35467412134`, probe 0.9). The difference is `policy_versions.created_by`, whose `policy_versions_created_by_fkey` was dropped by `20260613000001_fix_snapshot_created_by.sql`. The FK was declared INLINE on the column in `20260609000002`, so it lives in the artifact as `column.references`; the DROP names the constraint PostgreSQL generated implicitly, and the introspector does not connect the two. **The cost is small here and the class is not**: a rehearsed database gets a key production does not have, so an assertion about what happens when that key fires is made against a constraint that is only present in the rehearsal — the mirror image of D53, where the key existed in production and was silently SKIPPED in every rehearsal. Both directions are the same defect: the artifact is the only account of the schema that the rehearsals read, and a DROP it cannot see makes that account fiction in one row. **Found only because probe 0.9 asked `pg_constraint` instead of trusting the artifact**, which is the whole argument for §15 having a schema probe at all (D43) | `build/schema.introspected.json`'s `policy_versions.created_by.references` against `20260613000001_fix_snapshot_created_by.sql`'s `DROP CONSTRAINT IF EXISTS policy_versions_created_by_fkey`; §15 run `35467412134` probe 0.9 | **OPEN — WP 7.1, joining D99's list of the introspector's blind spots** *(D99 already owns that class under this package and names four detectors of three kinds; this is a fifth kind and the first found by the DATABASE disagreeing with the artifact rather than by a statement PostgreSQL would reject. The fix: an `ALTER TABLE … DROP CONSTRAINT <name>` must clear a matching inline `references`, which means synthesising PostgreSQL's implicit name — `<table>_<column>_fkey` — to match it. That is the same synthesis D59 and D60 needed for other inline declarations, so it is one helper rather than a special case. Not taken in stage 0 because rebuilding the artifact touches every table and its blast radius is the whole rehearsal suite, which is not a thing to fold into a read-only measurement. **The number is pinned meanwhile**: probe 0.9 prints 8 against 9 every run, so a second divergence cannot arrive quietly)* |
 
 ### 4.1 Code map — the data layer
 
@@ -2417,6 +2419,31 @@ the first time it has had an owner.
 taken from the branch that makes the change. The switch therefore spans two pushes by
 construction, and a package that ends at a merge cannot contain it.
 
+**AND IT HAS A HARD PRECONDITION NOW, FOUND BY WP 7.1's STAGE 0 — §4 D131.** Two
+foreign keys must be dropped BEFORE the function is published, or the switch turns
+every upload into an error:
+
+```
+ALTER TABLE public.ingest_runs DROP CONSTRAINT IF EXISTS erp_sync_runs_triggered_by_user_id_fkey;
+ALTER TABLE public.ingest_runs DROP CONSTRAINT IF EXISTS erp_sync_runs_applied_by_user_id_fkey;
+```
+
+`ingest_land_file` RAISES when its actor is NULL — deliberately, naming `audit-actor`
+in the message — and writes that actor into `ingest_runs.triggered_by_user_id`, which
+still keys to `auth.users`. Production holds **1** row in `auth.users`, **14** in
+`approved_users`, and an overlap of **0** (§15 run `35466925117`), so the function can
+satisfy neither requirement: not NULL, and not a real uploader either. Every rehearsal
+passes because each one INSERTs its actor into `auth.users` first — a world production
+has never been in. The columns then store an `approved_users` id exactly as
+`ingest_files.uploaded_by` already does, which is why the file half never failed; the
+pattern for the drop is `20260613000001_fix_snapshot_created_by.sql`, which did this
+in June for `policy_versions.created_by` and wrote down why.
+
+**§15 is RED until this is done** — probe 0.9 fails the run while the keys exist. That
+is a deliberate ratchet on a latent defect: nothing reaches the path today because the
+function is not published, and the redness is what stops the finding being rediscovered
+by a user.
+
 **The sequence, and none of it is optional:**
 
 1. **A §15 read BEFORE**, over every project (D42): how many rows each landable table
@@ -2619,8 +2646,8 @@ leaves a working product whether or not the next stage ever runs.
 | **0** ✅ *(run `35466925117`; nine probes — the last two added after reading the first seven)* | **Measure, change nothing.** A §15 read of which policies exist on the live database, which roles hold which grants, and whether any session is reaching a predicate at all — plus, added when the probes were written, **which ROLE each policy is granted to and which privileges `anon` holds that `authenticated` does not** (0.6, 0.7: stage 1's own blast radius, which the rest of this table had not asked — see below) | Nothing — read-only; `assertReadOnly()` refuses anything but `select` | n/a | **DONE, and it moved three of the numbers below**: 48 predicate-less policies over 30 tables (not 27 / 27), 16 of them covering a write (not 7), 86 tables `anon` may write (not 7), and 0 of 14 approved users present in `auth.users`. The repo's 27 / 7 / 7 were from MIGRATION HISTORY and a live read differed by more than an order of magnitude — §4 D43's class, D129 and D130 |
 | **1** | **Issue a real session at login**, beside the existing one — and STAGE 0 CHANGED WHAT THAT MEANS (D130). There is no identity to attach to: `auth.users` holds 1 row, `approved_users` 14, overlap 0. So stage 1 either imports 14 identities (whose passwords this app does not hold in a form Supabase Auth takes) or **signs a JWT whose `sub` is the `approved_users.id`**, which works because `auth.uid()` reads the claim and not the table. It also begins by widening the **16 policies granted to `{anon}` alone**, because the role change alone would take those reads away from whoever logged in. `authenticate_approved_user` continues to be the authority; a Supabase Auth session is created alongside it so `auth.uid()` starts returning a value. **No policy reads it yet.** | Nothing reads it, so nothing can break. A failure to issue must not fail the login | Stop issuing | A rehearsal that logs in and asserts `auth.uid()` and the GUC resolve to the SAME user |
 | **2** | **Flip the ORDER inside `get_current_user_id()`**: prefer `auth.uid()`, fall back to the GUC. Behaviour is identical while the two agree, which stage 1 proved | A user whose session did not issue falls back exactly as today | One `CREATE OR REPLACE` | The stage-1 rehearsal, re-run; plus a rehearsal where the GUC is POISONED with a second user and the predicate still answers for the session |
-| **3** | **Add a RESTRICTIVE policy per table** — `AS RESTRICTIVE … USING (auth.uid() IS NOT NULL)`. A restrictive policy **ANDs** with the permissive set, so a predicate-less policy keeps working for a real session and stops working for a genuinely anonymous caller. **The count is 48 policies over 30 tables, not 27 over 27** (D129), and a table whose RLS is OFF is not reachable by this mechanism at all — it belongs to stage 4 | A surface that never had a session loses access — which is the point, and is why it is one table per push | `DROP POLICY` restores the previous behaviour EXACTLY, because nothing else changed | A rehearsal per table: one session reads, one anonymous connection is refused |
-| **4** | **Revoke `anon`'s write grants** — and the list in this cell was WRONG (D129). Those seven are the tables carrying a predicate-less WRITE POLICY; the GRANTS cover **86** relations, `audit_logs` among them. The worklist is probe **0.8**'s intersection of grant × RLS × policy, **RLS-OFF tables first**, because stage 3 cannot help a table with no policy to AND against | A writer still running as `anon` stops writing | `GRANT` it back | A §15 read either side, and the client path exercised once per table |
+| **3** | **Add a RESTRICTIVE policy per table** — `AS RESTRICTIVE … USING (auth.uid() IS NOT NULL)`. A restrictive policy **ANDs** with the permissive set, so a predicate-less policy keeps working for a real session and stops working for a genuinely anonymous caller. **48 policies over 30 tables, not 27 over 27** (D129) — and probe 0.8 settled the mechanism's reach: **no table has RLS off**, so every one of them can be ANDed against and stage 3 has no exceptions | A surface that never had a session loses access — which is the point, and is why it is one table per push | `DROP POLICY` restores the previous behaviour EXACTLY, because nothing else changed | A rehearsal per table: one session reads, one anonymous connection is refused |
+| **4** | **Revoke `anon`'s write grants on the ELEVEN tables probe 0.8 measured** — `customers`, `dataset_versions`, `experiments`, `materials`, `policy_versions`, `products`, `run_item_series`, `run_replications`, `scenarios`, `simulation_runs`, `suppliers` — one per push. §14's original seven were seven of these, missing the four tier-2 masters; the 86 grants `anon` holds are mostly inert, because 46 tables' write policies carry a predicate, 23 have no write policy at all (`audit_logs` among them — denied today, not writable) and 6 are views (D129) | A writer still running as `anon` stops writing | `GRANT` it back | A §15 read either side, and the client path exercised once per table |
 | **5** | **Delete the predicate-less policies**, table by table, now that stage 3 has been carrying the weight | Same as stage 3, one table at a time | `CREATE POLICY` from the migration that made it | `governanceEnforcement.test.ts`'s list SHRINKS — the test names exactly which line to delete |
 | **6** | **Remove the GUC fallback** from `get_current_user_id()` and the `set_current_user_context` call from the client | Any path still relying on the GUC | `CREATE OR REPLACE` | The 33 functions that reference the GUC are re-read; the ones that SET it for their own writes (`assert_writer_may_act` and the eleven WP 6.2 closed) are unaffected — they set it for the AUDIT trigger, not for a predicate |
 
@@ -2843,6 +2870,58 @@ approved users in `auth.users` the two requirements are mutually unsatisfiable, 
 every rehearsal passes because each one INSERTs its actor into `auth.users` first — a
 world production does not have. That is a blocker under **WP 6.5 (a)**, found before
 the switch rather than by it, and 0.9 fails the run if it is real.
+
+
+### WP 7.1 stage 0, second read — run `35467412134`, and it is RED ON PURPOSE
+
+Both probes answered, and one of them corrected the §4 row written an hour earlier.
+
+**0.8 — the exposure is ELEVEN tables.** Not 86 grants, not 16 open write policies:
+
+| grant × RLS × policy | tables |
+|---|---|
+| RLS on, a write policy that refuses nothing | **11** — `customers`, `dataset_versions`, `experiments`, `materials`, `policy_versions`, `products`, `run_item_series`, `run_replications`, `scenarios`, `simulation_runs`, `suppliers` |
+| RLS on, every write policy has a predicate | 46 |
+| RLS on, NO write policy — denied today | 23, **`audit_logs` among them** |
+| view (grant only; RLS lives on the base table) | 6 |
+| **RLS OFF** | **0** |
+
+Three things follow. **§14's seven were seven of the eleven**, missing the four tier-2
+masters — an undercount of four, not of seventy-nine, so D129's first draft overstated
+its own finding and is corrected in place. **`audit_logs` is denied today**, not
+writable: the grant is there and RLS refuses every write for want of a permissive
+policy, so the alarming version of that sentence was wrong. **No table has RLS off**,
+which is the best news in the report — stage 3's restrictive-policy mechanism reaches
+all eleven and has no exceptions.
+
+The lesson is sharper than "measure, don't assume": a grant count is as wrong an answer
+as a policy count, and reading two of the three terms produced an alarm that the third
+dissolved.
+
+**0.9 — eight keys to `auth.users`, and two of them stop the CSV path (D131).**
+
+| constraint | table | column |
+|---|---|---|
+| `erp_sync_runs_triggered_by_user_id_fkey` | `ingest_runs` | `triggered_by_user_id` |
+| `erp_sync_runs_applied_by_user_id_fkey` | `ingest_runs` | `applied_by_user_id` |
+| `experiments_created_by_fkey` | `experiments` | `created_by` |
+| `policy_presets_owner_id_fkey` | `policy_presets` | `owner_id` |
+| `project_erp_links_linked_by_user_id_fkey` | `project_erp_links` | `linked_by_user_id` |
+| `recovery_playbooks_created_by_fkey` | `recovery_playbooks` | `created_by` |
+| `scenarios_created_by_fkey` | `scenarios` | `created_by` |
+| `simulation_runs_created_by_fkey` | `simulation_runs` | `created_by` |
+
+**The run is RED and that is the finding, not a failure of the instrument.**
+`ingest_land_file` must name its uploader and writes that uploader into a column keyed
+to a table no approved user is in, so publishing `ingest-file` would turn every upload
+into a foreign-key error — a precondition now written into WP 6.5 (a) with the two
+`DROP CONSTRAINT` statements. It is LATENT: the function is not deployed, so nothing
+reaches the path today. §15 stays red until the keys go, deliberately.
+
+**Eight against the artifact's nine is D132**: `policy_versions_created_by_fkey` was
+dropped in June and `contract:introspect` did not follow the DROP, so the repository
+believes in a key production does not have — the mirror of D53, where production had
+nine keys the rehearsals silently skipped.
 
 
 **Run it with `npm run verify:sql`** — do not paste it into a SQL editor. The
@@ -15293,3 +15372,101 @@ fails the run if it is real, and the fix has a pattern: the June migration.
   PR. It is not this package's to fix, but it is this package's to record: two agents
   numbering §4 independently is a `single-source` (I1) failure that R16 catches only
   after the merge, and nothing reserves a range in advance.
+
+### WP 7.1 (stage 0, second read) — the third term, and a latent blocker under WP 6.5 (a) · 2026-09-19 · no migration
+
+**What the previous slice promised.** That probes 0.8 and 0.9 would settle stage 4's
+worklist and say whether WP 6.5 (a) has a blocker, and that nothing downstream should
+be written until they landed. Run `35467412134` answered both. It is **RED**, on
+purpose, and the redness is the finding.
+
+#### A · THE PREVIOUS SLICE'S OWN §4 ROW WAS AN OVERSTATEMENT — D129, CORRECTED
+
+D129 was written an hour before this probe ran and it read the alarm rather than the
+answer. Probe 0.8 intersected all three terms:
+
+| grant × RLS × policy | tables |
+|---|---|
+| RLS on, a write policy that refuses nothing | **11** |
+| RLS on, every write policy has a predicate | 46 |
+| RLS on, NO write policy — denied today | 23 |
+| view (grant only) | 6 |
+| **RLS OFF** | **0** |
+
+- **The exposure is eleven tables**, not 86 and not 16. §14's seven were seven of those
+  eleven, missing the four tier-2 masters (`customers`, `materials`, `products`,
+  `suppliers`): an undercount of four.
+- **`audit_logs` is in the denied-today group.** The grant exists and RLS refuses every
+  write for want of a permissive policy. D129's sharpest sentence — the table every
+  `audit-actor` claim rests on being writable by the browser's role — was wrong, and it
+  is struck in that row rather than quietly softened.
+- **No table has RLS off**, so stage 3's mechanism has no exceptions. That is the best
+  line in the report.
+
+The general lesson is the one this plan keeps relearning at a new grain: a grant count
+is as wrong an answer as a policy count. Reading two of three terms produced an alarm
+the third dissolved — and the row that carried the alarm existed for an hour, which is
+the first time §4 has corrected itself inside one session.
+
+#### B · WP 6.5 (a) HAS A HARD PRECONDITION — D131
+
+Three facts, each correct alone, that cannot all hold:
+
+1. `ingest_land_file` RAISES `null_value_not_allowed` when `_actor_user_id` is NULL,
+   deliberately, with `audit-actor` named in the message.
+2. It writes that actor into `ingest_runs.triggered_by_user_id`, and `ingest_apply_run`
+   into `applied_by_user_id`. Both still key to `auth.users`, under the pre-rename
+   names `erp_sync_runs_*_fkey` — written in `20260829120000`, when the actor was
+   expected to be a Supabase Auth user.
+3. `auth.users` holds 1 row, `approved_users` 14, overlap 0.
+
+So the function can pass neither NULL nor a real uploader, and **every CSV landing by a
+real user would abort**. It is LATENT — `ingest-file` is not deployed (D123) — which is
+exactly why it was findable before it cost anybody anything.
+
+**What hid it is the fixtures.** `050`, `060`, `070`, `080`, `090`, `100`, `110` and
+`120` each INSERT their actor into `auth.users` before acting, so every rehearsal proves
+the landing against a world where `approved_users.id ∈ auth.users.id` — which production
+has never been. That is the sharpest instance yet of a fixture establishing the premise
+its own assertion needs, and it is a different failure from D50's: the fixture is not
+wrong, it is UNREPRESENTATIVE, and nothing compares a fixture's premises to production's.
+
+The remedy is two `DROP CONSTRAINT` statements, written into WP 6.5 (a) verbatim, with
+the June migration as precedent. `ingest_files.uploaded_by` was keyed to
+`approved_users` from the start, which is why the file half never failed.
+
+#### C · THE ARTIFACT BELIEVES IN A KEY PRODUCTION DROPPED — D132
+
+Eight keys against the artifact's nine. The difference is
+`policy_versions_created_by_fkey`, dropped in June by
+`20260613000001_fix_snapshot_created_by.sql`; the FK was declared inline, the DROP names
+PostgreSQL's implicit constraint name, and `contract:introspect` does not connect the
+two. It is D53's mirror — there, production held nine keys the rehearsals silently
+skipped — and it joins D99's list of the introspector's blind spots under this package,
+rather than the WP 7.2 the first draft invented. **R8 caught that invention**: an owner
+the document does not have is not an owner, which is the rule working on the same day it
+was last quoted.
+
+#### D · WHAT IS STILL NOT DONE
+
+Stages 1–6 remain unstarted. The full-go authorisation stands; what stage 0 produced is
+that stage 1's shape changed (D130: no identity to attach to, 16 `anon`-only policies to
+widen first) and stage 4's list is now eleven measured tables rather than seven inferred
+ones. Writing either against the old numbers would have been writing against a guess,
+which is the whole argument for a read-only stage existing.
+
+#### E · THE GAP CHECK
+
+- **§15 is red until WP 6.5 (a) drops the two keys.** That is intended, and it is the
+  first standing red in this instrument's history — worth watching, because a gate that
+  stays red teaches people to ignore it. If WP 6.5 (a) slips more than a package, the
+  drop should be lifted out of it and taken on its own.
+- **Nothing compares a rehearsal fixture's premises to production's** (D131's cause).
+  Eight files establish `approved_users.id ∈ auth.users.id` and production never has.
+  A rule is imaginable — a fixture that INSERTs into `auth.users` must say why, and §15
+  must agree — but it is not written, and inventing it inside a read-only stage would be
+  the third scope widening in two slices. Stated, not taken.
+- **D129 corrected itself within the hour, and only because the next probe was written.**
+  Had stage 0 stopped at seven probes, the twelve-fold error and the `audit_logs` alarm
+  would both have entered the plan as facts. The instruction that produced the
+  correction is the one worth keeping: read your own output before you believe it.

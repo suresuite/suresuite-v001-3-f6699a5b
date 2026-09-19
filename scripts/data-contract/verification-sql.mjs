@@ -1357,7 +1357,7 @@ async function wp71Stage0() {
 
   // 9 · THE IDENTITY SPLIT, from `pg_constraint` rather than from the artifact.
   //
-  // `build/schema.introspected.json` records ten columns as `REFERENCES auth.users(id)`
+  // `build/schema.introspected.json` records nine columns as `REFERENCES auth.users(id)`
   // — and at least one of them is WRONG: `20260613000001_fix_snapshot_created_by.sql`
   // DROPPED `policy_versions_created_by_fkey` in June, for exactly the reason 0.5 just
   // measured. Its header is the clearest statement of this problem in the repository:
@@ -1390,7 +1390,7 @@ async function wp71Stage0() {
   report("stage 0.9 — which foreign keys to `auth.users` production STILL has", authFks, (rows) => {
     out(...table(rows));
     out(
-      `- **${rows.length} key(s)**, against **10 columns** the introspected artifact records.`,
+      `- **${rows.length} key(s)**, against **9 columns** the introspected artifact records (D132).`,
       "  A difference is a defect in the artifact, not in the database (D49/D52's class):",
       "  a constraint dropped by a later `ALTER TABLE` that the introspector did not",
       "  follow, and therefore a foreign key this repository believes in and production",
@@ -1409,9 +1409,13 @@ async function wp71Stage0() {
       gateFailures.push(
         "`ingest_runs` still carries a foreign key to `auth.users` while 0 of the " +
           "approved users exist there, and `ingest_land_file` both requires a non-NULL " +
-          "actor and writes it into that column: the CSV landing path cannot run in " +
-          "production. WP 6.5 (a) must drop the key (the pattern is " +
-          "`20260613000001_fix_snapshot_created_by.sql`) before publishing `ingest-file`.",
+          "actor and writes it into that column, so the CSV landing path cannot run in " +
+          "production (PLAN.md §4 D131). It is LATENT, not an outage: `ingest-file` is " +
+          "not deployed (D123), so nothing reaches the path today. This run is red " +
+          "because WP 6.5 (a) publishes that function, and publishing it over these two " +
+          "keys turns every upload into a foreign-key error — drop them first, the " +
+          "pattern being `20260613000001_fix_snapshot_created_by.sql`. Red until then, " +
+          "deliberately.",
       );
     } else {
       out(
