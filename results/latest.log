@@ -1,0 +1,14 @@
+run_id: 35468693463  outcome: failure
+trigger: push  ref: main  sha: b98356b5352648a704f46c71c1b2a40ff6faee53
+──────────────────────────────────────
+Connecting to remote database...
+Do you want to push these migrations to the remote database?
+ • 20260919000001_one_node_classifier.sql
+ • 20260919000002_graph_nodes_read_path.sql
+ [Y/n] 
+Applying migration 20260919000001_one_node_classifier.sql...
+ERROR: duplicate key value violates unique constraint "schema_migrations_pkey" (SQLSTATE 23505)
+Key (version)=(20260919000001) already exists.
+At statement: 34
+INSERT INTO supabase_migrations.schema_migrations(version, name, statements) VALUES($1, $2, $3)
+Try rerunning the command with --debug to troubleshoot the error.
