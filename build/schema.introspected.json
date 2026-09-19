@@ -21577,7 +21577,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": "WP 8.1 · §4 D128. Replaces `auto_refresh_node_list_on_scd_change`, whose body ",
+      "comment": "WP 8.1 · §4 D135. Replaces `auto_refresh_node_list_on_scd_change`, whose body ",
       "defined_by": "20260919000001_one_node_classifier.sql"
     },
     {
@@ -21587,7 +21587,7 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": "DEAD as of WP 8.1 — §4 D128. Read NEW/OLD in a STATEMENT-level trigger, so the ",
+      "comment": "DEAD as of WP 8.1 — §4 D135. Read NEW/OLD in a STATEMENT-level trigger, so the ",
       "defined_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
     },
     {
@@ -21896,7 +21896,7 @@
       "returns": "text LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
-      "comment": "WP 8.1 · §4 D112. THE node classifier. Every other one in this repository is ",
+      "comment": "WP 8.1 · §4 D119. THE node classifier. Every other one in this repository is ",
       "defined_by": "20260919000001_one_node_classifier.sql"
     },
     {
@@ -21909,7 +21909,7 @@
       "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": "STABLE",
-      "comment": "WP 8.1 · §4 D112. The LEGACY four-value vocabulary, now DERIVED from ",
+      "comment": "WP 8.1 · §4 D119. The LEGACY four-value vocabulary, now DERIVED from ",
       "defined_by": "20260919000001_one_node_classifier.sql"
     },
     {
@@ -22692,7 +22692,7 @@
       "returns": "TABLE( node_id text, echelon text, node_type text, bom_depth integer, supply_tier integer, plant_name text, label text, location_text text, longitude numeric, latitude numeric )",
       "security_definer": true,
       "volatility": "STABLE",
-      "comment": "WP 8.3 · §4 D112. The read path for `node_list.echelon` / `bom_depth` / ",
+      "comment": "WP 8.3 · §4 D119. The read path for `node_list.echelon` / `bom_depth` / ",
       "defined_by": "20260919000002_graph_nodes_read_path.sql"
     },
     {
@@ -23623,7 +23623,7 @@
       "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": "WP 8.1 · §4 D117, D66. The node-set discovery, reading BOTH edge tables and ",
+      "comment": "WP 8.1 · §4 D124, D66. The node-set discovery, reading BOTH edge tables and ",
       "defined_by": "20260919000001_one_node_classifier.sql"
     },
     {
@@ -23858,7 +23858,7 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
-      "comment": "WP 8.1 · §4 D112, D117. Rebuilds the typed node projection from BOTH edge ",
+      "comment": "WP 8.1 · §4 D119, D124. Rebuilds the typed node projection from BOTH edge ",
       "defined_by": "20260919000001_one_node_classifier.sql"
     },
     {

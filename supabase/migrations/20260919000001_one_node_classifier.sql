@@ -1,6 +1,6 @@
 -- Phase 8 / WP 8.1 / §2.3 G1 — ONE CLASSIFIER, AND TWO HONEST COLUMNS.
 --
--- §4 D112: a node's TYPE is authored eight times — once in SQL, four times across
+-- §4 D119: a node's TYPE is authored eight times — once in SQL, four times across
 -- the network pages, once in the map component, once in the engine — and the eight
 -- disagree BY CONSTRUCTION, because none of them reads a type. There is no type
 -- column on either edge table, and `supply_chain_data.from_location`'s own sidecar
@@ -29,7 +29,7 @@
 --
 -- Either column may be NULL, and NULL means UNKNOWN rather than zero. That is WP
 -- 4.4's third-state lesson applied before it can be got wrong: `unknown` is not
--- `stale`, and a depth nobody knows is not a depth of 0 (§4 D119 is exactly what
+-- `stale`, and a depth nobody knows is not a depth of 0 (§4 D126 is exactly what
 -- answering it with 0 produces — the ladder calls 0 a product).
 --
 -- ── WHAT THIS FILE DELIBERATELY DOES NOT DO ────────────────────────────────
@@ -41,7 +41,7 @@
 --     one rule rather than a second copy of it — one rule, two vocabularies, and
 --     the legacy one is derived from the new one instead of living beside it.
 --   * It does not touch `supply_chain_data_multi_tier.level`. Two live writers
---     disagree about what that column means (§4 D125) and choosing between them is
+--     disagree about what that column means (§4 D132) and choosing between them is
 --     WP 8.2's first act, not a side effect of this file.
 --   * It adds NO column to `graph_hash`. `node_list` is in
 --     `graphHashCoverage.test.ts`'s `STILL_WHOLLY_OUT` and these three columns are
@@ -90,23 +90,23 @@ BEGIN
 END $$;
 
 COMMENT ON COLUMN public.node_list.echelon IS
-  'WP 8.1 · §4 D112. The node''s ROLE in the supply chain, derived once by '
+  'WP 8.1 · §4 D119. The node''s ROLE in the supply chain, derived once by '
   '`classify_node_echelon` and read rather than re-inferred. NULL means never '
   'derived; ''unknown'' means derived and unplaceable. Replaces the overloaded '
   '`node_type`, which cannot express ''subassembly'' — §15 run 35433474185 found '
   '65 nodes that are both a BOM material and a BOM source on one project alone.';
 
 COMMENT ON COLUMN public.node_list.bom_depth IS
-  'WP 8.1 · §4 D112. Depth in the BOM tree, from `bom_multi_level.level` — the '
+  'WP 8.1 · §4 D119. Depth in the BOM tree, from `bom_multi_level.level` — the '
   'table that owns the measurement — and NULL for a node that is in no BOM. This '
   'is what `supply_chain_data_multi_tier.level` actually holds on the bom lane, '
   'under a name that says so.';
 
 COMMENT ON COLUMN public.node_list.supply_tier IS
-  'WP 8.1 · §4 D112. Tiers upstream of the focal plant: 0 the plant, 1 a direct '
+  'WP 8.1 · §4 D119. Tiers upstream of the focal plant: 0 the plant, 1 a direct '
   'supplier, 2 and 3 from `tier2_suppliers`/`tier3_suppliers`. NULL when unknown, '
   'which includes every material, product and customer — they are not upstream '
-  'suppliers, and reporting 0 for them would be the D119 substitution again. This '
+  'suppliers, and reporting 0 for them would be the D126 substitution again. This '
   'is what `supply_chain_data_multi_tier.level`''s contract CLAIMED to be.';
 
 -- ── 2 · the one rule ───────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ COMMENT ON COLUMN public.node_list.supply_tier IS
 -- Reads BOTH edge tables, which the old classifier did not: `rebuild_node_list`
 -- derived `node_list` from `supply_chain_data` alone, so the deep-tier half of the
 -- graph — the half the Process-level page renders — was outside the only typed
--- projection in the repository. §15 measured 104 such nodes (§4 D117).
+-- projection in the repository. §15 measured 104 such nodes (§4 D124).
 --
 -- THE PRIORITY ORDER IS THE RULE AND IT IS DETERMINISTIC. A node can hold several
 -- lane roles at once (§15: 65 do), and "whichever we noticed last" is what four of
@@ -214,10 +214,10 @@ END;
 $function$;
 
 COMMENT ON FUNCTION public.classify_node_echelon(uuid, text) IS
-  'WP 8.1 · §4 D112. THE node classifier. Every other one in this repository is '
+  'WP 8.1 · §4 D119. THE node classifier. Every other one in this repository is '
   'either derived from it (`classify_node_type`) or is being deleted by WP 8.3. '
   'Reads both edge tables — the old rule read `supply_chain_data` only, which left '
-  '104 deep-tier nodes untyped (§4 D117).';
+  '104 deep-tier nodes untyped (§4 D124).';
 
 -- ── 3 · the legacy vocabulary, DERIVED rather than copied ──────────────────
 --
@@ -249,7 +249,7 @@ AS $function$
 $function$;
 
 COMMENT ON FUNCTION public.classify_node_type(uuid, text) IS
-  'WP 8.1 · §4 D112. The LEGACY four-value vocabulary, now DERIVED from '
+  'WP 8.1 · §4 D119. The LEGACY four-value vocabulary, now DERIVED from '
   '`classify_node_echelon` rather than implementing a second priority order beside '
   'it. Kept because `MapView` reads `node_list.node_type` today. `subassembly` maps '
   'to `material`: the old order answered `product` for those 65 nodes, which told '
@@ -265,7 +265,7 @@ SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
   -- From `bom_multi_level`, which OWNS the depth — not from
-  -- `supply_chain_data_multi_tier.level`, which two writers disagree about (D125)
+  -- `supply_chain_data_multi_tier.level`, which two writers disagree about (D132)
   -- and one of which discards this very value for a literal 2.
   --
   -- MIN, not MAX: a material used by two assemblies at different depths has more
@@ -290,7 +290,7 @@ AS $function$
   -- What `supply_chain_data_multi_tier.level`'s contract CLAIMED to be, derived
   -- from the tables that actually state it. NULL for anything that is not an
   -- upstream supplier, because a material has no supplier tier and answering 0
-  -- would be D119's substitution wearing a different column name.
+  -- would be D126's substitution wearing a different column name.
   --
   -- MIN across the sources: a firm that supplies the plant directly AND appears as
   -- someone's upstream supplier sits at both, and "tiers upstream" means the
@@ -320,13 +320,13 @@ $function$;
 --
 -- `rebuild_node_list`'s node set came from `supply_chain_data` only, so the
 -- deep-tier half of the graph had no row in the only typed projection this
--- repository has (§4 D117, 104 nodes). Widening the CTE is the easy half.
+-- repository has (§4 D124, 104 nodes). Widening the CTE is the easy half.
 --
 -- THE HARD HALF WAS FOUND BY EXECUTION, NOT BY READING, and it is what the
 -- rehearsal is for. `rebuild_node_list` AUTHORIZES: it refuses unless the current
 -- user is the project's modeler or an admin, in the same organization. That was
 -- harmless while the refresh ran only from the `projects.completed` trigger and
--- from explicit client calls. The moment D128's fix makes the LANE trigger fire
+-- from explicit client calls. The moment D135's fix makes the LANE trigger fire
 -- for real, the refresh runs inside somebody else's INSERT — and
 -- `rehearsal/090` and `110` both went RED with `forbidden`, raised from a
 -- derivation nobody asked to authorize.
@@ -398,7 +398,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.node_list_discover(uuid, text, uuid) IS
-  'WP 8.1 · §4 D117, D66. The node-set discovery, reading BOTH edge tables and '
+  'WP 8.1 · §4 D124, D66. The node-set discovery, reading BOTH edge tables and '
   'carrying NO authorization: a derivation is not a decision, and re-deciding one '
   'inside a trigger can only refuse a writer the database already allowed '
   '(rehearsal/090 and /110 proved it by going red). `rebuild_node_list` keeps the '
@@ -498,7 +498,7 @@ END;
 $function$;
 
 COMMENT ON FUNCTION public.refresh_node_list_for_project(uuid, uuid) IS
-  'WP 8.1 · §4 D112, D117. Rebuilds the typed node projection from BOTH edge '
+  'WP 8.1 · §4 D119, D124. Rebuilds the typed node projection from BOTH edge '
   'tables and writes `echelon`, `bom_depth` and `supply_tier` beside the legacy '
   '`node_type`/`node_group`, which are now derived from the same single rule.';
 
@@ -512,7 +512,7 @@ AS $function$
   SELECT public.refresh_node_list_for_project(p_project_id, NULL::uuid);
 $function$;
 
--- ── 7 · BOTH lane triggers, AND D128: the one that exists has never fired ──
+-- ── 7 · BOTH lane triggers, AND D135: the one that exists has never fired ──
 --
 -- `trg_scd_auto_refresh_node_list` has watched `supply_chain_data` FOR EACH
 -- STATEMENT since 2025-08-29, and **it has never refreshed anything.** Its body is
@@ -523,9 +523,9 @@ $function$;
 -- a statement trigger with that body raises `NOTICE pid=<NULL>` on a real
 -- PostgreSQL 16 (§16 · WP 8.1).
 --
--- That is **§4 D128**, and it is D80's shape exactly: a whole mechanism whose
+-- That is **§4 D135**, and it is D80's shape exactly: a whole mechanism whose
 -- failure has no symptom, because a refresh that does not happen looks like a
--- graph that has not changed. It is also the other half of the answer to D117 —
+-- graph that has not changed. It is also the other half of the answer to D124 —
 -- `node_list` is refreshed ONLY by the `projects.completed` row-level trigger and
 -- by a one-off backfill loop from 2025-08-31, which is why §15 found 242
 -- `node_list` rows against 294 graph nodes on the project a user reported.
@@ -559,7 +559,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.auto_refresh_node_list_on_lane_change() IS
-  'WP 8.1 · §4 D128. Replaces `auto_refresh_node_list_on_scd_change`, whose body '
+  'WP 8.1 · §4 D135. Replaces `auto_refresh_node_list_on_scd_change`, whose body '
   'read NEW/OLD in a STATEMENT-level trigger — both unassigned, so the project id '
   'was always NULL and the refresh never ran once since 2025-08-29. Reads the '
   'transition table instead, which is what a statement-level trigger actually has.';
@@ -592,7 +592,7 @@ AFTER DELETE ON public.supply_chain_data
 REFERENCING OLD TABLE AS changed_rows
 FOR EACH STATEMENT EXECUTE FUNCTION public.auto_refresh_node_list_on_lane_change();
 
--- `supply_chain_data_multi_tier` — the lane nothing has ever watched (D117).
+-- `supply_chain_data_multi_tier` — the lane nothing has ever watched (D124).
 DROP TRIGGER IF EXISTS trg_scdmt_auto_refresh_node_list_ins ON public.supply_chain_data_multi_tier;
 CREATE TRIGGER trg_scdmt_auto_refresh_node_list_ins
 AFTER INSERT ON public.supply_chain_data_multi_tier
@@ -617,7 +617,7 @@ FOR EACH STATEMENT EXECUTE FUNCTION public.auto_refresh_node_list_on_lane_change
 -- silently resurrects. Its comment says it is dead so a reader does not wire it
 -- back up.
 COMMENT ON FUNCTION public.auto_refresh_node_list_on_scd_change() IS
-  'DEAD as of WP 8.1 — §4 D128. Read NEW/OLD in a STATEMENT-level trigger, so the '
+  'DEAD as of WP 8.1 — §4 D135. Read NEW/OLD in a STATEMENT-level trigger, so the '
   'project id was always NULL and this function never refreshed anything between '
   '2025-08-29 and WP 8.1. Replaced by `auto_refresh_node_list_on_lane_change`, '
   'which reads a transition table. Do not attach it to a trigger again.';
@@ -632,7 +632,7 @@ COMMENT ON FUNCTION public.auto_refresh_node_list_on_scd_change() IS
 --
 -- `node_type` and `node_group` are RE-derived too, which moves the 65
 -- subassemblies from `product` to `material`. That is the one value this file
--- changes, and §4 D112's row says why.
+-- changes, and §4 D119's row says why.
 UPDATE public.node_list nl
 SET echelon     = e.echelon,
     node_type   = CASE e.echelon WHEN 'subassembly' THEN 'material' ELSE e.echelon END,

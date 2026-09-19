@@ -176,7 +176,7 @@ const CASES: Array<{ name: string; query: string }> = [
   { name: 'min flow above every arc', query: 'PROD-1 minFlow:1000' },
   { name: 'level range', query: 'MAT-1 level:0..3' },
   { name: 'level range excluding the root', query: 'MAT-1 level:4..6' },
-  { name: 'terminals on — the flag that is inverted (D129)', query: 'MAT-1 includeTerminals:on' },
+  { name: 'terminals on — the flag that is inverted (D136)', query: 'MAT-1 includeTerminals:on' },
   { name: 'terminals on, upstream', query: 'PROD-1 dir:up includeTerminals:on' },
   { name: 'custom stopUp', query: 'PROD-1 dir:up stopUp:3,4 includeTerminals:on' },
   { name: 'custom stopDown', query: 'SUP-1 dir:down stopDown:0 includeTerminals:on' },
@@ -239,7 +239,7 @@ describe('parseAdvancedQuery', () => {
   });
 });
 
-describe('D129 — includeTerminals is inverted, and the fix is opt-in', () => {
+describe('D136 — includeTerminals is inverted, and the fix is opt-in', () => {
   it('the default does NOT stop at a terminal level, which is the defect', () => {
     // `stopUp` defaults to [5, 6]. Walking up from PROD-1 should stop at the
     // suppliers; with the original's inverted guard it walks straight past them,

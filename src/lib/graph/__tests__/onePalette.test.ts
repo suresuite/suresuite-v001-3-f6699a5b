@@ -1,5 +1,5 @@
 /**
- * ONE PALETTE — Phase 8 / WP 8.3 / §4 D112.
+ * ONE PALETTE — Phase 8 / WP 8.3 / §4 D119.
  *
  * Five palettes drew the same supply chain in four pages and a map component, and
  * they agreed on nothing: the same firm was green on one screen, blue on another,
@@ -46,7 +46,7 @@ describe('one palette — the ratchet', () => {
         actual,
         `${path} holds ${actual} colour literal(s), baseline ${expected}. Colour encodes ` +
           `the echelon and there is one palette: import \`colorForEchelon\` from ` +
-          `\`@/lib/graph\`. §4 D112 is what five palettes cost.`,
+          `\`@/lib/graph\`. §4 D119 is what five palettes cost.`,
       ).toBeLessThanOrEqual(expected);
     });
 

@@ -21,6 +21,8 @@
 //   R9  `governance.audited` matches the audit triggers the migrations create
 //   R10 §17's sequencing table agrees with §7–§13's ✅ markers (WP 3.3)
 //   R11 every DEFERRED table says whether it is audited, and is right (D54, WP 4.2)
+//   R13 §4's defect ids are UNIQUE, and §16 has exactly one Sequencing section
+//       (WP 8.0 — both were broken by a MERGE, not by an edit)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -844,6 +846,64 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
     if (!failures.some((f) => f.startsWith("R10"))) {
       console.log(`  R10 §17 agrees with §7–§13 · ${done.size} done package(s) cross-checked`);
     }
+  }
+}
+
+// ───────── R13: A DEFECT ID IS A NAME, AND TWO DEFECTS CANNOT SHARE ONE
+//
+// THE FAILURE THIS CATCHES CANNOT BE MADE BY AN EDIT, WHICH IS WHY NOTHING SAW IT.
+// Two branches each opened the next free §4 id in good faith — one shipped D112–D118
+// for the documentation defects it found, the other D112–D118 for the graph layer's
+// — and `git merge` produced a §4 with SEVEN duplicated ids and no conflict marker,
+// because the two sets of rows never touched the same lines.
+//
+// A duplicated id is worse than a missing one. Every rule in this repository that
+// resolves a defect — R6's citations, R8's owners, CLAUDE.md's invariant table, the
+// generated manual, and every `§4 D112` in a migration header — silently picks
+// whichever row it finds first. That is D104's class (a citation that became
+// ambiguous when a page was renamed) arriving through a merge instead of a rename,
+// and it makes every reference to the colliding number a coin toss.
+//
+// The second half is the same story in the same commit: the merge produced TWO
+// `## 17. Sequencing` headings, because one branch had moved the section to the end
+// and the other had edited it in place. `section16()` slices from `## 16.` to the
+// FIRST `## 17.`, so twenty-two drift-log entries fell outside §16 again — D142
+// exactly, reintroduced by a merge after being closed by an edit.
+{
+  const planText = readFileSync(PLAN, "utf8");
+
+  const s4start = planText.indexOf("\n## 4. ");
+  const s4end = planText.indexOf("\n### 4.1 ");
+  const section4 = s4start < 0 ? "" : planText.slice(s4start, s4end < 0 ? undefined : s4end);
+
+  const seen = new Map();   // id -> how many rows carry it
+  for (const line of section4.split("\n")) {
+    const m = line.match(/^\|\s*\*{0,2}(D[0-9]+)\*{0,2}\s*\|/);
+    if (!m) continue;
+    seen.set(m[1], (seen.get(m[1]) ?? 0) + 1);
+  }
+  const dupes = [...seen.entries()].filter(([, n]) => n > 1).map(([id]) => id);
+  if (dupes.length) {
+    fail("R13", `§4 gives ${dupes.length} id(s) to more than one defect: ${dupes.join(", ")}. ` +
+                "Two branches opened the same next-free number and the merge produced no conflict, " +
+                "because the rows never touched the same lines. Every rule that resolves a defect " +
+                "silently picks the first match — renumber one set, contiguously, above the other.");
+  }
+
+  // Headings that must appear EXACTLY ONCE, because a slice keyed on the first
+  // occurrence is a slice that quietly loses everything after the second.
+  const singletons = ["## 4. ", "## 16. ", "## 17. Sequencing"];
+  for (const heading of singletons) {
+    const count = planText.split("\n").filter((l) => l.startsWith(heading.trim())).length;
+    if (count !== 1) {
+      fail("R13", `PLAN.md has ${count} "${heading.trim()}" heading(s) and must have exactly 1. ` +
+                  "`section16()` and §4's own slice key on the FIRST occurrence, so a duplicate " +
+                  "silently drops everything between the second one and the end of the section.");
+    }
+  }
+
+  if (!failures.some((f) => f.startsWith("R13"))) {
+    console.log(`  R13 §4 ids are unique · ${seen.size} defect(s), no id shared, no duplicated section heading`);
   }
 }
 

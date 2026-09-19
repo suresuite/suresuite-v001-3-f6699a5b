@@ -1,5 +1,5 @@
 /**
- * The shared graph layer — Phase 8 / WP 8.3 / §4 D112.
+ * The shared graph layer — Phase 8 / WP 8.3 / §4 D119.
  *
  * One vocabulary, one palette, one set of encodings, one subgraph engine and one
  * focus walk, for every page that draws a supply network. Before this module there

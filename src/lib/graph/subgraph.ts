@@ -17,13 +17,13 @@
  *
  * REPRODUCED DEFECTS, each named so the fix is a decision and not a discovery:
  *
- *   §4 D129 — `includeTerminals` is INVERTED. The traversal stops at a terminal
+ *   §4 D136 — `includeTerminals` is INVERTED. The traversal stops at a terminal
  *             level only `if (includeTerminals)`, so the default (`false`) does
  *             NOT stop and the whole `stopUp` / `stopDown` mechanism is inert
  *             unless the user opts into the flag whose name says the opposite.
  *             Guarded by `respectTerminals` below, default `false` = today's
  *             behaviour.
- *   §4 D130 — `traverse`'s `maxHops` parameter is never read; the body uses
+ *   §4 D137 — `traverse`'s `maxHops` parameter is never read; the body uses
  *             `params.hops` directly. Harmless today because both call sites pass
  *             the same value, and it is kept so the shapes match.
  *
@@ -37,9 +37,9 @@ export interface QueryParams {
   searchTerm: string;
   dir: 'both' | 'up' | 'down';
   hops: number | 'infinity';
-  /** Levels at which an UPSTREAM walk stops. See D129: inert by default. */
+  /** Levels at which an UPSTREAM walk stops. See D136: inert by default. */
   stopUp: number[];
-  /** Levels at which a DOWNSTREAM walk stops. See D129: inert by default. */
+  /** Levels at which a DOWNSTREAM walk stops. See D136: inert by default. */
   stopDown: number[];
   minFlow: number;
   levelRange: { min: number; max: number } | null;
@@ -119,7 +119,7 @@ export interface ExtractOptions {
   /**
    * `true` makes `stopUp`/`stopDown` do what their names say. Default `false`,
    * which is the ORIGINAL behaviour and therefore what the parity test asserts.
-   * §4 D129 owns flipping it; a caller may opt in today.
+   * §4 D136 owns flipping it; a caller may opt in today.
    */
   respectTerminals?: boolean;
 }
@@ -184,7 +184,7 @@ export function extractSubgraph<N extends SubgraphNode, E extends Pick<GraphEdge
       const currentNode = byId.get(nodeId);
       if (!currentNode) continue;
 
-      // D129 lives here. The original stops only when `includeTerminals` is TRUE,
+      // D136 lives here. The original stops only when `includeTerminals` is TRUE,
       // which is backwards; `respectTerminals` lets a caller ask for the sane
       // reading without changing what the parity test measures.
       const currentLevel = currentNode.level;

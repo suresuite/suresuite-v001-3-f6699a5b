@@ -5,19 +5,19 @@
 --
 --   §1  a node holding several lane roles resolves to exactly ONE echelon, and the
 --       same one every time — the property the eight render-time classifiers do not
---       have (§4 D112). `ProductLevelNetwork`'s answer for such a node depends on
+--       have (§4 D119). `ProductLevelNetwork`'s answer for such a node depends on
 --       which row it read last, and no amount of reading the function says whether
 --       the SQL rule is deterministic; running it twice over a shuffled table does.
 --   §2  a node that is BOTH a BOM target and a BOM source is `subassembly` — the
 --       value the old classifier had no word for, so it answered `product` for the
 --       65 such nodes §15 found on one project (run 35433474185).
---   §3  the deep-tier lane is in the projection (§4 D117): a node that exists ONLY
+--   §3  the deep-tier lane is in the projection (§4 D124): a node that exists ONLY
 --       in `supply_chain_data_multi_tier` gets a `node_list` row and an echelon.
 --   §4  `bom_depth` and `supply_tier` are INDEPENDENT and independently NULL — the
 --       whole point of splitting `level` in two. A material has a depth and no
 --       tier; a tier-2 supplier has a tier and no depth.
 --   §5  the refresh is idempotent, and the lane trigger actually FIRES — which is
---       §4 D128, a trigger that read NEW in a statement-level context and therefore
+--       §4 D135, a trigger that read NEW in a statement-level context and therefore
 --       did nothing at all between 2025-08-29 and this package.
 --
 -- MUTATIONS THAT MUST MAKE THIS FILE FAIL, each verified by making it:
@@ -25,7 +25,7 @@
 --     `classify_node_echelon` → §2 red (a subassembly reports `product`).
 --   * revert the CTE in `node_list_discover` to `supply_chain_data` only → §3 red.
 --   * make `node_supply_tier` return 0 instead of NULL for a non-supplier → §4 red,
---     which is §4 D119's substitution caught in a second column.
+--     which is §4 D126's substitution caught in a second column.
 --   * re-attach `auto_refresh_node_list_on_scd_change` → §5 red (no refresh). NOTE:
 --     performing this mutation ALSO found a defect in the migration itself — the
 --     three `supply_chain_data` triggers had no `DROP IF EXISTS`, so the file could
@@ -61,7 +61,7 @@ BEGIN
   -- The graph. `SUBASM` is deliberately BOTH a bom target and a bom source: the
   -- plant builds it from RAW and consumes it into PROD. `DUAL` is deliberately
   -- both an inbound source (a supplier) and a bom source (a material) — the exact
-  -- node §4 D112 says four classifiers answer four ways.
+  -- node §4 D119 says four classifiers answer four ways.
   INSERT INTO public.supply_chain_data
     (project_id, plant_name, data_source, from_location, to_location, weighted)
   VALUES
@@ -73,7 +73,7 @@ BEGIN
     (v_project, v_plant, 'inbound',  'DUAL',   'RAW',     1);
 
   -- The BOM, which is where `bom_depth` comes from — NOT from the lane's `level`,
-  -- which two live writers disagree about (§4 D125).
+  -- which two live writers disagree about (§4 D132).
   INSERT INTO public.bom_multi_level
     (project_id, plant_name, material_id, level, higher_level_component_id, consumption_rate)
   VALUES
@@ -129,7 +129,7 @@ BEGIN
     RAISE EXCEPTION 'WP 8.1 §2 — `classify_node_type` disagrees with the column it fills.';
   END IF;
 
-  -- ── 3 · the deep-tier lane is inside the projection (D117) ──────────────
+  -- ── 3 · the deep-tier lane is inside the projection (D124) ──────────────
   --
   -- `DEEPONLY` exists in `supply_chain_data_multi_tier` and NOWHERE else. Before
   -- this package it had no `node_list` row, so no page could read a type for it —
@@ -145,7 +145,7 @@ BEGIN
     RAISE EXCEPTION
       'WP 8.1 §3 — `DEEPONLY` exists only in the multi-tier lane and has % node_list '
       'row(s), expected 1. Either the discovery CTE reads one table again, or the '
-      'lane trigger did not fire (D117 / D128).', v_n;
+      'lane trigger did not fire (D124 / D135).', v_n;
   END IF;
   SELECT echelon INTO v_e FROM public.node_list
    WHERE project_id = v_project AND node_id = 'DEEPONLY';
@@ -158,7 +158,7 @@ BEGIN
   -- ── 4 · depth and tier are two measurements, independently NULL ─────────
   --
   -- This is the assertion the whole split exists for. If either column falls back
-  -- to 0 rather than staying NULL, §4 D119 has been rebuilt in a new column: an
+  -- to 0 rather than staying NULL, §4 D126 has been rebuilt in a new column: an
   -- unknown answered with a confident number.
   SELECT bom_depth, supply_tier INTO v_depth, v_tier
     FROM public.node_list WHERE project_id = v_project AND node_id = 'RAW';
@@ -168,7 +168,7 @@ BEGIN
   IF v_tier IS NOT NULL THEN
     RAISE EXCEPTION
       'WP 8.1 §4 — `RAW` is a material, not an upstream supplier, and reports '
-      'supply_tier % instead of NULL. An unknown answered with a number is D119.', v_tier;
+      'supply_tier % instead of NULL. An unknown answered with a number is D126.', v_tier;
   END IF;
 
   -- `SUP2` is asserted through the FUNCTION and not through `node_list`, and the
@@ -178,7 +178,7 @@ BEGIN
   -- graph today, `supply_tier` resolves to 0, 1 or NULL for every node that IS one,
   -- and 2/3 are reachable only for an upstream supplier that also appears in an
   -- edge table. Folding the deep-tier FIRM graph in is a different node universe
-  -- (`network_nodes.uid` against material ids is §4 D122) and is not this package's.
+  -- (`network_nodes.uid` against material ids is §4 D129) and is not this package's.
   SELECT public.node_supply_tier(v_project, 'SUP2') INTO v_tier;
   IF v_tier IS DISTINCT FROM 2 THEN
     RAISE EXCEPTION
@@ -219,7 +219,7 @@ BEGIN
       'expected 0.', v_depth;
   END IF;
 
-  -- ── 5 · idempotent, and the trigger that never fired now does (D128) ────
+  -- ── 5 · idempotent, and the trigger that never fired now does (D135) ────
   --
   -- The refresh runs a second time and nothing moves. Then a lane write with NO
   -- explicit refresh call must still reach `node_list` — which is the half that
@@ -243,7 +243,7 @@ BEGIN
   IF v_n <> 1 THEN
     RAISE EXCEPTION
       'WP 8.1 §5 — a `supply_chain_data` INSERT with no explicit refresh left `LATE` '
-      'out of the typed projection. The lane trigger is dead again — D128.';
+      'out of the typed projection. The lane trigger is dead again — D135.';
   END IF;
 
   -- And `SUP1`'s tier survives a refresh it was not the subject of.
@@ -256,7 +256,7 @@ BEGIN
   RAISE NOTICE
     'WP 8.1 · 230 — one classifier, deterministic; `subassembly` exists; the deep-tier '
     'lane is inside the projection; depth and tier are independently NULL; and the lane '
-    'trigger fires for the first time since 2025-08-29 (D128).';
+    'trigger fires for the first time since 2025-08-29 (D135).';
 END
 $wp81$;
 
@@ -316,7 +316,7 @@ BEGIN
   END IF;
 
   -- And `bom_depth` survives the trip, which is the column the reported project's
-  -- flattened `level` cannot provide (§4 D125).
+  -- flattened `level` cannot provide (§4 D132).
   SELECT bom_depth INTO v_n
     FROM public.get_graph_nodes(v_project, v_actor, 'wp81@example.invalid')
    WHERE node_id = 'RAW';
