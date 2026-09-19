@@ -5,7 +5,7 @@
 // listed here.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
-import { HowItLoads, SuppliedAndComputed, DatabaseRules } from "@/components/docs/tableRef";
+import { HowItLoads, SuppliedAndComputed, DatabaseRules, TemplateHeaders } from "@/components/docs/tableRef";
 import { refTable, computedColumns } from "@/components/docs/tableFacts";
 
 export default function NodeList() {
@@ -25,7 +25,7 @@ export default function NodeList() {
         </P>
         <P>
           Most of its rows are not typed by hand. They are refreshed from the chain you have already
-          uploaded, so a node appears here because an arc somewhere named it. You then add the parts
+          uploaded, so a node appears here because a lane somewhere named it. You then add the parts
           only you know: a description and a location.
         </P>
         <HowItLoads
@@ -66,6 +66,17 @@ export default function NodeList() {
           </p>
         </Callout>
       )}
+
+      <Section id="template" title="The file you upload">
+        <TemplateHeaders table={t} />
+        <P>
+          Export the node list you already have from{" "}
+          <AppLink to="/project-manager">Project Manager</AppLink>, fill in the description and
+          location columns, and upload the same file back under the Node List tab. The{" "}
+          <Term>node_id</Term> values are how a row finds the node it belongs to, so leave them
+          exactly as they came out.
+        </P>
+      </Section>
 
       <DatabaseRules table={t} />
 

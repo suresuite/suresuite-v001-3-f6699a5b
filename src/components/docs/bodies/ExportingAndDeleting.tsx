@@ -2,8 +2,10 @@
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
 import { COUNTS } from "@/components/docs/generated/dataModel.generated";
+import { PROJECT_DELETION } from "@/components/docs/generated/policy.generated";
 
 export default function ExportingAndDeleting() {
+  const d = PROJECT_DELETION;
   return (
     <>
       <PageTitle lead="Taking your data out, and having it removed.">
@@ -48,18 +50,76 @@ export default function ExportingAndDeleting() {
         </p>
       </Callout>
 
-      <Section id="deleting" title="Deleting">
+      <Section id="deleting" title="Deleting a project">
+        <Key>
+          Two mechanisms do it, and knowing which is which tells you what is actually gone.
+        </Key>
         <P>
-          Deleting a project removes it and what hangs off it. The relationships between tables are
-          declared in the database, so a deletion follows them rather than relying on anybody
-          remembering which tables were involved — which is exactly why those relationships are
-          documented per table rather than left implicit.
+          {d.projectScoped} tables hold rows belonging to a project. Deleting one removes them two
+          ways: <strong>{d.cascade}</strong> tables are wired to the project in the database and go
+          automatically, and a further <strong>{d.sweptOnly.length}</strong> are deleted by name by
+          the deletion itself, because they were created without that wiring.
         </P>
         <P>
           <DocLink to="all-tables">All tables</DocLink> shows, for every described table, what it
           points at and what happens to it when the thing it points at goes.
         </P>
       </Section>
+
+      {d.detached.length > 0 && (
+        <Callout title={`${d.detached.length} things are detached rather than deleted, on purpose`}>
+          <p>
+            Your conversation threads and your rendered files are not removed with the project. They
+            lose their link to it and remain yours — a report you rendered last month is still in
+            your file list after the project it described is gone.
+          </p>
+          <p>
+            That is the right behaviour for something you own personally, and it is worth knowing
+            before you delete a project expecting everything about it to disappear. Deleting those
+            is a separate act, on the file itself.
+          </p>
+        </Callout>
+      )}
+
+      {d.neither.length > 0 && (
+        <Callout tone="limit" title={`${d.neither.length} project-scoped tables are reached by neither mechanism`}>
+          <p>
+            They have no database wiring to the project and are not on the deletion's list, so{" "}
+            <strong>their rows survive the project</strong>. Nothing reads them afterwards — the
+            project they belong to is gone — but they are not removed.
+          </p>
+          <p>
+            Some are records that are <em>meant</em> to outlive a project: usage logs, API request
+            logs, assistant events. The rest are not, and they include{" "}
+            <Term>policy_defaults</Term> and <Term>policy_overrides</Term> — the decisions you
+            typed into the grid — as well as <Term>customers</Term>, the tier-2 and tier-3 supplier
+            uploads, and the network summary.
+          </p>
+          <p>
+            <strong>So “delete my project” is not today the same as “delete my data”.</strong> If
+            removal has to be complete — a contractual erasure rather than tidying a workspace —
+            raise it with whoever administers your organization and name this page, rather than
+            assuming the button was sufficient. We would rather tell you than let you rely on it.
+          </p>
+        </Callout>
+      )}
+
+      {d.asynchronous && (
+        <Callout tone="limit" title="Deletion is confirmed before it has happened">
+          <p>
+            The screen reports success as soon as the deletion <em>starts</em>. The work then runs in
+            the background in batches, and if it fails part way through{" "}
+            <strong>nothing tells you</strong> — the failure is recorded in the server's own logs
+            and the message you already saw said it worked.
+          </p>
+          <p>
+            In practice a partly deleted project shows up as a project that has disappeared from
+            your list with rows left behind it. If you have reason to need a deletion verified
+            rather than assumed, that is an administrator's check today, not something this screen
+            can answer.
+          </p>
+        </Callout>
+      )}
 
       <Callout tone="limit" title="What a deletion does not reach">
         <p>
@@ -85,7 +145,7 @@ export default function ExportingAndDeleting() {
         </P>
       </Section>
 
-      <Provenance from="the data contract's table count and the foreign keys it records for each table" />
+      <Provenance from="the data contract's table count, the project foreign keys the introspected schema records for every project-scoped table, and the delete-project function's own table list — the two joined, which is the only way the gap between them is visible" />
     </>
   );
 }

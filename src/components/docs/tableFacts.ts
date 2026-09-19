@@ -14,6 +14,8 @@ import {
   type RefColumn,
   type RefTable,
 } from "@/components/docs/generated/reference.generated";
+import { UPLOAD_ASSETS, type UploadAsset } from "@/components/docs/generated/policy.generated";
+import { ALL_PAGES } from "@/components/docs/registry";
 
 /** The contract row for a table, by name. Throws rather than rendering a blank. */
 export function refTable(name: string): RefTable {
@@ -93,3 +95,29 @@ export function blankBehaviour(c: RefColumn): BlankAnswer {
 export const computedColumns = (t: RefTable) => t.columns.filter((c) => c.computedBy);
 /** Everything else on the row — what a person or a discovery run supplied. */
 export const suppliedColumns = (t: RefTable) => t.columns.filter((c) => !c.computedBy);
+
+// ── the file a reader actually downloads (§4 D110) ─────────────────────────
+
+/**
+ * The wizard dataset that loads a table, and the assets it offers.
+ *
+ * Two routes, in order, and the order is the point. A table whose sidecar
+ * carries `ingest_dataset` answers for itself — that is the contract, and it is
+ * the route `ingest-file` builds its own parser from, so the manual and the
+ * uploader cannot disagree about which dataset a table belongs to. The four
+ * tables outside the ingestion contract (§4 D56) have no such block and must
+ * not be given one; their binding is declared beside `table` in the docs
+ * registry, where `docsAssets.test.ts` checks it resolves and checks it never
+ * shadows a contract answer.
+ *
+ * Returns `null` when neither route answers — a table with no upload at all —
+ * so a page renders nothing rather than an empty download button.
+ */
+export function uploadAssetFor(table: RefTable): UploadAsset | null {
+  const declared =
+    table.ingestDataset?.wizardId ??
+    ALL_PAGES.find((p) => p.section === 3 && p.table === table.table)?.wizardId ??
+    null;
+  if (!declared) return null;
+  return UPLOAD_ASSETS.find((a) => a.id === declared) ?? null;
+}

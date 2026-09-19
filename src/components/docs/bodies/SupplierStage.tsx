@@ -20,7 +20,7 @@ export default function SupplierStage() {
         </P>
         <P>
           The rows come from your <DocLink to="inbound-logistics">Inbound Logistics</DocLink>{" "}
-          upload. If a supplier-and-material pair is not on this screen, there is no arc for it.
+          upload. If a supplier-and-material pair is not on this screen, there is no lane for it.
         </P>
         <StageSummary stage="supplier" />
       </Section>

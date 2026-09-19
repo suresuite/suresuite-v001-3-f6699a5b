@@ -30,7 +30,7 @@ const SEVERITY: { level: string; what: string; blocks: boolean; why: string }[] 
     what: "The run will start, using something worked out from your data.",
     why:
       "A value is missing and the fallback is derived from what you did upload — the cheapest " +
-      "inbound price, the demand your outbound arcs imply. Usually what you meant, and still worth " +
+      "inbound price, the demand your outbound lanes imply. Usually what you meant, and still worth " +
       "reading.",
   },
 ];
@@ -115,7 +115,7 @@ export default function VerifyYourInputs() {
               title: "Fix it where it belongs",
               body: (
                 <>
-                  A missing master value goes in the item-master file or the grid cell; a missing arc
+                  A missing master value goes in the item-master file or the grid cell; a missing lane
                   goes in the logistics upload. Fixing it in the policy grid when it belongs in a
                   file means the next upload does not carry it.
                 </>
