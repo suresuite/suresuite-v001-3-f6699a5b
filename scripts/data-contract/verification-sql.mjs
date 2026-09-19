@@ -1293,6 +1293,134 @@ async function wp71Stage0() {
          "  privileges outright — a `permission denied for table` error, which RLS never",
          "  gets to soften. Grant them to `authenticated` before stage 1, not after."]));
   });
+
+  // 8 · THE REAL EXPOSURE, which 0.2–0.4 each see only half of.
+  //
+  // A write grant matters only where RLS lets the statement through, and a
+  // predicate-less policy matters only where the role holds the grant. Neither probe
+  // above is the answer on its own, and the gap between them is large: `anon` holds
+  // write privileges on 86 tables (0.4) while only 16 predicate-less WRITE policies
+  // exist (0.1). **The third term is RLS itself** — a table with `relrowsecurity =
+  // false` has no policies to consult, so the grant is the whole of its protection.
+  // This probe is the intersection, and it is the list stages 3 and 4 actually work.
+  const exposure = await tryQ(`
+    with anon_write as (
+      select distinct table_name
+        from information_schema.role_table_grants
+       where table_schema = 'public' and grantee = 'anon'
+         and privilege_type in ('INSERT','UPDATE','DELETE')),
+    rls as (
+      select c.relname, c.relrowsecurity, c.relkind
+        from pg_class c join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public' and c.relkind in ('r','p','v')),
+    wp as (
+      select tablename,
+             count(*) filter (where coalesce(qual,'') in ('','true')
+                                and coalesce(with_check,'') in ('','true'))::int as open_write_policies,
+             count(*)::int as write_policies
+        from pg_policies
+       where schemaname = 'public' and cmd in ('INSERT','UPDATE','DELETE','ALL')
+       group by tablename)
+    select case
+             when r.relkind = 'v' then 'view (grant only; RLS lives on the base table)'
+             when r.relrowsecurity is not true then 'RLS OFF — the grant is the only gate'
+             when coalesce(w.write_policies,0) = 0 then 'RLS on, NO write policy — denied today'
+             when coalesce(w.open_write_policies,0) > 0 then 'RLS on, a write policy that refuses nothing'
+             else 'RLS on, every write policy has a predicate'
+           end as state,
+           count(*)::int as tables,
+           string_agg(a.table_name, ', ' order by a.table_name) as which
+      from anon_write a
+      join rls r on r.relname = a.table_name
+      left join wp w on w.tablename = a.table_name
+     group by 1 order by 2 desc`);
+  report("stage 0.8 — grant × RLS × policy: what `anon` can ACTUALLY write", exposure, (rows) => {
+    for (const r of rows) {
+      out("", `**${r.state}** — ${r.tables} table(s)`, "", `  ${r.which}`);
+    }
+    const bad = rows.filter((r) => /RLS OFF|refuses nothing/.test(String(r.state)));
+    const n = bad.reduce((s, r) => s + Number(r.tables ?? 0), 0);
+    out(
+      "",
+      `- **${n} table(s) are genuinely writable by an anonymous caller today.** That is the`,
+      "  number stages 3 and 4 are sized by — not the 86 grants (most are held behind a",
+      "  policy that refuses the write) and not the 16 open write policies (some sit on",
+      "  tables `anon` cannot reach anyway).",
+      "- A row reading `RLS OFF` is the sharpest case in this report: there is no policy to",
+      "  add a restrictive clause to, so stage 3's mechanism does not apply and the only",
+      "  fix is the grant. Those tables belong at the FRONT of stage 4, not in its middle.",
+      "- `denied today` is the benign large group: the grant exists and RLS refuses every",
+      "  write for want of a permissive policy, which is why revoking is tidying rather",
+      "  than repair.",
+    );
+  });
+
+  // 9 · THE IDENTITY SPLIT, from `pg_constraint` rather than from the artifact.
+  //
+  // `build/schema.introspected.json` records ten columns as `REFERENCES auth.users(id)`
+  // — and at least one of them is WRONG: `20260613000001_fix_snapshot_created_by.sql`
+  // DROPPED `policy_versions_created_by_fkey` in June, for exactly the reason 0.5 just
+  // measured. Its header is the clearest statement of this problem in the repository:
+  // *"The app authenticates against public.approved_users (custom auth), so the user id
+  // passed to snapshot_policy is NOT an auth.users id. The legacy FK … therefore rejects
+  // every snapshot with a real user."*
+  //
+  // So the question is which of those keys production STILL has, and it cannot be
+  // answered from the repository — the artifact is demonstrably behind on at least one.
+  // It matters beyond bookkeeping: `ingest_land_file` RAISES when its actor is NULL
+  // (deliberately — `audit-actor`) and writes that actor into
+  // `ingest_runs.triggered_by_user_id`. If that FK still points at `auth.users`, then
+  // with 0 of 14 approved users present there the two requirements are mutually
+  // unsatisfiable and **every CSV landing by a real user aborts** — under WP 6.5 (a),
+  // which is the package that publishes `ingest-file`.
+  const authFks = await tryQ(`
+    select con.conname as constraint_name,
+           rel.relname as table_name,
+           (select string_agg(att.attname, ', ' order by att.attnum)
+              from unnest(con.conkey) k
+              join pg_attribute att on att.attrelid = rel.oid and att.attnum = k) as columns
+      from pg_constraint con
+      join pg_class rel on rel.oid = con.conrelid
+      join pg_namespace ns on ns.oid = rel.relnamespace
+      join pg_class fre on fre.oid = con.confrelid
+      join pg_namespace fns on fns.oid = fre.relnamespace
+     where con.contype = 'f' and ns.nspname = 'public'
+       and fns.nspname = 'auth' and fre.relname = 'users'
+     order by rel.relname, con.conname`);
+  report("stage 0.9 — which foreign keys to `auth.users` production STILL has", authFks, (rows) => {
+    out(...table(rows));
+    out(
+      `- **${rows.length} key(s)**, against **10 columns** the introspected artifact records.`,
+      "  A difference is a defect in the artifact, not in the database (D49/D52's class):",
+      "  a constraint dropped by a later `ALTER TABLE` that the introspector did not",
+      "  follow, and therefore a foreign key this repository believes in and production",
+      "  does not — or the reverse, which is worse.",
+    );
+    const t = rows.map((r) => r.table_name);
+    if (t.includes("ingest_runs")) {
+      out(
+        "- **`ingest_runs` IS IN THIS LIST, AND THAT BLOCKS WP 6.5 (a).**",
+        "  `ingest_land_file` raises when `_actor_user_id` is NULL and writes it into",
+        "  `triggered_by_user_id`; 0 of 14 approved users exist in `auth.users` (0.5). So a",
+        "  real CSV upload cannot satisfy both, and publishing `ingest-file` would make",
+        "  every landing fail. Every rehearsal passes because each one INSERTs its actor",
+        "  into `auth.users` first — a world production does not have.",
+      );
+      gateFailures.push(
+        "`ingest_runs` still carries a foreign key to `auth.users` while 0 of the " +
+          "approved users exist there, and `ingest_land_file` both requires a non-NULL " +
+          "actor and writes it into that column: the CSV landing path cannot run in " +
+          "production. WP 6.5 (a) must drop the key (the pattern is " +
+          "`20260613000001_fix_snapshot_created_by.sql`) before publishing `ingest-file`.",
+      );
+    } else {
+      out(
+        "- **`ingest_runs` is NOT in this list**, so its actor columns take an",
+        "  `approved_users` id without complaint and the landing path is not blocked by",
+        "  this. Then the artifact is wrong about it, which is its own finding.",
+      );
+    }
+  });
 }
 
 async function wp62and64Before() {

@@ -95,3 +95,36 @@ all seven tables, against 43 before** — and the migration fence added in this 
 will say so at the bottom of the report rather than leaving it to be trusted.
 
 No migration in this push; the other two doors are untouched.
+
+────────────────────────────────────────────────────────────────────────────────
+WP 7.1 STAGE 0, SECOND READ — two probes the first read's OUTPUT asked for
+2026-09-19, no migration in this push.
+
+Run 35466925117 came back fenced clean and moved three of §14's numbers by more than
+an order of magnitude (48 predicate-less policies not 27, 16 write-covering not 7, 86
+tables `anon` may write not 7 — §4 D129; and 0 of 14 approved users present in
+`auth.users` — D130). Reading it showed stage 0 was missing two questions.
+
+  0.8 **grant × RLS × policy, intersected.** Neither count above is the exposure: a
+      grant matters only where RLS lets the statement through, and a predicate-less
+      policy matters only where the role holds the grant. The third term is RLS
+      itself, and it changes the MECHANISM — a table with `relrowsecurity = false`
+      has no policy to AND a restrictive clause against, so stage 3 cannot reach it
+      and only revoking the grant can. This probe's output is stage 4's worklist,
+      RLS-off tables first.
+  0.9 **which foreign keys to `auth.users` production STILL has.** The artifact
+      records ten columns; at least one is stale, because
+      `20260613000001_fix_snapshot_created_by.sql` dropped
+      `policy_versions_created_by_fkey` in June and the introspector did not follow
+      it. **The one that matters is `ingest_runs`**: `ingest_land_file` raises when
+      its actor is NULL, by design, and writes that actor into
+      `triggered_by_user_id`. With 0 of 14 approved users in `auth.users` those two
+      requirements are mutually unsatisfiable, so if the key is still there every
+      CSV landing by a real user aborts — a blocker under WP 6.5 (a), which is the
+      package that publishes `ingest-file`. Every rehearsal passes because each one
+      INSERTs its actor into `auth.users` first, which production has not done.
+      **This probe FAILS the run if the key is real**, so the answer cannot be read
+      as a footnote.
+
+No migration in this push; the other two doors are untouched. The migration fence
+added in the previous push should again read unmoved at 20260919000007.
