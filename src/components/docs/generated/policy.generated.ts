@@ -2191,6 +2191,8 @@ export const ITEM_SERIES: ItemSeries[] = [
 export type RunKpis = {
   emitted: { key: string; always: boolean }[];
   display: { key: string; label: string; emitted: boolean }[];
+  /** The scenario objective a user may pick, and whether a run produces it. */
+  objectives: { key: string; label: string; emitted: boolean }[];
 };
 
 export const RUN_KPIS: RunKpis = {
@@ -2358,6 +2360,33 @@ export const RUN_KPIS: RunKpis = {
       "label": "Resilience index",
       "emitted": false
     }
+  ],
+  "objectives": [
+    {
+      "key": "fill_rate",
+      "label": "Fill rate",
+      "emitted": true
+    },
+    {
+      "key": "otif",
+      "label": "OTIF",
+      "emitted": false
+    },
+    {
+      "key": "lead_time_days",
+      "label": "Lead time",
+      "emitted": false
+    },
+    {
+      "key": "profit",
+      "label": "Profit",
+      "emitted": false
+    },
+    {
+      "key": "utilization",
+      "label": "Utilization",
+      "emitted": false
+    }
   ]
 };
 
@@ -2407,6 +2436,226 @@ export const REPLICATION_SERIES_FACTS: ReplicationSeries = {
   ],
   "heatmapWants": "utilization",
   "heatmapEverRenders": false
+};
+
+/**
+ * A scenario's settings, labelled as the setup form labels them.
+ *
+ * `scenarios` is deferred in the contract, so this is the only route to a
+ * settings reference. Label → stored key → default is a join the form's
+ * own `prov(local.X !== SCENARIO_ENGINE_DEFAULTS.X)` already declares.
+ */
+export type ScenarioSetupGroup = {
+  name: string;
+  fields: { label: string; unit: string | null; key: string; default: string }[];
+};
+
+export const SCENARIO_SETUP: ScenarioSetupGroup[] = [
+  {
+    "name": "Run window",
+    "fields": [
+      {
+        "label": "Planning horizon",
+        "unit": "the project's planning unit",
+        "key": "horizon_days",
+        "default": "90"
+      },
+      {
+        "label": "Steady state starts at",
+        "unit": "the project's planning unit",
+        "key": "warmup_days",
+        "default": "14"
+      },
+      {
+        "label": "Warm-up detection",
+        "unit": null,
+        "key": "warmup_mode",
+        "default": "\"auto\""
+      },
+      {
+        "label": "Time step",
+        "unit": null,
+        "key": "time_step",
+        "default": "\"day\""
+      }
+    ]
+  },
+  {
+    "name": "Precision",
+    "fields": [
+      {
+        "label": "Replications",
+        "unit": "runs",
+        "key": "replications",
+        "default": "10"
+      },
+      {
+        "label": "Common random numbers",
+        "unit": null,
+        "key": "crn",
+        "default": "true"
+      },
+      {
+        "label": "Seed",
+        "unit": null,
+        "key": "seed",
+        "default": "42"
+      },
+      {
+        "label": "Stopping rule",
+        "unit": null,
+        "key": "stopping_rule",
+        "default": "{ kind: \"fixed_horizon\", max_wall_seconds: 600 }"
+      }
+    ]
+  },
+  {
+    "name": "Objective",
+    "fields": [
+      {
+        "label": "Primary KPI",
+        "unit": null,
+        "key": "primary_kpi",
+        "default": "\"fill_rate\""
+      }
+    ]
+  }
+];
+
+/**
+ * The recovery levers a scenario offers, joined to the engine plugin each
+ * one reaches — `plugin: null` means the engine has no branch for it, so
+ * the lever is saved, shown enabled, and changes no number.
+ *
+ * `inGrid` is whether the /policies grid offers the same response: that
+ * list was already restricted to what the engine maps, so the two
+ * disagreeing is the finding. `engineOnly` is the reverse — responses the
+ * engine honours that the scenario pane never offers.
+ */
+export type RecoveryLever = {
+  key: string;
+  label: string;
+  description: string | null;
+  plugin: string | null;
+  inGrid: boolean;
+  params: { key: string; label: string; unit: string; default: number; hint: string | null }[];
+};
+
+export type RecoveryLevers = {
+  levers: RecoveryLever[];
+  engineOnly: { key: string; plugin: string; inGrid: boolean }[];
+};
+
+export const RECOVERY_LEVERS: RecoveryLevers = {
+  "levers": [
+    {
+      "key": "dual_source_activate",
+      "label": "Backup supplier",
+      "description": "Release orders to a predefined backup supplier when the primary is disrupted",
+      "plugin": "backup_supplier",
+      "inGrid": true,
+      "params": [
+        {
+          "key": "backup_lead_time_weeks",
+          "label": "Backup supplier lead time",
+          "unit": "weeks",
+          "default": 6,
+          "hint": "Standard lead time assumed for all backup suppliers (Ts')"
+        }
+      ]
+    },
+    {
+      "key": "safety_stock_drawdown",
+      "label": "Safety stock",
+      "description": "ABC-XYZ classified buffer stock protects against deep disruptions; incurs annual holding cost",
+      "plugin": null,
+      "inGrid": false,
+      "params": [
+        {
+          "key": "holding_cost_pct",
+          "label": "Annual holding cost",
+          "unit": "% of material cost",
+          "default": 20,
+          "hint": "Inventory carrying cost as a percentage of material value per year (hm)"
+        }
+      ]
+    },
+    {
+      "key": "capacity_flex",
+      "label": "Overtime production",
+      "description": "Activate overtime shifts when the revenue gain exceeds the overtime cost",
+      "plugin": "short_term_capacity",
+      "inGrid": true,
+      "params": [
+        {
+          "key": "overtime_cost_pct",
+          "label": "Overtime cost",
+          "unit": "% of product price",
+          "default": 5,
+          "hint": "Additional cost per unit produced during overtime shifts (Cop)"
+        }
+      ]
+    },
+    {
+      "key": "demand_shaping",
+      "label": "Material reallocation",
+      "description": "Revenue-maximising material allocation LP over a rolling planning horizon",
+      "plugin": null,
+      "inGrid": false,
+      "params": [
+        {
+          "key": "allocation_horizon_weeks",
+          "label": "Planning horizon",
+          "unit": "weeks",
+          "default": 4,
+          "hint": "Rolling window for the material-allocation LP (W)"
+        },
+        {
+          "key": "annual_labor_cost",
+          "label": "Annual planning labor cost",
+          "unit": "€",
+          "default": 6240,
+          "hint": "Indirect labor cost for supply chain allocation team — 208 h/yr (Calc)"
+        }
+      ]
+    },
+    {
+      "key": "mode_shift",
+      "label": "Expedite shipments",
+      "description": "Accelerate in-transit shipments when expedite revenue exceeds expedite cost",
+      "plugin": "expedited_shipments",
+      "inGrid": true,
+      "params": [
+        {
+          "key": "expedite_cost_pct",
+          "label": "Expedite cost",
+          "unit": "% of material cost per order",
+          "default": 3,
+          "hint": "Premium to accelerate in-transit materials to the current week (Cexp)"
+        }
+      ]
+    },
+    {
+      "key": "reroute",
+      "label": "Network rerouting",
+      "description": "Redirect flows through alternative network paths",
+      "plugin": "expedited_shipments",
+      "inGrid": true,
+      "params": []
+    }
+  ],
+  "engineOnly": [
+    {
+      "key": "early_warning",
+      "plugin": "early_warning_failover",
+      "inGrid": true
+    },
+    {
+      "key": "allocate_materials",
+      "plugin": "material_allocation",
+      "inGrid": true
+    }
+  ]
 };
 
 export const CHAIN_COUNT = 38;

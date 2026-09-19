@@ -669,10 +669,21 @@ export function deriveRunKpis(root) {
   while ((m = drow.exec(dBlock[1]))) rows.push({ key: m[1], label: m[2] });
   if (rows.length < 5) throw new Error(`chains: parsed ${rows.length} KPI_DISPLAY rows`);
 
+  // The scenario's objective, which drives the convergence plot and the stage
+  // rail's own sub-label. Five choices, from the same legacy vocabulary.
+  const setup = readFileSync(join(root, "src", "components", "sim", "ScenarioSetupForm.tsx"), "utf8");
+  const oBlock = /const KPI_OPTIONS = \[([\s\S]*?)\n\];/.exec(setup);
+  if (!oBlock) throw new Error("chains: KPI_OPTIONS not found in src/components/sim/ScenarioSetupForm.tsx");
+  const objectives = [];
+  const orow = /\{\s*value:\s*"(\w+)",\s*label:\s*"([^"]+)"\s*\}/g;
+  while ((m = orow.exec(oBlock[1]))) objectives.push({ key: m[1], label: m[2] });
+  if (objectives.length < 2) throw new Error(`chains: parsed ${objectives.length} scenario objectives`);
+
   const emittedKeys = new Set(emitted.map((e) => e.key));
   return {
     emitted,
     display: rows.map((r) => ({ ...r, emitted: emittedKeys.has(r.key) })),
+    objectives: objectives.map((o) => ({ ...o, emitted: emittedKeys.has(o.key) })),
   };
 }
 
@@ -725,4 +736,185 @@ export function deriveReplicationSeries(root) {
     heatmapWants: wants,
     heatmapEverRenders: written.includes(wants),
   };
+}
+
+/**
+ * A scenario's own settings, as the setup form labels them — WP 5.2j.
+ *
+ * `scenarios` is deferred in `coverage.yaml` (WP 6.4), so the contract
+ * describes none of its columns and the manual's scenario page could name no
+ * setting at all. What exists instead is two declarations in the product, and
+ * the useful thing is that they sit NEXT TO EACH OTHER:
+ *
+ *   · `ScenarioSetupForm.tsx` gives each field the label a reader sees, its
+ *     unit, and its control — and in the same object literal names the default
+ *     it compares against, `SCENARIO_ENGINE_DEFAULTS.<key>`.
+ *   · `useScenarios.tsx` gives that default's value.
+ *
+ * So label → key → default is a join the source already makes, not one this
+ * file invents. That satisfies §6.1 rule 1 — the reader's name leads, the
+ * stored name is translation — without a sidecar, and it goes red rather than
+ * stale when the form changes.
+ */
+export function deriveScenarioSetup(root) {
+  const hook = readFileSync(join(root, "src", "hooks", "useScenarios.tsx"), "utf8");
+  const dBlock = /SCENARIO_ENGINE_DEFAULTS = \{([\s\S]*?)\n\} satisfies/.exec(hook);
+  if (!dBlock) {
+    throw new Error(
+      "chains: SCENARIO_ENGINE_DEFAULTS not found in src/hooks/useScenarios.tsx. Fix the " +
+        "scan rather than shipping a scenario page that states no default.",
+    );
+  }
+  const defaults = {};
+  const drow = /^\s{2}(\w+):\s*(.+?),?\s*$/gm;
+  let m;
+  while ((m = drow.exec(dBlock[1]))) defaults[m[1]] = m[2].replace(/,$/, "").trim();
+
+  const form = readFileSync(join(root, "src", "components", "sim", "ScenarioSetupForm.tsx"), "utf8");
+  const groups = [];
+  const gRe = /const (\w+): ParamGroup = \{\s*\n\s*name: "([^"]+)",([\s\S]*?)\n  \};/g;
+  while ((m = gRe.exec(form))) {
+    const body = m[3];
+    const fields = [];
+    // Each field is `{ label: "…", [unit: …,] provenance: prov(local.X !== SCENARIO_ENGINE_DEFAULTS.X …`
+    const fRe =
+      /label:\s*"([^"]+)",\s*(?:unit:\s*(?:"([^"]*)"|(\w+)),\s*)?provenance:[\s\S]*?SCENARIO_ENGINE_DEFAULTS\.(\w+)/g;
+    let f;
+    while ((f = fRe.exec(body))) {
+      const key = f[4];
+      fields.push({
+        label: f[1],
+        // `unitLabel` is the project's chosen planning unit, resolved at
+        // render time — named rather than pinned to one word, because the
+        // screen really does change it.
+        unit: f[2] ?? (f[3] === "unitLabel" ? "the project's planning unit" : f[3] ?? null),
+        key,
+        default: defaults[key] ?? null,
+      });
+    }
+    if (fields.length) groups.push({ name: m[2], fields });
+  }
+  const total = groups.reduce((n, g) => n + g.fields.length, 0);
+  if (groups.length < 2 || total < 6) {
+    throw new Error(
+      `chains: parsed ${groups.length} scenario setup group(s) and ${total} field(s); the form ` +
+        "declares more. Fix the scan rather than publishing half a settings reference.",
+    );
+  }
+  for (const g of groups) {
+    for (const f of g.fields) {
+      if (f.default === null) {
+        throw new Error(
+          `chains: the setup form compares "${f.label}" against SCENARIO_ENGINE_DEFAULTS.${f.key} ` +
+            "and that key has no default. One of the two literals has moved.",
+        );
+      }
+    }
+  }
+  return groups;
+}
+
+/**
+ * The recovery levers a scenario offers, against the ones the engine maps —
+ * WP 5.2j.
+ *
+ * `DisruptionRecoveryPane` offers six strategies, each with a label, a
+ * description and its own parameters. `project_map.py` turns a response into an
+ * engine plugin, and it does not turn all six into anything: a lever the engine
+ * has no branch for is saved on the scenario, shown as enabled, and changes no
+ * number in the run.
+ *
+ * The policy grid has ALREADY been corrected for exactly this — `schemas.ts`'s
+ * `MULTI_SELECT_OPTIONS.response` carries a comment saying it is "restricted to
+ * the responses the scsim engine maps to policies" and lists a DIFFERENT six.
+ * So the fact is known in one screen's source and not the other's, which is why
+ * the manual joins all three rather than trusting either.
+ *
+ * `plugin` is the engine plugin a lever reaches, or null. Two levers reaching
+ * the SAME plugin is a fact too, and one the pane's own labels hide.
+ */
+export function deriveRecoveryLevers(root) {
+  const map = readFileSync(join(root, "scsim", "scsim", "io", "project_map.py"), "utf8");
+  const start = map.indexOf('responses = set(recovery.get("response") or [])');
+  if (start < 0) {
+    throw new Error(
+      "chains: the recovery-response block was not found in scsim/scsim/io/project_map.py. " +
+        "Fix the scan rather than publishing a claim about which levers reach the engine.",
+    );
+  }
+  const region = map.slice(start);
+  const plugins = new Map();
+  // `if "x" in responses:` / `if responses & {"a", "b"}:` … `out["plugin"]`
+  const branch = /if\s+(?:strategy[^\n]*\n\s*or\s+)?(?:"([a-z_]+)" in responses|responses & \{([^}]*)\})[^\n]*:\n([\s\S]{0,1200}?)out\["(\w+)"\]/g;
+  let m;
+  while ((m = branch.exec(region))) {
+    const keys = m[1] ? [m[1]] : [...m[2].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]);
+    for (const k of keys) if (!plugins.has(k)) plugins.set(k, m[4]);
+  }
+  if (plugins.size < 3) {
+    throw new Error(`chains: parsed ${plugins.size} engine recovery branches; the mapper has more`);
+  }
+
+  const pane = readFileSync(join(root, "src", "components", "sim", "DisruptionRecoveryPane.tsx"), "utf8");
+  const orderBlock = /const strategyOrder: RecoveryResponseKey\[\] = \[([\s\S]*?)\n\s{2}\];/.exec(pane);
+  if (!orderBlock) throw new Error("chains: `strategyOrder` not found in DisruptionRecoveryPane.tsx");
+  const order = [...orderBlock[1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]);
+
+  const descBlock = /const STRATEGY_DESCRIPTIONS: Record<RecoveryResponseKey, string> = \{([\s\S]*?)\n\};/.exec(pane);
+  if (!descBlock) throw new Error("chains: `STRATEGY_DESCRIPTIONS` not found in DisruptionRecoveryPane.tsx");
+  const desc = new Map([...descBlock[1].matchAll(/(\w+):\s*"((?:[^"\\]|\\.)*)"/g)].map((x) => [x[1], x[2]]));
+
+  const score = readFileSync(join(root, "src", "lib", "sim", "recoveryScore.ts"), "utf8");
+  const labelBlock = /export const RESPONSE_LABELS: Record<RecoveryResponseKey, string> = \{([\s\S]*?)\n\};/.exec(score);
+  if (!labelBlock) throw new Error("chains: `RESPONSE_LABELS` not found in src/lib/sim/recoveryScore.ts");
+  const labels = new Map([...labelBlock[1].matchAll(/(\w+):\s*"([^"]+)"/g)].map((x) => [x[1], x[2]]));
+
+  // Each lever's own parameters, with units and defaults.
+  const paramBlock =
+    /const STRATEGY_PARAMS: Partial<Record<RecoveryResponseKey, StrategyParamDef\[\]>> = \{([\s\S]*?)\n\};/.exec(pane);
+  if (!paramBlock) throw new Error("chains: `STRATEGY_PARAMS` not found in DisruptionRecoveryPane.tsx");
+  const params = new Map();
+  const perLever = /(\w+):\s*\[([\s\S]*?)\n\s{2}\],/g;
+  while ((m = perLever.exec(paramBlock[1]))) {
+    const rows = [
+      ...m[2].matchAll(
+        /key:\s*"(\w+)",\s*label:\s*"([^"]+)",\s*unit:\s*"([^"]*)",\s*default:\s*([\d.]+)(?:,\s*step:\s*"[^"]*")?(?:,\s*hint:\s*"((?:[^"\\]|\\.)*)")?/g,
+      ),
+    ].map((x) => ({ key: x[1], label: x[2], unit: x[3], default: Number(x[4]), hint: x[5] ?? null }));
+    params.set(m[1], rows);
+  }
+
+  // The grid's already-corrected list, for the third column.
+  const schemas = readFileSync(join(root, "src", "lib", "policies", "schemas.ts"), "utf8");
+  const gridBlock = /response: \[([\s\S]*?)\n\s{2}\],/.exec(schemas);
+  if (!gridBlock) throw new Error("chains: `MULTI_SELECT_OPTIONS.response` not found in schemas.ts");
+  const grid = [...gridBlock[1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]);
+
+  const levers = order.map((key) => {
+    const label = labels.get(key);
+    if (!label) throw new Error(`chains: the recovery pane offers "${key}" and RESPONSE_LABELS has no label for it`);
+    return {
+      key,
+      label,
+      description: desc.get(key) ?? null,
+      plugin: plugins.get(key) ?? null,
+      inGrid: grid.includes(key),
+      params: params.get(key) ?? [],
+    };
+  });
+  // Responses the ENGINE maps that the scenario pane never offers — filtered to
+  // the ones a scenario can actually hold. The mapper also branches on
+  // `expedite_freight`, which is not in `RecoveryResponse`, so no saved
+  // scenario or policy can ever contain it: a dead branch, not a missing
+  // control, and listing it as one would send a reader looking for a toggle.
+  const enumBlock = /export const RecoveryResponse = z\.enum\(\[([\s\S]*?)\n\]\);/.exec(schemas);
+  if (!enumBlock) throw new Error("chains: `RecoveryResponse` enum not found in schemas.ts");
+  const valid = new Set([...enumBlock[1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]));
+  const paneKeys = new Set(order);
+  const engineOnly = [...plugins.entries()]
+    .filter(([k]) => !paneKeys.has(k) && valid.has(k))
+    .map(([key, plugin]) => ({ key, plugin, inGrid: grid.includes(key) }));
+
+  if (levers.length < 4) throw new Error(`chains: parsed ${levers.length} recovery levers; the pane offers more`);
+  return { levers, engineOnly };
 }
