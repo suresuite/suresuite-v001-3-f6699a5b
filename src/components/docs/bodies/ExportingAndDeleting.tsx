@@ -82,24 +82,35 @@ export default function ExportingAndDeleting() {
       )}
 
       {d.neither.length > 0 && (
-        <Callout tone="limit" title={`${d.neither.length} project-scoped tables are reached by neither mechanism`}>
+        <Callout
+          tone="note"
+          title={`${d.neither.length} project-scoped tables are deliberately left behind`}
+        >
           <p>
             They have no database wiring to the project and are not on the deletion's list, so{" "}
-            <strong>their rows survive the project</strong>. Nothing reads them afterwards — the
-            project they belong to is gone — but they are not removed.
+            <strong>their rows survive it</strong> — and for these three that is the intended
+            answer, not an oversight:{" "}
+            {d.neither.map((t, i) => (
+              <span key={t}>
+                {i > 0 ? ", " : ""}
+                <Term>{t}</Term>
+              </span>
+            ))}
+            . Usage, API traffic and assistant events are facts about the <em>account</em>, and
+            deleting one project should not rewrite last quarter's usage.
           </p>
           <p>
-            Some are records that are <em>meant</em> to outlive a project: usage logs, API request
-            logs, assistant events. The rest are not, and they include{" "}
-            <Term>policy_defaults</Term> and <Term>policy_overrides</Term> — the decisions you
-            typed into the grid — as well as <Term>customers</Term>, the tier-2 and tier-3 supplier
-            uploads, and the network summary.
+            <strong>This used to be a list of ten, and seven of them were your data</strong> —{" "}
+            <Term>policy_defaults</Term> and <Term>policy_overrides</Term> (the decisions you typed
+            into the grid), <Term>customers</Term>, the tier-2 and tier-3 supplier uploads, the
+            network summary and the job magnitudes. They now follow the project because the schema
+            says so, on every path that deletes one. The rows that had already been orphaned were
+            removed at the same time.
           </p>
           <p>
-            <strong>So “delete my project” is not today the same as “delete my data”.</strong> If
-            removal has to be complete — a contractual erasure rather than tidying a workspace —
-            raise it with whoever administers your organization and name this page, rather than
-            assuming the button was sufficient. We would rather tell you than let you rely on it.
+            If removal has to be provably complete — a contractual erasure rather than tidying a
+            workspace — the three above are what remains, and they are the deliberate part. Name
+            this page when you ask.
           </p>
         </Callout>
       )}

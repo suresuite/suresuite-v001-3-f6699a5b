@@ -9884,7 +9884,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "level",
-        "computedBy": "combine-project"
+        "computedBy": "bulk_insert_network_summary"
       },
       {
         "name": "edges_count",
@@ -9908,7 +9908,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "level",
-        "computedBy": "combine-project"
+        "computedBy": "bulk_insert_network_summary"
       },
       {
         "name": "tiers_data",
@@ -9932,7 +9932,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "level",
-        "computedBy": "combine-project"
+        "computedBy": "bulk_insert_network_summary"
       },
       {
         "name": "computed_from_hash",
@@ -9956,7 +9956,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
-        "computedBy": "combine-project"
+        "computedBy": "bulk_insert_network_summary"
       },
       {
         "name": "computed_at",
@@ -9980,7 +9980,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
-        "computedBy": "combine-project"
+        "computedBy": "bulk_insert_network_summary"
       }
     ]
   },

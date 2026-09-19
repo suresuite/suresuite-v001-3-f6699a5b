@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 335,
-  "migrations_applied": 327,
+  "migrations_found": 336,
+  "migrations_applied": 328,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260919000004_row_provenance.sql",
+  "last_migration": "20260919000005_project_cascade.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -4922,6 +4922,15 @@
           ],
           "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
           "added_by": "20260919000001_customers_land.sql"
+        },
+        {
+          "name": "customers_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [],
@@ -10798,6 +10807,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql"
+        },
+        {
+          "name": "network_summary_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [],
@@ -12184,6 +12202,15 @@
           "columns": [],
           "definition": "CHECK (fulfillment_strategy IN ('make_to_stock','make_to_order','assemble_to_order','engineer_to_order','configure_to_order'))",
           "added_by": "20260607133944_444b6c58-6239-4b6d-89e3-deb6d075de97.sql"
+        },
+        {
+          "name": "policy_defaults_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [],
@@ -12421,6 +12448,15 @@
           "columns": [],
           "definition": "CHECK (family IN ('sourcing','inventory','transport','fulfillment','production','recovery','demand'))",
           "added_by": "20260609040000_consolidated_safe.sql"
+        },
+        {
+          "name": "policy_overrides_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [
@@ -17035,6 +17071,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20250917214434_0124e19b-fd0b-4bb1-9dad-0a449d321c0a.sql"
+        },
+        {
+          "name": "simulation_job_magnitudes_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [
@@ -19697,6 +19742,15 @@
           ],
           "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
           "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "tier2_suppliers_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [
@@ -19974,6 +20028,15 @@
           ],
           "definition": "FOREIGN KEY (source_row_id) REFERENCES public.ingest_staged_rows(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED",
           "added_by": "20260916000019_promotion_upsert.sql"
+        },
+        {
+          "name": "tier3_suppliers_project_fk",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
+          "added_by": "20260919000005_project_cascade.sql"
         }
       ],
       "indexes": [

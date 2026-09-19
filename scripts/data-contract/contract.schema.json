@@ -311,6 +311,11 @@
             "metadata"
           ]
         },
+        "computed_by_unreachable": {
+          "type": "string",
+          "minLength": 20,
+          "description": "WP 6.2 · §4 D118 · WHY the writer named in `computed_by` has no live call site. Absent means it has one, and `contract:check` R18 fails a `computed_by` whose writer it cannot find called anywhere in src/ or supabase/functions/. This exists because D118 was a value with the right SHAPE and the wrong content — `network_summary` declared `computed_by: combine-project` on five columns and that function never touches the table; the only statement that can insert a row is an RPC with ZERO call sites. A generator cannot catch that, and `computed_by` is load-bearing since D101 (graphHashCoverage.test.ts derives the computed-column set from it). So an unreachable writer is now a DECLARED fact with a reason, which the reference page prints, rather than a name a reader assumes is live."
+        },
         "computed_by": {
           "type": "string",
           "minLength": 3,

@@ -3307,32 +3307,22 @@ export type ProjectDeletion = {
 
 export const PROJECT_DELETION: ProjectDeletion = {
   "projectScoped": 49,
-  "cascade": 29,
+  "cascade": 39,
   "detached": [
     "chat_threads",
     "user_files"
   ],
   "sweptOnly": [
-    "disruption_scenario_profiles",
     "disruption_scenarios",
     "network_edges",
     "network_nodes",
-    "node_list",
     "simulation_results",
-    "supply_chain_data",
     "supply_chain_data_multi_tier"
   ],
   "neither": [
     "ai_chat_events",
     "ai_usage_logs",
-    "api_request_logs",
-    "customers",
-    "network_summary",
-    "policy_defaults",
-    "policy_overrides",
-    "simulation_job_magnitudes",
-    "tier2_suppliers",
-    "tier3_suppliers"
+    "api_request_logs"
   ],
   "asynchronous": true
 };

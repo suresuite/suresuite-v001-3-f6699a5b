@@ -16,7 +16,8 @@
 //   R6  every file:line in PLAN.md §4 resolves and is in bounds
 //   R7  §16 is append-only — no drift-log entry may vanish from history, AND
 //       every work package marked done in §7–§13 has a §16 entry
-//   R8  no open defect, unmet invariant or table deferral is owned by a FINISHED package,
+//   R8  no open defect, unmet invariant, table deferral or undeployed edge function is
+//       owned by a FINISHED package,
 //       a FINISHED PHASE, or a package the plan does not contain (WP 3.4)
 //   R9  `governance.audited` matches the audit triggers the migrations create
 //   R10 §17's sequencing table agrees with §7–§13's ✅ markers (WP 3.3)
@@ -30,6 +31,7 @@
 //       (D58, D101's shape inside one file, WP 6.2)
 //   R16 every §4 D-number is unique, and §4 has no duplicated row (D122's merge, WP 6.3)
 //   R17 every edge function is DEPLOYED or deferred with a named owner (D123, WP 6.3)
+//   R18 a `computed_by` names a writer that is CALLED, or declares why not (D118, WP 6.2)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -652,6 +654,30 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
     }
   }
 
+  // AND THE SAME RULE FOR AN UNDEPLOYED FUNCTION — WP 6.3, and the gap was mine.
+  //
+  // R17 gave `functions_not_deployed` the shape `table-covered` has: a function is
+  // deployed or deferred to a named package. It did NOT give it R8's half, so a
+  // function could be deferred to a package that had already shipped — a function
+  // nobody has decided about, which is the same defect one row down, and this
+  // package created the register that made it possible. `ingest-file` was deferred
+  // to WP 6.3 by WP 6.3, which is precisely the state R8 exists to refuse; WP 6.5
+  // was written so the deferral has an owner that has not run.
+  for (const row of coverage.functions_not_deployed ?? []) {
+    const wp = String(row.wp ?? "");
+    if (donePackages.has(wp)) {
+      orphaned += 1;
+      fail("R8", `coverage.yaml defers the edge function "${row.fn}" to WP ${wp}, which §7–§13 ` +
+                 "marks ✅ done. Deploy it, or move the deferral to a package that has not run — " +
+                 "an undeployed function waiting on a finished package is code nobody has decided " +
+                 "about, and its absence from production is invisible (§4 D123).");
+    } else if (wp && !knownPackages.has(wp)) {
+      orphaned += 1;
+      fail("R8", `coverage.yaml defers the edge function "${row.fn}" to WP ${wp}, which the plan ` +
+                 "does not contain. Name a package that exists, or write one.");
+    }
+  }
+
   if (!orphaned)
     console.log(
       `  R8  no open defect or unmet invariant is owned by a finished package · ` +
@@ -957,6 +983,154 @@ const covered = [...sidecars.keys()].length;
       `${deferredFns.size} deferred with a named package (D123)`,
     );
   }
+}
+
+// ───────── R18: A DECLARED WRITER HAS TO BE A WRITER SOMEBODY CALLS
+//
+// §4 D118: `network_summary` declared `computed_by: combine-project` on five columns
+// and that function never touches the table. Its whole write surface is
+// `etl_replace_supply_chain` and `refresh_node_list_for_project`. The only statement
+// that can insert a row is `bulk_insert_network_summary`, and NO CALL SITE EXISTS —
+// not in `src/`, not in `supabase/functions/`. So a project created today has an
+// empty `network_summary` and it stays empty, while the generated reference page
+// marked every value column "written by combine-project".
+//
+// **THE SHAPE WAS RIGHT AND THE CONTENT WAS WRONG, WHICH IS THE ONE KIND OF WRONG A
+// GENERATOR CANNOT CATCH.** `computed_by` is load-bearing since D101 —
+// `graphHashCoverage.test.ts` derives the computed-column set from it instead of a
+// literal Set — so every gate downstream believed it. It was also the only one of the
+// five tables declaring `computed_by` that was wrong, which is how long a single
+// wrong value survives when nothing compares it to the tree.
+//
+// TWO THINGS THIS RULE LEARNED FROM ITS OWN FIRST RUN, both worth keeping:
+//
+//   * **A declared writer is resolved against the writers that EXIST** — the edge
+//     function directories and the SQL functions the artifact knows — rather than
+//     pattern-matched out of the text. One sidecar's value is
+//     `"calculate-node-prominence (and calculate-network-science-metrics)"`, prose
+//     naming two real functions, and a rule that treated the whole string as one
+//     identifier called both of them missing.
+//   * **A function's own DEFINITION is not a call site.** `bulk_insert_network_summary`
+//     appears in `20250905160724` because that migration creates it, and the first
+//     draft read that as "something refers to it" — which would have passed the exact
+//     value D118 is about. `CREATE`/`DROP`/`ALTER`/`COMMENT ON`/`GRANT`/`REVOKE` lines
+//     are excluded, so what is left is somebody using it.
+//
+// An unreachable writer is ALLOWED — `bulk_insert_network_summary` is one, and naming
+// it is more honest than naming a live function that does not write the table — but it
+// has to be DECLARED, with `computed_by_unreachable` and a reason the reference page
+// prints. A stale exemption fails too: telling a reader a live writer is dead is its
+// own defect.
+//
+// **WHAT THIS RULE DOES NOT CHECK, AND IT IS THE HALF D118 ACTUALLY WAS.** It answers
+// "does this writer exist, and does anything call it" — not "does it write THIS
+// table". Naming `combine-project` on a `network_summary` column would still pass on
+// its own terms, because that function exists and is called; what catches it now is
+// the STALE EXEMPTION (the note says the writer is dead, the writer is live), and that
+// is a second-order catch rather than the thing itself. Checking the write surface
+// means parsing every branch of a 1 000-line edge function for the tables it touches,
+// which is a static analysis this repository does not have and should not fake. Named,
+// not taken — and the reason it is tolerable is that a wrong-but-live writer is now
+// visible in the reference page as a declared claim a reader can check, where before
+// it was invisible.
+{
+  const walk = (dir, out = []) => {
+    if (!existsSync(dir)) return out;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) {
+        if (e.name === "node_modules" || e.name === "__tests__") continue;
+        walk(full, out);
+      } else if (/\.(ts|tsx|sql|py)$/.test(e.name)) out.push(full);
+    }
+    return out;
+  };
+
+  // WHICH WRITERS EXIST. Edge functions are directories; SQL functions come from the
+  // introspected artifact, which is the schema's own account of itself.
+  const edgeFns = existsSync(join(ROOT, "supabase", "functions"))
+    ? readdirSync(join(ROOT, "supabase", "functions"), { withFileTypes: true })
+        .filter((d) => d.isDirectory() && !d.name.startsWith("_"))
+        .map((d) => d.name)
+    : [];
+  const sqlFns = (schema.functions ?? []).map((f) => f.name).filter(Boolean);
+  const knownWriters = [...new Set([...edgeFns, ...sqlFns])].sort((a, b) => b.length - a.length);
+
+  // The tree a CALLER lives in. Deliberately NOT the sidecars or the generated
+  // artifacts: a name that appears only in the contract and in the file the contract
+  // generated is a name nothing calls, which is the whole subject.
+  const callerFiles = [
+    ...walk(join(ROOT, "src")),
+    ...walk(join(ROOT, "supabase", "functions")),
+    ...walk(join(ROOT, "supabase", "migrations")),
+    ...walk(join(ROOT, "sim-worker")),
+    ...walk(join(ROOT, "scsim")),
+  ].filter((f) => !/\.generated\.|generated[/\\]/.test(f));
+  const callerLines = callerFiles
+    .flatMap((f) => readFileSync(f, "utf8").split("\n"))
+    // A definition, a grant or a COMMENT is not a call — and the comment half is not
+    // hypothetical: `20250905160724`'s first line is
+    // `-- Fix the bulk_insert_network_summary function …`, so prose about a dead
+    // function would have counted as somebody calling it, which is the exact value
+    // §4 D118 is about passing its own gate.
+    .filter((l) => !/\b(CREATE|DROP|ALTER|COMMENT\s+ON|GRANT|REVOKE)\b/i.test(l))
+    .filter((l) => !/^\s*(--|\/\/|\*|#)/.test(l));
+  const calledSomewhere = (name) => {
+    const re = new RegExp(`\\b${name.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`);
+    return callerLines.some((l) => re.test(l));
+  };
+
+  let declared = 0;
+  let exempt = 0;
+  let unresolved = 0;
+  // `sidecars` maps a table name to its PATH, not to parsed YAML — the same trap R9's
+  // first version fell into, which "found every table undeclared, which happens to be
+  // the answer it expected." This rule's first version reported 0 declarations for the
+  // same reason, and 0 of 0 passes.
+  for (const [table, path] of sidecars) {
+    const sc = load(readFileSync(join(ROOT, path), "utf8"));
+    for (const [field, spec] of Object.entries(sc.fields ?? {})) {
+      const value = spec?.computed_by;
+      if (!value) continue;
+      declared += 1;
+      const note = spec?.computed_by_unreachable;
+      const named = knownWriters.filter((w) => value.includes(w));
+      if (named.length === 0) {
+        unresolved += 1;
+        fail("R18",
+          `${table}.${field} declares \`computed_by: ${value}\`, which names no function this ` +
+          "repository contains — not an edge function directory and not a SQL function in the " +
+          "introspected schema. A declared producer that does not exist is a fact with the right " +
+          "shape and no content (§4 D118).");
+        continue;
+      }
+      const dead = named.filter((w) => !calledSomewhere(w));
+      if (dead.length === 0) {
+        if (note) {
+          fail("R18",
+            `${table}.${field} declares \`computed_by_unreachable\` and every writer it names ` +
+            `(${named.join(", ")}) IS called somewhere. A stale exemption is worse than none: it ` +
+            "tells a reader the writer is dead when it is live. Remove the note.");
+        }
+        continue;
+      }
+      if (!note) {
+        fail("R18",
+          `${table}.${field} declares \`computed_by: ${value}\` and ${dead.join(", ")} is called ` +
+          "NOWHERE a caller could live — not in src/, supabase/functions/, supabase/migrations/, " +
+          "sim-worker/ or scsim/, counting a definition or a grant as not a call. So nothing runs " +
+          "it and the column is permanently empty. Name the real writer, or declare " +
+          "`computed_by_unreachable` with the reason (§4 D118).");
+        continue;
+      }
+      exempt += 1;
+    }
+  }
+  if (!unresolved)
+    console.log(
+      `  R18 every declared writer is reachable or says why not · ${declared} \`computed_by\` ` +
+      `declaration(s) over ${knownWriters.length} known writer(s) · ${exempt} declared unreachable (D118)`,
+    );
 }
 
 // ───────── R16: A D-NUMBER IS AN IDENTITY, SO IT HAS TO BE UNIQUE

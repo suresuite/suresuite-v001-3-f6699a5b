@@ -251,9 +251,10 @@ deferred:
 # is CI-green — and that argument does not extend to these.
 functions_not_deployed:
   - fn: ingest-file
-    wp: "6.3"
+    wp: "6.5"
     why: >-
-      NOT debt and NOT an oversight — a deliberate deferral this package owns.
+      NOT debt and NOT an oversight — a deliberate deferral, and WP 6.5 exists
+      because of it.
       `ingest-file` is WP 3.2's entire deliverable and has never been published,
       which is why §2.1's `ingestion-contract` (I7) row called it a live second
       source for four packages while production had no such source (D123). Adding

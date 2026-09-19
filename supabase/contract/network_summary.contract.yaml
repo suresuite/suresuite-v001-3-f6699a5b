@@ -259,7 +259,18 @@ fields:
     meaning: >-
       ANALYSIS OUTPUT — the node count of the project's graph.
     grain: level
-    computed_by: "combine-project"
+    computed_by: "bulk_insert_network_summary"
+    computed_by_unreachable: >-
+      §4 D118 — THIS WRITER HAS NO CALL SITE, and the field said `combine-project`
+      until WP 6.2 read it. `combine-project`'s entire write surface is
+      `etl_replace_supply_chain` and `refresh_node_list_for_project`; it never
+      touches this table. The only statement that can insert a row is
+      `bulk_insert_network_summary` (`20250905160724`), and no caller exists — not
+      in `src/`, not in `supabase/functions/`. So a project created today has an
+      empty `network_summary` and it stays empty. The name here is now the true
+      producer and this note is the rest of the truth: nothing calls it. Naming the
+      wrong live function was worse than naming a dead one, because `computed_by` is
+      load-bearing (D101) and a reader had no way to tell.
     engine:
       consumed_by: null
       transform: null
@@ -282,7 +293,18 @@ fields:
     meaning: >-
       ANALYSIS OUTPUT — the edge count of the project's graph.
     grain: level
-    computed_by: "combine-project"
+    computed_by: "bulk_insert_network_summary"
+    computed_by_unreachable: >-
+      §4 D118 — THIS WRITER HAS NO CALL SITE, and the field said `combine-project`
+      until WP 6.2 read it. `combine-project`'s entire write surface is
+      `etl_replace_supply_chain` and `refresh_node_list_for_project`; it never
+      touches this table. The only statement that can insert a row is
+      `bulk_insert_network_summary` (`20250905160724`), and no caller exists — not
+      in `src/`, not in `supabase/functions/`. So a project created today has an
+      empty `network_summary` and it stays empty. The name here is now the true
+      producer and this note is the rest of the truth: nothing calls it. Naming the
+      wrong live function was worse than naming a dead one, because `computed_by` is
+      load-bearing (D101) and a reader had no way to tell.
     engine:
       consumed_by: null
       transform: null
@@ -305,7 +327,18 @@ fields:
     meaning: >-
       ANALYSIS OUTPUT — per-depth breakdown of the graph, as jsonb.
     grain: level
-    computed_by: "combine-project"
+    computed_by: "bulk_insert_network_summary"
+    computed_by_unreachable: >-
+      §4 D118 — THIS WRITER HAS NO CALL SITE, and the field said `combine-project`
+      until WP 6.2 read it. `combine-project`'s entire write surface is
+      `etl_replace_supply_chain` and `refresh_node_list_for_project`; it never
+      touches this table. The only statement that can insert a row is
+      `bulk_insert_network_summary` (`20250905160724`), and no caller exists — not
+      in `src/`, not in `supabase/functions/`. So a project created today has an
+      empty `network_summary` and it stays empty. The name here is now the true
+      producer and this note is the rest of the truth: nothing calls it. Naming the
+      wrong live function was worse than naming a dead one, because `computed_by` is
+      load-bearing (D101) and a reader had no way to tell.
     engine:
       consumed_by: null
       transform: null
@@ -332,7 +365,18 @@ fields:
       reportable state and not a silent default (`declared-fallback`,
       I6). This is the column invariant `input-hash` (I5) is about.
     grain: metadata
-    computed_by: "combine-project"
+    computed_by: "bulk_insert_network_summary"
+    computed_by_unreachable: >-
+      §4 D118 — THIS WRITER HAS NO CALL SITE, and the field said `combine-project`
+      until WP 6.2 read it. `combine-project`'s entire write surface is
+      `etl_replace_supply_chain` and `refresh_node_list_for_project`; it never
+      touches this table. The only statement that can insert a row is
+      `bulk_insert_network_summary` (`20250905160724`), and no caller exists — not
+      in `src/`, not in `supabase/functions/`. So a project created today has an
+      empty `network_summary` and it stays empty. The name here is now the true
+      producer and this note is the rest of the truth: nothing calls it. Naming the
+      wrong live function was worse than naming a dead one, because `computed_by` is
+      load-bearing (D101) and a reader had no way to tell.
     engine:
       consumed_by: null
       transform: null
@@ -357,7 +401,18 @@ fields:
       current_graph_hash()`, which is WP 4.4's one rule, and a timestamp
       comparison is the thing that rule replaces (§4 D12).
     grain: metadata
-    computed_by: "combine-project"
+    computed_by: "bulk_insert_network_summary"
+    computed_by_unreachable: >-
+      §4 D118 — THIS WRITER HAS NO CALL SITE, and the field said `combine-project`
+      until WP 6.2 read it. `combine-project`'s entire write surface is
+      `etl_replace_supply_chain` and `refresh_node_list_for_project`; it never
+      touches this table. The only statement that can insert a row is
+      `bulk_insert_network_summary` (`20250905160724`), and no caller exists — not
+      in `src/`, not in `supabase/functions/`. So a project created today has an
+      empty `network_summary` and it stays empty. The name here is now the true
+      producer and this note is the rest of the truth: nothing calls it. Naming the
+      wrong live function was worse than naming a dead one, because `computed_by` is
+      load-bearing (D101) and a reader had no way to tell.
     engine:
       consumed_by: null
       transform: null

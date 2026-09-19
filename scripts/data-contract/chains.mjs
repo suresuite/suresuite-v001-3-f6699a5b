@@ -1271,7 +1271,30 @@ export function deriveProjectDeletion(root) {
   if (scoped.length < 20) {
     throw new Error(`chains: only ${scoped.length} tables carry project_id; the scan has broken`);
   }
-  const fkTo = (t) => t.columns.find((c) => c.name === "project_id")?.references ?? null;
+  // WHERE A FOREIGN KEY LIVES IN THE ARTIFACT, AND THE FIRST VERSION KNEW HALF OF IT.
+  //
+  // An INLINE `project_id uuid REFERENCES projects(id) ON DELETE CASCADE` lands on the
+  // column as `references`. One added later — `ALTER TABLE … ADD CONSTRAINT … FOREIGN
+  // KEY (project_id) …`, which is how every constraint on an existing table arrives —
+  // lands in `table.constraints` and leaves the column's `references` NULL. This
+  // function read only the column, so every ALTER-added project key counted as no key
+  // at all: WP 6.2's seven cascades were invisible the moment they were written, and
+  // the number this page publishes had been measuring inline declarations rather than
+  // foreign keys for as long as the page has existed (§4 D117).
+  const fkTo = (t) => {
+    const inline = t.columns.find((c) => c.name === "project_id")?.references ?? null;
+    if (inline) return inline;
+    for (const c of t.constraints ?? []) {
+      if (c.kind !== "FOREIGN KEY") continue;
+      if (!(c.columns ?? []).includes("project_id")) continue;
+      const m = /REFERENCES\s+(?:public\.)?(\w+)\s*\(/i.exec(c.definition ?? "");
+      if (!m) continue;
+      const on = /ON\s+DELETE\s+(CASCADE|SET\s+NULL|SET\s+DEFAULT|RESTRICT|NO\s+ACTION)/i
+        .exec(c.definition ?? "")?.[1];
+      return { table: m[1], on_delete: on ? on.replace(/\s+/g, " ") : null };
+    }
+    return null;
+  };
 
   const src = readFileSync(join(root, "supabase", "functions", "delete-project", "index.ts"), "utf8");
   if (!/deleteTableByProjectId\(/.test(src)) {
