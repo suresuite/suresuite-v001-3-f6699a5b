@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 334,
-  "migrations_applied": 326,
+  "migrations_found": 335,
+  "migrations_applied": 327,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260919000003_value_chain.sql",
+  "last_migration": "20260919000004_row_provenance.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 275,
+    "functions": 276,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -23269,6 +23269,20 @@
       "volatility": "STABLE",
       "comment": "Phase 6 / WP 6.2 (§4 D120) — the columns a promotion of this run into this ",
       "defined_by": "20260919000001_customers_land.sql"
+    },
+    {
+      "name": "ingest_row_provenance",
+      "signature": "ingest_row_provenance(uuid, uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_user_id uuid",
+        "p_target_table text"
+      ],
+      "returns": "TABLE ( natural_key jsonb, has_provenance boolean, source_row_number integer, original_filename text, content_sha256 text, uploaded_by_email text, received_at timestamptz, promoted_by_email text, promoted_at timestamptz )",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "§5.4's acceptance test, export side (WP 6.3): one row per tier-2 row of a ",
+      "defined_by": "20260919000004_row_provenance.sql"
     },
     {
       "name": "ingest_target_is_promotable",

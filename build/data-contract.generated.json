@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 334,
-      "migrations_applied": 326,
-      "last_migration": "20260919000003_value_chain.sql"
+      "migrations_found": 335,
+      "migrations_applied": 327,
+      "last_migration": "20260919000004_row_provenance.sql"
     },
     "sidecars": 48,
     "registry": {
@@ -4465,7 +4465,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "evidence": "src/hooks/useVerifiableExports.tsx:117",
               "confirmed": true
             }
           ],
@@ -4544,7 +4544,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "evidence": "src/hooks/useVerifiableExports.tsx:117",
               "confirmed": true
             }
           ],
@@ -4584,7 +4584,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "evidence": "src/hooks/useVerifiableExports.tsx:117",
               "confirmed": true
             }
           ],
@@ -4624,7 +4624,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "evidence": "src/hooks/useVerifiableExports.tsx:117",
               "confirmed": true
             }
           ],
@@ -4728,7 +4728,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "evidence": "src/hooks/useVerifiableExports.tsx:117",
               "confirmed": true
             }
           ],
@@ -4768,7 +4768,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "evidence": "src/hooks/useVerifiableExports.tsx:117",
               "confirmed": true
             }
           ],
@@ -4808,7 +4808,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:100",
+              "evidence": "src/hooks/useVerifiableExports.tsx:117",
               "confirmed": true
             }
           ],
@@ -26810,5 +26810,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "6305d7ea6f57"
+  "contract_version": "29a46c68659a"
 }

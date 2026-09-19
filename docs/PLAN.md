@@ -486,6 +486,31 @@ Supplier grid and a laptop. With no help and no app access beyond the export, th
 trace it to a row in a named file uploaded by a named person on a named date — or
 find the named rule that produced it in the absence of data.
 
+**MET IN WP 6.3, AND THE ANSWER IT GIVES MOST PROJECTS TODAY IS "NO ROW CAN BE
+TRACED", WHICH IS THE POINT.** The second half was answerable from the export since
+WP 3.3 — the substitution rules are in the policy sheets. The first was not
+answerable at all, and A4's own note above says why: the workbook starts at tier 2.
+`ingest_row_provenance` + the workbook's `_provenance` sheet close it: one row per
+tier-2 row of every landable table, with its natural key (read from `pg_index`, never
+restated), the file, the line, the bytes' SHA-256, the uploader and the promoter.
+
+Three properties are the deliverable rather than the sheet:
+
+1. **Every row is listed, traced or not.** A sheet holding only the traced rows reads
+   as a complete lineage and gives a reader no way to discover what is missing from
+   it. `traced` is a column and the header prints all three counts.
+2. **It is read LIVE, and says so.** Provenance cannot go inside the snapshot:
+   `graph_hash` hashes the snapshot, so a re-upload that changed no VALUE would move
+   the hash if the run id were in it. The sheet therefore prints the dataset
+   version's freeze time beside each `promoted at`, so a reader SEES a disagreement
+   rather than being told a filename that is subtly wrong.
+3. **An empty read still produces the sheet.** 8 577 rows in this database predate
+   the ingestion path (§4 D88); "no row in this project can be traced to a file" is
+   what a stakeholder needs to hear, and a missing sheet says nothing at all.
+
+In the app, A2's popover answers the same question per cell. `supabase/rehearsal/270`
+proves the read against a real database, mutation-tested five ways.
+
 ---
 
 ## 6. The documentation plan
@@ -13579,6 +13604,92 @@ repository executes `report-render`; the sections are asserted, the writers are 
 
 **Still open in WP 6.3:** the `ingest-file` landing switch with a §15 either side,
 D123's six WP 7.1 deferrals, D125's declaration (WP 6.4), and D88's drop.
+
+### WP 6.3 (slice 28) — the acceptance test, and what it tells most projects · 2026-09-19 · `20260919000004`
+
+**What the previous slice promised.** Slice 27 finished A3 and listed the package's
+remainders. It did not mention the one thing §11 names as WP 6.3's EXIT: §5.4's
+acceptance test. Checking it rather than assuming it is this slice, and the check
+failed.
+
+#### A · THE TEST WAS HALF-ANSWERABLE, AND A4's OWN NOTE SAID SO
+
+> *"Hand a stakeholder a number from the Supplier grid and a laptop. With no help and
+> no app access beyond the export, they trace it to a row in a named file uploaded by
+> a named person on a named date — or find the named rule that produced it in the
+> absence of data."*
+
+The **second** half has been answerable since WP 3.3: the substitution rules are in
+the policy sheets. The **first** was not answerable at all, and §5.4's A4 note has
+said why since the plan was written — *"the dataset workbook starts at Tier 2 — it
+proves what the engine ran on, not where those rows came from."* A2's popover answers
+it inside the app; the acceptance test says **no app access**.
+
+#### B · WHY THE SNAPSHOT CANNOT CARRY PROVENANCE, WHICH DECIDED THE DESIGN
+
+The obvious fix is to add `ingest_run_id` to `_build_dataset_snapshot_v2` so the
+workbook already has it. **That would break the anchor.** `graph_hash` hashes the
+snapshot, so a re-upload that changed no VALUE would move the hash because the run id
+changed, and every run stamped with the old hash would read as describing a different
+dataset. The anchor is over values on purpose (D67, D88).
+
+So provenance travels BESIDE the frozen rows, which makes the timing a real limit:
+`ingest_row_provenance` reads LIVE, and a row re-promoted after the version was frozen
+reports the NEWER file. That cannot be closed by reading harder — the old staged row
+still exists, but nothing records which run a frozen snapshot's row came from. **So
+the sheet prints the dataset version's freeze time beside every `promoted at`**, and a
+reader SEES the disagreement instead of being handed a filename that is subtly wrong.
+
+#### C · THREE PROPERTIES, EACH ONE THE DELIVERABLE
+
+1. **Every row is listed, traced or not.** Five LEFT JOINs, and `has_provenance` is a
+   column. A sheet holding only the traced rows reads as a complete lineage and gives
+   a reader no way to discover what is missing from it — which is worse than no sheet.
+   The header prints all three counts.
+2. **The natural key is read from `pg_index`**, through `ingest_target_natural_key` —
+   the same function the promotion resolves its arbiter with. A restated key would be
+   right for `customers` and wrong for the next table, and `rehearsal/270` §4 checks a
+   second table for exactly that.
+3. **An empty read still produces the sheet.** "No row in this project can be traced
+   to a file" is true of most projects today and is what a stakeholder needs to hear.
+   A failed read is a different fact: `undefined` when nothing could be read, `[]`
+   when the reads returned nothing, and the hook keeps them apart.
+
+The tables asked about are **derived from `INGEST_DATASETS`**, so the eleventh dataset
+is covered the day it lands rather than the day somebody remembers a list.
+
+#### D · MUTATION-TESTED ON BOTH SIDES, NINE WAYS
+
+`rehearsal/270`, five: an inner join dropping untraced rows; the natural key restated
+as `ARRAY['project_id','customer_id']`; the access gate removed (with the GUC poisoned
+first); `has_provenance` hard-coded true; the file reached through the staged row
+instead of the run. The sheet, four: only traced rows listed; the live-read caveat
+removed; the sheet omitted when the read is empty; an untraced row labelled traced.
+
+#### E · WHAT THIS DOES NOT CLAIM
+
+- **It is not a lineage for a row that was never uploaded.** It says so, in the
+  sheet, in the words "UNKNOWN — not absent", and adds that inventing a file would be
+  worse than the blank (I6).
+- **R12 fired twice this slice** and both times my own edits had moved a cited line —
+  `supply_chain_data` in slice 26, seven `dataset_versions` citations here. That is
+  the gate working, and it is worth recording how cheap the failure is compared with
+  the alternative (D21).
+- **Not deployed.** `20260919000004` reaches production on merge, so the `_provenance`
+  sheet will report a failed read until then.
+
+**Verified:** `rehearsal/270` green and mutation-tested ×5 · three rehearse modes
+green (26 assertion files) · 772 tests ✓ (8 new, mutation-tested ×4) ·
+`contract:check` R1–R17 ✓ · `check:docs` ✓ · typecheck 23 of 23 ✓ · eslint 336/116
+and audit:ui 8, byte-identical to HEAD · artifacts regenerated (276 functions).
+**Read, not verified:** that a stakeholder actually succeeds. The sheet contains the
+file, the line, the hash and two names; whether a person finds them is a usability
+question no test in this repository can answer.
+
+**WP 6.3's deliverables are complete**: A1 (slice 22), A5 (slice 23), A2 (slice 26),
+A3 (slice 27), and §5.4's acceptance test here.
+**Still open and owned elsewhere:** the `ingest-file` landing switch with a §15
+either side, D123's six WP 7.1 deferrals, D125's declaration (WP 6.4), and D88's drop.
 
 ### WP 5.2j — The page that documented the wrong feature, the assets nobody pointed at, and the thin half · 2026-09-19 · no migration
 

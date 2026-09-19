@@ -11,6 +11,7 @@ import { fetchProjectLanes, laneTruncationNotice } from "@/lib/policies/projectL
 import { downloadWorkbook } from "@/lib/policies/excel";
 import {
   buildDatasetWorkbook,
+  type RowProvenance,
   buildRunResultsWorkbook,
   type DatasetVersionRow,
   type RunScenarioMeta,
@@ -21,6 +22,22 @@ import {
   type AnalysisBinding,
 } from "@/lib/trust/reproducibilityRecord";
 import { knownLimits } from "@/lib/trust/trustReport";
+import { INGEST_DATASETS } from "../../supabase/functions/_shared/ingestSpec.generated";
+
+/**
+ * The tables `ingest_row_provenance` can be asked about — DERIVED from the contract,
+ * never listed here.
+ *
+ * `INGEST_DATASETS` is generated from `supabase/contract/*.contract.yaml`, and its
+ * targets are exactly the tables the promotion writes, which are exactly the tables
+ * that carry `ingest_run_id` + `source_row_id`. A hand-written list would be a
+ * second copy that silently omits the eleventh dataset the day it lands — the shape
+ * `single-source` (I1) exists to refuse, and the reason `ingest_target_is_promotable`
+ * is checked against on the SQL side rather than trusted from the caller.
+ */
+const PROVENANCE_TABLES: readonly string[] = [
+  ...new Set(Object.values(INGEST_DATASETS).map((d) => d.target)),
+].sort();
 
 export interface ExportableRun {
   id: string;
@@ -134,10 +151,41 @@ export function useVerifiableExports(
           /* optional sheet only */
         }
       }
+      // §5.4's ACCEPTANCE TEST — WP 6.3. One read per landable table this project
+      // could hold, so the workbook can answer "which file, which line, which
+      // person" for every row it lists.
+      //
+      // `undefined` when NOTHING could be read and `[]` when the reads returned
+      // nothing: the sheet distinguishes them, because a workbook with no
+      // `_provenance` sheet asserts neither, and "no row can be traced" is the true
+      // and useful answer for most projects today (§4 D88).
+      let provenance: RowProvenance[] | undefined;
+      if (user?.id) {
+        const gathered: RowProvenance[] = [];
+        let anyRead = false;
+        for (const table of PROVENANCE_TABLES) {
+          const { data, error } = await sb.rpc("ingest_row_provenance", {
+            p_project_id: projectId,
+            p_user_id: user.id,
+            p_target_table: table,
+          });
+          // A table this project has no rows in returns []; a table the RPC refuses
+          // is a real failure and must not look the same. Either way one failed
+          // table does not discard the others.
+          if (error) continue;
+          anyRead = true;
+          for (const r of (data ?? []) as Array<Omit<RowProvenance, "table">>) {
+            gathered.push({ ...r, table });
+          }
+        }
+        if (anyRead) provenance = gathered;
+      }
+
       const wb = buildDatasetWorkbook(
         version as DatasetVersionRow,
         projectName ?? null,
         bomMulti,
+        provenance,
       );
       const hash8 = String((version as DatasetVersionRow).graph_hash).slice(0, 8);
       downloadWorkbook(wb, `dataset-${safeName(projectName ?? projectId)}-${hash8}.xlsx`);

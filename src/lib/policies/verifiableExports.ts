@@ -202,10 +202,101 @@ function sheetFromRows(rows: Record<string, unknown>[], columns?: string[]): XLS
  * `_meta` states which one this file is. `bomMulti` is still accepted for a v1
  * version, where it is the only way to get those rows into the sheet at all.
  */
+/**
+ * One row of `ingest_row_provenance` — §5.4's acceptance test, export side.
+ *
+ * Read LIVE, deliberately and with the consequence stated in the sheet: the
+ * snapshot is frozen and provenance is not in it, because `graph_hash` hashes the
+ * snapshot and a re-upload that changed no VALUE would move the hash if the run id
+ * were inside (§4 D67, D88). So provenance travels BESIDE the frozen rows, and
+ * `promoted_at` beside the version's own `created_at` lets a reader see a
+ * disagreement rather than be told a filename that is subtly wrong.
+ */
+export interface RowProvenance {
+  table: string;
+  natural_key: Record<string, unknown>;
+  has_provenance: boolean;
+  source_row_number: number | null;
+  original_filename: string | null;
+  content_sha256: string | null;
+  uploaded_by_email: string | null;
+  received_at: string | null;
+  promoted_by_email: string | null;
+  promoted_at: string | null;
+}
+
+/**
+ * The `_provenance` sheet. §5.4's acceptance test in one place:
+ *
+ *   "With no help and no app access beyond the export, they trace it to a row in a
+ *    named file uploaded by a named person on a named date — or find the named rule
+ *    that produced it in the absence of data."
+ *
+ * A4 already carried the second half (the substitution rules are in the policy
+ * sheets). This is the first, and the rule it obeys is that EVERY ROW IS LISTED,
+ * including the ones that cannot be traced: a sheet holding only the traced rows
+ * reads as a complete lineage, and a reader has no way to discover which rows are
+ * missing from it. `traced` is therefore a column, and the header states the count.
+ */
+export function provenanceSheet(
+  rows: RowProvenance[],
+  datasetCreatedAt: string | null,
+): XLSX.WorkSheet {
+  const traced = rows.filter((r) => r.has_provenance).length;
+  const header: Array<Array<string | number | null>> = [
+    ["§5.4 acceptance test — where each row came from"],
+    [
+      "Read LIVE at export time. The dataset snapshot is frozen and does NOT contain " +
+      "provenance, because graph_hash hashes the snapshot and a re-upload that changed " +
+      "no value would move the hash if the run id were inside it. Compare `promoted at` " +
+      "with the dataset version's own timestamp below: a later promotion means this row " +
+      "was re-uploaded after the version was frozen, and the file named here is the " +
+      "NEWER one.",
+    ],
+    ["Dataset version frozen at", datasetCreatedAt ?? "unknown"],
+    [`Rows listed: ${rows.length} · traceable to a file: ${traced} · not traceable: ${rows.length - traced}`],
+    [
+      "A row that is not traceable was written before the ingestion path existed, or by " +
+      "another route. Its provenance is UNKNOWN — not absent. Nothing can say which " +
+      "file produced it, and inventing one would be worse than this blank.",
+    ],
+    [null],
+    [
+      "table", "row key", "traced", "file", "line", "file sha256",
+      "uploaded by", "uploaded at", "promoted by", "promoted at",
+    ],
+  ];
+  const body = rows.map((r): Array<string | number | null> => [
+    r.table,
+    // The key as the index defines it, joined so a reader can match it to the
+    // table sheets without knowing which columns form the key.
+    Object.entries(r.natural_key)
+      .filter(([k]) => k !== "project_id")
+      .map(([k, v]) => `${k}=${String(v)}`)
+      .join(" · "),
+    r.has_provenance ? "yes" : "no",
+    r.original_filename,
+    r.source_row_number,
+    r.content_sha256,
+    r.uploaded_by_email,
+    r.received_at,
+    r.promoted_by_email,
+    r.promoted_at,
+  ]);
+  return XLSX.utils.aoa_to_sheet([...header, ...body]);
+}
+
 export function buildDatasetWorkbook(
   dataset: DatasetVersionRow,
   projectName: string | null,
   bomMulti?: Record<string, unknown>[],
+  /**
+   * §5.4's acceptance test (WP 6.3). `undefined` means the read was not attempted
+   * or failed; `[]` means it returned nothing. The sheet distinguishes them,
+   * because "we could not look" and "there is nothing" are different facts and a
+   * missing sheet asserts neither.
+   */
+  provenance?: RowProvenance[],
 ): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
   const raw = dataset.snapshot ?? {};
@@ -270,6 +361,18 @@ export function buildDatasetWorkbook(
       sheetFromRows(deepBom, ["plant_name", "material_id", "higher_level_component_id",
                               "level", "consumption_rate"]),
       "bom_multi_level",
+    );
+  }
+  // §5.4's acceptance test — WP 6.3. The sheet is added whenever the read was
+  // ATTEMPTED, including when it came back empty: an empty sheet says "no row in
+  // this project can be traced to a file", which is true of most projects today
+  // (§4 D88) and is exactly what a stakeholder needs to be told. Omitting it would
+  // leave the workbook silent on the question the acceptance test asks.
+  if (provenance) {
+    XLSX.utils.book_append_sheet(
+      wb,
+      provenanceSheet(provenance, dataset.created_at ?? null),
+      "_provenance",
     );
   }
   // The network domain, from v2 on. It is empty on every project in production
