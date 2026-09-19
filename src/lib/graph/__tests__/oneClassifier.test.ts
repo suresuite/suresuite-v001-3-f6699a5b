@@ -34,7 +34,10 @@ const CLASSIFIER_DECL =
 /** The state on the day this gate landed. One name per classifier still in place. */
 const BASELINE: Record<string, string[]> = {
   'src/pages/ProductLevelNetwork.tsx': ['buildGroupClassification', 'getLocationGroup'],
-  'src/pages/ProcessLevelNetwork.tsx': ['getNodeTypeFromLevel', 'getDisplayNodeType'],
+  // WP 8.3 migrated this page: both of its classifiers are GONE. It reads `echelon`
+  // from `typedNodesFromLanes` (the declared mirror of `classify_node_echelon`) and
+  // maps to the legacy vocabulary in one place. Four remain, on three pages.
+  'src/pages/ProcessLevelNetwork.tsx': [],
   'src/pages/FirmLevelNetwork.tsx': ['getTierFromDepth'],
   'src/pages/InteractiveNetworkSpace.tsx': ['getNodeTypeFromLevel'],
 };
@@ -112,6 +115,9 @@ describe('one classifier — the ratchet that stops eight becoming nine', () => 
     // SQL's `classify_node_echelon` and the engine's master-table read are the other
     // two of the eight. Six are in `src/`, and this is the number that must fall.
     const total = Object.values(BASELINE).reduce((a, names) => a + names.length, 0);
-    expect(total).toBe(6);
+    // 6 when this gate landed; 4 since WP 8.3 migrated ProcessLevelNetwork. The number
+    // is asserted rather than described so a migration cannot happen quietly — and so
+    // the remaining work is a count a reader can check in one line.
+    expect(total).toBe(4);
   });
 });

@@ -47,7 +47,7 @@ Written by the `combine-project` edge function, never by a page. Invariant I2: p
 |---|---|---|---|
 | `DataManager.tsx` | rpc combine_project_into_supply_chain | `src/pages/DataManager.tsx:650` | yes |
 | `InteractiveNetworkSpace.tsx` | table read | `src/pages/InteractiveNetworkSpace.tsx:369` | yes |
-| `ProcessLevelNetwork.tsx` | table read | `src/pages/ProcessLevelNetwork.tsx:1214` | yes |
+| `ProcessLevelNetwork.tsx` | table read | `src/pages/ProcessLevelNetwork.tsx:1258` | yes |
 | `ProjectPolicies.tsx` | rpc get_supply_chain_data_multi_tier | `src/hooks/useProjectContext.tsx:49` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
@@ -144,7 +144,7 @@ Which deep-tier upload produced this edge.
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:1214`) —
+**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:1258`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -238,7 +238,7 @@ How many tiers upstream of the plant this edge sits. 2 is a supplier's supplier.
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:1214`) —
+**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:1258`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -331,6 +331,6 @@ When the edge was last recomputed. Server-set.
 
 ---
 
-*Generated from data contract `8c56366d1bc3`, engine `0.2.3`,
+*Generated from data contract `b7c6a2233640`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data_multi_tier.contract.yaml`, table created by `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

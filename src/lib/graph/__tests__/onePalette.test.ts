@@ -22,6 +22,11 @@ const COLOR_LITERAL = /#[0-9a-fA-F]{3,8}\b|hsl\(/g;
 /** Counted on the day the gate landed. Each must fall to 0 as its page migrates. */
 const BASELINE: Record<string, number> = {
   'src/pages/ProductLevelNetwork.tsx': 11,
+  // UNCHANGED at 32 by WP 8.3, and that is the honest number: the two classifiers it
+  // deleted held no colours. `getNodeColor` still holds all 32, because replacing it
+  // is the same change as migrating the level tiles and the flow list — WP 8.4's.
+  // Worth recording that the first attempt lowered this to 31 from a `grep -c`, which
+  // counts LINES and not matches; the ratchet's own count is the one that decides.
   'src/pages/ProcessLevelNetwork.tsx': 32,
   'src/pages/FirmLevelNetwork.tsx': 13,
   'src/pages/InteractiveNetworkSpace.tsx': 16,
