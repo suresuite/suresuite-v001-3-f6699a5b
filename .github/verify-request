@@ -11,3 +11,11 @@
 # probe that ordered by a column that does not exist, printed QUERY FAILED, and
 # exited 0.
 WP 6.3 precondition — D88's unblocking condition: analysis_runs / analysis_results and computed_from_hash IS NULL per derived table, after the 20260918000002-4 deploy (run 35343683145, success). No migration in this push.
+
+D88 precondition, re-read: the user reports running a network analysis after
+21:47Z. Run 35398461411 (2026-09-18T21:47Z) read analysis_runs 0 / analysis_results 0
+and 9016 of 9016 derived rows with no input hash — that report predates the run
+they describe. Functions carrying WP 4.3's dual-write have been live since
+Deploy Supabase Functions #47 (2026-09-17T22:17Z, success); #50 at 20:27Z today
+is the latest. This asks the same questions again so the store can be read after
+the fact rather than reasoned about. No migration in this push.

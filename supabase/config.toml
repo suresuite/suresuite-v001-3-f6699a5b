@@ -1,7 +1,22 @@
 project_id = "wckdrutwkytwcomrlpib"
 
 [functions.calculate-node-prominence]
+# A database trigger reaches this one through `pg_net` with no user JWT
+# (`auto_calculate_prominence_on_deep_tier_completion`), so platform
+# verification must be off. The browser calls it too, with the anon key.
 verify_jwt = false
+
+# D105 — these two were UNDECLARED while they were also undeployed, so nothing
+# had ever had to state their trust model. Both are browser-invoked only
+# (`ProductLevelNetwork.tsx`, `MLPrediction.tsx`) with the anon key, which is a
+# valid JWT, and no `pg_net` caller reaches either — so verification stays on.
+# Declared rather than left to the CLI's default, which is the same value: a
+# default is not a decision, and the next reader cannot tell them apart.
+[functions.calculate-network-science-metrics]
+verify_jwt = true
+
+[functions.predict-critical-nodes]
+verify_jwt = true
 
 [functions.combine-project]
 verify_jwt = true
