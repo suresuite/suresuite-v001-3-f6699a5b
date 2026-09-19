@@ -127,7 +127,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
             <Label className="text-[10px]">Duration ({unitPlural})</Label>
             <DisruptionNumberInput
               value={Math.round(fromDays(d.duration_days))}
-              onChange={(e) => patch(i, { duration_days: Math.round(toDays(+e.target.value)) })}
+              onChange={(v) => patch(i, { duration_days: Math.round(toDays(v)) })}
               onBlur={commit}
             />
           </div>
@@ -135,7 +135,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
             <Label className="text-[10px]">Magnitude %</Label>
             <DisruptionNumberInput
               value={d.magnitude_pct}
-              onChange={(e) => patch(i, { magnitude_pct: +e.target.value })}
+              onChange={(v) => patch(i, { magnitude_pct: v })}
               onBlur={commit}
             />
           </div>
