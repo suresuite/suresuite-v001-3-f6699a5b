@@ -1390,13 +1390,20 @@ async function wp71Stage0() {
   report("stage 0.9 — which foreign keys to `auth.users` production STILL has", authFks, (rows) => {
     out(...table(rows));
     out(
-      `- **${rows.length} key(s)**, against **9 columns** the introspected artifact records (D132).`,
+      `- **${rows.length} key(s)**. Expected **6** since \`20260919000012\` re-keyed`,
+      "  `ingest_runs`' two actor columns to `approved_users` (D131); the artifact records",
+      "  seven, and the one it is still wrong about is `policy_versions.created_by`, dropped",
+      "  in June and not followed by the introspector (D132).",
       "  A difference is a defect in the artifact, not in the database (D49/D52's class):",
       "  a constraint dropped by a later `ALTER TABLE` that the introspector did not",
       "  follow, and therefore a foreign key this repository believes in and production",
       "  does not — or the reverse, which is worse.",
     );
     const t = rows.map((r) => r.table_name);
+    // `ingest_runs` must NOT be here any more. Until `20260919000012` it was, and the gate
+    // below is what made that visible rather than a footnote; it stays because a migration
+    // that reverted the re-key would otherwise put the CSV landing path back into a state
+    // where it cannot run, silently.
     if (t.includes("ingest_runs")) {
       out(
         "- **`ingest_runs` IS IN THIS LIST, AND THAT BLOCKS WP 6.5 (a).**",

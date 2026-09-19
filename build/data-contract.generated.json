@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 340,
-      "migrations_applied": 332,
-      "last_migration": "20260919000011_prefer_the_session.sql"
+      "migrations_found": 341,
+      "migrations_applied": 333,
+      "last_migration": "20260919000012_ingest_actor_points_at_approved_users.sql"
     },
     "sidecars": 54,
     "registry": {
@@ -9321,6 +9321,24 @@
           "columns": [],
           "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))",
           "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "ingest_runs_triggered_by_user_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "triggered_by_user_id"
+          ],
+          "definition": "FOREIGN KEY (triggered_by_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL",
+          "added_by": "20260919000012_ingest_actor_points_at_approved_users.sql"
+        },
+        {
+          "name": "ingest_runs_applied_by_user_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "applied_by_user_id"
+          ],
+          "definition": "FOREIGN KEY (applied_by_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL",
+          "added_by": "20260919000012_ingest_actor_points_at_approved_users.sql"
         }
       ],
       "indexes": [
@@ -30174,5 +30192,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "45218efefab2"
+  "contract_version": "9454a1dfc060"
 }

@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 340,
-  "migrations_applied": 332,
+  "migrations_found": 341,
+  "migrations_applied": 333,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260919000011_prefer_the_session.sql",
+  "last_migration": "20260919000012_ingest_actor_points_at_approved_users.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -7818,6 +7818,24 @@
           "columns": [],
           "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))",
           "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "ingest_runs_triggered_by_user_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "triggered_by_user_id"
+          ],
+          "definition": "FOREIGN KEY (triggered_by_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL",
+          "added_by": "20260919000012_ingest_actor_points_at_approved_users.sql"
+        },
+        {
+          "name": "ingest_runs_applied_by_user_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "applied_by_user_id"
+          ],
+          "definition": "FOREIGN KEY (applied_by_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL",
+          "added_by": "20260919000012_ingest_actor_points_at_approved_users.sql"
         }
       ],
       "indexes": [
