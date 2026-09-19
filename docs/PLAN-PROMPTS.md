@@ -699,6 +699,113 @@ Gap check for every sub-package: diff §6.3 against the live schema and App.tsx.
 table or route with no page and no internal-only justification is a finding.
 ```
 
+### WP 5.2j — Depth, and the assets the manual never points at  (closes D110)
+
+*Run this AFTER 5.2a–i. All eighty pages exist and pass every gate; this package
+is about whether they are worth reading. Budget it as a full session per
+section-group — do NOT try to do all four in one.*
+
+```
+Implement WP 5.2j from docs/PLAN.md (§6.3, §12; findings in §16 · WP 5.2i).
+
+The manual is COMPLETE and parts of it are THIN. Two measured problems:
+
+A. 23 of 80 pages render under 500 words, and they CLUSTER — sections 9, 10,
+   11 and 14 (the assistant, connectors, results, the API). The correlation is
+   the finding: where there was no generated fact to render, less was written.
+   The generated reference pages are fine; a generator cannot be lazy.
+
+B. D110 — eighty pages point at NONE of the files the product ships:
+     · 14 CSV templates in public/template/
+     · 3 guides in public/docs/ (csv-upload-guide, location-dataset-guide,
+       nexus-node)
+     · public/notebooks/suresuite_api_quickstart.ipynb — a ready-to-run Colab
+       notebook offered on /developer
+   A page can be perfectly sourced and still leave a reader hunting for the
+   file they came for.
+
+══ DO B FIRST. It is smaller, it is mechanical, and it is the half that saves
+   the most support time per hour spent.
+
+B — DERIVE THE LINKS, DO NOT TYPE THEM.
+  UploadWizard.tsx's `templateTypes` already pairs every dataset id with its
+  `templateFile` and `guideFile`. Parse it in scripts/data-contract/chains.mjs
+  the way deriveStressTests and deriveApiRoutes do, emit into
+  policy.generated.ts, and render on each table page. Then a template renamed
+  in the wizard cannot leave a dead link in the manual.
+  · Throw if the parse yields fewer than 10 datasets (the vacuity rule, D57).
+  · A test must assert every derived path EXISTS under public/. A 404 from a
+    documentation page is worse than no link.
+  · Two facts the derivation carries that no page states today, and both must
+    survive onto the page: node_list has templateFile: '' — there is
+    deliberately no template, the user works from downloaded data — and
+    deep_tier_json offers a .json template, not a .csv.
+  · The notebook is section 14's. Put it on `getting-an-api-key`, which is
+    where somebody who wants to call the API actually starts.
+
+A — THE METHOD, and it is the point of this package.
+  Do NOT "write more". For each thin page, run this and let it produce the
+  content:
+
+    1. Open the product surface the page documents (its route in App.tsx, or
+       the module named in the page's own lineage block).
+    2. ENUMERATE what it offers: every control, filter, panel, toggle, badge,
+       empty state and error state. Read the UI strings and the state hooks.
+    3. DIFF that against the page. Every item the page does not mention is
+       either (a) missing content, or (b) a deliberate omission — and if it is
+       (b), say so on the page rather than leaving silence.
+    4. For each item you add, answer the question the user will actually have:
+       not "there is a filter" but "it is ON by default and it hides exactly
+       the rows worth auditing".
+
+  This method is not theoretical — it is what the four network pages were
+  rewritten with, and it found: inferred node groups (so a mis-typed id
+  silently becomes a fifth node), the zero-flow filter's default, single-source
+  risk, revenue coverage as the figure that qualifies every weighted measure,
+  and what a one-node BOM level means. None of that was in the contract; all of
+  it was on screen.
+
+  WORK IN THIS ORDER — highest support-cost first:
+    §14 Developer API (4 pages, +notebook) · §11 Results (5) ·
+    §10 Connectors (3) · §9 Project Intelligence (4) · then the rest.
+
+══ THE RULES THAT DO NOT RELAX ══
+
+1. NEVER RETYPE A GENERATED FACT. Columns, units, substitutions, chains, KPIs,
+   policy params, analysis kinds, API routes and stress tests are all already
+   generated. Depth means MORE OF THE PRODUCT, never a hand-copied fact.
+2. Every claim about behaviour is read from the code that implements it, and
+   the page says where when it is not a contract fact. A confident sentence you
+   did not verify is worse than a short page.
+3. PUBLISH THE BLIND SPOTS. §4 is the authority; a brief is a snapshot. Two
+   defects in this phase were named as live by a brief AFTER they were closed
+   (D107) — check §4's "Closed by" before you repeat any warning.
+4. Do not add or renumber pages. If a page needs to exist, that is a finding
+   for §16 and §6.3, not an edit.
+5. FIGURES: 16 slots are declared and open in figureManifest.ts. If a page you
+   are deepening plainly needs a diagram and has no slot, ADD the slot with its
+   `shows` brief. Do not draw it. Do not remove a slot to make a page look
+   finished.
+
+══ EXIT ══
+  npm run lint · npm test · npm run check:docs · npm run contract:check
+  npm run typecheck · npm run build && npm run audit:bundle
+  registry.test.ts · bodies.test.tsx · figures.test.ts all green
+  eslint 336/116 and audit:ui 8 — AT BASELINE, not improved, not worse
+  every derived template/guide/notebook path resolves to a file that exists
+  no page under 500 rendered words in the section-group you took
+
+  `npm run lint` CANNOT pass: eslint (336) and audit:ui (8) predate this phase.
+  "At baseline, all four gates ran" is the honest report. Do not weaken them to
+  make it green, and do not claim it went green.
+
+══ GAP CHECK ══
+  Re-measure the word counts (render each body, strip tags, count) and put the
+  new distribution in §16 beside 5.2i's. If a page is still thin AFTER the
+  method was applied honestly, that is a finding about the PRODUCT surface
+  being thin, not about the page — say which, and say so plainly.
+```
+
 ### WP 5.3 — Pages read analysis_results; drop entity columns
 
 ```
