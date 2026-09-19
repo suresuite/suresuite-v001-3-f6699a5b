@@ -1,0 +1,638 @@
+<!-- run_id: 35468693464  outcome: success -->
+<!-- trigger: push  ref: main  sha: b98356b5352648a704f46c71c1b2a40ff6faee53 -->
+# PLAN.md §15 — verification SQL, executed
+
+- project ref: `wckdrutwkytwcomrlpib`
+- run at: 2026-09-19T20:52:09.185Z
+- route: Supabase Management API `/database/query` (the route §16 · WP 2.1 follow-up and `seed-project.yml` prove)
+- every statement is a `select`; `assertReadOnly()` refuses anything else.
+
+### Schema probe — production vs. the migrations (D32, D43)
+
+- migrations create **81 tables** and **7 views**; production's `public` schema holds **88 relations**.
+- **created by a migration, ABSENT from production: 0 tables, 0 views**
+- **present in production, created by NO migration: 0**
+
+### D38 — every view runs as its caller, or is the declared exception
+
+- production's `public` schema holds **7 views**.
+  | view                             | runs_as | states_own_rule |
+  |----------------------------------|---------|-----------------|
+  | admin_audit_logs                 | caller  | —               |
+  | admin_org_file_usage             | caller  | —               |
+  | sc_edges                         | caller  | —               |
+  | sc_nodes                         | caller  | —               |
+  | simulation_result_scenarios      | caller  | —               |
+  | simulation_results_with_settings | caller  | —               |
+  | v_admin_user_usage               | OWNER   | yes             |
+- `v_admin_user_usage` runs as its owner AND states its own rule — the declared exception is intact in production.
+
+### D30 — which of the two duplicate-policy migrations ran
+
+  | trigger_name                            | on_table                       |
+  |-----------------------------------------|--------------------------------|
+  | simulation_cache_defaults               | simulation_cache               |
+  | simulation_job_timing_trigger           | simulation_jobs                |
+  | simulation_jobs_defaults                | simulation_jobs                |
+  | simulation_performance_metrics_defaults | simulation_performance_metrics |
+- from `20250913085427`: **4 of 4**; from `20250914113723`: **0 of 4**.
+- **SETTLED: `20250913085427` ran to completion and `20250914113723` ABORTED at its first duplicate `CREATE POLICY` (42710).** Everything after statement 155 of the later file — two functions and four triggers — never reached production. What the tables have is the EARLIER file's set.
+  | function_name                  |
+  |--------------------------------|
+  | cleanup_simulation_cache       |
+  | set_simulation_tables_defaults |
+  | update_simulation_job_timing   |
+
+**D44 · what the unseed actually did**, read back from the audit row rather than from a NOTICE the `db push` log discards:
+  | created_at                    | action    | target_type      | rows_carrying_zero | distinct_targets | keys_removed | rows_deleted_empty | rows_still_zero | actor_known |
+  |-------------------------------|-----------|------------------|--------------------|------------------|--------------|--------------------|-----------------|-------------|
+  | 2026-09-16 06:34:12.104994+00 | remediate | policy_overrides | 477                | 477              | 477          | 0                  | 0               | false       |
+- `rows_deleted_empty = 0` is the number that judges the SHAPE of the fix: every row it did NOT delete is a row a row-level `DELETE` would have taken, along with whatever else its patch held.
+
+**D45 · the data plane, in production** — 18 rows and all of them `admin` was the measurement that opened D45:
+  | plane | rows  | first_row                     |
+  |-------|-------|-------------------------------|
+  | admin | 18    | 2026-07-11 18:11:02.13357+00  |
+  | data  | 12618 | 2026-09-16 06:34:12.104994+00 |
+- No policy name is duplicated. WP 2.1's drop-and-recreate left one of each, which is the END STATE D30 says was already deterministic.
+
+### D29 — `organizations.name` collisions (the dual read's text branch)
+
+- **0** normalized organization names are held by more than one organization.
+- No collision today. D29 is latent, not live — nothing prevents the next one (`name` has no unique constraint).
+- organizations: **3**
+
+**D29 · the one project the text branch is load-bearing for.** Removing the branch is gated on this row:
+  | project_id                           | project_name            | org_text    | orgs_matching_text | candidates | modeler_id                           | modeler_rows |
+  |--------------------------------------|-------------------------|-------------|--------------------|------------|--------------------------------------|--------------|
+  | 4f314330-6f55-48b7-a654-8784e2778508 | Demo Simulation Project | default_org | 0                  |            | 16afcc1b-0d86-4c95-ad60-ef28de8c695d | 0            |
+- At least one row's org text matches zero or several organizations. A migration must not choose; say so in §16 instead.
+  | id                                   | name     | slug     | status |
+  |--------------------------------------|----------|----------|--------|
+  | 35cae3ee-63cb-4fc9-8d1f-939720b28fd1 | Company1 | company1 | active |
+  | 32186f24-3135-492c-ac1c-f6b534a1aba2 | Company2 | company2 | active |
+  | 46feb45d-9df3-4d3e-9b13-5f205799d7cd | DMRG     | dmrg     | active |
+
+**D29 · who would lose access if the text branch were removed.** The branch can only admit a reader whose own org TEXT matches a project's:
+  | users_with_default_org_text | active | users_with_blank_org_text |
+  |-----------------------------|--------|---------------------------|
+  | 0                           | 0      | 0                         |
+- Nobody carries the `default_org` text, so the NULL-org project is reachable by no ordinary user today. Removing the branch revokes nothing.
+
+### The four decisions §15 gates (§16 PHASE BOUNDARY, condition 2)
+
+**1 · The org backfill's real coverage** — WP 2.1's unverifiable exit check.
+  | projects | projects_org_null | projects_org_text_blank | approved_users | users_org_null |
+  |----------|-------------------|-------------------------|----------------|----------------|
+  | 10       | 1                 | 0                       | 14             | 0              |
+
+**2 · Projects whose `modeler_id` resolves to no `approved_users` row** — WP 2.2's owner backfill.
+  | projects_with_modeler | modeler_without_account |
+  |-----------------------|-------------------------|
+  | 10                    | 1                       |
+
+**3 · Production's audit rows against WP 2.3's new `plane` CHECK.**
+  | plane | rows  |
+  |-------|-------|
+  | data  | 12618 |
+  | admin | 18    |
+- Every row's `plane` is inside `(admin, data, access)`. The generalization migrated cleanly.
+
+### WP 3.1 — the ingestion tables, after the rename
+
+  | runs | runs_connector | runs_without_link | runs_without_project | staged_products | staged_bom_versions | staged_bom_lines | landed_files | links |
+  |------|----------------|-------------------|----------------------|-----------------|---------------------|------------------|--------------|-------|
+  | 0    | 0              | 0                 | 0                    | 0               | 0                   | 0                | 0            | 0     |
+- The connector has never run in production. The rename therefore moved an EMPTY table, and `supabase/rehearsal/050` — which runs against rows — is the only evidence that the path still works. That is the right way round, and it is why the assertion exists.
+
+### WP 3.2 — the CSV landing, and whether it has ever run
+
+  | csv_runs | csv_runs_applied | staged_rows | staged_rows_rejected | csv_files | landing_audit_rows |
+  |----------|------------------|-------------|----------------------|-----------|--------------------|
+  | 0        | 0                | 0           | 0                    | 0         | 0                  |
+- **No CSV has been uploaded through `ingest-file` yet.** Every claim WP 3.2 makes rests on `supabase/rehearsal/070`. Do not read an empty staging table as evidence that anything works (§16 · WP 3.1).
+
+### WP 3.4 — provenance on tier 2, and what `diff_state` actually holds
+
+  | tbl                | total | with_run | with_row |
+  |--------------------|-------|----------|----------|
+  | bom_multi_level    | 792   | 0        | 0        |
+  | bom_single_level   | 2907  | 0        | 0        |
+  | inbound_logistics  | 1691  | 0        | 0        |
+  | materials          | 1315  | 0        | 0        |
+  | outbound_logistics | 38    | 0        | 0        |
+  | products           | 28    | 0        | 0        |
+  | suppliers          | 201   | 0        | 0        |
+- **0 of 6972 canonical rows trace to a source line.** A NULL means the provenance is UNKNOWN, never that there was none: both columns are `ON DELETE SET NULL`, and every row predating the CSV landing path carries neither because the files were never stored. Nothing can backfill it.
+- No staged row exists, so the column holds nothing. The claim that WP 3.3 left every row saying `new` is about the DDL, not about data — there is none.
+- No run stages `ingest_staged_rows`. The partition the review screen renders has never been exercised on real data.
+  | projects | projects_with_no_member | modeler_not_a_member | memberships |
+  |----------|-------------------------|----------------------|-------------|
+  | 10       | 1                       | 0                    | 9           |
+- Every project's modeler is a member of it. The role gate resolves for the person who created the project, which is the precondition WP 3.4's exit check stands on.
+
+### WP 4.1 — what the `schema_version` bump costs, counted before it happens
+
+  | dataset_versions | projects_with_a_version | distinct_graph_hashes | projects |
+  |------------------|-------------------------|-----------------------|----------|
+  | 11               | 5                       | 11                    | 10       |
+- Every one of these 11 rows is IMMUTABLE and keeps its stored `snapshot` and `graph_hash`. The bump does not rewrite them; it means the NEXT `snapshot_dataset` call inserts a new version instead of deduping against the latest, which is the intended behaviour and not the cost. The cost is below.
+  | runs | runs_bound_to_a_version | runs_with_a_graph_hash | runs_whose_version_is_gone |
+  |------|-------------------------|------------------------|----------------------------|
+  | 25   | 25                      | 25                     | 0                          |
+- Every bound run resolves its version. The bump cannot change this: `dataset_versions` rows are never updated and never deleted by any path this package touches, and the FK is `ON DELETE SET NULL`.
+  | proposals | live | live_grounded_on_graph_hash | live_and_fresh_today | already_expired |
+  |-----------|------|-----------------------------|----------------------|-----------------|
+  | 1         | 0    | 0                           | 0                    | 0               |
+- No live proposal is grounded on a `graph_hash`, so the bump expires nothing. The write path exists and is unexercised; the decision costs nothing today and would cost `live_grounded_on_graph_hash` proposals on any day it is not zero.
+  | validation_cards | active_cards | active_and_data_fresh_today |
+  |------------------|--------------|-----------------------------|
+  | 0                | 0            | 0                           |
+- 0 active card(s) match their project's hash today and will report `drift: ["data"]` from the deploy onward. **This one is display-only and reversible** — the badge is derived at read time (`useModelValidation`), no column is written, and re-validating clears it.
+  | memories | grounded_on_graph_hash |
+  |----------|------------------------|
+  | 0        | 0                      |
+- Display-only and reversible, same as the cards: `useProjectMemory` compares at read time.
+
+### WP 4.1 — the tables the hash starts covering, and the three that hold nothing
+
+  | tbl                     | rows | projects |
+  |-------------------------|------|----------|
+  | bom_multi_level         | 792  | 2        |
+  | customers               | 7    | 6        |
+  | multi_tier_supply_chain | 0    | 0        |
+  | tier2_suppliers         | 0    | 0        |
+  | tier3_suppliers         | 0    | 0        |
+- **`hash_network`'s three tables hold ZERO rows in every project**, which is the settled decision's second clause measured rather than asserted. The half is free to add and is UNEXERCISED until somebody uploads one: a green test on it is not a working path.
+
+### WP 4.1 — did the bump actually reach production?
+
+  | domain_columns | wp41_functions |
+  |----------------|----------------|
+  | 2              | 9              |
+- Landed: both domain columns and all nine functions are present.
+  | project_id                           | schema_version | has_inputs | has_network | inputs_hash | network_hash |
+  |--------------------------------------|----------------|------------|-------------|-------------|--------------|
+  | 4f314330-6f55-48b7-a654-8784e2778508 | 3              | true       | true        | true        | true         |
+  | 8724f960-b612-4bd5-a010-ab3250849f6a | 3              | true       | true        | true        | true         |
+  | 27a86f0e-81e8-4d83-a03f-d46981af281a | 3              | true       | true        | true        | true         |
+  | 639005df-58ad-405a-8e81-4a26cde1b18f | 3              | true       | true        | true        | true         |
+  | d8a4c2d5-92eb-49b2-9ead-a60b08db3156 | 3              | true       | true        | true        | true         |
+- Every project builds a v3 snapshot with both domains, and both domain hashes compute.
+  | versions | pre_bump_still_matching | post_bump_matching_expected | without_domain_hashes |
+  |----------|-------------------------|-----------------------------|-----------------------|
+  | 11       | 0                       | 0                           | 6                     |
+- All 11 version(s) read dirty against the live project, and 6 carry no domain hashes — correct and not backfillable: a v1 snapshot has no `network` domain. The next freeze on each project writes all three.
+
+### WP 4.1 — D36's six PostgREST writers, as the audit log holds them
+
+  | target_type       | action            | rows  | actor_known | actor_unknown |
+  |-------------------|-------------------|-------|-------------|---------------|
+  | supply_chain_data | update            | 10300 | 0           | 10300         |
+  | network_nodes     | update            | 2266  | 1           | 2265          |
+  | scenarios         | update            | 14    | 0           | 14            |
+  | dataset_versions  | insert            | 5     | 0           | 5             |
+  | policy_defaults   | update            | 6     | 1           | 5             |
+  | policy_overrides  | delete            | 5     | 1           | 4             |
+  | products          | update            | 3     | 0           | 3             |
+  | policy_overrides  | insert            | 3     | 1           | 2             |
+  | policy_overrides  | update            | 2     | 0           | 2             |
+  | bom_multi_level   | delete            | 1     | 0           | 1             |
+  | customers         | insert            | 1     | 0           | 1             |
+  | inbound_logistics | delete            | 1     | 0           | 1             |
+  | materials         | insert            | 1     | 0           | 1             |
+  | network_nodes     | insert            | 1     | 0           | 1             |
+  | policy_defaults   | delete            | 1     | 0           | 1             |
+  | policy_overrides  | remediate         | 1     | 0           | 1             |
+  | products          | insert            | 1     | 0           | 1             |
+  | scenarios         | insert            | 1     | 0           | 1             |
+  | suppliers         | insert            | 1     | 0           | 1             |
+  | tier2_lane_tables | natural_key_dedup | 1     | 0           | 1             |
+  | analysis_results  | insert            | 1     | 1           | 0             |
+  | analysis_runs     | insert            | 1     | 1           | 0             |
+  | analysis_runs     | update            | 1     | 1           | 0             |
+- **12611 data-plane row(s) record `actor_known: false`.** That is honest and it is not attribution (§2.1 `audit-actor`). This package moves the six PostgREST writes into RPCs that take the actor as a parameter; the after-run is how we find out whether the number moved for a path anyone actually ran.
+
+### WP 4.2 — the four DERIVED tables, and D19 as a quantity
+
+  | tbl             | rows | projects | rows_with_computed | rows_geocoded |
+  |-----------------|------|----------|--------------------|---------------|
+  | node_list       | 1747 | 7        | 0                  | 108           |
+  | network_nodes   | 1824 | 2        | 1824               | 1327          |
+  | network_edges   | 2129 | 1        | 0                  | 0             |
+  | network_summary | 0    | 0        | 0                  | 0             |
+
+- **5700 row(s) across the four tables, 1824 of them carrying at least one COMPUTED column and NONE of them carrying an input hash** — no tier-3 table has `computed_from_hash` yet. That is D19 as a number rather than an adjective, and it is WP 4.3's before-figure.
+  | project                 | node_list | network_nodes | network_edges | network_summary | nodes_with_metrics |
+  |-------------------------|-----------|---------------|---------------|-----------------|--------------------|
+  | Demo Simulation Project | 0         | 0             | 0             | 0               | 0                  |
+  | Project AA - ver3       | 242       | 1385          | 2129          | 0               | 1003               |
+  | Project 1               | 154       | 0             | 0             | 0               | 0                  |
+  | Project 2               | 242       | 0             | 0             | 0               | 0                  |
+  | First Project           | 0         | 0             | 0             | 0               | 0                  |
+  | Project TRON - ver1     | 25        | 0             | 0             | 0               | 0                  |
+  | Example — 1P/2M/3S      | 7         | 0             | 0             | 0               | 0                  |
+  | Project TRON - ver2     | 638       | 0             | 0             | 0               | 0                  |
+  | Project 3 - test AI     | 0         | 0             | 0             | 0               | 0                  |
+  | Aumovio                 | 439       | 439           | 0             | 0               | 439                |
+  | tbl               | audit_triggers |
+  |-------------------|----------------|
+  | external_evidence | 0              |
+  | model_validations | 0              |
+  | network_edges     | 0              |
+  | network_nodes     | 0              |
+  | network_summary   | 0              |
+  | node_list         | 0              |
+
+- **6 of 6 carry no `audit_tier_write` trigger.** They are outside the contract, therefore outside `dataPlaneAudit.test.ts`'s rule, therefore their writes are unattributable with nothing to notice. That is D54 measured rather than described.
+
+### WP 4.2 — did the analysis store reach production?
+
+  | store_tables | store_functions | partial_unique_key | audit_triggers |
+  |--------------|-----------------|--------------------|----------------|
+  | 2            | 5               | 1                  | 6              |
+- Landed: both tables, all five functions, the partial unique key and all six audit triggers.
+  | definition                                                                                                                                                                         |
+  |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+  | CREATE UNIQUE INDEX analysis_runs_key_uniq ON public.analysis_runs USING btree (project_id, analysis_kind, input_hash, params_hash, code_version) WHERE (status <> 'failed'::text) |
+  | runs | results | projects | runs_with_no_actor |
+  |------|---------|----------|--------------------|
+  | 1    | 439     | 1        | 0                  |
+  | rows | null_uid | rows_a_unique_index_would_reject | duplicated_keys |
+  |------|----------|----------------------------------|-----------------|
+  | 1824 | 0        | 0                                | 0               |
+
+- **0 row(s) across 0 duplicated key(s)** would be rejected by the unique index `calculate-network-science-metrics:115` already names in its `onConflict`. Until it exists that upsert raises `42P10` on every run, the handler logs and carries on, and the per-node update loop then matches nothing (D72). `null_uid` is 0 — a nullable key column means the index must be `NULLS NOT DISTINCT` or it constrains every row except those (D5).
+
+### WP 4.3 / 4.4 — provenance coverage, and D70's realised damage
+
+  | tbl               | rows | no_provenance | projects |
+  |-------------------|------|---------------|----------|
+  | network_nodes     | 1824 | 1385          | 2        |
+  | network_summary   | 0    | 0             | 0        |
+  | node_list         | 1747 | 1747          | 7        |
+  | supply_chain_data | 5445 | 5445          | 7        |
+- **8577 of 9016** derived row(s) carry NO input hash. Those are rows
+  written before WP 4.3, and nothing can say whether they are current — the
+  freshness badge reports them as `unknown`, which is not the same as stale.
+- This is the size of what WP 5.3 cannot migrate: dropping the entity columns
+  loses these values with no `analysis_results` row to replace them.
+  | expired_for_drift | projects | earliest | latest |
+  |-------------------|----------|----------|--------|
+  | 0                 | 0        |          |        |
+- **Zero.** D70 was closed before it cost anything, which is what WP 4.1's
+  measure-before-the-bump discipline bought.
+  | live_grounded_on_graph_hash | projects |
+  |-----------------------------|----------|
+  | 0                           | 0        |
+- **Zero.** WP 5.3 can take the bump for the same reason WP 4.1 could.
+  | key_present | null_uid |
+  |-------------|----------|
+  | 1           | 0        |
+
+### §15 · WP 6.2 / 6.4 — before the cascade, and the catalog nothing reads
+
+  | tbl                       | orphan_rows |
+  |---------------------------|-------------|
+  | customers                 | 0           |
+  | network_summary           | 0           |
+  | policy_defaults           | 0           |
+  | policy_overrides          | 0           |
+  | simulation_job_magnitudes | 0           |
+  | tier2_suppliers           | 0           |
+  | tier3_suppliers           | 0           |
+- **0 row(s)** belong to a project that has been deleted. No screen can
+  reach them — every read is `WHERE project_id = <a project you can open>` —
+  and nothing has ever removed them.
+- `policy_defaults` and `policy_overrides` are the sharp ones: those rows are
+  the decisions a user typed into the grid.
+- `20260919000005` deletes exactly these and then adds seven `ON DELETE CASCADE`
+  keys, so the same query must return 0 everywhere after the merge.
+  | rows | system_rows | slugs | user_rows |
+  |------|-------------|-------|-----------|
+  | 7    | 7           | 7     | 0         |
+- **7 row(s)** are seeded here and NO code reads them: not `src/`, not an
+  RPC, not an edge function. The presets a user applies are compiled into the
+  bundle under `src/lib/policies/presets/`, so this catalog cannot be edited
+  into effect — changing a preset needs a deploy.
+  | tbl                | rows |
+  |--------------------|------|
+  | external_evidence  | 0    |
+  | policy_presets     | 7    |
+  | policy_versions    | 70   |
+  | recovery_playbooks | 7    |
+  | scenario_templates | 12   |
+  | scenarios          | 10   |
+- Every one of these is now described, governed and audited by three triggers.
+- A table with 0 rows here is not a finding on its own: `external_evidence` fills
+  only when an agent has run, and `policy_presets` is D126's subject.
+
+### WP 8.0 — the graph layer, measured before it is changed (D127–D133)
+
+  | project                 | bom_level | bom_single | bom_multi | max_bom_depth | inbound | outbound | scd_rows | scdmt_rows |
+  |-------------------------|-----------|------------|-----------|---------------|---------|----------|----------|------------|
+  | Demo Simulation Project | single    | 0          | 0         | 0             | 0       | 0        | 0        | 0          |
+  | Project AA - ver3       | multi     | 0          | 396       | 4             | 321     | 1        | 767      | 767        |
+  | Project 1               | single    | 95         | 0         | 0             | 123     | 10       | 228      | 0          |
+  | Project 2               | multi     | 0          | 396       | 4             | 305     | 1        | 670      | 751        |
+  | First Project           | multi     | 0          | 0         | 0             | 0       | 0        | 0        | 0          |
+  | Project TRON - ver1     | single    | 12         | 0         | 0             | 12      | 2        | 26       | 26         |
+  | Example — 1P/2M/3S      | single    | 2          | 0         | 0             | 3       | 1        | 6        | 6          |
+  | Project TRON - ver2     | single    | 596        | 0         | 0             | 560     | 17       | 1173     | 1173       |
+  | Project 3 - test AI     | single    | 0          | 0         | 0             | 0       | 0        | 0        | 0          |
+  | Aumovio                 | single    | 2202       | 0         | 0             | 367     | 6        | 2575     | 2575       |
+
+- **7 of 10 project(s) are `bom_level = 'single'`**, and 3 of those hold ZERO `supply_chain_data_multi_tier` rows. That is **D130** measured: the ETL builds the multi-tier lanes only inside its multi-level branch, so a single-level project's Process-level page is permanently empty and no error says why.
+- **4 single-level project(s) DO hold multi-tier rows**, which the current ETL cannot produce — they predate a change, or were written by another path. Read them before WP 8.2 backfills the lane, because a backfill that assumes the table is empty would double the graph.
+- **2 project(s) have a multi-level BOM at all; 2 of them are exactly 4 levels deep.** `ProcessLevelNetwork.tsx`'s ladder calls level 5 a supplier and the inbound lane writes `max BOM depth + 1`, so the ladder is right on the 4-deep ones and wrong on every other one — suppliers there are rendered and labelled `material level N`. That is **D127** as a count of affected projects.
+  | project             | data_source | level | rows | distinct_from | distinct_to |
+  |---------------------|-------------|-------|------|---------------|-------------|
+  | Aumovio             | bom         | 1     | 2202 | 367           | 6           |
+  | Aumovio             | inbound     | 1     | 367  | 65            | 367         |
+  | Aumovio             | outbound    | 0     | 6    | 6             | 1           |
+  | Example — 1P/2M/3S  | bom         | 1     | 2    | 2             | 1           |
+  | Example — 1P/2M/3S  | inbound     | 1     | 3    | 3             | 2           |
+  | Example — 1P/2M/3S  | outbound    | 0     | 1    | 1             | 1           |
+  | Project 2           | bom         | 1     | 7    | 7             | 3           |
+  | Project 2           | bom         | 2     | 29   | 29            | 5           |
+  | Project 2           | bom         | 3     | 45   | 45            | 29          |
+  | Project 2           | bom         | 4     | 316  | 179           | 29          |
+  | Project 2           | inbound     | 5     | 353  | 32            | 179         |
+  | Project 2           | outbound    | 0     | 1    | 1             | 1           |
+  | Project AA - ver3   | bom         | 2     | 397  | 260           | 66          |
+  | Project AA - ver3   | inbound     | 1     | 16   | 1             | 16          |
+  | Project AA - ver3   | inbound     | 5     | 353  | 32            | 179         |
+  | Project AA - ver3   | outbound    | 0     | 1    | 1             | 1           |
+  | Project TRON - ver1 | bom         | 1     | 12   | 12            | 2           |
+  | Project TRON - ver1 | inbound     | 1     | 12   | 9             | 12          |
+  | Project TRON - ver1 | outbound    | 0     | 2    | 2             | 2           |
+  | Project TRON - ver2 | bom         | 1     | 596  | 559           | 17          |
+  | Project TRON - ver2 | inbound     | 1     | 560  | 60            | 560         |
+  | Project TRON - ver2 | outbound    | 0     | 17   | 17            | 1           |
+
+- The inbound lane — every row of which is a SUPPLIER edge by construction — occupies level(s) **1, 5**. The ladder recognises a supplier at 5 and above only. Any other value in that list is a supplier the page types as a material.
+  | tbl                          | project             | to_empty | to_null | from_empty | from_null | bom_level_1_rows |
+  |------------------------------|---------------------|----------|---------|------------|-----------|------------------|
+  | supply_chain_data            | Aumovio             | 0        | 0       | 0          | 0         | 2202             |
+  | supply_chain_data            | Example — 1P/2M/3S  | 0        | 0       | 0          | 0         | 2                |
+  | supply_chain_data            | Project 1           | 0        | 0       | 0          | 0         | 95               |
+  | supply_chain_data            | Project 2           | 0        | 0       | 0          | 0         | 316              |
+  | supply_chain_data            | Project AA - ver3   | 0        | 0       | 0          | 0         | 397              |
+  | supply_chain_data            | Project TRON - ver1 | 0        | 0       | 0          | 0         | 12               |
+  | supply_chain_data            | Project TRON - ver2 | 0        | 0       | 0          | 0         | 596              |
+  | supply_chain_data_multi_tier | Aumovio             | 0        | 0       | 0          | 0         | 2202             |
+  | supply_chain_data_multi_tier | Example — 1P/2M/3S  | 0        | 0       | 0          | 0         | 2                |
+  | supply_chain_data_multi_tier | Project 2           | 0        | 0       | 0          | 0         | 7                |
+  | supply_chain_data_multi_tier | Project AA - ver3   | 0        | 0       | 0          | 0         | 0                |
+  | supply_chain_data_multi_tier | Project TRON - ver1 | 0        | 0       | 0          | 0         | 12               |
+  | supply_chain_data_multi_tier | Project TRON - ver2 | 0        | 0       | 0          | 0         | 596              |
+
+- **No empty endpoints.** Either the BOM roots reach the product already, or no project has a level-1 BOM row for the defect to act on — the `bom_level_1_rows` column above says which, and a zero there makes D129 latent rather than absent.
+  | project             | nodes | nodes_at_many_levels | nodes_in_many_lanes | rows_behind_them | worst_level_spread |
+  |---------------------|-------|----------------------|---------------------|------------------|--------------------|
+  | Aumovio             | 439   | 6                    | 373                 | 2208             | 2                  |
+  | Example — 1P/2M/3S  | 7     | 1                    | 3                   | 3                | 2                  |
+  | Project 2           | 294   | 243                  | 180                 | 1125             | 2                  |
+  | Project AA - ver3   | 294   | 197                  | 196                 | 754              | 2                  |
+  | Project TRON - ver1 | 25    | 2                    | 14                  | 14               | 2                  |
+  | Project TRON - ver2 | 638   | 17                   | 576                 | 613              | 2                  |
+
+- **466 node(s) appear at more than one `level`.** For every one of them the page's node map is written by whichever row the loop reached last — its level, its type, its lane and its colour. The guard meant to prevent that tests a key the map is never keyed by, so it has never fired once. `levelNodeCounts` is incremented in the same unreachable-guard block, which is why the legend counts and the "BOM levels" tile count ROWS rather than nodes: **D128**.
+  | project             | nodes | supplier_and_customer | supplier_and_material | material_and_product | any_dual_role |
+  |---------------------|-------|-----------------------|-----------------------|----------------------|---------------|
+  | Aumovio             | 439   | 0                     | 0                     | 0                    | 0             |
+  | Example — 1P/2M/3S  | 7     | 0                     | 0                     | 0                    | 0             |
+  | Project 1           | 154   | 0                     | 0                     | 0                    | 0             |
+  | Project 2           | 242   | 0                     | 0                     | 0                    | 0             |
+  | Project AA - ver3   | 294   | 0                     | 0                     | 65                   | 65            |
+  | Project TRON - ver1 | 25    | 0                     | 0                     | 0                    | 0             |
+  | Project TRON - ver2 | 638   | 0                     | 0                     | 0                    | 0             |
+
+- **65 node(s) hold more than one lane role**, and each one is where the classifiers diverge by construction: `classify_node_type` resolves a supplier-and-material node to `material` by its priority order, `ProductLevelNetwork` resolves it to A or B depending on which row it read last, `ProcessLevelNetwork` resolves it to `supplier` through its `inbound` override, and `MapView`'s binary supplier-else-customer test drops it from the map. Same node, four answers, one screen apart (**D127**).
+- 0 are BOTH a supplier and a customer — **D131**: identity is a bare string with no role in it, so the two collapse into one node. 0 are a supplier and a material; 65 are a material and a product, which is the `subassembly` the SQL classifier has no value for and WP 8.1 adds.
+  | project                 | node_list_rows | scd_nodes | scdmt_nodes | scdmt_nodes_untyped | node_list_untyped |
+  |-------------------------|----------------|-----------|-------------|---------------------|-------------------|
+  | Demo Simulation Project | 0              | 0         | 0           | 0                   | 0                 |
+  | Project AA - ver3       | 242            | 294       | 294         | 52                  | 29                |
+  | Project 1               | 154            | 154       | 0           | 0                   | 0                 |
+  | Project 2               | 242            | 242       | 294         | 52                  | 0                 |
+  | First Project           | 0              | 0         | 0           | 0                   | 0                 |
+  | Project TRON - ver1     | 25             | 25        | 25          | 0                   | 0                 |
+  | Example — 1P/2M/3S      | 7              | 7         | 7           | 0                   | 0                 |
+  | Project TRON - ver2     | 638            | 638       | 638         | 0                   | 0                 |
+  | Project 3 - test AI     | 0              | 0         | 0           | 0                   | 0                 |
+  | Aumovio                 | 439            | 439       | 439         | 0                   | 0                 |
+
+- **104 multi-tier node(s) have no `node_list` row.** `rebuild_node_list` reads `supply_chain_data` and nothing else, so the deep-tier half of the graph — the half Process-level renders — is outside the one typed projection this repository has. That is **D132**, and it is why WP 8.1's derivation has to read both edge tables before WP 8.3 can make a page read a type instead of guessing one.
+- 29 `node_list` row(s) are typed `unknown` or NULL. `classify_node_type` returns `unknown` when a node appears in no lane it recognises, and `ProductLevelNetwork.tsx` defaults an unrecognised group to **Supplier** rather than rendering it as unknown — a value displayed for data that does not carry it, which is T1.
+  | scd_rows | scd_group_written | scdmt_rows | scdmt_level_null | scdmt_level_zero |
+  |----------|-------------------|------------|------------------|------------------|
+  | 5445     | 0                 | 5298       | 0                | 28               |
+
+- **`data_source_group` is written on 0 of 5445 rows.** Its sidecar says the network pages filter on it and no writer anywhere sets it, so the filter is a documented fact about a column that is always NULL — **D133**. WP 8.2 writes it or deletes it and its contract claim together; a third option would be leaving T1 broken on purpose.
+- **0 row(s) carry a NULL `level`** and 28 carry 0. `COALESCE(scdmt.level, 0)` in the multi-tier RPC serves a NULL as 0, and the ladder calls 0 a **product**: an unknown depth is answered with a confident wrong type rather than with `unknown` (**D134**). A zero count makes it latent, not closed — nothing stops the next NULL.
+
+### WP 8.0 — WHICH ETL wrote this graph, and what it invented (D140, D141)
+
+  | project                 | bom_table_max_depth | bom_table_depths | lane_bom_levels | lane_inbound_levels |
+  |-------------------------|---------------------|------------------|-----------------|---------------------|
+  | Demo Simulation Project | 0                   | 0                |                 |                     |
+  | Project AA - ver3       | 4                   | 5                | 2               | 1,5                 |
+  | Project 1               | 0                   | 0                |                 |                     |
+  | Project 2               | 4                   | 5                | 1,2,3,4         | 5                   |
+  | First Project           | 0                   | 0                |                 |                     |
+  | Project TRON - ver1     | 0                   | 0                | 1               | 1                   |
+  | Example — 1P/2M/3S      | 0                   | 0                | 1               | 1                   |
+  | Project TRON - ver2     | 0                   | 0                | 1               | 1                   |
+  | Project 3 - test AI     | 0                   | 0                |                 |                     |
+  | Aumovio                 | 0                   | 0                | 1               | 1                   |
+
+- **1 project(s) have a multi-depth BOM whose entire bom lane sits at level 2**, and 1 carry a ladder of several levels. Those are the two ETLs' fingerprints: the SQL RPC writes a LITERAL `2` for every `bom_multi_level` row and the edge function writes `row.level || 1`, so the histogram says which one last ran — and a page reading a fixed echelon ladder is reading a column whose meaning depends on that. **D140**: two live writers, one column, two definitions.
+- The `lane_inbound_levels` column is the same story on the other lane. Both writers use a `max BOM depth + 1` shape there, so a material absent from `bom_multi_level` lands at **1** and one at depth 4 lands at **5** — two suppliers, four levels apart, in the same upload. The page's ladder calls the first a material.
+  | project                 | scdmt_root_edges | scd_root_edges | node_list_root | bom_roots |
+  |-------------------------|------------------|----------------|----------------|-----------|
+  | Demo Simulation Project | 0                | 0              | 0              | 0         |
+  | Project AA - ver3       | 0                | 0              | 0              | 0         |
+  | Project 1               | 0                | 0              | 0              | 0         |
+  | Project 2               | 0                | 0              | 0              | 0         |
+  | First Project           | 0                | 0              | 0              | 0         |
+  | Project TRON - ver1     | 0                | 0              | 0              | 0         |
+  | Example — 1P/2M/3S      | 0                | 0              | 0              | 0         |
+  | Project TRON - ver2     | 0                | 0              | 0              | 0         |
+  | Project 3 - test AI     | 0                | 0              | 0              | 0         |
+  | Aumovio                 | 0                | 0              | 0              | 0         |
+
+- **No `ROOT` edges.** The substitution is in the live RPC and has produced nothing measurable — either no project has a parentless BOM row (the `bom_roots` column says: 0 across all projects), or the lane predates it. A zero here makes D141 latent, not absent: the `COALESCE` is still what the next parentless row meets.
+- 0 `bom_multi_level` row(s) have no parent at all, which is how many finished-product edges the two writers have to get right. The edge function drops them (the demand walk finds no parent, so the child gets no root and the row is never emitted); the RPC points them at `ROOT`. **Neither writes the product** — which is D129, restated against what the data actually shows rather than against the `|| ''` a reader sees first.
+  | project                 | inbound_src | inbound_lane | outbound_src | outbound_lane | bom_src | bom_lane | lane_written                  | inbound_touched               |
+  |-------------------------|-------------|--------------|--------------|---------------|---------|----------|-------------------------------|-------------------------------|
+  | Demo Simulation Project | 0           | 0            | 0            | 0             | 0       | 0        |                               |                               |
+  | Project AA - ver3       | 321         | 369          | 1            | 1             | 396     | 397      | 2026-07-05 20:22:45.384569+00 | 2026-07-05 20:22:45.213329+00 |
+  | Project 1               | 123         | 0            | 10           | 0             | 95      | 0        |                               | 2025-10-10 17:43:50.291605+00 |
+  | Project 2               | 305         | 353          | 1            | 1             | 396     | 397      | 2025-10-10 17:46:14.424248+00 | 2025-10-10 17:46:02.295723+00 |
+  | First Project           | 0           | 0            | 0            | 0             | 0       | 0        |                               |                               |
+  | Project TRON - ver1     | 12          | 12           | 2            | 2             | 12      | 12       | 2026-06-12 18:50:18.412521+00 | 2026-06-12 18:50:03.886856+00 |
+  | Example — 1P/2M/3S      | 3           | 3            | 1            | 1             | 2       | 2        | 2026-07-12 02:00:12.353602+00 | 2026-07-12 02:00:12.167048+00 |
+  | Project TRON - ver2     | 560         | 560          | 17           | 17            | 596     | 596      | 2026-07-13 11:18:46.322293+00 | 2026-07-13 11:18:44.595838+00 |
+  | Project 3 - test AI     | 0           | 0            | 0            | 0             | 0       | 0        |                               |                               |
+  | Aumovio                 | 367         | 367          | 6            | 6             | 2202    | 2202     | 2026-09-15 16:55:01.594943+00 | 2026-09-15 16:53:35.539218+00 |
+
+- **2 project(s) have an inbound lane whose row count does not match `inbound_logistics`.** Neither writer is a trigger: both are invoked by a client, so a CSV uploaded after the last combine changes the source table and leaves the graph exactly as it was. The page then renders a graph of a world that no longer exists, with no staleness signal on it — **D142**, and it is the one defect in this phase that a user would describe as "the map looks wrong" without any classifier being involved at all.
+- `lane_written` beside `inbound_touched` is the direct comparison. A source touched AFTER the lane was written is a graph derived from data that has since changed, and `project_freshness` is shown on Product-level and on no other network page.
+
+### §15 · the project measured
+
+- `project_id` = `0a7040e1-a3b8-4083-a160-728782fdfb67` — **Project TRON - ver2** — chosen because it has the most inbound_logistics rows (560).
+
+### §15 · D8 — blank / untrimmed / case-variant ids
+
+  | offending_rows | blank_supplier | blank_material | untrimmed_supplier | untrimmed_material |
+  |----------------|----------------|----------------|--------------------|--------------------|
+  | 0              | 0              | 0              | 0                  | 0                  |
+- **0** normalized material ids carry more than one spelling.
+
+### §15 · D6 — field-shift signature from an unquoted comma
+
+  | rows_with_quote_char |
+  |----------------------|
+  | 0                    |
+- No row carries the field-shift signature. D6 is unexercised here — it is a parser defect, not a data defect, and WP 3.2 still owns it.
+
+### §15 · D7 — blank numerics that passed validation
+
+  | null_volume | null_lead_time | null_price | nonpositive_price | total |
+  |-------------|----------------|------------|-------------------|-------|
+  | 0           | 0              | 0          | 0                 | 560   |
+
+### §15 · D5 — duplicate arcs (WP 3.3's before number)
+
+  | duplicated_groups | surplus_rows | worst_group |
+  |-------------------|--------------|-------------|
+  | 0                 | 0            | 0           |
+
+Against `inbound_logistics`'s `natural_key_intended` (`project_id + plant_name + supplier_id + material_id`) — this is the number WP 3.3's `CREATE UNIQUE INDEX` has to survive:
+  | duplicated_keys | rows_the_unique_index_would_reject | worst_key |
+  |-----------------|------------------------------------|-----------|
+  | 0               | 0                                  | 0         |
+
+### §15 · D2 / D10 — mixed and unrecognized `time_unit`
+
+  | materials_with_mixed_units |
+  |----------------------------|
+  | 0                          |
+- No material mixes time units in this project, so `sourcing_ratio` is at least internally comparable here.
+- **0** distinct token(s) fall outside the recognized set and are silently read as weekly.
+
+### §15 · D3 — `plant_name` drift between arcs and BOM
+
+  | orphan_plants | affected_arcs |
+  |---------------|---------------|
+  | 0             | 0             |
+
+### §15 · D2 / D3 headline — rows that reached the grid weighted 0
+
+  | data_source | total | zero_weighted |
+  |-------------|-------|---------------|
+  | bom         | 596   | 0             |
+  | inbound     | 560   | 0             |
+  | outbound    | 17    | 0             |
+  | materials_off_one |
+  |-------------------|
+  | 0                 |
+
+### §15 · masters missing for multi-level BOM materials
+
+  | materials_without_master |
+  |--------------------------|
+  | 0                        |
+
+### §15 · D17 — suppliers the grid renders as capacity 0
+
+  | shown_as_zero_but_unlimited | total |
+  |-----------------------------|-------|
+  | 60                          | 60    |
+
+### §15 · D1 — auto-seeded zero safety stock
+
+  | zero_safety_stock_patches |
+  |---------------------------|
+  | 367                       |
+- Project-scoped filtering is deliberately omitted: WP 0.1 closed the WRITE path, so the question is whether any seeded zeros survive anywhere.
+
+### §15 · D3 / D4 — the two adopted-or-dropped tables, each against its own expectation
+
+- `risk_data` is present, which is CORRECT: WP 1.4 adopted it (`20260915000003_risk_data.sql`) and it is in the contract.
+- `product_code_map` is gone, which is CORRECT: WP 3.0 dropped it (0 rows, no writer had ever existed).
+
+### Across EVERY project — what one project cannot tell you
+
+**`inbound_logistics`** — natural key `project_id + plant_name + supplier_id, material_id`:
+  | rows | projects | rows_the_unique_index_would_reject |
+  |------|----------|------------------------------------|
+  | 1691 | 7        | 0                                  |
+
+**`outbound_logistics`** — natural key `project_id + plant_name + customer_id, product_id`:
+  | rows | projects | rows_the_unique_index_would_reject |
+  |------|----------|------------------------------------|
+  | 38   | 7        | 0                                  |
+
+**`bom_single_level`** — natural key `project_id + plant_name + product_id, material_id`:
+  | rows | projects | rows_the_unique_index_would_reject |
+  |------|----------|------------------------------------|
+  | 2907 | 5        | 0                                  |
+
+**`bom_multi_level`** — natural key `project_id + plant_name + material_id, higher_level_component_id, level`:
+  | rows | projects | rows_the_unique_index_would_reject |
+  |------|----------|------------------------------------|
+  | 792  | 2        | 0                                  |
+
+**`tier2_suppliers`** (described in WP 3.2) — natural key `project_id + plant_name + supplier_id, upstream_supplier_id, material_id`:
+  | rows | projects | rows_the_unique_index_would_reject |
+  |------|----------|------------------------------------|
+  | 0    | 0        | 0                                  |
+
+**`tier3_suppliers`** (described in WP 3.2) — natural key `project_id + plant_name + supplier_id, upstream_supplier_id, material_id`:
+  | rows | projects | rows_the_unique_index_would_reject |
+  |------|----------|------------------------------------|
+  | 0    | 0        | 0                                  |
+
+**`multi_tier_supply_chain`** (described in WP 3.2) — natural key `project_id + plant_name + from_firm_id, to_firm_id`:
+  | rows | projects | rows_the_unique_index_would_reject |
+  |------|----------|------------------------------------|
+  | 0    | 0        | 0                                  |
+
+
+  | level_0 | level_negative | min_level | total |
+  |---------|----------------|-----------|-------|
+  | 4       | 0              | 0         | 792   |
+  | rows_with_untrimmed_or_blank_ids |
+  |----------------------------------|
+  | 0                                |
+
+  | null_volume | null_lead_time | null_price | total |
+  |-------------|----------------|------------|-------|
+  | 280         | 318            | 30         | 1691  |
+
+- **27** unrecognized `time_unit` token(s) database-wide, each silently read as weekly.
+  | time_unit | rows |
+  |-----------|------|
+  | 21        | 19   |
+  | 15        | 16   |
+  | <null>    | 16   |
+  | 16        | 13   |
+  | 7         | 12   |
+  | 14        | 11   |
+  | 9         | 10   |
+  | 4         | 7    |
+
+**Which rows are actually unresolved** — D29's text branch cannot be removed while any `org_uuid_missing` row exists:
+  | project_id                           | org_uuid_missing | modeler_has_no_account |
+  |--------------------------------------|------------------|------------------------|
+  | 4f314330-6f55-48b7-a654-8784e2778508 | true             | true                   |
+
+**D1's surviving damage.** WP 0.1 closed the WRITE path; it did not clean what the path had already written:
+  | distinct_targets | rows |
+  |------------------|------|
+  | 367              | 367  |
+
+_84 statements, all `SELECT`._
