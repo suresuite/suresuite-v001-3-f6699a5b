@@ -20,6 +20,17 @@ on:
       - 'supabase/functions/calculate-node-prominence/**'
       - 'supabase/functions/predict-critical-nodes/**'
       - 'supabase/functions/combine-project/**'
+      # THE FOUR ANALYZERS (§4 D104). They were absent from this list and
+      # from the deploy steps below, so WP 4.3's dual-write shipped to `main`,
+      # went green in CI and was recorded as done — while the functions
+      # carrying it were never deployed. `_shared/**` triggers this workflow
+      # but only ever redeployed the six named functions, and an edge function
+      # bundles its imports AT DEPLOY TIME, so the analyzers kept running the
+      # `_shared/analysisStore.ts` of whenever they were last pushed by hand.
+      - 'supabase/functions/calculate-network-science-metrics/**'
+      - 'supabase/functions/calculate-node-prominence/**'
+      - 'supabase/functions/predict-critical-nodes/**'
+      - 'supabase/functions/geocode-locations/**'
       - 'supabase/functions/_shared/**'
       - 'supabase/config.toml'
       - '.github/workflows/supabase-functions.yml'
@@ -210,6 +221,19 @@ jobs:
       # deploy reads — `calculate-node-prominence` is `false` because a database
       # trigger reaches it through `pg_net` with no user JWT; the other three are
       # browser-invoked with the anon key and stay on.
+      # ── THE FOUR ANALYZERS (§4 D104) ──────────────────────────────────────
+      #
+      # Measured, not assumed: on 2026-09-18 a metrics run on the `Aumovio`
+      # project wrote 439 `network_nodes` rows, every one carrying computed
+      # columns and NONE carrying `computed_from_hash`, with `analysis_runs`
+      # and `analysis_results` both still 0 (§15 run 35398461411). The source
+      # at `calculate-network-science-metrics/index.ts:197` calls
+      # `applyNodeMetrics` — the dual-write — so the gap was never in the code.
+      # It was that nothing deployed it.
+      #
+      # `geocode-locations` is here for the same reason and NOT because it
+      # writes provenance — it writes `node_list` coordinates with no run at
+      # all (D36's class). It is deployed so that stops being true silently.
       - name: Deploy calculate-network-science-metrics
         run: supabase functions deploy calculate-network-science-metrics --project-ref wckdrutwkytwcomrlpib
         env:
@@ -227,5 +251,7 @@ jobs:
 
       - name: Deploy combine-project
         run: supabase functions deploy combine-project --project-ref wckdrutwkytwcomrlpib
+      - name: Deploy geocode-locations
+        run: supabase functions deploy geocode-locations --project-ref wckdrutwkytwcomrlpib
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

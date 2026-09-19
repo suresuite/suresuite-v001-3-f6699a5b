@@ -10,6 +10,7 @@
 // ones carry a unit or name one, never by a list typed here.
 
 import { PageTitle, Section, P, Key, Callout, Defs, Prose, Term, DocLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { REFERENCE_TABLES } from "@/components/docs/generated/reference.generated";
 
 /** Columns whose unit is fixed by the contract, and cannot be changed by a file. */
@@ -78,6 +79,7 @@ export default function UnitsAndTimePeriods() {
           reasonably assume one setting covers both. It does not, and the two are not even the same
           kind of thing: one is a rate over a period, the other is a duration.
         </P>
+              <DocFigure id="two-periods" />
       </Section>
 
       <Callout tone="law" title="time_unit is about volume. Lead times are weeks.">

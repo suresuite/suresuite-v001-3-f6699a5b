@@ -19,6 +19,7 @@
 // so the page cannot become optimistic by going stale.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { REFERENCE_TABLES } from "@/components/docs/generated/reference.generated";
 import { COUNTS } from "@/components/docs/generated/dataModel.generated";
 
@@ -48,6 +49,7 @@ export default function WhoCanSeeYourData() {
           out where the boundaries are actually enforced and where they are currently only
           described.
         </P>
+              <DocFigure id="three-gates" />
       </Section>
 
       <Section id="the-three-gates" title="Three gates, and only two of them decide">

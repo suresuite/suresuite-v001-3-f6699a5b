@@ -1,6 +1,7 @@
 // §6.3 section 3 — BOM, multi level. Generated reference, authored narrative.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { HowItLoads, TypedColumns, FilledColumns, DatabaseRules, TemplateHeaders } from "@/components/docs/tableRef";
 import { refTable } from "@/components/docs/tableFacts";
 
@@ -24,6 +25,7 @@ export default function BomMultiLevel() {
           can be aimed at one.
         </P>
         <HowItLoads table={t} />
+              <DocFigure id="bom-depth" />
       </Section>
 
       <Section id="columns" title="The columns you type">
