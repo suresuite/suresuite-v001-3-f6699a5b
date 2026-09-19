@@ -104,8 +104,17 @@ describe("pages and their bodies", () => {
     { section: 1, wp: "5.2a", pages: 7 },
     { section: 2, wp: "5.2a", pages: 3 },
     { section: 3, wp: "5.2b", pages: 12 },
+    { section: 4, wp: "5.2f", pages: 4 },
     { section: 5, wp: "5.2c", pages: 9 },
     { section: 6, wp: "5.2c", pages: 3 },
+    { section: 7, wp: "5.2d", pages: 7 },
+    { section: 8, wp: "5.2e", pages: 5 },
+    { section: 9, wp: "5.2e", pages: 4 },
+    { section: 10, wp: "5.2g", pages: 3 },
+    { section: 11, wp: "5.2d", pages: 5 },
+    { section: 12, wp: "5.2f", pages: 3 },
+    { section: 13, wp: "5.2g", pages: 7 },
+    { section: 14, wp: "5.2g", pages: 4 },
     { section: 15, wp: "5.2h", pages: 4 },
   ];
 
