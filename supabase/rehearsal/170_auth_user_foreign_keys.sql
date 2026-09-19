@@ -52,7 +52,7 @@ DECLARE
   v_refused boolean;
   v_left    integer;
 BEGIN
-  -- ── 1 · all seven keys EXIST, and point at `auth.users` ─────────────────
+  -- ── 1 · all six keys EXIST, and point at `auth.users` ───────────────────
   --
   -- Read from `pg_constraint` rather than from the artifact: the artifact is
   -- what was wrong, so asking it whether it is right now proves nothing.
@@ -60,16 +60,24 @@ BEGIN
   SELECT string_agg(want.rel || '.' || want.col, ', ' ORDER BY want.rel, want.col),
          count(*)
     INTO v_missing, v_missing_n
-  -- SEVEN, NOT NINE — AND THE TWO THAT LEFT DID SO DELIBERATELY (§4 D131).
-  -- `ingest_runs.triggered_by_user_id` and `.applied_by_user_id` were on this list until
-  -- `20260919000012` re-keyed them to `public.approved_users`, because `ingest_land_file`
-  -- must name its uploader and no user of this application exists in `auth.users` — so the
-  -- landing could not be recorded at all. `rehearsal/320` owns them now, and this list is
-  -- the keys that still point at `auth.users` and are expected to.
+  -- SIX, NOT NINE, AND ALL THREE DEPARTURES ARE THE SAME STORY TOLD TWICE.
+  --
+  --   `policy_versions.created_by`      — dropped in JUNE (`20260613000001`), because this
+  --     application authenticates against `approved_users` and the key rejected every
+  --     snapshot with a real user. It stayed on this list because the ARTIFACT went on
+  --     recording it: an inline FK lives on the column, not in `constraints`, so the
+  --     introspector's DROP handler could not reach it (§4 D132).
+  --   `ingest_runs.triggered_by_user_id` } re-keyed to `approved_users` by
+  --   `ingest_runs.applied_by_user_id`   } `20260919000012` — same reason, one package
+  --     later, with the whole CSV landing path at stake (§4 D131). `rehearsal/320` owns
+  --     them now.
+  --
+  -- This list shrinking is the repository catching up with the database, not a regression;
+  -- §1's own error message says a PARTIAL set cannot be a stale base, and that is still
+  -- true — what changed is which set is whole.
   FROM (VALUES
     ('experiments',        'created_by'),
     ('policy_presets',     'owner_id'),
-    ('policy_versions',    'created_by'),
     ('project_erp_links',  'linked_by_user_id'),
     ('recovery_playbooks', 'created_by'),
     ('scenarios',          'created_by'),
@@ -92,19 +100,19 @@ BEGIN
       AND tgt.relname = 'users'
   );
 
-  IF v_missing_n = 7 THEN
+  IF v_missing_n = 6 THEN
     -- Every one absent: this base was built from an artifact that predates the
     -- fix, which is exactly what plain and `--fixtures` mode do. Nothing here is
     -- assertable and saying so is better than a guard that hides a regression.
     RAISE NOTICE
-      'D53 · 170 · SKIPPED: none of the seven `auth.users` keys are present, so '
+      'D53 · 170 · SKIPPED: none of the six `auth.users` keys are present, so '
       'this base predates the introspector fix (plain/--fixtures build from the '
       'BASE branch artifact). `--since HEAD` is the mode that proves it, and '
       '`introspectorRefSchema.test.ts` gates the parse with no database at all.';
     RETURN;
   ELSIF v_missing IS NOT NULL THEN
     RAISE EXCEPTION
-      'D53 §1 — % of the seven foreign keys to `auth.users` are missing: %. A '
+      'D53 §1 — % of the six foreign keys to `auth.users` are missing: %. A '
       'PARTIAL set cannot be a stale base — a base either predates the fix or '
       'carries it — so this is a regression in the introspector''s REFERENCES '
       'parse or in `rehearsal-schema.mjs`''s target resolution.', v_missing_n, v_missing;

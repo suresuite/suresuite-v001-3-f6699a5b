@@ -9486,14 +9486,7 @@
           "default": null,
           "primary_key": false,
           "unique": false,
-          "references": {
-            "schema": "auth",
-            "table": "users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": null
-          },
+          "references": null,
           "added_by": "20260829120000_erp_connector_phase1_2.sql",
           "unit": null,
           "unit_source": "none",
@@ -9925,14 +9918,7 @@
           "default": null,
           "primary_key": false,
           "unique": false,
-          "references": {
-            "schema": "auth",
-            "table": "users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": null
-          },
+          "references": null,
           "added_by": "20260829120000_erp_connector_phase1_2.sql",
           "unit": null,
           "unit_source": "none",
@@ -20119,14 +20105,7 @@
           "default": null,
           "primary_key": false,
           "unique": false,
-          "references": {
-            "schema": "auth",
-            "table": "users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": "SET NULL"
-          },
+          "references": null,
           "added_by": "20260609000002_policy_versions.sql",
           "unit": null,
           "unit_source": "none",
@@ -30192,5 +30171,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "9454a1dfc060"
+  "contract_version": "c318b92252d2"
 }
