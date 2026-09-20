@@ -47,7 +47,7 @@ it rather than duplicating it.
 > product intends to check, not what the database enforces:
 >
 > - `bom_multi_level_auth_read` — `SELECT` to `authenticated`
-> - `bom_multi_level_anon_read` — `SELECT` to `anon`
+> - `bom_multi_level_anon_read` — `SELECT` to `anon`, `authenticated`
 >
 > See PLAN.md D28: the application runs as the
 > `anon` role with no auth session and the anon key ships in the frontend bundle, so
@@ -58,9 +58,9 @@ it rather than duplicating it.
 | Policy | Command | Roles | Added by |
 |---|---|---|---|
 | bom_multi_level_auth_read | SELECT | authenticated | `20260705000001_open_logistics_reads.sql` |
-| bom_multi_level_anon_read | SELECT | anon | `20260705000001_open_logistics_reads.sql` |
 | BOM Multi: modifiers only | ALL | all | `20260915000004_org_identity_dual_read.sql` |
 | BOM Multi: organization access | SELECT | all | `20260915000004_org_identity_dual_read.sql` |
+| bom_multi_level_anon_read | SELECT | anon, authenticated | `20260919000010_anon_policies_widen.sql` |
 
 </details>
 
@@ -69,7 +69,7 @@ it rather than duplicating it.
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:429` | yes |
-| `ProcessLevelNetwork.tsx` | table read | `src/pages/ProcessLevelNetwork.tsx:1213` | yes |
+| `ProcessLevelNetwork.tsx` | table read | `src/pages/ProcessLevelNetwork.tsx:381` | yes |
 | `ProjectPolicies.tsx` | table read | `src/lib/policies/projectLanes.ts:48` | yes |
 | `SimulationLab.tsx` | table read | `src/lib/policies/projectLanes.ts:48` | yes |
 
@@ -193,7 +193,7 @@ Depth in the BOM tree. Level 1 is directly under the finished product; higher nu
 
 Depth in the BOM tree is structure, not measurement.
 
-**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:1213`) —
+**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:381`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -314,6 +314,6 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `dc1618b7df79`, engine `0.2.3`,
+*Generated from data contract `4231766af8b0`, engine `0.2.3`,
 sidecar `supabase/contract/bom_multi_level.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

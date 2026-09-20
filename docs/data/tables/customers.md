@@ -40,16 +40,28 @@ it rather than duplicating it.
 | Minimum project role | `editor` |
 | Tier transitions audited | yes |
 | Row-level security | enabled |
-| Policies on the table | 2 — all carry a predicate |
+| Policies on the table | 3 — **1 with no predicate** |
 
 Adopted with RLS enabled and no `anon` policy. The logistics lanes carry an `*_anon_read` policy because the public network pages render them (D28, a standing decision); nothing reads this table at all, so there was no reader to keep working and no reason to widen that exposure. `audited: true` was NOT the first draft. The adoption was written with the three WP 2.3 triggers left off — the table had had no migration when they were written, so it had never had them — and `dataPlaneAudit.test.ts` failed on the same commit that put the table in the contract. Its rule is derived from the contract's own tier, not from a list, so a tier-2 table without its triggers is a failure by construction. The triggers are in `20260916000003_adopt_customers_drop_product_code_map.sql` and R9 holds this field to them.
 
-<details><summary>2 RLS policies</summary>
+> **What the database actually permits is wider than the row above.**
+> 1 policy here grants access with
+> **no predicate at all** (`USING (true)`), so the capability named above is what the
+> product intends to check, not what the database enforces:
+>
+> - `customers_anon_read` — `SELECT` to `anon`, `authenticated`
+>
+> See PLAN.md D28: the application runs as the
+> `anon` role with no auth session and the anon key ships in the frontend bundle, so
+> closing these is a migration with an auth model behind it rather than a policy edit.
+
+<details><summary>3 RLS policies</summary>
 
 | Policy | Command | Roles | Added by |
 |---|---|---|---|
 | Customers: organization access | SELECT | all | `20260916000003_adopt_customers_drop_product_code_map.sql` |
 | Customers: modifiers only | ALL | all | `20260916000003_adopt_customers_drop_product_code_map.sql` |
+| customers_anon_read | SELECT | anon, authenticated | `20260919000010_anon_policies_widen.sql` |
 
 </details>
 
@@ -224,6 +236,6 @@ The tier-1 staged row this was promoted from (WP 6.2). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `dc1618b7df79`, engine `0.2.3`,
+*Generated from data contract `4231766af8b0`, engine `0.2.3`,
 sidecar `supabase/contract/customers.contract.yaml`, table created by `20260916000003_adopt_customers_drop_product_code_map.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

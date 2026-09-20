@@ -1,7 +1,7 @@
 -- WP 8.2 · ONE ETL, and it stops lying about `level` — asserted against a real
 -- database, because every claim below is about what the derivation DOES.
 --
--- `20260919000008` replaces a 270-line arithmetic body with a demand walk, a
+-- `20260920000003` replaces a 270-line arithmetic body with a demand walk, a
 -- depth read from the table that owns it, and a trigger. A static read of that
 -- file cannot settle any of the following:
 --

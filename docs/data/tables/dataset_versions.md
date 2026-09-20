@@ -57,7 +57,7 @@ Written by the `_build_dataset_snapshot` database function, never by a page — 
 |---|---|---|---|
 | `DataManager.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:406` | yes |
 | `DeveloperApi.tsx` | rpc list_dataset_versions | `src/pages/DeveloperApi.tsx:311` | yes |
-| `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:237` | yes |
+| `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:227` | yes |
 | `ProjectPolicies.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:406` | yes |
 | `SimulationLab.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:406` | yes |
 
@@ -283,6 +283,6 @@ is about the column and not only about the table.
 
 ---
 
-*Generated from data contract `dc1618b7df79`, engine `0.2.3`,
+*Generated from data contract `4231766af8b0`, engine `0.2.3`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

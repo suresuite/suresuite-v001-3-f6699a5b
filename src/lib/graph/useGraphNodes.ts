@@ -3,7 +3,7 @@
  *
  * THE ONE PLACE A PAGE GETS A NODE'S TYPE FROM. `node_list.echelon` is authored
  * once by `classify_node_echelon` (WP 8.1) and reached through
- * `get_graph_nodes` (WP 8.3, `20260919000002`), which exists because
+ * `get_graph_nodes` (WP 8.3, `20260920000002`), which exists because
  * `get_node_list`'s fixed `RETURNS TABLE` could not carry the new columns and
  * `CREATE OR REPLACE` cannot change a return type.
  *

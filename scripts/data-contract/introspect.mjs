@@ -830,7 +830,37 @@ function applyAlter(schema, t, action, migration, whole) {
         if (col) { if (gone.kind === "UNIQUE") col.unique = false; else col.primary_key = false; }
       }
     }
+    const hadNamed = t.constraints.some((c) => c.name === id.name);
     t.constraints = t.constraints.filter((c) => c.name !== id.name);
+
+    // AN INLINE FOREIGN KEY IS NOT IN `constraints`, SO A DROP COULD NOT REACH IT (§4 D157).
+    //
+    // `col uuid REFERENCES auth.users(id)` is recorded on the COLUMN, as
+    // `col.references` — there is no entry in `t.constraints` to filter out. PostgreSQL
+    // names that key `<table>_<column>_fkey` at creation, and a later
+    // `ALTER TABLE … DROP CONSTRAINT <that name>` therefore removed it from the database
+    // and left the artifact still describing it. `policy_versions.created_by` was in that
+    // state from June until §15 probe 0.9 read `pg_constraint` and counted one fewer key
+    // than the artifact claimed.
+    //
+    // The cost is not cosmetic: `rehearsal-schema.mjs` builds a base FROM this artifact, so
+    // a rehearsed database gets a foreign key production does not have — and in
+    // `--since HEAD` mode, which is the post-merge shape, a landing that works in
+    // production fails against a key that was dropped. That is how this was found.
+    //
+    // The match is deliberately narrow: only when no constraint of that name existed here
+    // (so the drop can only be aiming at an inline one), and only for a column whose own
+    // name the constraint ends with. The prefix is NOT required to equal `t.name`, because
+    // a renamed table keeps the key its old name generated — `ingest_runs` still carries
+    // `erp_sync_runs_triggered_by_user_id_fkey`, which is §4 D160.
+    if (!hadNamed && /_fkey$/i.test(id.name)) {
+      for (const col of t.columns) {
+        if (!col.references) continue;
+        if (!id.name.toLowerCase().endsWith(`_${col.name.toLowerCase()}_fkey`)) continue;
+        col.references = null;
+        break;
+      }
+    }
     return;
   }
   if (/^ENABLE\s+ROW\s+LEVEL\s+SECURITY/i.test(a)) { t.rls.enabled = true; return; }

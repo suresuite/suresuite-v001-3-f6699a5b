@@ -98,9 +98,23 @@ describe("WP 6.2 · D53 · the introspector keeps a reference's schema", () => {
     }
   });
 
-  it("the nine `auth.users` keys are recorded, by name", () => {
-    // Named rather than counted, because a count passes while the wrong nine are
-    // present. These are the columns §4 D53 lists.
+  it("the six `auth.users` keys are recorded, by name", () => {
+    // Named rather than counted, because a count passes while the wrong six are
+    // present. D53 listed NINE; three have gone and each for its own reason, which is
+    // why this list is worth reading rather than just updating:
+    //
+    //   `policy_versions.created_by`      — dropped in JUNE by
+    //     `20260613000001_fix_snapshot_created_by.sql`, because the app authenticates
+    //     against `approved_users` and the key rejected every snapshot with a real user.
+    //     The artifact went on recording it for three months: an inline FK lives on the
+    //     COLUMN, not in `constraints`, so the introspector's `DROP CONSTRAINT` handler
+    //     could not reach it (§4 D157, closed by teaching it the implicit name).
+    //   `ingest_runs.triggered_by_user_id` } re-keyed to `approved_users` by
+    //   `ingest_runs.applied_by_user_id`   } `20260919000012`, for the same reason one
+    //     package later and with the landing path at stake (§4 D156).
+    //
+    // So this list shrinking is the repository catching up with the database twice over,
+    // not a regression. `rehearsal/170` asserts the same six against `pg_constraint`.
     const got = new Set(
       allRefs()
         .filter((r) => r.ref.schema === "auth" && r.ref.table === "users")
@@ -108,10 +122,7 @@ describe("WP 6.2 · D53 · the introspector keeps a reference's schema", () => {
     );
     const want = [
       "experiments.created_by",
-      "ingest_runs.applied_by_user_id",
-      "ingest_runs.triggered_by_user_id",
       "policy_presets.owner_id",
-      "policy_versions.created_by",
       "project_erp_links.linked_by_user_id",
       "recovery_playbooks.created_by",
       "scenarios.created_by",

@@ -1,6 +1,6 @@
 -- WP 8.1 · one classifier, two honest columns — asserted against a real database.
 --
--- `20260919000001` makes five claims a static read of the migration cannot settle,
+-- `20260920000001` makes five claims a static read of the migration cannot settle,
 -- because every one of them is about what the database DOES:
 --
 --   §1  a node holding several lane roles resolves to exactly ONE echelon, and the
@@ -29,7 +29,7 @@
 --   * re-attach `auto_refresh_node_list_on_scd_change` → §5 red (no refresh). NOTE:
 --     performing this mutation ALSO found a defect in the migration itself — the
 --     three `supply_chain_data` triggers had no `DROP IF EXISTS`, so the file could
---     not be applied twice. Fixed in `20260919000001` section 7, and recorded here
+--     not be applied twice. Fixed in `20260920000001` section 7, and recorded here
 --     because it is the mutation, not the assertion, that earned it.
 --   * call `rebuild_node_list` from the refresh instead of `node_list_discover`
 --     → `rehearsal/090` and `/110` go red with `forbidden`, NOT this file: 230's
@@ -59,7 +59,7 @@ BEGIN
   PERFORM public.set_current_user_context(v_actor, 'wp81@example.invalid');
 
   -- THE SOURCE TABLES FIRST, AND WP 8.2 IS WHY THE ORDER MATTERS NOW. The four
-  -- lane sources carry a rebuild trigger since `20260919000008` (§4 D142), so a
+  -- lane sources carry a rebuild trigger since `20260920000003` (§4 D142), so a
   -- `bom_multi_level` INSERT rebuilds `supply_chain_data` from its real inputs —
   -- which DELETES anything written into it by hand. Loading the BOM before the
   -- lane fixture is the whole fix; loading it after silently emptied the fixture
@@ -293,7 +293,7 @@ BEGIN
   IF v_n <> 0 THEN
     RAISE EXCEPTION
       'WP 8.3 §6 — % node(s) come back from `get_graph_nodes` with a NULL echelon. '
-      'Every row was backfilled by `20260919000001`; a NULL here means the read path '
+      'Every row was backfilled by `20260920000001`; a NULL here means the read path '
       'is not reading the column the migration filled.', v_n;
   END IF;
 

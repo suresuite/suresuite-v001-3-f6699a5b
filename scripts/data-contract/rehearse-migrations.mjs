@@ -64,10 +64,23 @@ function gitOk(...a) {
  * and re-running it here would be a replay of history rather than a rehearsal
  * of new work — the thing this gate is explicitly not. R4 and the introspector
  * already refuse a silently edited migration.
+ *
+ * `--no-renames` IS LOAD-BEARING, AND IT COST THIS GATE ITS WHOLE POINT ONCE
+ * (§4 D162). `git diff` detects renames by default, so a migration renamed
+ * rather than written reads as `R` and `--diff-filter=A` drops it. But
+ * `schema_migrations` is keyed on the VERSION in the filename, so a renamed
+ * migration carries a version production has never recorded and `supabase db
+ * push` WILL apply it — it is new work by the only definition that matters
+ * here. Worse, the base schema is built from the BASE branch's artifact, which
+ * still names the OLD file when it looks up a function body: so a rename
+ * silently removes those functions from the base AND skips the file that would
+ * put them back, and the rehearsal proceeds against a database missing both.
+ * The question this function asks is "which migration files exist here that did
+ * not exist at the base", and rename detection answers a different one.
  */
 function newMigrations(since) {
   const base = gitOk("merge-base", since, "HEAD") || since;
-  const diff = gitOk("diff", "--name-only", "--diff-filter=A", `${base}..HEAD`, "--", MIGRATIONS);
+  const diff = gitOk("diff", "--name-only", "--no-renames", "--diff-filter=A", `${base}..HEAD`, "--", MIGRATIONS);
   if (diff === null) return null;
   const committed = diff.split("\n").filter((f) => f.endsWith(".sql"));
 

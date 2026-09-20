@@ -102,15 +102,33 @@ describe("D28 — the truth table of what is actually unconditional", () => {
    * as `anon`; the list exists so the exposure is visible and cannot grow without
    * this test failing. Shrinking it is the goal — a package that closes part of
    * D28 deletes lines from here, and the test tells it exactly which.
+   *
+   * THIS LIST READS THE MIGRATIONS, AND PRODUCTION HAD MORE — §4 D154 and D158.
+   * §15 run `35467910110` counted 48 predicate-less policies over 30 tables where
+   * this list named 27; part of that gap is simply policies no migration ever
+   * declared, which nothing here could see. WP 7.1 stage 1a adopted five of them
+   * (`20260919000010`), so the four names below are NEW TO THIS LIST AND NOT NEW TO
+   * PRODUCTION — the exposure did not grow, the visibility did. They are:
+   *
+   *   customers  ·  materials  ·  products  ·  suppliers
+   *
+   * each an `anon` SELECT policy with `USING (true)` that has existed in production
+   * for an unknown length of time and in no migration. `policy_versions` was already
+   * named here for a different policy, so adopting its INSERT policy added no line.
+   *
+   * The remaining gap is still open: this list is only as complete as the migrations,
+   * and nothing yet compares it against `pg_policies`. That comparison is stage 5's,
+   * which is the stage that deletes these policies and therefore has to know which
+   * ones the repository believes in (D158).
    */
   const EXPECTED_UNCONDITIONAL = [
     "ai_models", "ai_providers", "approved_users", "bom_multi_level", "bom_single_level",
-    "capabilities", "chat_plans", "dataset_versions", "experiments", "external_evidence",
-    "inbound_logistics", "model_validations", "outbound_logistics", "policy_defaults",
-    "policy_overrides", "policy_presets", "policy_versions", "project_memory",
-    "project_role_capabilities", "proposals", "recovery_playbooks", "risk_data",
-    "role_capabilities", "run_item_series", "run_replications", "scenarios",
-    "simulation_runs",
+    "capabilities", "chat_plans", "customers", "dataset_versions", "experiments",
+    "external_evidence", "inbound_logistics", "materials", "model_validations",
+    "outbound_logistics", "policy_defaults", "policy_overrides", "policy_presets",
+    "policy_versions", "products", "project_memory", "project_role_capabilities",
+    "proposals", "recovery_playbooks", "risk_data", "role_capabilities",
+    "run_item_series", "run_replications", "scenarios", "simulation_runs", "suppliers",
   ];
 
   it("no table has gained an unconditional policy that this list does not name", () => {

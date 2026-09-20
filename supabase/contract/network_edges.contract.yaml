@@ -33,7 +33,7 @@ surfaces:
   - page: "ProductLevelNetwork.tsx"
     via: "rpc get_network_metrics_for_materials"
     grain: table
-    evidence: "src/pages/ProductLevelNetwork.tsx:251"
+    evidence: "src/pages/ProductLevelNetwork.tsx:241"
     confirmed: true
 
 governance:

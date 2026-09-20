@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 341,
-  "migrations_applied": 333,
+  "migrations_found": 344,
+  "migrations_applied": 336,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260919000008_one_etl.sql",
+  "last_migration": "20260920000003_one_etl.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -3427,16 +3427,6 @@
             "added_by": "20260705000001_open_logistics_reads.sql"
           },
           {
-            "name": "bom_multi_level_anon_read",
-            "command": "SELECT",
-            "roles": [
-              "anon"
-            ],
-            "using": "true",
-            "with_check": "true",
-            "added_by": "20260705000001_open_logistics_reads.sql"
-          },
-          {
             "name": "BOM Multi: modifiers only",
             "command": "ALL",
             "roles": [],
@@ -3451,6 +3441,17 @@
             "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_multi_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "bom_multi_level_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -3692,16 +3693,6 @@
             "added_by": "20260705000001_open_logistics_reads.sql"
           },
           {
-            "name": "bom_single_level_anon_read",
-            "command": "SELECT",
-            "roles": [
-              "anon"
-            ],
-            "using": "true",
-            "with_check": "true",
-            "added_by": "20260705000001_open_logistics_reads.sql"
-          },
-          {
             "name": "BOM Single: modifiers only",
             "command": "ALL",
             "roles": [],
@@ -3716,6 +3707,17 @@
             "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = bom_single_level.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "bom_single_level_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -4953,6 +4955,17 @@
             "using": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = customers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin'))",
             "with_check": "EXISTS (SELECT 1 FROM public.projects p WHERE p.id = customers.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) AND (p.modeler_id = public.get_current_user_id() OR (SELECT user_role FROM public.get_current_approved_user() LIMIT 1) = 'admin'))",
             "added_by": "20260916000003_adopt_customers_drop_product_code_map.sql"
+          },
+          {
+            "name": "customers_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -7142,16 +7155,6 @@
             "added_by": "20260705000001_open_logistics_reads.sql"
           },
           {
-            "name": "inbound_logistics_anon_read",
-            "command": "SELECT",
-            "roles": [
-              "anon"
-            ],
-            "using": "true",
-            "with_check": "true",
-            "added_by": "20260705000001_open_logistics_reads.sql"
-          },
-          {
             "name": "Inbound: modifiers only",
             "command": "ALL",
             "roles": [],
@@ -7166,6 +7169,17 @@
             "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = inbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "inbound_logistics_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -7514,14 +7528,7 @@
           "default": null,
           "primary_key": false,
           "unique": false,
-          "references": {
-            "schema": "auth",
-            "table": "users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": null
-          },
+          "references": null,
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
         },
         {
@@ -7677,14 +7684,7 @@
           "default": null,
           "primary_key": false,
           "unique": false,
-          "references": {
-            "schema": "auth",
-            "table": "users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": null
-          },
+          "references": null,
           "added_by": "20260829120000_erp_connector_phase1_2.sql"
         },
         {
@@ -7804,6 +7804,24 @@
           "columns": [],
           "definition": "CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))",
           "added_by": "20260916000012_ingest_rename_and_widen.sql"
+        },
+        {
+          "name": "ingest_runs_triggered_by_user_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "triggered_by_user_id"
+          ],
+          "definition": "FOREIGN KEY (triggered_by_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL",
+          "added_by": "20260919000012_ingest_actor_points_at_approved_users.sql"
+        },
+        {
+          "name": "ingest_runs_applied_by_user_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "applied_by_user_id"
+          ],
+          "definition": "FOREIGN KEY (applied_by_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL",
+          "added_by": "20260919000012_ingest_actor_points_at_approved_users.sql"
         }
       ],
       "indexes": [
@@ -9186,7 +9204,19 @@
       "rls": {
         "enabled": false,
         "forced": false,
-        "policies": [],
+        "policies": [
+          {
+            "name": "materials_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
+          }
+        ],
         "determinate": false,
         "indeterminate_from": [
           "20260614000001_item_master.sql"
@@ -11113,7 +11143,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20260919000001_one_node_classifier.sql"
+          "added_by": "20260920000001_one_node_classifier.sql"
         },
         {
           "name": "bom_depth",
@@ -11125,7 +11155,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20260919000001_one_node_classifier.sql"
+          "added_by": "20260920000001_one_node_classifier.sql"
         },
         {
           "name": "supply_tier",
@@ -11137,7 +11167,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20260919000001_one_node_classifier.sql"
+          "added_by": "20260920000001_one_node_classifier.sql"
         }
       ],
       "constraints": [
@@ -11175,14 +11205,14 @@
           "kind": "CHECK",
           "columns": [],
           "definition": "CHECK (echelon IS NULL OR echelon IN ('customer','product','subassembly','material','supplier','plant','unknown'))",
-          "added_by": "20260919000001_one_node_classifier.sql"
+          "added_by": "20260920000001_one_node_classifier.sql"
         },
         {
           "name": "node_list_depths_non_negative",
           "kind": "CHECK",
           "columns": [],
           "definition": "CHECK ((bom_depth IS NULL OR bom_depth >= 0) AND (supply_tier IS NULL OR supply_tier >= 0))",
-          "added_by": "20260919000001_one_node_classifier.sql"
+          "added_by": "20260920000001_one_node_classifier.sql"
         }
       ],
       "indexes": [
@@ -11999,16 +12029,6 @@
             "added_by": "20260705000001_open_logistics_reads.sql"
           },
           {
-            "name": "outbound_logistics_anon_read",
-            "command": "SELECT",
-            "roles": [
-              "anon"
-            ],
-            "using": "true",
-            "with_check": "true",
-            "added_by": "20260705000001_open_logistics_reads.sql"
-          },
-          {
             "name": "Outbound: modifiers only",
             "command": "ALL",
             "roles": [],
@@ -12023,6 +12043,17 @@
             "using": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "with_check": "EXISTS ( SELECT 1 FROM public.projects p WHERE p.id = outbound_logistics.project_id AND public.org_is_current_user_org(p.organization_id, p.organization) )",
             "added_by": "20260915000004_org_identity_dual_read.sql"
+          },
+          {
+            "name": "outbound_logistics_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -12312,11 +12343,12 @@
             "name": "Anon can read policy defaults",
             "command": "SELECT",
             "roles": [
-              "anon"
+              "anon",
+              "authenticated"
             ],
             "using": "true",
             "with_check": "true",
-            "added_by": "20260609040000_consolidated_safe.sql"
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -12582,11 +12614,12 @@
             "name": "Anon can read policy overrides",
             "command": "SELECT",
             "roles": [
-              "anon"
+              "anon",
+              "authenticated"
             ],
             "using": "true",
             "with_check": "true",
-            "added_by": "20260609040000_consolidated_safe.sql"
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -12805,11 +12838,12 @@
             "name": "Anon can read policy presets",
             "command": "SELECT",
             "roles": [
-              "anon"
+              "anon",
+              "authenticated"
             ],
             "using": "true",
             "with_check": "true",
-            "added_by": "20260609040000_consolidated_safe.sql"
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -12903,14 +12937,7 @@
           "default": null,
           "primary_key": false,
           "unique": false,
-          "references": {
-            "schema": "auth",
-            "table": "users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": "SET NULL"
-          },
+          "references": null,
           "added_by": "20260609000002_policy_versions.sql"
         },
         {
@@ -13068,6 +13095,17 @@
             "using": "true",
             "with_check": "true",
             "added_by": "20260612000001_policy_version_snapshots.sql"
+          },
+          {
+            "name": "policy_versions_anon_insert",
+            "command": "INSERT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -13345,7 +13383,19 @@
       "rls": {
         "enabled": false,
         "forced": false,
-        "policies": [],
+        "policies": [
+          {
+            "name": "products_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
+          }
+        ],
         "determinate": false,
         "indeterminate_from": [
           "20260614000001_item_master.sql"
@@ -15741,16 +15791,6 @@
         "forced": false,
         "policies": [
           {
-            "name": "run_item_series_anon_write",
-            "command": "ALL",
-            "roles": [
-              "anon"
-            ],
-            "using": "true",
-            "with_check": "true",
-            "added_by": "20260720000001_run_item_series.sql"
-          },
-          {
             "name": "run_item_series_auth_all",
             "command": "ALL",
             "roles": [
@@ -15759,6 +15799,17 @@
             "using": "true",
             "with_check": "true",
             "added_by": "20260720000001_run_item_series.sql"
+          },
+          {
+            "name": "run_item_series_anon_write",
+            "command": "ALL",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -16015,11 +16066,12 @@
             "name": "run_replications_anon_write",
             "command": "ALL",
             "roles": [
-              "anon"
+              "anon",
+              "authenticated"
             ],
             "using": "true",
             "with_check": "true",
-            "added_by": "20260707000002_run_replications_anon_write.sql"
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -16658,11 +16710,12 @@
             "name": "scenarios_anon_all",
             "command": "ALL",
             "roles": [
-              "anon"
+              "anon",
+              "authenticated"
             ],
             "using": "true",
             "with_check": "true",
-            "added_by": "20260610000002_scenarios_anon_grants.sql"
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -18525,11 +18578,12 @@
             "name": "sim_runs_anon_all",
             "command": "ALL",
             "roles": [
-              "anon"
+              "anon",
+              "authenticated"
             ],
             "using": "true",
             "with_check": "true",
-            "added_by": "20260706000001_sim_runs_anon_grants.sql"
+            "added_by": "20260919000010_anon_policies_widen.sql"
           }
         ],
         "determinate": true
@@ -18735,7 +18789,19 @@
       "rls": {
         "enabled": false,
         "forced": false,
-        "policies": [],
+        "policies": [
+          {
+            "name": "suppliers_anon_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260919000010_anon_policies_widen.sql"
+          }
+        ],
         "determinate": false,
         "indeterminate_from": [
           "20260614000001_item_master.sql"
@@ -19429,7 +19495,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20260919000008_one_etl.sql"
+          "added_by": "20260920000003_one_etl.sql"
         }
       ],
       "constraints": [
@@ -21696,7 +21762,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D142. Rebuilds both edge tables when any of the four source lanes ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "auto_refresh_node_list_on_lane_change",
@@ -21706,7 +21772,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.1 · §4 D143. Replaces `auto_refresh_node_list_on_scd_change`, whose body ",
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "auto_refresh_node_list_on_scd_change",
@@ -22025,7 +22091,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": "WP 8.1 · §4 D127. THE node classifier. Every other one in this repository is ",
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "classify_node_type",
@@ -22038,7 +22104,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": "WP 8.1 · §4 D127. The LEGACY four-value vocabulary, now DERIVED from ",
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "cleanup_simulation_cache",
@@ -22075,7 +22141,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D140. The AUTHORIZING wrapper over `rebuild_supply_chain_lanes`. ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "create_agent_proposal",
@@ -22649,7 +22715,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 4.1's atomic tier-3 replace. DEAD as of WP 8.2 — its one caller was ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "expire_agent_proposals",
@@ -22729,11 +22795,11 @@
       "name": "get_current_user_id",
       "signature": "get_current_user_id()",
       "args": [],
-      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "returns": "uuid LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250820170403_a64f741a-c7b6-487d-9467-701e97492d9d.sql"
+      "volatility": "STABLE",
+      "comment": "Resolves the acting user: a Supabase session that names an approved user, else the ",
+      "defined_by": "20260919000011_prefer_the_session.sql"
     },
     {
       "name": "get_current_user_org_id",
@@ -22822,7 +22888,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": "WP 8.3 · §4 D127. The read path for `node_list.echelon` / `bom_depth` / ",
-      "defined_by": "20260919000002_graph_nodes_read_path.sql"
+      "defined_by": "20260920000002_graph_nodes_read_path.sql"
     },
     {
       "name": "get_individual_scenario_results",
@@ -22874,7 +22940,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D149. `InteractiveNetworkSpace`'s fallback read. It projected a ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "get_my_capabilities",
@@ -23183,7 +23249,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D134, D140. The deep lane's read path. Returns `bom_depth` beside ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "get_supply_chain_data",
@@ -23754,7 +23820,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": "WP 8.1 · §4 D140. THE node BOM-depth rule, now reading BOTH bom tables (WP 8.2, ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "node_list_discover",
@@ -23768,7 +23834,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.1 · §4 D132, D66. The node-set discovery, reading BOTH edge tables and ",
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "node_supply_tier",
@@ -23781,7 +23847,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "normalize_node_location_fields",
@@ -23890,7 +23956,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "rebuild_supply_chain_lanes",
@@ -23903,7 +23969,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D140. THE supply-chain lane derivation — the ONE writer of both ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "recompute_project_completion",
@@ -24017,7 +24083,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.1 · §4 D127, D132. Rebuilds the typed node projection from BOTH edge ",
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "refresh_node_list_for_project",
@@ -24029,7 +24095,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "restore_policy_version",

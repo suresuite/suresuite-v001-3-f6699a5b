@@ -42,7 +42,7 @@ const corsHeaders = {
  * reached by a DATABASE TRIGGER as well as by clients, and a trigger cannot call
  * an edge function; D142's rebuild-on-source-change needs a trigger too. A
  * derivation over tier-2 tables belongs in the database (`no-tier-skip`, I2).
- * The full argument is in `20260919000008_one_etl.sql`.
+ * The full argument is in `20260920000003_one_etl.sql`.
  *
  * WHAT THIS FUNCTION STILL DOES, AND WHY IT IS NOT DELETED. It owns two things
  * the RPC cannot: the `combine_etl` RUN in the analysis store (WP 4.3), and the

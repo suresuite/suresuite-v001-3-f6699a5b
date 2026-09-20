@@ -47,7 +47,7 @@ Written by `rebuild_supply_chain_lanes` — the ONE ETL since WP 8.2 — and nev
 |---|---|---|---|
 | `DataManager.tsx` | rpc combine_project_into_supply_chain | `src/pages/DataManager.tsx:656` | yes |
 | `InteractiveNetworkSpace.tsx` | table read | `src/pages/InteractiveNetworkSpace.tsx:369` | yes |
-| `ProcessLevelNetwork.tsx` | table read | `src/pages/ProcessLevelNetwork.tsx:1214` | yes |
+| `ProcessLevelNetwork.tsx` | table read | `src/pages/ProcessLevelNetwork.tsx:1258` | yes |
 | `ProjectPolicies.tsx` | rpc get_supply_chain_data_multi_tier | `src/hooks/useProjectContext.tsx:49` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
@@ -145,7 +145,7 @@ Which deep-tier upload produced this edge.
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:1214`) —
+**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:1258`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -239,7 +239,7 @@ DEPRECATED since WP 8.2 — a deprecated ALIAS of `bom_depth`, written with the 
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:1214`) —
+**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:1258`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -327,7 +327,7 @@ How deep in the BILL OF MATERIALS this edge's UPSTREAM end sits — 0 a finished
 | Type | `integer` |
 | Grain | `level` |
 | Unit | `levels down the bill of materials` — fixed |
-| Added by | `20260919000008_one_etl.sql` |
+| Added by | `20260920000003_one_etl.sql` |
 | Read by the engine | `the network pages' depth filter and column position` |
 | Transform | `bom_multi_level.level` for a bom edge, `node_bom_depth(...) + 1` for a supplier |
 | Validated at ingest | — |
@@ -347,6 +347,6 @@ How deep in the BILL OF MATERIALS this edge's UPSTREAM end sits — 0 a finished
 
 ---
 
-*Generated from data contract `dc1618b7df79`, engine `0.2.3`,
+*Generated from data contract `4231766af8b0`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data_multi_tier.contract.yaml`, table created by `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -19,6 +19,7 @@ import '@xyflow/react/dist/style.css';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { typedNodesFromLanes, labelForEchelon, type Echelon } from '@/lib/graph';
 import { useAuth } from '@/hooks/useAuth';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
 import { fetchMultiTierNetworkData, MultiTierNetworkData } from '@/services/network';
@@ -107,7 +108,25 @@ interface MultiTierData {
 
 interface NodeData extends Record<string, unknown> {
   label: string;
+  /**
+   * WP 8.3 · §4 D127. The node's ROLE, derived once by the one rule
+   * (`classify_node_echelon`, mirrored client-side by `typedNodesFromLanes`) instead
+   * of inferred from an integer. This is what the labels and the details panel read.
+   */
+  echelon: Echelon;
+  /**
+   * The legacy four-value field, kept because `getNodeColor` and the level filters
+   * still read it. DERIVED from `echelon` at the one place nodes are built, exactly
+   * as `classify_node_type` is now a mapping over `classify_node_echelon` in SQL —
+   * so the two vocabularies cannot disagree about the same node.
+   */
   nodeType: 'supplier' | 'material' | 'product' | 'customer';
+  /**
+   * The node's position ordinate. Since WP 8.3 this is the REAL BOM depth from
+   * `bom_multi_level` where the node is in a BOM, and the lane ordinate otherwise —
+   * NOT `supply_chain_data_multi_tier.level`, which two live writers disagree about
+   * and one of which flattens every BOM row to a literal 2 (§4 D140).
+   */
   level: number;
   bomLevel: number | null;
   incoming: number;
@@ -165,72 +184,49 @@ function getNodeColor(nodeType: string, level: number, maxLevel: number): string
   return '#6b7280';
 }
 
-function getNodeTypeFromLevel(level: number, dataSource: string, position: 'from' | 'to'): 'customer' | 'product' | 'material' | 'supplier' {
-  // Inbound rows are always structurally suppliers, regardless of what
-  // BOM-depth level got computed for them upstream. Some projects' multi-tier
-  // pipeline never tiers deep enough to assign inbound rows level 5 — without
-  // this override those rows silently collapse into "material".
-  if (dataSource === 'inbound') return 'supplier';  
-  
-  // Level -1: Customers (to_location in outbound with level 0)
-  if (level === -1) return 'customer';
-  
-  // Level 0: Products (from_location in outbound)
-  if (level === 0) {
-    if (dataSource === 'outbound' && position === 'from') return 'product';
-    if (dataSource === 'outbound' && position === 'to') return 'customer'; // Will be converted to level -1
-    return 'product';
+/**
+ * The legacy four-value vocabulary, DERIVED from the echelon — WP 8.3 · §4 D127.
+ *
+ * `getNodeTypeFromLevel` and `getDisplayNodeType` used to live here. Both are gone:
+ * they inferred a node's type from `supply_chain_data_multi_tier.level`, a column two
+ * live writers disagree about (§4 D140) and which the deployed one flattens to a
+ * literal 2 on every BOM row. They also disagreed with EACH OTHER — one had an
+ * `inbound` override and the other read the level alone — which is two of the eight
+ * classifiers D127 counts, in one file.
+ *
+ * What replaces them is `typedNodesFromLanes`, the declared mirror of
+ * `classify_node_echelon`, and this mapping. It is a mapping and not a second rule,
+ * exactly as `classify_node_type` is now a mapping over `classify_node_echelon` in
+ * SQL — so the page and the database cannot type the same node differently.
+ *
+ * `subassembly` maps to `material`: a thing the plant both builds and consumes is
+ * input to something else, and calling it a product told the map to draw it on the
+ * customer side. `plant` and `unknown` map to `material` ONLY for the legacy colour
+ * and filter paths that cannot express them; every label a user reads goes through
+ * `labelForEchelon`, which says "Unknown" rather than guessing (T1).
+ */
+function echelonToLegacyType(echelon: Echelon): 'supplier' | 'material' | 'product' | 'customer' {
+  switch (echelon) {
+    case 'customer': return 'customer';
+    case 'product': return 'product';
+    case 'supplier': return 'supplier';
+    default: return 'material';
   }
-  
-  // Level 1 used to be labelled "work station" for display. It is not one — see
-  // `getDisplayNodeType` below and §4 D139. A BOM row is a material either way.
-  if (level === 1) return 'material';
-  
-  // Level 2-4: Material Levels
-  if (level >= 2 && level <= 4) return 'material';
-  
-  // Level 5: Suppliers 
-  if (level === 5) return 'supplier';
-  
-  // Level 6+: Suppliers (fallback for any higher levels)
-  if (level >= 6) return 'supplier';
-  
-  // Default to material for unknown levels
-  return 'material';
 }
 
 /**
- * The label a user reads for a node.
+ * The label for a DEPTH BUCKET, as the level tiles and the flow list describe one.
  *
- * TWO FABRICATIONS WERE REMOVED HERE (WP 8.5 · §4 D139, D140).
- *
- * 1. `level === 1` used to render as **"work station"**. There is no routing,
- *    operation or work-centre table anywhere in `supabase/contract/` — the label
- *    was invented from an integer. That is **T1** broken in the plainest possible
- *    form: a noun on screen that no table in this database can produce, presented
- *    beside real ids, from which a user reasonably concludes the product knows
- *    about their operations. It does not. §14 carries the routings dataset that
- *    would earn the name back.
- *
- * 2. `material level N` asserted a BOM DEPTH, and this column is not one.
- *    `supply_chain_data_multi_tier.level` has two live writers that disagree
- *    (§4 D140): one stamps every `bom_multi_level` row with a literal 2 and never
- *    reads the real depth. §15 measured a project whose BOM is four levels deep
- *    and whose entire bom lane sits at level 2 — so "material level 2" was a
- *    confident statement about 260 materials and 66 products at once, and it was
- *    wrong for all of them.
- *
- * So the label says the echelon and nothing more. The DEPTH returns when the page
- * reads `node_list.bom_depth`, which comes from `bom_multi_level` — the table that
- * owns the measurement — and is unaffected by either writer (WP 8.1 authored it;
- * WP 8.4 moves this page onto it).
+ * Distinct from `labelForEchelon`, which labels a NODE. A bucket is a set of nodes at
+ * one ordinate, and since WP 8.3 that ordinate is the real BOM depth — so the honest
+ * label names the depth rather than asserting a kind. `-1` and `0` are the two the
+ * page's own convention reserves.
  */
-function getDisplayNodeType(level: number): string {
-  if (level === -1) return 'customer';
-  if (level === 0) return 'product';
-  if (level >= 1 && level <= 4) return 'material';
-  if (level >= 5) return 'supplier';
-  return 'unknown';
+function depthBucketLabel(level: number): string {
+  if (level === -1) return 'Customers';
+  if (level === 0) return 'Finished products';
+  if (level > 0) return `BOM depth ${level}`;
+  return 'Unknown depth';
 }
 
 export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: NetworkVisualizationProps) {
@@ -350,120 +346,168 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
       // Cache multiTierData for reachability algorithm
       setMultiTierDataCache(multiTierData);
 
+      // ── WP 8.3 · §4 D127, D140 — TYPE AND DEPTH COME FROM THE DATA NOW ────
+      //
+      // Everything below this point reads `record.level` and `nodeType`. Both were
+      // wrong, for two different reasons, and this is where they are fixed once
+      // rather than at each of the places that consume them.
+      //
+      // DEPTH. `supply_chain_data_multi_tier.level` has TWO live writers that
+      // disagree (§4 D140), and the deployed one — the SQL RPC
+      // `combine_project_into_supply_chain` — stamps a LITERAL 2 on every
+      // `bom_multi_level` row and never reads the real depth. §15 run 35433474185
+      // measured a project whose BOM is four levels deep and whose entire bom lane
+      // sits at level 2: its 260 materials and 66 products rendered as ONE flat
+      // column, every one of them labelled a level-2 material. `bom_multi_level.level`
+      // is the real depth, neither writer touches it, and it is one read away.
+      //
+      // TYPE. Derived from the LANE ROLES a node actually holds, by the one rule
+      // (`classify_node_echelon`, WP 8.1) rather than from a fixed ladder over an
+      // integer. That is what lets a `subassembly` exist at all — §15 found 65 nodes
+      // that are both a BOM target and a BOM source on the reported project, every
+      // one of which the ladder called a material and the SQL called a product.
+      //
+      // WHY NOT `node_list.echelon`, WHICH IS THE AUTHORITY. Because the migration
+      // that adds it deploys on MERGE (`supabase-migrations.yml` is
+      // `branches: [main]`), so reading it today renders nothing. `typedNodesFromLanes`
+      // is the declared mirror of the same rule and `echelonMirror.test.ts` parses the
+      // SQL's own branch order and fails if the two diverge. When the column reaches
+      // production this block becomes a `useGraphNodes` call and the mirror's only
+      // caller disappears.
+      const projectPlant =
+        projects.find((pr) => pr.id === globalSelectedProjectId)?.plant_name ?? null;
+
+      const { data: bomDepthRows, error: bomDepthError } = await supabase
+        .from('bom_multi_level')
+        .select('material_id,higher_level_component_id,level')
+        .eq('project_id', globalSelectedProjectId);
+
+      if (bomDepthError) {
+        // SAID, not swallowed. A depth we could not read is rendered as unknown
+        // below, and the user is told why rather than shown a flat graph (T2).
+        console.error('[ProcessLevelNetwork] bom_multi_level read failed:', bomDepthError.message);
+        toast.warning(
+          'Could not read the bill of materials, so BOM depth is shown as unknown. ' +
+            'The graph is still correct about what connects to what.',
+        );
+      }
+
+      const typedNodes = typedNodesFromLanes(multiTierData, bomDepthRows ?? [], projectPlant);
+
+      // The echelon a node resolves to, and the depth to render it at. `bomDepth` is
+      // null for anything outside the BOM — a supplier, a customer — so those keep the
+      // lane ordinate, which is meaningful for them (0 outbound, and the inbound lane's
+      // own position). A NULL depth is never substituted with 0: that is §4 D134.
+      const echelonOf = (id: string): Echelon =>
+        typedNodes.get(id)?.echelon ?? 'unknown';
+      const depthOf = (id: string): number | null =>
+        typedNodes.get(id)?.bomDepth ?? null;
+
+      // ── WHERE A SUPPLIER SITS, derived rather than inherited ───────────────
+      //
+      // A supplier is in no BOM, so it has no BOM depth — and taking the lane's own
+      // ordinate for it is the last place §4 D140 still shows: on the reported
+      // project the inbound lane occupies levels 1 AND 5, from one upload, because
+      // `GREATEST(1, max_level + 1)` was computed against a BOM depth the writer had
+      // already flattened. The page then drew the same kind of firm in two columns
+      // four apart, and called the ones at level 1 materials.
+      //
+      // The position IS in the data: a supplier feeds material M, M has a real BOM
+      // depth d, so the supplier sits one step beyond the deepest material it
+      // supplies. That is what both ETLs were reaching for with `max_level + 1`; the
+      // only thing they got wrong was computing it from the flattened copy.
+      //
+      // A supplier whose materials are all outside the BOM has no derivable position,
+      // and is placed one step beyond the deepest material in the project rather than
+      // at a level that means something else. That is a LAYOUT fallback, not a claim
+      // about the data: `bomDepth` stays null for it and every label it carries comes
+      // from its echelon.
+      const deepestMaterialDepth = Math.max(
+        0,
+        ...[...typedNodes.values()].map((v) => v.bomDepth ?? 0),
+      );
+      const supplierOrdinate = new Map<string, number>();
+      for (const record of multiTierData) {
+        if ((record.data_source ?? '').toLowerCase() !== 'inbound') continue;
+        const supplier = (record.from_location ?? '').trim();
+        if (!supplier) continue;
+        const fedDepth = depthOf((record.to_location ?? '').trim());
+        const candidate = (fedDepth ?? deepestMaterialDepth) + 1;
+        const prev = supplierOrdinate.get(supplier);
+        if (prev === undefined || candidate > prev) supplierOrdinate.set(supplier, candidate);
+      }
+
       console.log('🔄 Processing nodes and edges from multi-tier data...');
 
       const nodeMap: { [key: string]: NodeData } = {};
       const edgeMap: { [key: string]: Edge } = {};
       const levelNodeCounts: Record<number, number> = {};
 
-      // CORRECTED LOGIC: Step 1 - Extract ALL unique nodes from from_location with their levels
-      // This captures all source nodes including suppliers, materials, and products
-      
-      // Debug tracking
-      let processedRecordsCount = 0;
-      let level5InboundCount = 0;
-      let level4BomCount = 0;
-      let skippedDuplicatesCount = 0;
-      let createdSuppliersCount = 0;
-      let createdLevel4MaterialsCount = 0;
-      
-      console.log('🔍 Starting node extraction from', multiTierData.length, 'records...');
-      
-      multiTierData.forEach((record, index) => {
-        processedRecordsCount++;
-        const nodeId = record.from_location;
-        
-        // Debug logging for specific levels we're interested in
-        if (record.level === 5 && record.data_source === 'inbound') {
-          level5InboundCount++;
-          console.log(`🔎 Level 5 inbound record ${level5InboundCount}: ${nodeId} (data_source: ${record.data_source})`);
-        }
-        
-        if (record.level === 4 && record.data_source === 'bom') {
-          level4BomCount++;
-          if (level4BomCount <= 5) { // Log first 5 for debugging
-            console.log(`🔎 Level 4 bom record ${level4BomCount}: ${nodeId} (data_source: ${record.data_source})`);
-          }
-        }
-        
-        const dedupKey = `${nodeId}::${record.level}::${record.data_source}`;
-        if (nodeId && !nodeMap[dedupKey]) {
-          const level = record.level;
-          const nodeType = getNodeTypeFromLevel(level, record.data_source, 'from');
-          
-          // Track specific node type creation
-          if (nodeType === 'supplier' && level === 5) {
-            createdSuppliersCount++;
-            console.log(`✅ Created supplier ${createdSuppliersCount}: ${nodeId} (level: ${level}, data_source: ${record.data_source})`);
-          }
-          
-          if (nodeType === 'material' && level === 4) {
-            createdLevel4MaterialsCount++;
-            if (createdLevel4MaterialsCount <= 5) { // Log first 5 for debugging
-              console.log(`✅ Created level 4 material ${createdLevel4MaterialsCount}: ${nodeId} (level: ${level}, data_source: ${record.data_source})`);
-            }
-          }
-          
-          levelNodeCounts[level] = (levelNodeCounts[level] || 0) + 1;
-          
-          nodeMap[nodeId] = {
-            label: nodeId,
-            nodeType: nodeType,
-            level: level,
-            bomLevel: level,
-            incoming: 0,
-            outgoing: 0,
-            flowVolume: 0,
-            consumptionRate: 0,
-            dataSource: record.data_source,
-            isConnected: true,
-            mappingConfidence: 1.0,
-          };
-        } else if (nodeId && nodeMap[nodeId]) {
-          skippedDuplicatesCount++;
-          
-          // Debug logging for skipped Level 5 inbound records
-          if (record.level === 5 && record.data_source === 'inbound') {
-            console.log(`⚠️  Skipped duplicate Level 5 inbound: ${nodeId} (existing node type: ${nodeMap[nodeId].nodeType})`);
-          }
-        }
-      });
-      
-      console.log('🔍 Node extraction summary:');
-      console.log(`   📊 Processed ${processedRecordsCount} records`);
-      console.log(`   📊 Found ${level5InboundCount} Level 5 inbound records`);
-      console.log(`   📊 Found ${level4BomCount} Level 4 bom records`);
-      console.log(`   📊 Created ${createdSuppliersCount} suppliers`);
-      console.log(`   📊 Created ${createdLevel4MaterialsCount} level 4 materials`);
-      console.log(`   📊 Skipped ${skippedDuplicatesCount} duplicates`);
-      console.log(`   📊 Total unique nodes: ${Object.keys(nodeMap).length}`);
+      // ── ONE node pass, over BOTH endpoints (WP 8.3 · §4 D128) ─────────────
+      //
+      // There were two passes and between them they lost nodes. The first read only
+      // `record.from_location`. The second read `to_location` but ONLY for outbound
+      // rows at level 0, i.e. customers. So **a BOM target that is never also a BOM
+      // source and never an outbound source got no node at all** — and every edge
+      // pointing at it was then skipped, silently, because the edge builder requires
+      // both endpoints to exist. On the reported project that is invisible only
+      // because its sub-assemblies happen to be both, which is luck rather than
+      // design.
+      //
+      // The dedup guard is also fixed here: it used to test `nodeMap[dedupKey]` while
+      // writing `nodeMap[nodeId]`, so it never fired and the last row won every
+      // node's level, type, lane and colour. §15 measured 466 nodes for which "last
+      // row wins" was a real choice. `levelNodeCounts` was incremented inside that
+      // same unreachable branch, which is why the legend counts and the level tiles
+      // counted ROWS rather than nodes.
+      const addNode = (rawId: string | null | undefined, record: MultiTierData) => {
+        const nodeId = (rawId ?? '').trim();
+        if (!nodeId) return;                 // never a node for a blank endpoint
+        if (nodeMap[nodeId]) return;         // first record wins, deterministically
 
-      // CORRECTED LOGIC: Step 2 - Extract customers from to_location where level=0 and outbound
-      // These are the final customers at the end of the supply chain
-      multiTierData.forEach((record) => {
-        if (record.level === 0 && record.data_source === 'outbound') {
-          const nodeId = record.to_location;
-          if (nodeId && !nodeMap[nodeId]) {
-            const customerLevel = -1; // Assign level -1 for customers
-            
-            levelNodeCounts[customerLevel] = (levelNodeCounts[customerLevel] || 0) + 1;
-            
-            nodeMap[nodeId] = {
-              label: nodeId,
-              nodeType: 'customer',
-              level: customerLevel,
-              bomLevel: 0,
-              incoming: 0,
-              outgoing: 0,
-              flowVolume: 0,
-              consumptionRate: 0,
-              dataSource: record.data_source,
-              isConnected: true,
-              mappingConfidence: 1.0,
-            };
-          }
-        }
-      });
+        const echelon = echelonOf(nodeId);
+        // A customer sits at -1 by this page's own convention, which keeps it apart
+        // from a finished product at BOM depth 0. Everything else takes the real BOM
+        // depth where it has one, and the lane ordinate where it does not — a
+        // supplier and a customer are in no BOM, and giving them a depth of 0 would
+        // be §4 D134's substitution in a new place.
+        const level =
+          echelon === 'customer' ? -1
+          : echelon === 'supplier' ? supplierOrdinate.get(nodeId) ?? deepestMaterialDepth + 1
+          : depthOf(nodeId) ?? record.level;
+
+        levelNodeCounts[level] = (levelNodeCounts[level] || 0) + 1;
+
+        nodeMap[nodeId] = {
+          label: nodeId,
+          echelon,
+          nodeType: echelonToLegacyType(echelon),
+          level,
+          bomLevel: depthOf(nodeId),
+          incoming: 0,
+          outgoing: 0,
+          flowVolume: 0,
+          consumptionRate: 0,
+          dataSource: record.data_source,
+          isConnected: true,
+          // §4 D135 — this was a literal 1.0 at five creation sites, which made the
+          // amber low-confidence border unreachable: a confidence signal that could
+          // only ever say "confident". It is now computed from the one thing that
+          // genuinely makes a node's role uncertain — the data not placing it.
+          mappingConfidence: echelon === 'unknown' ? 0 : 1,
+        };
+      };
+
+      for (const record of multiTierData) {
+        addNode(record.from_location, record);
+        addNode(record.to_location, record);
+      }
+
+      const echelonTally = Object.values(nodeMap).reduce<Record<string, number>>((acc, n) => {
+        acc[n.echelon] = (acc[n.echelon] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('📍 Nodes by echelon:', echelonTally, '· depths:', levelNodeCounts);
 
       console.log('📍 Created', Object.keys(nodeMap).length, 'unique nodes using corrected logic');
       console.log('📊 Level distribution:', levelNodeCounts);
@@ -555,7 +599,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
         const key = n.nodeType === 'material' ? `material-${n.level}` : n.nodeType;
         if (!legendGroupMap[key]) {
           legendGroupMap[key] = {
-            label: n.nodeType === 'material' ? getDisplayNodeType(n.level) : n.nodeType,
+            label: labelForEchelon(n.echelon),
             count: 0,
             color: getNodeColor(n.nodeType, n.level, currentMaxLevel),
             // Suppliers first, then materials deepest→shallowest, then product, then customer —
@@ -827,7 +871,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
         const l = Number(lvl);
         return {
           level: l,
-          displayType: getDisplayNodeType(l),
+          displayType: depthBucketLabel(l),
           count: s.count,
           avgIn:   Math.round((s.totalIn   / s.count) * 10) / 10,
           avgOut:  Math.round((s.totalOut  / s.count) * 10) / 10,
@@ -843,7 +887,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
       .sort((a, b) => b.flow - a.flow)
       .slice(0, 10);
     setTopFlowNodes(topNodes);
-    const firstType = topNodes.length > 0 ? getDisplayNodeType(topNodes[0].level) : '';
+    const firstType = topNodes.length > 0 ? depthBucketLabel(topNodes[0].level) : '';
     setTopFlowFilter(firstType);
 
       setNodes(nodeListWithLabels);
@@ -1508,7 +1552,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                   key: n.id,
                   id: String(label),
                   cells: [
-                    { text: getDisplayNodeType(n.level) },
+                    { text: labelForEchelon(n.echelon as Echelon) },
                     { text: n.flow.toLocaleString(), primary: true },
                     { text: String((node?.data?.incoming as number) ?? 0) },
                     { text: String((node?.data?.outgoing as number) ?? 0) },
@@ -1600,7 +1644,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                   <div>
                     <div className="text-sm font-medium">{selectedNode.data.label}</div>
                     <div className="text-xs text-muted-foreground capitalize">
-                      {getDisplayNodeType(selectedNode.data.level)}
+                      {labelForEchelon(selectedNode.data.echelon)}
                     </div>
                   </div>
                   <Separator />
@@ -1763,7 +1807,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
               <CardContent className="space-y-3">
                 {/* Filter buttons */}
                 <div className="flex flex-wrap gap-1 pb-2">
-                  {Array.from(new Set(topFlowNodes.map(n => getDisplayNodeType(n.level)))).map(type => (
+                  {Array.from(new Set(topFlowNodes.map(n => depthBucketLabel(n.level)))).map(type => (
                     <button
                       key={type}
                       onClick={() => setTopFlowFilter(type)}
@@ -1781,7 +1825,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                 {/* Chart */}
                 {(() => {
                   const filtered = topFlowNodes.filter(n =>
-                    topFlowFilter === '' || getDisplayNodeType(n.level) === topFlowFilter
+                    topFlowFilter === '' || depthBucketLabel(n.level) === topFlowFilter
                   );
                   const max = filtered[0]?.flow || 1;
 
