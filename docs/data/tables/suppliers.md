@@ -33,9 +33,20 @@
 | Minimum project role | `editor` |
 | Tier transitions audited | yes |
 | Row-level security | **cannot be determined from the migrations** |
-| Policies on the table | **none** |
+| Policies on the table | 1 — **1 with no predicate** |
 
 `write` names the capability that exists today. WP 2.2 splits `data_editing` into `data_edit_inputs` (tier 2) and `data_edit_policies` (tier 4); this row becomes `data_edit_inputs` then, and all thirteen sidecars change together. SEPARATELY — AND THIS REPLACES WHAT WP 1.2 WROTE HERE, WHICH WAS WRONG: this sidecar used to assert `rls_enabled: false` and say "no migration ever runs ALTER TABLE ... ENABLE ROW LEVEL SECURITY on them". One does. `20260614000001_item_master.sql:57-66` enables RLS and creates two policies (`%s_auth_all`, `%s_anon_read`) on each of the three masters — but through `EXECUTE format(...)` inside a `FOREACH` over an array of table names, which a static replay of the migrations cannot evaluate. The introspector recorded the absence as `enabled: false`, WP 1.2 read that as fact, and the contract was one generated page away from telling a user their item masters were unprotected. WP 1.4 fixed the mechanism, not the guess: the introspector now records dynamic DDL (`dynamic_ddl`) and marks the tables it touches `rls.determinate: false`, the validator refuses to let a sidecar assert an RLS state the migrations do not settle, and the generated page says the state is indeterminate and names the migration. The ONLY way to know is to read the live database — PLAN.md §15, still unrun. WP 2.4's security review owns it.
+
+> **What the database actually permits is wider than the row above.**
+> 1 policy here grants access with
+> **no predicate at all** (`USING (true)`), so the capability named above is what the
+> product intends to check, not what the database enforces:
+>
+> - `suppliers_anon_read` — `SELECT` to `anon`, `authenticated`
+>
+> See PLAN.md D28: the application runs as the
+> `anon` role with no auth session and the anon key ships in the frontend bundle, so
+> closing these is a migration with an auth model behind it rather than a policy edit.
 
 > **The migrations do not settle whether RLS is on here.**
 > `20260614000001_item_master.sql` sets it with
@@ -44,6 +55,14 @@
 > page will not round it to *off*: a security review that starts from an invented
 > "unprotected" is as wrong as one that starts from an invented "protected".
 > Only reading the live database answers it (PLAN.md §15).
+
+<details><summary>1 RLS policy</summary>
+
+| Policy | Command | Roles | Added by |
+|---|---|---|---|
+| suppliers_anon_read | SELECT | anon, authenticated | `20260919000010_anon_policies_widen.sql` |
+
+</details>
 
 ## Columns
 
@@ -316,6 +335,6 @@ The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_numb
 
 ---
 
-*Generated from data contract `7610aaafc342`, engine `0.2.3`,
+*Generated from data contract `4231766af8b0`, engine `0.2.3`,
 sidecar `supabase/contract/suppliers.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

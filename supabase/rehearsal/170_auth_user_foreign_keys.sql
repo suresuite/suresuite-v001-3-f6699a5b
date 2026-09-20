@@ -52,7 +52,7 @@ DECLARE
   v_refused boolean;
   v_left    integer;
 BEGIN
-  -- ── 1 · all nine keys EXIST, and point at `auth.users` ──────────────────
+  -- ── 1 · all six keys EXIST, and point at `auth.users` ───────────────────
   --
   -- Read from `pg_constraint` rather than from the artifact: the artifact is
   -- what was wrong, so asking it whether it is right now proves nothing.
@@ -60,12 +60,24 @@ BEGIN
   SELECT string_agg(want.rel || '.' || want.col, ', ' ORDER BY want.rel, want.col),
          count(*)
     INTO v_missing, v_missing_n
+  -- SIX, NOT NINE, AND ALL THREE DEPARTURES ARE THE SAME STORY TOLD TWICE.
+  --
+  --   `policy_versions.created_by`      — dropped in JUNE (`20260613000001`), because this
+  --     application authenticates against `approved_users` and the key rejected every
+  --     snapshot with a real user. It stayed on this list because the ARTIFACT went on
+  --     recording it: an inline FK lives on the column, not in `constraints`, so the
+  --     introspector's DROP handler could not reach it (§4 D157).
+  --   `ingest_runs.triggered_by_user_id` } re-keyed to `approved_users` by
+  --   `ingest_runs.applied_by_user_id`   } `20260919000012` — same reason, one package
+  --     later, with the whole CSV landing path at stake (§4 D156). `rehearsal/320` owns
+  --     them now.
+  --
+  -- This list shrinking is the repository catching up with the database, not a regression;
+  -- §1's own error message says a PARTIAL set cannot be a stale base, and that is still
+  -- true — what changed is which set is whole.
   FROM (VALUES
     ('experiments',        'created_by'),
-    ('ingest_runs',        'triggered_by_user_id'),
-    ('ingest_runs',        'applied_by_user_id'),
     ('policy_presets',     'owner_id'),
-    ('policy_versions',    'created_by'),
     ('project_erp_links',  'linked_by_user_id'),
     ('recovery_playbooks', 'created_by'),
     ('scenarios',          'created_by'),
@@ -88,19 +100,19 @@ BEGIN
       AND tgt.relname = 'users'
   );
 
-  IF v_missing_n = 9 THEN
+  IF v_missing_n = 6 THEN
     -- Every one absent: this base was built from an artifact that predates the
     -- fix, which is exactly what plain and `--fixtures` mode do. Nothing here is
     -- assertable and saying so is better than a guard that hides a regression.
     RAISE NOTICE
-      'D53 · 170 · SKIPPED: none of the nine `auth.users` keys are present, so '
+      'D53 · 170 · SKIPPED: none of the six `auth.users` keys are present, so '
       'this base predates the introspector fix (plain/--fixtures build from the '
       'BASE branch artifact). `--since HEAD` is the mode that proves it, and '
       '`introspectorRefSchema.test.ts` gates the parse with no database at all.';
     RETURN;
   ELSIF v_missing IS NOT NULL THEN
     RAISE EXCEPTION
-      'D53 §1 — % of the nine foreign keys to `auth.users` are missing: %. A '
+      'D53 §1 — % of the six foreign keys to `auth.users` are missing: %. A '
       'PARTIAL set cannot be a stale base — a base either predates the fix or '
       'carries it — so this is a regression in the introspector''s REFERENCES '
       'parse or in `rehearsal-schema.mjs`''s target resolution.', v_missing_n, v_missing;
@@ -116,13 +128,17 @@ BEGIN
   INSERT INTO public.projects (id, name, modeler_id, plant_name, organization, organization_id)
     VALUES (v_proj, 'D53', v_user, 'P', 'D53 Org', v_org);
 
-  -- NO ACTION: an ingest run's actor cannot be deleted out from under it.
-  -- `triggered_by` is HOW the run started, not WHO started it — the who is
-  -- `triggered_by_user_id`, which is the column this section is about. An email
-  -- here fails `CHECK (triggered_by IN ('manual','scheduled'))`, which §4 D59
-  -- kept out of the rehearsed database until now.
-  INSERT INTO public.ingest_runs (project_id, source_kind, triggered_by, triggered_by_user_id)
-    VALUES (v_proj, 'csv', 'manual', v_user2);
+  -- NO ACTION: an ERP link's author cannot be deleted out from under it.
+  --
+  -- This demonstration USED to run on `ingest_runs.triggered_by_user_id`, and moved here
+  -- when `20260919000012` re-keyed that column to `approved_users` (§4 D156).
+  -- `project_erp_links.linked_by_user_id` is the right replacement rather than the nearest
+  -- one: it is NOT NULL, so SET NULL was never available to it, and NO ACTION is the only
+  -- rule it could have — which makes it the clearest place in the schema to assert what NO
+  -- ACTION does.
+  INSERT INTO public.project_erp_links
+    (project_id, external_system, external_company_id, linked_by_user_id, external_oauth_token_ref)
+    VALUES (v_proj, 'orbit_mrp', 'D53-CO', v_user2, 'vault://d53');
 
   v_refused := false;
   BEGIN
@@ -133,8 +149,8 @@ BEGIN
 
   IF NOT v_refused THEN
     RAISE EXCEPTION
-      'D53 §2 — deleting a user that an `ingest_runs` row names as its actor was '
-      'ALLOWED. That is the orphaned-actor case the key exists to refuse, and it '
+      'D53 §2 — deleting a user that a `project_erp_links` row names as its author '
+      'was ALLOWED. That is the orphaned-actor case the key exists to refuse, and it '
       'is exactly what every rehearsal before this one permitted.';
   END IF;
 

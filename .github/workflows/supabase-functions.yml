@@ -31,6 +31,12 @@ on:
       - 'supabase/functions/calculate-node-prominence/**'
       - 'supabase/functions/predict-critical-nodes/**'
       - 'supabase/functions/geocode-locations/**'
+      # WP 7.1 stage 1b. Mints a session token whose `sub` is the approved_users id, so
+      # `auth.uid()` resolves to the person this application authenticated (§4 D130). It
+      # FAILS CLOSED without `SUPABASE_JWT_SECRET`, which is not set today and which no
+      # session in this repository can set — so deploying it changes nobody's login until
+      # somebody provisions that secret deliberately.
+      - 'supabase/functions/session-mint/**'
       - 'supabase/functions/_shared/**'
       - 'supabase/config.toml'
       - '.github/workflows/supabase-functions.yml'
@@ -180,6 +186,16 @@ jobs:
       # added at the v1.2 GA flip.
       - name: Deploy report-render
         run: supabase functions deploy report-render --project-ref wckdrutwkytwcomrlpib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # WP 7.1 stage 1b. `verify_jwt = false` is DECLARED in `supabase/config.toml`, which
+      # the deploy reads — not passed as `--no-verify-jwt` here, because config.toml is
+      # where this repository states a function's trust model and a flag in a workflow is
+      # not a declaration anybody reading the function would find. It must be off: this is
+      # the endpoint that ISSUES the token, so requiring a token to reach it is a circle.
+      - name: Deploy session-mint
+        run: supabase functions deploy session-mint --project-ref wckdrutwkytwcomrlpib
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 

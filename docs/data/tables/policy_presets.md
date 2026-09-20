@@ -42,7 +42,7 @@ Tier 4 — the DECISION plane: a preset is a choice a person can make, not a fac
 > **no predicate at all** (`USING (true)`), so the capability named above is what the
 > product intends to check, not what the database enforces:
 >
-> - `Anon can read policy presets` — `SELECT` to `anon`
+> - `Anon can read policy presets` — `SELECT` to `anon`, `authenticated`
 >
 > See PLAN.md D28: the application runs as the
 > `anon` role with no auth session and the anon key ships in the frontend bundle, so
@@ -56,7 +56,7 @@ Tier 4 — the DECISION plane: a preset is a choice a person can make, not a fac
 | Users can create their own presets | INSERT | authenticated | `20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql` |
 | Users can update their own presets | UPDATE | authenticated | `20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql` |
 | Users can delete their own presets | DELETE | authenticated | `20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql` |
-| Anon can read policy presets | SELECT | anon | `20260609040000_consolidated_safe.sql` |
+| Anon can read policy presets | SELECT | anon, authenticated | `20260919000010_anon_policies_widen.sql` |
 
 </details>
 
@@ -208,6 +208,6 @@ When it was last changed. Maintained by a trigger where one exists; with no writ
 
 ---
 
-*Generated from data contract `7610aaafc342`, engine `0.2.3`,
+*Generated from data contract `4231766af8b0`, engine `0.2.3`,
 sidecar `supabase/contract/policy_presets.contract.yaml`, table created by `20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

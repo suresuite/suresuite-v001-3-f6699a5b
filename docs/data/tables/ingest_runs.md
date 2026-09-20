@@ -30,6 +30,11 @@ partially or get corrected — the write fails.
 | `erp_sync_runs_status_check` | `CHECK (status IN ('running', 'staged', 'applied', 'failed', 'skipped'))` | `20260829120000_erp_connector_phase1_2.sql` |
 | `ingest_runs_source_kind_check` | `CHECK (source_kind IN ('csv', 'orbit-mrp', 'api'))` | `20260916000012_ingest_rename_and_widen.sql` |
 
+| Constraint | Kind | Definition |
+|---|---|---|
+| `ingest_runs_triggered_by_user_fkey` | FOREIGN KEY | `FOREIGN KEY (triggered_by_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL` |
+| `ingest_runs_applied_by_user_fkey` | FOREIGN KEY | `FOREIGN KEY (applied_by_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL` |
+
 ## Governance
 
 | | |
@@ -158,7 +163,6 @@ The person who asked for a manual run, in `auth.users`. NULL for a scheduled run
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `auth.users(id)` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -355,7 +359,6 @@ Who approved the promotion, in `auth.users`. NULL when the link's auto-apply thr
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260829120000_erp_connector_phase1_2.sql` |
-| References | `auth.users(id)` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
@@ -468,6 +471,6 @@ Staged rows that a LATER line of the same file repeats on the natural key. The p
 
 ---
 
-*Generated from data contract `7610aaafc342`, engine `0.2.3`,
+*Generated from data contract `4231766af8b0`, engine `0.2.3`,
 sidecar `supabase/contract/ingest_runs.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

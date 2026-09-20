@@ -2434,8 +2434,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "rls": {
       "enabled": true,
       "determinate": true,
-      "policies": 2,
-      "unrestricted": 0
+      "policies": 3,
+      "unrestricted": 1
     },
     "columns": [
       {
@@ -5935,14 +5935,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "meaning": "The person who asked for a manual run, in `auth.users`. NULL for a scheduled run, where there is no person — stated rather than back-filled to a service account, because 'nobody asked, the schedule did' is the true answer (G4).",
         "primaryKey": false,
         "unique": false,
-        "references": {
-          "schema": "auth",
-          "table": "users",
-          "columns": [
-            "id"
-          ],
-          "onDelete": null
-        },
+        "references": null,
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null,
@@ -6254,14 +6247,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "meaning": "Who approved the promotion, in `auth.users`. NULL when the link's auto-apply threshold promoted it, and that NULL is the one D36 is about: an automatic promotion has no actor and says so rather than borrowing one.",
         "primaryKey": false,
         "unique": false,
-        "references": {
-          "schema": "auth",
-          "table": "users",
-          "columns": [
-            "id"
-          ],
-          "onDelete": null
-        },
+        "references": null,
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null,
@@ -8007,8 +7993,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "rls": {
       "enabled": false,
       "determinate": false,
-      "policies": 0,
-      "unrestricted": 0
+      "policies": 1,
+      "unrestricted": 1
     },
     "columns": [
       {
@@ -12844,8 +12830,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "rls": {
       "enabled": true,
       "determinate": true,
-      "policies": 2,
-      "unrestricted": 2
+      "policies": 3,
+      "unrestricted": 3
     },
     "columns": [
       {
@@ -12962,14 +12948,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "meaning": "The user who saved it, by uuid. The three `author_*` columns beside it are the denormalised copy that survives the account.",
         "primaryKey": false,
         "unique": false,
-        "references": {
-          "schema": "auth",
-          "table": "users",
-          "columns": [
-            "id"
-          ],
-          "onDelete": "SET NULL"
-        },
+        "references": null,
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null,
@@ -13213,8 +13192,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "rls": {
       "enabled": false,
       "determinate": false,
-      "policies": 0,
-      "unrestricted": 0
+      "policies": 1,
+      "unrestricted": 1
     },
     "columns": [
       {
@@ -16909,8 +16888,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "rls": {
       "enabled": false,
       "determinate": false,
-      "policies": 0,
-      "unrestricted": 0
+      "policies": 1,
+      "unrestricted": 1
     },
     "columns": [
       {

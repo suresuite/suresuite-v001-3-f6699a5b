@@ -26,28 +26,30 @@
 | Minimum project role | `editor` |
 | Tier transitions audited | yes |
 | Row-level security | enabled |
-| Policies on the table | 2 — **2 with no predicate** |
+| Policies on the table | 3 — **3 with no predicate** |
 
 Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the dataset they chose it over and the result it produced. `result-binding` (I8) needs all three, which is why WP 6.3 keeps the results and this package takes the decisions. Audited from WP 6.4: the three statement-grain triggers land beside this sidecar, because `dataPlaneAudit.test.ts` scopes its rule to tables IN the contract and a deferred table's writes are unaudited with nothing to notice (D54). **This is the one decision table `result-binding` (I8) already reaches**: a run stores `policy_version_id` and the verifiable export reads the row back, so the policy half of a reproducibility record is bound where the dataset half has to be reconstructed. The row carries THREE author columns beside `created_by`, which is a denormalised copy of a person rather than a second identity (G1) — kept because a version outlives an account and a deleted user should not erase who made a decision.
 
 > **What the database actually permits is wider than the row above.**
-> 2 policies here grant access with
+> 3 policies here grant access with
 > **no predicate at all** (`USING (true)`), so the capability named above is what the
 > product intends to check, not what the database enforces:
 >
 > - `policy_versions_read_all` — `SELECT` to `anon`, `authenticated`
 > - `policy_versions_insert_all` — `INSERT` to `anon`, `authenticated`
+> - `policy_versions_anon_insert` — `INSERT` to `anon`, `authenticated`
 >
 > Some of these permit **writes**. See PLAN.md D28: the application runs as the
 > `anon` role with no auth session and the anon key ships in the frontend bundle, so
 > closing these is a migration with an auth model behind it rather than a policy edit.
 
-<details><summary>2 RLS policies</summary>
+<details><summary>3 RLS policies</summary>
 
 | Policy | Command | Roles | Added by |
 |---|---|---|---|
 | policy_versions_read_all | SELECT | anon, authenticated | `20260612000001_policy_version_snapshots.sql` |
 | policy_versions_insert_all | INSERT | anon, authenticated | `20260612000001_policy_version_snapshots.sql` |
+| policy_versions_anon_insert | INSERT | anon, authenticated | `20260919000010_anon_policies_widen.sql` |
 
 </details>
 
@@ -154,7 +156,6 @@ The user who saved it, by uuid. The three `author_*` columns beside it are the d
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260609000002_policy_versions.sql` |
-| References | `auth.users(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -280,6 +281,6 @@ Free text a person wrote about why. The only column here that carries a REASON r
 
 ---
 
-*Generated from data contract `7610aaafc342`, engine `0.2.3`,
+*Generated from data contract `4231766af8b0`, engine `0.2.3`,
 sidecar `supabase/contract/policy_versions.contract.yaml`, table created by `20260609000002_policy_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
