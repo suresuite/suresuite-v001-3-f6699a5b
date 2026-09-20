@@ -93,7 +93,21 @@ describe("D3 — product_code_map is gone, and stays gone", () => {
 describe("D25 — the ETL's own core reads fail loudly too", () => {
   // The same swallow as D3, on the lanes the graph is actually built from.
   // A half-empty graph that reports success is the worst outcome in the file.
-  const CORE = ["outbound_logistics", "inbound_logistics", "bom_single_level", "bom_multi_level"];
+  //
+  // TWO OF THE FOUR MOVED IN WP 8.2, AND THE RULE FOLLOWED THEM RATHER THAN
+  // BEING RELAXED. The edge function no longer builds the lanes — §4 D140 left
+  // one ETL and it is the SQL one — so it no longer reads `bom_single_level` or
+  // `bom_multi_level` at all. It still reads the two logistics tables, for the
+  // D46 unit-substitution warnings, and those reads must still be loud.
+  //
+  // The BOM reads are now inside `rebuild_supply_chain_lanes`, where D25's
+  // failure mode CANNOT OCCUR: a SQL function has no `{ data, error }` to
+  // destructure, so a read that fails aborts the statement and the caller sees an
+  // exception. That is not an argument for dropping the rule — it is the reason
+  // the rule now has a different shape for those two, asserted below rather than
+  // assumed.
+  const CORE = ["outbound_logistics", "inbound_logistics"];
+  const MOVED_TO_SQL = ["bom_single_level", "bom_multi_level"];
 
   it.each(CORE)("%s is read with its error checked", (table) => {
     const src = read(ETL);
@@ -110,6 +124,33 @@ describe("D25 — the ETL's own core reads fail loudly too", () => {
     expect(
       /\berror\s*:/.test(pattern),
       `${table}'s own read must destructure \`error\`, not just \`data\` (D25) — got ${pattern}`,
+    ).toBe(true);
+  });
+
+  it.each(MOVED_TO_SQL)("%s is no longer read over PostgREST by the ETL at all", (table) => {
+    // The stronger statement, and the one that keeps this rule honest: the two
+    // BOM tables are not read here with an unchecked error — they are not read
+    // here. A future edit that brings the read back brings D25's failure mode
+    // back with it, and this is what notices.
+    expect(
+      read(ETL).includes(`.from('${table}')`),
+      `${table} is read over PostgREST again. The lane build moved into ` +
+        "`rebuild_supply_chain_lanes` in WP 8.2 (§4 D140); a second reader of the " +
+        "BOM in the ETL is the two-writers defect starting over.",
+    ).toBe(false);
+  });
+
+  it("and the ETL's one write is an RPC, which cannot swallow a failed read", () => {
+    const src = read(ETL);
+    expect(src, "the ETL must delegate the lane build to the SQL writer").toContain(
+      "combine_project_into_supply_chain",
+    );
+    const idx = src.indexOf("rpc('combine_project_into_supply_chain'");
+    expect(idx, "the combine RPC must be called").toBeGreaterThan(-1);
+    const after = src.slice(idx, idx + 700);
+    expect(
+      /combineError/.test(after) && /return \{ success: false/.test(after),
+      "the combine RPC's error must be checked and returned, not dropped (D25)",
     ).toBe(true);
   });
 });

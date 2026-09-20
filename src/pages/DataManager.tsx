@@ -569,11 +569,17 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
             )
           );
           {
-            const mt = (combineData as any)?.multi_tier_breakdown;
-            const scd = (combineData as any)?.scd_breakdown;
-            const scdMsg = scd ? `SCD — Outbound: ${scd.outbound}, BOM: ${scd.bom}, Inbound: ${scd.inbound}` : '';
-            const mtMsg = mt ? `Multi-tier — Outbound: ${mt.outbound}, BOM: ${mt.bom}, Inbound: ${mt.inbound}` : '';
-            const details = [scdMsg, mtMsg].filter(Boolean).join(' | ');
+            // WP 8.2 — TOTALS, NOT PER-LANE BREAKDOWNS. The breakdowns were
+            // counters the edge function kept while it built the rows itself; it
+            // no longer does (§4 D140 — one ETL, and it is the SQL one), so the
+            // figures it returns are counted from the tables after the write.
+            // Reporting a lane split the server did not measure would be a number
+            // with no source, which is §5 T1.
+            const total = (combineData as any)?.total_records;
+            const mtTotal = (combineData as any)?.multi_tier_written;
+            const details = typeof total === 'number'
+              ? `${total} product-level edge(s), ${mtTotal ?? 0} deep-tier edge(s)`
+              : '';
             toast.success(details ? `Data combined and node list is ready. ${details}` : 'Data combined and node list is ready.');
 
             // THE ETL'S WARNINGS REACH THE PERSON (WP 3.3, §5 T2).

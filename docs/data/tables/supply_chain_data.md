@@ -9,7 +9,7 @@
 
 **Tier 3** — derived — a pure function of tier 2 · owned by `etl` · `public.supply_chain_data`
 
-**One row is** One edge of the project's computed supply graph: material flows from this node to that one, carrying this weighted volume and this share of the destination's sourcing. Derived from the four lane tables by the ETL and always safe to drop and rebuild.
+**One row is** One edge of the project's PRODUCT-LEVEL supply graph — four echelons with the BILL OF MATERIALS COLLAPSED: supplier → purchased material → finished product → customer. A bom edge here runs from a material the plant BUYS to the product it ends up in, however many assemblies lie between them; `supply_chain_data_multi_tier` is the same network with the tree intact. Derived from the four lane tables by `rebuild_supply_chain_lanes` and always safe to drop and rebuild — which since WP 8.2 it IS, on every change to any of those four tables (§4 D142).
 
 ## Uniqueness
 
@@ -52,7 +52,7 @@ Written by the `combine-project` edge function, never by a page. Invariant I2: p
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DataManager.tsx` | rpc combine_project_into_supply_chain | `src/pages/DataManager.tsx:650` | yes |
+| `DataManager.tsx` | rpc combine_project_into_supply_chain | `src/pages/DataManager.tsx:656` | yes |
 | `FirmLevelNetwork.tsx` | rpc get_prediction_stats | `src/components/MLPrediction.tsx:54` | yes |
 | `ProcessLevelNetwork.tsx` | rpc get_prediction_stats | `src/components/MLPrediction.tsx:54` | yes |
 | `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:237` | yes |
@@ -73,11 +73,11 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | Column | CSV header | Type | Unit | Required in CSV | Meaning |
 |---|---|---|---|---|---|
 | `id` 🔑 | — | `uuid` | — | — | Surrogate row identifier. Carries no meaning. |
-| `from_location` | — | `text` | — | — | The upstream end of the edge — a supplier, a material, or the plant, depending on which lane produced it. |
-| `to_location` | — | `text` | — | — | The downstream end of the edge. |
+| `from_location` | — | `text` | — | — | The upstream end of the edge — a supplier, a PURCHASED material, or a finished product, depending on which lane produced it. THIS SENTENCE IS WHY §4 D127 EXISTS: the column carries no role, so every consumer infers one at render time and eight of them disagree. The role is authored once now, on `node_list.echelon`, and read rather than inferred. |
+| `to_location` | — | `text` | — | — | The downstream end of the edge — a customer, a FINISHED PRODUCT, or a purchased material, by lane. On the bom lane it is always a finished product, never an intermediate assembly: this lane is the collapsed graph. |
 | `plant_name` | — | `text` | — | — | The focal plant this edge belongs to, by NAME — the join key G1 forbids. Renamed from `plant` by 20250822025432, which is also when its incorrect UNIQUE constraint stopped meaning one-row-per-plant. |
 | `weighted` | — | `numeric(16,6)` | `units per week` | — | The volume on this edge after unit normalization — always per WEEK, whatever period the uploaded row quoted. This is where D2's fix lands: before it, a supplier quoting 52 000 a year and one quoting 1 000 a week were summed as 52 000 and 1 000. |
-| `material_consumption_rate` | — | `numeric(16,6)` | `units of upstream per unit of downstream` | — | How much of the upstream item one unit of the downstream item consumes, carried through from the BOM. |
+| `material_consumption_rate` | — | `numeric(16,6)` | `units of upstream per unit of downstream` | — | How much of the upstream item one unit of the downstream item consumes. On a bom edge that is the EFFECTIVE rate through the collapsed tree — the sum over every path of the product of the rates along it, which on a single-level BOM is exactly the uploaded `consumption_rate`. Before WP 8.2 the multi-level path wrote a literal 0 here while the single-level path wrote the real number, so one column meant two things depending on the project's shape (§4 D136). |
 | `sourcing_ratio` | — | `numeric(16,6)` | `fraction of the destination's inbound flow` | — | This edge's share of everything flowing into its destination. A share, so the D2 unit error did not cancel: it decides which supplier the platform calls primary. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the edge was first computed. Server-set. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the edge was last recomputed. Server-set. |
@@ -88,7 +88,6 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `organization` | — | `text` | — | — | The owning organization, as a NAME with a `default_org` default. A displayable string used as an authorization key — the second half of G1, and the identity D13 says is compared by string. |
 | `project_id` | — | `uuid` | — | — | The project this edge belongs to. NULLABLE here, unlike every lane table — a row with no project is reachable only through the organization/uploader policies. |
 | `data_source` | — | `text` | — | — | Which lane produced this edge — inbound, outbound or BOM. |
-| `data_source_group` | — | `text` | — | — | A coarser grouping of `data_source`, for filtering. |
 | `is_zero_flow_filtered` | — | `boolean` | — | — | Whether this edge was hidden for carrying no flow in either direction. |
 | `zero_flow_filter_applied_at` | — | `timestamp with time zone` | — | — | When the zero-flow filter last ran over this edge. |
 | `zero_flow_filter_reason` | — | `text` | — | — | Why the edge was filtered. One value is used today: zero_incoming_outgoing_flow. |
@@ -113,7 +112,7 @@ Surrogate row identifier. Carries no meaning.
 
 ### `from_location`
 
-The upstream end of the edge — a supplier, a material, or the plant, depending on which lane produced it.
+The upstream end of the edge — a supplier, a PURCHASED material, or a finished product, depending on which lane produced it. THIS SENTENCE IS WHY §4 D127 EXISTS: the column carries no role, so every consumer infers one at render time and eight of them disagree. The role is authored once now, on `node_list.echelon`, and read rather than inferred.
 
 | | |
 |---|---|
@@ -128,7 +127,7 @@ The upstream end of the edge — a supplier, a material, or the plant, depending
 
 ### `to_location`
 
-The downstream end of the edge.
+The downstream end of the edge — a customer, a FINISHED PRODUCT, or a purchased material, by lane. On the bom lane it is always a finished product, never an intermediate assembly: this lane is the collapsed graph.
 
 | | |
 |---|---|
@@ -137,7 +136,7 @@ The downstream end of the edge.
 | Unit | dimensionless |
 | Added by | `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql` |
 | Read by the engine | `network pages and the analyzers; not read by the engine mapping` |
-| Transform | copied from the lane row's id column |
+| Transform | the customer, the root product of the demand walk, or the material |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
@@ -167,7 +166,7 @@ The volume on this edge after unit normalization — always per WEEK, whatever p
 | Unit | `units per week` — fixed |
 | Added by | `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql` |
 | Read by the engine | `the analyzers and the policy grid's volume basis; not the engine mapping` |
-| Transform | weeklyVolume(volume, time_unit) in _shared/laneVolumes.ts, over grading.ts's one unit table |
+| Transform | `rate_to_weekly(volume, time_unit)` in `rebuild_supply_chain_lanes`, over the one unit table |
 | When NULL, the engine uses | 0 |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -176,7 +175,7 @@ The volume on this edge after unit normalization — always per WEEK, whatever p
 
 ### `material_consumption_rate`
 
-How much of the upstream item one unit of the downstream item consumes, carried through from the BOM.
+How much of the upstream item one unit of the downstream item consumes. On a bom edge that is the EFFECTIVE rate through the collapsed tree — the sum over every path of the product of the rates along it, which on a single-level BOM is exactly the uploaded `consumption_rate`. Before WP 8.2 the multi-level path wrote a literal 0 here while the single-level path wrote the real number, so one column meant two things depending on the project's shape (§4 D136).
 
 | | |
 |---|---|
@@ -185,7 +184,7 @@ How much of the upstream item one unit of the downstream item consumes, carried 
 | Unit | `units of upstream per unit of downstream` — derived |
 | Added by | `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql` |
 | Read by the engine | `the analyzers and the network pages; not the engine mapping` |
-| Transform | copied from bom consumption_rate, multiplied down multi-level chains |
+| Transform | weighted / the product's weekly demand — the rates multiplied down every path |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
@@ -344,21 +343,6 @@ Which lane produced this edge — inbound, outbound or BOM.
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
-### `data_source_group`
-
-A coarser grouping of `data_source`, for filtering.
-
-| | |
-|---|---|
-| Type | `text` |
-| Grain | `metadata` |
-| Unit | dimensionless |
-| Added by | `20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql` |
-| Read by the engine | `the network pages' filters` |
-| Transform | set by the ETL per lane |
-| Validated at ingest | — |
-| Rendered at | *not yet recorded (WP 5.1)* |
-
 ### `is_zero_flow_filtered`
 
 Whether this edge was hidden for carrying no flow in either direction.
@@ -453,6 +437,6 @@ WP 4.3 · when the run that wrote the criticality columns finished. It is proven
 
 ---
 
-*Generated from data contract `8c56366d1bc3`, engine `0.2.3`,
+*Generated from data contract `dc1618b7df79`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data.contract.yaml`, table created by `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

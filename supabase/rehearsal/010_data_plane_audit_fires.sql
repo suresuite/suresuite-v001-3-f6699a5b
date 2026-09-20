@@ -46,13 +46,23 @@ BEGIN
          (v_project, 'REHEARSAL', 'SUP-1', 'MAT-2'),
          (v_project, 'REHEARSAL', 'SUP-2', 'MAT-1');
 
-  SELECT count(*) INTO v_rows FROM public.audit_logs WHERE plane = 'data';
+  -- SCOPED TO THE TABLE THIS STATEMENT WROTE, since WP 8.2. What D45 asserts is
+  -- the STATEMENT GRAIN of one tier-2 write — one row saying three, not three
+  -- rows. It used to count every `plane='data'` row in the database, which said
+  -- the same thing only while nothing else reacted to a tier-2 write. WP 8.2's
+  -- `trg_inbound_logistics_rebuild_lanes_ins` is something else reacting: the
+  -- derived graph is rebuilt inside this statement and its tier-3 writes are
+  -- audited too, correctly. Counting them here would make this assertion mean
+  -- "no other tier transition happened", which is not D45 and is not true.
+  SELECT count(*) INTO v_rows FROM public.audit_logs
+   WHERE plane = 'data' AND target_type = 'inbound_logistics';
   IF v_rows <> 1 THEN
     RAISE EXCEPTION
       'D45: one tier-2 INSERT of 3 rows produced % data-plane audit row(s), expected exactly 1', v_rows;
   END IF;
 
-  SELECT * INTO v_row FROM public.audit_logs WHERE plane = 'data';
+  SELECT * INTO v_row FROM public.audit_logs
+   WHERE plane = 'data' AND target_type = 'inbound_logistics';
 
   IF v_row.action <> 'insert' THEN
     RAISE EXCEPTION 'D45: the audit row says action=%, expected insert', v_row.action;
@@ -82,14 +92,16 @@ BEGIN
   -- ── UPDATE and DELETE are separate triggers and are asserted separately ──
   DELETE FROM public.audit_logs WHERE plane = 'data';
   UPDATE public.inbound_logistics SET volume = 1 WHERE project_id = v_project;
-  SELECT count(*) INTO v_rows FROM public.audit_logs WHERE plane = 'data' AND action = 'update';
+  SELECT count(*) INTO v_rows FROM public.audit_logs
+   WHERE plane = 'data' AND action = 'update' AND target_type = 'inbound_logistics';
   IF v_rows <> 1 THEN
     RAISE EXCEPTION 'D45: a tier-2 UPDATE produced % data-plane audit row(s), expected 1', v_rows;
   END IF;
 
   DELETE FROM public.audit_logs WHERE plane = 'data';
   DELETE FROM public.inbound_logistics WHERE project_id = v_project;
-  SELECT count(*) INTO v_rows FROM public.audit_logs WHERE plane = 'data' AND action = 'delete';
+  SELECT count(*) INTO v_rows FROM public.audit_logs
+   WHERE plane = 'data' AND action = 'delete' AND target_type = 'inbound_logistics';
   IF v_rows <> 1 THEN
     RAISE EXCEPTION 'D45: a tier-2 DELETE produced % data-plane audit row(s), expected 1', v_rows;
   END IF;
@@ -97,6 +109,10 @@ BEGIN
   -- ── a statement that touches nothing is not a tier transition ────────────
   DELETE FROM public.audit_logs WHERE plane = 'data';
   UPDATE public.inbound_logistics SET volume = 2 WHERE project_id = v_project;  -- matches nothing now
+  -- UNSCOPED on purpose, and it still holds: a statement that touches nothing
+  -- fires no trigger at all, so neither the tier-2 audit nor WP 8.2's rebuild
+  -- runs. This is the one of the four that would notice a derivation firing on
+  -- an empty statement.
   SELECT count(*) INTO v_rows FROM public.audit_logs WHERE plane = 'data';
   IF v_rows <> 0 THEN
     RAISE EXCEPTION 'D45: an UPDATE matching no rows wrote % audit row(s), expected 0', v_rows;

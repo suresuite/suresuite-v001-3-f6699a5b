@@ -1994,9 +1994,13 @@ async function graphLayerBefore() {
     out("");
     out(
       `- **${single.length} of ${rows.length} project(s) are \`bom_level = 'single'\`**, and ${singleNoTier.length} ` +
-        "of those hold ZERO `supply_chain_data_multi_tier` rows. That is **D130** measured: the ETL builds the " +
-        "multi-tier lanes only inside its multi-level branch, so a single-level project's Process-level page is " +
-        "permanently empty and no error says why.",
+        "of those hold ZERO `supply_chain_data_multi_tier` rows. That was **D130**: the edge function built the " +
+        "multi-tier lanes only inside its multi-level branch, so a single-level project's Process-level page was " +
+        "permanently empty and no error said why. **WP 8.2 CLOSED IT IN THE WRITER, AND A NON-ZERO COUNT HERE IS " +
+        "NOT THE EXIT CHECK** — the surviving ETL never reads `projects.bom_level` and builds both lanes from " +
+        "whichever BOM rows exist, but it changed what a combine WRITES and backfilled nothing. A single-level " +
+        "project still reads ZERO here until somebody presses Combine on it. **This line measures ADOPTION, not " +
+        "the fix**, which is the distinction §4 D88 cost three packages to learn.",
     );
     if (singleWithTier.length) {
       out(
@@ -2231,32 +2235,86 @@ async function graphLayerBefore() {
   // 7 ── the two columns a page filters on and a report reads, both measured
   //      rather than assumed: `data_source_group` (D133) and a NULL `level`,
   //      which `COALESCE(level, 0)` serves to the ladder as a PRODUCT (D134).
+  //
+  // WRITTEN FOR BOTH SHAPES, DELIBERATELY. WP 8.2 DROPS `data_source_group` and
+  // ADDS `bom_depth`, and its migrations deploy on MERGE — so this probe must
+  // answer against production before that deploy and after it, and a §15 report
+  // taken from a branch measures the shape WITHOUT the branch's migrations. A
+  // probe that names a column unconditionally is a probe that errors on one side
+  // of a deploy and reports nothing, which is the state the answer cannot be read
+  // out of. The two columns are detected first and the report SAYS WHICH SHAPE IT
+  // MEASURED.
+  const columnShape = await tryQ(`
+    select (select count(*)::int from information_schema.columns
+             where table_schema = 'public' and table_name = 'supply_chain_data'
+               and column_name = 'data_source_group')            as has_group,
+           (select count(*)::int from information_schema.columns
+             where table_schema = 'public' and table_name = 'supply_chain_data_multi_tier'
+               and column_name = 'bom_depth')                    as has_bom_depth`);
+  const hasGroup = Number(columnShape.rows?.[0]?.has_group ?? 0) > 0;
+  const hasDepth = Number(columnShape.rows?.[0]?.has_bom_depth ?? 0) > 0;
+
   const columns = await tryQ(`
-    select (select count(*)::int from public.supply_chain_data)                                    as scd_rows,
-           (select count(*)::int from public.supply_chain_data where data_source_group is not null) as scd_group_written,
-           (select count(*)::int from public.supply_chain_data_multi_tier)                          as scdmt_rows,
-           (select count(*)::int from public.supply_chain_data_multi_tier where level is null)      as scdmt_level_null,
-           (select count(*)::int from public.supply_chain_data_multi_tier where level = 0)          as scdmt_level_zero`);
+    select (select count(*)::int from public.supply_chain_data)                               as scd_rows,
+           ${hasGroup
+             ? "(select count(*)::int from public.supply_chain_data where data_source_group is not null)"
+             : "null::int"}                                                                   as scd_group_written,
+           (select count(*)::int from public.supply_chain_data_multi_tier)                     as scdmt_rows,
+           (select count(*)::int from public.supply_chain_data_multi_tier where level is null) as scdmt_level_null,
+           (select count(*)::int from public.supply_chain_data_multi_tier where level = 0)     as scdmt_level_zero,
+           ${hasDepth
+             ? "(select count(*)::int from public.supply_chain_data_multi_tier where bom_depth is distinct from level)"
+             : "null::int"}                                                                   as depth_alias_broken`);
   report("D133 / D134 — the documented filter column, and the NULL level the RPC types as a product", columns, (rows) => {
     if (!rows?.length) { out("- No rows returned."); return; }
     out(...table(rows));
     const r = rows[0];
     out("");
     out(
-      Number(r.scd_group_written) === 0
-        ? `- **\`data_source_group\` is written on 0 of ${r.scd_rows} rows.** Its sidecar says the network pages ` +
-          "filter on it and no writer anywhere sets it, so the filter is a documented fact about a column that is " +
-          "always NULL — **D133**. WP 8.2 writes it or deletes it and its contract claim together; a third option " +
-          "would be leaving T1 broken on purpose."
-        : `- \`data_source_group\` is written on ${r.scd_group_written} of ${r.scd_rows} rows — the sidecar's ` +
-          "claim is partly true, and WP 8.2 owns which rows it is false for.",
+      `- **Shape measured:** \`data_source_group\` ${hasGroup ? "EXISTS" : "is GONE"}, ` +
+        `\`bom_depth\` ${hasDepth ? "EXISTS" : "is ABSENT"}. WP 8.2 drops the first and adds the second, ` +
+        "and its migrations deploy on MERGE — so a report taken from a feature branch measures the schema " +
+        "WITHOUT them, and this line says which one this run saw rather than leaving it to be inferred.",
+    );
+    out(
+      !hasGroup
+        ? "- **`data_source_group` is gone, with its contract claim, and that closes D133.** It was written on 0 " +
+          "of 5 445 rows while its sidecar told readers the network pages filter on it. Writing it was the worse " +
+          "of the two outcomes D133 allowed: `data_source` holds three values and a \"coarser grouping\" of three " +
+          "is not a grouping."
+        : Number(r.scd_group_written) === 0
+          ? `- **\`data_source_group\` is written on 0 of ${r.scd_rows} rows.** Its sidecar says the network pages ` +
+            "filter on it and no writer anywhere sets it, so the filter is a documented fact about a column that is " +
+            "always NULL — **D133**. WP 8.2 deletes it and its contract claim together; this run predates that deploy."
+          : `- \`data_source_group\` is written on ${r.scd_group_written} of ${r.scd_rows} rows — the sidecar's ` +
+            "claim is partly true, and WP 8.2 owns which rows it is false for.",
     );
     out(
       `- **${r.scdmt_level_null} row(s) carry a NULL \`level\`** and ${r.scdmt_level_zero} carry 0. ` +
-        "`COALESCE(scdmt.level, 0)` in the multi-tier RPC serves a NULL as 0, and the ladder calls 0 a **product**: " +
-        "an unknown depth is answered with a confident wrong type rather than with `unknown` (**D134**). A zero " +
-        "count makes it latent, not closed — nothing stops the next NULL.",
+        (hasDepth
+          ? "The read path no longer substitutes 0 for a NULL (D134 closed by WP 8.2), so a NULL here now reaches " +
+            "the page as a NULL. **A non-zero count is no longer a defect — it is an unknown depth arriving as " +
+            "unknown**, which is what the column is for."
+          : "`COALESCE(scdmt.level, 0)` in the multi-tier RPC serves a NULL as 0, and the ladder calls 0 a " +
+            "**product**: an unknown depth is answered with a confident wrong type rather than with `unknown` " +
+            "(**D134**). A zero count makes it latent, not closed — nothing stops the next NULL."),
     );
+    if (hasDepth) {
+      out(
+        Number(r.depth_alias_broken) === 0
+          ? "- `level` and `bom_depth` agree on every row, which is what a DEPRECATED ALIAS means: the same value, " +
+            "NULLs included, for one release. **This is the number to watch while the readers move** — the day it " +
+            "is non-zero, `level` has stopped being an alias and started being a second authoring."
+          : `- **${r.depth_alias_broken} row(s) have \`level\` different from \`bom_depth\`.** ` +
+            "`level` is supposed to be a deprecated ALIAS carrying the same value. Something wrote one without the " +
+            "other, and every page still reading `level` is reading a value the honest column disagrees with.",
+      );
+      out(
+        "- **AND THE ROWS THIS DEPLOY DID NOT FIX ARE THE POINT.** WP 8.2 changed what a combine WRITES, not what " +
+          "is stored: every project still holds the graph its last combine produced, at whatever `level` that " +
+          "writer meant. `Project AA - ver3` needs Combine re-run. Probe 8's histogram is where to check it.",
+      );
+    }
   });
 }
 

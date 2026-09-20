@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 340,
-      "migrations_applied": 332,
-      "last_migration": "20260919000007_decision_plane_actor.sql"
+      "migrations_found": 341,
+      "migrations_applied": 333,
+      "last_migration": "20260919000008_one_etl.sql"
     },
     "sidecars": 54,
     "registry": {
@@ -13226,7 +13226,7 @@
           "page": "DataManager.tsx",
           "via": "rpc delete_project_dataset",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:712",
+          "evidence": "src/pages/DataManager.tsx:718",
           "confirmed": true
         },
         {
@@ -26618,7 +26618,7 @@
       "schema_name": "public",
       "tier": "3",
       "tier_name": "derived — a pure function of tier 2",
-      "grain": "One edge of the project's computed supply graph: material flows from this node to that one, carrying this weighted volume and this share of the destination's sourcing. Derived from the four lane tables by the ETL and always safe to drop and rebuild.",
+      "grain": "One edge of the project's PRODUCT-LEVEL supply graph — four echelons with the BILL OF MATERIALS COLLAPSED: supplier → purchased material → finished product → customer. A bom edge here runs from a material the plant BUYS to the product it ends up in, however many assemblies lie between them; `supply_chain_data_multi_tier` is the same network with the tree intact. Derived from the four lane tables by `rebuild_supply_chain_lanes` and always safe to drop and rebuild — which since WP 8.2 it IS, on every change to any of those four tables (§4 D142).",
       "owner": "etl",
       "created_by": "20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql",
       "sidecar": "supabase/contract/supply_chain_data.contract.yaml",
@@ -26638,7 +26638,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:650",
+          "evidence": "src/pages/DataManager.tsx:656",
           "confirmed": true
         },
         {
@@ -26930,7 +26930,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The upstream end of the edge — a supplier, a material, or the plant, depending on which lane produced it.",
+          "meaning": "The upstream end of the edge — a supplier, a PURCHASED material, or a finished product, depending on which lane produced it. THIS SENTENCE IS WHY §4 D127 EXISTS: the column carries no role, so every consumer infers one at render time and eight of them disagree. The role is authored once now, on `node_list.echelon`, and read rather than inferred.",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
@@ -26962,12 +26962,12 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The downstream end of the edge.",
+          "meaning": "The downstream end of the edge — a customer, a FINISHED PRODUCT, or a purchased material, by lane. On the bom lane it is always a finished product, never an intermediate assembly: this lane is the collapsed graph.",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
             "consumed_by": "network pages and the analyzers; not read by the engine mapping",
-            "transform": "copied from the lane row's id column",
+            "transform": "the customer, the root product of the demand walk, or the material",
             "missing_default": null
           },
           "substitutions": [],
@@ -27031,7 +27031,7 @@
           "computed_by": null,
           "engine": {
             "consumed_by": "the analyzers and the policy grid's volume basis; not the engine mapping",
-            "transform": "weeklyVolume(volume, time_unit) in _shared/laneVolumes.ts, over grading.ts's one unit table",
+            "transform": "`rate_to_weekly(volume, time_unit)` in `rebuild_supply_chain_lanes`, over the one unit table",
             "missing_default": "0"
           },
           "substitutions": [],
@@ -27058,12 +27058,12 @@
           "unit_source": "derived",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "How much of the upstream item one unit of the downstream item consumes, carried through from the BOM.",
+          "meaning": "How much of the upstream item one unit of the downstream item consumes. On a bom edge that is the EFFECTIVE rate through the collapsed tree — the sum over every path of the product of the rates along it, which on a single-level BOM is exactly the uploaded `consumption_rate`. Before WP 8.2 the multi-level path wrote a literal 0 here while the single-level path wrote the real number, so one column meant two things depending on the project's shape (§4 D136).",
           "grain": "level",
           "computed_by": null,
           "engine": {
             "consumed_by": "the analyzers and the network pages; not the engine mapping",
-            "transform": "copied from bom consumption_rate, multiplied down multi-level chains",
+            "transform": "weighted / the product's weekly demand — the rates multiplied down every path",
             "missing_default": null
           },
           "substitutions": [],
@@ -27405,38 +27405,6 @@
           "engine_requirement": null
         },
         {
-          "name": "data_source_group",
-          "type": "text",
-          "nullable": true,
-          "default": null,
-          "primary_key": false,
-          "unique": false,
-          "references": null,
-          "added_by": "20250822021943_59fb0d9c-4891-484d-89be-66941fb38a05.sql",
-          "unit": null,
-          "unit_source": "none",
-          "unit_column": null,
-          "normalize_at_promotion": null,
-          "meaning": "A coarser grouping of `data_source`, for filtering.",
-          "grain": "metadata",
-          "computed_by": null,
-          "engine": {
-            "consumed_by": "the network pages' filters",
-            "transform": "set by the ETL per lane",
-            "missing_default": null
-          },
-          "substitutions": [],
-          "ingest": {
-            "csv_header": null,
-            "required": false,
-            "validate": null
-          },
-          "surfaces": [],
-          "resolution": null,
-          "note": null,
-          "engine_requirement": null
-        },
-        {
           "name": "is_zero_flow_filtered",
           "type": "boolean",
           "nullable": true,
@@ -27605,7 +27573,7 @@
       "schema_name": "public",
       "tier": "3",
       "tier_name": "derived — a pure function of tier 2",
-      "grain": "One edge of the DEEP supply graph — tier-2 and tier-3 suppliers behind the direct ones. Computed by the same ETL, read by the network pages, and NOT propagated into the simulation: the engine models a single focal plant with three echelons (blueprint §2.4).",
+      "grain": "One edge of the REAL BOM TREE, at the BOM's own depth — where `supply_chain_data` is the same network with the BOM COLLAPSED to purchased-material → finished-product. A bom edge appears once per root product, so `(from_location, to_location, path_root)` is its grain and not `(from_location, to_location)`. Read by the network pages, and NOT propagated into the simulation: the engine models a single focal plant with three echelons (blueprint §2.4). WP 8.2 REWROTE THIS LINE. It said \"tier-2 and tier-3 suppliers behind the direct ones\", which is `tier2_suppliers` / `tier3_suppliers` and a different node universe — and it is where `level`'s \"tiers upstream\" claim came from (§4 D140). Nothing has ever written a tier-2 supplier into this table.",
       "owner": "etl",
       "created_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql",
       "sidecar": "supabase/contract/supply_chain_data_multi_tier.contract.yaml",
@@ -27625,7 +27593,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:650",
+          "evidence": "src/pages/DataManager.tsx:656",
           "confirmed": true
         },
         {
@@ -27656,7 +27624,7 @@
         "min_project_role": "viewer",
         "audited": true,
         "rls_enabled": true,
-        "note": "Written by the `combine-project` edge function, never by a page. Invariant I2: pages never write tier 3. `write: null` is therefore a statement, not an omission — there is no user-facing write path and there must not be one. For precision, since WP 2.4 checked it: three PROJECT-SCOPED write policies do exist here, serving that ETL path. They are consistent with `write: null`, which names the capability gating a USER-facing write and not the existence of any policy — and unlike `dataset_versions` they carry a real predicate, so they do not admit an arbitrary holder of the table grant."
+        "note": "Written by `rebuild_supply_chain_lanes` — the ONE ETL since WP 8.2 — and never by a page. It had TWO writers until then, this and the `combine-project` edge function, disagreeing about what `level` meant (§4 D140); the edge function's lane build is deleted and it now calls the RPC. Invariant I2: pages never write tier 3. `write: null` is therefore a statement, not an omission — there is no user-facing write path and there must not be one. For precision, since WP 2.4 checked it: three PROJECT-SCOPED write policies do exist here, serving that ETL path. They are consistent with `write: null`, which names the capability gating a USER-facing write and not the existence of any policy — and unlike `dataset_versions` they carry a real predicate, so they do not admit an arbitrary holder of the table grant."
       },
       "rls": {
         "enabled": true,
@@ -27952,12 +27920,12 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The upstream end of the edge — a tier-2 or tier-3 supplier.",
+          "meaning": "The upstream end of the edge: the finished product on the outbound lane, the component on a bom edge, the supplier on an inbound one. It said \"a tier-2 or tier-3 supplier\" until WP 8.2 and no writer has ever put one here (see the table's `grain`).",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
             "consumed_by": "the network pages",
-            "transform": "copied from the deep-tier row",
+            "transform": "the child of a BOM row, a product, or a supplier, by lane",
             "missing_default": null
           },
           "substitutions": [],
@@ -27984,12 +27952,12 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The downstream end of the edge.",
+          "meaning": "The downstream end of the edge: the customer on the outbound lane, the parent assembly on a bom edge, the material on an inbound one. Where a `bom_multi_level` row names NO parent, this is the FINISHED PRODUCT — never blank and never `ROOT` (§4 D129, D141).",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
             "consumed_by": "the network pages",
-            "transform": "copied from the deep-tier row",
+            "transform": "the parent of a BOM row, resolved to the finished product when it names none",
             "missing_default": null
           },
           "substitutions": [],
@@ -28016,12 +27984,12 @@
           "unit_source": "derived",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "How much of the upstream item one unit of the downstream item consumes.",
+          "meaning": "How much of the upstream item one unit of the downstream item consumes — this BOM row's own `consumption_rate`. On the outbound and inbound lanes it is the row's WEEKLY volume instead, which is the convention both writers have always had and is stated here rather than left to be inferred.",
           "grain": "level",
           "computed_by": null,
           "engine": {
             "consumed_by": "the network pages",
-            "transform": "carried through from the deep-tier BOM",
+            "transform": "`bom_*.consumption_rate`, or `rate_to_weekly(volume, time_unit)` off the BOM lane",
             "missing_default": null
           },
           "substitutions": [],
@@ -28048,12 +28016,12 @@
           "unit_source": "derived",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "This edge's share of everything flowing into its destination. Its denominator is the eighth raw-volume read D2 missed — a share computed over unnormalized volumes until WP 0.2.",
+          "meaning": "This edge's share of everything flowing into its destination. Its denominator is the eighth raw-volume read D2 missed — a share computed over unnormalized volumes until WP 0.2 in the edge function and until WP 8.2 in the SQL writer that was actually deployed (§4 D148). 1.0 on a bom edge: a BOM row is the whole of what its parent takes from that component.",
           "grain": "level",
           "computed_by": null,
           "engine": {
             "consumed_by": "the network pages",
-            "transform": "volumeShare over weekly-normalized volumes (_shared/laneVolumes.ts)",
+            "transform": "volume over the destination's total, both `rate_to_weekly`-normalized",
             "missing_default": null
           },
           "substitutions": [],
@@ -28080,12 +28048,12 @@
           "unit_source": "fixed",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The volume on this edge, normalized to weeks. Unconstrained `numeric` here, unlike supply_chain_data's numeric(16,6) — so the normalization carries no overflow risk.",
+          "meaning": "The weekly flow along this edge: on a bom edge, the parent's demand for this edge's `path_root` times this row's consumption rate — so the edge carries ITS OWN contribution and not the child's whole requirement, which double-counted a material used by two assemblies. Unconstrained `numeric` here, unlike supply_chain_data's numeric(16,6) — so the normalization carries no overflow risk.",
           "grain": "rate",
           "computed_by": null,
           "engine": {
             "consumed_by": "the network pages",
-            "transform": "weeklyVolume(volume, time_unit) in _shared/laneVolumes.ts",
+            "transform": "the demand walk in `rebuild_supply_chain_lanes`, over `rate_to_weekly` volumes",
             "missing_default": null
           },
           "substitutions": [],
@@ -28108,16 +28076,16 @@
           "unique": false,
           "references": null,
           "added_by": "20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql",
-          "unit": "tiers upstream",
+          "unit": "levels down the bill of materials",
           "unit_source": "fixed",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "How many tiers upstream of the plant this edge sits. 2 is a supplier's supplier.",
+          "meaning": "DEPRECATED since WP 8.2 — a deprecated ALIAS of `bom_depth`, written with the same value (NULLs included) for one release while the network pages move to the honest name. Read `bom_depth`. This column named FOUR different measurements across two live writers (§4 D140) — 0 on outbound, a literal 1 on the single-level bom lane, a literal 2 on the multi-level one whatever the BOM's real depth, and `max_level + 1` on inbound — while this sidecar claimed a fifth (\"tiers upstream of the plant; 2 is a supplier's supplier\"), which is `supply_tier` and lives on `node_list`.",
           "grain": "level",
           "computed_by": null,
           "engine": {
             "consumed_by": "the network pages' depth filter",
-            "transform": "int()",
+            "transform": "copied from `bom_depth`",
             "missing_default": null
           },
           "substitutions": [],
@@ -28152,12 +28120,12 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The direct (tier-1) supplier this deep chain hangs off, so a deep edge can be attributed to a supplier the plant actually buys from.",
+          "meaning": "The node at the DOWNSTREAM end of the path this edge belongs to. On the outbound and bom lanes that is the FINISHED PRODUCT whose demand flows along the edge — a bom edge appears once per root product, so one BOM row feeding two products is two rows with two roots. On the inbound lane it is the material the supplier delivers. NULL on a bom edge that no finished product reaches: the structure is real and no demand flows through it, and that is a thing to say rather than a row to drop. CORRECTED IN WP 8.2. This field previously read \"the direct (tier-1) supplier this deep chain hangs off\", which NEITHER writer has ever written — the RPC wrote the product, the product, the parent component and the material on its four lanes, and the edge function wrote the root product. A sidecar describing a fifth thing is §5 T1 in the contract itself.",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
-            "consumed_by": "the network pages, to group deep edges under their tier-1 supplier",
-            "transform": "set by the ETL while walking the chain",
+            "consumed_by": "the network pages, to group deep edges under the product they serve",
+            "transform": "the root of the demand walk, or the material on the inbound lane",
             "missing_default": null
           },
           "substitutions": [],
@@ -28286,6 +28254,38 @@
           "engine": {
             "consumed_by": null,
             "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "bom_depth",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260919000008_one_etl.sql",
+          "unit": "levels down the bill of materials",
+          "unit_source": "fixed",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How deep in the BILL OF MATERIALS this edge's UPSTREAM end sits — 0 a finished product, 1 a material directly under one, N the Nth level of `bom_multi_level`. A bom edge takes it from `bom_multi_level.level`, the table that OWNS the measurement; an inbound edge takes the depth of the material it feeds PLUS ONE, from `node_bom_depth`, which is the one rule `node_list.bom_depth` also reads. NULL means UNKNOWN — a supplier of a material that is in no BOM has no depth, and reporting 0 for it is §4 D134: the ladder calls 0 a PRODUCT, so an unknown arrives as a confident wrong answer and the page's own `unknown` case can never be reached.",
+          "grain": "level",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": "the network pages' depth filter and column position",
+            "transform": "`bom_multi_level.level` for a bom edge, `node_bom_depth(...) + 1` for a supplier",
             "missing_default": null
           },
           "substitutions": [],
@@ -30218,5 +30218,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "8c56366d1bc3"
+  "contract_version": "dc1618b7df79"
 }

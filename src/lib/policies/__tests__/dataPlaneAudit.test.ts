@@ -385,7 +385,13 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
       "create_disruption_scenario_v2",
       "create_project",
       "get_project_dataset_status",
-      "get_supply_chain_data_multi_tier",
+      // `get_supply_chain_data_multi_tier` stood here until WP 8.2. It had a
+      // five-argument and a three-argument form projecting the SAME table, so
+      // D134's fix would have landed in one and been false of the other under one
+      // name — and a three-argument positional call raised `function … is not
+      // unique`, which is how `rehearsal/310` found it. The duplicate is dropped;
+      // THIS LIST MAY SHRINK AND MAY NOT GROW, so removing the name here is the
+      // record of that (§4 D145's class).
       "refresh_node_list_for_project",
       "update_project",
       "update_project_completion_status",
