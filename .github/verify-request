@@ -87,7 +87,7 @@ are sized from the database and not from the repo. Seven probes:
       `authenticated` does not, which is a permission error before RLS is consulted
 
 **2 · A CLEAN RE-READ OF WHAT THE MERGE DID.** Run `35466205199` raced the deploy
-(§4 D128): its report is stamped 20:03:28Z and the seven migrations applied at
+(§4 D153): its report is stamped 20:03:28Z and the seven migrations applied at
 20:04:11–13Z, so D117's after-reading of 0 orphans is an inference rather than a
 measurement. This push carries no migration, `32e581c` is deployed and settled, so
 the same probes now answer for one schema. The number to confirm is **0 orphans in
@@ -102,8 +102,8 @@ WP 7.1 STAGE 0, SECOND READ — two probes the first read's OUTPUT asked for
 
 Run 35466925117 came back fenced clean and moved three of §14's numbers by more than
 an order of magnitude (48 predicate-less policies not 27, 16 write-covering not 7, 86
-tables `anon` may write not 7 — §4 D129; and 0 of 14 approved users present in
-`auth.users` — D130). Reading it showed stage 0 was missing two questions.
+tables `anon` may write not 7 — §4 D154; and 0 of 14 approved users present in
+`auth.users` — D155). Reading it showed stage 0 was missing two questions.
 
   0.8 **grant × RLS × policy, intersected.** Neither count above is the exposure: a
       grant matters only where RLS lets the statement through, and a predicate-less
@@ -135,7 +135,7 @@ WP 7.1 STAGE 1, first half — the sixteen policies, by name
 
 Stage 1 cannot issue a session until the 16 policies granted to `{anon}` ALONE also
 name `authenticated`, or the role change refuses those reads to exactly the people
-who logged in (§4 D130). Writing that migration needs their names, and D129 is the
+who logged in (§4 D155). Writing that migration needs their names, and D154 is the
 reason not to take them from `grep 'TO anon'`: the last list assembled that way was
 the wrong list to the wrong question.
 
@@ -144,7 +144,7 @@ the wrong list to the wrong question.
        rather than trusted. `ALTER POLICY … TO anon, authenticated` preserves
        USING and WITH CHECK, and this is what they must still be afterwards.
 
-Expect the run to be RED again on probe 0.9 (D131, `ingest_runs`' two keys to
+Expect the run to be RED again on probe 0.9 (D156, `ingest_runs`' two keys to
 `auth.users`) — that is the standing ratchet and not a new finding. The fence should
 read unmoved at 20260919000007.
 

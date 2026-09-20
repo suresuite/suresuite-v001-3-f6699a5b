@@ -32,7 +32,7 @@ on:
       - 'supabase/functions/predict-critical-nodes/**'
       - 'supabase/functions/geocode-locations/**'
       # WP 7.1 stage 1b. Mints a session token whose `sub` is the approved_users id, so
-      # `auth.uid()` resolves to the person this application authenticated (§4 D130). It
+      # `auth.uid()` resolves to the person this application authenticated (§4 D155). It
       # FAILS CLOSED without `SUPABASE_JWT_SECRET`, which is not set today and which no
       # session in this repository can set — so deploying it changes nobody's login until
       # somebody provisions that secret deliberately.
