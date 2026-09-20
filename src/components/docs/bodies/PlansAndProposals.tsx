@@ -156,10 +156,9 @@ export default function PlansAndProposals() {
           ))}
         </div>
         <P>
-          A card arrives <Term>proposed</Term>. You approve it, it becomes <Term>approved</Term>,
-          and applying moves it to <Term>applied</Term>. Rejecting it moves it to{" "}
-          <Term>rejected</Term> — and <strong>a rejected card stays in the thread</strong>, faded
-          rather than removed, because the record that you said no is the point.
+          <strong>A rejected card stays in the thread</strong>, faded rather than removed, because
+          the record that you said no is the point — and it is the one state above that you can
+          reach and then do nothing further with.
         </P>
         <P>
           <strong>A proposal expires after {proposal.expiresAfter ?? "a fixed window"}</strong> if

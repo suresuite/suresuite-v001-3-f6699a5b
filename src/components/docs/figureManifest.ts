@@ -52,43 +52,63 @@ export const FIGURE_SLOTS: FigureSlot[] = [
   {
     id: "tiers",
     page: "how-suresuite-is-designed",
-    file: null,
+    file: "tiers.svg",
     title: "The six tiers",
     alt:
-      "Six stacked tiers, from raw uploaded files at the bottom through staging, your " +
-      "canonical data, computed data, your policy decisions, and results at the top. " +
-      "Arrows run upward only.",
-    caption: "Data only ever moves up. Nothing below a tier can be edited from above it.",
+      "Six stacked tiers read from the bottom up — the bytes you sent, staging, your canonical " +
+      "data, computed data, your decisions, and results — with a single arrow running up the " +
+      "side and one mark on the bottom tier labelled as the only way in.",
+    caption:
+      "Data only ever moves up. Nothing below a tier can be edited from above it, so a result " +
+      "can never quietly rewrite the data it used.",
     shows:
-      "Tiers 0–5 as a stack, each labelled with what a user would call it; the upward-only " +
-      "arrows; and the one rule that makes the picture worth drawing — external data never " +
-      "enters above tier 1.",
+      "Tiers 0–5 as a stack, each labelled with what a USER would call it, the upward-only " +
+      "arrow, and the rule that makes the picture worth drawing — external data never enters " +
+      "above tier 1, drawn as a single entry point rather than stated underneath. Supersedes " +
+      "the `TierJourney` schematic, which stays as the fallback and must not be deleted.",
   },
   {
     id: "flow",
     page: "how-your-data-flows",
-    file: null,
+    file: "flow.svg",
     title: "One row's journey",
     alt:
-      "A single spreadsheet row followed left to right: uploaded, checked, held in staging, " +
-      "diffed against existing data, approved by a person, promoted, then read by the engine.",
-    caption: "Every uploaded value takes this path. The approval step is a person, every time.",
+      "A single spreadsheet row followed down the page: uploaded, parsed and checked, diffed " +
+      "against your existing data, approved by a person, promoted, computed from, governed by " +
+      "policies and finally used by a stamped run. The approval step is filled solid, and two " +
+      "arrows come in from the right marking the only two places a number you did not supply " +
+      "can enter.",
+    caption:
+      "Every uploaded value takes this path, and the approval step is a person every time. The " +
+      "two inbound arrows are the only places a number you did not type can join it.",
     shows:
-      "ONE row, not the whole system — upload, parse, validate, stage, diff, approve, promote, " +
-      "compute, simulate. The approval gate marked as human. Where a substitution can enter.",
+      "ONE row, not the whole system, with the tier each step lands in beside it. The approval " +
+      "gate marked as HUMAN and visually unlike every other step. And the brief's third ask, " +
+      "which the fallback never carried: where a substitution can enter — a derived fallback " +
+      "and a policy default, both ABOVE your data and neither able to reach down into it. " +
+      "Supersedes the `DataFlow` schematic, which stays as the fallback.",
   },
   {
     id: "boundary",
     page: "system-boundary",
-    file: null,
+    file: "boundary.svg",
     title: "What runs where",
     alt:
-      "Four boxes — the browser, the Supabase data and control plane, the simulation worker, " +
-      "and the scsim engine — with labelled arrows for what crosses each boundary.",
-    caption: "Four processes. What crosses each line is the part worth knowing.",
+      "Four stacked layers — your browser, Supabase, the simulation worker and the engine — " +
+      "with what crosses each line written between them. A filled mark on Supabase says your " +
+      "data is at rest there and nowhere else; a dashed mark on the other three says it is " +
+      "held only in memory, with the worker's ten-minute cache named.",
+    caption:
+      "Four processes, and only one of them your data rests in. The worker holds it in memory " +
+      "after a run too, until an idle timer drops it — which is the part an approver is " +
+      "entitled to and the page did not used to say.",
     shows:
-      "Browser, Supabase, worker, engine. What crosses each boundary and in which direction. " +
-      "Where a user's data is at rest, and where it is only in flight.",
+      "Browser, Supabase, worker, engine; what crosses each boundary and in which direction; " +
+      "and the brief's second ask, which needed CHECKING rather than inheriting (F3): where a " +
+      "user's data is at rest and where it is only in flight. Reading `GraphCache` for that " +
+      "found §4 D148 — the worker keeps the graph and the effective policies in memory for ten " +
+      "minutes after a run, which neither the figure nor the page had said. Supersedes the " +
+      "`SystemBoundaryFigure` schematic, which stays as the fallback.",
   },
 
   // ── 3 · Input tables ────────────────────────────────────────────────────
@@ -219,45 +239,63 @@ export const FIGURE_SLOTS: FigureSlot[] = [
   {
     id: "product-network",
     page: "product-level-network",
-    file: null,
+    file: "product-network.svg",
     title: "The product-level view",
     alt:
-      "The product-level network as the application draws it: supplier, material, product and " +
-      "customer nodes joined by flow arcs.",
-    caption: "Every node and every arc here is a row you uploaded.",
+      "A DRAWN product-level network: supplier, material, product and customer nodes joined " +
+      "left to right by flow arcs. Two nodes are outlined rather than joined — a material " +
+      "with no supplier behind it, and a customer with nothing arriving — and each is called " +
+      "out beneath.",
+    caption:
+      "A representation, not a screenshot. Every node and every arc in the real view is a row " +
+      "you uploaded, and the two loose nodes are what a missing row looks like.",
     shows:
-      "A screenshot of a REAL project at a size where node labels are readable. Ideally one " +
-      "with a visible defect — an orphaned material, a disconnected customer — since spotting " +
-      "those is what the page says this screen is for.",
+      "**A SCHEMATIC, declared as one (F5).** The brief asked for a capture of a real project " +
+      "at readable label size and this package had no project to capture; a drawing presented " +
+      "as a screenshot is a fabricated record, so the `alt` and the caption say it is drawn. " +
+      "**Supersede it with a real capture rather than redrawing it.** What the drawing does " +
+      "carry is the argument: the four groups left to right, and TWO faults visible at a " +
+      "glance, because spotting those is what the page says this screen is for.",
   },
   {
     id: "process-network",
     page: "process-level-network",
-    file: null,
+    file: "process-network.svg",
     title: "The process-level view",
     alt:
-      "The process-level network: manufacturing stages stacked by depth, with sub-assemblies " +
-      "feeding sub-assemblies.",
-    caption: "Levels here are stages of manufacture, not distances between companies.",
+      "A DRAWN process-level network: a product on level 0 with sub-assemblies stacked on " +
+      "labelled levels beneath it, one sub-assembly feeding another, and raw materials at the " +
+      "bottom of each branch. Beneath it, the two meanings of the word level set against each " +
+      "other.",
+    caption:
+      "A representation, not a screenshot. Levels here are stages of manufacture and can all " +
+      "sit in one factory; tiers in the firm graph are companies away from you. The two " +
+      "numbers are unrelated.",
     shows:
-      "A multi-level BOM drawn as the app draws it, with the LEVELS labelled — and drawn so it " +
-      "is visibly unlike the firm-level picture, because confusing the two kinds of depth is " +
-      "the mistake this page exists to prevent.",
+      "**A SCHEMATIC, declared as one (F5)** — see `product-network` for why, and supersede it " +
+      "the same way. The LEVELS must be labelled and the drawing must be visibly unlike the " +
+      "firm-level picture, because confusing the two kinds of depth is the mistake this page " +
+      "exists to prevent — which is why the distinction is spelled out in the figure rather " +
+      "than left to the caption.",
   },
   {
     id: "firm-network",
     page: "firm-level-network",
-    file: null,
+    file: "firm-network.svg",
     title: "The deep-tier firm graph",
     alt:
-      "The firm-level network: companies as nodes arranged by tier depth, with supply " +
-      "relationships between them, node size carrying prominence.",
+      "A DRAWN firm-level network: companies arranged in tiers away from you, with node size " +
+      "standing for a computed prominence. Two tier-1 suppliers, A and B, are joined by " +
+      "separate paths that converge on one large tier-3 firm, which is ringed.",
     caption:
-      "Two suppliers you consider independent can meet at a single firm three tiers back.",
+      "A representation, not a screenshot. Two suppliers you dual-sourced on purpose can meet " +
+      "at a single firm three steps back — and nothing in your own purchasing data would show " +
+      "it, because you have never bought from that firm.",
     shows:
-      "A real deep-tier graph with a SHARED upstream firm visible — the concentration risk the " +
-      "page claims this view reveals. Node size or colour should be one of the computed " +
-      "measures, so the page can point at it and say which columns are not yours.",
+      "**A SCHEMATIC, declared as one (F5)** — see `product-network` for why, and supersede it " +
+      "the same way. The SHARED upstream firm is the whole point and must be unmissable: two " +
+      "paths, one destination, drawn heavier than the rest. Node size carries a COMPUTED " +
+      "measure, so the page can point at it and say which columns are not yours.",
   },
   {
     id: "interactive-space",
@@ -270,7 +308,15 @@ export const FIGURE_SLOTS: FigureSlot[] = [
     caption: "No fixed layout. What you arrange is for looking at, not for quoting.",
     shows:
       "The canvas mid-exploration, ideally a cluster pulled apart, so it reads as something a " +
-      "person is doing rather than a finished diagram.",
+      "person is doing rather than a finished diagram. **DELIBERATELY STILL OPEN, and WP 5.2k " +
+      "decided it rather than ran out of budget.** The other three capture slots were drawn as " +
+      "declared schematics because each carries a STRUCTURAL argument a drawing makes as well " +
+      "as a photograph — an orphaned node, a level, a shared firm. This one does not: its " +
+      "brief asks for something that reads as a person part-way through a thought, and a " +
+      "hand-authored SVG is the precise opposite of that. A tidy drawing here would illustrate " +
+      "the fixed layout the page exists to contrast itself with, so it would be worse than the " +
+      "placeholder, which at least says out loud what is missing (§5.3 T3). **This slot needs " +
+      "a capture and nothing else.**",
   },
 
   // ── 11 · Results & statistics ───────────────────────────────────────────

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 458" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- What runs where, and what crosses each line. The four zones and their
+       runtimes follow SystemBoundaryFigure, which this supersedes; what is
+       added is the brief's own ask — where your data is AT REST and where it
+       is only IN FLIGHT — and a layout that reads at phone width. -->
+
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">Four processes. What crosses each line is</text>
+  <text x="4" y="28" font-size="12" fill="hsl(var(--foreground))">the part worth knowing.</text>
+
+  <!-- ══ browser ══ -->
+  <rect x="4" y="40" width="312" height="42" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="58" font-size="12" fill="hsl(var(--foreground))">Your browser</text>
+  <text x="12" y="72" font-size="12" fill="hsl(var(--muted-foreground))">the interface, and nothing else</text>
+  <text x="308" y="58" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">React</text>
+  <circle cx="300" cy="70" r="4" fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="1.2" stroke-dasharray="1.5 1.5"/>
+
+  <line x1="160" y1="86" x2="160" y2="98" stroke="hsl(var(--muted-foreground))" stroke-width="1.2" stroke-dasharray="3 2"/>
+  <text x="12" y="98" font-size="12" fill="hsl(var(--muted-foreground))">authenticated requests only — never a</text>
+  <text x="12" y="110" font-size="12" fill="hsl(var(--muted-foreground))">direct database connection</text>
+
+  <!-- ══ supabase ══ -->
+  <rect x="4" y="118" width="312" height="56" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.6"/>
+  <text x="12" y="136" font-size="12" fill="hsl(var(--foreground))">Supabase</text>
+  <text x="12" y="150" font-size="12" fill="hsl(var(--muted-foreground))">your data, your policies, your results, and</text>
+  <text x="12" y="162" font-size="12" fill="hsl(var(--muted-foreground))">the rules about who may read them</text>
+  <text x="308" y="136" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">Postgres</text>
+  <circle cx="300" cy="152" r="4" fill="hsl(var(--foreground))"/>
+
+  <line x1="160" y1="178" x2="160" y2="190" stroke="hsl(var(--muted-foreground))" stroke-width="1.2" stroke-dasharray="3 2"/>
+  <text x="12" y="190" font-size="12" fill="hsl(var(--muted-foreground))">a job, and the data that job is allowed</text>
+  <text x="12" y="202" font-size="12" fill="hsl(var(--muted-foreground))">to see</text>
+
+  <!-- ══ worker ══ -->
+  <rect x="4" y="210" width="312" height="42" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="228" font-size="12" fill="hsl(var(--foreground))">Simulation worker</text>
+  <text x="12" y="242" font-size="12" fill="hsl(var(--muted-foreground))">takes a job, runs it, writes the result back</text>
+  <text x="308" y="228" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">Fly.io</text>
+  <circle cx="300" cy="240" r="4" fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="1.2" stroke-dasharray="1.5 1.5"/>
+
+  <line x1="160" y1="256" x2="160" y2="268" stroke="hsl(var(--muted-foreground))" stroke-width="1.2" stroke-dasharray="3 2"/>
+  <text x="12" y="268" font-size="12" fill="hsl(var(--muted-foreground))">parameters in, a result out</text>
+
+  <!-- ══ engine ══ -->
+  <rect x="4" y="276" width="312" height="42" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="294" font-size="12" fill="hsl(var(--foreground))">Engine</text>
+  <text x="12" y="308" font-size="12" fill="hsl(var(--muted-foreground))">the model — no database access of its own</text>
+  <text x="308" y="294" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">Python</text>
+  <circle cx="300" cy="306" r="4" fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="1.2" stroke-dasharray="1.5 1.5"/>
+
+  <!-- ══ at rest vs in flight ═════════════════════════════════════════ -->
+  <line x1="4" y1="336" x2="316" y2="336" stroke="hsl(var(--border))" stroke-width="1"/>
+  <circle cx="10" cy="354" r="4" fill="hsl(var(--foreground))"/>
+  <text x="24" y="358" font-size="12" fill="hsl(var(--foreground))">your data is AT REST here</text>
+  <text x="24" y="372" font-size="12" fill="hsl(var(--muted-foreground))">One place. That is the whole list.</text>
+
+  <circle cx="10" cy="394" r="4" fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="1.2" stroke-dasharray="1.5 1.5"/>
+  <text x="24" y="398" font-size="12" fill="hsl(var(--foreground))">held only in memory here</text>
+  <text x="24" y="412" font-size="12" fill="hsl(var(--muted-foreground))">Never written to disk. The worker does keep</text>
+  <text x="24" y="424" font-size="12" fill="hsl(var(--muted-foreground))">your graph in memory after a run — so the</text>
+  <text x="24" y="436" font-size="12" fill="hsl(var(--muted-foreground))">next one need not refetch it — until an idle</text>
+  <text x="24" y="448" font-size="12" fill="hsl(var(--muted-foreground))">timer drops it. Ten minutes by default.</text>
+</svg>

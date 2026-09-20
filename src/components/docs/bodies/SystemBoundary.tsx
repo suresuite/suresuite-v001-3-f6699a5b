@@ -80,6 +80,20 @@ export default function SystemBoundary() {
             left to be discovered.
           </p>
         </Callout>
+        <Callout title="The worker keeps your graph in memory for a while after a run">
+          <p>
+            A run is not the worker's only contact with your data. It loads your graph and your
+            effective policies on first use and <strong>keeps them in memory</strong>, so a second
+            run on the same project does not refetch everything — and an idle timer drops them
+            again, ten minutes after last use by default.
+          </p>
+          <p>
+            Nothing is written to disk at that layer. But <em>where the data sits</em> is the first
+            question this page exists to answer, and the honest answer includes a bounded residency
+            on the worker rather than only the database. It is deliberate and it is why a repeated
+            run is fast; it is stated here rather than left to be discovered.
+          </p>
+        </Callout>
         <Callout title="Audit today covers the administrative plane">
           <p>
             Changes to accounts, roles and organizations are recorded with the actor who made them.
