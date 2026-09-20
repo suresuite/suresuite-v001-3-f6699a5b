@@ -57,7 +57,7 @@ Read follows project reachability (`has_project_access`), uuid-only since WP 3.0
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:237` | yes |
+| `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:227` | yes |
 | `SimulationLab.tsx` | rpc project_freshness | `src/components/trust/useProjectFreshness.ts:24` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
@@ -329,6 +329,6 @@ Last lifecycle change. The IDENTITY columns are frozen by `analysis_runs_identit
 
 ---
 
-*Generated from data contract `232f60fe2622`, engine `0.2.3`,
+*Generated from data contract `7610aaafc342`, engine `0.2.3`,
 sidecar `supabase/contract/analysis_runs.contract.yaml`, table created by `20260917000006_analysis_store.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

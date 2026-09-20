@@ -69,7 +69,7 @@ it rather than duplicating it.
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:429` | yes |
-| `ProcessLevelNetwork.tsx` | table read | `src/pages/ProcessLevelNetwork.tsx:1213` | yes |
+| `ProcessLevelNetwork.tsx` | table read | `src/pages/ProcessLevelNetwork.tsx:381` | yes |
 | `ProjectPolicies.tsx` | table read | `src/lib/policies/projectLanes.ts:48` | yes |
 | `SimulationLab.tsx` | table read | `src/lib/policies/projectLanes.ts:48` | yes |
 
@@ -193,7 +193,7 @@ Depth in the BOM tree. Level 1 is directly under the finished product; higher nu
 
 Depth in the BOM tree is structure, not measurement.
 
-**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:1213`) —
+**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:381`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -314,6 +314,6 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `232f60fe2622`, engine `0.2.3`,
+*Generated from data contract `7610aaafc342`, engine `0.2.3`,
 sidecar `supabase/contract/bom_multi_level.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
