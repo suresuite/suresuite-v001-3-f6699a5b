@@ -2,8 +2,9 @@
   "_comment": [
     "Golden validation-parity project (§8.2). One row per fallback case:",
     "  M_OK        master cost set, priced arc            → no findings",
-    "  M_DERIVED   no cost, priced arc (3.0)              → info (cheapest inbound)",
-    "  M_UNPRICED  no cost, arc without price/lead_time   → info cost + WARN arc price + WARN arc lead_time",
+    "  M_DERIVED   no cost, one priced lane (3.0, vol 200)  → info (volume-weighted = that lane)",
+    "  M_UNPRICED  no cost, lane without price/lead_time   → info cost + WARN arc price + WARN arc lead_time",
+    "  M_MULTI     no cost, two lanes 10.0×300 + 6.0×100  → info cost = 9.0 (weighted), NOT 6.0 (cheapest)",
     "  P_OK        fully specified                        → no findings",
     "  P_PRICE_FALLBACK  no sell_price/demand_mean, priced outbound → info ×2; no capacity → WARN",
     "  P_NO_DEMAND       no sell_price/demand_mean, no outbound     → WARN ×2 (neutral constants); no capacity → WARN",
@@ -56,6 +57,13 @@
         "material_id": "M_UNPRICED",
         "cost": null,
         "holding_cost_pct": null,
+        "moq": null,
+        "initial_on_hand": null
+      },
+      {
+        "material_id": "M_MULTI",
+        "cost": null,
+        "holding_cost_pct": 0.2,
         "moq": null,
         "initial_on_hand": null
       }
@@ -115,6 +123,22 @@
         "lead_time": 3,
         "time_unit": "week",
         "volume": 150
+      },
+      {
+        "supplier_id": "S1",
+        "material_id": "M_MULTI",
+        "unit_price": 10.0,
+        "lead_time": 2,
+        "time_unit": "week",
+        "volume": 300
+      },
+      {
+        "supplier_id": "S2",
+        "material_id": "M_MULTI",
+        "unit_price": 6.0,
+        "lead_time": 2,
+        "time_unit": "week",
+        "volume": 100
       }
     ],
     "outbound": [

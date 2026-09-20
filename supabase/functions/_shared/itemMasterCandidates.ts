@@ -76,6 +76,7 @@ export const NUMERIC_DRAFT_FIELDS = new Set(
 
 /** Reducer → the project table its derivation reads (citation targets). */
 export const REDUCER_SOURCE_TABLE: Record<string, string> = {
+  volume_weighted_inbound_price: "inbound_logistics",
   cheapest_inbound_price: "inbound_logistics",
   demand_weighted_outbound_price: "outbound_logistics",
   weekly_outbound_volume: "outbound_logistics",

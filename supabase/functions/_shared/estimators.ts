@@ -222,20 +222,28 @@ function reducerCtx(inputs: EstimatorInputs): ReducerCtx {
 
 export const ESTIMATOR_METHODS: EstimatorMethod[] = [
   {
-    id: "direct_cheapest_inbound",
+    // Renamed from `direct_cheapest_inbound@1` when the engine's first
+    // fallback step became the volume-weighted price: a method id is a claim
+    // about the derivation, and `findMethod` failing loudly on a stored
+    // reference to the old id is the §18.1 behaviour a changed derivation is
+    // supposed to produce.
+    id: "direct_inbound_price",
     version: 1,
     family: "direct_from_project",
     target: { table: "materials", field: "cost" },
     params: {},
     sources: [GROUND_LIVE],
     assumptions: [
-      "The cheapest currently-quoted inbound unit price is the engine's own " +
-      "fallback for materials.cost (docs/data-simulation-mapping.md §8); " +
-      "arc prices ≤ 0 default to 1.0 before the min, exactly as the engine does.",
+      "The engine's own fallback chain for materials.cost: the volume-weighted " +
+      "average inbound unit price across the material's lanes, or its cheapest " +
+      "quoted price when no lane carries a volume to weight by; arc prices ≤ 0 " +
+      "default to 1.0 first, exactly as the engine does.",
     ],
     groundTables: ["inbound_logistics"],
     estimate(entityId, inputs) {
-      const value = REDUCERS.cheapest_inbound_price(entityId, reducerCtx(inputs));
+      const ctx = reducerCtx(inputs);
+      const value = REDUCERS.volume_weighted_inbound_price(entityId, ctx)
+        ?? REDUCERS.cheapest_inbound_price(entityId, ctx);
       if (value === undefined) return undefined;
       let low = Infinity;
       let high = -Infinity;
@@ -755,9 +763,10 @@ export function bomConsumers(dataset: GradingDataset): Map<string, Set<string>> 
   return out;
 }
 
-/** Resolved unit price of a material: master cost when set, else the
- * engine's own cheapest-inbound fallback (arc prices ≤ 0 default to 1.0
- * before the min — exactly the project_map.py chain). */
+/** Resolved unit price of a material: master cost when set, else the engine's
+ * own inbound chain — the volume-weighted lane price, then the cheapest quote
+ * when no lane carries a volume (arc prices ≤ 0 default to 1.0 first, exactly
+ * the project_map.py chain). */
 function materialUnitPrice(materialId: string, inputs: EstimatorInputs): number | undefined {
   const master = inputs.dataset.materials.find(
     (m) => String(m.material_id ?? "") === materialId,
@@ -765,7 +774,9 @@ function materialUnitPrice(materialId: string, inputs: EstimatorInputs): number 
   if (!master) return undefined;
   const cost = num(master.cost);
   if (cost > 0) return cost;
-  return reducerCtx(inputs).cheapestInbound.get(materialId);
+  const ctx = reducerCtx(inputs);
+  return REDUCERS.volume_weighted_inbound_price(materialId, ctx)
+    ?? REDUCERS.cheapest_inbound_price(materialId, ctx);
 }
 
 /** Resolved unit price of a product: master sell_price when set, else the
@@ -902,8 +913,8 @@ export const RATE_ESTIMATOR_METHODS: RateEstimatorMethod[] = [
       "against the seed rows; the manufacturing-composite row is the " +
       "declared fallback.",
       "u_p = product master sell_price else the demand-weighted outbound " +
-      "price; c_m = material master cost else the cheapest inbound price — " +
-      "the engine's own fallback chains.",
+      "price; c_m = material master cost else the volume-weighted inbound " +
+      "price — the engine's own fallback chains.",
     ],
     groundTables: ["materials", "products", "inbound_logistics", "outbound_logistics"],
     estimate(pair, inputs) {

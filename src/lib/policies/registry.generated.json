@@ -2,8 +2,13 @@
   "base_data_requirements": [
     {
       "condition": null,
-      "fallback": "cheapest inbound unit_price across the material's suppliers",
+      "fallback": "volume-weighted average inbound unit_price across the material's supply lanes; the cheapest quoted price when no lane carries a volume",
       "fallback_spec": [
+        {
+          "constant": null,
+          "grade": "info",
+          "reducer": "volume_weighted_inbound_price"
+        },
         {
           "constant": null,
           "grade": "info",

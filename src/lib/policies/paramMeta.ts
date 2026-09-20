@@ -89,8 +89,9 @@ export const PARAM_META: Record<string, ParamMeta> = {
       "correction has to be made. Editing it on this grid used to store an " +
       "override the engine never consulted (§4 D18). Where the inbound file gives " +
       "no price the cell shows an imputed average and the run does NOT use that " +
-      "number — the engine substitutes the cheapest link for the material, or 1.0 " +
-      "when there is none; the imputation dot is the cell saying so.",
+      "number — the engine values the material at the volume-weighted average of " +
+      "its lanes (the cheapest quote when no lane carries a volume, 1.0 when it " +
+      "has no lane at all); the imputation dot is the cell saying so.",
     specRef: "§IV.1",
   },
   reliability_score: {
@@ -311,7 +312,7 @@ export const PARAM_META: Record<string, ParamMeta> = {
     unit: "€ / unit",
     range: "≥ 0",
     meaning:
-      "Unit cost of the material (item master). Feeds holding-cost and purchase-cost accounting; falls back to the cheapest inbound price when the master is empty.",
+      "Unit cost of the material (item master). Feeds holding-cost and purchase-cost accounting; falls back to the volume-weighted average inbound price when the master is empty — the cheapest quote only when no lane carries a volume.",
     specRef: "docs/data-simulation-mapping §4",
   },
   material_moq: {

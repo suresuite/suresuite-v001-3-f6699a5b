@@ -180,8 +180,14 @@ def test_policy_activation_matches_shared_grader():
 
     # Wired parameters, not just activation (G1 closure):
     pols = mapping.scenario.policies
+    # Both multi-sourced materials of the fixture, split by LANE VOLUME SHARE —
+    # the same volumes that now weight `materials.cost`. P-S.2 has always
+    # allocated orders this way, which is why valuing the material at its
+    # cheapest lane was the odd rule out: the engine bought 300/400 of M_MULTI
+    # at 10.0 and priced all of it at 6.0.
     assert pols["proactive_multi_sourcing"]["weights"] == {
-        "M_OK": {"S1": 60.0, "S2": 40.0}
+        "M_OK": {"S1": 60.0, "S2": 40.0},
+        "M_MULTI": {"S1": 60.0, "S2": 40.0},
     }
     assert pols["early_warning_failover"]["detection_lag_weeks"] == 1  # 7 days
     assert pols["fg_safety_stock"]["sizing"] == "service_level"
