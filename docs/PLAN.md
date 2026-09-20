@@ -329,6 +329,8 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D144** | **`includeTerminals` is INVERTED, so the whole terminal-stop mechanism has been inert since it was written.** The subgraph walk stops at a `stopUp` / `stopDown` level only `if (queryParams.includeTerminals)` — and the default is `false`. So with the flag OFF the traversal walks straight past every terminal, and with it ON the walk stops: the parameter does the opposite of what its name says, and `stopUp: [5, 6]` / `stopDown: [-1]` have never bounded a single walk under their own default. Found while extracting the engine into `src/lib/graph/subgraph.ts`, and **reproduced there rather than fixed**, because the extraction's whole guarantee is parity with the orphaned page it came from and a refactor that also changes behaviour can be verified as neither. `extractSubgraph` takes `respectTerminals` so a caller may opt into the sane reading today; `subgraphParity.test.ts` asserts BOTH — that the default reaches a terminal-level node, which is the defect, and that the option stops at it | `src/pages/InteractiveNetworkSpace.tsx:255-265` | **WP 8.4** *(flip the default when the two pages adopt the engine, which is the first time anything depends on it)* |
 | **D145** | **A function's fixed `RETURNS TABLE` is a SECOND place the schema is authored, and it goes stale the moment a migration widens the table — so three columns that exist, are backfilled and are CHECK-constrained were invisible to every page in the product.** `get_node_list` is the only route to `node_list` from the application and its `RETURNS TABLE(...)` lists seventeen columns BY NAME. WP 8.1 added `echelon`, `bom_depth` and `supply_tier`; `CREATE OR REPLACE FUNCTION` cannot change a return type; nothing failed. **This is `single-source` (I1) broken in SQL rather than in markdown**, which is the same blind spot D101 and D105 came out of — and `contract:validate` cannot see it, because the sidecar describes the TABLE and no rule compares a table's columns with the projections that claim to return them. Closed for this table by an ADDITIVE function rather than by a DROP: `get_node_list` has four live callers and `20260918000003` is the record of what a DROP costs (it takes the function's grants with it, which `rehearsal/210` §2 had to check back as explicit `proacl` grantees). **The CLASS is open**: no gate counts the other fixed `RETURNS TABLE`s in this schema against the tables they project | `supabase/migrations/20250830231617_879246a9-616c-408d-8b71-2b4ff44461ef.sql:106-131` (the seventeen-column projection) | **WP 8.4** *(the class, as a `contract:check` rule — this table's instance is closed by `20260919000002`)* |
 | **D146** | **A MERGE gave seven defects two meanings each, then a second merge did it again with eight more — and BOTH branches had independently built the gate for it.** Phase 8 and WP 5.2j each opened the next free §4 id in good faith and shipped **D112–D118** for entirely different defects; `git merge` joined them with no conflict, because the two sets of rows never touched the same lines. Phase 8 renumbered to D119–D137 — and the next merge brought WP 6.2/6.3/6.4's **D119–D126**, colliding with eight of them. Renumbered again to **D127–D146**, above §4's actual maximum. **The instructive part is that WP 6.3 had already closed this as `contract:check` R16** (its own merge, D122) while Phase 8 was closing it as R13 in parallel: two branches, one defect, two gates, and neither could see the other. On merge the duplicate rule was dropped and R16 kept — a rule authored twice is `single-source` broken in the gate layer, which is the layer that exists to catch it. **What Phase 8 contributed that R16 does not cover is R19**: `## 4.`, `## 16.` and `## 17. Sequencing` must each appear EXACTLY ONCE. The same merge produced TWO `## 17. Sequencing` headings, because one branch had moved the section to the end so §16 would run to it and the other had edited it in place. `section16()` keys on the first, so forty-two drift-log entries fell outside §16 — which is **D124** reopened by a merge after being closed by an edit. §4 also gained a second **rehearsal numbered 230** the same way, renumbered to 300. **CLOSED (WP 8.0)**: R16 (main's) + R19 (this package's) + `section16()` now excluding a PHASE section WHOLE rather than at its first `### ` heading, because §18's six package headings were being read as §16 entries and R7 reported a LOSS whenever one was edited | `scripts/data-contract/check.mjs`'s R16, R19 and `section16` against the two merge commits | **WP 8.0 ✅** *(and a Phase 8 citation in any commit message before this reads up to fifteen lower than the row it points at)* |
+| **D147** | **The run gate has a FOURTH state, and in it the rail says "clear — run allowed" while the Run button is disabled — the readout, the stage 3 sub-label and the button disagree three ways about the same screen. Found by reading the gate for the `run-sequence` figure (WP 5.2k), not by a test.** `runBlockedReason` has four branches and the first of them is the CAPABILITY check — an account that may open `/simulation-lab` but lacks the `simulation_lab` FEATURE gets a non-null reason with `gateBlocks = 0` and `gateWarns = 0`. `buildStages`'s `gateReadout` branches on `gate.blocks > 0`, then on `gate.warns > 0 && gate.reason`, then falls through to `{ value: "clear", tail: "— run allowed" }` — so it reads CLEAR. `runStageSub` branches on `gate.reason` first and then on `gate.blocks > 0`, so stage 3's sub-label reads **"0 warnings — ack required"**, describing an acknowledgement that would change nothing. `GateBar` computes `canRun = !reason` and disables the button, correctly, with the correct reason in visible text beside it. So the one component that reads `reason` DIRECTLY is right and the two that re-derive a summary FROM `blocks`/`warns` are both wrong, because the fourth reason is carried by neither count. **The page and the feature are separate capability kinds** (`pages` vs `features` in `roleFallbackCapabilities`), and an org or user override can grant one and deny the other, so the state is reachable rather than theoretical — and the branch exists precisely because its author expected it to be. This is D113's shape one layer out: not a wrong number, but a SUMMARY derived from the wrong inputs, agreeing with itself and disagreeing with the thing it summarises | `src/pages/SimulationLab.tsx`'s `runBlockedReason` against `buildStages`'s `gateReadout` and `runStageSub` in `src/components/sim/StageRail.tsx`, read beside `GateBar`'s `canRun` in `src/components/sim/RunGate.tsx` | **OPEN — WP 6.4** *(the decision plane, which owns the run gate's surface. The fix is one shape: give the readout the REASON rather than the two counts, so a fourth reason cannot fall through to "clear". Drawn in the `run-sequence` figure meanwhile, because a disagreement a reader can hit is one §5.3 T3 says we publish rather than wait to fix)* |
+| **D148** | **The worker holds a project's graph and effective policies IN MEMORY for ten minutes after a run finishes, and the page whose job is "where does the data sit" does not say so. Found by drawing `boundary` for WP 5.2k, by checking a claim rather than inheriting it (brief F3).** `GraphCache` keys a `dict` by `project_id`, loads the graph and the effective policies on first use, and `evict_idle` drops entries whose `last_used` is older than `idle_ttl` — **default 600 seconds**, swept on the worker's own timer. Nothing is written to disk, which is the reassuring half and is worth saying explicitly. The half that is not said anywhere is the residency: `system-boundary` describes the worker as *"takes a job, runs it, writes the result back"* and describes the queue-to-worker boundary as *"the worker picks up the job and fetches exactly the project data that job needs"* — both true of a single run, and neither says the data is still there when the run is over. **That page exists for the person who has to APPROVE this tool**, and its own opening names four questions, the first of which is *where the data sits*. A ten-minute in-memory residency on a third-party host, under a service credential that bypasses the per-user rules (which the page DOES state), is a fact that reader is entitled to. This is not a defect in the cache — the cache is why a second run on the same project is fast, and the TTL is why it does not grow without bound. It is §5.3 T3 applied to the architecture page: the blind spot is ours to publish. The figure and one paragraph now state it | `sim-worker/sim_worker/graph_cache.py`'s `GraphCache.__init__` / `evict_idle` against `src/components/docs/bodies/SystemBoundary.tsx`'s "Queue to the worker" definition | **CLOSED for the manual ✅ (Phase 5 / WP 5.2k)** — the `boundary` figure states the residency and the TTL, and the page's own "parts worth asking about" section carries it beside the service-credential note it belongs with. *(No product change is proposed and none is needed: the cache is deliberate and bounded. What was missing was the sentence)* |
 
 ### 4.1 Code map — the data layer
 
@@ -1934,6 +1936,7 @@ its footer said "~78". Enumerated and reconciled in WP 5.2a — see §16.)*
 | **5.2h** ✅ | Reference — all-tables detail index, units, glossary, field index | 4 | WP 1.2 |
 | **5.2i** ✅ | **Figures.** Not in §6.3's page counts because it adds no page: it adds the DOOR a diagram comes through, which the manual did not have (D109). `src/assets/manual/` + a slot manifest + `DocFigure`. Sixteen slots declared and open, each briefed | 0 | WP 5.2b–g |
 | **5.2j** ✅ | **Depth, the assets, and the page that documents the wrong feature.** ONE package: **D111** (`stress-tests` documents an engine library the product cannot reach, while the seven presets a user clicks are undocumented), **D110** (80 pages point at none of the 14 templates, 3 guides and 1 Colab notebook the product ships — and the mapping is declared, so the links derive), and the **23 pages under 500 rendered words**, clustered where there was no generated fact to render. Adds no page. **Closed all three and found seven more** — D112–D118, of which D112, D114, D115, D116, D117 and D118 are all one shape: two declarations, each correct alone, disagreeing with nothing comparing them. **Zero pages under 500 now**, and the floor is a gate | 0 | WP 5.2b–i |
+| **5.2k** ✅ | **The figures.** The twenty-eight diagrams the slots were asking for, drawn. Adds no page and no fact: every element comes from the module the page it sits on already renders from. It also had to widen the door — an `<img>`-referenced SVG is an isolated document, so the drawing standard's "read in both themes using the manual's own custom properties" was unreachable through WP 5.2i's `DocFigure` until `.svg` markup was inlined into the page's cascade. **Found D147** (the run gate's fourth state, where two of three readouts disagree with the button) and **D148** (the worker keeps a project's graph in memory for ten minutes after a run, on the page whose job is "where does the data sit"), **closed a VACUOUS assertion** in `figures.test.ts` that could not fail, and corrected two slot briefs written against defects already closed. **27 of 28 filled**; the one still open needs a screenshot and says so | 0 | WP 5.2b–j |
 
 **5.2a is shippable before Phase 1 and is now the most valuable single package in
 the plan.** It ships the architecture section — the answer to *how is this built and
@@ -15535,6 +15538,391 @@ commit.
    line, which is what §4's own R6 already does ("anchored elsewhere"). Not
    attempted here; named so the next package that edits a page with lineage entries
    is not surprised.
+
+### WP 5.2k — The figures: A1–A5 · 2026-09-19
+
+Preconditions held?      **no, and the miss was structural.** The brief's drawing
+standard D2 says a figure must read in both themes using `currentColor` and the CSS
+custom properties the manual already defines. That was not reachable through the door
+WP 5.2i built. `DocFigure` rendered every slot as `<img src={url}>`, and an
+`<img>`-referenced SVG is an **isolated document**: the page's stylesheet does not
+reach it, `--border`/`--card`/`--foreground` do not reach it, and `currentColor`
+inside it resolves against the SVG's own initial `color` rather than the text it sits
+beside. Nothing would have failed — the first figure would simply have been drawn in
+colours that ignore the theme, and gone dark-on-dark the day anything sets `.dark`.
+`prefers-color-scheme` inside the file is not the fix and is worse than nothing:
+`tailwind.config.ts` is `darkMode: ["class"]`, so a figure keyed to the OS preference
+would invert itself underneath a page that had not. Closed by giving `DocFigure` a
+second `import.meta.glob` at `?raw` and inlining `.svg` markup into the page's own
+cascade — which is how `figures.tsx`'s three schematics have always worked, because
+they are JSX and were never `<img>`. Raster files still go through the URL glob.
+A `.svg` FILE and an inline schematic now theme identically.
+
+Exit checks passed?      yes, for the four that can run here. `npm test` 285/285
+(docs suite), `check:docs` ✓, `contract:check` ✓ (2 pre-existing warnings, R10 and
+R13, neither this package's), `typecheck` ✓ (21 of 21 held in the baseline — the
+number is 21 here, not the 28 the brief quotes; the baseline file has moved since it
+was written), `build` ✓, `audit:bundle` **clean — initial graph 156.6 kB, total JS
+1880.0 kB, nothing above the baseline**, `audit:ui` **8 — at baseline**, eslint
+**336 errors / 116 warnings — at baseline**. `npm run lint` still cannot pass, for
+the reason the brief states.
+
+Discovered:
+  - **The drawing standard and the manual's existing schematics disagree about
+    phone width, and the brief's rule is the stricter one.** `figures.tsx` gives its
+    three SVGs `min-w-[640px]` and lets the wrapper scroll horizontally, with a
+    comment arguing that a wide diagram *should* scroll on a phone. The brief's D3
+    forbids exactly that. D3 wins for anything drawn here, and satisfying it is a
+    measurable constraint rather than a preference: at a 360 px viewport the manual's
+    gutter (`--m-gutter`, 14.8 px each side) plus the figure card's `p-4` leave
+    **298 px** of drawing width, so a label at font-size *F* in a viewBox *W* units
+    wide renders at *F × 298/W* — and the 11 px floor means *F/W ≥ 0.0369*. Every
+    figure in this package is therefore authored on a **320-unit grid with a 12 px
+    minimum**, which renders at 11.2 px on a phone, and `DocFigure` caps an inlined
+    figure at **480 px** rather than `max-w-3xl` so the same label does not become
+    29 px on a desktop. → affects the remaining WP 5.2k groups → recorded here rather
+    than in the manifest, because it is a property of the page, not of any one slot.
+  - **§4 D147 — the run gate has a fourth state, and two of its three readouts are
+    wrong in it.** Found by opening `RunGate.tsx` and `StageRail.tsx` to draw the
+    `run-sequence` figure's three exits (brief F3: behaviour is read, not inferred).
+    `runBlockedReason` has FOUR branches and the first is the capability check, which
+    produces a non-null reason with zero blocking findings and zero warnings. The rail
+    readout and the stage-3 sub-label are both re-derived from `blocks`/`warns`, so
+    they cannot see it: the rail reads "clear — run allowed" and stage 3 reads "0
+    warnings — ack required" while the button is correctly disabled. The component
+    that reads `reason` directly is right; the two that summarise from the counts are
+    both wrong. → affects **WP 6.4**, which owns the decision plane → §4 row added in
+    this commit, owner WP 6.4, and the fourth state is drawn in the figure meanwhile
+    (T3: publish the blind spot in the picture).
+  - **Two of this brief's twelve new-slot specifications are written against defects
+    that are already closed, which is the check F7 asks for and the reason it asks.**
+    **B2 (`kpi-vocabulary-gap`)** is specified as "two columns … with lines between
+    the ones that match. Two lines. §4 D113, and the emptiness is the point." D113 is
+    **CLOSED (WP 6.3)** and the closure removed the emptiness: `KpiStatTable` is now
+    driven by the run rather than by a hand-written display list, so the two-line
+    picture would publish a defect that no longer exists — exactly what F7 says two
+    packages have already done. The live fact in the same join is *different and
+    sharper*: `RUN_KPIS` carries **24 emitted keys** (three of them only on a
+    disrupted run), **34 display labels** of which **10 are never emitted**, and —
+    the part no page draws — **5 scenario objectives of which 4 name a measure no run
+    produces**. **B3 (`delete-reach`)** is specified around "the fourth group labelled
+    with what is in it. §4 D117." D117 is **CLOSED (WP 6.2)**, and its own closure
+    corrected the split it was measured on: `PROJECT_DELETION` today reads cascade
+    **39**, swept-only **5**, detached **2**, reached by neither **3** — and the three
+    are the log tables, which are a decision (`rehearsal/280` §3 fails if one of them
+    starts cascading) rather than the omission the brief describes. → affects WP 5.2k
+    group B1–B7 → both slots will be briefed and drawn from the generated modules as
+    they read today, and the `shows` text will say so.
+  - **A2 is a stronger figure than its brief, and the strength is a defect the page
+    already carries in prose.** The brief asks for the four inventory types with "the
+    parameters that policy actually uses" marked. Joining `INVENTORY_TYPES` to
+    `CHAINS` shows that of the five distinct parameters across the four types, **three
+    never reach the strategic engine**: `reorder_point` is `overridden` (the engine
+    computes the same quantity and never consults yours) and `order_up_to` and
+    `review_period_days` are `legacy-only`. So **min-max's two sizing parameters are
+    both dead, base stock's only one is dead, and periodic review's review interval is
+    dead** — `(R, Q)` is the single type with a sizing parameter the engine reads.
+    Drawn, because a reader choosing between four rules is choosing between four sets
+    of numbers and three of those sets change nothing.
+  - **A near-tie had to be drawn as a near-tie.** A3 asks for a graph where the four
+    centralities disagree. Random search does not produce one: over ~10⁶ sampled
+    graphs at n = 8–10 the winners tie on degree (an integer measure) or collapse onto
+    one node. The graph used is 11 nodes and 16 edges, found by hill-climbing and then
+    **re-verified by a second, independent implementation** — brute-force enumeration
+    of every shortest path rather than Brandes — because F1 makes every element of a
+    diagram a fact with a source and the source here is the definition, not a library.
+    Degree picks C, betweenness B, eigenvector G, closeness I. But the eigenvector
+    margin is 4.7 % (G 0.442 against C 0.421) and the closeness margin 5.6 %, so the
+    figure **rings the runner-up in every panel**: a highlight alone would assert a
+    verdict where the data supports a ranking, and the runner-up mark is what makes
+    "C is never far behind" visible instead of hidden.
+
+Baseline numbers (if run):
+  - figures fill rate → **5 of 21 slots filled, 16 open** (was 0 of 16; five slots
+    added by this group, five filled)
+  - eslint → 336 errors / 116 warnings · audit:ui → 8 violations · typecheck → 21 of
+    21 baseline errors held · audit:bundle → initial graph 156.6 kB, total JS 1880.0 kB
+
+Handoff to next WP:
+  - **Author on the 320-unit grid, 12 px minimum type, and let `DocFigure` cap the
+    width.** The arithmetic is above. A figure that needs more than 320 units of
+    horizontal room is two figures (brief D3/D7), and stacking vertically is almost
+    always the answer — every figure in this group is taller than it is wide.
+  - **An inlined SVG is in the page's document, which puts two rules on a file.** No
+    `<style>` element (an inline SVG's styles are document-scoped and would leak to
+    the whole manual) and no `id` another figure could also define — which is why
+    these files draw arrowheads as explicit polygons rather than reusing a `<marker>`
+    from `<defs>`. Both rules are in `src/assets/manual/README.md`.
+  - **Check §4's "Closed by" column before drawing any defect a brief names.** Two of
+    twelve were stale here. The generated module is the authority for what is true
+    today; the brief is a snapshot, and it says so.
+
+### WP 5.2k, group A — the nine declared and bare · 2026-09-19
+
+Preconditions held?      yes. Every one of the nine had a `shows` brief written by
+somebody with the page open, and eight were right. The ninth is below.
+
+Exit checks passed?      yes. `npm test` **868/868, 51 files**, `check:docs` ✓,
+`contract:check` ✓ (same 2 pre-existing warnings), `typecheck` 21 of 21 baseline held,
+`build` ✓, `audit:bundle` **clean — initial graph 156.6 kB unchanged, total JS
+1891.2 kB (up 11.2 kB for nine inlined drawings)**, `audit:ui` **8 — at baseline**,
+eslint **336/116 — at baseline**.
+
+Discovered:
+  - **An existing gate caught a defect this package would otherwise have shipped, and
+    the fix belongs in the door rather than in the files.** `bodies.test.tsx` fails a
+    live page that prints a raw backtick outside a `<code>` element — the
+    markdown-leaking-through rule. Every figure file opens with a comment naming the
+    sources its elements came from, and those citations name code in backticks; the
+    inliner passes the file through verbatim, so the comments were reaching the DOM
+    and `policy-types` went red. The notes are the reason a drawing is checkable
+    rather than merely confident, so they stay in the file — `DocFigure` now strips
+    comments at the boundary. It also stops shipping bytes no reader can see.
+    → affects every later figure → fixed in this commit, no rule weakened.
+  - **The figures needed a gate of their own, and it found seven real faults —
+    including two in the group already committed.** Nothing in this repository can
+    tell that a `<text>` element runs off the edge of its own viewBox: the tests read
+    the manifest and the folder, not the drawings. A width check (average advance
+    against each element's `x`, `font-size` and `text-anchor`) found **seven
+    overflows across seven files**, two of them in A1–A5 — `centralities` ran 48 units
+    past the edge on two panel captions and `resilience-curve` ran 8 units off the
+    left. All seven are fixed. → affects the remaining groups → the check is a
+    scratch script, not a committed gate, and that is a gap this package is choosing
+    to name rather than close: see the handoff.
+  - **`provenance-dots` asked for a screenshot, and the drawing found something the
+    brief did not know.** Nine provenance states map to **five dot colours plus one
+    invisible**: teal is both `data` and `master`, and amber is all three of
+    `derived`, `suggested` and `contract`. The first instinct was to file that as a
+    defect — a dot that cannot be decoded into a state. It is not one, and checking
+    before filing is the same discipline F7 asks for about §4: `ProvenanceLegend`
+    **already declares both shares in as many words** ("derived fallback (≈) ·
+    suggested · declared meaning of empty"). So the figure draws the collision as a
+    stated fact rather than accusing the product of hiding it. What the legend does
+    NOT carry is `default`: it has five entries for eight states, and the ninth has
+    no dot AND no legend line — which is the gap the page's own callout names, and
+    the thing the figure is for.
+  - **Three slots were amended because what could be drawn is not what was asked
+    for (F5).** `provenance-dots` and `replications` both ask for captures of real
+    runs and real grids; this package can produce neither, so both now say in `shows`
+    that they are schematics and ask to be superseded rather than redrawn, and both
+    `alt` texts say "drawn". `disruption-models` asked for the two shapes "side by
+    side" and they are stacked — at 320 units two four-row columns cannot hold a
+    table name at 12 px, and the requirement that actually matters is EQUAL WEIGHT
+    (neither shape marked preferred), which stacking keeps.
+
+Baseline numbers (if run):
+  - figures fill rate → **14 of 21 slots filled, 7 open** (was 5 of 21)
+  - the 7 open are the three with inline fallbacks (`tiers`, `flow`, `boundary` —
+    nothing regresses while they wait) and the four that ask for a capture of a real
+    project (`product-network`, `process-network`, `firm-network`,
+    `interactive-space`)
+
+Handoff to next WP:
+  - **There is no gate on the drawings themselves, and there should be.** The width
+    check found seven faults in fourteen files on its first run, which is a defect
+    rate no unreviewed asset class should carry. It is a scratch script in this
+    session and nothing in CI runs it, so the next figure can ship with a label off
+    the edge and nothing will say so. What it would need to become `figures.test.ts`'s
+    fourth rule: parse each `.svg`, assert a 12 px floor on `font-size`, assert every
+    `<text>` fits its viewBox at the average advance, and assert no `<style>` element
+    and no duplicated `id` across files — the last two being the rules inlining puts
+    on a file, which are documented in the README and enforced by nothing.
+  - **An SVG comment does not reach the browser any more.** Write the sources down in
+    the file anyway; that is what makes F1 checkable a year from now.
+
+### WP 5.2k, B1–B7 — the seven new slots · 2026-09-19
+
+Preconditions held?      **no — two of the seven briefs were written against
+defects that had already been closed**, which the group-A entry predicted from F7's
+instruction to check §4's "Closed by" column first. Both slots are drawn from the
+generated modules as they read today, and both `shows` texts now say so and say what
+they supersede.
+
+Exit checks passed?      yes. `npm test` **868/868**, `check:docs` ✓, `contract:check`
+✓ (same 2 pre-existing warnings), `typecheck` 21 of 21 baseline held, `build` ✓,
+`audit:bundle` **clean — initial graph 156.6 kB unchanged, total JS 1900.2 kB**,
+`audit:ui` **8 — at baseline**, eslint **336/116 — at baseline**.
+
+Discovered:
+  - **`figures.test.ts`'s fourth assertion was VACUOUS, and its own comment said
+    exactly what it was supposed to be doing.** The comment reads *"The manifest says
+    a page has a figure; the body has to actually ask for it. Otherwise a slot is
+    declared, counted as open, briefed — and invisible."* The code under it checked
+    that the page had a body, then asserted `s.page === page` for every slot that had
+    just been filtered out of the manifest BY `s.page === page`. A tautology cannot
+    fail. So a slot could be declared, briefed, counted in the fill rate and rendered
+    by nothing at all — the precise state the comment promises to catch — and this
+    package would have shipped seven of them without noticing, because the seven
+    pages needed a `<DocFigure>` adding and nothing was going to ask. **This is §4
+    D57's shape in a test rather than in a compiler**: a green result that describes
+    nothing. Closed in this commit: the assertion renders the body and looks for the
+    slot's own `figure-<id>` anchor, which `DocFigure` writes whether the slot is
+    filled, falling back or empty — so it fails for a slot nothing asks for and keeps
+    passing while a figure is still being drawn, which is the asymmetry the rest of
+    the file is built on. **Mutation-tested**: removing one `<DocFigure>` turns it
+    red, naming the slot and the page. → affects every later figure package → fixed
+    here, no rule weakened.
+  - **B2's live fact is not the one its brief names, and it is worse.** The brief
+    asks for the §4 D113 picture — the results table's labels against the engine's
+    keys, "two lines, and the emptiness is the point". D113 is **CLOSED (WP 6.3)**:
+    `KpiStatTable` is driven by the run now, so every emitted key appears, under its
+    raw name if nobody has labelled it. Drawing the old emptiness would have published
+    a defect that no longer exists. What IS live, in the same join and undrawn
+    anywhere, is the **objective list**: `RUN_KPIS.objectives` offers five, and
+    **four of them name a measure no run produces** — pick OTIF, Lead time, Profit or
+    Utilization and the run still happens, there is simply no chart at the end of it.
+    That is the lower half of the figure, and it is named rather than counted so the
+    drawing cannot quietly disagree with the page's own rendered sentence.
+  - **B3's brief describes a defect whose closure changed the answer.** It asks for
+    "the fourth group labelled with what is in it. §4 D117" — ten tables reached by
+    neither mechanism. WP 6.2 closed that with a foreign key each, and `PROJECT_
+    DELETION` today reports **three**: `ai_chat_events`, `ai_usage_logs`,
+    `api_request_logs`. All three are facts about the ACCOUNT rather than the
+    project, and `rehearsal/280` §3 fails if one of them starts cascading — so the
+    group is now a DECISION, as hard to lose as the cascade, and the figure draws it
+    that way. The small groups are named rather than counted for the same reason as
+    B2.
+  - **No number is lettered into either figure, and that is F2 applied rather than
+    quoted.** Both pages render their counts from the same generated modules the
+    figures were drawn from, and a total drawn into an SVG goes stale the first time
+    the engine gains a measure or a migration adds a key — silently, because nothing
+    compares a drawing to a module. Blocks and names where the page has numbers.
+
+Baseline numbers (if run):
+  - figures fill rate → **21 of 28 slots filled, 7 open** (was 14 of 21; seven slots
+    added, seven filled)
+  - total JS 1900.2 kB gzip (was 1891.2; +9.0 kB for seven inlined drawings), initial
+    graph unchanged at 156.6 kB
+
+Handoff to next WP:
+  - **The remaining seven are the two groups that cannot be closed by drawing.** Four
+    ask for a capture of a real project (`product-network`, `process-network`,
+    `firm-network`, `interactive-space`) and three already render an inline schematic
+    (`tiers`, `flow`, `boundary`), which nothing regresses while it waits. Neither
+    group is behind on effort; both are waiting on a decision, and F5 is the one to
+    make it against.
+  - **The width check is still not a gate**, and it has now found eight faults across
+    two groups. See the group-A handoff for what it would take.
+
+
+### WP 5.2k — groups B and C, and the gap check · 2026-09-20
+
+Preconditions held?      yes for group C; **no for group B, which needed a decision
+rather than a drawing.** Four slots ask for a capture of a real project and this
+package can produce none. F5 allows a declared schematic and forbids a silent
+substitution; it does not say every slot must be filled.
+
+Exit checks passed?      yes. `npm test` **868/868, 51 files**, `check:docs` ✓,
+`contract:check` ✓, `typecheck` 21 of 21 baseline held, `build` ✓, `audit:bundle`
+**clean — initial graph 156.6 kB unchanged all package, total JS 1907.5 kB**,
+`audit:ui` **8 — at baseline**, eslint **336/116 — at baseline**. `npm run lint`
+cannot pass and did not.
+
+Discovered:
+  - **F5's question, asked of all four capture slots, got two different answers —
+    and that is the finding rather than the four drawings.** Three of them carry a
+    STRUCTURAL argument that a drawing makes as well as a photograph: an orphaned
+    node with nothing supplying it, a level that is a stage of manufacture rather
+    than a distance between companies, two suppliers meeting at one firm three steps
+    back. Those are drawn, and the `alt`, the caption and the `shows` of each say
+    the word DRAWN and ask to be superseded by a capture rather than redrawn.
+    **`interactive-space` is deliberately still open.** Its brief asks for the canvas
+    *"mid-exploration … so it reads as something a person is doing rather than a
+    finished diagram"*, and a hand-authored SVG is the precise opposite of that: a
+    tidy drawing there would illustrate the fixed layout the page exists to contrast
+    itself with, so it would be a WORSE figure than the placeholder, which at least
+    says out loud what is missing (§5.3 T3). The slot records the decision, so the
+    next author inherits a judgement instead of an omission.
+  - **§4 D148 — the worker keeps your graph in memory for ten minutes after a run,
+    and the page whose job is "where does the data sit" did not say so.** The
+    `boundary` brief asks where a user's data is AT REST and where it is only IN
+    FLIGHT. The first draft of the figure inherited the answer from the schematic it
+    supersedes and wrote *"held while a job runs, and gone when it finishes"* — which
+    is F3's exact prohibition, a confident arrow nobody verified. Reading
+    `GraphCache` instead: it keys a `dict` by `project_id`, loads the graph AND the
+    effective policies on first use, and `evict_idle` drops entries whose `last_used`
+    is older than `idle_ttl` — **600 seconds by default**. Nothing is written to
+    disk, which is the reassuring half and is now said explicitly. The half nobody
+    had said is the residency, on the page that opens by naming four questions an
+    approver has and putting *where the data sits* first, and on a layer the same
+    page already admits runs under a credential that bypasses the per-user rules.
+    Closed for the manual in this commit — the figure states it and the page carries
+    a paragraph beside the service-credential note it belongs with. No product change
+    is proposed: the cache is why a repeat run is fast and the TTL is why it does not
+    grow without bound. **What was missing was the sentence.**
+  - **Superseding the three fallbacks was not optional politeness, and the reason is
+    measurable.** `figures.tsx` gives its three schematics `min-w-[640px]` and lets
+    the wrapper scroll sideways, with a comment arguing that a wide diagram *should*
+    scroll on a phone. The drawing standard forbids it, and the arithmetic in the
+    group-A entry says why: at 360 px there are 298 px of drawing width, so a 640-unit
+    diagram cannot hold an 11 px label without scrolling. All three replacements are
+    on the 320-unit grid and none scrolls. **The fallbacks are untouched**, as the
+    brief requires — `DocFigure` prefers the file and falls back to the JSX, so
+    deleting any figure file restores the old behaviour exactly.
+  - **THE PROSE MOSTLY SHOULD NOT BE CUT, and saying why is more useful than cutting
+    it.** The gap check asks for a re-read of every page with its figure in place and
+    a cut wherever the prose now repeats the picture. Done, and it found one honest
+    cut: `plans-and-proposals` narrated *"A card arrives proposed. You approve it…
+    applying moves it to applied. Rejecting it moves it to rejected"*, which is now
+    four labelled arrows, so the sentence is gone and only the part the figure does
+    not carry — **why** a rejected card stays in the thread — remains. Everywhere
+    else the apparent duplication is a TRAP: on `where-a-number-came-from` the dot
+    list is generated from the grid's own `PROVENANCE` map, on `policy-types` the
+    parameters come from the registry, on `reading-your-results` the counts come from
+    `RUN_KPIS`. **A figure is a static asset and that prose is a derivation.** Cutting
+    it in favour of the drawing would move a fact out of its single source into an
+    SVG that nothing compares to anything — `single-source` broken by a tidying pass,
+    which is the defect this plan exists to end. The rule to inherit: cut prose that
+    NARRATES, never prose that RENDERS.
+  - **A duplicated §16 entry is stranded outside §16 and is still doing damage —
+    reported, not touched.** `### WP 5.2j …` appears TWICE: once inside §16 and once
+    inside §18, after `## 17. Sequencing`. They are not identical. The stranded copy
+    carries Phase 8's renumbering (D112 → **D127**, D113 → **D128**, D115 → **D130**)
+    while §4's live rows still use D112–D118 for those defects — so the stranded copy
+    cites three D-numbers that today mean entirely different things (D127 is the node
+    type authored eight times; D128 is the dedup guard). **It also produces a false
+    warning**: R10 reads `### WP N.M` headings in the roadmap ranges, §18 is a
+    roadmap range, so a §16 entry parked there is read as an unmarked package —
+    which is why `contract:check` reports "§7–§13 leaves 5.2, 5.2j unmarked" for a
+    sub-package whose table row carries ✅. This is §4 D146's residue, still live
+    after the renumbering that closed it. **Not edited here**: §16's own rule is
+    *never delete an entry*, this is another package's history, and inventing an
+    owner for it is what `contract:check` R8 exists to catch. Whoever next touches
+    §16 has the line numbers and the divergence above.
+  - **And this package made the same mistake first, which is how it was found.**
+    All three earlier WP 5.2k entries were appended with `>>` and landed at the END
+    of the file — inside §18, past §17, outside every slice a gate reads. They were
+    read as unmarked roadmap packages exactly as the 5.2j copy is, and R10 named
+    "5.2k" in its warning until they were moved into §16 proper. §16 entries in scope
+    went 83 → **86** on the move. **A drift log appended to the end of a document is
+    not in the drift log**, and D138 said so once already.
+
+Baseline numbers (if run):
+  - figures fill rate → **27 of 28 slots filled, 1 open** — `interactive-space`,
+    deliberately, per the decision above
+  - 27 files in `src/assets/manual/`, 27 slots naming a file, **no orphan asset**
+  - eslint 336/116 · audit:ui 8 · typecheck 21 of 21 baseline · tests 868/868 ·
+    initial graph 156.6 kB (unchanged across the whole package) · total JS 1907.5 kB
+    (1880.0 at the start; **+27.5 kB for 27 inlined drawings**, ~1 kB each)
+  - the width check found **eight** text overflows across the package, in five files,
+    two of them in figures already committed
+
+Handoff to next WP:
+  - **`interactive-space` needs a screenshot and nothing else.** Everything else in
+    the manual's figure set is drawn. Three more slots hold declared schematics that
+    a real capture should replace — `product-network`, `process-network`,
+    `firm-network` — and each says so in its own `shows`.
+  - **The drawings have no gate.** A width check written in an afternoon found eight
+    faults in twenty-seven files, and it is a scratch script: nothing in CI runs it,
+    so the next figure can ship with a label off the edge, a font under the 11 px
+    floor, a `<style>` element that leaks to the whole manual, or an `id` that
+    collides with another figure on the same page. The last two are rules that
+    inlining PUT on these files, are documented in `src/assets/manual/README.md`, and
+    are enforced by nothing. As `figures.test.ts`'s fifth rule this is perhaps sixty
+    lines, and this package has just demonstrated twice that the fourth rule was not
+    doing its job either.
+  - **Cut prose that narrates, never prose that renders.** The reasoning is above and
+    it is the one thing about figures that is easy to get backwards.
 
 ---
 

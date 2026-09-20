@@ -37,3 +37,34 @@ Every slot carries `alt`. It is what a screen reader says and what shows if the
 image fails to load, and a diagram whose only explanation is the picture is a
 diagram half this manual's readers cannot use. `shows:` is for the author;
 `alt:` is for the reader.
+
+## Two rules an SVG in this folder must follow
+
+`.svg` files are **inlined into the page** rather than loaded through `<img>`, so
+that `hsl(var(--border))`, `hsl(var(--foreground))` and the rest of the manual's
+tokens actually reach the drawing. (An `<img>`-referenced SVG is an isolated
+document: no page CSS reaches it, and `currentColor` inside it resolves against the
+SVG's own initial colour, not the text beside it. WP 5.2k widened `DocFigure` for
+exactly this.) Being in the page's document puts two rules on the file:
+
+1. **No `<style>` element.** An inline SVG's styles are *document*-scoped — a rule
+   written inside one figure applies to the whole manual. Put every fill and stroke
+   on the element as a presentation attribute.
+2. **No `id` another figure could also define.** Two figures on one page share an
+   id namespace, and the first `<marker id="arrow">` wins for both. Draw arrowheads
+   as explicit `<polygon>`s rather than reusing a `<defs>` entry.
+
+Raster files (`.png`, `.webp`, …) are unaffected — they still render as `<img>`,
+because they have no cascade to join.
+
+## The drawing grid
+
+Author on a **320-unit-wide viewBox with a 12 px minimum font size**, and let the
+figure grow downwards rather than sideways. The arithmetic: at a 360 px viewport the
+manual's gutter and the figure card's padding leave **298 px** of drawing width, so a
+label at font-size *F* in a viewBox *W* units wide renders at *F × 298/W*. An 11 px
+floor therefore needs *F/W ≥ 0.0369* — which 12/320 meets and 12/640 does not.
+`DocFigure` caps an inlined figure at 480 px so the same label does not balloon to
+29 px on a desktop.
+
+A figure that cannot survive 360 px without scrolling sideways is two figures.

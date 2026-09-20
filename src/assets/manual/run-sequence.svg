@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 448" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- The five stages and the gate between 2 and 3. Stage names and the gate's
+       readouts are buildStages() in src/components/sim/StageRail.tsx; the exits
+       and the button text are GateBar in src/components/sim/RunGate.tsx; the
+       reasons are runBlockedReason in src/pages/SimulationLab.tsx. Sub-labels
+       on the real screen are live facts about your own scenario, so the
+       structure is drawn and no value is invented. -->
+
+  <text x="4" y="14" font-size="12" fill="hsl(var(--muted-foreground))">Scenario run sequence</text>
+
+  <!-- ── 1 ─────────────────────────────────────────────────────────── -->
+  <rect x="4" y="24" width="312" height="30" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <circle cx="22" cy="39" r="9" fill="hsl(var(--foreground))"/>
+  <text x="22" y="43" text-anchor="middle" font-size="12" fill="hsl(var(--card))">1</text>
+  <text x="38" y="43" font-size="12" fill="hsl(var(--foreground))">Setup</text>
+
+  <line x1="22" y1="54" x2="22" y2="66" stroke="hsl(var(--muted-foreground))" stroke-width="1.4"/>
+  <polygon points="22,70 18.5,63 25.5,63" fill="hsl(var(--muted-foreground))"/>
+
+  <!-- ── 2 ─────────────────────────────────────────────────────────── -->
+  <rect x="4" y="72" width="312" height="30" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <circle cx="22" cy="87" r="9" fill="hsl(var(--foreground))"/>
+  <text x="22" y="91" text-anchor="middle" font-size="12" fill="hsl(var(--card))">2</text>
+  <text x="38" y="91" font-size="12" fill="hsl(var(--foreground))">Recovery playbook</text>
+
+  <line x1="22" y1="102" x2="22" y2="114" stroke="hsl(var(--muted-foreground))" stroke-width="1.4"/>
+  <polygon points="22,118 18.5,111 25.5,111" fill="hsl(var(--muted-foreground))"/>
+
+  <!-- ── the gate ──────────────────────────────────────────────────── -->
+  <rect x="4" y="120" width="312" height="112" rx="3" fill="hsl(var(--muted))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="14" y="138" font-size="12" fill="hsl(var(--foreground))">The gate. Three ways out.</text>
+
+  <!-- exit 1: clear -->
+  <circle cx="20" cy="155" r="5" fill="none" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <text x="32" y="159" font-size="12" fill="hsl(var(--foreground))">clear</text>
+  <text x="86" y="159" font-size="12" fill="hsl(var(--muted-foreground))">button reads</text>
+  <rect x="168" y="146" width="44" height="18" rx="2" fill="hsl(var(--foreground))"/>
+  <text x="190" y="159" text-anchor="middle" font-size="12" fill="hsl(var(--card))">Run</text>
+  <path d="M218 155 L296 155" stroke="hsl(var(--foreground))" stroke-width="1.4" fill="none"/>
+
+  <!-- exit 2: warnings -->
+  <path d="M20 173 m -5 0 a 5 5 0 0 1 10 0 z" fill="hsl(var(--foreground))"/>
+  <circle cx="20" cy="173" r="5" fill="none" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <text x="32" y="177" font-size="12" fill="hsl(var(--foreground))">warnings</text>
+  <rect x="98" y="164" width="114" height="18" rx="2" fill="hsl(var(--foreground))"/>
+  <text x="155" y="177" text-anchor="middle" font-size="12" fill="hsl(var(--card))">Acknowledge &amp; run</text>
+  <path d="M218 173 L296 173" stroke="hsl(var(--foreground))" stroke-width="1.4" fill="none"/>
+
+  <!-- exit 3: blocked -->
+  <circle cx="20" cy="191" r="5" fill="hsl(var(--destructive))"/>
+  <text x="32" y="195" font-size="12" fill="hsl(var(--foreground))">blocking findings</text>
+  <rect x="140" y="182" width="44" height="18" rx="2" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="162" y="195" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">Run</text>
+  <g stroke="hsl(var(--destructive))" stroke-width="1.4" fill="none">
+    <path d="M192 191 L214 191"/>
+    <path d="M224 183 L224 199"/>
+    <path d="M218 185 L230 197 M230 185 L218 197"/>
+  </g>
+  <text x="14" y="216" font-size="12" fill="hsl(var(--muted-foreground))">The reason is always on screen beside</text>
+  <text x="14" y="228" font-size="12" fill="hsl(var(--muted-foreground))">the button, never only in a tooltip.</text>
+
+  <!-- the two exits that pass rejoin and carry on to stage 3 -->
+  <path d="M296 155 L296 244 L22 244 L22 250"
+        stroke="hsl(var(--foreground))" stroke-width="1.4" fill="none"/>
+  <polygon points="22,254 18.5,247 25.5,247" fill="hsl(var(--foreground))"/>
+
+  <!-- ── 3 ─────────────────────────────────────────────────────────── -->
+  <rect x="4" y="256" width="312" height="30" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <circle cx="22" cy="271" r="9" fill="hsl(var(--foreground))"/>
+  <text x="22" y="275" text-anchor="middle" font-size="12" fill="hsl(var(--card))">3</text>
+  <text x="38" y="275" font-size="12" fill="hsl(var(--foreground))">Run</text>
+
+  <line x1="22" y1="286" x2="22" y2="296" stroke="hsl(var(--muted-foreground))" stroke-width="1.4"/>
+  <polygon points="22,300 18.5,293 25.5,293" fill="hsl(var(--muted-foreground))"/>
+
+  <!-- ── 4 ─────────────────────────────────────────────────────────── -->
+  <rect x="4" y="302" width="312" height="30" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <circle cx="22" cy="317" r="9" fill="hsl(var(--foreground))"/>
+  <text x="22" y="321" text-anchor="middle" font-size="12" fill="hsl(var(--card))">4</text>
+  <text x="38" y="321" font-size="12" fill="hsl(var(--foreground))">Results</text>
+
+  <line x1="22" y1="332" x2="22" y2="342" stroke="hsl(var(--muted-foreground))" stroke-width="1.4"/>
+  <polygon points="22,346 18.5,339 25.5,339" fill="hsl(var(--muted-foreground))"/>
+
+  <!-- ── 5 ─────────────────────────────────────────────────────────── -->
+  <rect x="4" y="348" width="312" height="30" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <circle cx="22" cy="363" r="9" fill="hsl(var(--foreground))"/>
+  <text x="22" y="367" text-anchor="middle" font-size="12" fill="hsl(var(--card))">5</text>
+  <text x="38" y="367" font-size="12" fill="hsl(var(--foreground))">Compare</text>
+
+  <!-- ── the fourth state, which the rail does not have a reading for ── -->
+  <rect x="4" y="390" width="312" height="52" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--destructive))" stroke-width="1"/>
+  <circle cx="20" cy="404" r="5" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.4"/>
+  <text x="32" y="408" font-size="12" fill="hsl(var(--foreground))">A fourth state exists.</text>
+  <text x="14" y="422" font-size="12" fill="hsl(var(--muted-foreground))">If your account may open this page but not run</text>
+  <text x="14" y="436" font-size="12" fill="hsl(var(--muted-foreground))">simulations, the gate still reads clear.</text>
+</svg>

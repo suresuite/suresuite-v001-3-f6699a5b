@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 362" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- The horizon in days, the warm-up excluded from it, and the rounding the
+       engine does on the way in. project_map.py: horizon = clamp(round(
+       horizon_days / 7), 52, 520); warmup_end = round(warmup_days / 7);
+       start_week = round(start_days / 7); dur_weeks = round(dur_days / 7).
+       1092 and 105 are the declared defaults. -->
+
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">You set the scenario in DAYS.</text>
+  <text x="4" y="30" font-size="12" fill="hsl(var(--muted-foreground))">The chain's physics are weekly.</text>
+
+  <!-- ══ the horizon ══════════════════════════════════════════════════ -->
+  <rect x="8" y="46" width="304" height="26" rx="2" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <rect x="8" y="46" width="29" height="26" fill="hsl(var(--muted))"/>
+  <line x1="37" y1="42" x2="37" y2="80" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="44" y="63" font-size="12" fill="hsl(var(--foreground))">the measured window</text>
+
+  <path d="M8 88 L37 88" stroke="hsl(var(--muted-foreground))" stroke-width="1.2" fill="none"/>
+  <path d="M8 84 L8 92 M37 84 L37 92" stroke="hsl(var(--muted-foreground))" stroke-width="1.2"/>
+  <text x="8" y="104" font-size="12" fill="hsl(var(--foreground))">warm-up — 105 days, 15 weeks</text>
+  <text x="8" y="116" font-size="12" fill="hsl(var(--muted-foreground))">Simulated, then thrown away. Every measure</text>
+  <text x="8" y="128" font-size="12" fill="hsl(var(--muted-foreground))">starts after it, which is why a result can look</text>
+  <text x="8" y="140" font-size="12" fill="hsl(var(--muted-foreground))">nothing like the first weeks of its own chart.</text>
+
+  <text x="8" y="160" font-size="12" fill="hsl(var(--muted-foreground))">horizon — 1 092 days, 156 weeks</text>
+
+  <!-- ══ the rounding ═════════════════════════════════════════════════ -->
+  <line x1="4" y1="176" x2="316" y2="176" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="194" font-size="12" fill="hsl(var(--foreground))">Where a disruption actually starts</text>
+
+  <!-- day ruler, days 21..35 -->
+  <line x1="20" y1="220" x2="300" y2="220" stroke="hsl(var(--border))" stroke-width="1"/>
+  <g stroke="hsl(var(--border))" stroke-width="1">
+    <line x1="20" y1="216" x2="20" y2="224"/>
+    <line x1="60" y1="216" x2="60" y2="224"/>
+    <line x1="100" y1="216" x2="100" y2="224"/>
+    <line x1="140" y1="216" x2="140" y2="224"/>
+    <line x1="180" y1="216" x2="180" y2="224"/>
+    <line x1="220" y1="216" x2="220" y2="224"/>
+    <line x1="260" y1="216" x2="260" y2="224"/>
+    <line x1="300" y1="216" x2="300" y2="224"/>
+  </g>
+  <text x="20" y="236" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">21</text>
+  <text x="100" y="236" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">25</text>
+  <text x="180" y="236" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">29</text>
+  <text x="260" y="236" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">33</text>
+  <text x="4" y="212" font-size="12" fill="hsl(var(--muted-foreground))">day</text>
+
+  <!-- two starts, one week -->
+  <circle cx="160" cy="208" r="4" fill="hsl(var(--foreground))"/>
+  <text x="140" y="202" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">day 28</text>
+  <circle cx="200" cy="208" r="4" fill="hsl(var(--foreground))"/>
+  <text x="222" y="202" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">day 30</text>
+
+  <path d="M160 226 L160 250 L180 250" fill="none" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <path d="M200 226 L200 250 L180 250" fill="none" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <line x1="180" y1="250" x2="180" y2="262" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <polygon points="180,266 176.5,259 183.5,259" fill="hsl(var(--foreground))"/>
+
+  <rect x="140" y="268" width="80" height="24" rx="3" fill="hsl(var(--foreground))"/>
+  <text x="180" y="284" text-anchor="middle" font-size="12" fill="hsl(var(--card))">week 4</text>
+
+  <!-- the boundary -->
+  <line x1="90" y1="196" x2="90" y2="226" stroke="hsl(var(--destructive))" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="86" y="194" text-anchor="end" font-size="12" fill="hsl(var(--destructive))">wk 3</text>
+  <text x="94" y="194" font-size="12" fill="hsl(var(--destructive))">wk 4</text>
+
+  <text x="4" y="312" font-size="12" fill="hsl(var(--foreground))">Two different days. The same week, and the</text>
+  <text x="4" y="326" font-size="12" fill="hsl(var(--foreground))">same run.</text>
+  <text x="4" y="342" font-size="12" fill="hsl(var(--muted-foreground))">Duration rounds the same way: 21 days is</text>
+  <text x="4" y="354" font-size="12" fill="hsl(var(--muted-foreground))">3 weeks.</text>
+</svg>

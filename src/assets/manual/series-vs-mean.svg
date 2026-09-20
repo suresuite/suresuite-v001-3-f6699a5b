@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- SCHEMATIC. Two weekly fill-rate series with the SAME arithmetic mean,
+       92%: one flat and slightly short, one perfect for ten weeks and then
+       collapsing. The means are exact — 12 weeks, 1104 total on both. -->
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">Two projects. Same average fill rate.</text>
+  <line x1="40" y1="150" x2="304" y2="150" stroke="hsl(var(--border))" stroke-width="1"/>
+  <line x1="40" y1="30" x2="40" y2="150" stroke="hsl(var(--border))" stroke-width="1"/>
+  <line x1="40" y1="52.9" x2="304" y2="52.9" stroke="hsl(var(--muted-foreground))" stroke-width="1.4" stroke-dasharray="5 3"/>
+  <text x="308" y="56.9" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">92%</text>
+  <polyline fill="none" stroke="hsl(var(--foreground))" stroke-width="2" stroke-dasharray="6 3" points="40.0,52.9 61.5,52.9 83.0,52.9 104.5,52.9 126.0,52.9 147.5,52.9 169.0,52.9 190.5,52.9 212.0,52.9 233.5,52.9 255.0,52.9 276.5,52.9"/>
+  <polyline fill="none" stroke="hsl(var(--foreground))" stroke-width="2" points="40.0,38.0 61.5,38.0 83.0,38.0 104.5,38.0 126.0,38.0 147.5,38.0 169.0,38.0 190.5,38.0 212.0,38.0 233.5,38.0 255.0,127.6 276.5,127.6"/>
+  <text x="36" y="42.0" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">100%</text>
+  <text x="36" y="153" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">40%</text>
+  <text x="40" y="168" font-size="12" fill="hsl(var(--muted-foreground))">week 1</text>
+  <text x="304" y="168" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">week 12</text>
+  <text x="104.5" y="44.9" font-size="12" fill="hsl(var(--foreground))">A</text>
+  <text x="104.5" y="32.0" font-size="12" fill="hsl(var(--foreground))">B</text>
+
+  <line x1="4" y1="186" x2="316" y2="186" stroke="hsl(var(--border))" stroke-width="1"/>
+  <path d="M8 202 L34 202" stroke="hsl(var(--foreground))" stroke-width="2" stroke-dasharray="6 3" fill="none"/>
+  <text x="42" y="206" font-size="12" fill="hsl(var(--foreground))">A — a little short, every week.</text>
+  <text x="42" y="220" font-size="12" fill="hsl(var(--muted-foreground))">Every customer waits a little. Nobody</text>
+  <text x="42" y="232" font-size="12" fill="hsl(var(--muted-foreground))">is ever badly let down.</text>
+  <path d="M8 252 L34 252" stroke="hsl(var(--foreground))" stroke-width="2" fill="none"/>
+  <text x="42" y="256" font-size="12" fill="hsl(var(--foreground))">B — perfect, then a collapse.</text>
+  <text x="42" y="270" font-size="12" fill="hsl(var(--muted-foreground))">Ten clean weeks, then two in which half</text>
+  <text x="42" y="282" font-size="12" fill="hsl(var(--muted-foreground))">the orders do not ship at all.</text>
+  <text x="4" y="304" font-size="12" fill="hsl(var(--foreground))">Both average 92%. They are not the same</text>
+  <text x="4" y="318" font-size="12" fill="hsl(var(--foreground))">business, and the mean cannot tell them apart.</text>
+</svg>

@@ -5,6 +5,7 @@
 // module so the sentence cannot go stale in either direction.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { REFERENCE_TABLES } from "@/components/docs/generated/reference.generated";
 import { FEATURE_CAPABILITIES, PAGE_CAPABILITIES } from "@/lib/capabilities.generated";
 
@@ -81,6 +82,7 @@ export default function RolesAndCapabilities() {
       </Section>
 
       <Section id="resolution" title="The order the answer is found in">
+        <DocFigure id="capability-layers" />
         <Key>
           Narrowest first. The first layer with a row about you decides, and the answer when nobody
           has a row is <em>no</em>.

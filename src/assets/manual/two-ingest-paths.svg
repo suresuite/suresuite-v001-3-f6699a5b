@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 442" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- Where the two routes into your data diverge. Read from
+       supabase/functions/ingest-file and ingest_land_file/ingest_diff_run/
+       ingest_apply_run on one side, and erp-sync-orbit-mrp with
+       mrp_apply_staged_products on the other (§4 D116). -->
+
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">A file you drag in</text>
+  <text x="168" y="14" font-size="12" fill="hsl(var(--foreground))">A connected system</text>
+
+  <rect x="4" y="22" width="148" height="26" rx="3" fill="hsl(var(--foreground))"/>
+  <text x="78" y="39" text-anchor="middle" font-size="12" fill="hsl(var(--card))">every CSV dataset</text>
+  <rect x="168" y="22" width="148" height="26" rx="3" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="242" y="39" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">products only</text>
+
+  <!-- ── tier 0 / 1 ─────────────────────────────────────────────────── -->
+  <path d="M78 48 L78 62" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <polygon points="78,66 74.5,59 81.5,59" fill="hsl(var(--foreground))"/>
+  <path d="M242 48 L242 62" stroke="hsl(var(--muted-foreground))" stroke-width="1.4"/>
+  <polygon points="242,66 238.5,59 245.5,59" fill="hsl(var(--muted-foreground))"/>
+
+  <rect x="4" y="70" width="148" height="46" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="86" font-size="12" fill="hsl(var(--foreground))">the file is kept,</text>
+  <text x="12" y="98" font-size="12" fill="hsl(var(--foreground))">then parsed and</text>
+  <text x="12" y="110" font-size="12" fill="hsl(var(--foreground))">checked row by row</text>
+
+  <rect x="168" y="70" width="148" height="46" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="176" y="86" font-size="12" fill="hsl(var(--foreground))">rows are staged</text>
+  <text x="176" y="102" font-size="12" fill="hsl(var(--muted-foreground))">no file is kept —</text>
+  <text x="176" y="114" font-size="12" fill="hsl(var(--muted-foreground))">there was not one</text>
+
+  <!-- ── the diff ───────────────────────────────────────────────────── -->
+  <path d="M78 116 L78 130" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <polygon points="78,134 74.5,127 81.5,127" fill="hsl(var(--foreground))"/>
+  <path d="M242 116 L242 130" stroke="hsl(var(--muted-foreground))" stroke-width="1.4"/>
+  <polygon points="242,134 238.5,127 245.5,127" fill="hsl(var(--muted-foreground))"/>
+
+  <rect x="4" y="138" width="148" height="58" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="154" font-size="12" fill="hsl(var(--foreground))">diffed against your</text>
+  <text x="12" y="166" font-size="12" fill="hsl(var(--foreground))">data, value by value</text>
+  <text x="12" y="182" font-size="12" fill="hsl(var(--muted-foreground))">new · changed ·</text>
+  <text x="12" y="194" font-size="12" fill="hsl(var(--muted-foreground))">unchanged</text>
+
+  <rect x="168" y="138" width="148" height="58" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="176" y="154" font-size="12" fill="hsl(var(--foreground))">"is this id already</text>
+  <text x="176" y="166" font-size="12" fill="hsl(var(--foreground))">here?" — that is all</text>
+  <text x="176" y="182" font-size="12" fill="hsl(var(--muted-foreground))">No value is compared,</text>
+  <text x="176" y="194" font-size="12" fill="hsl(var(--muted-foreground))">so unchanged is 0.</text>
+
+  <!-- ── the decision ───────────────────────────────────────────────── -->
+  <path d="M78 196 L78 210" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <polygon points="78,214 74.5,207 81.5,207" fill="hsl(var(--foreground))"/>
+  <path d="M242 196 L242 210" stroke="hsl(var(--muted-foreground))" stroke-width="1.4"/>
+
+  <rect x="4" y="218" width="148" height="46" rx="3" fill="hsl(var(--foreground))"/>
+  <text x="78" y="238" text-anchor="middle" font-size="12" fill="hsl(var(--card))">a person looks</text>
+  <text x="78" y="254" text-anchor="middle" font-size="12" fill="hsl(var(--card))">and approves</text>
+
+  <!-- the connector's fork -->
+  <path d="M242 210 L192 210 L192 226" stroke="hsl(var(--muted-foreground))" stroke-width="1.4" fill="none"/>
+  <path d="M242 210 L292 210 L292 226" stroke="hsl(var(--destructive))" stroke-width="1.4" fill="none"/>
+  <polygon points="192,230 188.5,223 195.5,223" fill="hsl(var(--muted-foreground))"/>
+  <polygon points="292,230 288.5,223 295.5,223" fill="hsl(var(--destructive))"/>
+
+  <rect x="168" y="234" width="50" height="30" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="193" y="247" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">a person</text>
+  <text x="193" y="259" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">looks</text>
+
+  <rect x="266" y="234" width="50" height="30" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="291" y="247" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">nobody</text>
+  <text x="291" y="259" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">does</text>
+
+  <!-- ── tier 2 ─────────────────────────────────────────────────────── -->
+  <path d="M78 264 L78 292" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <path d="M193 264 L193 278 L242 278 L242 292" stroke="hsl(var(--muted-foreground))" stroke-width="1.4" fill="none"/>
+  <path d="M291 264 L291 278 L242 278" stroke="hsl(var(--destructive))" stroke-width="1.4" fill="none"/>
+  <polygon points="78,296 74.5,289 81.5,289" fill="hsl(var(--foreground))"/>
+  <polygon points="242,296 238.5,289 245.5,289" fill="hsl(var(--muted-foreground))"/>
+
+  <rect x="4" y="300" width="312" height="30" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <text x="160" y="320" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">your data</text>
+
+  <!-- ── the auto-apply branch, named ───────────────────────────────── -->
+  <line x1="4" y1="346" x2="316" y2="346" stroke="hsl(var(--border))" stroke-width="1"/>
+  <circle cx="10" cy="362" r="4" fill="hsl(var(--destructive))"/>
+  <text x="22" y="366" font-size="12" fill="hsl(var(--foreground))">The branch with nobody on it</text>
+  <text x="4" y="384" font-size="12" fill="hsl(var(--muted-foreground))">A link with an auto-apply threshold applies its</text>
+  <text x="4" y="396" font-size="12" fill="hsl(var(--muted-foreground))">own run when the change looks small and</text>
+  <text x="4" y="408" font-size="12" fill="hsl(var(--muted-foreground))">everything mapped. It is attributed — to</text>
+  <text x="4" y="420" font-size="12" fill="hsl(var(--muted-foreground))">whoever set the link up — and that is not the</text>
+  <text x="4" y="432" font-size="12" fill="hsl(var(--muted-foreground))">same as a person being present.</text>
+</svg>
