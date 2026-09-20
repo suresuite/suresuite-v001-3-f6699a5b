@@ -17390,6 +17390,92 @@ changed is which set is whole.
   its class is not: the artifact is still a parse of DDL rather than a read of a database,
   and §15's schema probe is the only thing that compares them.
 
+### Branch consolidation — three open branches, two collisions and a wedged deploy · 2026-09-20 · `20260920000001`–`20260920000003` (renumbered, not new)
+
+**Not a work package.** A consolidation pass over every branch in the repository,
+asked for as *"scan the branches carefully and try to merge and later delete the
+open branches"*. It is recorded here because it changed §4, §14, §16 and §17, and
+because two of the three things it found are the same defect class arriving again.
+
+Preconditions held?      **No, and the first finding is why.** `main`'s own
+production deploy was failing before any branch was merged — so every branch merged
+on top of it would have added migrations to a queue that could not drain.
+
+Exit checks passed?      yes. `contract:check` ✓ **all 20 rules** (R7 97 entries over
+164 revisions · R16 161 rows, highest D161, none unused · R17 19 functions, 12
+deployed · R20 344 versions across 344 files) · `npm test` **918/918, 55 files**
+(869 → 903 → 918) · `typecheck` 21 of 21 baseline held · `check:docs` ✓ ·
+`audit:ui` **8 — at baseline**. `contract:rehearse` NOT run: no PostgreSQL 16 in
+this environment, and CI runs it all three ways.
+
+Discovered:
+  - **§4 D151 — a migration VERSION is a primary key, and `main` had two of them
+    twice.** `main` carried four migration files under two versions:
+    `20260919000001` was both WP 6.2's `customers_land` (applied in production) and
+    WP 8.1's `one_node_classifier` (never applied), and `20260919000002` was both
+    WP 6.3's `dual_read_node_metrics` (applied) and WP 8.3's `graph_nodes_read_path`
+    (never applied). `schema_migrations` is keyed on the version alone, so the CLI
+    ran the classifier's 34 statements and died on the bookkeeping `INSERT`.
+    **The blast radius is three migrations, not one**, because the CLI stops at the
+    first failure: WP 8.2's entire `one_etl` was never attempted. So the whole graph
+    layer — `node_list.echelon`, `get_graph_nodes`, the one ETL — has been absent
+    from production since a320ee6 while three §16 entries described it as shipped.
+    Renumbered `20260920000001`/`2`/`3`, order preserved because the order is
+    load-bearing: `one_etl` `CREATE OR REPLACE`s `node_bom_depth` over the body
+    WP 8.1 wrote, so a classifier running last would silently restore the definition
+    D130 was closed by replacing. **`contract:check` R20** is the gate, mutation-
+    tested red. No mode of `contract:rehearse` could have caught it — all three
+    apply migrations by FILE and never go through `schema_migrations`.
+  - **D146's collision, a FOURTH time, and ten rows wide.** `claude/exciting-newton`
+    and `main` had both shipped **D127–D136** for ten entirely different defects.
+    `git merge` reports nothing, because the two sets never touch the same line.
+    Newton's are now **D152–D161**. **R16 did its job and its job is not enough**:
+    it reads §4, so it catches duplicate ROWS and not the twenty-odd citations
+    behind them — in three migrations, three rehearsals, five source and test files,
+    two data-contract scripts, §14's WP 7.2 heading and two sentences of CLAUDE.md,
+    which carried D127/D134 in main's meaning and D127/D128 in newton's three lines
+    apart. The remapping had to be driven off *which side introduced each
+    reference*, which no static rule in this repository can currently answer.
+  - **The same collision one layer down: two rehearsals numbered 300 and two
+    numbered 310.** Newton's three renumbered 320/330/340. §4 D146 already records
+    a duplicate `rehearsal/230`; nothing gates rehearsal numbering either.
+  - **Each of the two live branches ended its §17 row naming the other as what
+    remained.** WP 8.2 closed with *"WP 8.4 remains"*; WP 8.3 + 8.4 closed with
+    *"WP 8.2 remains, and it is the one that matters next"*. Both were true and
+    neither could see the other. The merged row says what is actually left.
+  - **`echelonMirror.test.ts` pinned a migration by PATH** and was the only code
+    change either merge needed — which is the good news about the renumber and also
+    the measure of how thin that pin is.
+
+Baseline numbers (if run):
+  - branches: **20 remote · 9 fully merged into `main` (0 ahead) · 3 CI result
+    branches that must never be deleted** (`eval-results`, `migration-results`,
+    `verification-results`) · 3 carrying live work, all merged here · 4 stale,
+    dropped by the user's decision, left in place
+  - `claude/simulation-engine-review-45vgux`'s 9 commits touch only
+    `.github/deploy-request` and `.github/verify-e2e-request` — CI trigger files
+    from July with no content
+  - tests 918 · typecheck 21 of 21 · audit:ui 8 · contract rules 20 · §16 entries 97
+  - §4 rows 161, highest D161, next free D162
+
+Handoff to next WP:
+  - **The renumber is not the deploy.** `20260920000001`–`3` apply on MERGE to
+    `main`, and `supabase-migrations.yml` is `branches: [main]`, so nothing in this
+    branch can prove it. **Watch that run.** Until it is green the graph layer is
+    still absent from production and `Project AA - ver3` still needs Combine re-run
+    (WP 8.2's own precondition, unchanged and now actually reachable).
+  - **Nothing gates a rehearsal's number, and nothing gates a D-citation outside
+    §4.** R20 now covers migrations, R16 covers §4 rows. The two gaps this pass had
+    to close by hand are the obvious next rules, and the second is the harder one:
+    it needs "which side introduced this reference", which is a property of history
+    rather than of the tree.
+  - **The §17 Phase 5 warning is still open and is still not ours.** `contract:check`
+    R10 has reported *"§7–§13 leaves 5.2, 5.2j unmarked"* for four packages now; §16's
+    own rule forbids editing another package's entry and R8 forbids inventing an
+    owner, so it stays reported. It is the stranded duplicate `### WP 5.2j` entry
+    that WP 5.2k named and did not touch, for the same two reasons.
+
+---
 ---
 
 ## 17. Sequencing
