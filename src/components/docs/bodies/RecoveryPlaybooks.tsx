@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { UNDESCRIBED } from "@/components/docs/generated/dataModel.generated";
 import { RECOVERY_LEVERS } from "@/components/docs/generated/policy.generated";
 import { policyCatalog } from "@/lib/policies/registryAccess";
+import { DocFigure } from "@/components/docs/DocFigure";
 
 export default function RecoveryPlaybooks() {
   const owing = UNDESCRIBED.find((g) => g.tables.some((t) => t.table === "recovery_playbooks"));
@@ -86,6 +87,7 @@ export default function RecoveryPlaybooks() {
       )}
 
       <Section id="the-levers" title={`The ${levers.length} strategies`}>
+        <DocFigure id="lever-map" />
         <P>
           Each one is a switch, and turning it on reveals its own parameters. The parameters are
           what the strategy costs or how fast it works — they are not thresholds for when it fires,

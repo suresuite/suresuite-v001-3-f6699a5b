@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 376" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- Both live shapes at the same scale and the same weight. NEITHER is marked
+       as preferred: the choice has not been made and a drawing that leaned
+       would be making it. Table names are the contract's own. -->
+
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">Two ways this system records a disruption.</text>
+  <text x="4" y="28" font-size="12" fill="hsl(var(--muted-foreground))">Both are live. Neither reads the other.</text>
+
+  <!-- ══ A · the one-row shape ═══════════════════════════════════════ -->
+  <text x="4" y="52" font-size="12" fill="hsl(var(--foreground))">A · one row holds the whole thing</text>
+  <rect x="4" y="60" width="312" height="66" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="78" font-size="12" fill="hsl(var(--foreground))">disruption_scenarios</text>
+  <line x1="12" y1="84" x2="308" y2="84" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="12" y="100" font-size="12" fill="hsl(var(--muted-foreground))">what it is called · what it hits · when it</text>
+  <text x="12" y="112" font-size="12" fill="hsl(var(--muted-foreground))">starts · how long · how hard · how it runs</text>
+  <text x="12" y="122" font-size="12" fill="hsl(var(--muted-foreground))">— all of it, on one row, per node.</text>
+
+  <!-- ══ B · the four-table shape ════════════════════════════════════ -->
+  <text x="4" y="150" font-size="12" fill="hsl(var(--foreground))">B · a profile with three children</text>
+  <rect x="4" y="158" width="312" height="34" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="174" font-size="12" fill="hsl(var(--foreground))">disruption_scenario_profiles</text>
+  <text x="12" y="187" font-size="12" fill="hsl(var(--muted-foreground))">the header — name, start, end</text>
+
+  <!-- the cascade -->
+  <g stroke="hsl(var(--foreground))" stroke-width="1.4" fill="none">
+    <path d="M20 192 L20 214 L52 214"/>
+    <path d="M20 214 L20 254 L52 254"/>
+    <path d="M20 254 L20 294 L52 294"/>
+  </g>
+  <g fill="hsl(var(--foreground))">
+    <polygon points="56,214 49,210.5 49,217.5"/>
+    <polygon points="56,254 49,250.5 49,257.5"/>
+    <polygon points="56,294 49,290.5 49,297.5"/>
+  </g>
+
+  <rect x="56" y="200" width="260" height="30" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="64" y="214" font-size="12" fill="hsl(var(--foreground))">..._targets</text>
+  <text x="64" y="226" font-size="12" fill="hsl(var(--muted-foreground))">what it hits</text>
+
+  <rect x="56" y="240" width="260" height="30" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="64" y="254" font-size="12" fill="hsl(var(--foreground))">..._effects</text>
+  <text x="64" y="266" font-size="12" fill="hsl(var(--muted-foreground))">what it does</text>
+
+  <rect x="56" y="280" width="260" height="30" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="64" y="294" font-size="12" fill="hsl(var(--foreground))">..._settings</text>
+  <text x="64" y="306" font-size="12" fill="hsl(var(--muted-foreground))">how it is simulated</text>
+
+  <!-- ══ and nothing joins them ══════════════════════════════════════ -->
+  <line x1="4" y1="324" x2="316" y2="324" stroke="hsl(var(--border))" stroke-width="1"/>
+  <g stroke="hsl(var(--destructive))" stroke-width="1.4" fill="none">
+    <path d="M8 338 L26 338"/>
+    <path d="M34 338 L52 338"/>
+    <path d="M24 331 L36 345 M36 331 L24 345"/>
+  </g>
+  <text x="60" y="342" font-size="12" fill="hsl(var(--foreground))">Nothing migrated between them.</text>
+  <text x="4" y="356" font-size="12" fill="hsl(var(--muted-foreground))">A project can hold disruptions in both</text>
+  <text x="4" y="370" font-size="12" fill="hsl(var(--muted-foreground))">shapes, and a reader of either sees half.</text>
+</svg>

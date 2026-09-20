@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 378" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- The six tiers as the journey a user's data takes. Names and glosses are
+       TierJourney's, which this supersedes; what is added is the RULE — arrows
+       run one way and external data never enters above tier 1 — and a layout
+       that reads at phone width instead of scrolling sideways. -->
+
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">Data only ever moves up.</text>
+
+  <!-- ══ tier 5 ══ -->
+  <rect x="44" y="26" width="272" height="34" rx="3" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="47" font-size="12" fill="hsl(var(--muted-foreground))">5</text>
+  <text x="54" y="42" font-size="12" fill="hsl(var(--foreground))">Results</text>
+  <text x="54" y="54" font-size="12" fill="hsl(var(--muted-foreground))">what the run produced, stamped</text>
+
+  <!-- ══ tier 4 ══ -->
+  <rect x="44" y="68" width="272" height="34" rx="3" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="89" font-size="12" fill="hsl(var(--muted-foreground))">4</text>
+  <text x="54" y="84" font-size="12" fill="hsl(var(--foreground))">Decisions</text>
+  <text x="54" y="96" font-size="12" fill="hsl(var(--muted-foreground))">your policies</text>
+
+  <!-- ══ tier 3 ══ -->
+  <rect x="44" y="110" width="272" height="34" rx="3" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="131" font-size="12" fill="hsl(var(--muted-foreground))">3</text>
+  <text x="54" y="126" font-size="12" fill="hsl(var(--foreground))">Derived</text>
+  <text x="54" y="138" font-size="12" fill="hsl(var(--muted-foreground))">what we worked out</text>
+
+  <!-- ══ tier 2 — the only one you edit ══ -->
+  <rect x="44" y="152" width="272" height="34" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.6"/>
+  <text x="4" y="173" font-size="12" fill="hsl(var(--foreground))">2</text>
+  <text x="54" y="168" font-size="12" fill="hsl(var(--foreground))">Canonical — your data</text>
+  <text x="54" y="180" font-size="12" fill="hsl(var(--muted-foreground))">the only tier you edit</text>
+
+  <!-- ══ tier 1 ══ -->
+  <rect x="44" y="194" width="272" height="34" rx="3" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="215" font-size="12" fill="hsl(var(--muted-foreground))">1</text>
+  <text x="54" y="210" font-size="12" fill="hsl(var(--foreground))">Staging</text>
+  <text x="54" y="222" font-size="12" fill="hsl(var(--muted-foreground))">parsed, not yet yours</text>
+
+  <!-- ══ tier 0 ══ -->
+  <rect x="44" y="236" width="272" height="34" rx="3" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="257" font-size="12" fill="hsl(var(--muted-foreground))">0</text>
+  <text x="54" y="252" font-size="12" fill="hsl(var(--foreground))">Landing</text>
+  <text x="54" y="264" font-size="12" fill="hsl(var(--muted-foreground))">the bytes you sent, kept as sent</text>
+
+  <!-- the one-way arrow -->
+  <path d="M34 262 L34 40" stroke="hsl(var(--foreground))" stroke-width="1.6" fill="none"/>
+  <polygon points="34,30 30,40 38,40" fill="hsl(var(--foreground))"/>
+
+  <!-- ══ where the outside gets in ════════════════════════════════════ -->
+  <path d="M316 253 L296 253" stroke="hsl(var(--foreground))" stroke-width="1.8" fill="none"/>
+  <text x="200" y="288" font-size="12" fill="hsl(var(--foreground))">the only way in</text>
+  <path d="M258 292 L292 292 L292 268" stroke="hsl(var(--foreground))" stroke-width="1.2" fill="none"/>
+
+  <line x1="4" y1="304" x2="316" y2="304" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="322" font-size="12" fill="hsl(var(--foreground))">Nothing from outside enters above tier 1.</text>
+  <text x="4" y="336" font-size="12" fill="hsl(var(--muted-foreground))">A file, a connector, an API call — all of them</text>
+  <text x="4" y="348" font-size="12" fill="hsl(var(--muted-foreground))">land at the bottom and climb. Nothing below a</text>
+  <text x="4" y="360" font-size="12" fill="hsl(var(--muted-foreground))">tier can be edited from above it, so a result</text>
+  <text x="4" y="372" font-size="12" fill="hsl(var(--muted-foreground))">can never quietly rewrite the data it used.</text>
+</svg>

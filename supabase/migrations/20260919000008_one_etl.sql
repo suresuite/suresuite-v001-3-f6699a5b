@@ -50,9 +50,9 @@
 --
 -- and two this package FOUND rather than inherited:
 --
---   D147  `get_multi_tier_network_data` projects `smt.data_source_group` from a
+--   D149  `get_multi_tier_network_data` projects `smt.data_source_group` from a
 --         table that has no such column, so the function RAISES on every call.
---   D148  D2 was closed in the edge function and never in the RPC: the deployed
+--   D150  D2 was closed in the edge function and never in the RPC: the deployed
 --         writer read every lane `volume` RAW, so a plant mixing monthly and
 --         weekly rows had its sourcing shares computed across incompatible units.
 --
@@ -110,7 +110,7 @@ COMMENT ON COLUMN public.supply_chain_data_multi_tier.level IS
 -- written but never read is the same defect as a column read but never written,
 -- pointing the other way. So it goes, together with the claim.
 --
--- AND DROPPING IT IS WHAT FOUND D147. Two functions project
+-- AND DROPPING IT IS WHAT FOUND D149. Two functions project
 -- `smt.data_source_group` FROM `supply_chain_data_multi_tier`, which has never had
 -- that column: `get_multi_tier_network_data` raises `column smt.data_source_group
 -- does not exist` on every call, and it is `InteractiveNetworkSpace`'s FALLBACK —
@@ -324,7 +324,7 @@ BEGIN
   -- uploads too. Four statements instead of ten is not a micro-optimisation
   -- here; it is what makes the trigger in section 5 affordable.
   WITH RECURSIVE
-  -- D148 — `rate_to_weekly` at EVERY read, which the deployed writer never had.
+  -- D150 — `rate_to_weekly` at EVERY read, which the deployed writer never had.
   -- WP 0.2 closed D2 in the edge function and the RPC kept all eight raw reads.
   -- `normalize-at-promotion` (I3) makes this exactly identity (×7/7) for any row
   -- promoted since WP 3.3 and load-bearing for every row that predates it, which
@@ -826,7 +826,7 @@ REFERENCING OLD TABLE AS changed_rows
 FOR EACH STATEMENT EXECUTE FUNCTION public.auto_rebuild_supply_chain_lanes();
 
 -- ══════════════════════════════════════════════════════════════════════════
--- 6 · the two read paths — D134's substitution, and D147's raise
+-- 6 · the two read paths — D134's substitution, and D149's raise
 -- ══════════════════════════════════════════════════════════════════════════
 --
 -- Both are D145's shape: a fixed `RETURNS TABLE` is a SECOND authoring of the
@@ -950,7 +950,7 @@ DECLARE
 BEGIN
   PERFORM public.set_current_user_context(p_user_id, p_user_email);
 
-  -- QUALIFIED, and this is D147's SECOND fatal error rather than a tidy-up. The
+  -- QUALIFIED, and this is D149's SECOND fatal error rather than a tidy-up. The
   -- `RETURNS TABLE` declares an OUT parameter named `organization`, so the
   -- unqualified `SELECT organization … FROM public.projects` that stood here
   -- raised `column reference "organization" is ambiguous` — BEFORE the missing
@@ -971,7 +971,7 @@ BEGIN
   RETURN QUERY
   SELECT
     smt.id, smt.project_id, smt.plant_name, smt.from_location, smt.to_location,
-    -- D147 — `smt.data_source_group` stood here, and
+    -- D149 — `smt.data_source_group` stood here, and
     -- `supply_chain_data_multi_tier` has never had that column. This function
     -- raised `column smt.data_source_group does not exist` on EVERY call, and it
     -- is `InteractiveNetworkSpace`'s fallback: the path a user reaches only after
@@ -988,7 +988,7 @@ END;
 $function$;
 
 COMMENT ON FUNCTION public.get_multi_tier_network_data(uuid, uuid, text) IS
-  'WP 8.2 · §4 D147. `InteractiveNetworkSpace`''s fallback read. It projected a '
+  'WP 8.2 · §4 D149. `InteractiveNetworkSpace`''s fallback read. It projected a '
   'column the table has never had, so it raised on every call since 2025-09-09 — '
   'D145''s class one column further in: nothing compares a `RETURN QUERY`''s '
   'column list with the table under it.';

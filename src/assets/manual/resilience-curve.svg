@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 344" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- TTS, TTR and the service-loss area as regions on one fill-rate trace.
+       The RULE is scsim/scsim/kpi/compute.py: FR_BAND_PP = 0.02 (the band is
+       the pre-disruption mean less 2 pp) and TTR_SUSTAIN_WEEKS = 3. The weekly
+       values are illustrative; the geometry is the engine's. -->
+
+  <!-- ── frame ──────────────────────────────────────────────────────── -->
+  <line x1="44" y1="150" x2="300" y2="150" stroke="hsl(var(--border))" stroke-width="1"/>
+  <line x1="44" y1="30" x2="44" y2="150" stroke="hsl(var(--border))" stroke-width="1"/>
+
+  <!-- the band: the pre-disruption mean, down 2 pp -->
+  <rect x="44" y="60" width="256" height="15" fill="hsl(var(--muted))" opacity="0.6"/>
+
+  <!-- service-loss area = max(0, FR_clean − FR_disrupted) over the window -->
+  <polygon points="106,60 106,63.75 121.5,97.5 137,127.5 152.5,135 168,112.5 183.5,67.5 199,67.5 214.5,90 230,105 245.5,82.5 261,67.5 276.5,60"
+           fill="hsl(var(--destructive))" opacity="0.13"/>
+  <g stroke="hsl(var(--destructive))" stroke-width="0.7" opacity="0.55">
+    <line x1="122" y1="61" x2="122" y2="97"/>
+    <line x1="132" y1="61" x2="132" y2="119"/>
+    <line x1="142" y1="61" x2="142" y2="131"/>
+    <line x1="152" y1="61" x2="152" y2="134"/>
+    <line x1="162" y1="61" x2="162" y2="120"/>
+    <line x1="172" y1="61" x2="172" y2="103"/>
+    <line x1="214" y1="61" x2="214" y2="89"/>
+    <line x1="224" y1="61" x2="224" y2="100"/>
+    <line x1="234" y1="61" x2="234" y2="100"/>
+    <line x1="244" y1="61" x2="244" y2="84"/>
+  </g>
+
+  <!-- the clean run: the same portfolio with no events -->
+  <line x1="44" y1="60" x2="300" y2="60" stroke="hsl(var(--muted-foreground))"
+        stroke-width="1.4" stroke-dasharray="5 3"/>
+  <!-- the band's lower edge -->
+  <line x1="44" y1="75" x2="300" y2="75" stroke="hsl(var(--muted-foreground))"
+        stroke-width="1" stroke-dasharray="2 2.5"/>
+
+  <!-- the disrupted run -->
+  <polyline fill="none" stroke="hsl(var(--foreground))" stroke-width="2"
+            stroke-linejoin="round" stroke-linecap="round"
+            points="44,60 59.5,60 75,60 90.5,60 106,63.75 121.5,97.5 137,127.5 152.5,135 168,112.5 183.5,67.5 199,67.5 214.5,90 230,105 245.5,82.5 261,67.5 276.5,60 292,60"/>
+
+  <!-- disruption start -->
+  <line x1="106" y1="26" x2="106" y2="156" stroke="hsl(var(--foreground))" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="4" y="22" font-size="12" fill="hsl(var(--foreground))">disruption starts</text>
+
+  <!-- the three weeks recovery has to hold for -->
+  <path d="M261 46 L261 41 L292 41 L292 46" fill="none" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="276" y="36" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">3 wks</text>
+
+  <!-- weeks 5 and 6 look recovered and are not -->
+  <circle cx="183.5" cy="67.5" r="3.6" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.5"/>
+  <circle cx="199" cy="67.5" r="3.6" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.5"/>
+  <!-- week 10: the first week recovery actually holds from -->
+  <circle cx="261" cy="67.5" r="3.6" fill="hsl(var(--foreground))"/>
+
+  <!-- ── axes ───────────────────────────────────────────────────────── -->
+  <text x="40" y="64" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">96%</text>
+  <text x="40" y="79" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">94%</text>
+  <text x="40" y="153" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">84%</text>
+  <text x="0" y="0" font-size="12" fill="hsl(var(--muted-foreground))"
+        transform="translate(14,126) rotate(-90)">weekly fill rate</text>
+
+  <text x="46" y="167" text-anchor="start" font-size="12" fill="hsl(var(--muted-foreground))">−4</text>
+  <text x="106" y="167" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">0</text>
+  <text x="168" y="167" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">4</text>
+  <text x="230" y="167" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">8</text>
+  <text x="292" y="167" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">12</text>
+  <text x="172" y="183" text-anchor="middle" font-size="12" fill="hsl(var(--muted-foreground))">weeks from disruption start</text>
+
+  <!-- ── the three measures ─────────────────────────────────────────── -->
+  <line x1="12" y1="196" x2="308" y2="196" stroke="hsl(var(--border))" stroke-width="1"/>
+
+  <!-- TTS -->
+  <line x1="12" y1="213" x2="34" y2="213" stroke="hsl(var(--foreground))" stroke-width="2"/>
+  <line x1="12" y1="208" x2="12" y2="218" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <line x1="34" y1="208" x2="34" y2="218" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <text x="44" y="211" font-size="12" fill="hsl(var(--foreground))">tts_weeks = 1 wk</text>
+  <text x="44" y="226" font-size="12" fill="hsl(var(--muted-foreground))">weeks the chain held inside the band</text>
+  <text x="44" y="240" font-size="12" fill="hsl(var(--muted-foreground))">before service fell out of it.</text>
+
+  <!-- TTR -->
+  <line x1="12" y1="260" x2="34" y2="260" stroke="hsl(var(--foreground))" stroke-width="2"/>
+  <line x1="12" y1="255" x2="12" y2="265" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <line x1="34" y1="255" x2="34" y2="265" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <circle cx="23" cy="260" r="3.6" fill="hsl(var(--foreground))"/>
+  <text x="44" y="258" font-size="12" fill="hsl(var(--foreground))">ttr_weeks = 10 wks</text>
+  <text x="44" y="273" font-size="12" fill="hsl(var(--muted-foreground))">the first week that then holds inside</text>
+  <text x="44" y="287" font-size="12" fill="hsl(var(--muted-foreground))">the band for 3. Weeks 5 and 6 (○) look</text>
+  <text x="44" y="301" font-size="12" fill="hsl(var(--muted-foreground))">recovered and relapse, so neither counts.</text>
+
+  <!-- SLA -->
+  <rect x="12" y="315" width="22" height="14" fill="hsl(var(--destructive))" opacity="0.13"/>
+  <g stroke="hsl(var(--destructive))" stroke-width="0.7" opacity="0.55">
+    <line x1="17" y1="315" x2="17" y2="329"/>
+    <line x1="23" y1="315" x2="23" y2="329"/>
+    <line x1="29" y1="315" x2="29" y2="329"/>
+  </g>
+  <rect x="12" y="315" width="22" height="14" fill="none" stroke="hsl(var(--destructive))" stroke-width="0.8"/>
+  <text x="44" y="322" font-size="12" fill="hsl(var(--foreground))">service_loss_area, in %·wks</text>
+  <text x="44" y="337" font-size="12" fill="hsl(var(--muted-foreground))">the whole region: depth times duration.</text>
+</svg>

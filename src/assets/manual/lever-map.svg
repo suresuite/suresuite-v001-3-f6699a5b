@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 340" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- The six recovery levers the scenario pane offers, against the engine
+       plugins they map to. Every lever, label and plugin below is a field of
+       RECOVERY_LEVERS in policy.generated.ts, derived by chains.mjs from
+       scsim/scsim/io/project_map.py's own response-to-plugin branches. -->
+
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">What you switch on</text>
+  <text x="186" y="14" font-size="12" fill="hsl(var(--foreground))">What the engine runs</text>
+  <line x1="4" y1="22" x2="124" y2="22" stroke="hsl(var(--border))" stroke-width="1"/>
+  <line x1="186" y1="22" x2="316" y2="22" stroke="hsl(var(--border))" stroke-width="1"/>
+
+  <!-- ══ plugins (right) ══════════════════════════════════════════════ -->
+  <rect x="186" y="46" width="130" height="32" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="194" y="66" font-size="12" fill="hsl(var(--foreground))">backup_supplier</text>
+
+  <rect x="186" y="86" width="130" height="32" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="194" y="101" font-size="12" fill="hsl(var(--foreground))">short_term_</text>
+  <text x="194" y="114" font-size="12" fill="hsl(var(--foreground))">capacity</text>
+
+  <rect x="186" y="126" width="130" height="32" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="194" y="141" font-size="12" fill="hsl(var(--foreground))">expedited_</text>
+  <text x="194" y="154" font-size="12" fill="hsl(var(--foreground))">shipments</text>
+
+  <rect x="186" y="166" width="130" height="32" rx="3" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="194" y="181" font-size="12" fill="hsl(var(--muted-foreground))">early_warning_</text>
+  <text x="194" y="194" font-size="12" fill="hsl(var(--muted-foreground))">failover</text>
+
+  <rect x="186" y="206" width="130" height="32" rx="3" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="194" y="221" font-size="12" fill="hsl(var(--muted-foreground))">material_</text>
+  <text x="194" y="234" font-size="12" fill="hsl(var(--muted-foreground))">allocation</text>
+
+  <!-- ══ levers (left) ════════════════════════════════════════════════ -->
+  <rect x="4" y="46" width="120" height="28" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="64" font-size="12" fill="hsl(var(--foreground))">Backup supplier</text>
+
+  <rect x="4" y="80" width="120" height="28" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="92" font-size="12" fill="hsl(var(--foreground))">Overtime</text>
+  <text x="12" y="104" font-size="12" fill="hsl(var(--foreground))">production</text>
+
+  <rect x="4" y="114" width="120" height="28" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="126" font-size="12" fill="hsl(var(--foreground))">Expedite</text>
+  <text x="12" y="138" font-size="12" fill="hsl(var(--foreground))">shipments</text>
+
+  <rect x="4" y="148" width="120" height="28" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.2"/>
+  <text x="12" y="160" font-size="12" fill="hsl(var(--foreground))">Network</text>
+  <text x="12" y="172" font-size="12" fill="hsl(var(--foreground))">rerouting</text>
+
+  <rect x="4" y="182" width="120" height="28" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="12" y="200" font-size="12" fill="hsl(var(--foreground))">Safety stock</text>
+
+  <rect x="4" y="216" width="120" height="28" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--destructive))" stroke-width="1.2"/>
+  <text x="12" y="228" font-size="12" fill="hsl(var(--foreground))">Material</text>
+  <text x="12" y="240" font-size="12" fill="hsl(var(--foreground))">reallocation</text>
+
+  <!-- ══ the join ═════════════════════════════════════════════════════ -->
+  <g stroke="hsl(var(--foreground))" stroke-width="1.4" fill="none">
+    <path d="M124 60 L186 62"/>
+    <path d="M124 94 L186 102"/>
+    <path d="M124 128 L155 128 L155 142 L186 142"/>
+    <path d="M124 162 L155 162 L155 142 L186 142"/>
+  </g>
+  <g fill="hsl(var(--foreground))" stroke="none">
+    <polygon points="186,62 179,58.5 179,65.5"/>
+    <polygon points="186,102 179,98.5 179,105.5"/>
+    <polygon points="186,142 179,138.5 179,145.5"/>
+  </g>
+
+  <!-- two levers that reach nothing: the arrow stops at a wall -->
+  <g stroke="hsl(var(--destructive))" stroke-width="1.4" fill="none">
+    <path d="M124 196 L152 196"/>
+    <path d="M124 230 L152 230"/>
+    <path d="M158 188 L158 204"/>
+    <path d="M158 222 L158 238"/>
+    <path d="M152 190 L164 202 M164 190 L152 202"/>
+    <path d="M152 224 L164 236 M164 224 L152 236"/>
+  </g>
+
+  <!-- the two plugins no scenario lever reaches -->
+  <g stroke="hsl(var(--border))" stroke-width="1.2" fill="none" stroke-dasharray="3 3">
+    <path d="M158 182 L186 182"/>
+    <path d="M158 222 L186 222"/>
+  </g>
+
+  <!-- ══ the key ══════════════════════════════════════════════════════ -->
+  <line x1="4" y1="256" x2="316" y2="256" stroke="hsl(var(--border))" stroke-width="1"/>
+  <g stroke="hsl(var(--destructive))" stroke-width="1.4" fill="none">
+    <path d="M6 272 L18 284 M18 272 L6 284"/>
+  </g>
+  <text x="26" y="276" font-size="12" fill="hsl(var(--foreground))">Switches on, saves, shows as enabled,</text>
+  <text x="26" y="288" font-size="12" fill="hsl(var(--foreground))">and changes no number in the run.</text>
+
+  <rect x="6" y="300" width="12" height="12" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="26" y="310" font-size="12" fill="hsl(var(--muted-foreground))">An engine plugin the scenario pane</text>
+  <text x="26" y="322" font-size="12" fill="hsl(var(--muted-foreground))">cannot reach. The policy grid lists both;</text>
+  <text x="26" y="334" font-size="12" fill="hsl(var(--muted-foreground))">the pane lists neither.</text>
+</svg>

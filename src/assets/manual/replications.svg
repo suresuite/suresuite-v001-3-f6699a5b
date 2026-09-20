@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 344" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- SCHEMATIC. Five replications of one model, the warm-up excluded, and
+       the interval that comes of them; then two models whose intervals
+       overlap. The traces are illustrative — what is being shown is the
+       SHAPE of a replicated result, not any project's numbers. -->
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">Five runs of the SAME model.</text>
+  <rect x="40" y="34" width="54" height="98" fill="hsl(var(--muted))" opacity="0.8"/>
+  <line x1="94" y1="28" x2="94" y2="140" stroke="hsl(var(--foreground))" stroke-width="1" stroke-dasharray="3 2"/>
+  <line x1="40" y1="132" x2="300" y2="132" stroke="hsl(var(--border))" stroke-width="1"/>
+  <line x1="40" y1="34" x2="40" y2="132" stroke="hsl(var(--border))" stroke-width="1"/>
+  <polygon points="94,60.8 112,47.0 130,64.9 148,69.3 166,70.2 184,78.5 202,66.0 220,63.7 238,52.1 256,54.4 274,70.3 292,47.7 292,76.1 274,85.8 256,84.5 238,83.1 220,83.3 202,97.5 184,99.2 166,104.6 148,99.1 130,76.2 112,79.3 94,65.9" fill="hsl(var(--foreground))" opacity="0.10"/>
+  <polyline fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="0.9" opacity="0.85" points="40,72.2 58,64.3 76,72.8 94,62.2 112,47.0 130,76.2 148,99.1 166,104.6 184,86.0 202,97.5 220,63.7 238,52.1 256,84.5 274,70.3 292,76.1"/>
+  <polyline fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="0.9" opacity="0.85" points="40,76.3 58,63.8 76,73.7 94,65.7 112,72.8 130,66.2 148,86.6 166,80.2 184,78.5 202,89.8 220,82.8 238,78.5 256,54.4 274,85.8 292,47.7"/>
+  <polyline fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="0.9" opacity="0.85" points="40,73.4 58,63.9 76,69.5 94,61.4 112,79.3 130,71.9 148,69.3 166,85.1 184,96.8 202,66.0 220,68.5 238,74.8 256,74.8 274,71.9 292,53.1"/>
+  <polyline fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="0.9" opacity="0.85" points="40,76.5 58,64.0 76,73.1 94,60.8 112,77.4 130,64.9 148,86.1 166,70.2 184,87.9 202,73.0 220,69.7 238,83.1 256,69.3 274,78.2 292,55.8"/>
+  <polyline fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="0.9" opacity="0.85" points="40,75.3 58,63.1 76,73.5 94,65.9 112,72.8 130,68.2 148,72.9 166,73.6 184,99.2 202,70.8 220,83.3 238,68.9 256,64.1 274,79.2 292,53.9"/>
+  <polyline fill="none" stroke="hsl(var(--foreground))" stroke-width="2" points="40,74.7 58,63.8 76,72.5 94,63.2 112,69.9 130,69.5 148,82.8 166,82.8 184,89.7 202,79.4 220,73.6 238,71.5 256,69.4 274,77.1 292,57.3"/>
+  <text x="36" y="38" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">100%</text>
+  <text x="36" y="135" text-anchor="end" font-size="12" fill="hsl(var(--muted-foreground))">70%</text>
+  <text x="4" y="150" font-size="12" fill="hsl(var(--muted-foreground))">warm-up —</text>
+  <text x="4" y="162" font-size="12" fill="hsl(var(--muted-foreground))">excluded</text>
+  <path d="M40 154 L94 154" stroke="hsl(var(--muted-foreground))" stroke-width="1"/>
+  <path d="M40 150 L40 158 M94 150 L94 158" stroke="hsl(var(--muted-foreground))" stroke-width="1"/>
+  <text x="100" y="150" font-size="12" fill="hsl(var(--foreground))">the measured window</text>
+  <text x="100" y="162" font-size="12" fill="hsl(var(--muted-foreground))">same model, different draws</text>
+  <text x="4" y="182" font-size="12" fill="hsl(var(--muted-foreground))">Same inputs, same policies. Only the random</text>
+  <text x="4" y="194" font-size="12" fill="hsl(var(--muted-foreground))">draws differ, and that is the whole spread.</text>
+
+  <line x1="4" y1="208" x2="316" y2="208" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="226" font-size="12" fill="hsl(var(--foreground))">Two models. Is B better than A?</text>
+  <line x1="90.4" y1="250" x2="209.0" y2="250" stroke="hsl(var(--foreground))" stroke-width="1.6"/>
+  <line x1="90.4" y1="244" x2="90.4" y2="256" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <line x1="209.0" y1="244" x2="209.0" y2="256" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <circle cx="147.2" cy="250" r="4" fill="hsl(var(--foreground))"/>
+  <text x="4" y="254" font-size="12" fill="hsl(var(--foreground))">A</text>
+  <line x1="114.7" y1="276" x2="235.0" y2="276" stroke="hsl(var(--foreground))" stroke-width="1.6"/>
+  <line x1="114.7" y1="270" x2="114.7" y2="282" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <line x1="235.0" y1="270" x2="235.0" y2="282" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <circle cx="173.3" cy="276" r="4" fill="hsl(var(--foreground))"/>
+  <text x="4" y="280" font-size="12" fill="hsl(var(--foreground))">B</text>
+  <rect x="114.7" y="240" width="94.3" height="46" fill="hsl(var(--destructive))" opacity="0.12"/>
+  <rect x="114.7" y="240" width="94.3" height="46" fill="none" stroke="hsl(var(--destructive))" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="114.7" y="300" font-size="12" fill="hsl(var(--destructive))">they overlap</text>
+  <text x="4" y="320" font-size="12" fill="hsl(var(--foreground))">B's mean is higher and the answer is still no.</text>
+  <text x="4" y="334" font-size="12" fill="hsl(var(--muted-foreground))">Where the intervals overlap, the difference is</text>
+  <text x="4" y="346" font-size="12" fill="hsl(var(--muted-foreground))">not one this many replications can show.</text>
+</svg>

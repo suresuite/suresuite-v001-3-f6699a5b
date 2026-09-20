@@ -21,6 +21,7 @@
 import { PageTitle, Section, P, Key, Callout, Steps, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
 import { ReadsFrom } from "@/components/docs/lineage";
 import { RUN_KPIS } from "@/components/docs/generated/policy.generated";
+import { DocFigure } from "@/components/docs/DocFigure";
 
 export default function SimulationLab() {
   const usable = RUN_KPIS.objectives.filter((o) => o.emitted);
@@ -96,6 +97,7 @@ export default function SimulationLab() {
       </Section>
 
       <Section id="the-gate" title="The gate, and why a run is refused">
+        <DocFigure id="run-sequence" />
         <P>
           To the right of the rail's heading is a single readout: a coloured dot, the word{" "}
           <Term>gate</Term>, and a count. It is the most useful thing on the screen and it has

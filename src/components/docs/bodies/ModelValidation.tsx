@@ -24,6 +24,7 @@
 // that every scenario created under it inherits.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { Badge } from "@/components/ui/badge";
 import { UNDESCRIBED } from "@/components/docs/generated/dataModel.generated";
 import { VALIDATION_CARD } from "@/components/docs/generated/policy.generated";
@@ -91,6 +92,7 @@ export default function ModelValidation() {
       </Section>
 
       <Section id="the-binding" title="A verdict is bound to what produced it">
+        <DocFigure id="validation-binding" />
         <Key>
           This is the one place in the product where a stored conclusion names all four of the
           things that decided it.

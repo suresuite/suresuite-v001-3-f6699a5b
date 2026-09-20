@@ -10,6 +10,7 @@ import { PageTitle, Section, P, Key, Callout, Prose, Term, DocLink, Provenance }
 import { Badge } from "@/components/ui/badge";
 import { ANALYSIS_KINDS } from "@/components/docs/generated/policy.generated";
 import { refTable, computedColumns } from "@/components/docs/tableFacts";
+import { DocFigure } from "@/components/docs/DocFigure";
 
 /** What each measure means, in the reader's terms. */
 const MEANING: Record<string, { what: string; use: string }> = {
@@ -64,6 +65,15 @@ export default function NetworkScienceMetrics() {
           and their limit: a firm can be structurally critical and commercially trivial, and the
           graph does not know the difference.
         </P>
+      </Section>
+
+      <Section id="which-one" title="They do not agree, and that is not a fault">
+        <P>
+          Each measure asks a different question of the same graph, so each can name a different
+          firm as the most critical one. None of them is the right answer on its own — the right
+          question is which failure you are worried about.
+        </P>
+        <DocFigure id="centralities" />
       </Section>
 
       <Section id="the-measures" title="The measures">

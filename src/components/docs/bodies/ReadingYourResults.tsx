@@ -22,6 +22,7 @@
 // number it cannot get wrong and stops stating it the day somebody aligns them.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { engineVersion } from "@/lib/policies/registryAccess";
 import {
   REPLICATION_SERIES_FACTS as SERIES,
@@ -207,6 +208,7 @@ export default function ReadingYourResults() {
       </Callout>
 
       <Section id="what-comes-back" title="The three layers underneath">
+        <DocFigure id="kpi-vocabulary-gap" />
         <P>Each answers a different question, and each is what the one above it was computed from.</P>
         <div className="space-y-3">
           {[

@@ -5,6 +5,7 @@
 import { PageTitle, Section, P, Key, Callout, Prose, Term, DocLink, Provenance } from "@/components/docs/prose";
 import { engineVersion } from "@/lib/policies/registryAccess";
 import registry from "@/lib/policies/registry.generated.json";
+import { DocFigure } from "@/components/docs/DocFigure";
 
 type Kpi = { name: string; symbol: string; unit: string; definition: string };
 
@@ -42,6 +43,16 @@ export default function KpisAndResilienceIndex() {
           The archived manual carried hand-copied KPI definitions and they drifted. This page cannot
           — a measure added, renamed or redefined in the engine changes here with nobody editing it.
         </P>
+      </Section>
+
+      <Section id="three-as-regions" title="Three of them are shapes, not numbers">
+        <P>
+          <Term>ttr_weeks</Term>, <Term>tts_weeks</Term> and <Term>service_loss_area</Term> are
+          defined on the fill-rate trace itself. Reading their definitions as sentences is
+          possible; seeing them is faster, and the three-week rule in particular does not read as
+          load-bearing until you watch it disqualify a week.
+        </P>
+        <DocFigure id="resilience-curve" />
       </Section>
 
       <Section id="the-measures" title="The measures">

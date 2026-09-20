@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 272" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- One inbound_logistics row. Column names and the unit each one carries are
+       the contract's own: `volume` declares unit "units per `time_unit`",
+       `lead_time` declares unit "weeks" with unit_column `lead_time_unit`.
+       Read from REFERENCE_TABLES, not typed. -->
+
+  <text x="4" y="14" font-size="12" fill="hsl(var(--foreground))">One row of Inbound logistics.</text>
+
+  <!-- the row -->
+  <rect x="4" y="26" width="312" height="30" rx="3" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <line x1="4" y1="42" x2="316" y2="42" stroke="hsl(var(--border))" stroke-width="1"/>
+  <g stroke="hsl(var(--border))" stroke-width="1">
+    <line x1="72" y1="26" x2="72" y2="56"/>
+    <line x1="126" y1="26" x2="126" y2="56"/>
+    <line x1="186" y1="26" x2="186" y2="56"/>
+    <line x1="240" y1="26" x2="240" y2="56"/>
+  </g>
+  <text x="8" y="38" font-size="12" fill="hsl(var(--muted-foreground))">material_id</text>
+  <text x="8" y="53" font-size="12" fill="hsl(var(--foreground))">MAT-1</text>
+  <text x="76" y="38" font-size="12" fill="hsl(var(--foreground))">volume</text>
+  <text x="76" y="53" font-size="12" fill="hsl(var(--foreground))">500</text>
+  <text x="130" y="38" font-size="12" fill="hsl(var(--foreground))">time_unit</text>
+  <text x="130" y="53" font-size="12" fill="hsl(var(--foreground))">month</text>
+  <text x="190" y="38" font-size="12" fill="hsl(var(--foreground))">lead_time</text>
+  <text x="190" y="53" font-size="12" fill="hsl(var(--foreground))">2</text>
+  <text x="244" y="38" font-size="12" fill="hsl(var(--muted-foreground))">lead_time</text>
+  <text x="244" y="50" font-size="12" fill="hsl(var(--muted-foreground))">_unit</text>
+  <text x="244" y="62" font-size="12" fill="hsl(var(--muted-foreground))">(blank)</text>
+
+  <!-- time_unit governs volume, and nothing else -->
+  <path d="M150 74 L150 88 L96 88 L96 62" fill="none" stroke="hsl(var(--foreground))" stroke-width="1.6"/>
+  <polygon points="96,58 92.5,65 99.5,65" fill="hsl(var(--foreground))"/>
+  <text x="104" y="102" font-size="12" fill="hsl(var(--foreground))">time_unit governs volume.</text>
+
+  <!-- and it does NOT reach lead_time -->
+  <path d="M164 74 L200 74" fill="none" stroke="hsl(var(--destructive))" stroke-width="1.6" stroke-dasharray="3 3"/>
+  <g stroke="hsl(var(--destructive))" stroke-width="1.6">
+    <path d="M176 68 L188 80 M188 68 L176 80"/>
+  </g>
+  <text x="4" y="120" font-size="12" fill="hsl(var(--destructive))">It does not reach lead_time. Ever.</text>
+
+  <line x1="4" y1="134" x2="316" y2="134" stroke="hsl(var(--border))" stroke-width="1"/>
+
+  <!-- what the row means -->
+  <text x="4" y="152" font-size="12" fill="hsl(var(--foreground))">So this row says:</text>
+  <rect x="4" y="160" width="312" height="52" rx="3" fill="hsl(var(--muted))" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="12" y="178" font-size="12" fill="hsl(var(--foreground))">500 units a MONTH,</text>
+  <text x="12" y="194" font-size="12" fill="hsl(var(--foreground))">delivered in two WEEKS.</text>
+  <text x="12" y="208" font-size="12" fill="hsl(var(--muted-foreground))">Not 500 a month arriving in two months.</text>
+
+  <text x="4" y="232" font-size="12" fill="hsl(var(--muted-foreground))">lead_time is in weeks unless the row's own</text>
+  <text x="4" y="246" font-size="12" fill="hsl(var(--muted-foreground))">lead_time_unit says otherwise. That column is</text>
+  <text x="4" y="260" font-size="12" fill="hsl(var(--muted-foreground))">optional, and blank means weeks.</text>
+</svg>

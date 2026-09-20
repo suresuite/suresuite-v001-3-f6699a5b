@@ -121,12 +121,44 @@ describe("the pages that carry figures", () => {
   it("declares a slot only where the page renders one", async () => {
     // The manifest says a page has a figure; the body has to actually ask for
     // it. Otherwise a slot is declared, counted as open, briefed — and invisible.
+    //
+    // ── THIS ASSERTION USED TO BE VACUOUS, WHICH IS WHY IT IS SPELLED OUT ──
+    //
+    // The comment above has been right since WP 5.2i and the code under it was
+    // not: it checked that the page had a BODY, and then asserted
+    // `s.page === page` for every slot filtered out of the manifest BY
+    // `s.page === page`. A tautology cannot fail, so a slot could be declared,
+    // briefed, counted in the fill rate and rendered by nothing at all — the
+    // exact state the comment promises to catch. §4 D57's shape in a test
+    // rather than in a compiler: a green result that describes nothing.
+    //
+    // It renders the body now and looks for the slot's own anchor, which
+    // `DocFigure` writes as `figure-<id>` on the `<figure>` element whether the
+    // slot is filled, falling back, or an empty placeholder. So this fails for
+    // a slot no page asks for, and keeps passing while a figure is still being
+    // drawn — which is the asymmetry the rest of this file is built on.
     const pages = [...new Set(FIGURE_SLOTS.map((s) => s.page))];
     const { DOC_BODIES } = await import("../bodies");
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { MemoryRouter } = await import("react-router-dom");
+
     for (const page of pages) {
-      expect(DOC_BODIES[page], `page "${page}" carries slots but has no body`).toBeDefined();
+      const Body = DOC_BODIES[page];
+      expect(Body, `page "${page}" carries slots but has no body`).toBeDefined();
+      const html = renderToStaticMarkup(
+        createElement(
+          MemoryRouter,
+          { initialEntries: [`/docs/${page}`] },
+          createElement(Body),
+        ),
+      );
       for (const s of slotsFor(page)) {
-        expect(s.page, `slot "${s.id}"`).toBe(page);
+        expect(
+          html.includes(`figure-${s.id}`),
+          `slot "${s.id}" is declared on "${page}" and that page renders no <DocFigure id="${s.id}" />. ` +
+            "A slot nothing asks for is briefed, counted and invisible.",
+        ).toBe(true);
       }
     }
   });

@@ -23,6 +23,7 @@
 // is the manual that was describing something else.
 
 import { PageTitle, Section, P, Key, Callout, Defs, DocLink, AppLink, Provenance } from "@/components/docs/prose";
+import { DocFigure } from "@/components/docs/DocFigure";
 import { INGEST_DATASETS } from "../../../../supabase/functions/_shared/ingestSpec.generated";
 
 export default function CsvVsConnector() {
@@ -101,6 +102,7 @@ export default function CsvVsConnector() {
       </Section>
 
       <Section id="what-is-not" title="What is not">
+        <DocFigure id="two-ingest-paths" />
         <div className="space-y-3">
           <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
             <p className="text-[13px] font-semibold text-foreground">

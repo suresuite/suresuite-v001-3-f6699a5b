@@ -30,12 +30,12 @@
 --   §6  THE LANE IS REBUILT WHEN ITS SOURCES CHANGE (§4 D142), including on a
 --       DELETE — the case that moves no timestamp, which is why the freshness
 --       signal reported AA-ver3's 48 stale edges as fresh.
---   §7  THE FALLBACK READ NO LONGER RAISES (§4 D147). `get_multi_tier_network_data`
+--   §7  THE FALLBACK READ NO LONGER RAISES (§4 D149). `get_multi_tier_network_data`
 --       projected `smt.data_source_group` from a table that has never had that
 --       column. It is `InteractiveNetworkSpace`'s fallback: the path a user
 --       reaches only after the primary read has already failed.
 --   §8  THE GRANTS AFTER TWO DROPs, and §9 the unit conversion the deployed
---       writer never had (§4 D148), and §10 the actor on a trigger-driven write.
+--       writer never had (§4 D150), and §10 the actor on a trigger-driven write.
 --
 -- ── MUTATIONS THAT MUST MAKE THIS FILE FAIL ───────────────────────────────
 -- Each performed against this file and verified red (§16 · WP 8.2):
@@ -439,7 +439,7 @@ BEGIN
     RAISE EXCEPTION 'WP 8.2 §6 — a new source row produced % lane edge(s), expected 1.', v_n;
   END IF;
 
-  -- ══ 7 · THE FALLBACK READ NO LONGER RAISES (D147) ══════════════════════
+  -- ══ 7 · THE FALLBACK READ NO LONGER RAISES (D149) ══════════════════════
   --
   -- `get_multi_tier_network_data` projected `smt.data_source_group` and
   -- `supply_chain_data_multi_tier` has never had that column, so the function
@@ -492,7 +492,7 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- ══ 9 · THE UNIT CONVERSION THE DEPLOYED WRITER NEVER HAD (D148) ═══════
+  -- ══ 9 · THE UNIT CONVERSION THE DEPLOYED WRITER NEVER HAD (D150) ═══════
   --
   -- D2 was closed in `combine-project` by WP 0.2 and never in the RPC: all eight
   -- of its `volume` reads were RAW, so a plant mixing monthly and weekly rows had
@@ -507,7 +507,7 @@ BEGIN
     RAISE EXCEPTION
       'WP 8.2 §9 — `MU → PRODU` carries %, expected 14 = (30.4375 / month → 7 / week) '
       '× 2. A raw read gives 60.875. `rate_to_weekly` is the one unit rule (I3) and '
-      'the deployed RPC never called it (§4 D148).', v_w;
+      'the deployed RPC never called it (§4 D150).', v_w;
   END IF;
 
   -- ══ 10 · THE TRIGGER-DRIVEN WRITE NAMES ITS ACTOR (G4) ═════════════════

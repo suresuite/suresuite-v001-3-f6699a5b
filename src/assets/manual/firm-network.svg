@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 356" aria-hidden="true" focusable="false" font-family="inherit">
+  <!-- A REPRESENTATION of the firm-level view, not a capture of a project.
+       Node size stands for a computed measure — prominence, which the analysis
+       writes and you do not — and the shape drawn is the one the page says
+       this view is for: two suppliers you buy from separately meeting at one
+       firm three steps back. -->
+
+  <text x="4" y="12" font-size="12" fill="hsl(var(--muted-foreground))">you</text>
+  <text x="74" y="12" font-size="12" fill="hsl(var(--muted-foreground))">tier 1</text>
+  <text x="152" y="12" font-size="12" fill="hsl(var(--muted-foreground))">tier 2</text>
+  <text x="240" y="12" font-size="12" fill="hsl(var(--muted-foreground))">tier 3</text>
+  <line x1="4" y1="18" x2="316" y2="18" stroke="hsl(var(--border))" stroke-width="1"/>
+
+  <!-- edges -->
+  <g stroke="hsl(var(--muted-foreground))" stroke-width="1.3" fill="none">
+    <path d="M40 86 L74 54"/>
+    <path d="M40 86 L74 122"/>
+    <path d="M96 54 L148 46"/>
+    <path d="M96 54 L148 96"/>
+    <path d="M96 122 L148 96"/>
+    <path d="M96 122 L148 146"/>
+  </g>
+  <!-- the two paths that meet -->
+  <g stroke="hsl(var(--foreground))" stroke-width="2" fill="none">
+    <path d="M170 46 L244 92"/>
+    <path d="M170 146 L244 92"/>
+  </g>
+  <path d="M170 96 L244 92" stroke="hsl(var(--muted-foreground))" stroke-width="1.3" fill="none"/>
+
+  <!-- nodes: radius stands for prominence -->
+  <circle cx="26" cy="86" r="14" fill="hsl(var(--foreground))"/>
+  <text x="26" y="90" text-anchor="middle" font-size="12" fill="hsl(var(--card))">you</text>
+
+  <circle cx="84" cy="54" r="10" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+  <circle cx="84" cy="122" r="10" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.4"/>
+
+  <circle cx="159" cy="46" r="8" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.3"/>
+  <circle cx="159" cy="96" r="7" fill="hsl(var(--card))" stroke="hsl(var(--border))" stroke-width="1.2"/>
+  <circle cx="159" cy="146" r="8" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" stroke-width="1.3"/>
+
+  <!-- the shared firm: largest, because prominence is largest -->
+  <circle cx="258" cy="92" r="17" fill="hsl(var(--card))" stroke="hsl(var(--destructive))" stroke-width="2"/>
+  <circle cx="258" cy="92" r="6" fill="hsl(var(--destructive))"/>
+
+  <!-- the two suppliers you think are independent -->
+  <text x="84" y="34" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">A</text>
+  <text x="84" y="148" text-anchor="middle" font-size="12" fill="hsl(var(--foreground))">B</text>
+
+  <path d="M258 116 L258 138 L200 138" stroke="hsl(var(--destructive))" stroke-width="1.2" fill="none"/>
+
+  <!-- ══ what the picture says ════════════════════════════════════════ -->
+  <line x1="4" y1="166" x2="316" y2="166" stroke="hsl(var(--border))" stroke-width="1"/>
+  <text x="4" y="184" font-size="12" fill="hsl(var(--foreground))">A and B are two separate suppliers.</text>
+  <text x="4" y="198" font-size="12" fill="hsl(var(--muted-foreground))">Different contracts, different invoices,</text>
+  <text x="4" y="210" font-size="12" fill="hsl(var(--muted-foreground))">different countries. You dual-sourced.</text>
+
+  <circle cx="10" cy="232" r="6" fill="hsl(var(--card))" stroke="hsl(var(--destructive))" stroke-width="1.6"/>
+  <circle cx="10" cy="232" r="2.5" fill="hsl(var(--destructive))"/>
+  <text x="26" y="236" font-size="12" fill="hsl(var(--foreground))">Both depend on this one firm.</text>
+  <text x="26" y="250" font-size="12" fill="hsl(var(--muted-foreground))">Nothing in your own purchasing data would</text>
+  <text x="26" y="262" font-size="12" fill="hsl(var(--muted-foreground))">ever show it. You have never bought from it.</text>
+
+  <!-- size key -->
+  <line x1="4" y1="280" x2="316" y2="280" stroke="hsl(var(--border))" stroke-width="1"/>
+  <circle cx="14" cy="300" r="5" fill="hsl(var(--card))" stroke="hsl(var(--muted-foreground))" stroke-width="1.2"/>
+  <circle cx="38" cy="300" r="9" fill="hsl(var(--card))" stroke="hsl(var(--muted-foreground))" stroke-width="1.2"/>
+  <text x="56" y="304" font-size="12" fill="hsl(var(--foreground))">size is a computed measure</text>
+  <text x="4" y="324" font-size="12" fill="hsl(var(--muted-foreground))">Prominence: an analysis wrote it, you did not</text>
+  <text x="4" y="336" font-size="12" fill="hsl(var(--muted-foreground))">upload it, and it belongs to the run that</text>
+  <text x="4" y="348" font-size="12" fill="hsl(var(--muted-foreground))">produced it.</text>
+</svg>
