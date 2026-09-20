@@ -7,7 +7,7 @@
       "generator": "scripts/data-contract/introspect.mjs",
       "migrations_found": 341,
       "migrations_applied": 333,
-      "last_migration": "20260919000008_one_etl.sql"
+      "last_migration": "20260920000003_one_etl.sql"
     },
     "sidecars": 54,
     "registry": {
@@ -16019,14 +16019,14 @@
           "kind": "CHECK",
           "columns": [],
           "definition": "CHECK (echelon IS NULL OR echelon IN ('customer','product','subassembly','material','supplier','plant','unknown'))",
-          "added_by": "20260919000001_one_node_classifier.sql"
+          "added_by": "20260920000001_one_node_classifier.sql"
         },
         {
           "name": "node_list_depths_non_negative",
           "kind": "CHECK",
           "columns": [],
           "definition": "CHECK ((bom_depth IS NULL OR bom_depth >= 0) AND (supply_tier IS NULL OR supply_tier >= 0))",
-          "added_by": "20260919000001_one_node_classifier.sql"
+          "added_by": "20260920000001_one_node_classifier.sql"
         }
       ],
       "indexes": [
@@ -16682,7 +16682,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20260919000001_one_node_classifier.sql",
+          "added_by": "20260920000001_one_node_classifier.sql",
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
@@ -16714,7 +16714,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20260919000001_one_node_classifier.sql",
+          "added_by": "20260920000001_one_node_classifier.sql",
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
@@ -16746,7 +16746,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20260919000001_one_node_classifier.sql",
+          "added_by": "20260920000001_one_node_classifier.sql",
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
@@ -28275,7 +28275,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20260919000008_one_etl.sql",
+          "added_by": "20260920000003_one_etl.sql",
           "unit": "levels down the bill of materials",
           "unit_source": "fixed",
           "unit_column": null,
@@ -30218,5 +30218,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "dc1618b7df79"
+  "contract_version": "232f60fe2622"
 }

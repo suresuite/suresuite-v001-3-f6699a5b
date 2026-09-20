@@ -33,6 +33,7 @@
 //   R17 every edge function is DEPLOYED or deferred with a named owner (D123, WP 6.3)
 //   R18 a `computed_by` names a writer that is CALLED, or declares why not (D118, WP 6.2)
 //   R19 §4, §16 and §17 each have exactly ONE heading (D146's merge, WP 8.0)
+//   R20 no two migration files share a version (D151's deploy, this package)
 //
 // WHY R1 IS THE ONE THAT MATTERS. "Every column of the twelve tables is
 // described" is a fact about twelve tables; it says nothing about the seventy
@@ -1010,6 +1011,51 @@ const git = (...args) => spawnSync("git", args, { cwd: ROOT, encoding: "utf8", m
   }
   if (!duplicated)
     console.log(`  R19 §4, §16 and §17 each have exactly one heading · ${singletons.length} checked`);
+}
+
+// ───────── R20: A MIGRATION VERSION IS A PRIMARY KEY, SO TWO FILES MAY NOT SHARE ONE
+//
+// FOUND BY A PRODUCTION DEPLOY FAILING, NOT BY A GATE (§4 D151).
+//
+// `supabase_migrations.schema_migrations` is keyed on `version` alone — the name
+// after the version is not part of the key and is never compared. `main` carried
+// FOUR files under TWO versions, one of each pair already applied in production, and
+// the CLI's pending set (local versions minus remote versions) left the other copy
+// looking pending. It ran that file's statements and died on the bookkeeping INSERT
+// with a duplicate-key error, rolling the transaction back and taking the two
+// migrations queued behind it with it.
+//
+// This is D146's collision in a PRIMARY KEY rather than in prose: a reader can
+// resolve two meanings for one D-number, and a database cannot resolve two meanings
+// for one version. `contract:rehearse` cannot see it in ANY of its three modes,
+// because all three apply a branch's migrations by FILE and never go through
+// `schema_migrations` — so the one gate that executes migrations is blind to it by
+// construction, which is why the rule has to be static.
+{
+  const MIGRATIONS = join(ROOT, "supabase", "migrations");
+  const byVersion = new Map();
+  for (const f of readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort()) {
+    const version = (f.match(/^(\d+)/) || [])[1];
+    if (!version) {
+      fail("R20", `migration "${f}" has no leading numeric version. The Supabase CLI keys ` +
+                  "`schema_migrations` on that number; a file without one cannot be applied.");
+      continue;
+    }
+    if (!byVersion.has(version)) byVersion.set(version, []);
+    byVersion.get(version).push(f);
+  }
+  let collisions = 0;
+  for (const [version, files] of byVersion) {
+    if (files.length < 2) continue;
+    collisions += 1;
+    fail("R20", `migration version ${version} is used by ${files.length} files: ${files.join(", ")}. ` +
+                "`schema_migrations` is keyed on the version alone, so the deploy applies one of " +
+                "them and then aborts on a duplicate key — taking every migration queued behind it " +
+                "with it (§4 D151). Renumber the file that has NOT been applied in production, and " +
+                "keep the relative order of any migration that depends on it.");
+  }
+  if (!collisions)
+    console.log(`  R20 migration versions are unique · ${byVersion.size} version(s) across ${[...byVersion.values()].flat().length} file(s)`);
 }
 
 // ──────────────────────────────────────────────────────────────────── report

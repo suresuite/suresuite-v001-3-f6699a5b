@@ -165,7 +165,7 @@ serve(async (req) => {
         //
         // This block used to delete `node_list` and `supply_chain_data` FIRST and
         // the four source lanes after. Deleting derived data before the data it
-        // is derived from is backwards on any reading; since `20260919000008`
+        // is derived from is backwards on any reading; since `20260920000003`
         // (§4 D142) it is also wrong, because the four source tables carry a
         // statement trigger that REBUILDS both edge tables. Deleting a source
         // would have re-derived the graph a moment after the graph was deleted,

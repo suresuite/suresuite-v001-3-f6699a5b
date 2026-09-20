@@ -327,7 +327,7 @@ How deep in the BILL OF MATERIALS this edge's UPSTREAM end sits — 0 a finished
 | Type | `integer` |
 | Grain | `level` |
 | Unit | `levels down the bill of materials` — fixed |
-| Added by | `20260919000008_one_etl.sql` |
+| Added by | `20260920000003_one_etl.sql` |
 | Read by the engine | `the network pages' depth filter and column position` |
 | Transform | `bom_multi_level.level` for a bom edge, `node_bom_depth(...) + 1` for a supplier |
 | Validated at ingest | — |
@@ -347,6 +347,6 @@ How deep in the BILL OF MATERIALS this edge's UPSTREAM end sits — 0 a finished
 
 ---
 
-*Generated from data contract `dc1618b7df79`, engine `0.2.3`,
+*Generated from data contract `232f60fe2622`, engine `0.2.3`,
 sidecar `supabase/contract/supply_chain_data_multi_tier.contract.yaml`, table created by `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

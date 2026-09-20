@@ -4,7 +4,7 @@
   "migrations_found": 341,
   "migrations_applied": 333,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260919000008_one_etl.sql",
+  "last_migration": "20260920000003_one_etl.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -11113,7 +11113,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20260919000001_one_node_classifier.sql"
+          "added_by": "20260920000001_one_node_classifier.sql"
         },
         {
           "name": "bom_depth",
@@ -11125,7 +11125,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20260919000001_one_node_classifier.sql"
+          "added_by": "20260920000001_one_node_classifier.sql"
         },
         {
           "name": "supply_tier",
@@ -11137,7 +11137,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20260919000001_one_node_classifier.sql"
+          "added_by": "20260920000001_one_node_classifier.sql"
         }
       ],
       "constraints": [
@@ -11175,14 +11175,14 @@
           "kind": "CHECK",
           "columns": [],
           "definition": "CHECK (echelon IS NULL OR echelon IN ('customer','product','subassembly','material','supplier','plant','unknown'))",
-          "added_by": "20260919000001_one_node_classifier.sql"
+          "added_by": "20260920000001_one_node_classifier.sql"
         },
         {
           "name": "node_list_depths_non_negative",
           "kind": "CHECK",
           "columns": [],
           "definition": "CHECK ((bom_depth IS NULL OR bom_depth >= 0) AND (supply_tier IS NULL OR supply_tier >= 0))",
-          "added_by": "20260919000001_one_node_classifier.sql"
+          "added_by": "20260920000001_one_node_classifier.sql"
         }
       ],
       "indexes": [
@@ -19429,7 +19429,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20260919000008_one_etl.sql"
+          "added_by": "20260920000003_one_etl.sql"
         }
       ],
       "constraints": [
@@ -21696,7 +21696,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D142. Rebuilds both edge tables when any of the four source lanes ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "auto_refresh_node_list_on_lane_change",
@@ -21706,7 +21706,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.1 · §4 D143. Replaces `auto_refresh_node_list_on_scd_change`, whose body ",
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "auto_refresh_node_list_on_scd_change",
@@ -22025,7 +22025,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": "WP 8.1 · §4 D127. THE node classifier. Every other one in this repository is ",
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "classify_node_type",
@@ -22038,7 +22038,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": "WP 8.1 · §4 D127. The LEGACY four-value vocabulary, now DERIVED from ",
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "cleanup_simulation_cache",
@@ -22075,7 +22075,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D140. The AUTHORIZING wrapper over `rebuild_supply_chain_lanes`. ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "create_agent_proposal",
@@ -22649,7 +22649,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 4.1's atomic tier-3 replace. DEAD as of WP 8.2 — its one caller was ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "expire_agent_proposals",
@@ -22822,7 +22822,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": "WP 8.3 · §4 D127. The read path for `node_list.echelon` / `bom_depth` / ",
-      "defined_by": "20260919000002_graph_nodes_read_path.sql"
+      "defined_by": "20260920000002_graph_nodes_read_path.sql"
     },
     {
       "name": "get_individual_scenario_results",
@@ -22874,7 +22874,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D149. `InteractiveNetworkSpace`'s fallback read. It projected a ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "get_my_capabilities",
@@ -23183,7 +23183,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D134, D140. The deep lane's read path. Returns `bom_depth` beside ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "get_supply_chain_data",
@@ -23754,7 +23754,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": "WP 8.1 · §4 D140. THE node BOM-depth rule, now reading BOTH bom tables (WP 8.2, ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "node_list_discover",
@@ -23768,7 +23768,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.1 · §4 D132, D66. The node-set discovery, reading BOTH edge tables and ",
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "node_supply_tier",
@@ -23781,7 +23781,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "normalize_node_location_fields",
@@ -23890,7 +23890,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "rebuild_supply_chain_lanes",
@@ -23903,7 +23903,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D140. THE supply-chain lane derivation — the ONE writer of both ",
-      "defined_by": "20260919000008_one_etl.sql"
+      "defined_by": "20260920000003_one_etl.sql"
     },
     {
       "name": "recompute_project_completion",
@@ -24017,7 +24017,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.1 · §4 D127, D132. Rebuilds the typed node projection from BOTH edge ",
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "refresh_node_list_for_project",
@@ -24029,7 +24029,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260919000001_one_node_classifier.sql"
+      "defined_by": "20260920000001_one_node_classifier.sql"
     },
     {
       "name": "restore_policy_version",

@@ -29,8 +29,8 @@ partially or get corrected — the write fails.
 
 | Constraint | Rule | Added by |
 |---|---|---|
-| `node_list_echelon_declared` | `CHECK (echelon IS NULL OR echelon IN ('customer','product','subassembly','material','supplier','plant','unknown'))` | `20260919000001_one_node_classifier.sql` |
-| `node_list_depths_non_negative` | `CHECK ((bom_depth IS NULL OR bom_depth >= 0) AND (supply_tier IS NULL OR supply_tier >= 0))` | `20260919000001_one_node_classifier.sql` |
+| `node_list_echelon_declared` | `CHECK (echelon IS NULL OR echelon IN ('customer','product','subassembly','material','supplier','plant','unknown'))` | `20260920000001_one_node_classifier.sql` |
+| `node_list_depths_non_negative` | `CHECK ((bom_depth IS NULL OR bom_depth >= 0) AND (supply_tier IS NULL OR supply_tier >= 0))` | `20260920000001_one_node_classifier.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
@@ -421,7 +421,7 @@ THE node's role in the supply chain, authored once and read rather than re-infer
 | Type | `text` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20260919000001_one_node_classifier.sql` |
+| Added by | `20260920000001_one_node_classifier.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -437,7 +437,7 @@ Depth in the BOM tree, read from `bom_multi_level.level` — the table that OWNS
 | Type | `integer` |
 | Grain | `level` |
 | Unit | dimensionless |
-| Added by | `20260919000001_one_node_classifier.sql` |
+| Added by | `20260920000001_one_node_classifier.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -453,7 +453,7 @@ Tiers upstream of the focal plant: 0 the plant itself, 1 a direct supplier, 2 an
 | Type | `integer` |
 | Grain | `level` |
 | Unit | dimensionless |
-| Added by | `20260919000001_one_node_classifier.sql` |
+| Added by | `20260920000001_one_node_classifier.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -470,6 +470,6 @@ Tiers upstream of the focal plant: 0 the plant itself, 1 a direct supplier, 2 an
 
 ---
 
-*Generated from data contract `dc1618b7df79`, engine `0.2.3`,
+*Generated from data contract `232f60fe2622`, engine `0.2.3`,
 sidecar `supabase/contract/node_list.contract.yaml`, table created by `20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
