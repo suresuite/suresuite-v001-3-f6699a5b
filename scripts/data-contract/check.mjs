@@ -1099,6 +1099,29 @@ const covered = [...sidecars.keys()].length;
     const watched = new Set(
       [...wf.matchAll(/supabase\/functions\/([a-z0-9-]+)\/\*\*/g)].map((m) => m[1]),
     );
+    // THE THIRD CLAUSE, AND IT COST SEVEN CONSECUTIVE PRODUCTION DEPLOYS (D165).
+    // A deploy STEP is not a deploy. `combine-project`'s step was added without the
+    // `env:` block every one of its neighbours carries, so `supabase functions
+    // deploy` exited 1 with "Access token not provided" on every push to `main`
+    // since 2026-09-19 — and because the job runs `bash -e`, the step AFTER it never
+    // ran either. R17 counted the step and reported the function deployed, which is
+    // D123's own lesson arriving one level up: the gate read the intention to deploy
+    // rather than the ability to.
+    const deployStepMissingToken = [];
+    for (const step of wf.split(/\n      - name: /).slice(1)) {
+      const m = step.match(/functions deploy ([a-z0-9-]+)/);
+      if (!m) continue;
+      // The step ends where the next one begins; `split` already gave us exactly that.
+      if (!/SUPABASE_ACCESS_TOKEN/.test(step)) deployStepMissingToken.push(m[1]);
+    }
+    for (const fn of deployStepMissingToken) {
+      fail("R17",
+        `${fn}'s deploy step carries no SUPABASE_ACCESS_TOKEN, so \`supabase functions ` +
+        "deploy` exits 1 with \"Access token not provided\" and — under `bash -e` — takes " +
+        "every later step in the job with it. The function never reaches production and " +
+        "the workflow is red on every push (§4 D165). Add the `env:` block its neighbours have.");
+    }
+
     const present = readdirSync(fnDir, { withFileTypes: true })
       .filter((d) => d.isDirectory() && !d.name.startsWith("_"))
       .map((d) => d.name)
