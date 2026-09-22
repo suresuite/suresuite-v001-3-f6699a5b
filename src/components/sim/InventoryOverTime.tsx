@@ -28,12 +28,13 @@ import { Boxes } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Replication } from "@/hooks/useSimulationRun";
 import { meanCI } from "@/lib/sim/validationStats";
+import { MONEY_SYMBOL } from "@/lib/sim/money";
 
 /** The two denominations the engine measures each stock in. */
 const DENOMINATIONS = {
   value: {
     label: "Value",
-    unit: "€",
+    unit: MONEY_SYMBOL,
     material: "on_hand_value",
     finished: "fg_value",
     caption: "Material stock at unit cost; finished goods at unit COGS.",
@@ -68,7 +69,7 @@ function fmtAxis(v: number, unit: string): string {
     abs >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M`
     : abs >= 1_000 ? `${(v / 1_000).toFixed(0)}k`
     : v.toFixed(0);
-  return unit === "€" ? `€${n}` : n;
+  return unit === MONEY_SYMBOL ? `${MONEY_SYMBOL}${n}` : n;
 }
 
 /** Weekly traces for one key, across the replications that carry it. */

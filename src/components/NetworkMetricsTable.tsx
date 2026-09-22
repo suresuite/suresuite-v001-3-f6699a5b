@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { formatMoneyCompact } from '@/lib/sim/money';
 
 interface NetworkMetric {
   id: string;
@@ -137,9 +138,7 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
 
   const formatRevenue = (value: number | null) => {
     if (value === null) return '-';
-    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
-    return `$${value.toFixed(0)}`;
+    return formatMoneyCompact(value);
   };
 
   const getSortIcon = (field: SortField) => {

@@ -87,33 +87,6 @@ async function broadcast(channel: string, event: string, payload: unknown) {
   }
 }
 
-function stubKpiDelta(cmd: Command) {
-  const magnitude = Number((cmd.payload as Record<string, unknown>).magnitude ?? 0);
-  const base = { fill_rate: 0.94, otif: 0.91, revenue: 1_000_000, lead_time_days: 7.2 };
-  const k = Math.tanh(magnitude / 100);
-  return {
-    fill_rate: +(base.fill_rate - 0.18 * k).toFixed(4),
-    otif: +(base.otif - 0.22 * k).toFixed(4),
-    revenue: Math.round(base.revenue * (1 - 0.27 * k)),
-    lead_time_days: +(base.lead_time_days + 4.5 * k).toFixed(2),
-    source: "stub",
-  };
-}
-
-function stubPolicyKpiDelta(cmd: Command) {
-  const family = String((cmd.payload as Record<string, unknown>).family ?? "");
-  const base = { fill_rate: 0.94, otif: 0.91, revenue: 1_000_000, lead_time_days: 7.2, utilization: 0.78 };
-  const bumps: Record<string, Partial<typeof base>> = {
-    inventory: { fill_rate: 0.955, otif: 0.92, utilization: 0.74 },
-    sourcing: { fill_rate: 0.948, revenue: 1_010_000 },
-    transport: { lead_time_days: 6.8, utilization: 0.82 },
-    fulfillment: { otif: 0.925, fill_rate: 0.95 },
-    production: { revenue: 1_005_000, lead_time_days: 6.9, utilization: 0.86 },
-    recovery: { fill_rate: 0.96, otif: 0.93 },
-  };
-  return { ...base, ...(bumps[family] ?? {}), source: "stub" };
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -232,21 +205,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Default: enqueue + broadcast echoes (existing behavior).
+    // Default: enqueue + broadcast the command echo. KPIs are the worker's to
+    // publish (`kpi.delta`, source "worker"); this function used to broadcast
+    // hard-coded stub figures on scenario/policy changes (audit 2026-09-22 · F-34).
     await Promise.all([
       enqueueEnvelope(deps, cmd.project_id, envelope).catch((e) =>
         console.error("xadd failed", e)
       ),
       broadcast(channel, "command", envelope),
-      cmd.kind === "scenario.changed"
-        ? broadcast(channel, "kpi.delta", { kpis: stubKpiDelta(cmd), ts: Date.now(), source: "stub" })
-        : cmd.kind === "policy.changed"
-        ? broadcast(channel, "kpi.delta", {
-            kpis: stubPolicyKpiDelta(cmd),
-            ts: Date.now(),
-            source: "stub",
-          })
-        : Promise.resolve(),
     ]);
     fireWakeWorker();  // scenario/policy commands also feed the Fly worker
 

@@ -100,6 +100,7 @@ import { RunQueueConsole } from "@/components/sim/RunQueueConsole";
 import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { M, MobileChip, MobileGroup, MobilePanel, MobileRow } from '@/components/mobile';
+import { formatMoney, MONEY_SYMBOL } from "@/lib/sim/money";
 
 // Runs launched from the policies stage all reuse this single auto-managed
 // scenario so the Lab's scenario list doesn't fill up with validation runs.
@@ -490,7 +491,7 @@ export function RunValidateStage({
     } else if (dbRun.status === "done") {
       const agg = dbRun.aggregate_kpis ?? {};
       const fr = agg.fill_rate != null ? `${(agg.fill_rate * 100).toFixed(1)}%` : "—";
-      const rev = agg.revenue != null ? `€${Math.round(agg.revenue).toLocaleString()}` : "—";
+      const rev = agg.revenue != null ? formatMoney(agg.revenue) : "—";
       setRunPhase({
         kind: "succeeded",
         summary: `fill rate ${fr} · revenue ${rev} · ${dbRun.rep_count_done} replication(s) · ${dbRun.code_version || "server"} (server)`,
@@ -1028,7 +1029,7 @@ export function RunValidateStage({
 
     const agg = (result.runUpdate.aggregate_kpis as Record<string, number>) ?? {};
     const fr = agg.fill_rate != null ? `${(agg.fill_rate * 100).toFixed(1)}%` : "—";
-    const rev = agg.revenue != null ? `€${Math.round(agg.revenue).toLocaleString()}` : "—";
+    const rev = agg.revenue != null ? formatMoney(agg.revenue) : "—";
     setRunPhase({
       kind: "succeeded",
       summary: `fill rate ${fr} · revenue ${rev} · ${result.replications.length} replication(s) · scsim ${result.engineVersion}`,
@@ -2728,7 +2729,7 @@ function fmtKpi(id: string, v: number | null | undefined): string {
 
 function fmtEuro(v: number | null): string {
   if (v == null || !Number.isFinite(v)) return "—";
-  return `€${Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(2)}`;
+  return Math.abs(v) >= 1000 ? formatMoney(v) : `${MONEY_SYMBOL}${v.toFixed(2)}`;
 }
 
 const SUMMARY_TILES = [
