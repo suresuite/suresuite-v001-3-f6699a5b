@@ -3360,6 +3360,35 @@ async function wp65aLandingSwitch() {
       : "- **Not met.** No tier-2 row carries a `source_row_id` that resolves — expected before the switch, the whole exit after it.");
   });
 
+  // (4b) EVERY APPLIED RUN, AND WHERE ITS ROWS WENT. (4) proves one row per table;
+  // this proves the other direction — that a run the database calls `applied` left
+  // rows in the table it names. Added after the first after-read showed a run with
+  // 271 staged rows, status `applied`, whose project holds no tier-2 row at all.
+  const perTarget = LANDABLE.map((t) => `
+      select '${t}'::text as tbl, x.source_row_id from public.${t} x where x.source_row_id is not null`)
+    .join("\n      union all ");
+  const landed = await tryQ(`
+    with traced as (${perTarget})
+    select r.id::text as run, p.name as project, s.target_table,
+           r.status, r.applied_at::text as applied_at,
+           count(*)::int as staged,
+           count(*) filter (where exists (select 1 from traced t where t.source_row_id = s.id))::int as in_tier2,
+           count(*) filter (where s.findings @> '[{"level": "error"}]'::jsonb)::int as held
+      from public.ingest_runs r
+      join public.ingest_staged_rows s on s.ingest_run_id = r.id
+      left join public.projects p on p.id = r.project_id
+     where r.status = 'applied'
+     group by 1, 2, 3, 4, 5
+     order by r.applied_at`);
+  report("(4b) applied runs — where their rows are", landed, (rows) => {
+    out("", "**(4b) every applied run, and how many of its staged rows a tier-2 row still names:**");
+    out(...table(rows.map((r) => ({ ...r, run: String(r.run).slice(0, 8) }))));
+    const lost = rows.filter((r) => Number(r.in_tier2) + Number(r.held) < Number(r.staged));
+    out(lost.length
+      ? `- **${lost.length} applied run(s) name fewer tier-2 rows than they staged** — either the rows were removed after the promotion, or the promotion wrote them without \`source_row_id\`. Read the run before reading this as a loss.`
+      : "- Every applied run's staged rows are either held or named by a tier-2 row.");
+  });
+
   // Whether production SERVES `ingest-file`, which SQL cannot see (D123, D168).
   const fns = await apiGet("/functions");
   report("(5) is `ingest-file` published?", fns, (r) => {
