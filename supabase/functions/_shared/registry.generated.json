@@ -128,7 +128,7 @@
       "reason": "Empty means unlimited (a valid modeling choice) \u2014 but partial-magnitude supplier disruptions need a finite capacity to throttle, else they degrade to full outages."
     }
   ],
-  "engine_version": "0.2.3",
+  "engine_version": "0.2.4",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -1109,13 +1109,13 @@
       "unit": "%"
     },
     {
-      "definition": "Weeks from disruption start until weekly FR re-enters the pre-disruption band (3-week sustained); 0 if FR never left the band.",
+      "definition": "Weeks from disruption start until weekly FR re-enters the pre-disruption band (3-week sustained); 0 if FR never left the band. ABSENT when censored (never recovered inside the window \u2014 ttr_censored=1) or when the window holds no pre-disruption week (recovery_measurable=0); never a sentinel.",
       "name": "ttr_weeks",
       "symbol": "TTR",
       "unit": "wks"
     },
     {
-      "definition": "Weeks from disruption start that FR survives inside the band (time-to-survive under the shock).",
+      "definition": "Weeks from disruption start that FR survives inside the band (time-to-survive under the shock). ABSENT when censored (never left the band \u2014 tts_censored=1) or unmeasurable.",
       "name": "tts_weeks",
       "symbol": "TTS",
       "unit": "wks"

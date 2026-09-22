@@ -37,7 +37,7 @@ const facts = deriveRunKpis(ROOT) as {
 
 describe("§4 D113 · the run's measures reach the table", () => {
   it("the component builds its rows with the tested function", () => {
-    expect(COMPONENT).toMatch(/buildKpiRows\(reps\)/);
+    expect(COMPONENT).toMatch(/buildKpiRows\(reps,/);
   });
 
   it("the derivation still finds the engine's KPI row", () => {
@@ -68,7 +68,9 @@ describe("§4 D113 · the run's measures reach the table", () => {
 
   it("the table is driven by the RUN's keys, not by the catalog", () => {
     // The whole fix in one assertion: the keys come off the replication rows.
-    expect(TABLE).toMatch(/new Set\(done\.flatMap\(\(r\) => Object\.keys\(r\.kpis \?\? \{\}\)\)\)/);
+    // Audit WP 3 filtered the engine's recovery FLAGS out of the run's keys; the
+    // keys still come from the run's rows, which is what D113 pins.
+    expect(TABLE).toMatch(/done\.flatMap\(\(r\) => Object\.keys\(r\.kpis \?\? \{\}\)\)/);
     expect(TABLE).not.toMatch(/KPI_DISPLAY\.map/);
   });
 

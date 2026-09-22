@@ -172,7 +172,7 @@ export function ResultsDashboard({
         reps={reps.filter((r) => r.status === "done" && r.kpis)}
         warmupWeeks={run.warmup_detected_at}
       />
-      <KpiStatTable reps={reps} primaryKpi={primaryKpi} />
+      <KpiStatTable reps={reps} primaryKpi={primaryKpi} codeVersion={codeVersion} />
       {/* `UtilizationHeatmap` WAS HERE AND IS REMOVED — §4 D113.
           It read a per-node `utilization` series from each replication and NO
           ENGINE WRITES ONE: `extra_series` carries exactly the four

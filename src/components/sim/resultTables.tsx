@@ -47,6 +47,9 @@ export interface KpiStat {
   min: string;
   max: string;
   n: number;
+  /** What the mean does NOT include, said beside it (audit WP 3): censored
+   *  replications, unmeasurable ones, or a run from an engine before a fix. */
+  note?: string;
 }
 
 export function KpiStatTable({ rows, primaryKpi }: { rows: KpiStat[]; primaryKpi: string }) {
@@ -77,6 +80,9 @@ export function KpiStatTable({ rows, primaryKpi }: { rows: KpiStat[]; primaryKpi
                 >
                   {r.label}
                 </span>
+                {r.note ? (
+                  <span className="block pl-2 text-[10.5px] leading-tight text-[--zinc-quiet]">{r.note}</span>
+                ) : null}
               </td>
               <td className={cn(TD, "pr-1 text-right text-[12.5px] tabular-nums text-[#18181b]")} style={{ background: bg }}>
                 {r.mean}

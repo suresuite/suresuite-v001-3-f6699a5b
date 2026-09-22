@@ -283,6 +283,6 @@ is about the column and not only about the table.
 
 ---
 
-*Generated from data contract `f3c2cfdbd30a`, engine `0.2.3`,
+*Generated from data contract `d1fbba79d35d`, engine `0.2.4`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

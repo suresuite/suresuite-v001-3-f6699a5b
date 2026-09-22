@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { disruptionWeeks } from "@/lib/sim/runWindow";
+import { AUTO_WARMUP_RULE, defaultDisruptionStartDay, warmupNote } from "@/lib/sim/disruptionTiming";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2 } from "lucide-react";
@@ -12,6 +13,9 @@ interface Props {
   value: Scenario["disruption_schedule"];
   onChange: (next: Scenario["disruption_schedule"]) => void;
   projectId?: string | null;
+  /** The scenario's warm-up, so a new disruption starts where KPIs are measured
+   *  and a row inside the warm-up says what the engine will do (audit F-03). */
+  warmup?: { days: number; mode: string; horizonDays: number };
 }
 
 /** Local display text, separate from the committed number: a controlled
@@ -57,7 +61,7 @@ function DisruptionNumberInput({
   );
 }
 
-export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) {
+export function DisruptionScheduleEditor({ value, onChange, projectId, warmup }: Props) {
   const { unit, fromDays, toDays } = useTimeUnit(projectId);
   const unitPlural = UNIT_LABEL_PLURAL[unit ?? "day"];
 
@@ -75,7 +79,12 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
 
   // discrete actions (add/remove/type select) still commit immediately
   const add = () => {
-    const next = [...local, { target: "", target_type: "node", start_day: 10, duration_days: 5, magnitude_pct: 50 }];
+    // The default start was day 10 → engine week 1: inside every warm-up, so the
+    // default disruption was a no-disruption run with a fabricated recovery time
+    // (audit F-03). It now starts four measured weeks after the warm-up, so the
+    // recovery band has a pre-disruption baseline to be measured against.
+    const next = [...local, { target: "", target_type: "node",
+      start_day: defaultDisruptionStartDay(warmup?.days), duration_days: 5, magnitude_pct: 50 }];
     setLocal(next);
     onChange(next);
   };
@@ -94,6 +103,9 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
   return (
     <div className="flex flex-col gap-2">
       {local.length === 0 && <p className="text-xs text-muted-foreground">No disruptions scheduled.</p>}
+      {local.length > 0 && warmup && String(warmup.mode).toLowerCase() !== "manual" && (
+        <p className="text-[10px] text-muted-foreground">{AUTO_WARMUP_RULE}</p>
+      )}
       {local.map((d, i) => (
         <div key={i} className="grid grid-cols-2 gap-2 items-end border border-border p-2 rounded-sm md:grid-cols-12">
           <div className="col-span-2 flex flex-col gap-1 md:col-span-3">
@@ -147,7 +159,7 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-          <EngineTicks startDay={d.start_day} durationDays={d.duration_days} />
+          <EngineTicks startDay={d.start_day} durationDays={d.duration_days} warmup={warmup} />
         </div>
       ))}
       <Button variant="outline" size="sm" className="self-start gap-1" onClick={add}>
@@ -161,13 +173,17 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
  *  engine advances in weekly ticks, so a 3-day and a 10-day disruption are the
  *  same one-week event. Mobile said so in its sheet header; the desktop editor
  *  said nothing. The translation comes from the engine's exported rule. */
-export function EngineTicks({ startDay, durationDays }: { startDay: number; durationDays: number }) {
+export function EngineTicks({ startDay, durationDays, warmup }: {
+  startDay: number; durationDays: number; warmup?: { days: number; mode: string; horizonDays: number };
+}) {
   const { startWeek, durationWeeks } = disruptionWeeks(startDay, durationDays);
   const collapsed = startDay % 7 !== 0 || durationDays !== durationWeeks * 7;
+  const note = warmupNote(startWeek, warmup);
   return (
     <p className="col-span-2 text-[10px] text-muted-foreground md:col-span-12">
       Engine runs week {startWeek} for {durationWeeks} wk
       {collapsed ? " — authored in days; the engine advances in weekly ticks" : ""}
+      {note ? <span className="block text-[--warn-ink,#92400e]">{note}</span> : null}
     </p>
   );
 }

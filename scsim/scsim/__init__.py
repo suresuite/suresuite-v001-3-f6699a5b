@@ -18,7 +18,7 @@ __version__ = "0.2.0"
 # Engine semantic version. Bump per change-governance tiers (Part IX §9.5):
 #   Tier 2 (new variable, behavior-neutral default) -> patch
 #   Tier 3 (new phase / contract change)            -> minor or major + ADR
-ENGINE_VERSION = "0.2.3"  # Tier 2: single-run inspection surface — per-item weekly matrices on ScenarioResult (behavior-neutral; full_debug + 1 rep only)
+ENGINE_VERSION = "0.2.4"  # audit WP 3: no substituted TTR baseline; censored TTR/TTS are flags, not values; fixed starts inside warm-up shift to t_w
 
 from scsim.entities.config import SimulationSettings, StatisticsReport  # noqa: E402,F401
 from scsim.entities.network import (  # noqa: E402,F401

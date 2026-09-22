@@ -2350,15 +2350,27 @@ export const RUN_KPIS: RunKpis = {
       "always": true
     },
     {
+      "key": "recovery_measurable",
+      "always": false
+    },
+    {
+      "key": "pre_disruption_fill_rate",
+      "always": false
+    },
+    {
+      "key": "ttr_censored",
+      "always": false
+    },
+    {
+      "key": "tts_censored",
+      "always": false
+    },
+    {
       "key": "ttr_weeks",
       "always": false
     },
     {
       "key": "tts_weeks",
-      "always": false
-    },
-    {
-      "key": "pre_disruption_fill_rate",
       "always": false
     }
   ],

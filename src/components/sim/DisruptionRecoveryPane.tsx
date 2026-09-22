@@ -320,6 +320,7 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave, sect
             value={scenario.disruption_schedule}
             onChange={(v) => onSave({ disruption_schedule: v })}
             projectId={projectId}
+            warmup={{ days: scenario.warmup_days, mode: scenario.warmup_mode, horizonDays: scenario.horizon_days }}
           />
         </CardContent>
       </Card>
