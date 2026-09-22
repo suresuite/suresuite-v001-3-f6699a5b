@@ -2032,7 +2032,8 @@ at the root passes vacuously**, because `tsconfig.json` is `"files": []` plus tw
 project references and therefore checks nothing. `npm run typecheck` pins
 `tsconfig.app.json`, refuses to report success from a program that does not
 contain `src/main.tsx` and at least 50 files under `src/`, and ratchets against
-`scripts/typecheck-baseline.json` — 28 pre-existing errors in twelve files, each
+`scripts/typecheck-baseline.json` — 28 pre-existing errors in twelve files when
+it landed (17 in nine as of audit WP 8), each
 with a named owner, a list that may shrink and may not grow. It runs in
 `npm run lint` and in `data-contract.yml`. Teeth proved by reverting the type
 fix: 61 new errors, exit 1; by pointing it at the root tsconfig: exit 2; and by
@@ -18709,6 +18710,83 @@ Handoff to next WP:
   warm-up can be compared across the switch.
 - **WP 8 next**, then WP 7, WP 9 and WP 10, as the user asked ("continue until we
   get everything done").
+
+### Audit 2026-09-22 · WP 8 — trust, exports, provenance · 2026-09-22 · `20260922000002`
+
+Previous package promised: WP 6b handed nothing on. WP 6 handed this package
+the export's `seed_used` column. The brief listed F-11, F-12, F-26 and F-29, plus D-3 and D-6. D-1 and
+D-4 are corrected here too, because this package touches the rows they are about.
+
+This package found: **F-12 was worse than "more optimistic". It was the D103
+defect the plan had already closed once, coming back through the INPUTS.** WP 6.3
+made the workbook call the Trust Report's own `knownLimits` so the two lists could
+not diverge. Then the call passed `tables: {}` and `latest_runs: []`, and the two
+COUNTED limits vanished from every export. A shared function with different inputs
+is two computations. The gate now compares OUTPUTS: the export's limits for a
+project must be a superset of the report's.
+
+**Per finding:**
+
+- **F-11 / D-3 — FIXED, with a stamp and a fallback that cannot lie.**
+  `20260922000002` adds nullable `simulation_runs.seed` and `disruption_schedule`
+  with NO default: a run older than the stamp reads NULL, never a fabricated value.
+  The dispatcher stamps both (`_shared/runStamp.ts`). If the function deploys ahead
+  of its migration (both fire on merge, in no fixed order), the insert is retried
+  ONCE without the stamp on exactly the PGRST204 error for those two columns, so
+  dispatch never breaks. `resolveRunScenarioBinding` binds the stamp. For an
+  unstamped run it binds the live row ONLY when the row is provably unchanged since
+  dispatch (`updated_at <= created_at`, the guard sim-command's reuse check has
+  always used), and otherwise binds nothing, with the reason. The record gains a
+  REQUIRED `scenario.disruption_schedule` binding (a digest; the full schedule is on
+  the scenario sheet). The seed's stated source was `sim_scenarios.seed`, a table
+  that does not exist; it is now the actual source. **Gates:**
+  `runScenarioBinding.test.ts`, `runStamp.test.ts`, `reproducibilityRecord.test.ts`
+  (3 new) and `supabase/rehearsal/360` (columns nullable with no default).
+  **Mutations:** guard removed → red; stamp ignored → red.
+- **F-12 / D-6 — FIXED.** The export reads `project_freshness` and the same
+  ingest history as the report. The mapping of `ingest_runs` rows is ONE function
+  (`ingestHistoryFrom`) used by both surfaces. A failed freshness read becomes a
+  declared limit, never "nothing stale". The "VERBATIM" comment is gone; the
+  statement is now true and tested. **Gate:** `exportTrustInputs.test.ts`
+  (superset, plus the two counted limits present). **Mutation:** empty tables →
+  red.
+- **F-29 — FIXED.** `analysesAtRun` binds the latest succeeded analysis per kind
+  that FINISHED BEFORE the run was dispatched. A kind that only ran later binds
+  nothing. `projectName` is the project's name, not `"project " + id.slice(0,8)`.
+  **Gate:** `exportTrustInputs.test.ts`. **Mutation:** no cutoff → 2 red.
+- **F-26 — FIXED: three always-true limits are published.** The fixed 52-week
+  analysis window; §4 D168 (production serves edge-function builds this repository
+  does not describe); and the pre-run check failing open and grading at most
+  50 000 rows per table. `trustReportLimits.test.ts` already gates `§4 D<n>` refs
+  against "Closed by"; D168 is OPEN, so the ref passes that gate honestly.
+  **Mutation:** ref dropped → red.
+- **WP 6's handoff — FIXED.** The workbook's `replication_kpis` header reads
+  `seed_used (display key, not a seed)`. The values are unchanged so existing
+  readers still line up.
+- **D-1, D-3, D-4 — CORRECTED in CLAUDE.md in this commit.** D-1: the
+  `single-source` row now says D103 is CLOSED and names its gate. D-3: the
+  `result-binding` row says the schedule and seed come from the run since this
+  package. D-4: the typecheck baseline is **17 in nine**. The audit read 21;
+  this package paid four in `TrustReportPanel.tsx`, and the ratchet REQUIRED
+  lowering it, because "one fewer than the baseline also fails".
+
+Discovered:
+- **Importing `dispatch.ts` into a browser test fails typecheck**, because it pulls
+  in `env.ts` and its `Deno` global. Pure helpers a browser test needs belong in a
+  dependency-free `_shared/` module, which is why `runStamp.ts` exists. No plan
+  edit; noted for the next person who reaches for `dispatch.ts`.
+
+Baseline numbers:
+- typecheck baseline 21 → **17** errors, nine files
+- migration `20260922000002` (additive, nullable, no default); rehearsal `360`
+- tests: vitest 1016 → **1034**; scsim 287; sim-worker 116
+
+Handoff to next WP:
+- **The stamp is only as good as the deploy order.** Until `20260922000002` is
+  applied, dispatch runs unstamped and exports resolve through the guard. Take the
+  §15 reading in the push AFTER the merge (D153), counting runs with a non-NULL
+  `seed`.
+- **WP 7 next** (network classification), then WP 9 and WP 10.
 
 ---
 ---

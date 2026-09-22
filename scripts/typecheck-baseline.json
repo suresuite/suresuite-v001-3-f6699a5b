@@ -7,8 +7,8 @@
       "why": "`target_type` is a `\"node\" | \"edge\"` union in state and plain `string` where it is parsed. §16 · WP 6.4 records that `_targets` has this discriminator and NO validation behind it, so the type error and the missing CHECK are the same defect seen from two sides. WP 6.4's. This entry held 4 until it was lowered: the other two were `e.target.value` on the Duration and Magnitude handlers, which take a `number`, not a `ChangeEvent` — a real runtime defect (the edit never reached state) parked behind a `why` that described only `target_type`. Fixed; the entry now covers no more than it describes."
     },
     "src/components/trust/TrustReportPanel.tsx": {
-      "count": 6,
-      "why": "The generated Supabase client types do not know `ingest_runs`, so `.from('ingest_runs')` resolves to a SelectQueryError union and every field read off it is an error. The client types are regenerated outside this repository; WP 4.4's panel, not Phase 5's."
+      "count": 2,
+      "why": "The generated Supabase client types do not know `ingest_runs`, so `.from('ingest_runs')` resolves to a SelectQueryError union and every field read off it is an error. The client types are regenerated outside this repository; WP 4.4's panel, not Phase 5's. Audit WP 8 moved the ingest-row mapping into `ingestHistoryFrom`, which types its input, and paid four of the six; the two left are the `.from('ingest_runs')` query itself."
     },
     "src/components/trust/useProjectFreshness.ts": {
       "count": 1,

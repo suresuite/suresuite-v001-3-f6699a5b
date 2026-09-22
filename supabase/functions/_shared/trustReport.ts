@@ -235,6 +235,39 @@ export function knownLimits(input: TrustReportInput): KnownLimit[] {
       "proof of identity.",
   });
 
+  // ── THE ENGINE AND THE DEPLOYMENT (audit 2026-09-22, F-26) ──────────────
+  // T3 was met for the data layer and not for these. Each is always true today;
+  // when one stops being true, delete it here in the change that made it so.
+  out.push({
+    ref: "T3 · engine",
+    limit:
+      "Every simulated figure is measured over a fixed window of 52 weeks after the " +
+      "warm-up (less on a short horizon); weeks of the horizon beyond it are simulated " +
+      "but not measured.",
+    consequence:
+      "A longer horizon does not produce a longer measurement. The scenario form's " +
+      "Run-window card states the window the engine will measure.",
+  });
+  out.push({
+    ref: "§4 D168",
+    limit:
+      "Production serves edge-function builds this repository does not describe: some " +
+      "are older than the code here, and some have no source here at all.",
+    consequence:
+      "Where a feature is served by one of them, the code that answered is not the code " +
+      "that was reviewed, so its behaviour cannot be read from this repository.",
+  });
+  out.push({
+    ref: "T3 · pre-run check",
+    limit:
+      "The pre-run data check lets a run proceed when it cannot read its data, and it " +
+      "grades at most 50 000 rows per table.",
+    consequence:
+      "A run that skipped the check is labelled Unchecked on its results, and a larger " +
+      "table produces a warning that must be acknowledged — but in both cases the " +
+      "check did not see all of the data.",
+  });
+
   if (input.graded === null) {
     out.push({
       ref: "T3",

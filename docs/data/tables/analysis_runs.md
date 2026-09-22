@@ -329,6 +329,6 @@ Last lifecycle change. The IDENTITY columns are frozen by `analysis_runs_identit
 
 ---
 
-*Generated from data contract `6c0a62cf6ba7`, engine `0.2.7`,
+*Generated from data contract `f1a5071b0109`, engine `0.2.6`,
 sidecar `supabase/contract/analysis_runs.contract.yaml`, table created by `20260917000006_analysis_store.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
