@@ -48,9 +48,18 @@ const SERIES_COLORS = [
 interface Props {
   runId: string;
   warmupWeeks?: number | null;
+  /** What to say when the run carries no per-item evidence.
+   *
+   *  Omitted, the panel renders nothing — right on /policies, where the
+   *  inspection toggle sits a few rows above and silence is not a dead end.
+   *  On /simulation-lab it WAS a dead end: that page dispatches no inspection
+   *  run, so the panel was empty there by construction and said nothing about
+   *  why — §4 D113's shape exactly. Passing a hint turns "empty forever" into
+   *  a state with a remedy the reader can actually reach. */
+  emptyHint?: string;
 }
 
-export function ItemSeriesExplorer({ runId, warmupWeeks = null }: Props) {
+export function ItemSeriesExplorer({ runId, warmupWeeks = null, emptyHint }: Props) {
   const [items, setItems] = useState<ItemRef[] | null>(null);
   const [kind, setKind] = useState<"material" | "product">("product");
   const [query, setQuery] = useState("");
@@ -146,9 +155,17 @@ export function ItemSeriesExplorer({ runId, warmupWeeks = null }: Props) {
     });
   }, [series]);
 
-  // Not an inspection run (or index still loading with zero rows): render
-  // nothing — this panel only exists where per-item evidence exists.
-  if (!items || items.length === 0) return null;
+  // Not an inspection run (or index still loading with zero rows). Render
+  // nothing, unless the caller asked for the absence to be explained.
+  if (!items || items.length === 0) {
+    if (!items || !emptyHint) return null;
+    return (
+      <div className="rounded-md border border-dashed bg-card px-3 py-2 text-[11px] text-muted-foreground">
+        <span className="font-semibold text-foreground">Per-item weekly series</span>{" "}
+        — {emptyHint}
+      </div>
+    );
+  }
 
   const seriesKeys = series ? Object.keys(series).filter((k) => Array.isArray(series[k])) : [];
 

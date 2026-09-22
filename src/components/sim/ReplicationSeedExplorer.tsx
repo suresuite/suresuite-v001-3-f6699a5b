@@ -27,13 +27,17 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Replication } from "@/hooks/useSimulationRun";
+import { meanCI } from "@/lib/sim/validationStats";
 import { FROZEN_CELL } from '@/components/shared';
 
 /** The weekly series keys the worker persists on run_replications.time_series. */
 export const REPLICATION_SERIES = [
   { key: "fill_rate", label: "Fill rate", unit: "fraction" },
   { key: "backlog_units", label: "Backlog", unit: "units" },
-  { key: "on_hand_value", label: "On-hand value", unit: "€" },
+  { key: "on_hand_value", label: "Material inventory", unit: "€" },
+  { key: "fg_value", label: "Finished-goods inventory", unit: "€" },
+  { key: "on_hand_units", label: "Material inventory", unit: "units" },
+  { key: "fg_units", label: "Finished-goods inventory", unit: "units" },
   { key: "revenue_value", label: "Revenue", unit: "€/week" },
 ] as const;
 export type ReplicationSeriesKey = (typeof REPLICATION_SERIES)[number]["key"];
@@ -52,15 +56,6 @@ function fmt(key: string, v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
   if (key === "fill_rate") return `${(v * 100).toFixed(2)}%`;
   return Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(3);
-}
-
-function meanCI(values: number[], confidence: number) {
-  const n = values.length;
-  if (n === 0) return { mean: 0, half: 0, n: 0 };
-  const m = values.reduce((a, b) => a + b, 0) / n;
-  const variance = values.reduce((a, b) => a + (b - m) ** 2, 0) / Math.max(1, n - 1);
-  const z = confidence >= 0.99 ? 2.576 : confidence >= 0.95 ? 1.96 : 1.645;
-  return { mean: m, half: (z * Math.sqrt(variance)) / Math.sqrt(n), n };
 }
 
 function nameForSeriesKey(key: string): string {

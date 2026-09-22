@@ -25,15 +25,15 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "4231766af8b0";
+export const CONTRACT_VERSION = "a45c06124bb9";
 export const ENGINE_VERSION = "0.2.3";
 export const LAST_MIGRATION = "20260920000003_one_etl.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
-  "tablesDescribed": 54,
-  "columnsDescribed": 672,
-  "tablesUndescribed": 27
+  "tablesDescribed": 55,
+  "columnsDescribed": 684,
+  "tablesUndescribed": 26
 } as const;
 
 /** Described tables, grouped by the tier their data sits in. */
@@ -303,6 +303,18 @@ export const TIERS: GlanceTier[] = [
     ]
   },
   {
+    "tier": "5",
+    "name": "results — pinned to dataset + policy + engine version",
+    "tables": [
+      {
+        "table": "run_replications",
+        "grain": "One replication of one simulation run: the seed it used, the KPI row the engine computed for it, and its weekly series. A run has as many rows here as it has replications, and `rep_index` orders them. Tier 5 — a RESULT, derived from a tier-2 dataset by a named engine version, never an input to anything. Nothing downstream reads it except the result surfaces; a row is superseded by re-running, never edited.",
+        "columns": 12,
+        "owner": "engine"
+      }
+    ]
+  },
+  {
     "tier": "G",
     "name": "governance — identity, capability, delegation, audit",
     "tables": [
@@ -493,8 +505,8 @@ export const UNDESCRIBED: UndescribedGroup[] = [
     ]
   },
   {
-    "wp": "6.3",
-    "why": "Runs and results (tier 5). Invariant `result-binding` is the claim these tables have to satisfy — every result binds dataset + policy + scenario + engine version. MOVED FROM WP 4.4 BY WP 4.4 ITSELF. This row read \"WP 4.1/4.4 are where the binding is completed\", and neither package was ever scoped to complete it: §11's WP 4.1 is the graph hash and §11's WP 4.4 is staleness plus the Trust Report. Ten tables were waiting on a sentence no work item behind them ever agreed to. WP 6.3 ships the A5 Reproducibility Record — \"dataset, policy, scenario, engine and analysis versions plus declared limits\" — which is `result-binding` stated as a deliverable, so the tables and the invariant now wait on the same package. See §16 · WP 4.4 · J. NOTE for whoever authors `simulation_jobs`: it carries an UNRESOLVED shadowed definition (`20250914113723` re-declares what `20250913085427` created, and the two disagree about `job_id`). The introspector records the disagreement rather than picking a winner. Resolve it BEFORE writing the sidecar — a field entry for a column whose type depends on which CREATE TABLE won is a guess with a schema around it.",
+    "wp": "9.2",
+    "why": "Runs and results (tier 5). Invariant `result-binding` is the claim these tables have to satisfy — every result binds dataset + policy + scenario + engine version. RE-HOMED FROM WP 6.3 BY WP 9.1, AND THIS IS THE SECOND TIME THIS ROW HAS OUTLIVED ITS OWNER. WP 6.3 shipped the A5 Reproducibility Record and finished; these tables stayed deferred to it, so the owner was a completed package — which is exactly the state `contract:check` R8 exists to refuse, and exactly what the note below describes happening to WP 4.4. A deferral whose owner has shipped is not a plan, and it is not free: `dataPlaneAudit` scopes the audit rule to tables IN the contract, so a deferred table's writes are unaudited with nothing to notice (§4 D54). WP 9.1 describes ONE of the group — `run_replications` — because it added facts to that table's `time_series` and a fact the product reads cannot live in a column the contract does not describe. It did NOT describe the other eight, because what they owe is `result-binding` and WP 9.1 does not pay it. WP 9.2 is where that binding lands. MOVED FROM WP 4.4 BY WP 4.4 ITSELF. This row read \"WP 4.1/4.4 are where the binding is completed\", and neither package was ever scoped to complete it: §11's WP 4.1 is the graph hash and §11's WP 4.4 is staleness plus the Trust Report. Ten tables were waiting on a sentence no work item behind them ever agreed to. WP 6.3 ships the A5 Reproducibility Record — \"dataset, policy, scenario, engine and analysis versions plus declared limits\" — which is `result-binding` stated as a deliverable, so the tables and the invariant now wait on the same package. See §16 · WP 4.4 · J. NOTE for whoever authors `simulation_jobs`: it carries an UNRESOLVED shadowed definition (`20250914113723` re-declares what `20250913085427` created, and the two disagree about `job_id`). The introspector records the disagreement rather than picking a winner. Resolve it BEFORE writing the sidecar — a field entry for a column whose type depends on which CREATE TABLE won is a guess with a schema around it.",
     "tables": [
       {
         "table": "experiments",
@@ -503,10 +515,6 @@ export const UNDESCRIBED: UndescribedGroup[] = [
       {
         "table": "run_item_series",
         "columns": 7
-      },
-      {
-        "table": "run_replications",
-        "columns": 12
       },
       {
         "table": "simulation_cache",

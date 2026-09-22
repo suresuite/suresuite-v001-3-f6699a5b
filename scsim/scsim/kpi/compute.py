@@ -44,7 +44,12 @@ def compute_replication_kpis(
         "lost_units": float(tr.lost_units[w].sum()),
         "max_backlog": float(tr.backlog_units[w].max()) if window_len else 0.0,
         "lost_inbound_units": float(tr.inbound_rejected[w].sum()),
+        # Inventory is a `level` in WEEKLY_SERIES, so the window aggregate is a
+        # MEAN — summing a stock over weeks counts the same goods repeatedly.
         "avg_on_hand_value": float(tr.on_hand_value[w].mean()) if window_len else 0.0,
+        "avg_fg_value": float(tr.fg_value[w].mean()) if window_len else 0.0,
+        "avg_on_hand_units": float(tr.on_hand_units[w].mean()) if window_len else 0.0,
+        "avg_fg_units": float(tr.fg_units[w].mean()) if window_len else 0.0,
         "capacity_utilization": _utilization(ctx, t_w, window_end),
         "cost_of_resilience": c_res,
     }

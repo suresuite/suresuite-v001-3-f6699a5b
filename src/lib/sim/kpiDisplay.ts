@@ -52,7 +52,14 @@ export const KPI_DISPLAY: KpiDisplay[] = [
   { key: "lost_units", label: "Lost units", format: units, higherIsBetter: false },
   { key: "lost_inbound_units", label: "Lost inbound units", format: units, higherIsBetter: false },
   { key: "max_backlog", label: "Peak backlog (units)", format: units, higherIsBetter: false },
-  { key: "avg_on_hand_value", label: "Average on-hand (value)", format: money, higherIsBetter: null },
+  // Inventory window averages (G19). A stock is averaged over the analysis
+  // window, never summed — `WEEKLY_SERIES` calls these `level` for that reason.
+  // `higherIsBetter` is null for all four on purpose: inventory is a trade-off
+  // against service, not a thing to minimise on its own.
+  { key: "avg_on_hand_value", label: "Average material inventory (value)", format: money, higherIsBetter: null },
+  { key: "avg_fg_value", label: "Average finished-goods inventory (value)", format: money, higherIsBetter: null },
+  { key: "avg_on_hand_units", label: "Average material inventory (units)", format: units, higherIsBetter: null },
+  { key: "avg_fg_units", label: "Average finished-goods inventory (units)", format: units, higherIsBetter: null },
   { key: "capacity_utilization", label: "Capacity utilization", format: pct1, higherIsBetter: null },
   // The total the ten components below sum to — P-X.1's own measure.
   { key: "cost_of_resilience", label: "Cost of resilience", format: money, higherIsBetter: false },

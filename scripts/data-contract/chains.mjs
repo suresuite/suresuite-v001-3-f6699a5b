@@ -695,10 +695,37 @@ export function deriveRunKpis(root) {
  * the empty state reads as though a run could be made to produce it.
  */
 export function deriveReplicationSeries(root) {
-  const engine = readFileSync(join(root, "scsim", "scsim", "core", "engine.py"), "utf8");
-  const extra = /extra_series=\{([\s\S]*?)\n\s{8}\}/.exec(engine);
-  if (!extra) throw new Error("chains: `extra_series` not found in scsim/scsim/core/engine.py");
-  // `fill_rate` is the series the bridge always writes, beside the extras.
+  // WHICH SERIES A RUN CARRIES IS READ FROM THE DECLARATION THAT PRODUCES THEM
+  // (WP 9.1). This used to regex the `extra_series={…}` literal in engine.py and
+  // prepend `fill_rate` by hand — a reading of one of the six places the
+  // vocabulary was authored, which is why it could not see that `fg_value` was
+  // in the golden trace and not in the published set (§4 D163). `WEEKLY_SERIES`
+  // in scsim/core/context.py is now the only author; `published` marks the
+  // subset that leaves the engine, so no name is added here.
+  const ctx = readFileSync(join(root, "scsim", "scsim", "core", "context.py"), "utf8");
+  const decl = /^WEEKLY_SERIES: tuple\[WeeklySeries, \.\.\.\] = \(([\s\S]*?)^\)$/m.exec(ctx);
+  if (!decl) {
+    throw new Error(
+      "chains: `WEEKLY_SERIES` not found in scsim/scsim/core/context.py. It is the " +
+        "single author of the weekly-series vocabulary — re-read it rather than " +
+        "publishing a list of series a run may not carry.",
+    );
+  }
+  const written = [];
+  const row = /WeeklySeries\(\s*"(\w+)",\s*"([^"]*)",\s*"(\w+)",\s*(True|False)/g;
+  const declared = [];
+  let m;
+  while ((m = row.exec(decl[1]))) {
+    declared.push({ key: m[1], unit: m[2], aggregation: m[3], published: m[4] === "True" });
+    if (m[4] === "True") written.push(m[1]);
+  }
+  if (written.length === 0) {
+    throw new Error("chains: parsed 0 published series out of `WEEKLY_SERIES`");
+  }
+  // The bridge is on the LIVE path — the browser worker loads sim_worker into
+  // Pyodide (src/lib/sim/engine.worker.ts) — and it is what turns the engine's
+  // arrays into `run_replications.time_series`. It must still write `fill_rate`
+  // as the base series and iterate the rest generically.
   const bridge = readFileSync(join(root, "sim-worker", "sim_worker", "scsim_bridge.py"), "utf8");
   if (!/ts = \{"fill_rate":/.test(bridge)) {
     throw new Error(
@@ -706,10 +733,12 @@ export function deriveReplicationSeries(root) {
         "Re-read it rather than publishing a list of series a run may not carry.",
     );
   }
-  const written = ["fill_rate"];
-  const k = /"(\w+)":/g;
-  let m;
-  while ((m = k.exec(extra[1]))) written.push(m[1]);
+  if (!/for key, rows in extra\.items\(\):/.test(bridge)) {
+    throw new Error(
+      "chains: the bridge no longer forwards the engine's extra series generically, " +
+        "so a declared series may not reach `run_replications.time_series`.",
+    );
+  }
 
   const ui = readFileSync(join(root, "src", "components", "sim", "ReplicationSeedExplorer.tsx"), "utf8");
   const sBlock = /export const REPLICATION_SERIES = \[([\s\S]*?)\n\] as const;/.exec(ui);
@@ -739,9 +768,18 @@ export function deriveReplicationSeries(root) {
       );
     }
   }
+  const byKey = new Map(declared.map((d) => [d.key, d]));
   return {
     written,
-    offered: offered.map((o) => ({ ...o, written: written.includes(o.key) })),
+    // Every declared series with how it may honestly be aggregated across
+    // weeks, so a reader cannot sum a stock or average a ratio without the
+    // page saying which it is doing (WP 9.1).
+    declared,
+    offered: offered.map((o) => ({
+      ...o,
+      written: written.includes(o.key),
+      aggregation: byKey.get(o.key)?.aggregation ?? null,
+    })),
     heatmapRemoved,
     heatmapWants: wants ?? "utilization",
     heatmapEverRenders: wants != null && written.includes(wants),

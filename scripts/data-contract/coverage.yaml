@@ -92,11 +92,24 @@ deferred:
     audited:
       model_validations: false
 
-  - wp: "6.3"
+  - wp: "9.2"
     why: >-
       Runs and results (tier 5). Invariant `result-binding` is the claim these
       tables have to satisfy — every result binds dataset + policy + scenario +
       engine version.
+      RE-HOMED FROM WP 6.3 BY WP 9.1, AND THIS IS THE SECOND TIME THIS ROW HAS
+      OUTLIVED ITS OWNER. WP 6.3 shipped the A5 Reproducibility Record and
+      finished; these tables stayed deferred to it, so the owner was a completed
+      package — which is exactly the state `contract:check` R8 exists to refuse,
+      and exactly what the note below describes happening to WP 4.4. A deferral
+      whose owner has shipped is not a plan, and it is not free: `dataPlaneAudit`
+      scopes the audit rule to tables IN the contract, so a deferred table's
+      writes are unaudited with nothing to notice (§4 D54).
+      WP 9.1 describes ONE of the group — `run_replications` — because it added
+      facts to that table's `time_series` and a fact the product reads cannot
+      live in a column the contract does not describe. It did NOT describe the
+      other eight, because what they owe is `result-binding` and WP 9.1 does not
+      pay it. WP 9.2 is where that binding lands.
       MOVED FROM WP 4.4 BY WP 4.4 ITSELF. This row read "WP 4.1/4.4 are where the
       binding is completed", and neither package was ever scoped to complete it:
       §11's WP 4.1 is the graph hash and §11's WP 4.4 is staleness plus the Trust
@@ -114,7 +127,6 @@ deferred:
     tables:
       - simulation_runs
       - simulation_results
-      - run_replications
       - run_item_series
       - simulation_jobs
       - simulation_job_magnitudes
@@ -124,7 +136,6 @@ deferred:
     audited:
       simulation_runs: false
       simulation_results: false
-      run_replications: false
       run_item_series: false
       simulation_jobs: false
       simulation_job_magnitudes: false

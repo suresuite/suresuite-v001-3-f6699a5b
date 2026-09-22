@@ -2248,6 +2248,18 @@ export const RUN_KPIS: RunKpis = {
       "always": true
     },
     {
+      "key": "avg_fg_value",
+      "always": true
+    },
+    {
+      "key": "avg_on_hand_units",
+      "always": true
+    },
+    {
+      "key": "avg_fg_units",
+      "always": true
+    },
+    {
       "key": "capacity_utilization",
       "always": true
     },
@@ -2351,7 +2363,22 @@ export const RUN_KPIS: RunKpis = {
     },
     {
       "key": "avg_on_hand_value",
-      "label": "Average on-hand (value)",
+      "label": "Average material inventory (value)",
+      "emitted": true
+    },
+    {
+      "key": "avg_fg_value",
+      "label": "Average finished-goods inventory (value)",
+      "emitted": true
+    },
+    {
+      "key": "avg_on_hand_units",
+      "label": "Average material inventory (units)",
+      "emitted": true
+    },
+    {
+      "key": "avg_fg_units",
+      "label": "Average finished-goods inventory (units)",
       "emitted": true
     },
     {
@@ -2515,7 +2542,24 @@ export const RUN_KPIS: RunKpis = {
  */
 export type ReplicationSeries = {
   written: string[];
-  offered: { key: string; label: string; unit: string; written: boolean }[];
+  /** Every series scsim's `WEEKLY_SERIES` declares — the single author of
+   *  the vocabulary (WP 9.1). `published` marks the ones that leave the
+   *  engine; `aggregation` says what may honestly be done across weeks:
+   *  a `level` is a stock (average it, never sum it), a `flow` is a weekly
+   *  quantity (sum it), a `ratio` is neither. */
+  declared: {
+    key: string;
+    unit: string;
+    aggregation: "level" | "flow" | "ratio";
+    published: boolean;
+  }[];
+  offered: {
+    key: string;
+    label: string;
+    unit: string;
+    written: boolean;
+    aggregation: "level" | "flow" | "ratio" | null;
+  }[];
   /** WP 6.3 removed the panel (§4 D113). The manual says which state it is in,
    *  rather than falling silent about a panel a reader may remember. */
   heatmapRemoved: boolean;
@@ -2525,35 +2569,137 @@ export type ReplicationSeries = {
 
 export const REPLICATION_SERIES_FACTS: ReplicationSeries = {
   "written": [
-    "fill_rate",
+    "revenue_value",
     "backlog_units",
+    "fill_rate",
     "on_hand_value",
-    "revenue_value"
+    "fg_value",
+    "on_hand_units",
+    "fg_units"
+  ],
+  "declared": [
+    {
+      "key": "demand_value",
+      "unit": "currency",
+      "aggregation": "flow",
+      "published": false
+    },
+    {
+      "key": "fulfilled_value",
+      "unit": "currency",
+      "aggregation": "flow",
+      "published": false
+    },
+    {
+      "key": "revenue_value",
+      "unit": "currency",
+      "aggregation": "flow",
+      "published": true
+    },
+    {
+      "key": "lost_value",
+      "unit": "currency",
+      "aggregation": "flow",
+      "published": false
+    },
+    {
+      "key": "lost_units",
+      "unit": "units",
+      "aggregation": "flow",
+      "published": false
+    },
+    {
+      "key": "backlog_units",
+      "unit": "units",
+      "aggregation": "level",
+      "published": true
+    },
+    {
+      "key": "fill_rate",
+      "unit": "fraction",
+      "aggregation": "ratio",
+      "published": true
+    },
+    {
+      "key": "inbound_rejected",
+      "unit": "units",
+      "aggregation": "flow",
+      "published": false
+    },
+    {
+      "key": "on_hand_value",
+      "unit": "currency",
+      "aggregation": "level",
+      "published": true
+    },
+    {
+      "key": "fg_value",
+      "unit": "currency",
+      "aggregation": "level",
+      "published": true
+    },
+    {
+      "key": "on_hand_units",
+      "unit": "units",
+      "aggregation": "level",
+      "published": true
+    },
+    {
+      "key": "fg_units",
+      "unit": "units",
+      "aggregation": "level",
+      "published": true
+    }
   ],
   "offered": [
     {
       "key": "fill_rate",
       "label": "Fill rate",
       "unit": "fraction",
-      "written": true
+      "written": true,
+      "aggregation": "ratio"
     },
     {
       "key": "backlog_units",
       "label": "Backlog",
       "unit": "units",
-      "written": true
+      "written": true,
+      "aggregation": "level"
     },
     {
       "key": "on_hand_value",
-      "label": "On-hand value",
+      "label": "Material inventory",
       "unit": "€",
-      "written": true
+      "written": true,
+      "aggregation": "level"
+    },
+    {
+      "key": "fg_value",
+      "label": "Finished-goods inventory",
+      "unit": "€",
+      "written": true,
+      "aggregation": "level"
+    },
+    {
+      "key": "on_hand_units",
+      "label": "Material inventory",
+      "unit": "units",
+      "written": true,
+      "aggregation": "level"
+    },
+    {
+      "key": "fg_units",
+      "label": "Finished-goods inventory",
+      "unit": "units",
+      "written": true,
+      "aggregation": "level"
     },
     {
       "key": "revenue_value",
       "label": "Revenue",
       "unit": "€/week",
-      "written": true
+      "written": true,
+      "aggregation": "flow"
     }
   ],
   "heatmapRemoved": true,
@@ -3408,7 +3554,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 54,
+  "described": 55,
   "open": [
     {
       "table": "approved_users",
@@ -3539,6 +3685,13 @@ export const READ_EXPOSURE: ReadExposure = {
       ]
     },
     {
+      "table": "run_replications",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
       "table": "scenarios",
       "roles": [
         "anon",
@@ -3572,6 +3725,7 @@ export const READ_EXPOSURE: ReadExposure = {
     "project_role_capabilities",
     "risk_data",
     "role_capabilities",
+    "run_replications",
     "scenarios",
     "suppliers"
   ]

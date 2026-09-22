@@ -21,6 +21,7 @@ import numpy as np
 from scsim import ENGINE_VERSION
 from scsim.core.context import (
     COST_COMPONENTS,
+    PUBLISHED_SERIES_KEYS,
     CompiledModel,
     ResolvedEvent,
     SimContext,
@@ -340,6 +341,11 @@ def _mech_accounting(model: CompiledModel, ctx: SimContext, policies: list[Polic
     tr.inbound_rejected[t] = ctx.lost_inbound_this_week
     tr.on_hand_value[t] = float((ctx.on_hand * model.mat_cost).sum())
     tr.fg_value[t] = float((ctx.fg_on_hand * model.fg_unit_cogs).sum())
+    # The same two stocks in units. Plain scalars, so — unlike the per-item
+    # matrices below — they cost nothing, need no `keep_matrices`, and exist on
+    # every replication of every run rather than on inspection runs only.
+    tr.on_hand_units[t] = float(ctx.on_hand.sum())
+    tr.fg_units[t] = float(ctx.fg_on_hand.sum())
     if lost_v > 0:
         ctx.cost.add("lost_sales", lost_v)
     for pol in policies:
@@ -627,8 +633,10 @@ class ScenarioResult:
     rep_cells: list[tuple[int, int]] = field(default_factory=list)
     warmup: Optional[WarmupReport] = None
     lp_fallbacks: int = 0
-    # Additional weekly per-replication series lifted from the trace
-    # (same shape as fr_series): "backlog_units", "on_hand_value", "revenue_value".
+    # Additional weekly per-replication series lifted from the trace (same
+    # shape as fr_series): every `PUBLISHED_SERIES_KEYS` entry except
+    # `fill_rate`, which is `fr_series` above. Keyed by the declared name, so
+    # the set follows `WEEKLY_SERIES` rather than a list kept here by hand.
     extra_series: dict[str, np.ndarray] = field(default_factory=dict)
     # Single-run inspection surface (blueprint G17/§9.5.1): per-item weekly
     # matrices lifted from the full-debug trace — populated ONLY when
@@ -648,9 +656,9 @@ class ScenarioResult:
 
 # Per-replication progress observer: called as (done, total, kpi_row,
 # weekly_series) after each replication completes; ``weekly_series`` carries
-# the same four traces ScenarioResult exposes (fill_rate, backlog_units,
-# on_hand_value, revenue_value) for that single replication. ``total`` is the
-# planned grid size and may grow under sequential-CI stopping.
+# exactly the published traces ScenarioResult exposes — `PUBLISHED_SERIES_KEYS`
+# — for that single replication. ``total`` is the planned grid size and may
+# grow under sequential-CI stopping.
 ProgressFn = Callable[[int, int, dict[str, float], dict[str, np.ndarray]], None]
 
 
@@ -663,10 +671,7 @@ def _notify_progress(
         return
     try:
         progress(done, total, row, {
-            "fill_rate": ctx.trace.fill_rate,
-            "backlog_units": ctx.trace.backlog_units,
-            "on_hand_value": ctx.trace.on_hand_value,
-            "revenue_value": ctx.trace.revenue_value,
+            k: getattr(ctx.trace, k) for k in PUBLISHED_SERIES_KEYS
         })
     except Exception:  # noqa: BLE001 — observer only, run integrity first
         pass
@@ -696,10 +701,13 @@ def run_scenario(
         any_stochastic(scenario.events),
     )
     kpis: list[dict[str, float]] = []
-    fr_rows = np.zeros((len(grid), settings.horizon))
-    backlog_rows = np.zeros((len(grid), settings.horizon))
-    onhand_rows = np.zeros((len(grid), settings.horizon))
-    revenue_rows = np.zeros((len(grid), settings.horizon))
+    # One [n_reps, horizon] block per PUBLISHED series, keyed by its declared
+    # name. This was four separate locals threaded through `_extend_until_ci`'s
+    # signature, which is why adding a fifth series meant touching five call
+    # sites and is a large part of why `fg_value` never became one (§4 D163).
+    rows: dict[str, np.ndarray] = {
+        k: np.zeros((len(grid), settings.horizon)) for k in PUBLISHED_SERIES_KEYS
+    }
     lp_fallbacks = 0
     for n, (i, j) in enumerate(grid):
         events = resolve_events(compiled.model, t_w, j) if scenario.events else []
@@ -712,19 +720,16 @@ def run_scenario(
             row.update(pol.kpi_contribution(ctx, t_w, window_end))
         row["model_rep"], row["event_rep"] = float(i), float(j)
         kpis.append(row)
-        fr_rows[n] = ctx.trace.fill_rate
-        backlog_rows[n] = ctx.trace.backlog_units
-        onhand_rows[n] = ctx.trace.on_hand_value
-        revenue_rows[n] = ctx.trace.revenue_value
+        for k in PUBLISHED_SERIES_KEYS:
+            rows[k][n] = getattr(ctx.trace, k)
         lp_fallbacks += int(ctx.policy_state.get("material_allocation", {}).get("lp_fallbacks", 0))
         _notify_progress(progress, n + 1, len(grid), row, ctx)
 
     # Sequential stopping (optional) extends model seeds until ε is met.
     from scsim.entities.enums import ReplicationStopping
     if settings.replication_stopping == ReplicationStopping.SEQUENTIAL_CI and scenario.events:
-        kpis, fr_rows, backlog_rows, onhand_rows, revenue_rows, grid = _extend_until_ci(
-            compiled, scenario, kpis, fr_rows, backlog_rows, onhand_rows, revenue_rows,
-            grid, t_w, window_end, debug, progress,
+        kpis, rows, grid = _extend_until_ci(
+            compiled, scenario, kpis, rows, grid, t_w, window_end, debug, progress,
         )
 
     # Single-run inspection surface (G17/§9.5.1): expose the full-debug
@@ -773,25 +778,22 @@ def run_scenario(
     return ScenarioResult(
         name=scenario.name,
         kpis=kpis,
-        fr_series=fr_rows,
+        fr_series=rows["fill_rate"],
         aggregates=aggregates,
         stats=stats,
         feasibility_warnings=compiled.feasibility_warnings,
         rep_cells=grid,
         warmup=warmup,
         lp_fallbacks=lp_fallbacks,
-        extra_series={
-            "backlog_units": backlog_rows,
-            "on_hand_value": onhand_rows,
-            "revenue_value": revenue_rows,
-        },
+        # Every published series except `fill_rate`, which keeps its own
+        # `fr_series` field for the callers that have always read it there.
+        extra_series={k: v for k, v in rows.items() if k != "fill_rate"},
         item_series=item_series,
         item_ids=item_ids,
     )
 
 
-def _extend_until_ci(compiled, scenario, kpis, fr_rows, backlog_rows, onhand_rows,
-                     revenue_rows, grid, t_w, window_end, debug,
+def _extend_until_ci(compiled, scenario, kpis, rows, grid, t_w, window_end, debug,
                      progress: Optional[ProgressFn] = None):
     settings = compiled.model.settings
     e_axis = max({j for _, j in grid}) + 1
@@ -812,16 +814,14 @@ def _extend_until_ci(compiled, scenario, kpis, fr_rows, backlog_rows, onhand_row
                 row.update(pol.kpi_contribution(ctx, t_w, window_end))
             row["model_rep"], row["event_rep"] = float(i), float(j)
             kpis.append(row)
-            fr_rows = np.vstack([fr_rows, ctx.trace.fill_rate[None, :]])
-            backlog_rows = np.vstack([backlog_rows, ctx.trace.backlog_units[None, :]])
-            onhand_rows = np.vstack([onhand_rows, ctx.trace.on_hand_value[None, :]])
-            revenue_rows = np.vstack([revenue_rows, ctx.trace.revenue_value[None, :]])
+            for k in PUBLISHED_SERIES_KEYS:
+                rows[k] = np.vstack([rows[k], getattr(ctx.trace, k)[None, :]])
             # The final total is unknown while extending — report the current
             # count as both done and total so observers see monotone progress.
             _notify_progress(progress, len(kpis), len(kpis), row, ctx)
         grid = grid + batch
         next_i += 10
-    return kpis, fr_rows, backlog_rows, onhand_rows, revenue_rows, grid
+    return kpis, rows, grid
 
 
 # ---------------------------------------------------------------------------

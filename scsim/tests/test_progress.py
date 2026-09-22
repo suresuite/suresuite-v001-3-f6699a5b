@@ -11,6 +11,7 @@ from __future__ import annotations
 import numpy as np
 
 from scsim import Scenario
+from scsim.core.context import PUBLISHED_SERIES_KEYS
 from scsim.core.engine import run_scenario
 
 from .conftest import make_settings, single_chain_network
@@ -46,7 +47,10 @@ def test_progress_called_per_replication_with_result_shapes():
     horizon = result.fr_series.shape[1]
     for done, _total, row, series in calls:
         assert "fill_rate" in row
-        assert set(series) == {"fill_rate", "backlog_units", "on_hand_value", "revenue_value"}
+        # The observer carries exactly the declared published set — read from
+        # the declaration rather than restated here, so this assertion cannot
+        # become a seventh author of the vocabulary (§4 D163).
+        assert set(series) == set(PUBLISHED_SERIES_KEYS)
         for arr in series.values():
             assert arr.shape == (horizon,)
     # The streamed rows are the rows the final result reports.

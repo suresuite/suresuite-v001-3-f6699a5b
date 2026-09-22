@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-54 of 81 tables are covered,
-672 columns in all. A table that is not here is listed
+55 of 81 tables are covered,
+684 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -57,6 +57,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`recovery_playbooks`](recovery_playbooks.md) | 4 | `engine` | 9 | One named recovery strategy a scenario can apply after a disruption — the levers, their order and their parameters. A system playbook (`is_system`, `project_id` NULL) ships with the product; a project playbook belongs to one project. |
 | [`risk_data`](risk_data.md) | reference | `reference-data` | 9 | One country's current risk class, as one named publisher graded it in one named edition. NOT project-scoped: two projects sourcing from the same country see the same row, which is the point — a per-project copy drifts. |
 | [`role_capabilities`](role_capabilities.md) | G | `platform` | 5 | One grant or denial, for one role and one capability. The OUTERMOST layer: what a role gets before any org, project or user says otherwise. |
+| [`run_replications`](run_replications.md) | 5 | `engine` | 12 | One replication of one simulation run: the seed it used, the KPI row the engine computed for it, and its weekly series. A run has as many rows here as it has replications, and `rep_index` orders them. Tier 5 — a RESULT, derived from a tier-2 dataset by a named engine version, never an input to anything. Nothing downstream reads it except the result surfaces; a row is superseded by re-running, never edited. |
 | [`scenario_templates`](scenario_templates.md) | 4 | `engine` | 15 | One shipped starting point for a scenario: a named disruption shape with its schedule, its suggested playbook and the run settings that go with it. A template is not a scenario — applying one WRITES a scenario, and the two diverge from that moment. |
 | [`scenarios`](scenarios.md) | 4 | `engine` | 22 | One what-if a person set up and can run: the horizon, the warm-up, the replications, the seed, the demand model, the disruption schedule and the recovery overrides. The scenario half of `result-binding` (I8) — a run cites one of these rows, and the export reads it back whole. |
 | [`suppliers`](suppliers.md) | 2 | `data-ingestion` | 12 | One supplier in one project: what the simulation needs to know about them beyond the arcs that connect them to materials. |
@@ -69,4 +70,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `4231766af8b0`, engine `0.2.3`.*
+*Generated from data contract `a45c06124bb9`, engine `0.2.3`.*

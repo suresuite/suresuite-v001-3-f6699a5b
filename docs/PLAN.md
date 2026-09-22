@@ -345,6 +345,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D160** | **The same foreign key has two different names — production's and every rehearsed database's — because PostgreSQL names an unnamed constraint after the table AT CREATION TIME and WP 3.1 renamed the table.** `ingest_runs` was created as `erp_sync_runs` (`20260829120000`) with two inline `REFERENCES auth.users(id)` columns, so production's keys are `erp_sync_runs_triggered_by_user_id_fkey` and `erp_sync_runs_applied_by_user_id_fkey` — §15 run `35467412134` read those names out of `pg_constraint`. A rehearsed database builds the table fresh under its CURRENT name, so the same two keys are called `ingest_runs_*_fkey` there. **A `DROP CONSTRAINT IF EXISTS` naming one of them silently does nothing in the other world, and `IF EXISTS` is precisely what makes it silent.** D156's fix is what found it: the first draft named production's two, dropped nothing in the rehearsal, added a second key beside the first, and the landing still failed on the old one — with an error naming a constraint the migration had never heard of. **The class is D52's**, a rename that did not follow its foreign keys, surfacing four packages later in the one place the name is load-bearing; and it generalises past this table — any inline constraint on any renamed table has a name in production that the repository cannot derive | `supabase/migrations/20260829120000_erp_connector_phase1_2.sql`'s inline `REFERENCES` against §15 run `35467412134` probe 0.9's constraint names, and against the rehearsal error naming `ingest_runs_triggered_by_user_id_fkey` | **WORKED AROUND ✅ AND THE CLASS IS OPEN.** `20260919000012` drops BOTH names explicitly — four statements rather than two — and not in a `DO` block, because a `DO` block's DDL is invisible to `contract:introspect` (D99, D117's first draft), so the duplication is the smaller cost. **`rehearsal/320` §2 counts the keys by TARGET rather than by name**, so it fails whatever the constraint is called and a third name would not slip past it. What is NOT fixed is the general case: nothing tells a future migration that a constraint it wants to drop has a different name in production. A rule is imaginable — the artifact could record each constraint's production name beside its derived one — and it is unwritten. Owned by **WP 7.1**, with D99 and D157, since all three are the artifact disagreeing with the database |
 | **D161** | **A user who has ever uploaded a file cannot be deleted, because erasing them requires mutating a tier-0 row and the write-once trigger refuses it.** `ingest_files.uploaded_by` is `REFERENCES public.approved_users(id) ON DELETE SET NULL` — correct on its own, and the convention every actor column in this schema follows (`audit_logs.actor_user_id`, `ingest_runs`' two after D156). `ingest_files` is TIER 0, and `ingest_files_write_once()` (`20260916000013`) raises `restrict_violation` on ANY `UPDATE` — also correct on its own, and the thing that makes tier 0 mean something. Together they are unsatisfiable: `DELETE FROM approved_users` makes PostgreSQL attempt `UPDATE ingest_files SET uploaded_by = NULL`, the trigger refuses, and **the delete fails with an error about tier-0 immutability that says nothing about the user being deleted**. Two correct decisions with nothing comparing them, which is the shape this plan has now found at table grain (D117), column grain (D118) and constraint grain (D160). **Latent today** — `ingest_files` holds 0 rows in production because `ingest-file` is not deployed (D123) — and live the moment WP 6.5 (a) publishes it, at which point the first person to upload a CSV becomes undeletable. **Found by writing D156's rehearsal**, when §3 tried to delete the uploader it had just created | `supabase/migrations/20260916000013_ingest_files_tier0.sql`'s trigger against `ingest_files.uploaded_by`'s `ON DELETE SET NULL`; reproduced in `supabase/rehearsal/320` §4 | **PINNED, NOT FIXED — WP 7.2** *(and the reason it is not fixed here is that the fix is a DECISION about erasure rather than a defect to correct, with two defensible answers. **(a)** Let the trigger permit exactly `uploaded_by → NULL` — anonymising an actor is not rewriting a fact about the file, and tier 0 keeps meaning what it says about content. **(b)** Make the key `ON DELETE RESTRICT` — then the refusal is explicit, the error names the right thing, and deleting a person who has uploaded data becomes a deliberate act requiring the files to be dealt with first. (a) is what a data-protection request needs; (b) is what an audit trail wants. Choosing between them is a retention policy, not a migration, and it is not WP 7.1's — this package touches access control. `rehearsal/320` §4 ASSERTS the current refusal, so whichever answer is taken, the assertion fails and tells the author which decision they changed)* |
 | **D162** | **A RENAMED migration is invisible to `contract:rehearse` — the one gate that executes migrations — and it is invisible in the way that does the most damage: it removes the file's objects from the base AND skips the file that would put them back.** `newMigrations()` asks git for `--diff-filter=A`, and `git diff` detects renames by default, so a migration that was renamed rather than written reads as `R` and is dropped from the rehearsal set. That alone would only mean "not rehearsed". What makes it worse is the OTHER half: the base schema is built from the BASE branch's `build/schema.introspected.json`, and that artifact records, for each function, the migration FILE its body came from. After a rename the base branch's artifact names a file this branch no longer has, so `rehearsal-schema.mjs` prints `function source missing` and builds a base WITHOUT those functions — while the file that defines them sits unrehearsed. The result is a rehearsal against a database missing objects that neither the base nor the branch put there, and every behavioural assertion that calls one fails for a reason that has nothing to do with what it asserts. Found by D151's renumber: three files moved, three `function source missing` warnings appeared, `rehearsing 3 new migration(s)` named only the three that were newly WRITTEN, and `rehearsal/300` and `/310` failed on `function public.refresh_node_list_for_project(uuid, uuid) does not exist` — a function WP 8.1 had created and this branch had not touched. **And the rename is not a corner case but the correct response to D151**: `schema_migrations` is keyed on the version in the filename, so renaming is the only way to give a never-applied migration a version production has not recorded, and `supabase db push` WILL apply that file. It is new work by the only definition that matters, and it was the one kind of new work the gate could not see | `scripts/data-contract/rehearse-migrations.mjs`'s `newMigrations()` against `scripts/data-contract/rehearsal-schema.mjs:330`'s `function source missing` warning; reproduced on this branch before the fix, where all three modes reported `✓ 3 migration(s) apply cleanly` and then failed three behavioural assertions | **CLOSED ✅ (this package)** — `--no-renames` on the diff, so the question the function asks ("which migration files exist here that did not exist at the base") is the question git answers. 3 rehearsed became **6**, the three assertions pass, and all three modes are green. *(The `function source missing` warning is left in place and is now correct rather than misleading: it says the BASE branch's artifact named a file this branch renamed, which is true and stops being true the moment this merges. It is a warning and not a failure because the renamed migration now runs and supplies what the base could not)* |
+| **D163** | **Finished-goods inventory was computed on every replication of every run since the weekly trace was written, and published by nothing — because "which weekly series exist" was authored SIX times and `fg_value` was present in two of them.** `engine.py`'s per-week block writes `on_hand_value` and `fg_value` on adjacent lines, and `io/traces.py::trace_frame` — the golden-trace contract — carries both. But `ScenarioResult.extra_series` was a dict LITERAL naming three series, and it is `extra_series` that the bridge turns into `run_replications.time_series`, so `fg_value` stopped at the engine boundary and no user ever saw it. The other four authors: `WeeklyTrace.__post_init__`'s allocation tuple, `_notify_progress`'s observer dict, `REPLICATION_SERIES` in `ReplicationSeedExplorer.tsx` and `SERIES_CHARTS` in `RunValidateStage.tsx`. **The consequence users actually met**: the /policies chart captioned "Inventory dynamics" plotted `on_hand_value` alone — MATERIAL stock — and called it inventory, so the product's own answer to "how much stock do we hold" omitted every finished good, silently and for the whole life of the trace. **THE GATE FOR THIS CLASS EXISTED AND COULD NOT SEE IT.** `deriveReplicationSeries` was written after §4 D113 to join what the engine WRITES against what the UI OFFERS — and it read the `extra_series` literal, i.e. ONE of the six authors, so a series the engine measured and declined to publish was invisible to the rule built to catch exactly that. A gate that reads one of N authors measures that author, not the fact. **This is `single-source` below markdown, the class §2.1 names after D101 and D127** — a data fact (which series a result carries, and in what unit) authored in TypeScript and Python rather than in §4, with nothing comparing the copies | `scsim/scsim/core/engine.py`'s adjacent `tr.on_hand_value[t]` / `tr.fg_value[t]` writes against the three-key `extra_series=` literal in the same file; `scripts/data-contract/chains.mjs::deriveReplicationSeries`, which parsed that literal | **CLOSED ✅ (WP 9.1)** — `WEEKLY_SERIES` in `scsim/scsim/core/context.py` is the one author: each series declares its key, unit, `aggregation` (`level` / `flow` / `ratio`) and whether it is `published`. The allocation loop, `trace_frame`, `_notify_progress` and `extra_series` all DERIVE from it, so a series cannot exist in one and not another; `deriveReplicationSeries` reads the declaration rather than a literal, and throws if it cannot find it. Four parallel `*_rows` arrays threaded through `_extend_until_ci`'s seven-argument signature became one dict keyed by the declaration — that signature is a large part of WHY adding a fifth series never happened. `test_inventory_series.py` holds the reconciliation that makes the two levels of detail one fact: per-material on-hand summed equals `on_hand_units`, and `fg_value` equals `fg_units` at COGS on an MTS fixture that genuinely holds stock. *(What is NOT closed: the same six-author shape for `kpis`' keys. `deriveRunKpis` reads the engine's KPI row, which is one author and the right one, but nothing compares it to `KPI_DISPLAY` beyond D113's join)* |
 
 ### 4.1 Code map — the data layer
 
@@ -17486,6 +17487,133 @@ Handoff to next WP:
     owner, so it stays reported. It is the stranded duplicate `### WP 5.2j` entry
     that WP 5.2k named and did not touch, for the same two reasons.
 
+### WP 9.1 — Inventory over time, and the fact that was measured for a year and published by nothing · 2026-09-22 · no migration
+
+**What the previous package promised.** Nothing about inventory. Phase 8 closed
+the graph layer, and the run-results surface had been considered finished since
+WP 6.3 shipped the Reproducibility Record. The ask that opened this package was a
+product one — *track how inventory changes over time, for materials and products,
+at different levels of detail* — and the first thing it met was that the engine had
+been measuring most of it all along.
+
+**What this package found.**
+
+**(a) `fg_value` — computed on every replication of every run since the weekly
+trace was written, and published by nothing (§4 D163).** `engine.py` writes
+`tr.on_hand_value[t]` and `tr.fg_value[t]` on adjacent lines. `trace_frame`, the
+golden-trace contract, carries both. `ScenarioResult.extra_series` — the thing the
+bridge turns into `run_replications.time_series` — was a dict LITERAL naming three
+series, and `fg_value` was not one of them. So the chart on /policies captioned
+**"Inventory dynamics"** plotted material stock alone and called it inventory: the
+product's own answer to "how much stock do we hold" omitted every finished good.
+
+The vocabulary was authored **six** times — `WeeklyTrace`'s allocation tuple,
+`trace_frame`, `_notify_progress`, `extra_series`, `REPLICATION_SERIES`,
+`SERIES_CHARTS` — and `fg_value` was in two of them. This is `single-source` below
+markdown, the class §2.1 names after D101 and D127, and `check:docs` cannot see any
+of it.
+
+**(b) The gate for this class existed and could not see it.** WP 5.2j wrote
+`deriveReplicationSeries` after §4 D113 precisely to join what the engine WRITES
+against what the UI OFFERS. It read the `extra_series` literal — **one of the six
+authors** — so a series the engine measured and declined to publish was invisible
+to the rule built to catch that. *A gate that reads one of N authors measures that
+author, not the fact.* It now reads `WEEKLY_SERIES` and throws if it cannot find it.
+
+**(c) The parallel-array signature is why nobody ever added one.** `run_scenario`
+threaded four `*_rows` locals through `_extend_until_ci`'s seven-positional-argument
+signature. Adding a fifth series meant touching five call sites, so the literal was
+never the only obstacle — the plumbing was. One dict keyed by the declaration
+removed four arguments and made the next series a one-line change.
+
+**(d) `run_replications`, `run_item_series` and seven more were deferred to WP 6.3,
+which had shipped.** A deferral whose owner is a finished package is what R8 exists
+to refuse, and it is the second time this row has outlived an owner — WP 4.4 moved
+it once for the same reason. It is not free: `dataPlaneAudit` scopes the audit rule
+to tables IN the contract (§4 D54). `run_replications` is now described, because this
+package adds facts to its `time_series`; the other eight are re-homed to **WP 9.2**,
+which is where `result-binding` lands. Describing them here would have been claiming
+an invariant this package does not pay.
+
+**(e) `write: null` was claimed and refused, correctly.** The sidecar's first
+draft copied `analysis_runs`' `write: null`. `governanceEnforcement.test.ts` failed
+it, and the gate was right: `analysis_runs` can claim that because it has NO write
+policy and every write goes through a SECURITY DEFINER RPC, whereas
+`run_replications` is written **by the browser**, as a PostgREST upsert from
+`pyodideEngine.persistEngineResult`, behind two predicate-less policies. A policy
+with no predicate is a user-facing write path whether or not a page uses it. Now
+declared as `write: simulation_lab` — the capability that gates running a
+simulation — with the `anon` exposure (one of D154's eleven) stated rather than
+implied. *The lesson is the one D163 is about: the nearest analogue is not
+evidence, and the gate that compares a claim to the database is.*
+
+**(f) Two unique indexes on the same two columns.** `rep_run_index_uq`
+(`20260607121406`) and `run_replications_run_rep_uniq` (`20260614000001`), seven days
+apart, both `UNIQUE (run_id, rep_index)` — `IF NOT EXISTS` keys on the NAME, so the
+guard passed and the database carries both. Harmless in effect, not free in cost, and
+`ingest_apply_run` reads its conflict arbiter from `pg_index` where two now match.
+**Recorded in the sidecar, not dropped** — dropping it is a migration and this
+package's subject is the series.
+
+**(g) The plan's own claim about the live path was wrong, and checking it changed the
+work.** This package's plan said `scsim_bridge.py` was the undeployed Fly path and that
+`chains.mjs` should be repointed at `engine.worker.ts`. False: the browser worker
+imports `sim_worker.scsim_bridge` into Pyodide, so the bridge IS live — only
+`worker.py`, the Fly daemon, is not. The repoint was not made. What the bridge earned
+instead is a second assertion: it must keep forwarding the engine's extras
+*generically*, which is why the three new series reached the database with no change
+to it.
+
+**What shipped.** `WEEKLY_SERIES` in `scsim/scsim/core/context.py` — key, unit,
+`aggregation` (`level` / `flow` / `ratio`) and `published`, per series. The allocation
+loop, `trace_frame`, `_notify_progress` and `extra_series` all derive from it.
+`on_hand_units` and `fg_units` join `on_hand_value` and `fg_value`: plain weekly
+scalars, so they need no `keep_matrices`, no `FULL_DEBUG` and no single-replication
+gate, and exist on **every replication of every run** — unlike the per-item matrices,
+which is what makes the chart usable on the runs people actually make.
+`InventoryOverTime` renders materials, finished goods and total, units or value, on
+BOTH result surfaces from one component.
+
+**The reconciliation is the gate.** `test_inventory_series.py` asserts that the
+aggregate a user reads and the per-item explorer beside it are the same number:
+per-material on-hand summed equals `on_hand_units`, and `fg_value` equals `fg_units`
+at COGS on an MTS fixture that genuinely holds stock (with the MTO case asserted at
+zero, so it is not two zeroes agreeing). `test_progress.py` no longer restates the key
+set; it reads `PUBLISHED_SERIES_KEYS`, so it cannot become a seventh author.
+
+**What this package did NOT do, and why.**
+
+- **No node-, supplier- or echelon-level inventory.** Inventory in this engine is one
+  bucket per material (`ctx.on_hand = np.zeros(model.n_mats)`) and one per product;
+  `I_transit` is explicitly aggregated over supplier links. There is no per-node stock
+  to report, so any such rollup would be an **allocation presented as a measurement** —
+  §4 D113 exactly, and D113's panel was deleted for it. `node_list.echelon` cannot
+  rescue it either: §4 D137 records that `network_nodes.uid` and material ids are
+  different universes. The user asked for levels of detail and was told this; the
+  answer taken was the material / finished-goods split, which is measured.
+- **The units view carries a caveat at the point of display.** Neither `materials` nor
+  `products` has a unit-of-measure column, so a units total assumes one common unit.
+  The panel says so (**T2**) rather than letting the toggle imply a rigour the data
+  does not have.
+- **No migration.** `time_series` is `jsonb`; new keys need no DDL. **And therefore no
+  rehearsal** — `supabase/rehearsal/*.sql` is for assertions that need a real database,
+  and this package adds no database behaviour. Stated here rather than shipping a
+  rehearsal that asserts nothing.
+- **A run made before this carries no inventory keys.** The panel says so instead of
+  drawing a zero line: a missing measurement and a measured zero are different facts
+  (**T1**).
+
+**Gap check.** `contract:check` green (55 tables, 684 columns; the 2 warnings are
+pre-existing — R10's Phase 5 marker, R13's two `customers` bindings). `npm test` 918
+passed. `scsim` 236 passed. `typecheck` — 21 baseline errors, no new. The class in
+(a)/(b) is **not fully closed**: `run_replications.kpis`' key vocabulary has the same
+shape, and `deriveRunKpis` reads the engine — one author, and the right one — but
+nothing compares it to `KPI_DISPLAY` beyond D113's join. Named in D163 rather than
+fixed.
+
+---
+---
+
 ---
 ---
 
@@ -17502,6 +17630,7 @@ Handoff to next WP:
 | 6 | **6.1 – 6.5** | policy contract, researcher grade | — | **6.1 ✅** · **6.2 ✅** — twenty slices, eight rows closed that arrived while it ran, and FOUR remedies corrected by measurement rather than satisfied (D66, D87, D90, D96); see §16's closing entry. **6.3's five deliverables are DONE** — A1's vocabulary, A2's value-chain popover, A3's Trust Report through `report-render`, A5's Reproducibility Record and §5.4's acceptance test, plus D113 — **and it is NOT ✅, because `coverage.yaml` defers TEN result tables to it and R8 refused the mark.** That is the gate doing the one thing a habit cannot: a package can finish everything it describes and still not be finished. **6.4** carries six decision tables plus D112, D114 and D115's designer. **6.5 is NEW, created by 6.3's gap check**: two changes whose correctness is a fact about PRODUCTION — publishing `ingest-file` (D123) and dropping the computed entity columns (D88) — each needing a §15 reading either side, which no branch can take because both deploy workflows are `branches: [main]` |
 | 7+ | deferred | observations, estimation, backtesting | — | — |
 | **8** | **8.0 – 8.5** | **the graph layer — one node type, one graph layer** | — | **8.0 ✅** the seven §15 probes, and the numbers are NOT in yet: the package deliberately measures and changes nothing, because the diagnosis branches on a BOM depth no work-package session can read. Thirteen defects opened, **D127–D142**, two of which the measurement then CORRECTED from over-claims to latent (D129, D141). The root cause is in the contract already — there is **no type column on either edge table**, so **eight** classifiers each infer one at render time and disagree by construction, and the single `level` column carries **three** incompatible meanings between its writer, its contract and its reader. Two defects silently destroy data (**D128** a dedup guard testing a key it never writes; **D129** an edge emitted to `''` where the BOM root should be) and one label is fabricated outright (**D139** "work station", from `level === 1`, with no routing table anywhere in the contract). It also found **D138** — §16's last twenty-one entries sat AFTER §17 and so outside the slice every gate reads — and the numbering collision that made this Phase 8 rather than Phase 7 (§14 already owns `WP 7.1`, and D28 is owned by it). `check.mjs` now reads its roadmap from two ranges so a Phase 8 package is gated like a Phase 3 one, proved by making R7 fail with the package named. **AND THE SECOND §15 RUN IS WHY THE PACKAGE MATTERED**: the reported project's BOM is exactly four levels deep, so the ladder defect the brief predicted is LATENT there — and the map is wrong anyway, because **two live ETLs write both edge tables with different `level` rules** (**D140**, the finding of the package, and it rescopes WP 8.2 onto the SQL RPC because the edge function the brief named is the undeployed half). Also **D141** (the RPC invents a node called `ROOT`) and **D142** (nothing rebuilds the lane when its sources change, and every timestamp reports it fresh because a DELETE moves no `updated_at` — D12's lesson in a second place). **WP 8.1 ✅** — one classifier, and it found **D143**: the trigger that keeps the typed node projection in sync with the graph reads `NEW` in a STATEMENT-level context, so it has never fired once since 2025-08-29. Fixing it made two rehearsals go red with `forbidden`, because `rebuild_node_list` AUTHORIZES and a derivation running inside somebody else's INSERT can only refuse a writer the database already allowed — D66's shape in a derivation, closed by splitting discovery from authorization. **D132 closed**; **D127**'s data half landed. **WP 8.3 PARTIAL** — `src/lib/graph/` lands with 85 tests: one palette where there were five, encodings that carry data (area-scaled size, log-scaled width, position from the ECHELON and never from `level`), and the subgraph engine EXTRACTED from the orphaned fourth page under a parity suite that runs the original verbatim as a frozen witness. **Taken before WP 8.2 deliberately**: after WP 8.1 a page reading `echelon` and `bom_depth` is independent of `level` entirely, so the layer fixes the reported map without the ETL changing, and WP 8.2 can then alter `level` with nothing reading it. Found **D144** (`includeTerminals` is inverted, so the terminal-stop mechanism has never bounded a walk) and **D145** (a fixed `RETURNS TABLE` is a SECOND authoring of the schema — `get_node_list` could not carry WP 8.1's three columns, so a type that was authored, backfilled and constrained was invisible to every page). **The pages still classify**, and the two gates are RATCHETS that say so in numbers: 6 classifiers, 11/32/13/16/18 colour literals, each may only fall. **WP 8.5 PARTIAL** — the fabricated label is gone: `getDisplayNodeType` no longer returns "work station" (**D139**, a noun on screen no table in this database can produce), the title and empty state say **multi-level bill of materials**, the legend says **Echelons**, and the node panel labels the lane ordinate as the raw column it is. `material level N` went too, because on the measured project that string called 260 materials and 66 products "material level 2" at once. The ROUTE, the sidebar and eight manual bodies keep the old name deliberately — renaming those is D104's class and is named follow-up. **WP 8.2 ✅ — ONE ETL, and the decision was the package's first act.** The SQL RPC lives and the edge function's lane build is deleted; the demand walk was PORTED into SQL as a `WITH RECURSIVE`, because a loop over `level` assumes that column is a topological order and D140 is the finding that it is not. **The rescope's own evidence was stale**: `combine-project` has had a deploy step since WP 6.3 and the Combine BUTTON invokes it, so both writers were live across five call sites — worse than measured, and the structural reason the RPC wins stands either way (the completion trigger cannot call an edge function, and D142's rebuild needs a trigger). `bom_depth` is read from `bom_multi_level.level`; `level` carries the same value as a deprecated alias for one release. **Closed D129, D130, D133, D134, D136's hardcoded zero, D140, D141 and D142's rebuild half**, the last with a statement-level trigger on all four source lanes — which made four existing rehearsals go red, every one because it wrote a DERIVED table by hand and then touched its source, and each was repaired by following its own assertion rather than weakening it. Opened **D149** (a fallback read that raises on every call, for two independent reasons, found by DROPPING D133's column) and **D150** (**D2 was closed in the edge function and never in the RPC**, so the deployed writer read every lane `volume` raw for another year — a fix applied to one of two writers is not a fix). `rehearsal/310`, ten sections, six mutations verified red. **AND IT DOES NOT BACKFILL**: the fix changes what a combine WRITES, so `Project AA - ver3` must have Combine re-run after this deploys. **WP 8.3 + 8.4 THEN MADE IT VISIBLE**, after a reader said the one thing that mattered — *no differences in the result*. They were right: the migration deploys on MERGE, no page referenced `echelon`, and nothing imported the layer at all. Now both pages read the data. Process-level takes depth from `bom_multi_level` (so a 4-deep BOM renders as 5 columns instead of 1) and type from the lane roles; Product-level is the four echelons the reader specified — Supplier → purchased Material → finished Product → Customer — with the BOM COLLAPSED and the flow PROPAGATED down the tree rather than one hop of it, plus edge width by flow and arrowheads. **Four classifiers deleted, ratchet 6 → 4 → 2.** **D128, D135, D136 closed** (D136 by inverting it: the collapse is the view's intent, drawing the tree was the bug). **BOTH HALVES ARE NOW IN ONE PLACE, WHICH NEITHER BRANCH COULD SAY.** WP 8.2 wrote the ETL that WP 8.3 + 8.4's pages were computing for themselves, and each branch's §17 row ended by naming the other as what remained. What is left of the phase is the RATCHET's last two classifiers (6 → 4 → 2, and `oneClassifier.test.ts` fails if the list shrinks without the baseline shrinking with it) and WP 8.5's named follow-up — the ROUTE rename with a redirect, the eight manual bodies and the registry entry, in one commit. **And nothing in this phase is in production**: the three migrations behind it never deployed, because `main` carried two migration versions twice (§4 D151, closed here with `contract:check` R20). |
+| **9** | **9.1 – 9.2** | **results: inventory over time, and the result binding** | — | **9.1 ✅** the weekly-series vocabulary is authored ONCE (`WEEKLY_SERIES`, scsim/core/context.py) and the engine's six copies derive from it — which is how §4 D163 was found and closed: `fg_value`, finished-goods inventory, had been computed on every replication since the trace was written and published by nothing, so the chart captioned "Inventory dynamics" showed MATERIAL stock and called it inventory. Materials and finished goods now both reach a user, in units or value, on BOTH result surfaces, on ordinary multi-replication runs. It also describes `run_replications` — the first of the nine run/result tables to leave the deferral — and re-homes the other eight, whose owner (WP 6.3) had shipped, which is the state R8 exists to refuse. **9.2** is what those eight owe and 9.1 does not pay: `result-binding` — every result binds dataset + policy + scenario + engine version. A5's Reproducibility Record (WP 6.3) assembles that at EXPORT time from rows that could each have been written by a different world; the invariant asks for it on the ROW, and D88 is the precondition — 8 577 derived rows predate provenance |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -18382,3 +18511,68 @@ eleven joins can establish — true. What is owed, in the order it costs:
   unreachable but which are somebody's to route or delete rather than to
   document. The manual states each one plainly; that is the most a manual can do
   about a feature that is not there.
+
+---
+---
+
+## 19. Phase 9 — Results: inventory over time, and the result binding
+
+### WP 9.1 — Inventory over time ✅ *(no migration)*
+
+**The ask.** Track how inventory changes over time during a simulation, for
+materials and products, aggregatable at different levels of detail, on both the
+policies setting surface and the simulation lab.
+
+**What was already true.** The engine measured more inventory than the product
+showed. `on_hand_value` reached a chart; `fg_value` was computed on every
+replication and published by nothing, because the weekly-series vocabulary was
+authored six times and it was present in two of them (§4 D163).
+
+**Deliverables.**
+
+1. **One author for the vocabulary** — `WEEKLY_SERIES` in
+   `scsim/scsim/core/context.py`. Each series declares `key`, `unit`,
+   `aggregation` (`level` = a stock, average it; `flow` = a weekly quantity, sum
+   it; `ratio` = neither) and `published`. `WeeklyTrace`'s allocation,
+   `io/traces.py::trace_frame`, `_notify_progress` and `ScenarioResult.extra_series`
+   all derive from it.
+2. **Two new series** — `on_hand_units`, `fg_units`, beside the two existing
+   value series, and `fg_value` lifted into the published set. All four are
+   plain weekly scalars: present on every replication of every run, with no
+   trace-verbosity or single-replication gate.
+3. **Four window averages** — `avg_fg_value`, `avg_on_hand_units`,
+   `avg_fg_units` join `avg_on_hand_value`, which was computed but never
+   aggregated by the bridge and so never reached a user as a run figure.
+4. **`InventoryOverTime`** — materials, finished goods and total; a units/value
+   toggle; cross-replication mean with the total's CI band; the warm-up marker.
+   One component, mounted on `/policies` (Run & Validate) and `/simulation-lab`.
+5. **`run_replications` described** — the first of the nine run/result tables to
+   leave the deferral, because this package adds facts to its `time_series`. The
+   other eight re-homed to WP 9.2; their owner (WP 6.3) had shipped, which is the
+   state R8 exists to refuse.
+6. **The gate reads the declaration** — `deriveReplicationSeries` parsed the
+   `extra_series` literal, which is one of six authors; it now reads
+   `WEEKLY_SERIES` and publishes each series' `aggregation`, so a page cannot sum
+   a stock without the manual saying which it is doing.
+
+**Exit — MET.** Inventory reaches a user as materials AND finished goods, in units
+or value, on both surfaces, on ordinary multi-replication runs. The reconciliation
+in `scsim/tests/test_inventory_series.py` is what makes the aggregate and the
+per-item explorer one fact rather than two: per-material on-hand summed equals
+`on_hand_units`, and `fg_value` equals `fg_units` at COGS.
+
+**Scope refused, and why.** No node-, supplier- or echelon-level rollup. The engine
+holds one inventory bucket per material and one per product — there is no per-node
+stock to report, so such a figure would be an allocation presented as a
+measurement, which is §4 D113 and which cost a deleted panel. The honest levels of
+detail here are total, the material / finished-goods split, and the per-item
+explorer that already existed.
+
+### WP 9.2 — The result binding *(not started)*
+
+Invariant `result-binding`: every result binds dataset + policy + scenario + engine
+version. A5's Reproducibility Record (WP 6.3) assembles that at EXPORT time from
+rows that could each have been written by a different world; the invariant asks for
+it **on the row**. Owns the eight run/result tables still deferred in
+`scripts/data-contract/coverage.yaml`. §4 D88 is the precondition: 8 577 derived
+rows predate provenance, and the unblocking condition is a §15 reading, not code.
