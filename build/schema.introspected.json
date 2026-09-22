@@ -4,7 +4,7 @@
   "migrations_found": 347,
   "migrations_applied": 339,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260922000002_run_binds_seed_and_schedule.sql",
+  "last_migration": "20260922000003_delete_project_whole.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -22623,7 +22623,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "D170 — deletes ONE project and everything scoped to it in a single transaction: ",
-      "defined_by": "20260922000002_delete_project_whole.sql"
+      "defined_by": "20260922000003_delete_project_whole.sql"
     },
     {
       "name": "delete_simulation_result",

@@ -1336,7 +1336,7 @@ export function deriveProjectDeletion(root) {
 
   // WHERE THE LIST LIVES NOW (§4 D170). The edge function used to delete a
   // hand-written list over PostgREST, in batches, in the background. Since
-  // `20260922000002` the whole deletion is `public.delete_project`, one transaction,
+  // `20260922000003` the whole deletion is `public.delete_project`, one transaction,
   // and the function only relays its answer — so the list is read from the LATEST
   // migration that defines it, which is the definition production runs.
   const migDir = join(root, "supabase", "migrations");

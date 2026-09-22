@@ -250,7 +250,7 @@ jobs:
       # `product_code_map` (a dropped table) after it had already removed rows, with no
       # actor and a `202 Deletion started` to the person who clicked. The build this
       # step publishes deletes nothing itself: it calls `public.delete_project`
-      # (`20260922000002`), one transaction, and relays the database's answer.
+      # (`20260922000003`), one transaction, and relays the database's answer.
       # `verify_jwt = true` is declared in `supabase/config.toml`.
       - name: Deploy delete-project
         run: supabase functions deploy delete-project --project-ref wckdrutwkytwcomrlpib

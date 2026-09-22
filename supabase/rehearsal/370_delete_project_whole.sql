@@ -3,7 +3,7 @@
 -- Production's "Delete project" never worked: the live `delete-project` (a 2026-03-17
 -- build) deleted table by table in the background and stopped at a table that no
 -- longer exists, having already removed rows, with no actor on them, while the page
--- said it had worked. `20260922000002` moves the whole deletion into
+-- said it had worked. `20260922000003` moves the whole deletion into
 -- `public.delete_project`, one transaction. What only a running database can settle:
 --
 --   §1 the owner deletes a project that holds lanes, derived lanes, a node list, a
@@ -76,7 +76,7 @@ BEGIN
 
   SELECT count(*) INTO v_n FROM public.supply_chain_data WHERE project_id = v_p;
   IF v_n = 0 THEN
-    RAISE EXCEPTION 'D170/360 setup: the combine produced no supply_chain_data, so §1 would prove nothing about derived rows';
+    RAISE EXCEPTION 'D170/370 setup: the combine produced no supply_chain_data, so §1 would prove nothing about derived rows';
   END IF;
 
   -- ══ §3 · refusals, before anything is deleted ══
@@ -84,22 +84,22 @@ BEGIN
   BEGIN PERFORM public.delete_project(v_p, v_other, 'd170x@example.invalid');
   EXCEPTION WHEN OTHERS THEN v_code := SQLSTATE; END;
   IF v_code IS DISTINCT FROM '42501' THEN
-    RAISE EXCEPTION 'D170/360 §3: a non-owner non-admin ended with SQLSTATE %, expected 42501', COALESCE(v_code, '(none — it deleted)');
+    RAISE EXCEPTION 'D170/370 §3: a non-owner non-admin ended with SQLSTATE %, expected 42501', COALESCE(v_code, '(none — it deleted)');
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.projects WHERE id = v_p) OR NOT EXISTS (SELECT 1 FROM public.inbound_logistics WHERE project_id = v_p) THEN
-    RAISE EXCEPTION 'D170/360 §3: a refused delete removed rows';
+    RAISE EXCEPTION 'D170/370 §3: a refused delete removed rows';
   END IF;
   v_code := NULL;
   BEGIN PERFORM public.delete_project(gen_random_uuid(), v_owner, 'd170o@example.invalid');
   EXCEPTION WHEN OTHERS THEN v_code := SQLSTATE; END;
   IF v_code IS DISTINCT FROM 'P0002' THEN
-    RAISE EXCEPTION 'D170/360 §3: an unknown project ended with SQLSTATE %, expected P0002', COALESCE(v_code, '(none)');
+    RAISE EXCEPTION 'D170/370 §3: an unknown project ended with SQLSTATE %, expected P0002', COALESCE(v_code, '(none)');
   END IF;
   v_code := NULL;
   BEGIN PERFORM public.delete_project(v_p, NULL, NULL);
   EXCEPTION WHEN OTHERS THEN v_code := SQLSTATE; END;
   IF v_code IS DISTINCT FROM '22004' THEN
-    RAISE EXCEPTION 'D170/360 §3: a NULL actor ended with SQLSTATE %, expected 22004', COALESCE(v_code, '(none)');
+    RAISE EXCEPTION 'D170/370 §3: a NULL actor ended with SQLSTATE %, expected 22004', COALESCE(v_code, '(none)');
   END IF;
 
   -- ══ §4 · atomic: fail at the LAST step, after the lanes are gone ══
@@ -112,12 +112,12 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN v_code := SQLERRM; END;
   DROP TRIGGER d170_refuse ON public.projects;
   IF v_code IS NULL OR v_code NOT LIKE '%forced failure%' THEN
-    RAISE EXCEPTION 'D170/360 §4: the forced failure did not surface (got %)', COALESCE(v_code, '(no error)');
+    RAISE EXCEPTION 'D170/370 §4: the forced failure did not surface (got %)', COALESCE(v_code, '(no error)');
   END IF;
   FOREACH v_tbl IN ARRAY ARRAY['inbound_logistics','outbound_logistics','bom_single_level','supply_chain_data'] LOOP
     EXECUTE format('SELECT count(*) FROM public.%I WHERE project_id = $1', v_tbl) INTO v_n USING v_q;
     IF v_n = 0 THEN
-      RAISE EXCEPTION 'D170/360 §4: a delete that FAILED left % empty — it is not atomic, which is the defect D170 exists to close', v_tbl;
+      RAISE EXCEPTION 'D170/370 §4: a delete that FAILED left % empty — it is not atomic, which is the defect D170 exists to close', v_tbl;
     END IF;
   END LOOP;
 
@@ -130,7 +130,7 @@ BEGIN
   PERFORM set_config('app.current_user_id', '', true);
   PERFORM public.delete_project(v_p, v_owner, 'd170o@example.invalid');
   IF EXISTS (SELECT 1 FROM public.projects WHERE id = v_p) THEN
-    RAISE EXCEPTION 'D170/360 §1: the project row survived its own deletion';
+    RAISE EXCEPTION 'D170/370 §1: the project row survived its own deletion';
   END IF;
   FOR v_tbl IN
     SELECT c.table_name FROM information_schema.columns c
@@ -140,14 +140,14 @@ BEGIN
   LOOP
     EXECUTE format('SELECT count(*) FROM public.%I WHERE project_id::text = $1', v_tbl) INTO v_n USING v_p::text;
     IF v_n > 0 THEN
-      RAISE EXCEPTION 'D170/360 §1: % still holds % row(s) of the deleted project', v_tbl, v_n;
+      RAISE EXCEPTION 'D170/370 §1: % still holds % row(s) of the deleted project', v_tbl, v_n;
     END IF;
   END LOOP;
   IF EXISTS (SELECT 1 FROM public.disruption_scenario_settings WHERE profile_id = v_prof) THEN
-    RAISE EXCEPTION 'D170/360 §1: a disruption profile''s child outlived the project';
+    RAISE EXCEPTION 'D170/370 §1: a disruption profile''s child outlived the project';
   END IF;
   IF EXISTS (SELECT 1 FROM public.ingest_files f WHERE f.storage_path = 'd170/d170.csv') THEN
-    RAISE EXCEPTION 'D170/360 §1: the landed file''s manifest outlived the project';
+    RAISE EXCEPTION 'D170/370 §1: the landed file''s manifest outlived the project';
   END IF;
 
   -- ══ §2 · every data-plane row the deletion wrote names the actor ══
@@ -156,28 +156,28 @@ BEGIN
      AND actor_user_id IS DISTINCT FROM v_owner
      AND target_type IN ('inbound_logistics','outbound_logistics','bom_single_level','supply_chain_data','node_list');
   IF v_n > 0 THEN
-    RAISE EXCEPTION 'D170/360 §2: % delete audit row(s) do not name the actor — the batches'' defect survived', v_n;
+    RAISE EXCEPTION 'D170/370 §2: % delete audit row(s) do not name the actor — the batches'' defect survived', v_n;
   END IF;
   SELECT count(*) INTO v_n FROM public.audit_logs
    WHERE plane = 'data' AND action = 'delete' AND created_at >= v_since AND actor_user_id = v_owner;
   IF v_n = 0 THEN
-    RAISE EXCEPTION 'D170/360 §2: the deletion wrote no attributed audit row at all';
+    RAISE EXCEPTION 'D170/370 §2: the deletion wrote no attributed audit row at all';
   END IF;
 
   -- The untouched project is intact, and an ADMIN of the organization may delete it.
   PERFORM public.delete_project(v_q, v_admin, 'd170a@example.invalid');
   IF EXISTS (SELECT 1 FROM public.projects WHERE id = v_q) THEN
-    RAISE EXCEPTION 'D170/360 §3: an admin of the project''s organization could not delete it';
+    RAISE EXCEPTION 'D170/370 §3: an admin of the project''s organization could not delete it';
   END IF;
 
   -- ══ §5 · who may call it ══
   IF has_function_privilege('anon', 'public.delete_project(uuid, uuid, text)', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.delete_project(uuid, uuid, text)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'D170/360 §5: anon or authenticated may EXECUTE delete_project — a browser could delete any project by naming its owner';
+    RAISE EXCEPTION 'D170/370 §5: anon or authenticated may EXECUTE delete_project — a browser could delete any project by naming its owner';
   END IF;
   IF NOT has_function_privilege('service_role', 'public.delete_project(uuid, uuid, text)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'D170/360 §5: service_role cannot EXECUTE delete_project, so the edge function cannot delete anything';
+    RAISE EXCEPTION 'D170/370 §5: service_role cannot EXECUTE delete_project, so the edge function cannot delete anything';
   END IF;
 
-  RAISE NOTICE 'D170/360: delete_project is whole, attributed, atomic and service-role only';
+  RAISE NOTICE 'D170/370: delete_project is whole, attributed, atomic and service-role only';
 END $d170$;

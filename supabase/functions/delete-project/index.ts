@@ -10,7 +10,7 @@
 // attempts on one project, six `PGRST205` errors, the project still present).
 //
 // Now it authorizes nothing and deletes nothing by hand. It calls
-// `public.delete_project` (`20260922000002`), which does the whole deletion in ONE
+// `public.delete_project` (`20260922000003`), which does the whole deletion in ONE
 // transaction — all of it or none of it — names the actor on every audit row, and
 // decides who may delete. This function waits for the answer and relays it, so a
 // refusal or a failure reaches the person who clicked instead of a server log.
