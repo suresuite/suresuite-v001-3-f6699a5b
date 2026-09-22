@@ -345,6 +345,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D160** | **The same foreign key has two different names — production's and every rehearsed database's — because PostgreSQL names an unnamed constraint after the table AT CREATION TIME and WP 3.1 renamed the table.** `ingest_runs` was created as `erp_sync_runs` (`20260829120000`) with two inline `REFERENCES auth.users(id)` columns, so production's keys are `erp_sync_runs_triggered_by_user_id_fkey` and `erp_sync_runs_applied_by_user_id_fkey` — §15 run `35467412134` read those names out of `pg_constraint`. A rehearsed database builds the table fresh under its CURRENT name, so the same two keys are called `ingest_runs_*_fkey` there. **A `DROP CONSTRAINT IF EXISTS` naming one of them silently does nothing in the other world, and `IF EXISTS` is precisely what makes it silent.** D156's fix is what found it: the first draft named production's two, dropped nothing in the rehearsal, added a second key beside the first, and the landing still failed on the old one — with an error naming a constraint the migration had never heard of. **The class is D52's**, a rename that did not follow its foreign keys, surfacing four packages later in the one place the name is load-bearing; and it generalises past this table — any inline constraint on any renamed table has a name in production that the repository cannot derive | `supabase/migrations/20260829120000_erp_connector_phase1_2.sql`'s inline `REFERENCES` against §15 run `35467412134` probe 0.9's constraint names, and against the rehearsal error naming `ingest_runs_triggered_by_user_id_fkey` | **WORKED AROUND ✅ AND THE CLASS IS OPEN.** `20260919000012` drops BOTH names explicitly — four statements rather than two — and not in a `DO` block, because a `DO` block's DDL is invisible to `contract:introspect` (D99, D117's first draft), so the duplication is the smaller cost. **`rehearsal/320` §2 counts the keys by TARGET rather than by name**, so it fails whatever the constraint is called and a third name would not slip past it. What is NOT fixed is the general case: nothing tells a future migration that a constraint it wants to drop has a different name in production. A rule is imaginable — the artifact could record each constraint's production name beside its derived one — and it is unwritten. Owned by **WP 7.1**, with D99 and D157, since all three are the artifact disagreeing with the database |
 | **D161** | **A user who has ever uploaded a file cannot be deleted, because erasing them requires mutating a tier-0 row and the write-once trigger refuses it.** `ingest_files.uploaded_by` is `REFERENCES public.approved_users(id) ON DELETE SET NULL` — correct on its own, and the convention every actor column in this schema follows (`audit_logs.actor_user_id`, `ingest_runs`' two after D156). `ingest_files` is TIER 0, and `ingest_files_write_once()` (`20260916000013`) raises `restrict_violation` on ANY `UPDATE` — also correct on its own, and the thing that makes tier 0 mean something. Together they are unsatisfiable: `DELETE FROM approved_users` makes PostgreSQL attempt `UPDATE ingest_files SET uploaded_by = NULL`, the trigger refuses, and **the delete fails with an error about tier-0 immutability that says nothing about the user being deleted**. Two correct decisions with nothing comparing them, which is the shape this plan has now found at table grain (D117), column grain (D118) and constraint grain (D160). **Latent today** — `ingest_files` holds 0 rows in production because `ingest-file` is not deployed (D123) — and live the moment WP 6.5 (a) publishes it, at which point the first person to upload a CSV becomes undeletable. **Found by writing D156's rehearsal**, when §3 tried to delete the uploader it had just created | `supabase/migrations/20260916000013_ingest_files_tier0.sql`'s trigger against `ingest_files.uploaded_by`'s `ON DELETE SET NULL`; reproduced in `supabase/rehearsal/320` §4 | **PINNED, NOT FIXED — WP 7.2** *(and the reason it is not fixed here is that the fix is a DECISION about erasure rather than a defect to correct, with two defensible answers. **(a)** Let the trigger permit exactly `uploaded_by → NULL` — anonymising an actor is not rewriting a fact about the file, and tier 0 keeps meaning what it says about content. **(b)** Make the key `ON DELETE RESTRICT` — then the refusal is explicit, the error names the right thing, and deleting a person who has uploaded data becomes a deliberate act requiring the files to be dealt with first. (a) is what a data-protection request needs; (b) is what an audit trail wants. Choosing between them is a retention policy, not a migration, and it is not WP 7.1's — this package touches access control. `rehearsal/320` §4 ASSERTS the current refusal, so whichever answer is taken, the assertion fails and tells the author which decision they changed)* |
 | **D162** | **A RENAMED migration is invisible to `contract:rehearse` — the one gate that executes migrations — and it is invisible in the way that does the most damage: it removes the file's objects from the base AND skips the file that would put them back.** `newMigrations()` asks git for `--diff-filter=A`, and `git diff` detects renames by default, so a migration that was renamed rather than written reads as `R` and is dropped from the rehearsal set. That alone would only mean "not rehearsed". What makes it worse is the OTHER half: the base schema is built from the BASE branch's `build/schema.introspected.json`, and that artifact records, for each function, the migration FILE its body came from. After a rename the base branch's artifact names a file this branch no longer has, so `rehearsal-schema.mjs` prints `function source missing` and builds a base WITHOUT those functions — while the file that defines them sits unrehearsed. The result is a rehearsal against a database missing objects that neither the base nor the branch put there, and every behavioural assertion that calls one fails for a reason that has nothing to do with what it asserts. Found by D151's renumber: three files moved, three `function source missing` warnings appeared, `rehearsing 3 new migration(s)` named only the three that were newly WRITTEN, and `rehearsal/300` and `/310` failed on `function public.refresh_node_list_for_project(uuid, uuid) does not exist` — a function WP 8.1 had created and this branch had not touched. **And the rename is not a corner case but the correct response to D151**: `schema_migrations` is keyed on the version in the filename, so renaming is the only way to give a never-applied migration a version production has not recorded, and `supabase db push` WILL apply that file. It is new work by the only definition that matters, and it was the one kind of new work the gate could not see | `scripts/data-contract/rehearse-migrations.mjs`'s `newMigrations()` against `scripts/data-contract/rehearsal-schema.mjs:330`'s `function source missing` warning; reproduced on this branch before the fix, where all three modes reported `✓ 3 migration(s) apply cleanly` and then failed three behavioural assertions | **CLOSED ✅ (this package)** — `--no-renames` on the diff, so the question the function asks ("which migration files exist here that did not exist at the base") is the question git answers. 3 rehearsed became **6**, the three assertions pass, and all three modes are green. *(The `function source missing` warning is left in place and is now correct rather than misleading: it says the BASE branch's artifact named a file this branch renamed, which is true and stops being true the moment this merges. It is a warning and not a failure because the renamed migration now runs and supplies what the base could not)* |
+| **D163** | **`materials.cost` fell back to the material's CHEAPEST quoted price, while the same engine, from the same `volume` column, split that material's orders across its suppliers by lane share.** P-S.2 allocates a multi-sourced material's replenishment in proportion to each lane's weekly volume; the cost fallback took the MINIMUM over the same lanes. On the golden fixture's two-lane material that is 300/400 of it bought at 10.0 and all of it valued at 6.0 — a 33% understatement of purchase spend and of every inventory value derived from it, on a project whose data is COMPLETE and which the run reports as `info`, the grade meaning "derived from what you uploaded". Nothing was missing and nothing was wrong on the screen; the rule was. **And the asymmetry was visible in the registry the whole time**: `products.sell_price` falls back to the DEMAND-WEIGHTED outbound price, one table over, weighted by exactly the same kind of column. The two halves of the same idea were written differently, and only one of them was the average of what actually happens | `scsim/scsim/io/project_map.py`'s materials loop against the same file's `_map_policies` P-S.2 weights, and `base_data_requirements()`'s two `fallback_spec` chains side by side; reproduced in `supabase/functions/_shared/fixtures/validation_parity/dataset.json`'s `M_MULTI` (10.0×300 + 6.0×100 → 9.0 weighted, 6.0 cheapest) | **CLOSED ✅ (this package)** — the chain is `volume_weighted_inbound_price` (info) → `cheapest_inbound_price` (info) → 1.0 (warn), authored ONCE in the registry and walked by the engine, the shared grader and the display layer. The cheapest step is not deleted: it is what resolves a material whose lanes carry no volume, so a project with no volumes is valued exactly as before. `grading_test.ts` asserts the VALUE and the reducer that produced it (9.0 via the weighted step, 6.0 via the cheapest one when the volumes are removed), `test_project_map.py` asserts the same four cases on the engine, and `test_validation_parity.py` holds both to one fixture |
 
 ### 4.1 Code map — the data layer
 
@@ -377,9 +378,10 @@ only in `PROMPTS.md` or in a session transcript.
 
 | Location | What is there |
 |---|---|
-| `grading.ts:113-135` | `UNIT_DAYS` + `rateToWeekly` — **canonical**, mirrors `project_map.py` |
-| `grading.ts:159` | `cheapestInboundCost` floors a ≤0 price to 1.0 before the min |
-| `effectiveEconomics.ts:43-50` | `ratePerDay`, delegates to the shared table |
+| `grading.ts:123-145` | `UNIT_DAYS` + `rateToWeekly` — **canonical**, mirrors `project_map.py` |
+| `grading.ts:172-191` | `volumeWeightedInboundCost` — the FIRST `materials.cost` step since WP 8.5: Σ(price × weekly lane volume) ÷ Σ(weekly lane volume), prices floored at 1.0 first, a volume-less lane excluded rather than epsilon-weighted |
+| `grading.ts:201-213` | `cheapestInboundCost` floors a ≤0 price to 1.0 before the min. Still the chain's SECOND step — reached only when no lane of the material carries a volume |
+| `effectiveEconomics.ts:49-56` | `ratePerDay`, delegates to the shared table |
 | `item_master.sql:138-141` | the third, divergent unit `CASE` in `sc_nodes` (D10) |
 | `project_map.py:418-429` | lead time → weeks, `round`, `clamp(1,51)`, default 2 |
 | `core/engine.py:294` | `if dist != DETERMINISTIC && cv > 0` — deterministic skips sampling. Cited by the `core/` prefix because `sim-worker/sim_worker/engine.py` is the frozen legacy engine and the bare basename matches both |
@@ -18430,3 +18432,91 @@ eleven joins can establish — true. What is owed, in the order it costs:
   unreachable but which are somebody's to route or delete rather than to
   document. The manual states each one plainly; that is the most a manual can do
   about a feature that is not there.
+
+### WP 8.6 — `materials.cost` is what you pay, not the cheapest quote · 2026-09-20 · no migration
+
+**Where this came from.** Not from a gap check: from a user reading a run's own
+`info` note — *no master cost → using cheapest supplier price* — and asking what
+was wrong with it. Nothing was wrong with the NOTE. The note was accurate, the
+Required-data gate said the same thing, the provenance dot said the same thing,
+and the number underneath all three was the price of the lane the project buys
+LEAST through. **T2 was satisfied and T1 was not**: the substitution was visible
+everywhere and the rule it made visible was the wrong rule.
+
+**── D163: THE ENGINE ALREADY KNEW THE ANSWER, ONE FUNCTION AWAY ──**
+
+`materials.cost` fell back to `min(unit_price)` over a material's inbound lanes.
+In the same mapper, from the same `volume` column, P-S.2 splits that material's
+replenishment across its suppliers **by lane volume share** — so the engine
+bought 300 of 400 units at 10.0 and valued every one of them at 6.0. The registry
+declared the asymmetry in two adjacent rows the whole time: `products.sell_price`
+falls back to the DEMAND-WEIGHTED outbound price, and `materials.cost` to a
+minimum. One of the two was the average of what actually happens.
+
+The chain is now `volume_weighted_inbound_price` (info) → `cheapest_inbound_price`
+(info) → 1.0 (warn).
+
+Four decisions inside that are worth keeping:
+
+1. **The cheapest step stays, as the SECOND step.** A project whose lanes carry no
+   volume has nothing to weight by, and it is valued exactly as it was before this
+   package. The change reaches only projects that uploaded the column that decides
+   it.
+2. **A volume-less lane carries no weight, not an epsilon one.** The outbound
+   analogue floors its weight at `1e-9` and so can never fall through; here a lane
+   nothing is bought through neither moves the mean nor hides the cheapest step.
+   `grading_test.ts` pins both halves.
+3. **Both reductions run over the RAW arcs, not the deduped links.** The graders
+   see rows and cannot dedupe; reducing over `links_by_key` would put the engine
+   and every surface that predicts it in permanent disagreement — D101's shape,
+   avoided by construction rather than by a test.
+4. **The ORDER is authored once and read, never restated.** `effectiveEconomics.ts`
+   resolves the chain from the registry's `fallback_spec` through a new
+   `derivedFallbackValues`, so the display layer cannot name a step the engine has
+   stopped walking. That is the §2.1 `single-source` lesson applied before it had a
+   chance to become a D-number: the old hook hard-coded `cheapestInboundCost` as
+   *the* fallback, and would have gone on showing it.
+
+**What else had to move, and what that says.** One rule, six authors: the engine,
+the shared grader's reducer library, the display layer, the AI estimator registry
+(`direct_cheapest_inbound@1` → `direct_inbound_price@1` — a method id is a claim
+about a derivation, and §18.1's `findMethod` failing loudly on a stored reference
+to the old id is what a changed derivation is supposed to produce), the contract
+sidecars, and eleven pieces of user-facing prose. `npm run contract:check` and
+`check:docs` caught none of the prose: it is the D101 class again — a fact about
+the data layer authored in TypeScript, in YAML and in JSX, with nothing comparing
+the copies.
+
+**Discovered:**
+
+- **The BOM-only material branch in `from_project_data` is dead code.** An arc
+  whose `material_id` has no master row is skipped before `cheapest_cost` is
+  built, so the `ValueError: materials with no supplier link` always fires first
+  and `bom_mat_ids - {m.id for m in materials}` is empty by construction. The
+  branch was updated to use the new chain rather than left inconsistent, but it
+  is unreachable. Not fixed here: making it live changes which projects can be
+  simulated at all, which is a product decision and not this package's.
+  → affects **no package yet** → recorded here only.
+- **`report_builder_test.ts` fails on a pristine tree** under deno 2.9.7 (the
+  five-template registry assertion), as does `deno test`'s type-check of
+  `_shared/trustReportTool.ts`. Both predate this branch and neither is in its
+  path; CI pins `deno-version: v2.x`, so this may be a local-version artifact.
+  → affects **whoever owns the eval suite's deno pin** → recorded, not touched.
+
+**Numbers:** engine 232 tests green (4 new on the chain); `grading_test.ts` 27
+green (3 new, asserting the VALUE and the reducer rather than the row list);
+sim-worker 98 green including the engine↔grader parity; vitest 926 green, 8 of
+them the new `materialCostChain.test.ts` — whose last two cases are the ones to
+keep: the display layer must resolve **row for row what the grader resolves**,
+and the registry must still carry the order it reads. Agent eval 290 green with
+the six cost/steward fixtures re-derived; `typecheck` 21 baseline errors, none
+new; `contract:check` green with its two standing warnings; eslint 329 errors
+and `audit:ui` 8 violations, both EXACTLY the pre-change baseline (measured on
+a stashed tree, not assumed).
+
+**What is NOT done.** `materials.cost` is still a number per material, and a
+material genuinely bought at two prices has one. The honest end state is a cost
+that carries its own spread — which `materials.contract.yaml`'s `resolution.note`
+already says the engine has nowhere to put (`Material.cost` is a bare float) and
+which §14's RFC owns. This package makes the single number the right single
+number; it does not make it two.

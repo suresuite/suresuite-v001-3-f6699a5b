@@ -29,9 +29,9 @@ const SEVERITY: { level: string; what: string; blocks: boolean; why: string }[] 
     blocks: false,
     what: "The run will start, using something worked out from your data.",
     why:
-      "A value is missing and the fallback is derived from what you did upload — the cheapest " +
-      "inbound price, the demand your outbound lanes imply. Usually what you meant, and still worth " +
-      "reading.",
+      "A value is missing and the fallback is derived from what you did upload — the average " +
+      "price you pay across a material's inbound lanes, the demand your outbound lanes imply. " +
+      "Usually what you meant, and still worth reading.",
   },
 ];
 
@@ -104,8 +104,8 @@ export default function VerifyYourInputs() {
               title: "Decide whether the fallback is wrong",
               body: (
                 <>
-                  An <Term>info</Term> finding is often correct — if the cheapest inbound price is
-                  the price, there is nothing to fix.{" "}
+                  An <Term>info</Term> finding is often correct — if what you pay on your own
+                  inbound lanes is the price, there is nothing to fix.{" "}
                   <DocLink to="when-a-value-is-missing">When a value is missing</DocLink> lists what
                   each substitution actually does.
                 </>

@@ -30,8 +30,8 @@
     "tool": "draft_item_master_update",
     "args": {
       "rows": [
-        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "value": 4.5, "source": "reducer", "reducer": "cheapest_inbound_price" },
-        { "table": "materials", "entity_id": "MAT-2", "field": "cost", "value": 2, "source": "reducer", "reducer": "cheapest_inbound_price" },
+        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "value": 4.78125, "source": "reducer", "reducer": "volume_weighted_inbound_price" },
+        { "table": "materials", "entity_id": "MAT-2", "field": "cost", "value": 2, "source": "reducer", "reducer": "volume_weighted_inbound_price" },
         { "table": "products", "entity_id": "P-1", "field": "sell_price", "value": 30, "source": "user_supplied", "why": "User stated the sell price." }
       ],
       "title": "Fill missing costs; set P-1 sell price"

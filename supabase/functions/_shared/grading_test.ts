@@ -298,3 +298,44 @@ Deno.test("D75: an owner name containing the separator still resolves", () => {
     "second split candidate — a plant literally named \"A::B\"",
   );
 });
+
+// ── materials.cost is the volume-weighted lane price (§8.2) ──────────────────
+// The golden findings above name the rows a fallback resolves; they do not
+// carry the NUMBER, and the number is the whole of this rule. M_MULTI quotes
+// 10.0 on a 300/week lane and 6.0 on a 100/week one: the engine values it at
+// 9.0, and the cheapest quote (6.0) is what the chain would answer if the
+// first step were skipped or the weights were dropped.
+
+Deno.test("materials.cost resolves to the volume-weighted lane price, not the cheapest quote", () => {
+  const graded = gradeManifest(DATASET, DEFAULTS, REG, BRIDGE)
+    .find((g) => g.field === "materials.cost")!;
+  const multi = graded.resolved.find((r) => r.id === "M_MULTI")!;
+  assertEquals(multi.via, "volume_weighted_inbound_price", "M_MULTI reducer");
+  assertEquals(multi.value, 9, "(10×300 + 6×100) / 400 — the cheapest quote is 6");
+  assertEquals(multi.grade, "info", "a data-derived step is never a warn");
+
+  // A single priced lane weights to its own price — the chain does not change
+  // what a single-sourced material costs.
+  const single = graded.resolved.find((r) => r.id === "M_DERIVED")!;
+  assertEquals(single.value, 3, "M_DERIVED's one lane");
+});
+
+Deno.test("with no lane volumes the chain falls back to the cheapest quote", () => {
+  const noVolumes = (DATASET.inbound as Row[]).map((a) => ({ ...a, volume: null }));
+  const graded = gradeManifest({ ...DATASET, inbound: noVolumes }, DEFAULTS, REG, BRIDGE)
+    .find((g) => g.field === "materials.cost")!;
+  const multi = graded.resolved.find((r) => r.id === "M_MULTI")!;
+  assertEquals(multi.via, "cheapest_inbound_price", "second step of the chain");
+  assertEquals(multi.value, 6, "the cheapest of 10.0 and 6.0");
+});
+
+Deno.test("a lane with no volume carries no weight rather than an epsilon one", () => {
+  // Drop the 100/week lane's volume: the weighted mean must become the other
+  // lane's price exactly, not a near-average of the two.
+  const inbound = (DATASET.inbound as Row[]).map((a) =>
+    a.material_id === "M_MULTI" && a.supplier_id === "S2" ? { ...a, volume: 0 } : a
+  );
+  const graded = gradeManifest({ ...DATASET, inbound }, DEFAULTS, REG, BRIDGE)
+    .find((g) => g.field === "materials.cost")!;
+  assertEquals(graded.resolved.find((r) => r.id === "M_MULTI")!.value, 10, "S1's price alone");
+});

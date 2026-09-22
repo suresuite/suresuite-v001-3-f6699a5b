@@ -184,8 +184,8 @@ Implement WP 1.3 from docs/PLAN.md.
 
 Already verified (re-check before relying on it):
 · THREE unit conversions exist and disagree:
-  – grading.ts:113-135 UNIT_DAYS + rateToWeekly (canonical; mirrors project_map.py)
-  – effectiveEconomics.ts:43-50 ratePerDay (already delegates — verify it still does)
+  – grading.ts:123-145 UNIT_DAYS + rateToWeekly (canonical; mirrors project_map.py)
+  – effectiveEconomics.ts:49-56 ratePerDay (already delegates — verify it still does)
   – item_master.sql:138-141 sc_nodes SQL CASE — ILIKE branches only; quarter falls
     into ELSE and is treated as weekly, a 13x error. Its price aggregate at :143
     also weights by RAW volume with a MAX() fallback, unlike demandWeightedSellPrice.
@@ -979,8 +979,9 @@ Already verified (re-check before relying on it):
 · D18: material_price is consumed NOWHERE in scsim/ or sim-worker/ — grep returns
   nothing. It is COLUMN_FIT keep:true (columnSpecs.ts:353) while material_cost,
   which the engine does read, carries prio:8 and folds away first.
-· The cheapestInboundCost / resolveField divergence: grading.ts:159 floors a <=0
-  arc price to 1.0 before taking the min, while useStageRows.tsx:162 rejects the
+· The cheapestInboundCost / resolveField divergence: grading.ts:201-213 floors a <=0
+  arc price to 1.0 before taking the min (the chain's SECOND step since D163 —
+  grading.ts:172-191 weights by lane volume first), while useStageRows.tsx:162 rejects the
   same 0 and imputes an average. One row can show Price 42.50 (imputed) and Cost
   1.00 (derived) for the same material.
 · D16 residual from WP 0.1: the untracked branch is GONE — provenance now reads

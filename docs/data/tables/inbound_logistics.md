@@ -320,7 +320,7 @@ for one you did.
 | When | The value used | Shown as | Visible where |
 |---|---|---|---|
 | NULL, zero or negative | 1.0 | `default` | MappingWarning on the run's mapping report |
-| `materials.cost` is unset for this material | this arc's price becomes the material's cost, via the cheapest inbound arc | `derived` | the effective-economics badge in /policies |
+| `materials.cost` is unset for this material | this arc's price contributes to the material's cost, weighted by this arc's volume share (its cheapest arc when no arc carries a volume) | `derived` | the effective-economics badge in /policies |
 
 **Resolution** — how a value is decided when more than one source could supply one.
 
@@ -440,6 +440,6 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `4231766af8b0`, engine `0.2.3`,
+*Generated from data contract `3caef13024f9`, engine `0.2.3`,
 sidecar `supabase/contract/inbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -323,7 +323,7 @@ fields:
         provenance: default
         visible_as: MappingWarning on the run's mapping report
       - when: "`materials.cost` is unset for this material"
-        value: this arc's price becomes the material's cost, via the cheapest inbound arc
+        value: this arc's price contributes to the material's cost, weighted by this arc's volume share (its cheapest arc when no arc carries a volume)
         provenance: derived
         visible_as: the effective-economics badge in /policies
     ingest:

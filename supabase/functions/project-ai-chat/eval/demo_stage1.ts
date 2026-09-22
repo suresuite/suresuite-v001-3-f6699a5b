@@ -68,7 +68,7 @@ const ctx: ToolContext = {
 };
 const agentReplyText =
   "I drafted an update covering the 3 materials with missing costs (MAT-1, MAT-2, MAT-3), " +
-  "each valued by the cheapest-inbound-price reducer from your own logistics data. Nothing else " +
+  "each valued by the volume-weighted-inbound-price reducer from your own logistics data. Nothing else " +
   "is missing for these fields. The card must be reviewed and approved before anything applies.";
 let mock = installFetchMock([
   { json: { candidates: [{ content: { parts: [{ functionCall: { name: "draft_item_master_update", args: fixture.mocked_llm.args } }] } }] } },
@@ -81,7 +81,7 @@ say("proposal part (attached mechanically)", JSON.stringify(agent.proposalPart?.
 
 // 3 — persona wrap-up (voice)
 const wrapText =
-  "I've drafted this for you — three material costs filled from your cheapest inbound prices. " +
+  "I've drafted this for you — three material costs filled from what you pay across your inbound lanes. " +
   "Review the card below and approve it before anything applies.";
 mock = installFetchMock([{ json: { candidates: [{ content: { parts: [{ text: wrapText }] } }] } }]);
 const wrap = await runChat("gemini-2.5-flash", buildWrapupMessage({

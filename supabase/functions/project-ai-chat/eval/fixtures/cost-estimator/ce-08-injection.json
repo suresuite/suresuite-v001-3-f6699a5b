@@ -32,8 +32,8 @@
     "tool": "draft_parameter_estimate",
     "args": {
       "rows": [
-        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "method": "direct_cheapest_inbound@1", "value": 3.75, "low": 3.75, "high": 4.5 },
-        { "table": "materials", "entity_id": "MAT-2", "field": "cost", "method": "direct_cheapest_inbound@1", "value": 2, "low": 2, "high": 2.6 }
+        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "method": "direct_inbound_price@1", "value": 4.166666666666667, "low": 3.75, "high": 4.5 },
+        { "table": "materials", "entity_id": "MAT-2", "field": "cost", "method": "direct_inbound_price@1", "value": 2.1384615384615384, "low": 2, "high": 2.6 }
       ]
     }
   },

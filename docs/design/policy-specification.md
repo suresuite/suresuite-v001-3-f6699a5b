@@ -242,8 +242,9 @@ $T=1$ ⇒ $\rho_t\equiv1$). Every reorder rule below is gated by $\rho_t$.
 
 Per parameter, per row: **user edit ≻ strategy/preset ≻ data-prefill ≻ registry default.**
 Data-prefill reads item-master fields, or a named reducer over logistics arcs when the master is
-empty (cost = cheapest inbound price; price = demand-weighted outbound; mean demand = Σ outbound
-volume; §PART VII details per policy). Every prefilled cell shows a provenance badge; no hidden
+empty (cost = volume-weighted inbound price, the cheapest quote only when no lane carries a
+volume; price = demand-weighted outbound; mean demand = Σ outbound volume; §PART VII details per
+policy). Every prefilled cell shows a provenance badge; no hidden
 heuristics.
 
 ---

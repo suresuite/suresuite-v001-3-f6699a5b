@@ -143,10 +143,15 @@ def test_registry_exports_machine_readable_fallback_specs():
     reg = build_registry()
     base = {r["field"]: r for r in reg["base_data_requirements"]}
 
+    # materials.cost carries TWO data-derived steps, in the engine's order:
+    # weight by the volume actually bought through each lane, and fall back to
+    # the cheapest quote only when no lane carries a volume to weight by.
     cost = base["materials.cost"]["fallback_spec"]
-    assert [s["reducer"] for s in cost] == ["cheapest_inbound_price", None]
-    assert cost[1]["constant"] == 1.0
-    assert [s["grade"] for s in cost] == ["info", "warn"]
+    assert [s["reducer"] for s in cost] == [
+        "volume_weighted_inbound_price", "cheapest_inbound_price", None,
+    ]
+    assert cost[2]["constant"] == 1.0
+    assert [s["grade"] for s in cost] == ["info", "info", "warn"]
 
     assert base["products.sell_price"]["fallback_spec"][0]["reducer"] == \
         "demand_weighted_outbound_price"

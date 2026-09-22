@@ -201,8 +201,10 @@ Deno.test("ce-01-estimate-costs: candidates surface, draft equals recomputation,
       grounding: stored.grounding as Record<string, unknown>,
     });
     const mats = db.tables.materials;
-    assertEquals(Number(mats.find((m) => m.material_id === "MAT-1")!.cost), 3.75, "MAT-1 cost applied");
-    assertEquals(Number(mats.find((m) => m.material_id === "MAT-2")!.cost), 2, "MAT-2 cost applied");
+    // The volume-weighted lane price, not the cheapest quote (3.75 / 2.0):
+    // (4.5×100 + 3.75×80) / 180 and (2×200 + 2.6×60) / 260.
+    assertEquals(Number(mats.find((m) => m.material_id === "MAT-1")!.cost), 4.166666666666667, "MAT-1 cost applied");
+    assertEquals(Number(mats.find((m) => m.material_id === "MAT-2")!.cost), 2.1384615384615384, "MAT-2 cost applied");
     assert(Array.isArray(result.before.materials) && result.before.materials!.length === 2, "before snapshot present");
     const beforeKeys = new Set(result.findings_before.map((f) => `${f.severity}|${f.field}|${f.policy}`));
     for (const f of result.findings_after) {
@@ -290,7 +292,7 @@ Deno.test("ce-05-mismatch: a tampered value ⇒ not_grounded at draft, stale_val
       prompt_version: 1,
       rows: [{
         table: "materials", entity_id: "MAT-1", field: "cost",
-        method: "direct_cheapest_inbound@1", value: 3.76, low: 3.75, high: 4.5,
+        method: "direct_inbound_price@1", value: 4.17, low: 3.75, high: 4.5,
       }],
     };
     let failed: ApplyFailure | null = null;
@@ -352,8 +354,8 @@ Deno.test("ce-08-injection: instruction-like project data cannot steer values", 
     assertProposalExpectations(db, draft, fixture.expect.proposal);
     const stored = proposalRow(db, String((draft.data as Record<string, unknown>).proposal_id));
     const rows = (stored.payload as { rows: Array<Record<string, unknown>> }).rows;
-    assertEquals(Number(rows.find((r) => r.entity_id === "MAT-1")!.value), 3.75, "MAT-1 unchanged by injection");
-    assertEquals(Number(rows.find((r) => r.entity_id === "MAT-2")!.value), 2, "MAT-2 unchanged by injection");
+    assertEquals(Number(rows.find((r) => r.entity_id === "MAT-1")!.value), 4.166666666666667, "MAT-1 unchanged by injection");
+    assertEquals(Number(rows.find((r) => r.entity_id === "MAT-2")!.value), 2.1384615384615384, "MAT-2 unchanged by injection");
   });
 });
 

@@ -54,7 +54,62 @@ def test_product_price_is_demand_weighted_average_when_no_master():
     assert any(w.field == "unit_price" for w in res.warnings)
 
 
+def test_material_cost_is_volume_weighted_across_lanes_when_no_master():
+    """The analogue of the demand-weighted sell price above: a multi-sourced
+    material is valued at what it costs, not at its cheapest quote."""
+    d = _base()
+    d.materials[0].cost = None
+    d.supply_arcs = [
+        SupplyArc("s1", "m1", unit_price=5.0, lead_time=2, lead_time_unit="week",
+                  volume=300.0, time_unit="week"),
+        SupplyArc("s2", "m1", unit_price=3.0, lead_time=3, lead_time_unit="week",
+                  volume=100.0, time_unit="week"),
+    ]
+    res = from_project_data(d)
+    # (5*300 + 3*100) / 400 = 4.5  — NOT the cheapest quote (3.0)
+    assert res.scenario.network.materials[0].cost == pytest.approx(4.5)
+    note = next(w for w in res.warnings
+                if w.entity == "material:m1" and w.field == "cost")
+    assert note.level == "info"
+    assert "volume-weighted" in note.reason
+
+
+def test_material_cost_weight_is_normalized_to_a_weekly_rate():
+    """`time_unit` describes the VOLUME period, so lanes quoted in different
+    periods must be weighted by the same weekly basis before averaging."""
+    d = _base()
+    d.materials[0].cost = None
+    d.supply_arcs = [
+        # 13 per month ≈ 3 per week vs. 1 per week → the monthly lane dominates
+        SupplyArc("s1", "m1", unit_price=10.0, lead_time=2, lead_time_unit="week",
+                  volume=13.035, time_unit="month"),
+        SupplyArc("s2", "m1", unit_price=2.0, lead_time=2, lead_time_unit="week",
+                  volume=1.0, time_unit="week"),
+    ]
+    res = from_project_data(d)
+    # (10*3 + 2*1) / 4 = 8.0 on a weekly basis; taking the volumes raw would
+    # give (10*13.035 + 2)/14.035 = 9.43.
+    assert res.scenario.network.materials[0].cost == pytest.approx(8.0, rel=1e-3)
+
+
+def test_material_cost_ignores_lanes_with_no_volume():
+    """A lane nothing is bought through carries no weight at all — it neither
+    moves the mean nor (by being present) hides the cheapest-quote step."""
+    d = _base()
+    d.materials[0].cost = None
+    d.supply_arcs = [
+        SupplyArc("s1", "m1", unit_price=5.0, lead_time=2, lead_time_unit="week",
+                  volume=100.0, time_unit="week"),
+        SupplyArc("s2", "m1", unit_price=3.0, lead_time=3, lead_time_unit="week"),
+    ]
+    res = from_project_data(d)
+    assert res.scenario.network.materials[0].cost == pytest.approx(5.0)
+
+
 def test_material_cost_falls_back_to_cheapest_link_with_warning():
+    """No lane carries a volume → nothing to weight by, so the chain's second
+    step resolves it: the cheapest quote, which is what every project got
+    before volumes were weighted."""
     d = _base()
     d.materials[0].cost = None
     d.supply_arcs = [
@@ -63,7 +118,10 @@ def test_material_cost_falls_back_to_cheapest_link_with_warning():
     ]
     res = from_project_data(d)
     assert res.scenario.network.materials[0].cost == 3.0  # cheapest
-    assert any(w.entity == "material:m1" and w.field == "cost" for w in res.warnings)
+    note = next(w for w in res.warnings
+                if w.entity == "material:m1" and w.field == "cost")
+    assert note.level == "info"
+    assert "cheapest" in note.reason
 
 
 def test_duplicate_supplier_material_arcs_deduped_to_cheapest():

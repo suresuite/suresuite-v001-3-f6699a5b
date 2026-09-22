@@ -3,8 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import {
-  cheapestInboundCost,
   demandWeightedSellPrice,
+  derivedMaterialCost,
   weeklyDemand,
 } from "@/lib/policies/effectiveEconomics";
 
@@ -85,7 +85,8 @@ const SAVE_BATCH_SIZE = 100;
  * with a derived value here are NOT "missing" — the engine resolves them.
  */
 export interface DerivedEconomics {
-  /** materials.cost fallback: cheapest inbound unit_price per material. */
+  /** materials.cost fallback: the registry's inbound chain — the
+   * volume-weighted lane price, else the cheapest quote. */
   materialCost: Map<string, number>;
   /** products.sell_price fallback: demand-weighted outbound unit_price. */
   sellPrice: Map<string, number>;
@@ -261,7 +262,7 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
 
   const derived: DerivedEconomics = useMemo(
     () => ({
-      materialCost: cheapestInboundCost(inboundArcs),
+      materialCost: derivedMaterialCost(inboundArcs),
       sellPrice: demandWeightedSellPrice(outboundArcs),
       demandMean: weeklyDemand(outboundArcs),
     }),

@@ -380,8 +380,11 @@ def base_data_requirements() -> tuple:
             field="materials.cost", level="required",
             reason="Inventory valuation and holding cost — the terminal default of "
                    "1.0 makes every cost KPI meaningless.",
-            fallback="cheapest inbound unit_price across the material's suppliers",
+            fallback="volume-weighted average inbound unit_price across the "
+                     "material's supply lanes; the cheapest quoted price when no "
+                     "lane carries a volume",
             fallback_spec=(
+                FallbackStep(grade="info", reducer="volume_weighted_inbound_price"),
                 FallbackStep(grade="info", reducer="cheapest_inbound_price"),
                 FallbackStep(grade="warn", constant=1.0),
             ),
@@ -607,11 +610,34 @@ def from_project_data(data: ProjectData) -> MappingResult:
     prod_ids = {p.id for p in data.products}
     sup_ids = {s.id for s in data.suppliers}
 
-    # ── Supplier links (per supplier×material) + per-material cheapest cost ──
+    # ── Supplier links (per supplier×material) + the materials.cost fallback ──
     # Duplicate (supplier, material) inbound rows are reduced to one link:
     # cheapest unit_price wins, ties broken by shortest lead time.
+    #
+    # Two per-material price reductions are accumulated here, and they are the
+    # two data-derived steps of the `materials.cost` chain (the registry's
+    # fallback_spec below declares them in this order):
+    #
+    #   volume_weighted_inbound_price — Σ(price × weekly volume) / Σ(weekly
+    #     volume) over the material's arcs. The exact analogue of the
+    #     demand-weighted outbound price that backs `products.sell_price`: a
+    #     lane contributes at the rate the project actually buys through it,
+    #     so a material quoted by three suppliers is valued at what it costs
+    #     rather than at its cheapest quote.
+    #   cheapest_inbound_price — min over the arcs. Reached only when NO arc
+    #     of the material carries a positive volume, i.e. when there is no
+    #     weight to average by.
+    #
+    # Both reduce over the RAW arcs rather than over `links_by_key`: the
+    # platform graders (supabase/functions/_shared/grading.ts) see raw rows
+    # and cannot dedupe, so reducing over the deduped links would make the
+    # engine and every surface that predicts it disagree by construction. A
+    # duplicate (supplier, material) row is extra volume quoted at its own
+    # price, which is what the weighted mean should say.
     links_by_key: dict[tuple[str, str], SupplierLink] = {}
     cheapest_cost: dict[str, float] = {}
+    vol_price_num: dict[str, float] = {}
+    vol_price_den: dict[str, float] = {}
     mat_lt_dist = {m.id: m for m in data.materials}
     for arc in data.supply_arcs:
         if arc.material_id not in mat_ids:
@@ -650,6 +676,29 @@ def from_project_data(data: ProjectData) -> MappingResult:
             if (link.cost, link.lead_time_weeks) < (prev.cost, prev.lead_time_weeks):
                 links_by_key[key] = link
         cheapest_cost[arc.material_id] = min(cheapest_cost.get(arc.material_id, cost), cost)
+        # `time_unit` describes the VOLUME period (§3), so the weight is a
+        # weekly rate. A zero/absent/negative volume is no weight at all
+        # rather than an epsilon one: the lane is excluded from the mean, and
+        # a material with no weighted lane at all falls through to cheapest.
+        weekly_vol = _rate_to_weekly(float(arc.volume or 0.0), arc.time_unit)
+        if weekly_vol > 0:
+            vol_price_num[arc.material_id] = vol_price_num.get(arc.material_id, 0.0) + cost * weekly_vol
+            vol_price_den[arc.material_id] = vol_price_den.get(arc.material_id, 0.0) + weekly_vol
+
+    def _inbound_cost(material_id: str) -> Optional[tuple[float, str]]:
+        """The material's inbound-derived cost and the reducer that derived it.
+
+        `None` when the material has no inbound arc at all — the caller then
+        applies the terminal 1.0 and warns. Mirrored by
+        `volume_weighted_inbound_price` / `cheapest_inbound_price` in
+        supabase/functions/_shared/grading.ts.
+        """
+        den = vol_price_den.get(material_id, 0.0)
+        if den > 0:
+            return vol_price_num[material_id] / den, "volume_weighted_inbound_price"
+        if material_id in cheapest_cost:
+            return cheapest_cost[material_id], "cheapest_inbound_price"
+        return None
 
     links = list(links_by_key.values())
 
@@ -696,10 +745,13 @@ def from_project_data(data: ProjectData) -> MappingResult:
         inv = _merged_policy(data.policies, m.id, "inventory")
         if m.cost and m.cost > 0:
             cost = float(m.cost)
-        elif m.id in cheapest_cost:
-            cost = cheapest_cost[m.id]
-            w.append(MappingWarning("info", f"material:{m.id}", "cost",
-                                    "no master cost → using cheapest supplier price"))
+        elif (derived := _inbound_cost(m.id)) is not None:
+            cost, via = derived
+            w.append(MappingWarning(
+                "info", f"material:{m.id}", "cost",
+                "no master cost → using volume-weighted inbound price"
+                if via == "volume_weighted_inbound_price"
+                else "no master cost and no inbound volumes → using cheapest supplier price"))
         else:
             cost = 1.0
             w.append(MappingWarning("warn", f"material:{m.id}", "cost",
@@ -710,9 +762,11 @@ def from_project_data(data: ProjectData) -> MappingResult:
             id=m.id, name=str(m.name or m.id), cost=cost, holding_cost_rate=holding,
             initial_on_hand=(float(m.initial_on_hand) if m.initial_on_hand is not None else None),
         ))
-    # Materials referenced only by BOM but lacking a master row.
+    # Materials referenced only by BOM but lacking a master row. Same chain as
+    # above — a row with no master cannot have one, so the fallback is all it has.
     for mid in sorted(bom_mat_ids - {m.id for m in materials}):
-        materials.append(Material(id=mid, name=mid, cost=cheapest_cost.get(mid, 1.0)))
+        derived = _inbound_cost(mid)
+        materials.append(Material(id=mid, name=mid, cost=derived[0] if derived else 1.0))
 
     # ── Products ──
     # The plant grid keys its production overrides "<focal plant>::<product>",

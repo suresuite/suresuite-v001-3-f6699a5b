@@ -14,8 +14,9 @@ code that implements it: `scsim/scsim/io/project_map.py` (`ProjectData` → `Sce
 ingestion `sim-worker/sim_worker/datamap.py`. The human contract (this file) and the typed contract
 (`ProjectData`) must agree.
 
-Why this exists: the old ingestion derived prices and demand ad-hoc (material cost = cheapest
-supplier price, product price = last-writer / MAX across customers, capacity = a hardcoded 1000),
+Why this exists: the old ingestion derived prices and demand ad-hoc (material cost = the cheapest
+supplier's price whatever the project bought through it, product price = last-writer / MAX across
+customers, capacity = a hardcoded 1000),
 and two different code paths (the worker vs the `sc_nodes`/`sc_edges` views) disagreed. The result
 was meaningless value-weighted KPIs. The rules below replace all of that.
 
@@ -90,7 +91,7 @@ the cheapest `unit_price` wins, ties broken by shortest lead time ⚠.
 | `moq` | `materials.moq` | units | 0 |
 
 ### Material — from `materials` master, else links/policy
-| `cost` c_m | `materials.cost` → cheapest supplier link → 1.0 ⚠ | master first |
+| `cost` c_m | `materials.cost` → volume-weighted average inbound `unit_price` → cheapest supplier link (no lane volumes) → 1.0 ⚠ | master first; the weight is the lane's weekly volume rate, and a lane with no volume carries none |
 | `holding_cost_rate` | `materials.holding_cost_pct` → policy `inventory.holding_cost_pct` → 20 | ×100, clamp [5,50] |
 | `initial_on_hand` | `materials.initial_on_hand` | else engine warm-starts at S_m |
 
@@ -228,9 +229,10 @@ The /policies UI renders the §4 priority chains live, so a planner never has to
 economics that already exist in the uploaded logistics:
 
 - **`src/lib/policies/effectiveEconomics.ts`** is the frontend encoding of the §3 unit table
-  (`unitDays`, `ratePerDay`, `rateToWeekly`) and the §4 reducers (cheapest inbound `unit_price`
-  for material cost; demand-weighted outbound `unit_price` for product price; Σ weekly outbound
-  volume for demand). It must change in lockstep with `from_project_data` — it ports
+  (`unitDays`, `ratePerDay`, `rateToWeekly`) and the §4 reducers (volume-weighted inbound
+  `unit_price` for material cost, its cheapest quote when no lane carries a volume;
+  demand-weighted outbound `unit_price` for product price; Σ weekly outbound volume for demand).
+  It reads the chain's ORDER from the registry snapshot rather than restating it. It must change in lockstep with `from_project_data` — it ports
   `_UNIT_DAYS` (including the rate-word synonyms) and the weight semantics verbatim.
 - **Item Master editor** shows the derived value as a `≈` placeholder with a provenance badge
   ("from inbound data" / "from outbound data") when the master field is NULL; typing a value is
