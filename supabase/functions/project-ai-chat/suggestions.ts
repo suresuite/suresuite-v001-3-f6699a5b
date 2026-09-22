@@ -94,8 +94,9 @@ export async function buildSuggestions(
         loadPolicyDefaults(db, projectId),
       ]);
       // Every graded finding is the Steward's value surface — including the
-      // info-severity derivable fields ("cost is derived via cheapest
-      // inbound"), which are exactly the gaps the §17.3 example names.
+      // info-severity derivable fields ("cost is derived via the
+      // volume-weighted inbound price"), which are exactly the gaps the
+      // §17.3 example names.
       gapCount = flattenFindings(gradeDataset(dataset, defaults)).length;
     }
   } catch { /* rule contributes nothing */ }

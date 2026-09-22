@@ -10,7 +10,7 @@
 //
 // `fg_value` was computed on every run since the weekly trace was written and
 // never published, because "which series exist" was authored in six places and
-// it was present in two of them (§4 D163). It is the finished-goods line here.
+// it was present in two of them (§4 D164). It is the finished-goods line here.
 
 import { useMemo, useState } from "react";
 import {

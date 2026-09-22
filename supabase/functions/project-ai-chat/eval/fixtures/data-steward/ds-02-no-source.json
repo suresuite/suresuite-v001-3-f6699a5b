@@ -18,7 +18,7 @@
     "tool": "draft_item_master_update",
     "args": {
       "rows": [
-        { "table": "materials", "entity_id": "MAT-9", "field": "cost", "value": 1, "source": "reducer", "reducer": "cheapest_inbound_price" }
+        { "table": "materials", "entity_id": "MAT-9", "field": "cost", "value": 1, "source": "reducer", "reducer": "volume_weighted_inbound_price" }
       ]
     }
   },

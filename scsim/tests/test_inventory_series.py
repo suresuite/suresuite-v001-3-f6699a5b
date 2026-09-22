@@ -6,7 +6,7 @@ per-item explorer beside it are THE SAME NUMBER at two levels of detail. Before
 `WEEKLY_SERIES` existed, "which weekly series exist" was authored in six places
 and `fg_value` — finished-goods inventory, computed on every replication since
 the trace was written — fell into the gap between two of them and was never
-published (§4 D163).
+published (§4 D164).
 """
 from __future__ import annotations
 

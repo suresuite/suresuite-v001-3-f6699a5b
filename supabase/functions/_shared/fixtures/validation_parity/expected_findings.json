@@ -67,9 +67,10 @@
     "policy": "engine",
     "rows": [
       "M_DERIVED",
-      "M_UNPRICED"
+      "M_UNPRICED",
+      "M_MULTI"
     ],
-    "message": "materials.cost is derived for 2 row(s) via cheapest inbound unit_price across the material's suppliers — set the master value only to override.",
+    "message": "materials.cost is derived for 3 row(s) via volume-weighted average inbound unit_price across the material's supply lanes; the cheapest quoted price when no lane carries a volume — set the master value only to override.",
     "reason": "Inventory valuation and holding cost — the terminal default of 1.0 makes every cost KPI meaningless."
   },
   {
@@ -109,9 +110,10 @@
     "rows": [
       "M_OK",
       "M_DERIVED",
-      "M_UNPRICED"
+      "M_UNPRICED",
+      "M_MULTI"
     ],
-    "message": "materials.moq is missing for 3 row(s) (required by P-P.1): Minimum order quantity rounds up PH-80 order releases. Fallback: 0 (no minimum).",
+    "message": "materials.moq is missing for 4 row(s) (required by P-P.1): Minimum order quantity rounds up PH-80 order releases. Fallback: 0 (no minimum).",
     "reason": "Minimum order quantity rounds up PH-80 order releases."
   },
   {

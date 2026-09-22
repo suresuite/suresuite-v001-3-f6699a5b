@@ -1,6 +1,6 @@
 {
   "id": "ds-01-fill-costs",
-  "description": "3 materials NULL cost, inbound prices exist; 'fill in missing costs' → 3 reducer rows via cheapest_inbound_price, values equal recomputation (ai-agents.md §5.1 #1).",
+  "description": "3 materials NULL cost, inbound prices exist; 'fill in missing costs' → 3 reducer rows via volume_weighted_inbound_price, values equal recomputation (ai-agents.md §5.1 #1).",
   "project_snapshot": {
     "materials": [
       { "project_id": "11111111-1111-4111-8111-111111111111", "material_id": "MAT-1", "name": "Resin A", "cost": null, "holding_cost_pct": 0.2, "moq": 100, "initial_on_hand": null, "lead_time_dist": null, "lead_time_cv": null },
@@ -33,24 +33,24 @@
     "tool": "draft_item_master_update",
     "args": {
       "rows": [
-        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "value": 3.75, "source": "reducer", "reducer": "cheapest_inbound_price" },
-        { "table": "materials", "entity_id": "MAT-2", "field": "cost", "value": 2, "source": "reducer", "reducer": "cheapest_inbound_price" },
-        { "table": "materials", "entity_id": "MAT-3", "field": "cost", "value": 7.25, "source": "reducer", "reducer": "cheapest_inbound_price" }
+        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "value": 4.166666666666667, "source": "reducer", "reducer": "volume_weighted_inbound_price" },
+        { "table": "materials", "entity_id": "MAT-2", "field": "cost", "value": 2, "source": "reducer", "reducer": "volume_weighted_inbound_price" },
+        { "table": "materials", "entity_id": "MAT-3", "field": "cost", "value": 7.25, "source": "reducer", "reducer": "volume_weighted_inbound_price" }
       ],
       "title": "Fill missing material costs from cheapest inbound prices"
     }
   },
   "expect": {
     "completeness_candidates": [
-      { "field": "materials.cost", "entity_id": "MAT-1", "value": 3.75, "source": "cheapest_inbound_price" },
-      { "field": "materials.cost", "entity_id": "MAT-2", "value": 2, "source": "cheapest_inbound_price" },
-      { "field": "materials.cost", "entity_id": "MAT-3", "value": 7.25, "source": "cheapest_inbound_price" }
+      { "field": "materials.cost", "entity_id": "MAT-1", "value": 4.166666666666667, "source": "volume_weighted_inbound_price" },
+      { "field": "materials.cost", "entity_id": "MAT-2", "value": 2, "source": "volume_weighted_inbound_price" },
+      { "field": "materials.cost", "entity_id": "MAT-3", "value": 7.25, "source": "volume_weighted_inbound_price" }
     ],
     "proposal": {
       "rows": 3,
       "provenance": "deterministic",
       "sources": { "reducer": 3 },
-      "reducers": ["cheapest_inbound_price"],
+      "reducers": ["volume_weighted_inbound_price"],
       "citation_kinds": ["table_rows"]
     }
   },

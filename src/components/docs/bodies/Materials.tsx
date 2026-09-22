@@ -33,8 +33,10 @@ export default function Materials() {
             cost: (
               <>
                 Leaving this blank is <em>not</em> an error and is often the right choice: the
-                cheapest inbound lane's price is usually what you meant, and the model marks the cell
-                as derived so you can see it happened.
+                volume-weighted average of what you pay across the material's inbound lanes is
+                usually what you meant, and the model marks the cell as derived so you can see it
+                happened. Fill it in when the cost you want differs from what the lanes say — a
+                standard cost, or one including freight.
               </>
             ),
             holding_cost_pct: (

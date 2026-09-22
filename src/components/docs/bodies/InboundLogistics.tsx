@@ -109,9 +109,12 @@ export default function InboundLogistics() {
           Almost every economic default in the model traces back to this file.
         </Key>
         <P>
-          When <Term>cost</Term> is blank on a material, the engine uses the cheapest inbound{" "}
-          <Term>unit_price</Term> for it. When a supplier's share of a material has to be worked
-          out, it comes from the <Term>volume</Term> columns here. So an inbound file with
+          When <Term>cost</Term> is blank on a material, the engine values it at the average{" "}
+          <Term>unit_price</Term> of its lanes here, each weighted by that lane's{" "}
+          <Term>volume</Term> — so what you pay most for counts most, and a cheap lane you barely
+          use does not set the material's cost. With no volumes anywhere on a material, the
+          cheapest quoted price is used instead. When a supplier's share of a material has to be
+          worked out, it comes from the same <Term>volume</Term> columns. So an inbound file with
           placeholder prices does not produce a model with placeholder prices in one place — it
           produces one with placeholder economics throughout, and the{" "}
           <DocLink to="where-a-number-came-from">provenance dots</DocLink> in the policy grid are

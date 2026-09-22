@@ -97,7 +97,7 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   // ── inbound_logistics ──────────────────────────────────────────────────
   { dataset: "inbound_logistics", field: "supplier_id", engineField: "SupplierLink.supplier_id", chain: "identity — builds the supplier→material sourcing arc", statusKey: "identity" },
   { dataset: "inbound_logistics", field: "material_id", engineField: "SupplierLink.material_id", chain: "identity — builds the supplier→material sourcing arc", statusKey: "identity" },
-  { dataset: "inbound_logistics", field: "unit_price", engineField: "SupplierLink.cost (c_{m,s})", chain: "per arc → 1.0 (warn); also the fallback for materials.cost (cheapest wins)", statusKey: "inbound_unit_price" },
+  { dataset: "inbound_logistics", field: "unit_price", engineField: "SupplierLink.cost (c_{m,s})", chain: "per arc → 1.0 (warn); also the fallback for materials.cost (weighted by this lane's volume)", statusKey: "inbound_unit_price" },
   { dataset: "inbound_logistics", field: "lead_time", engineField: "SupplierLink.lead_time_weeks", chain: "WEEKS as-is, clamp [1,51] → 2 weeks (warn); time_unit does not apply", statusKey: "inbound_lead_time" },
   { dataset: "inbound_logistics", field: "time_unit", engineField: "unit normalizer", chain: "volume period only (day/week/month/yearly…); unknown → week", statusKey: "identity" },
   { dataset: "inbound_logistics", field: "volume", engineField: "sourcing share basis", chain: "per-lane volume; drives supplier share and primary suggestion", statusKey: "inbound_volume" },
@@ -114,7 +114,7 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "bom_single_level", field: "consumption_rate", engineField: "BomLine.consumption_rate", chain: "units of material per unit of product", statusKey: "bom_consumption_rate" },
   // ── materials master ───────────────────────────────────────────────────
   { dataset: "materials", field: "name", engineField: "Material.name", chain: "display only → id", statusKey: "name" },
-  { dataset: "materials", field: "cost", engineField: "Material.cost (c_m)", chain: "master → cheapest inbound unit_price (info) → 1.0 (warn)", statusKey: "material_cost" },
+  { dataset: "materials", field: "cost", engineField: "Material.cost (c_m)", chain: "master → volume-weighted inbound unit_price (info) → cheapest inbound (info) → 1.0 (warn)", statusKey: "material_cost" },
   { dataset: "materials", field: "holding_cost_pct", engineField: "Material.holding_cost_rate", chain: "master → policy inventory.holding_cost_pct → 20% · ×100, clamp [5,50]", statusKey: "material_holding" },
   { dataset: "materials", field: "moq", engineField: "SupplierLink.moq", chain: "master → 0", statusKey: "material_moq" },
   { dataset: "materials", field: "initial_on_hand", engineField: "Material.initial_on_hand", chain: "master → engine warm-starts at S_m", statusKey: "material_initial_on_hand" },

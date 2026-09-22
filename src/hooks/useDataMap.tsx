@@ -139,7 +139,7 @@ export function useDataMap(projectId: string | null | undefined) {
       material_cost: withFallback(
         mats, "material_id", "cost",
         (id) => derived.materialCost.has(id),
-        "resolve from cheapest inbound unit_price",
+        "resolve from volume-weighted inbound unit_price",
         "engine would default cost to 1.0",
       ),
       material_holding: masterField(mats, "holding_cost_pct", { status: "default", detail: "policy holding_cost_pct → 20%" }),

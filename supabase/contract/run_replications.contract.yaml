@@ -287,7 +287,7 @@ fields:
       `fg_units`) are what WP 9.1 added to a user's view; `fg_value` had been
       computed on every replication since the trace was written and published
       by nothing, because the vocabulary was authored six times and it was
-      present in only two of them (§4 D163).
+      present in only two of them (§4 D164).
     grain: level
     engine:
       consumed_by: "scsim_bridge.py::compute_run_from_project -> replications[].time_series"

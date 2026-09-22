@@ -74,7 +74,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `project_id` | — | `uuid` | — | — | The project this material belongs to. Half of the primary key. |
 | `material_id` | `material_id` | `text` | — | **yes** | The material's code as the user's own systems spell it. Joins to the BOM and to every inbound arc that supplies it. |
 | `name` | `name` | `text` | — | no | A human-readable name for the material. Display only. |
-| `cost` | `cost` | `numeric` | `currency per unit of material` | no | What one unit of this material costs to buy. The master value; where it is unset the engine uses the cheapest inbound arc instead, which is usually what the user wants and is why leaving it blank is not an error. |
+| `cost` | `cost` | `numeric` | `currency per unit of material` | no | What one unit of this material costs to buy. The master value; where it is unset the engine values the material at the volume-weighted average price of its inbound arcs — what the project actually pays, which is usually what the user wants and is why leaving it blank is not an error. |
 | `holding_cost_pct` | `holding_cost_pct` | `numeric` | `fraction of unit value per year` | no | The annual cost of holding one unit in stock, as a fraction of its value. 0.2 means holding a unit for a year costs a fifth of what the unit is worth. |
 | `moq` | `moq` | `numeric` | `units of material` | no | Minimum order quantity: the smallest amount this material can be ordered in. A commercial fact the supplier states, not something to be inferred from order history. |
 | `initial_on_hand` | `initial_on_hand` | `numeric` | `units of material` | no | How much of this material is in stock when the simulation starts. |
@@ -158,7 +158,7 @@ A label. Recorded for completeness: every engine-consumed field carries a resolu
 
 ### `cost`
 
-What one unit of this material costs to buy. The master value; where it is unset the engine uses the cheapest inbound arc instead, which is usually what the user wants and is why leaving it blank is not an error.
+What one unit of this material costs to buy. The master value; where it is unset the engine values the material at the volume-weighted average price of its inbound arcs — what the project actually pays, which is usually what the user wants and is why leaving it blank is not an error.
 
 | | |
 |---|---|
@@ -168,20 +168,21 @@ What one unit of this material costs to buy. The master value; where it is unset
 | Added by | `20260614000001_item_master.sql` |
 | Read by the engine | `project_map.py::_map_materials -> Material.cost` |
 | Transform | float() when > 0 |
-| When NULL, the engine uses | the cheapest inbound unit_price for this material, floored at 1.0 |
+| When NULL, the engine uses | the volume-weighted average inbound unit_price for this material, or its cheapest quote when no arc carries a volume; arc prices floored at 1.0 |
 | Validated at ingest | numeric > 0 |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 **The engine calls this `required`.** Inventory valuation and holding cost — the terminal default of 1.0 makes every cost KPI meaningless.
 
-Fallback chain, from the engine's own registry: cheapest_inbound_price (info) → constant 1 (warn).
+Fallback chain, from the engine's own registry: volume_weighted_inbound_price (info) → cheapest_inbound_price (info) → constant 1 (warn).
 
 **Substitutions** — every point where a value you did not supply can stand in
 for one you did.
 
 | When | The value used | Shown as | Visible where |
 |---|---|---|---|
-| NULL or <= 0 | the cheapest inbound arc's unit_price (grading.ts::cheapestInboundCost floors a <= 0 price to 1.0 first) | `derived` | the effective-economics badge in /policies |
+| NULL or <= 0, with at least one inbound arc carrying a volume | the volume-weighted average of the material's inbound unit_price values, each weighted by that arc's weekly volume (grading.ts::volumeWeightedInboundCost floors a <= 0 price to 1.0 first) | `derived` | the effective-economics badge in /policies |
+| NULL or <= 0, and no inbound arc of the material carries a volume | the cheapest inbound arc's unit_price (grading.ts::cheapestInboundCost floors a <= 0 price to 1.0 first) | `derived` | the effective-economics badge in /policies |
 
 **Resolution** — how a value is decided when more than one source could supply one.
 
@@ -193,7 +194,7 @@ for one you did.
 | Hybrid (centre / spread) | **none** — the engine has no variability field for this quantity |
 | On conflict | `assertion_wins` |
 
-hybrid is NULL because scsim has nowhere to put a spread: cost and unit_price are bare floats on Material and Product, with no distribution, no CV and no sampling path anywhere in the engine. Recording `hybrid: null` here is a statement about the ENGINE, not about the world — prices obviously vary. Giving them a spread is an engine change on the scsim track; see the RFC in PLAN.md §14. Do not invent one in this contract: a contract that describes a capability the engine does not have is how a fallback ends up in code with no contract entry, which is what I6 forbids in the other direction. estimable_from is empty for a second reason: the value already has a derivation — the cheapest inbound arc — and that is a substitution the user can see and trace, not an estimate.
+hybrid is NULL because scsim has nowhere to put a spread: cost and unit_price are bare floats on Material and Product, with no distribution, no CV and no sampling path anywhere in the engine. Recording `hybrid: null` here is a statement about the ENGINE, not about the world — prices obviously vary. Giving them a spread is an engine change on the scsim track; see the RFC in PLAN.md §14. Do not invent one in this contract: a contract that describes a capability the engine does not have is how a fallback ends up in code with no contract entry, which is what I6 forbids in the other direction. estimable_from is empty for a second reason: the value already has a derivation — the volume-weighted inbound price — and that is a substitution the user can see and trace, not an estimate.
 
 ### `holding_cost_pct`
 
@@ -470,6 +471,6 @@ The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_numb
 
 ---
 
-*Generated from data contract `a45c06124bb9`, engine `0.2.3`,
+*Generated from data contract `3b9e561b5ead`, engine `0.2.3`,
 sidecar `supabase/contract/materials.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

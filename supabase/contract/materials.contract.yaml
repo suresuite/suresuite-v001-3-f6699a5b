@@ -144,15 +144,20 @@ fields:
     unit_source: fixed
     meaning: >-
       What one unit of this material costs to buy. The master value; where it is
-      unset the engine uses the cheapest inbound arc instead, which is usually
+      unset the engine values the material at the volume-weighted average price
+      of its inbound arcs — what the project actually pays, which is usually
       what the user wants and is why leaving it blank is not an error.
     grain: level
     engine:
       consumed_by: "project_map.py::_map_materials -> Material.cost"
       transform: "float() when > 0"
-      missing_default: "the cheapest inbound unit_price for this material, floored at 1.0"
+      missing_default: "the volume-weighted average inbound unit_price for this material, or its cheapest quote when no arc carries a volume; arc prices floored at 1.0"
     substitutions:
-      - when: "NULL or <= 0"
+      - when: "NULL or <= 0, with at least one inbound arc carrying a volume"
+        value: "the volume-weighted average of the material's inbound unit_price values, each weighted by that arc's weekly volume (grading.ts::volumeWeightedInboundCost floors a <= 0 price to 1.0 first)"
+        provenance: derived
+        visible_as: "the effective-economics badge in /policies"
+      - when: "NULL or <= 0, and no inbound arc of the material carries a volume"
         value: "the cheapest inbound arc's unit_price (grading.ts::cheapestInboundCost floors a <= 0 price to 1.0 first)"
         provenance: derived
         visible_as: "the effective-economics badge in /policies"
@@ -179,8 +184,8 @@ fields:
         contract that describes a capability the engine does not have is how a
         fallback ends up in code with no contract entry, which is what I6 forbids
         in the other direction. estimable_from is empty for a second reason: the
-        value already has a derivation — the cheapest inbound arc — and that is a
-        substitution the user can see and trace, not an estimate.
+        value already has a derivation — the volume-weighted inbound price — and
+        that is a substitution the user can see and trace, not an estimate.
   holding_cost_pct:
     type: "numeric"
     unit: "fraction of unit value per year"

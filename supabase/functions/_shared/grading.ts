@@ -13,7 +13,7 @@
 //   engine hard failure (unsourced BOM material)          → block
 //   `required` field that nothing resolves                → block
 //   fallback to a NEUTRAL CONSTANT (price→1.0, lt→2w)     → warn (ack-able)
-//   fallback DERIVED FROM DATA (cheapest inbound, …)      → info
+//   fallback DERIVED FROM DATA (volume-weighted inbound, …) → info
 //   `defaulted` manifest level                            → info
 //
 // Fallback chains are NOT hand-coded here: they come from the registry's
@@ -154,8 +154,46 @@ export const ENGINE_DEFAULT_PRICE = 1.0;
 // ── Reducer library (the engine's exact fallback derivations) ───────────────
 
 /**
- * Cheapest inbound unit_price per material — engine fallback for
- * materials.cost. Matches project_map.py: every arc contributes, with
+ * Volume-weighted average inbound unit_price per material — the FIRST
+ * engine fallback for materials.cost, and the exact analogue of
+ * `demandWeightedSellPrice` below: each lane contributes at the weekly rate
+ * the project buys through it, so a multi-sourced material is valued at what
+ * it costs rather than at its cheapest quote.
+ *
+ * Matches project_map.py step for step: prices ≤ 0 are floored to 1.0 (the
+ * per-arc default, graded separately on inbound_logistics.unit_price), the
+ * weight is the lane's WEEKLY volume rate (`time_unit` describes the volume
+ * period), and a lane with no positive volume carries no weight at all rather
+ * than an epsilon one. A material whose lanes all lack volume therefore
+ * yields `undefined` here and falls through to `cheapestInboundCost` — the
+ * chain's second step, and the behaviour every project had before volumes
+ * were weighted.
+ */
+export function volumeWeightedInboundCost(inbound: Row[]): Map<string, number> {
+  const numer = new Map<string, number>();
+  const denom = new Map<string, number>();
+  for (const arc of inbound) {
+    const mat = String(arc.material_id ?? "");
+    if (!mat) continue;
+    let cost = num(arc.unit_price);
+    if (cost <= 0) cost = ENGINE_DEFAULT_PRICE;
+    const weekly = rateToWeekly(num(arc.volume), arc.time_unit as string | null);
+    if (weekly <= 0) continue;
+    numer.set(mat, (numer.get(mat) ?? 0) + cost * weekly);
+    denom.set(mat, (denom.get(mat) ?? 0) + weekly);
+  }
+  const out = new Map<string, number>();
+  for (const [mat, n] of numer) {
+    const d = denom.get(mat) ?? 0;
+    if (d > 0) out.set(mat, n / d);
+  }
+  return out;
+}
+
+/**
+ * Cheapest inbound unit_price per material — the SECOND step of the
+ * materials.cost chain, reached when no lane of the material carries a
+ * volume to weight by. Matches project_map.py: every arc contributes, with
  * missing/≤0 prices defaulted to 1.0 BEFORE taking the min, so a material
  * with any arc always resolves (the missing arc price itself is graded
  * separately on inbound_logistics.unit_price).
@@ -211,6 +249,9 @@ export function weeklyDemand(outbound: Row[]): Map<string, number> {
 }
 
 export interface ReducerCtx {
+  /** Volume-weighted inbound price — the FIRST materials.cost fallback. */
+  weightedInbound: Map<string, number>;
+  /** Cheapest inbound price — its second step, for volume-less lanes. */
   cheapestInbound: Map<string, number>;
   weightedPrice: Map<string, number>;
   weeklyDemand: Map<string, number>;
@@ -229,6 +270,7 @@ export interface ReducerCtx {
  * Exported (v1.5) so the §18.1 estimator family (a) delegates to THIS library
  * instead of duplicating it — one derivation per value, everywhere. */
 export const REDUCERS: Record<string, (id: string, ctx: ReducerCtx) => number | undefined> = {
+  volume_weighted_inbound_price: (id, c) => c.weightedInbound.get(id),
   cheapest_inbound_price: (id, c) => c.cheapestInbound.get(id),
   demand_weighted_outbound_price: (id, c) => c.weightedPrice.get(id),
   weekly_outbound_volume: (id, c) => {
@@ -245,6 +287,42 @@ export const REDUCERS: Record<string, (id: string, ctx: ReducerCtx) => number | 
   twice_demand_floor_1000: (id, c) =>
     Math.max((c.effectiveDemand.get(id) ?? 0) * 2, 1000),
 };
+
+/**
+ * Per-entity values of a field's DATA-DERIVED fallback steps, resolved in the
+ * order the registry declares them — the display-side counterpart of the
+ * resolution `gradeManifest` performs below, for surfaces that need "what
+ * number will the engine use" without grading anything.
+ *
+ * Steps are walked until one resolves; a NEUTRAL CONSTANT ends the walk
+ * without contributing, because a constant is the engine giving up rather
+ * than a value derived from the project. An id absent from the result is one
+ * no data-derived step resolves.
+ *
+ * Callers pass the registry's `fallback_spec` rather than naming reducers, so
+ * the chain's ORDER stays authored once (scsim base_data_requirements) — a
+ * surface that hard-codes "cheapest inbound" is a second author of a rule it
+ * does not own, which is how the two halves drift.
+ */
+export function derivedFallbackValues(
+  steps: FallbackStep[] | undefined,
+  ids: Iterable<string>,
+  ctx: ReducerCtx,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!steps) return out;
+  for (const id of ids) {
+    for (const step of steps) {
+      if (step.reducer == null) break;
+      const value = REDUCERS[step.reducer]?.(id, ctx);
+      if (value !== undefined) {
+        out.set(id, value);
+        break;
+      }
+    }
+  }
+  return out;
+}
 
 /**
  * Normalize BOM rows to the single-level shape the grader reads. Multi-level
@@ -518,6 +596,7 @@ export function buildReducerCtx(dataset: GradingDataset, defaults: Row): Reducer
     }
   }
   return {
+    weightedInbound: volumeWeightedInboundCost(dataset.inbound),
     cheapestInbound: cheapestInboundCost(dataset.inbound),
     weightedPrice: demandWeightedSellPrice(dataset.outbound),
     weeklyDemand: weekly,

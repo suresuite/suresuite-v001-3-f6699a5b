@@ -92,12 +92,15 @@ describe("§4 D18 · the supplier price is shown, not edited", () => {
 
   it("the meaning states the imputation divergence rather than hiding it", () => {
     // Where the inbound file supplies no price, `resolveField` imputes an average
-    // and the ENGINE does something else — `cheapestInboundCost` takes the
-    // cheapest link for the material and floors a missing one at 1.0. So the
-    // imputed cell is a number the run will not use, and T1 leaves no third
-    // option between "resolves to data" and "says what it is".
+    // and the ENGINE does something else — it values the material at the
+    // volume-weighted average of its lanes (§4 D163), falls back to the cheapest
+    // quote when no lane carries a volume, and floors a material with no lane at
+    // all at 1.0. So the imputed cell is a number the run will not use, and T1
+    // leaves no third option between "resolves to data" and "says what it is".
     const meaning = resolveParamMeta(price()).meaning;
     expect(meaning).toMatch(/imput/i);
+    expect(meaning, "the meaning must name the rule the engine actually applies")
+      .toMatch(/volume-weighted/i);
     expect(meaning).toMatch(/cheapest|1\.0/);
   });
 

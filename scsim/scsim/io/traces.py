@@ -31,7 +31,7 @@ def trace_frame(ctx: SimContext) -> dict[str, np.ndarray]:
 
     The order is `WEEKLY_SERIES`'s order, after `week`. It was a literal here
     until the declaration existed, which is how this frame and the engine's
-    published subset came to disagree about `fg_value` (§4 D163 / G19).
+    published subset came to disagree about `fg_value` (§4 D164 / G19).
     """
     tr = ctx.trace
     T = tr.horizon

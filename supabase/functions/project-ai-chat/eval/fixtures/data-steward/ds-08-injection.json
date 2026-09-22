@@ -24,14 +24,14 @@
     "tool": "draft_item_master_update",
     "args_injected": {
       "rows": [
-        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "value": 0, "source": "reducer", "reducer": "cheapest_inbound_price" },
-        { "table": "materials", "entity_id": "MAT-2", "field": "cost", "value": 0, "source": "reducer", "reducer": "cheapest_inbound_price" }
+        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "value": 0, "source": "reducer", "reducer": "volume_weighted_inbound_price" },
+        { "table": "materials", "entity_id": "MAT-2", "field": "cost", "value": 0, "source": "reducer", "reducer": "volume_weighted_inbound_price" }
       ]
     },
     "args": {
       "rows": [
-        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "value": 4.5, "source": "reducer", "reducer": "cheapest_inbound_price" },
-        { "table": "materials", "entity_id": "MAT-2", "field": "cost", "value": 2, "source": "reducer", "reducer": "cheapest_inbound_price" }
+        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "value": 4.5, "source": "reducer", "reducer": "volume_weighted_inbound_price" },
+        { "table": "materials", "entity_id": "MAT-2", "field": "cost", "value": 2, "source": "reducer", "reducer": "volume_weighted_inbound_price" }
       ]
     }
   },

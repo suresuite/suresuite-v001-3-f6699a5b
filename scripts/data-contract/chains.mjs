@@ -699,7 +699,7 @@ export function deriveReplicationSeries(root) {
   // (WP 9.1). This used to regex the `extra_series={…}` literal in engine.py and
   // prepend `fill_rate` by hand — a reading of one of the six places the
   // vocabulary was authored, which is why it could not see that `fg_value` was
-  // in the golden trace and not in the published set (§4 D163). `WEEKLY_SERIES`
+  // in the golden trace and not in the published set (§4 D164). `WEEKLY_SERIES`
   // in scsim/core/context.py is now the only author; `published` marks the
   // subset that leaves the engine, so no name is added here.
   const ctx = readFileSync(join(root, "scsim", "scsim", "core", "context.py"), "utf8");

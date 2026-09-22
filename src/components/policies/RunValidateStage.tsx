@@ -2924,7 +2924,7 @@ function EngineOutputSummary({
             feedback loop for P-P.1's coverage weeks and P-P.3's safety stock.
             WAS a single `on_hand_value` chart, which showed the MATERIAL half
             and called it "inventory" — the finished-goods series existed all
-            along and was never published (G19 / §4 D163). */}
+            along and was never published (G19 / §4 D164). */}
         <InventoryOverTime reps={reps} warmupWeeks={warmupWeeks} height={200} />
         {/* 2 — the financial statement from the persisted per-rep KPIs. */}
         <FinancialStatement reps={reps} />

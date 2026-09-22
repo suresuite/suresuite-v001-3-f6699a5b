@@ -7,7 +7,7 @@
     "tool": "draft_parameter_estimate",
     "args": {
       "rows": [
-        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "method": "direct_cheapest_inbound@1", "value": 3.75 }
+        { "table": "materials", "entity_id": "MAT-1", "field": "cost", "method": "direct_inbound_price@1", "value": 4.166666666666667 }
       ]
     }
   },

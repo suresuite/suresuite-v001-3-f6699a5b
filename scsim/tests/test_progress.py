@@ -49,7 +49,7 @@ def test_progress_called_per_replication_with_result_shapes():
         assert "fill_rate" in row
         # The observer carries exactly the declared published set — read from
         # the declaration rather than restated here, so this assertion cannot
-        # become a seventh author of the vocabulary (§4 D163).
+        # become a seventh author of the vocabulary (§4 D164).
         assert set(series) == set(PUBLISHED_SERIES_KEYS)
         for arr in series.values():
             assert arr.shape == (horizon,)

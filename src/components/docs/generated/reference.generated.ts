@@ -5314,7 +5314,7 @@ export const REFERENCE_TABLES: RefTable[] = [
           },
           {
             "when": "`materials.cost` is unset for this material",
-            "value": "this arc's price becomes the material's cost, via the cheapest inbound arc",
+            "value": "this arc's price contributes to the material's cost, weighted by this arc's volume share (its cheapest arc when no arc carries a volume)",
             "provenance": "derived",
             "visibleAs": "the effective-economics badge in /policies"
           }
@@ -8091,23 +8091,29 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": "cost",
         "required": false,
         "validate": "numeric > 0",
-        "meaning": "What one unit of this material costs to buy. The master value; where it is unset the engine uses the cheapest inbound arc instead, which is usually what the user wants and is why leaving it blank is not an error.",
+        "meaning": "What one unit of this material costs to buy. The master value; where it is unset the engine values the material at the volume-weighted average price of its inbound arcs — what the project actually pays, which is usually what the user wants and is why leaving it blank is not an error.",
         "primaryKey": false,
         "unique": false,
         "references": null,
         "substitutions": [
           {
-            "when": "NULL or <= 0",
+            "when": "NULL or <= 0, with at least one inbound arc carrying a volume",
+            "value": "the volume-weighted average of the material's inbound unit_price values, each weighted by that arc's weekly volume (grading.ts::volumeWeightedInboundCost floors a <= 0 price to 1.0 first)",
+            "provenance": "derived",
+            "visibleAs": "the effective-economics badge in /policies"
+          },
+          {
+            "when": "NULL or <= 0, and no inbound arc of the material carries a volume",
             "value": "the cheapest inbound arc's unit_price (grading.ts::cheapestInboundCost floors a <= 0 price to 1.0 first)",
             "provenance": "derived",
             "visibleAs": "the effective-economics badge in /policies"
           }
         ],
-        "engineChain": "cheapest_inbound_price (info) → constant 1 (warn)",
+        "engineChain": "volume_weighted_inbound_price (info) → cheapest_inbound_price (info) → constant 1 (warn)",
         "engineLevel": "required",
         "blank": "null",
         "engineField": "project_map.py::_map_materials -> Material.cost",
-        "engineMissingDefault": "the cheapest inbound unit_price for this material, floored at 1.0",
+        "engineMissingDefault": "the volume-weighted average inbound unit_price for this material, or its cheapest quote when no arc carries a volume; arc prices floored at 1.0",
         "engineTransform": "float() when > 0",
         "unitColumn": null,
         "normalizeAtPromotion": null,
@@ -16102,7 +16108,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "This replication's weekly series, one array per key, each as long as the horizon in weeks. The keys are scsim's PUBLISHED weekly series and are declared in ONE place — `WEEKLY_SERIES` in scsim/scsim/core/context.py — which also fixes each series' unit and how it may be aggregated across weeks (`level` = a stock, average it; `flow` = a weekly quantity, sum it; `ratio` = neither). `unit_source` is `derived` because the unit is per-key, from that declaration, not one token for the column. The four inventory series (`on_hand_value`, `fg_value`, `on_hand_units`, `fg_units`) are what WP 9.1 added to a user's view; `fg_value` had been computed on every replication since the trace was written and published by nothing, because the vocabulary was authored six times and it was present in only two of them (§4 D163).",
+        "meaning": "This replication's weekly series, one array per key, each as long as the horizon in weeks. The keys are scsim's PUBLISHED weekly series and are declared in ONE place — `WEEKLY_SERIES` in scsim/scsim/core/context.py — which also fixes each series' unit and how it may be aggregated across weeks (`level` = a stock, average it; `flow` = a weekly quantity, sum it; `ratio` = neither). `unit_source` is `derived` because the unit is per-key, from that declaration, not one token for the column. The four inventory series (`on_hand_value`, `fg_value`, `on_hand_units`, `fg_units`) are what WP 9.1 added to a user's view; `fg_value` had been computed on every replication since the trace was written and published by nothing, because the vocabulary was authored six times and it was present in only two of them (§4 D164).",
         "primaryKey": false,
         "unique": false,
         "references": null,
