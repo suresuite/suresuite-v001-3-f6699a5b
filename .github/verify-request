@@ -149,3 +149,20 @@ Expect the run to be RED again on probe 0.9 (D156, `ingest_runs`' two keys to
 read unmoved at 20260919000007.
 
 No migration in this push; the other two doors are untouched.
+
+────────────────────────────────────────────────────────────────────────────────
+WP 6.5 (a) — THE BEFORE READ. 2026-09-22, no migration in this push.
+
+`ingest-file` is about to be published (§4 D123). This is sequence step 1 of 6.5a:
+the reading the after-read is compared against, over EVERY project (D42). A new
+section, "WP 6.5 (a) — the landing switch", asks:
+
+  (1) D156 positively — each landing actor column (`ingest_runs` x2,
+      `ingest_files.uploaded_by`) keys to `approved_users`. FAILS the run otherwise.
+  (2) storage bucket `ingest` exists and is private. FAILS the run otherwise.
+  (3) per project × landable table: rows / with ingest_run_id / with source_row_id,
+      plus `ingest_runs`, `ingest_files`, `ingest_staged_rows` per project.
+  (4) the exit — a tier-2 row resolving through `ingest_value_chain` (expected: none).
+  (5) whether production serves `ingest-file` (expected: absent).
+
+The fence should read unmoved at 20260920000003.

@@ -3156,6 +3156,221 @@ async function userAuditShape() {
   });
 }
 
+// ── WP 6.5 (a) — THE LANDING SWITCH, measured either side of it ────────────
+//
+// Publishing `ingest-file` (§4 D123) switches every CSV upload in production onto
+// the WP 3.2–3.4 landing path at once, and PLAN.md's 6.5a sequence asks for a read
+// BEFORE and a read AFTER, over every project (D42). This section is both: the same
+// probes, run once before the merge that publishes the function and once in a push
+// AFTER it (never on the merge commit itself — D153).
+//
+// Four questions, each of which a rehearsal cannot answer:
+//
+//   (1) THE PRECONDITION (D156), positively. 0.9 above asks "which keys still point
+//       at `auth.users`" and passes when `ingest_runs` is absent from the answer. That
+//       is necessary and not sufficient: a migration that DROPPED the keys without
+//       re-adding them would pass it too. So this reads the actor columns' keys by
+//       TARGET, and fails the run unless both `ingest_runs` actor columns and
+//       `ingest_files.uploaded_by` key to `approved_users`.
+//   (2) THE BUCKET. `ingest-file` writes the bytes to storage bucket `ingest` BEFORE it
+//       opens a run. The migration that creates it (`20260916000014`) is guarded on
+//       `to_regclass('storage.buckets')`, so a database with no storage schema skips it
+//       silently — and every rehearsal database is one. Only production can say.
+//   (3) THE BASELINE, per project and per landable table: rows, rows carrying
+//       `ingest_run_id`, rows carrying `source_row_id`; and `ingest_runs`,
+//       `ingest_files`, `ingest_staged_rows` per project. The after-read is compared
+//       against this, and "no table lost rows" is a claim about THIS table.
+//   (4) THE EXIT, once there is anything to read: a tier-2 row whose `source_row_id`
+//       resolves through `ingest_value_chain` — called as the function, with the run's
+//       own promoter as the reader, because the exit names that function and a join
+//       that imitates it would prove the imitation.
+const LANDABLE = [
+  // The ten the contract describes (`INGEST_DATASETS`), which land through `ingest-file`.
+  "inbound_logistics", "outbound_logistics", "bom_single_level", "bom_multi_level",
+  "materials", "products", "suppliers", "customers", "tier2_suppliers", "tier3_suppliers",
+];
+// Uploaded through the wizard but NOT landed — `ingest-file` only PARSES them (mode
+// `parse`) and the client promotes through the bulk RPCs (D56). Counted for the
+// no-data-loss half only: publishing the function changes their parse path too.
+const PARSED_ONLY = ["multi_tier_supply_chain", "node_list", "network_nodes", "network_edges"];
+
+async function wp65aLandingSwitch() {
+  section("WP 6.5 (a) — the landing switch: precondition, bucket, baseline, exit");
+
+  // (1) The actor keys, by target.
+  const keys = await tryQ(`
+    select rel.relname as table_name,
+           (select string_agg(att.attname, ', ' order by att.attnum)
+              from unnest(con.conkey) k
+              join pg_attribute att on att.attrelid = rel.oid and att.attnum = k) as columns,
+           con.conname as constraint_name,
+           fns.nspname || '.' || fre.relname as references_table,
+           case con.confdeltype when 'n' then 'SET NULL' when 'c' then 'CASCADE'
+                                when 'r' then 'RESTRICT' when 'a' then 'NO ACTION'
+                                else con.confdeltype::text end as on_delete
+      from pg_constraint con
+      join pg_class rel on rel.oid = con.conrelid
+      join pg_namespace ns on ns.oid = rel.relnamespace
+      join pg_class fre on fre.oid = con.confrelid
+      join pg_namespace fns on fns.oid = fre.relnamespace
+     where con.contype = 'f' and ns.nspname = 'public'
+       and rel.relname in ('ingest_runs', 'ingest_files')
+       and fre.relname in ('users', 'approved_users')
+     order by 1, 2`);
+  report("(1) D156 — the landing's actor keys, by target", keys, (rows) => {
+    out("**(1) D156 — which table each landing actor column keys to:**");
+    out(...table(rows));
+    const want = [
+      ["ingest_runs", "triggered_by_user_id"],
+      ["ingest_runs", "applied_by_user_id"],
+      ["ingest_files", "uploaded_by"],
+    ];
+    const bad = [];
+    for (const [t, c] of want) {
+      const hit = rows.filter((r) => r.table_name === t && r.columns === c);
+      if (!hit.length || hit.some((r) => r.references_table !== "public.approved_users")) {
+        bad.push(`${t}.${c} → ${hit.map((r) => r.references_table).join(", ") || "(no key)"}`);
+      }
+    }
+    if (bad.length) {
+      out(`- **NOT MET**: ${bad.join("; ")}. Publishing \`ingest-file\` over this makes every landing by a real user abort (D156).`);
+      gateFailures.push(
+        `WP 6.5 (a)'s precondition (PLAN.md §4 D156) is not met: ${bad.join("; ")}. ` +
+          "Every landing actor column must key to `public.approved_users`, because that is " +
+          "the table this application authenticates against and `auth.users` holds none of them.",
+      );
+    } else {
+      out("- **MET.** All three actor columns key to `public.approved_users`, none to `auth.users`, so a real uploader satisfies the landing's non-NULL actor AND its foreign key.");
+    }
+  });
+
+  // (2) The bucket, and what it holds.
+  const bucket = await tryQ(`
+    select b.id, b.public,
+           (select count(*)::int from storage.objects o where o.bucket_id = b.id) as objects
+      from storage.buckets b where b.id = 'ingest'`);
+  report("(2) storage bucket `ingest`", bucket, (rows) => {
+    out("", "**(2) the storage bucket `ingest-file` writes to:**");
+    out(...table(rows));
+    if (!rows.length) {
+      out("- **ABSENT.** `ingest-file` uploads the bytes before it opens a run, so every landing would fail at stage `store`.");
+      gateFailures.push(
+        "Storage bucket `ingest` does not exist in production. `ingest-file` stores the " +
+          "bytes before it opens a run, so every CSV landing would fail at stage `store` " +
+          "(WP 6.5 (a); the bucket is created by `20260916000014`, guarded on `storage.buckets`).",
+      );
+    } else if (rows[0].public === true || rows[0].public === "true") {
+      out("- **The bucket is PUBLIC.** A tier-0 artifact is reached through its manifest row or not at all; a public bucket serves raw uploads to anyone with the path.");
+      gateFailures.push("Storage bucket `ingest` is public; tier-0 uploads must not be world-readable (`20260916000014`).");
+    } else {
+      out("- Present and private.");
+    }
+  });
+
+  // (3) The baseline, per project. One statement per table so a missing column in one
+  // table reports as that table's failure rather than blanking the section.
+  out("", "**(3) the baseline — every project, every landable table** (`rows / with ingest_run_id / with source_row_id`):");
+  const all = [];
+  for (const t of LANDABLE) {
+    const res = await tryQ(`
+      select '${t}'::text as tbl, x.project_id::text as project_id, count(*)::int as rows,
+             count(x.ingest_run_id)::int as with_run, count(x.source_row_id)::int as with_row
+        from public.${t} x group by x.project_id`);
+    if (res.error) out(`- \`${t}\` — QUERY FAILED: \`${res.error.slice(0, 200)}\``);
+    else all.push(...res.rows);
+  }
+  for (const t of PARSED_ONLY) {
+    const res = await tryQ(`
+      select '${t}'::text as tbl, x.project_id::text as project_id, count(*)::int as rows,
+             null::int as with_run, null::int as with_row
+        from public.${t} x group by x.project_id`);
+    if (res.error) out(`- \`${t}\` — QUERY FAILED: \`${res.error.slice(0, 200)}\``);
+    else all.push(...res.rows);
+  }
+  const projects = await tryQ(`select id::text as id, name from public.projects order by created_at`);
+  const pname = new Map((projects.rows ?? []).map((p) => [p.id, p.name]));
+  all.sort((a, b) => String(a.tbl).localeCompare(String(b.tbl)) ||
+                     String(pname.get(a.project_id) ?? a.project_id).localeCompare(String(pname.get(b.project_id) ?? b.project_id)));
+  out(...table(all.map((r) => ({
+    tbl: r.tbl,
+    project: `${pname.get(r.project_id) ?? "(no project row)"} · ${String(r.project_id).slice(0, 8)}`,
+    rows: r.rows, with_run: r.with_run ?? "—", with_row: r.with_row ?? "—",
+  }))));
+  const totals = {};
+  for (const r of all) {
+    totals[r.tbl] ??= { tbl: r.tbl, projects: 0, rows: 0, with_run: 0, with_row: 0 };
+    totals[r.tbl].projects += 1;
+    totals[r.tbl].rows += Number(r.rows);
+    totals[r.tbl].with_run += Number(r.with_run ?? 0);
+    totals[r.tbl].with_row += Number(r.with_row ?? 0);
+  }
+  out("", "Totals (the line the after-read is compared against — a table whose `rows` falls lost data):");
+  out(...table([...LANDABLE, ...PARSED_ONLY].map((t) => totals[t] ?? { tbl: t, projects: 0, rows: 0, with_run: 0, with_row: 0 })));
+
+  const ingest = await tryQ(`
+    select p.id::text as project_id, p.name as project,
+           (select count(*)::int from public.ingest_runs r where r.project_id = p.id) as ingest_runs,
+           (select count(*)::int from public.ingest_runs r where r.project_id = p.id and r.source_kind = 'csv') as csv_runs,
+           (select count(*)::int from public.ingest_runs r where r.project_id = p.id and r.status = 'applied') as applied_runs,
+           (select count(*)::int from public.ingest_files f join public.ingest_runs r on r.id = f.ingest_run_id
+             where r.project_id = p.id) as ingest_files,
+           (select count(*)::int from public.ingest_staged_rows s join public.ingest_runs r on r.id = s.ingest_run_id
+             where r.project_id = p.id) as ingest_staged_rows
+      from public.projects p order by p.created_at`);
+  report("(3) ingestion tables per project", ingest, (rows) => {
+    out("", "**(3) the ingestion tables, per project:**");
+    out(...table(rows.map((r) => ({ ...r, project_id: String(r.project_id).slice(0, 8) }))));
+    const any = rows.filter((r) => Number(r.ingest_files) > 0 && Number(r.ingest_staged_rows) > 0);
+    out(any.length
+      ? `- **${any.length} project(s)** hold both a landed file and staged rows — the first half of WP 6.5 (a)'s exit.`
+      : "- **No project holds a landed file and staged rows.** Before the switch that is expected; after it, it means no upload reached the landing.");
+  });
+  const unowned = await tryQ(`
+    select (select count(*)::int from public.ingest_runs) as ingest_runs_total,
+           (select count(*)::int from public.ingest_files) as ingest_files_total,
+           (select count(*)::int from public.ingest_staged_rows) as ingest_staged_rows_total,
+           (select count(*)::int from public.audit_logs where action = 'ingest_file_landed') as landing_audit_rows`);
+  report("(3) ingestion totals", unowned, (rows) => out(...table(rows)));
+
+  // (4) The exit: a tier-2 row that resolves through `ingest_value_chain`.
+  const union = LANDABLE.map((t) => `
+      select '${t}'::text as tbl, x.source_row_id
+        from public.${t} x where x.source_row_id is not null`).join("\n      union all ");
+  const chain = await tryQ(`
+    with traced as (${union}),
+         pick as (
+           select distinct on (t.tbl) t.tbl, t.source_row_id,
+                  coalesce(r.applied_by_user_id, r.triggered_by_user_id) as reader
+             from traced t
+             join public.ingest_staged_rows s on s.id = t.source_row_id
+             join public.ingest_runs r on r.id = s.ingest_run_id
+            order by t.tbl, r.applied_at desc nulls last)
+    select p.tbl, (select count(*)::int from traced tr where tr.tbl = p.tbl) as traced_rows,
+           vc.has_provenance, vc.source_kind, vc.original_filename, vc.source_row_number,
+           vc.uploaded_by_name, vc.promoted_at::text as promoted_at, vc.run_status
+      from pick p
+      cross join lateral public.ingest_value_chain(p.reader, p.source_row_id) vc
+     order by p.tbl`);
+  report("(4) the exit — `ingest_value_chain`", chain, (rows) => {
+    out("", "**(4) the exit — one tier-2 row per table, resolved through `ingest_value_chain`:**");
+    out(...table(rows));
+    const ok = rows.filter((r) => (r.has_provenance === true || r.has_provenance === "true") && r.original_filename);
+    out(ok.length
+      ? `- **MET for ${ok.length} table(s)**: a tier-2 row names its source file and line through the function the review screen calls.`
+      : "- **Not met.** No tier-2 row carries a `source_row_id` that resolves — expected before the switch, the whole exit after it.");
+  });
+
+  // Whether production SERVES `ingest-file`, which SQL cannot see (D123, D168).
+  const fns = await apiGet("/functions");
+  report("(5) is `ingest-file` published?", fns, (r) => {
+    const f = (Array.isArray(r) ? r : []).find((x) => x.slug === "ingest-file");
+    out("", "**(5) is `ingest-file` published?** (Management API, GET):");
+    out(f
+      ? `- **LIVE** — version ${f.version}, status ${f.status}, verify_jwt ${f.verify_jwt}, updated ${f.updated_at ? new Date(f.updated_at).toISOString() : "?"}.`
+      : "- **ABSENT.** The upload wizard calls it on file-select with no fallback, so every upload on /project-manager fails there (D123, D168).");
+  });
+}
+
 async function main() {
   out(`# PLAN.md §15 — verification SQL, executed`);
   out("");
@@ -3172,6 +3387,7 @@ async function main() {
   await d29();
   await boundaryDecisions();
   await ingestTables();
+  await wp65aLandingSwitch();
   await graphHashBlastRadius();
   await wp42Smear();
   await wp42Landed();
