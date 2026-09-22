@@ -18572,10 +18572,17 @@ Each changes stored-run comparability or every KPI, and the brief says a switch
 of that kind is "a separate, named decision":
 1. **Adopt `mser5_published` (WP 2).** It moves the adopted warm-up in 17 of 144
    cases, by up to 70 weeks.
-2. **The auto-start draw (WP 3).** `U{t_w..t_w+2}` makes one replication in three
-   start exactly at t_w, with no pre-disruption week, so its recovery is not
-   measured. `U{t_w+1..t_w+3}` would measure every one, and it departs from the
-   manuscript's `U{85..87}`.
+2. ~~**The auto-start draw (WP 3).**~~ **Withdrawn after the user's answer, which
+   corrected the framing.** In the PRODUCT the disruption start is always the
+   user's: `project_map._map_events` and `legacy_graph` both pass the authored
+   `start_day` as a fixed `start`. The random `U{t_w..t_w+2}` branch is reached ONLY
+   by `stress/battery.py`, the engine's reproduction of the manuscript experiment,
+   which no app surface calls (the app's stress presets pass explicit start days).
+   So "one replication in three" describes that battery, not a user's run, and the
+   battery keeps the manuscript's window. For user runs, WP 3's rule stands: a
+   start inside the warm-up is moved to its end and SAID (the editor for a manual
+   warm-up, the run's warnings for an auto one), and a start ON the first measured
+   week says recovery is not measured.
 3. **Sequential CI on undisrupted scenarios (WP 4, F-32)**, and whether to replace
    the plain t-interval under sequential stopping with a procedure that survives
    the peeking (F-13's remainder).
@@ -18592,8 +18599,10 @@ Baseline numbers:
 
 Handoff to next WP:
 - **WP 8 inherits the export column above**, and F-11/F-12/F-26/F-29.
-- **The three decisions above are the user's.** Whichever they choose lands as its
-  own package with its golden deltas in the commit, never folded into another.
+- **The user answered (2026-09-22):** (1) **switch to the published MSER-5**,
+  which lands as its own package with its golden deltas stated; (2) the disruption
+  start is the user's to set, which it already is on every product path (see the
+  withdrawn item above); (3) **sequential CI stays as labelled**, with no engine change.
 
 ---
 ---
