@@ -186,3 +186,10 @@ uploaded into Test_Simulation and promoted through the review screen. Exit: inge
 and ingest_staged_rows non-empty for a project, a tier-2 row whose source_row_id resolves
 through ingest_value_chain, and no landable table below the before-read baseline
 (run 35781287043). The fence should read unmoved at 20260922000001.
+
+2026-09-22 · audit WP 8 AFTER-read, in the push after the merge (D153). #266 merged as
+6d81984 and deployed `20260922000002` (Deploy Supabase Migrations run 35791658894,
+success); the §15 run that fired on the branch push (35791521776) straddled that deploy
+and failed its own fence, as designed. Exit: the fence reads unmoved at 20260922000002.
+`simulation_runs.seed` / `disruption_schedule` exist once sim-command's merge build is
+live; stamped runs appear only after a run is dispatched on that build.
