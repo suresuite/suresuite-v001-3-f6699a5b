@@ -20,6 +20,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
 import { fetchMultiTierNetworkData } from '@/services/network';
+import {
+  placeLaneNodes,
+  echelonToLegacyType,
+  colorForEchelon,
+  labelForEchelon,
+  GRAPH_INK,
+  ECHELONS,
+  type Echelon,
+} from '@/lib/graph';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -46,23 +55,15 @@ import {
   HDR_PROJECT_SELECT,
 } from '@/components/shared';
 
-const NODE_TYPE_COLORS: Record<string, string> = {
-  supplier: '#2563eb',   // Blue - suppliers (leftmost)
-  material: '#059669',   // Green - base materials
-  product: '#dc2626',    // Red - products  
-  customer: '#7c2d12',   // Brown - customers (rightmost)
-};
-
-const LEVEL_COLORS: Record<number, string> = {
-  '-1': '#7c2d12', // Level -1 (Customers) - Brown (rightmost)
-  0: '#dc2626',    // Level 0 (Products) - Red  
-  1: '#059669',    // Level 1 (Materials) - Green
-  2: '#ca8a04',    // Level 2 (Materials) - Gold
-  3: '#ea580c',    // Level 3 (Materials) - Orange
-  4: '#dc2626',    // Level 4 (Materials) - Red
-  5: '#2563eb',    // Level 5 (Materials/Suppliers) - Blue
-  6: '#1d4ed8',    // Level 6 (Suppliers) - Darker Blue (leftmost)
-};
+/*
+ * Colour is the ECHELON, from the one palette (`@/lib/graph`). This page used to
+ * carry a level ramp and a type table of its own, and type a node with the integer
+ * ladder `getNodeTypeFromLevel` over `supply_chain_data_multi_tier.level` — which
+ * the deployed ETL stamped 2 on every BOM row, so every product and sub-assembly
+ * rendered as a material while `/process-level-network` called it a product
+ * (audit 2026-09-22 · F-09 · §4 D127). Both pages now place nodes with
+ * `placeLaneNodes`, so they cannot disagree about the same node.
+ */
 
 const HIGHLIGHT_HEX = '#ff0000';
 
@@ -87,6 +88,7 @@ interface MultiTierData {
 
 interface NodeData extends Record<string, unknown> {
   label: string;
+  echelon: Echelon;
   nodeType: 'supplier' | 'material' | 'product' | 'customer';
   level: number;
   bomLevel: number | null;
@@ -113,23 +115,6 @@ interface QueryParams {
   minFlow: number;
   levelRange: { min: number; max: number } | null;
   includeTerminals: boolean;
-}
-
-function getNodeColor(nodeType: string, level: number, bomLevel?: number | null): string {
-  return LEVEL_COLORS[level.toString()] || NODE_TYPE_COLORS[nodeType] || '#6b7280';
-}
-
-function getNodeTypeFromLevel(level: number, dataSource: string, position: 'from' | 'to'): 'customer' | 'product' | 'material' | 'supplier' {
-  if (level === -1) return 'customer';
-  if (level === 0) {
-    if (dataSource === 'outbound' && position === 'from') return 'product';
-    if (dataSource === 'outbound' && position === 'to') return 'customer';
-    return 'product';
-  }
-  if (level === 5 && dataSource === 'inbound') return 'supplier';
-  if (level >= 1 && level <= 5) return 'material';
-  if (level >= 6) return 'supplier';
-  return 'material';
 }
 
 // Advanced query parsing
@@ -337,6 +322,7 @@ export default function InteractiveNetworkSpace({ isCollapsed, setIsCollapsed }:
   const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null);
   const [loading, setLoading] = useState(false);
   const [levelCounts, setLevelCounts] = useState<Record<number, number>>({});
+  const [echelonCounts, setEchelonCounts] = useState<Partial<Record<Echelon, number>>>({});
   const [allNodes, setAllNodes] = useState<Node<NodeData>[]>([]);
   const [allEdges, setAllEdges] = useState<Edge[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -391,6 +377,7 @@ export default function InteractiveNetworkSpace({ isCollapsed, setIsCollapsed }:
       setAllNodes([]);
       setAllEdges([]);
       setLevelCounts({});
+      setEchelonCounts({});
       setSelectedNode(null);
       setFocusedNode(null);
       setMaxLevel(0);
@@ -413,6 +400,7 @@ export default function InteractiveNetworkSpace({ isCollapsed, setIsCollapsed }:
         setAllNodes([]);
         setAllEdges([]);
         setLevelCounts({});
+        setEchelonCounts({});
         setSelectedNode(null);
         setFocusedNode(null);
         setMaxLevel(0);
@@ -458,6 +446,7 @@ export default function InteractiveNetworkSpace({ isCollapsed, setIsCollapsed }:
         setAllNodes([]);
         setAllEdges([]);
         setLevelCounts({});
+        setEchelonCounts({});
         setSelectedNode(null);
         setFocusedNode(null);
         setMaxLevel(0);
@@ -479,105 +468,54 @@ export default function InteractiveNetworkSpace({ isCollapsed, setIsCollapsed }:
       const edgeMap: { [key: string]: Edge } = {};
       const levelNodeCounts: Record<number, number> = {};
 
-      let processedRecordsCount = 0;
-      let level5InboundCount = 0;
-      let level4BomCount = 0;
-      let skippedDuplicatesCount = 0;
-      let createdSuppliersCount = 0;
-      let createdLevel4MaterialsCount = 0;
-      
-      console.log('🔍 Starting node extraction from', multiTierData.length, 'records...');
-      
-      multiTierData.forEach((record, index) => {
-        processedRecordsCount++;
-        const nodeId = record.from_location;
-        
-        if (record.level === 5 && record.data_source === 'inbound') {
-          level5InboundCount++;
-          console.log(`🔎 Level 5 inbound record ${level5InboundCount}: ${nodeId} (data_source: ${record.data_source})`);
-        }
-        
-        if (record.level === 4 && record.data_source === 'bom') {
-          level4BomCount++;
-          if (level4BomCount <= 5) {
-            console.log(`🔎 Level 4 bom record ${level4BomCount}: ${nodeId} (data_source: ${record.data_source})`);
-          }
-        }
-        
-        if (nodeId && !nodeMap[nodeId]) {
-          const level = record.level;
-          const nodeType = getNodeTypeFromLevel(level, record.data_source, 'from');
-          
-          if (nodeType === 'supplier' && level === 5) {
-            createdSuppliersCount++;
-            console.log(`✅ Created supplier ${createdSuppliersCount}: ${nodeId} (level: ${level}, data_source: ${record.data_source})`);
-          }
-          
-          if (nodeType === 'material' && level === 4) {
-            createdLevel4MaterialsCount++;
-            if (createdLevel4MaterialsCount <= 5) {
-              console.log(`✅ Created level 4 material ${createdLevel4MaterialsCount}: ${nodeId} (level: ${level}, data_source: ${record.data_source})`);
-            }
-          }
-          
-          levelNodeCounts[level] = (levelNodeCounts[level] || 0) + 1;
-          
-          nodeMap[nodeId] = {
-            label: nodeId,
-            nodeType: nodeType,
-            level: level,
-            bomLevel: level,
-            incoming: 0,
-            outgoing: 0,
-            flowVolume: 0,
-            consumptionRate: 0,
-            dataSource: record.data_source,
-            isConnected: true,
-            mappingConfidence: 1.0,
-          };
-        } else if (nodeId && nodeMap[nodeId]) {
-          skippedDuplicatesCount++;
-          
-          if (record.level === 5 && record.data_source === 'inbound') {
-            console.log(`⚠️  Skipped duplicate Level 5 inbound: ${nodeId} (existing node type: ${nodeMap[nodeId].nodeType})`);
-          }
-        }
-      });
-      
-      console.log('🔍 Node extraction summary:');
-      console.log(`   📊 Processed ${processedRecordsCount} records`);
-      console.log(`   📊 Found ${level5InboundCount} Level 5 inbound records`);
-      console.log(`   📊 Found ${level4BomCount} Level 4 bom records`);
-      console.log(`   📊 Created ${createdSuppliersCount} suppliers`);
-      console.log(`   📊 Created ${createdLevel4MaterialsCount} level 4 materials`);
-      console.log(`   📊 Skipped ${skippedDuplicatesCount} duplicates`);
-      console.log(`   📊 Total unique nodes: ${Object.keys(nodeMap).length}`);
+      // Type, depth and position from ONE rule shared with `/process-level-network`
+      // (audit 2026-09-22 · F-09): echelon from the lane roles, depth from
+      // `bom_multi_level` (never from the lane's `level`, §4 D140), customers at -1,
+      // suppliers one step beyond the deepest material they feed.
+      const projectPlant =
+        projects.find((pr) => pr.id === globalSelectedProjectId)?.plant_name ?? null;
+      const { data: bomDepthRows, error: bomDepthError } = await supabase
+        .from('bom_multi_level')
+        .select('material_id,higher_level_component_id,level')
+        .eq('project_id', globalSelectedProjectId);
+      if (bomDepthError) {
+        // SAID, not swallowed (T2): an unread depth renders as unknown, not as 0.
+        console.error('[InteractiveNetworkSpace] bom_multi_level read failed:', bomDepthError.message);
+        toast.warning(
+          'Could not read the bill of materials, so BOM depth is shown as unknown. ' +
+            'The graph is still correct about what connects to what.',
+        );
+      }
+      const placed = placeLaneNodes(multiTierData, bomDepthRows ?? [], projectPlant);
 
-      // Extract customers from to_location where level=0 and outbound
-      multiTierData.forEach((record) => {
-        if (record.level === 0 && record.data_source === 'outbound') {
-          const nodeId = record.to_location;
-          if (nodeId && !nodeMap[nodeId]) {
-            const customerLevel = -1;
-            
-            levelNodeCounts[customerLevel] = (levelNodeCounts[customerLevel] || 0) + 1;
-            
-            nodeMap[nodeId] = {
-              label: nodeId,
-              nodeType: 'customer',
-              level: customerLevel,
-              bomLevel: 0,
-              incoming: 0,
-              outgoing: 0,
-              flowVolume: 0,
-              consumptionRate: 0,
-              dataSource: record.data_source,
-              isConnected: true,
-              mappingConfidence: 1.0,
-            };
-          }
-        }
-      });
+      // One pass over BOTH endpoints: a BOM target that is never a source still gets
+      // a node, and the first record naming a node wins deterministically (§4 D128).
+      const addNode = (rawId: string | null | undefined, record: MultiTierData) => {
+        const nodeId = (rawId ?? '').trim();
+        if (!nodeId || nodeMap[nodeId]) return;
+        const { echelon, level, bomDepth } = placed.get(nodeId) ?? {
+          echelon: 'unknown' as Echelon, level: record.level, bomDepth: null,
+        };
+        levelNodeCounts[level] = (levelNodeCounts[level] || 0) + 1;
+        nodeMap[nodeId] = {
+          label: nodeId,
+          echelon,
+          nodeType: echelonToLegacyType(echelon),
+          level,
+          bomLevel: bomDepth,
+          incoming: 0,
+          outgoing: 0,
+          flowVolume: 0,
+          consumptionRate: 0,
+          dataSource: record.data_source,
+          isConnected: true,
+          mappingConfidence: echelon === 'unknown' ? 0 : 1,
+        };
+      };
+      for (const record of multiTierData) {
+        addNode(record.from_location, record);
+        addNode(record.to_location, record);
+      }
 
       console.log('📍 Created', Object.keys(nodeMap).length, 'unique nodes using corrected logic');
       console.log('📊 Level distribution:', levelNodeCounts);
@@ -606,7 +544,7 @@ export default function InteractiveNetworkSpace({ isCollapsed, setIsCollapsed }:
             nodeMap[fromNode].consumptionRate += consumptionRate;
             nodeMap[toNode].consumptionRate += consumptionRate;
 
-            const strokeColor = '#8C8C8C';
+            const strokeColor = GRAPH_INK.edge;
             const strokeWidth = 1.5;
 
             edgeMap[edgeKey] = {
@@ -639,6 +577,12 @@ export default function InteractiveNetworkSpace({ isCollapsed, setIsCollapsed }:
       console.log('📊 Created', Object.keys(edgeMap).length, 'edges using corrected logic');
 
       setLevelCounts(levelNodeCounts);
+      setEchelonCounts(
+        Object.values(nodeMap).reduce<Partial<Record<Echelon, number>>>((acc, n) => {
+          acc[n.echelon] = (acc[n.echelon] ?? 0) + 1;
+          return acc;
+        }, {}),
+      );
       setMaxLevel(Math.max(...Object.keys(levelNodeCounts).map(Number)));
 
       console.log('📊 Level distribution:', levelNodeCounts);
@@ -658,27 +602,15 @@ export default function InteractiveNetworkSpace({ isCollapsed, setIsCollapsed }:
       const baseRowGap = 60;
       const startY = 100;
 
-      const levelToColumn: Record<number, number> = {
-        6: 0,   // Suppliers (leftmost)
-        5: 1,   // High-level materials
-        4: 2,   // Mid-level materials
-        3: 2,   // Mid-level materials
-        2: 2,   // Mid-level materials  
-        1: 2,   // Mid-level materials
-        0: 3,   // Products
-        '-1': 4 // Customers (rightmost)
-      };
+      // One column per ordinate, deepest on the left and customers (-1) on the right.
+      // The ordinate is the real BOM depth now (F-09), not the fixed six-step ladder
+      // this map used to hard-code — which placed any BOM not exactly four deep wrong.
+      const sortedLevels = Object.keys(nodesByLevel).map(Number).sort((a, b) => b - a);
+      const deepest = sortedLevels[0] ?? 0;
 
-      const sortedLevels = Object.keys(nodesByLevel).map(Number).sort((a, b) => {
-        const colA = levelToColumn[a] ?? 2;
-        const colB = levelToColumn[b] ?? 2;
-        if (colA !== colB) return colA - colB;
-        return b - a;
-      });
-      
       sortedLevels.forEach((level) => {
         const levelNodes = nodesByLevel[level];
-        const columnIndex = levelToColumn[level] ?? 2;
+        const columnIndex = deepest - level;
         const x = columnX + columnIndex * columnGap;
         
         const totalNodes = Object.keys(nodeMap).length;
@@ -703,7 +635,7 @@ export default function InteractiveNetworkSpace({ isCollapsed, setIsCollapsed }:
           
           const y = startY + indexInSubgroup * dynamicRowGap + additionalY + staggeredY;
 
-          const color = getNodeColor(nodeData.nodeType, level, nodeData.bomLevel);
+          const color = colorForEchelon(nodeData.echelon);
           
           const reactFlowNode: Node<NodeData> = {
             id: nodeId,
@@ -1051,8 +983,9 @@ Result: We return the induced subgraph (nodes + edges) matching your filters, la
                 <CardContent className="space-y-1 text-xs">
                   <div><strong>ID:</strong> {selectedNode.id}</div>
                   <div><strong>Label:</strong> {selectedNode.data.label}</div>
-                  <div><strong>Type:</strong> {selectedNode.data.nodeType}</div>
-                  <div><strong>Level:</strong> {selectedNode.data.level}</div>
+                  <div><strong>Type:</strong> {labelForEchelon(selectedNode.data.echelon)}</div>
+                  <div><strong>BOM depth:</strong> {selectedNode.data.bomLevel ?? 'not in the BOM'}</div>
+                  <div><strong>Column (level queries):</strong> {selectedNode.data.level}</div>
                   <div><strong>Incoming Edges:</strong> {selectedNode.data.incoming}</div>
                   <div><strong>Outgoing Edges:</strong> {selectedNode.data.outgoing}</div>
                   <div><strong>Flow Volume:</strong> {selectedNode.data.flowVolume.toFixed(2)}</div>
@@ -1068,27 +1001,20 @@ Result: We return the induced subgraph (nodes + edges) matching your filters, la
                 <CardTitle className="text-sm">Interactive Network Legend</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {Object.entries(LEVEL_COLORS).map(([level, color]) => {
-                  const count = levelCounts[parseInt(level)] || 0;
-                  const levelName = level === '-1' ? 'Customers' :
-                                  level === '0' ? 'Products' :
-                                  parseInt(level) >= 5 ? 'Suppliers' : 'Materials';
-                  
-                  return (
-                    <div key={level} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-4 h-4 rounded border border-gray-400"
-                          style={{ backgroundColor: color }}
-                        />
-                        <span className="text-sm">Level {level} ({levelName})</span>
-                      </div>
-                      <Badge variant="outline" className="text-xs">
-                        {count}
-                      </Badge>
+                {ECHELONS.filter((e) => (echelonCounts[e] ?? 0) > 0).map((echelon) => (
+                  <div key={echelon} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-4 h-4 rounded border border-gray-400"
+                        style={{ backgroundColor: colorForEchelon(echelon) }}
+                      />
+                      <span className="text-sm">{labelForEchelon(echelon)}</span>
                     </div>
-                  );
-                })}
+                    <Badge variant="outline" className="text-xs">
+                      {echelonCounts[echelon]}
+                    </Badge>
+                  </div>
+                ))}
               </CardContent>
             </Card>
 
