@@ -10,6 +10,8 @@ interface Props {
   primaryKpi?: string;
   /** The run's engine, so rows computed before a fix are marked (audit WP 3). */
   codeVersion?: string | null;
+  /** `_meta.stopping_rule` — labels a sequentially stopped run's CIs (F-13). */
+  stoppingRule?: string | null;
 }
 
 /**
@@ -34,8 +36,9 @@ interface Props {
  * The ORDER is the catalog's, then alphabetical for the rest, so two runs of the
  * same shape produce the same table and an unnamed measure does not jump around.
  */
-export function KpiStatTable({ reps, primaryKpi, codeVersion }: Props) {
-  const rows = useMemo<KpiStat[]>(() => buildKpiRows(reps, codeVersion), [reps, codeVersion]);
+export function KpiStatTable({ reps, primaryKpi, codeVersion, stoppingRule }: Props) {
+  const rows = useMemo<KpiStat[]>(
+    () => buildKpiRows(reps, codeVersion, stoppingRule), [reps, codeVersion, stoppingRule]);
 
   return (
     // L1: the table's name reads on the canvas, above the shell.

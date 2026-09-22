@@ -47,6 +47,8 @@ interface RunMeta {
    *  worker from `ScenarioResult.capacity_binding`; absent on a run that
    *  predates the measurement, which the panel says rather than assumes. */
   capacity_binding?: CapacityBinding;
+  /** "sequential_ci" when the replication count was chosen by the CI rule (F-13). */
+  stopping_rule?: string;
 }
 
 function extractMeta(run: SimulationRun | null, reps: Replication[]): RunMeta | null {
@@ -183,7 +185,7 @@ export function ResultsDashboard({
         reps={reps.filter((r) => r.status === "done" && r.kpis)}
         warmupWeeks={run.warmup_detected_at}
       />
-      <KpiStatTable reps={reps} primaryKpi={primaryKpi} codeVersion={codeVersion} />
+      <KpiStatTable reps={reps} primaryKpi={primaryKpi} codeVersion={codeVersion} stoppingRule={meta?.stopping_rule} />
       </>)}
       {/* `UtilizationHeatmap` WAS HERE AND IS REMOVED — §4 D113.
           It read a per-node `utilization` series from each replication and NO

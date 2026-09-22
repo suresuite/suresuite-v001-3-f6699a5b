@@ -7,6 +7,7 @@
 // shows its KPI row next to the aggregate. Everything rendered here is
 // persisted engine output — nothing synthetic.
 
+import { replicationLabel } from "@/lib/sim/replicationLabel";
 import { useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -63,13 +64,13 @@ function nameForSeriesKey(key: string): string {
   if (key === "upper") return "Upper (95% CI)";
   if (key === "lower") return "Lower (95% CI)";
   const m = /^s(-?\d+)$/.exec(key);
-  return m ? `Seed ${m[1]}` : key;
+  return m ? `Rep ${m[1]}` : key;
 }
 
 interface SeedSelectorProps {
   reps: Replication[];
-  value: number | null; // seed_used, or null = all reps
-  onChange: (seed: number | null) => void;
+  value: number | null; // rep_index, or null = all reps
+  onChange: (repIndex: number | null) => void;
   className?: string;
 }
 
@@ -89,8 +90,10 @@ export function SeedSelector({ reps, value, onChange, className }: SeedSelectorP
           All replications (mean + CI)
         </SelectItem>
         {reps.map((r) => (
-          <SelectItem key={r.seed_used} value={String(r.seed_used)} className="min-h-11 text-xs md:min-h-0">
-            seed {r.seed_used} · rep {r.rep_index}
+          // Keyed by rep_index, unique per run; seed_used repeats across the
+          // event draws of one world and is not a seed (audit F-23).
+          <SelectItem key={r.rep_index} value={String(r.rep_index)} className="min-h-11 text-xs md:min-h-0">
+            {replicationLabel(r)}
           </SelectItem>
         ))}
       </SelectContent>
@@ -110,7 +113,7 @@ export function ReplicationSeedExplorer({
   reps,
   warmupWeeks = null,
   confidence = 0.95,
-  title = "Weekly traces by seed",
+  title = "Weekly traces by replication",
 }: Props) {
   const [seriesKey, setSeriesKey] = useState<ReplicationSeriesKey>("fill_rate");
   const [seed, setSeed] = useState<number | null>(null);
@@ -136,8 +139,9 @@ export function ReplicationSeedExplorer({
     [reps],
   );
 
-  const selected = seed != null ? withSeries.find((r) => r.seed_used === seed) ?? null : null;
-  const selectedRep = seed != null ? reps.find((r) => r.seed_used === seed) ?? null : null;
+  // `seed` holds a rep_index (unique per run) — see SeedSelector.
+  const selected = seed != null ? withSeries.find((r) => r.rep_index === seed) ?? null : null;
+  const selectedRep = seed != null ? reps.find((r) => r.rep_index === seed) ?? null : null;
 
   const data = useMemo(() => {
     if (withSeries.length === 0) return [];
@@ -155,7 +159,7 @@ export function ReplicationSeedExplorer({
         upper: (mean + half) * scale,
       };      
       shown.forEach((r) => {
-        row[`s${r.seed_used}`] = r.time_series[seriesKey][week] * scale;
+        row[`s${r.rep_index}`] = r.time_series[seriesKey][week] * scale;
       });
       return row;
     });
@@ -249,14 +253,14 @@ export function ReplicationSeedExplorer({
                 </>
               )}
               {shownReps.map((r, i) => {
-                const isSel = selected != null && r.seed_used === selected.seed_used;
+                const isSel = selected != null && r.rep_index === selected.rep_index;
                 if (isolate && selected && !isSel) return null;
                 if (isolate && !selected) return null;
                 return (
                   <Line
-                    key={r.seed_used}
+                    key={r.rep_index}
                     type="monotone"
-                    dataKey={`s${r.seed_used}`}
+                    dataKey={`s${r.rep_index}`}
                     stroke={isSel ? "hsl(25 95% 50%)" : `hsl(${(i * 47) % 360} 65% 55%)`}
                     strokeOpacity={isSel ? 1 : selected ? 0.18 : 0.4}
                     strokeWidth={isSel ? 2.2 : 0.8}
@@ -273,9 +277,9 @@ export function ReplicationSeedExplorer({
           <div className="px-1 pt-1 text-[10px] text-muted-foreground">
             {selected
               ? isolate
-                ? `Isolated: replication ${selected.rep_index} (seed ${selected.seed_used}).`
-                : `Selected seed ${selected.seed_used} highlighted over the cross-replication mean ± CI band.`
-              : "Cross-replication mean ± CI band with individual seed traces dimmed."}
+                ? `Isolated: ${replicationLabel(selected)}.`
+                : `Selected ${replicationLabel(selected)} highlighted over the cross-replication mean ± CI band.`
+              : "Cross-replication mean ± CI band with individual replication traces dimmed."}
           </div>
         </div>
       )}
@@ -297,7 +301,7 @@ export function ReplicationSeedExplorer({
             <tbody>
               <tr>
                 <td className={`pr-3 py-0.5 font-medium whitespace-nowrap ${FROZEN_CELL}`}>
-                  seed {selectedRep.seed_used} · rep {selectedRep.rep_index}
+                  {replicationLabel(selectedRep)}
                 </td>
                 {SEED_KPI_ROW.map((k) => (
                   <td key={k.key} className="text-right px-2 py-0.5 font-mono tabular-nums">

@@ -106,16 +106,19 @@ export default function ExperimentsAndComparison() {
       <Section id="reading-the-table" title="Reading the table">
         <P>
           One row per measure both runs produced, with A's value and interval, B's value and
-          interval, and the signed difference. The arrow of improvement is per measure — a lower
-          lead time is better and a lower fill rate is not — so the table marks which side won
-          rather than leaving you to remember the direction.
+          interval, and the difference. Because the two runs share their random numbers,
+          replication 7 of A and replication 7 of B saw the same world, so the difference is taken
+          replication by replication and its interval is on THOSE differences — the common swing
+          cancels. A policy that is better in every replication is therefore shown as better even
+          when the two runs' own intervals overlap.
         </P>
         <Key>
-          A row whose two intervals overlap is marked, and a marked row is not a finding.
+          A row is coloured with a winner only when the paired interval excludes zero.
         </Key>
         <P>
-          Overlap means the difference is smaller than the uncertainty on either side. B may still
-          be better; this run cannot show it. The two honest responses are to add replications until
+          "Not separated" means the paired difference is inside the noise: B may still be better,
+          and this pair of runs cannot show it. "Unpaired" means the replication rows were not
+          available, so no direction is drawn at all. The two honest responses are to add replications until
           the intervals separate, or to report the comparison as inconclusive — and the second is a
           real result rather than a failure.{" "}
           <DocLink to="seeds-replications-confidence">Seeds, replications &amp; confidence</DocLink>{" "}
@@ -174,7 +177,7 @@ export default function ExperimentsAndComparison() {
       <Callout tone="law" title="Change one thing, and let the intervals decide">
         <p>
           The whole discipline in two sentences. Duplicate the baseline, change exactly one thing,
-          run both with common random numbers on and the same seed. Then read the overlap column
+          run both with common random numbers on and the same seed. Then read the paired-test column
           before the difference column, because a difference inside the noise is a number and not a
           finding.
         </p>
@@ -196,7 +199,7 @@ export default function ExperimentsAndComparison() {
           <DocLink to="scenarios">Scenarios</DocLink> is where common random numbers and the seed
           are set ·{" "}
           <DocLink to="seeds-replications-confidence">Seeds, replications &amp; confidence</DocLink>{" "}
-          is what the overlap column means ·{" "}
+          is what the paired interval means ·{" "}
           <DocLink to="recovery-playbooks">Recovery playbooks</DocLink> is the usual thing being
           compared · <DocLink to="reading-your-results">Reading your results</DocLink> is why a
           measure may be missing from a row.
@@ -206,7 +209,7 @@ export default function ExperimentsAndComparison() {
         </P>
       </Section>
 
-      <Provenance from="CompareScenariosPanel's own comparability rules and overlap marking, read from the component; the reachability claims are import scans over src/ and scsim/" />
+      <Provenance from="CompareScenariosPanel's own comparability rules and its paired test (pairedCompare.ts), read from the component; the reachability claims are import scans over src/ and scsim/" />
     </>
   );
 }

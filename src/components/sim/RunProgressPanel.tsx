@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { replicationLabel } from "@/lib/sim/replicationLabel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -138,7 +139,7 @@ export function RunProgressPanel({ run, reps, versionLabel, credibility, onCance
               {reps.map((r) => (
                 <div
                   key={r.id}
-                  title={`rep ${r.rep_index} · seed ${r.seed_used} · ${r.status}`}
+                  title={`${replicationLabel(r)} · ${r.status}`}
                   className={
                     "h-6 border border-border text-[10px] flex items-center justify-center " +
                     (r.status === "done"

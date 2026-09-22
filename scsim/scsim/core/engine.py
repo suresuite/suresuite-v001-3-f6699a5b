@@ -277,7 +277,6 @@ def _mech_ship_queue(model: CompiledModel, ctx: SimContext) -> None:
     """Move supplier-held orders into the in-transit pipeline under capacity gating."""
     t = ctx.week
     W = model.ring_width
-    rng = ctx.streams.leadtime
     reject_sups = {
         e.supplier_idx
         for e in ctx.events
@@ -325,7 +324,8 @@ def _mech_ship_queue(model: CompiledModel, ctx: SimContext) -> None:
             lt = int(ctx.po_lt_override[link]) if ctx.po_lt_override[link] > 0 else int(model.link_lt[link])
             dist = model.link_lt_dist[link]
             if dist != LeadTimeDist.DETERMINISTIC and model.link_lt_cv[link] > 0:
-                lt = _sample_lt(rng, dist, lt, float(model.link_lt_cv[link]))
+                lt = _lt_from_variate(dist, lt, float(model.link_lt_cv[link]),
+                                      float(ctx.lt_variates[link, t]))
             arrival = t + max(1, lt)
             if ctx.lt_block_end[s] > 0:
                 arrival = max(arrival, int(ctx.lt_block_end[s]))
@@ -339,16 +339,25 @@ def _mech_ship_queue(model: CompiledModel, ctx: SimContext) -> None:
             ctx.pipeline[link, arrival % W] += qty
 
 
-def _sample_lt(rng: np.random.Generator, dist: LeadTimeDist, mean: int, cv: float) -> int:
-    # Consumed only when an order ships — CRN caveat documented (docs/statistics.md).
+def _lt_from_variate(dist: LeadTimeDist, mean: float, cv: float, v: float,
+                     rounded: bool = True) -> float:
+    """A lead time with the link's distribution and the shipment's mean, from a
+    variate pre-drawn for this (link, week) (audit F-24).
+
+    Lognormal: ``exp(μ + σ·z)`` with ``σ² = ln(1+cv²)`` and ``μ = ln(mean) − σ²/2``,
+    so ``E = mean``. Gamma: ``(mean/shape)·g`` with ``g ~ Γ(shape, 1)`` and
+    ``shape = 1/cv²``, the same scale family ``rng.gamma(shape, mean/shape)`` drew
+    from. The distribution is unchanged; only WHEN the stream is consumed moved.
+    """
     if dist == LeadTimeDist.LOGNORMAL:
         sigma2 = np.log1p(cv * cv)
         mu = np.log(max(mean, 1e-9)) - sigma2 / 2.0
-        return int(round(float(rng.lognormal(mu, np.sqrt(sigma2)))))
-    if dist == LeadTimeDist.GAMMA:
-        shape = 1.0 / (cv * cv)
-        return int(round(float(rng.gamma(shape, mean / shape))))
-    return mean
+        x = float(np.exp(mu + np.sqrt(sigma2) * v))
+    elif dist == LeadTimeDist.GAMMA:
+        x = float(v * mean * cv * cv)  # (mean / shape) · g, shape = 1/cv²
+    else:
+        x = float(mean)
+    return int(round(x)) if rounded else x
 
 
 def _mech_land_arrivals(model: CompiledModel, ctx: SimContext) -> None:
@@ -889,7 +898,8 @@ def run_scenario(
 
     # Sequential stopping (optional) extends model seeds until ε is met.
     from scsim.entities.enums import ReplicationStopping
-    if settings.replication_stopping == ReplicationStopping.SEQUENTIAL_CI and scenario.events:
+    sequential = settings.replication_stopping == ReplicationStopping.SEQUENTIAL_CI and bool(scenario.events)
+    if sequential:
         kpis, rows, grid = _extend_until_ci(
             compiled, scenario, kpis, rows, grid, t_w, window_end, debug, progress,
             cap_acc, shifts=shifts,
@@ -937,6 +947,7 @@ def run_scenario(
         warmup=warmup,
         below_replication_floor=settings.below_replication_floor,
         wide_ci_badge=settings.run_mode == RunMode.FAST_SCAN,
+        stopping_rule="sequential_ci" if sequential else "fixed",
     )
     return ScenarioResult(
         name=scenario.name,

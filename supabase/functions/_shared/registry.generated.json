@@ -128,7 +128,7 @@
       "reason": "Empty means unlimited (a valid modeling choice) \u2014 but partial-magnitude supplier disruptions need a finite capacity to throttle, else they degrade to full outages."
     }
   ],
-  "engine_version": "0.2.5",
+  "engine_version": "0.2.6",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -1036,7 +1036,7 @@
         "lead_time_dist": {
           "$ref": "#/$defs/LeadTimeDist",
           "default": "deterministic",
-          "notes": "Stochastic lead times consume the world leadtime stream only when an order is placed; CRN caveat documented in docs/statistics.md.",
+          "notes": "Stochastic lead times are pre-drawn per (link, week) from the world leadtime stream, so CRN pairing holds across policies (docs/statistics.md).",
           "scope": "SM",
           "unit": "enum"
         },

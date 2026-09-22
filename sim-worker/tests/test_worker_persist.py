@@ -46,3 +46,10 @@ def test_missing_source_defaults_to_worker():
     patch = build_run_update({"mean_x": 1.0}, n_reps=1)
     assert patch["code_version"] == "worker-legacy"
     assert patch["aggregate_kpis"]["_meta"]["engine"] == "worker"
+
+
+def test_the_stopping_rule_rides_meta():
+    """Audit F-13: the KPI table needs to know a CI came from a sequential rule."""
+    patch = build_run_update({"source": "scsim", "engine_version": "0.2.5",
+                              "stopping_rule": "sequential_ci"}, n_reps=40)
+    assert patch["aggregate_kpis"]["_meta"]["stopping_rule"] == "sequential_ci"

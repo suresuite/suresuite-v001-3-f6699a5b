@@ -62,7 +62,7 @@ class CancelWatch:
 # Non-scalar KPI keys that must never be broadcast as a KPI delta.
 _NON_BROADCAST_KEYS = {
     "replications", "mapping_warnings", "feasibility_warnings", "scsim_notes", "run_id",
-    "item_series", "capacity_binding",
+    "item_series", "capacity_binding", "stopping_rule",
 }
 
 
@@ -84,6 +84,9 @@ def build_run_update(kpis: dict[str, Any], n_reps: int) -> dict[str, Any]:
         # name a product.
         **({"capacity_binding": kpis["capacity_binding"]}
            if kpis.get("capacity_binding") else {}),
+        # Which rule decided the replication count (audit F-13): the KPI table
+        # labels a sequentially stopped run's intervals.
+        **({"stopping_rule": kpis["stopping_rule"]} if kpis.get("stopping_rule") else {}),
     }
     if kpis.get("source") == "scsim":
         code_version = f"scsim-{kpis.get('engine_version', 'unknown')}"

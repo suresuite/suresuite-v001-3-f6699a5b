@@ -166,3 +166,9 @@ class StatisticsReport(BaseModel):
     warmup: Optional[WarmupReport] = None
     below_replication_floor: bool = False
     wide_ci_badge: bool = False  # set for fast_scan results (Risk R4)
+    # Which rule decided the replication count (audit F-13). "sequential_ci"
+    # means `_extend_until_ci` stopped at the first batch whose half-width met ε,
+    # so a plain t-interval over the same sample is biased narrow by that peeking
+    # and the display must say so. "fixed" otherwise — including a sequential
+    # rule on a scenario with no events, which the engine does not extend (F-32).
+    stopping_rule: str = "fixed"

@@ -88,8 +88,8 @@ class SupplierLink(BaseModel):
         LeadTimeDist.DETERMINISTIC,
         json_schema_extra=_meta(
             "enum", "SM",
-            "Stochastic lead times consume the world leadtime stream only when an order "
-            "is placed; CRN caveat documented in docs/statistics.md.",
+            "Stochastic lead times are pre-drawn per (link, week) from the world leadtime "
+            "stream, so CRN pairing holds across policies (docs/statistics.md).",
         ),
     )
     lead_time_cv: float = Field(
