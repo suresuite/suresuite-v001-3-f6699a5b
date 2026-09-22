@@ -293,7 +293,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
                   value={projectId || ""}
                   onValueChange={(v) => setGlobalSelectedProjectId(v || null)}
                 >
-                  <SelectTrigger className={cn("h-8 w-[210px] gap-1.5", HDR_PROJECT_SELECT)}>
+                  <SelectTrigger className={cn("h-11 md:h-8 w-[210px] gap-1.5", HDR_PROJECT_SELECT)}>
                     <SelectValue placeholder="Select project" />
                   </SelectTrigger>
                   <SelectContent>

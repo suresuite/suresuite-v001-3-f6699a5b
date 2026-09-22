@@ -411,7 +411,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                     desktop literal without a second breakpoint. The desktop
                     header handoff makes that literal the product-wide project
                     select — 200 × 36 with the `--border-strong` hairline. */}
-                <SelectTrigger className={cn('h-9 w-[clamp(130px,42vw,200px)]', HDR_PROJECT_SELECT)}>
+                <SelectTrigger className={cn('h-11 md:h-9 w-[clamp(130px,42vw,200px)]', HDR_PROJECT_SELECT)}>
                   <SelectValue placeholder="Select project" />
                 </SelectTrigger>
                 <SelectContent>

@@ -18696,6 +18696,41 @@ bump surfaces in the same PR.
   reading afterwards is what would confirm the lane rebuild now matches the RPC.
   → affects **whoever owns the next §15 run**.
 
+### CI · the last two red gates · 2026-09-22 · no migration
+
+Both were **stale expectations, not broken code**, and both had been red long
+enough that the badges had stopped meaning anything.
+
+**`eval`.** `report_builder_test.ts:639` asserted `REPORT_TEMPLATE_IDS` was the
+five v1 templates; the registry carries six. The sixth is `data-trust` — the
+Trust Report's own template, added deliberately and rendered by WP 6.3 (§499,
+asset A3). The list was catching up with a shipped package, so the assertion
+gained the element rather than losing its teeth. **The suite is now 291 passed
+/ 0 failed** — green for the first time since the template landed.
+
+**`audit:ui`.** Eight §2.4 violations, every one a header `SelectTrigger` with
+`h-9` (`h-8` on /policies) and no mobile floor: /project-manager,
+/simulation-lab, /policies and the five network pages. Each took the audit's own
+prescription, `h-11 md:h-9` — a 44px touch target on a phone, the existing
+height from `md` up. **The audit now exits 0.**
+
+**Why the floor is on the line and not in `HDR_PROJECT_SELECT`.** The shared
+constant is where a single-source instinct says to put it, and it would not
+work: `audit-adaptive-ui.mjs` matches the JSX text of the LINE, so a floor
+living in an imported constant is invisible to it and the gate stays red while
+the pixels are right. The rule as written wants the height visible at the call
+site. Worth knowing before someone "fixes" this properly and reopens it.
+
+**Discovered:**
+
+- **Both of these were reported as "pre-existing on `main`" twice in this
+  session before anyone fixed them** — once on #250's stand-down comment, once
+  on #252's body. A failure that is correctly attributed and then left is still
+  a red gate, and two of them made `main`'s CI unreadable at a glance: the
+  seven-deploy outage (D165) sat in the same list and nobody saw it.
+  → affects **no package** → recorded as the reason this cleanup was worth a
+  package of its own.
+
 ---
 ---
 
