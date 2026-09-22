@@ -87,7 +87,7 @@ async function loadIngestHistory(
   // the second into a declared limit; conflating them would publish a clean bill
   // for a read that failed.
   if (error) return null;
-  return (data ?? []).map((r: Record<string, unknown>) => ({
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     run_id: String(r.id),
     fact_class: (r.source_kind as string) ?? null,
     landed_at: (r.applied_at as string) ?? null,
