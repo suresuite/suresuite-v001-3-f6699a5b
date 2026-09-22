@@ -37,6 +37,10 @@ on:
       # session in this repository can set — so deploying it changes nobody's login until
       # somebody provisions that secret deliberately.
       - 'supabase/functions/session-mint/**'
+      # WP 6.5 (a) — the CSV landing path (§4 D123). Its own path, so a change to the
+      # function redeploys it; `_shared/**` below covers the parser, the validator and
+      # the generated ingest spec it bundles.
+      - 'supabase/functions/ingest-file/**'
       - 'supabase/functions/_shared/**'
       - 'supabase/config.toml'
       - '.github/workflows/supabase-functions.yml'
@@ -215,16 +219,29 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      # `ingest-file` IS DELIBERATELY NOT DEPLOYED HERE — §4 D123, deferred to
-      # WP 6.3's own landing switch. It is WP 3.2's entire deliverable and has
-      # never been published, and adding the step is a one-line change; what it is
-      # NOT is a small one. On merge it activates the WP 3.2–3.4 landing path in
-      # production for EVERY upload at once — server-side parse, tier-0 storage,
-      # staged rows, the diff screen, the promotion — and §16 · WP 6.3 (slice 16)
-      # declined it for that reason, asking for a §15 reading either side of the
-      # switch. That reading cannot be taken from a branch. The deferral is
-      # registered in `scripts/data-contract/coverage.yaml`, so R17 counts it
-      # rather than being satisfied by a step added in passing.
+      # `ingest-file` — PUBLISHED BY WP 6.5 (a), §4 D123. WP 3.2's entire deliverable,
+      # never deployed until this step: the upload wizard on /project-manager calls it
+      # on file-select (mode `parse`) with no fallback, so every upload in production
+      # failed there while `main` carried a correct landing path. Adding this step
+      # switches EVERY CSV upload onto the WP 3.2–3.4 landing at once — server-side
+      # parse, tier-0 bytes in the private `ingest` bucket, staged rows, the diff
+      # review screen, and the promotion with its normalisation and its editor gate —
+      # which is why it was a package and not a line: §15 was read over every project
+      # BEFORE the merge that adds it and is read again in a push AFTER it (D153).
+      #
+      # Its precondition is D156, met in production since `20260919000012`: the
+      # landing's actor columns key to `approved_users`, not `auth.users`, so a real
+      # uploader satisfies both the non-NULL actor and the foreign key. Its known side
+      # effect is D161, accepted and owned by WP 7.2: the first person who uploads a
+      # CSV cannot be deleted from `approved_users`, because erasing them needs an
+      # UPDATE on a write-once tier-0 row. `verify_jwt = true` is declared in
+      # `supabase/config.toml`, which the deploy reads; the wizard reaches it with the
+      # anon key, as it does `sim-command` and `combine-project`.
+      - name: Deploy ingest-file
+        run: supabase functions deploy ingest-file --project-ref wckdrutwkytwcomrlpib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       # ── The four analysis functions (D105) ────────────────────────────────
       #
       # NEVER DEPLOYED BY THIS WORKFLOW UNTIL NOW, and not once in its history —
