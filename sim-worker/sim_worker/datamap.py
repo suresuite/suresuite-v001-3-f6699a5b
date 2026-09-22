@@ -7,7 +7,10 @@ See docs/data-simulation-mapping.md.
 """
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Optional
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:  # httpx only used by load_project_data (the worker's DB reads);
     import httpx    # the serverless engine calls build_project_data directly.
@@ -186,6 +189,14 @@ def build_project_data(
     )
 
 
+class ProjectReadError(RuntimeError):
+    """A project table could not be READ — distinct from a table that is empty."""
+
+    def __init__(self, table: str, detail: str) -> None:
+        super().__init__(f"could not read {table}: {detail}")
+        self.table = table
+
+
 async def load_project_data(
     http: httpx.AsyncClient,
     base_url: str,
@@ -200,19 +211,38 @@ async def load_project_data(
     base = base_url.rstrip("/")
 
     async def rows(table: str, select: str = "*") -> list[dict]:
+        """One project-scoped read. An EMPTY table returns []; a read that did
+        not happen RAISES (audit F-08).
+
+        This used to catch every exception and every non-200 and return [] for
+        both — so a transient failure on `outbound_logistics` became a run with
+        no demand, which then reported a perfect fill rate, and one wrong column
+        name looked exactly like data the project did not have (§4 D69's note
+        said so and could not close it). The worker marks the run `failed` with
+        this message, which names the table and the status.
+        """
         try:
             r = await http.get(
                 f"{base}/rest/v1/{table}",
                 params={"project_id": f"eq.{project_id}", "select": select},
                 headers=headers,
             )
-            if r.status_code == 200 and isinstance(r.json(), list):
-                return r.json()
-        except Exception:
-            pass
-        return []
+        except Exception as exc:
+            raise ProjectReadError(table, f"request failed: {exc}") from exc
+        if r.status_code != 200:
+            raise ProjectReadError(table, f"HTTP {r.status_code}: {r.text[:200]}")
+        try:
+            body = r.json()
+        except ValueError as exc:
+            raise ProjectReadError(table, "response is not JSON") from exc
+        if not isinstance(body, list):
+            raise ProjectReadError(table, f"expected a list of rows, got: {str(body)[:200]}")
+        return body
 
-    # Best-effort: make sure a master row exists for every id in the graph.
+    # Best-effort BY DECLARATION: make sure a master row exists for every id in
+    # the graph. A failure here changes no value the run reads — the mapper
+    # names every BOM material with no master row and simulates it (§4 D166) —
+    # so it does not fail the run; it is logged rather than swallowed.
     try:
         await http.post(
             f"{base}/rest/v1/rpc/ensure_item_masters",
@@ -220,7 +250,7 @@ async def load_project_data(
             json={"p_project_id": project_id},
         )
     except Exception:
-        pass
+        log.warning("ensure_item_masters failed for project %s", project_id, exc_info=True)
 
     # BOM: multi-level rows win when they exist — the same rule the frontend
     # lanes apply (src/lib/policies/projectLanes.ts) — so browser and server

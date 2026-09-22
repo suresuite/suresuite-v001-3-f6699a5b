@@ -31,6 +31,9 @@ export interface SimulationRun {
   scenario_hash?: string | null;
   /** The model-validation card in force at dispatch — immutable history. */
   model_validation_id?: string | null;
+  /** The pre-run gate could not load its data and dispatch proceeded unchecked
+   *  (`20260707000001_run_gate_skipped.sql`). Rendered by `gateNotice` (F-19a). */
+  gate_skipped?: boolean | null;
 }
 
 /** One finding of a sim-command 422 — the §8.1 gate's typed shape. */

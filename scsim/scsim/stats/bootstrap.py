@@ -95,12 +95,20 @@ def t_halfwidth(values: np.ndarray, ci_level: float = 95.0) -> float:
 
 
 def aggregate_mean_ci(values: np.ndarray, ci_level: float = 95.0) -> dict:
+    """Mean/CI over the replications that MEASURED the KPI.
+
+    NaN is the engine's "not measured" (a window with no demand has no fill
+    rate; an unlimited supplier has no utilization). It is excluded, ``n`` says
+    how many replications remain, and a KPI no replication measured aggregates
+    to NaN — not 0.0, which would read as a measured zero (audit F-08).
+    """
     x = np.asarray(values, dtype=float)
+    x = x[np.isfinite(x)]
     return {
-        "mean": float(x.mean()) if x.size else 0.0,
+        "mean": float(x.mean()) if x.size else float("nan"),
         "std": float(x.std(ddof=1)) if x.size > 1 else 0.0,
         "ci_halfwidth": t_halfwidth(x, ci_level) if x.size > 1 else 0.0,
         "n": int(x.size),
-        "min": float(x.min()) if x.size else 0.0,
-        "max": float(x.max()) if x.size else 0.0,
+        "min": float(x.min()) if x.size else float("nan"),
+        "max": float(x.max()) if x.size else float("nan"),
     }

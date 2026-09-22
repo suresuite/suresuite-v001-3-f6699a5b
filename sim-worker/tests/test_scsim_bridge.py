@@ -243,3 +243,19 @@ def test_event_shifts_reach_the_mapping_warnings_list():
     assert w["entity"] == "event:s1" and w["field"] == "start"
     assert "week 1" in w["reason"] and "week 15" in w["reason"]
     assert _event_shift_warnings(SimpleNamespace()) == []
+
+
+def test_feasibility_warnings_reach_the_mapping_warnings_list():
+    """Audit WP 5: the engine's feasibility warnings were a second list nothing
+    rendered; they now join the one the run panel reads."""
+    from types import SimpleNamespace
+
+    from sim_worker.scsim_bridge import _feasibility_warnings
+
+    res = SimpleNamespace(feasibility_warnings=[
+        SimpleNamespace(code="no_backup_supplier", message="P-S.1 has no second qualified supplier")])
+    [w] = _feasibility_warnings(res)
+    assert w == {"level": "warn", "entity": "policy:feasibility",
+                 "field": "no_backup_supplier",
+                 "reason": "P-S.1 has no second qualified supplier"}
+    assert _feasibility_warnings(SimpleNamespace()) == []

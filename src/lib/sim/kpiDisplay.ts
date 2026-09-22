@@ -51,7 +51,8 @@ const units = (n: number) => Math.round(n).toLocaleString();
 
 export const KPI_DISPLAY: KpiDisplay[] = [
   // ── the canonical engine (`scsim/scsim/kpi/compute.py::_kpi_row`) ─────────
-  { key: "fill_rate", label: "Fill rate (α)", format: pct2, higherIsBetter: true },
+  { key: "fill_rate", label: "Fill rate (α)", format: pct2, higherIsBetter: true,
+    whenAbsent: "no demand in the analysis window — a fill rate needs something to fill (audit F-08)" },
   { key: "revenue", label: "Revenue", format: money, higherIsBetter: true },
   { key: "demand_value", label: "Demand (value)", format: money, higherIsBetter: null },
   { key: "produced_value", label: "Produced (value)", format: money, higherIsBetter: null },

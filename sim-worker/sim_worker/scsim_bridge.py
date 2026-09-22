@@ -136,6 +136,21 @@ def _truncation_warnings(result: Any) -> list[dict]:
     ]
 
 
+def _feasibility_warnings(result: Any) -> list[dict]:
+    """Policy feasibility warnings the engine raises at compile time.
+
+    They travelled as a SECOND list, `feasibility_warnings`, which the worker
+    kept out of broadcasts and nothing persisted or rendered — so a policy the
+    engine judged only partly feasible ran with no word to the user (audit WP 2
+    handoff, closed in WP 5). They join the one list the run panel reads. The
+    separate key is kept on the output for any caller that still reads it.
+    """
+    return [
+        {"level": "warn", "entity": "policy:feasibility", "field": w.code, "reason": w.message}
+        for w in (getattr(result, "feasibility_warnings", None) or [])
+    ]
+
+
 def _event_shift_warnings(result: Any) -> list[dict]:
     """Fixed-start disruptions the engine moved out of warm-up (audit F-03).
 
@@ -197,7 +212,7 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
         "n_reps": result.stats.n_replications,
         "below_replication_floor": result.stats.below_replication_floor,
         "mapping_warnings": (mapping.warning_dicts + _truncation_warnings(result)
-                             + _event_shift_warnings(result)),
+                             + _event_shift_warnings(result) + _feasibility_warnings(result)),
         "warmup_detected_at": (result.warmup.adopted_week if result.warmup else None),
         "feasibility_warnings": [
             {"code": w.code, "message": w.message} for w in result.feasibility_warnings

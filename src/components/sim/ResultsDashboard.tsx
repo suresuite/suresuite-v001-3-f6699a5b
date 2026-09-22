@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { gateNotice } from "@/lib/sim/gateNotice";
 import { KpiStatTable } from "./KpiStatTable";
 import { ConvergencePlot } from "./ConvergencePlot";
 import { InventoryOverTime } from "./InventoryOverTime";
@@ -72,6 +73,7 @@ export function ResultsDashboard({
   const meta = extractMeta(run, reps);
   const codeVersion = run.code_version ?? "";
   const isStub = codeVersion.startsWith("stub") || !codeVersion;
+  const gateText = gateNotice(run);
   const disruptions: DisruptionEvent[] =
     scenario?.disruption_schedule && scenario.disruption_schedule.length > 0
       ? scenario.disruption_schedule
@@ -95,6 +97,7 @@ export function ResultsDashboard({
               : `Monte Carlo · ${run?.rep_count_done ?? 0} reps`}
           </MobileChip>
           {credibility && <CredibilityBadge credibility={credibility} />}
+          {gateText && <MobileChip fill={M.warnFill} ink={M.warnInk}>{gateText}</MobileChip>}
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
@@ -108,6 +111,11 @@ export function ResultsDashboard({
             </Badge>
           )}
           {credibility && <CredibilityBadge credibility={credibility} />}
+          {gateText && (
+            <Badge variant="outline" className="text-[11px] gap-1 border-yellow-400 text-yellow-700 bg-yellow-50">
+              {gateText}
+            </Badge>
+          )}
         </div>
       )}
 

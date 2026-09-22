@@ -18253,6 +18253,84 @@ Handoff to next WP:
   them raw. That is correct data with no label, and WP 8's export work should
   decide their presentation there.
 
+### Audit 2026-09-22 · WP 5 — the failure-swallowing class · 2026-09-22 · no migration
+
+Previous package promised: WP 2 handed this package `feasibility_warnings`
+("the second warning list nobody renders — the same class WP 5 owns"). WP 1
+measured F-19 as LATENT in production: 0 of 26 runs `gate_skipped`, and the
+largest project per gate table is 2 202 rows against a 50 000 ceiling. The
+brief ranks F-08 the worst finding in the audit by consequence.
+
+This package found: **F-08 is exactly as the audit described, and the code
+already knew.** The §4 D69 comment in `datamap.py` warned that one wrong column
+name "would leave every customer on the engine defaults and look exactly like the
+defect being fixed". It could not close that, because the function it described
+returned `[]` for both an empty table and a read that never happened.
+
+**Per finding:**
+
+- **F-08 (read half) — FIXED: a read error fails the run.** `rows()` now raises
+  `ProjectReadError` naming the table and the cause on any transport failure,
+  non-200, non-JSON or non-list body. A 200 with `[]` is still an empty table.
+  The worker already marks a run `failed` with the exception's message when
+  `load_project_data` raises, so no worker change was needed. `ensure_item_masters`
+  stays best-effort, because a failure there changes no value the run reads
+  (§4 D166 names and simulates master-less materials). It is now LOGGED instead of
+  swallowed. **Gate:** `sim-worker/tests/test_datamap_reads.py`, 7 cases: 401/404/
+  500/503, transport reset, non-list body, legitimately empty. **Mutation:** a
+  non-200 returning `[]` again → 4 red.
+- **F-08 (the 1.0 half) — DECIDED: no demand is not measured, not 100%.** The
+  window fill rate is NaN when the window holds no demand, and the bridge maps it
+  to null. The weekly series keeps 1.0 for a week with no demand: nothing was
+  unmet that week, and TTR's band (WP 3) is built on it. `aggregate_mean_ci`
+  now excludes non-finite replications, so `n` counts measurements, and a KPI no
+  replication measured aggregates to **NaN, not 0.0**. The old empty-set 0.0 would
+  have read as a measured zero. Sequential-CI stopping ends on an empty measured set
+  instead of running to 200 replications on nothing; a single measured value still
+  extends as before. The KPI table's "not measured" row (WP 2) names the reason.
+  `ENGINE_VERSION` 0.2.4 → **0.2.5**. **Gate:** `scsim/tests/test_zero_demand.py`.
+  **Mutations:** restoring `else 1.0` → red; dropping the finite filter → 2 red.
+- **F-19(a) — FIXED: `gate_skipped` is shown beside the credibility badge**, on
+  both skins, via `gateNotice(run)` (`src/lib/sim/gateNotice.ts`). The column was
+  always fetched (`select("*")`) and simply never typed or read. **Gate:**
+  `gateNotice.test.ts`, which also asserts `ResultsDashboard` renders it on both
+  skins, so the notice cannot be computed and then dropped.
+- **F-19(b) — FIXED: a graded slice is a `warn`.** `runValidationGate` pushes a
+  `dataset.truncated` finding naming the tables and the ceiling, so the run needs
+  the same acknowledgement as any other warn. `gradedResultNote` beside it has
+  said this to the AI tool since it was written; the gate that decides dispatch
+  never did. **Gate:** `gateTruncation.test.ts`, run under vitest because no
+  session has Deno and vitest already imports `_shared` modules.
+  **Mutation:** finding removed → red.
+- **WP 2's handoff — CLOSED.** The engine's compile-time policy
+  `feasibility_warnings` join `mapping_warnings` (`_feasibility_warnings` in the
+  bridge). The separate key stays on the output for any caller that reads it.
+  **Gate:** `test_scsim_bridge.py`.
+
+Discovered:
+- **`ResultsDashboard` fabricates a disruption schedule.** When the scenario is not
+  passed but `_meta.disruption_count` is, it draws N placeholder events of 40%, 5
+  days, day 10: numbers with no source, drawn as if they were the run's (T1).
+  → affects **audit WP 4**, which owns `ResultsDashboard` (F-07). No plan edit
+  beyond this line.
+- **A sidecar cites line numbers in `useSimulationRun.tsx`, and R12 caught the
+  three lines this package added** (`run_replications.surfaces`: 121/239 →
+  124/242). That is the rule working; it is also why a lineage citation should
+  one day name a symbol rather than a line.
+
+Baseline numbers:
+- `ENGINE_VERSION` 0.2.4 → **0.2.5** (generated pages move one line each; `pipeline_schema.json`
+  re-frozen on `engine_version` only — no phase or hook moved, so no ADR, as in WP 3)
+- tests: scsim 276 → **279**; sim-worker 100 → **108**; vitest 980 → **986**
+- `npm run lint`: typecheck 21/21 held · `check:docs` · `audit:ui` 0 new · eslint red on `main` and unchanged
+  (the two errors in `validationGate.ts` are in its loader, lines this package does not touch)
+
+Handoff to next WP:
+- **WP 4 inherits two display defects in `ResultsDashboard`**: F-07 (it never
+  reads `run.status`) and the fabricated schedule above. A run that fails on a
+  read now reaches it as `failed`, with a message naming the table, which is only
+  honest if the dashboard reads the status.
+
 ---
 
 ### WP 6.5a — Publish `ingest-file` · 2026-09-22 · no migration

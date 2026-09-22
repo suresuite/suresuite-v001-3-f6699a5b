@@ -15,7 +15,9 @@ class KpiSpec:
 KPI_DICTIONARY: tuple[KpiSpec, ...] = (
     KpiSpec("fill_rate", "FR",
             "Value-weighted served demand: Σ u_p·served_p / Σ u_p·D_p over the analysis "
-            "window (Eq. 10); weekly FR[t] recorded in the trace.", "%"),
+            "window (Eq. 10); weekly FR[t] recorded in the trace. NOT MEASURED (NaN → null) "
+            "when the window holds no demand — never a perfect 100%; a week with no demand "
+            "keeps FR[t] = 1.", "%"),
     KpiSpec("lost_sales_value", "—", "Σ u_p · L_p over the window.", "€"),
     KpiSpec("cost_of_resilience", "C^res",
             "mat-SS holding + backup premiums + multi-sourcing premiums + expediting + "

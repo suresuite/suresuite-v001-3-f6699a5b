@@ -30,7 +30,12 @@ def compute_replication_kpis(
     demand_value = float(tr.demand_value[w].sum())
     fulfilled_value = float(tr.fulfilled_value[w].sum())
     produced_value = float(tr.revenue_value[w].sum())
-    fill_rate = fulfilled_value / demand_value if demand_value > 0 else 1.0
+    # No demand in the window → no fill rate, not a perfect one (audit F-08).
+    # The WEEKLY series keeps 1.0 for a week with no demand (nothing was unmet
+    # that week, and TTR's band depends on it); a WINDOW with none is not
+    # measured, and NaN is the engine's "not measured" (the bridge maps it to
+    # null). The old 1.0 is what a failed demand read reported as 100% service.
+    fill_rate = fulfilled_value / demand_value if demand_value > 0 else float("nan")
 
     costs = ctx.cost.total_by_component(t_w, window_end)
     c_res = float(sum(costs.values()))

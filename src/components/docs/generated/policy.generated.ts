@@ -1064,11 +1064,11 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "reaches NO scsim field, and is read only by the FROZEN legacy engine (`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field is editable, stored and hashed into `policy_hash` while the strategic engine ignores it — and no catalog policy is planned that would change that. Evidence: sim-worker/sim_worker/datamap.py:107."
+      "reaches NO scsim field, and is read only by the FROZEN legacy engine (`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field is editable, stored and hashed into `policy_hash` while the strategic engine ignores it — and no catalog policy is planned that would change that. Evidence: sim-worker/sim_worker/datamap.py:110."
     ],
     "breakClass": "legacy-only",
     "breakEvidence": [
-      "sim-worker/sim_worker/datamap.py:107"
+      "sim-worker/sim_worker/datamap.py:110"
     ]
   },
   {

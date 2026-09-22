@@ -128,7 +128,7 @@
       "reason": "Empty means unlimited (a valid modeling choice) \u2014 but partial-magnitude supplier disruptions need a finite capacity to throttle, else they degrade to full outages."
     }
   ],
-  "engine_version": "0.2.4",
+  "engine_version": "0.2.5",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -1079,7 +1079,7 @@
   },
   "kpis": [
     {
-      "definition": "Value-weighted served demand: \u03a3 u_p\u00b7served_p / \u03a3 u_p\u00b7D_p over the analysis window (Eq. 10); weekly FR[t] recorded in the trace.",
+      "definition": "Value-weighted served demand: \u03a3 u_p\u00b7served_p / \u03a3 u_p\u00b7D_p over the analysis window (Eq. 10); weekly FR[t] recorded in the trace. NOT MEASURED (NaN \u2192 null) when the window holds no demand \u2014 never a perfect 100%; a week with no demand keeps FR[t] = 1.",
       "name": "fill_rate",
       "symbol": "FR",
       "unit": "%"
