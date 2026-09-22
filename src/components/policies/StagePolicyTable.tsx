@@ -49,6 +49,7 @@ import {
   getEffectiveValue as getEffectiveValueShared,
   isPrefillPersistable,
   resolveCell,
+  substitutionNote,
 } from "@/lib/policies/resolveEffective";
 import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
 import { groupHasPrimary as groupHasPrimaryFor, groupKeyFor, lineNeedsInput } from "@/lib/policies/stageGuards";
@@ -60,6 +61,7 @@ import { ValueChainPopover, type ValueChainTarget } from "@/components/policies/
 import { sourceFor } from "@/lib/trust/valueChain";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useItemMasters, type ItemMasterTable } from "@/hooks/useItemMasters";
+import { useDerivedMaps } from "@/hooks/useDerivedMaps";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
 import type { StageRowsQuery } from "@/hooks/useStageGuards";
@@ -194,10 +196,21 @@ export function StagePolicyTable({
     materials,
     products,
     suppliers,
-    derived,
+    derived: derivedEconomics,
+    lanes,
     saveRows,
     error: mastersError,
   } = useItemMasters(projectId);
+  // The economics maps plus the capacity chain, which needs the bundle and its
+  // overrides as well as the lanes — assembled by the one hook both grid
+  // surfaces call, never per surface (§4 D167).
+  const derived = useDerivedMaps({
+    derived: derivedEconomics,
+    products,
+    outbound: lanes.outbound,
+    defaults,
+    overrides,
+  });
   const { snapshot: snapshotDataset } = useDatasetVersion(projectId);
   const masterRowById = useMemo(
     () => ({
@@ -1283,10 +1296,7 @@ export function StagePolicyTable({
           // the product decides what a number MEANS, and D26 is the record of
           // what the shape costs: two implementations of the D1 prefill rule,
           // both unit-tested, one dead, the suite green while only one ran.
-          const {
-            cellValue, liveDefault, provenance: prov, edited,
-            placeholder: cellPlaceholder, placeholderTitle,
-          } = resolveCell({
+          const resolved = resolveCell({
             rowKey,
             row: r,
             col,
@@ -1300,6 +1310,14 @@ export function StagePolicyTable({
             scope: spec.scope,
             familyDefault: getDefault,
           });
+          const {
+            cellValue, liveDefault, provenance: prov, edited,
+            placeholder: cellPlaceholder, placeholderTitle, supersededBy,
+          } = resolved;
+          // T1/T2 — one sentence, assembled from the registry's own chain, used
+          // by the hover AND by the popover so the two cannot disagree about
+          // what stood in for this number (§4 D167).
+          const substitution = substitutionNote(resolved);
 
           const firms = r.__firms_available as string[] | undefined;
           const opts = enumOptionsFor(col);
@@ -1409,13 +1427,16 @@ export function StagePolicyTable({
                     integer={fc.kind === "int"}
                     unit={fc.unit}
                     placeholder={cellPlaceholder}
-                    title={placeholderTitle}
+                    title={substitution ?? placeholderTitle}
+                    superseded={!!supersededBy}
                     onCommit={commit}
                     dot={
                       <ValueChainPopover
                         target={target}
                         provenance={prov}
                         displayed={shown}
+                        substitution={substitution}
+                        superseded={!!supersededBy}
                         userId={user?.id ?? null}
                       >
                         <ProvenanceDotButton p={prov} label={col.label} />

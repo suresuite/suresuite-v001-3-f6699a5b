@@ -103,6 +103,22 @@ export interface ValueChainInput {
   /** What the grid is showing, already formatted. */
   displayed: string;
   /**
+   * The substitution behind this cell, when there is one (§4 D167).
+   *
+   * `provenance` says a fallback answered; this says WHICH, in a sentence the
+   * resolver assembles from the registry's declared chain
+   * (`resolveEffective.ts::substitutionNote`). Also carries the OTHER case the
+   * dot cannot express: a cell the user can edit and the engine will not read,
+   * because an item-master column outranks it.
+   *
+   * Optional, and an absent one is rendered as "no substitution — the value is
+   * the value", never as a gap: a cell that resolves straight from data has
+   * nothing missing here.
+   */
+  substitution?: string | null;
+  /** True when the engine reads another field instead of this one (`shadowed_by`). */
+  superseded?: boolean;
+  /**
    * Whether this cell's value can come from an UPLOAD at all.
    *
    * Seven grid columns are master-backed (`ColSpec.master`) and therefore land
@@ -294,6 +310,19 @@ export function buildValueChain(input: ValueChainInput): ValueChain {
   });
 
   // ── engine ───────────────────────────────────────────────────────────────
+  // T2 — the substitution is visible at the POINT OF DISPLAY, and this popover
+  // is that point. Rendered before the engine hop because "the run uses a
+  // different number than this cell" outranks "here is what the engine does
+  // with this cell" (§4 D167).
+  push({
+    key: "substitution",
+    label: input.superseded ? "The run does NOT use this cell" : "How this value was arrived at",
+    part: "engine",
+    value: input.substitution ?? null,
+    absentBecause: input.substitution
+      ? undefined
+      : "nothing stood in for this value — it is the number itself, not a substitute",
+  });
   const engineHop = chain?.hops.find((h) => h.kind === "engine") ?? null;
   push({
     key: "engine", label: "In the engine", part: "engine",

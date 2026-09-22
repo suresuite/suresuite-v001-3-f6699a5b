@@ -2,6 +2,7 @@ import { FIELD_LABELS, type PolicyBundle, type PolicyFamily } from "./schemas";
 import { fieldEngineStatus } from "./fieldStatus";
 import type { StageKey } from "./stages";
 import type { FitCol } from "./columnFit";
+import { emptyMeansFor } from "./registryAccess";
 
 export interface ColSpecCtx {
   fulfillmentStrategy?: string;
@@ -77,6 +78,16 @@ export interface StageTableSpec {
 }
 
 const lbl = (f: string) => FIELD_LABELS[f] ?? f;
+
+/** `master.nullMeans` from the engine's own `empty_means` declaration.
+ *  `undefined` when the registry declares none, which keeps the "—" placeholder
+ *  — a column whose blank has no declared meaning must not be given one here. */
+const registryNullMeans = (
+  field: string,
+): { token: string; title: string } | undefined => {
+  const em = emptyMeansFor(field);
+  return em ? { token: em.token, title: em.meaning } : undefined;
+};
 const col = (
   field: string,
   family: PolicyFamily,
@@ -198,12 +209,14 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
           // `item_master.sql:44` — "NULL = ∞; finite enables partial capacity
           // cuts". Measured at 60 of 60 suppliers null in the §15 project, every
           // one of which the grid used to report as a capacity of zero.
-          nullMeans: {
-            token: "∞",
-            title:
-              "No capacity limit. This supplier's capacity is empty, and an empty " +
-              "capacity means unlimited — enter a number to model a finite one.",
-          },
+          //
+          // READ FROM THE ENGINE SINCE WP 9.3 (§4 D167). The token and the
+          // sentence were written out here, which made this file the only
+          // machine-readable statement of a fact about the ENGINE — the
+          // registry said "unlimited" in prose one field over and no surface
+          // could read it. `suppliers.capacity_per_week` now declares an
+          // `empty_means` and this is the reader.
+          nullMeans: registryNullMeans("suppliers.capacity_per_week"),
         },
       }),
       col("reliability_score", "sourcing", {
@@ -264,6 +277,15 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
         master: { table: "products", field: "demand_mean", idFrom: "product_id" },
       }),
       col("capacity_units_per_day", "production", { defaultWhenMissing: 1000 }),
+      // THE OTHER HALF OF THE ARITHMETIC, AND IT HAD NO COLUMN (§4 D167). The
+      // engine builds a product's weekly capacity as units/day × 7 ×
+      // utilization_cap_pct, and the grid rendered the first factor and hid the
+      // second — so a planner saw 1 000/day become 5 950/week with nothing on
+      // screen holding the 0.85. `defaultWhenMissing` is deliberately absent:
+      // the Zod bundle declares 85 and `bundleVal` is read first, so a second
+      // number here could only ever speak by disagreeing (the WP 0.1 gap
+      // check's second divergence).
+      col("utilization_cap_pct", "production"),
       // Fulfillment (backorder, allocation, service level) is a customer-stage
       // concern only — the engine reads it from the project fulfillment default,
       // never from a plant node — so no fulfillment column is offered here.
@@ -442,6 +464,7 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   production_capacity: { sub: "units / wk · master", w: 100, kind: "int", prio: 5 },
   demand_mean: { sub: "units / wk · master", w: 100, kind: "int", prio: 4 },
   capacity_units_per_day: { sub: "units / day", w: 96, kind: "int", keep: true },
+  utilization_cap_pct: { sub: "% of line capacity", w: 84, kind: "int", unit: "%", prio: 6 },
   allocation_priority_weight: { sub: "weight", w: 76, kind: "num", dec: 2, prio: 9 },
   // ---- plant · finished goods
   fg_safety_stock: { sub: "sizing · P-P.4", w: 132, kind: "chip", keep: true, filterable: false, align: "left" },
@@ -479,6 +502,7 @@ export const SHORT_LABEL: Record<string, string> = {
   production_capacity: "Prod. capacity",
   demand_mean: "Demand mean",
   capacity_units_per_day: "Line capacity",
+  utilization_cap_pct: "Utilization cap",
   allocation_priority_weight: "Allocation wt.",
   fg_safety_stock: "FG safety stock",
   fg_service_level_target: "FG service",

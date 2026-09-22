@@ -60,7 +60,17 @@ export const KPI_DISPLAY: KpiDisplay[] = [
   { key: "avg_fg_value", label: "Average finished-goods inventory (value)", format: money, higherIsBetter: null },
   { key: "avg_on_hand_units", label: "Average material inventory (units)", format: units, higherIsBetter: null },
   { key: "avg_fg_units", label: "Average finished-goods inventory (units)", format: units, higherIsBetter: null },
-  { key: "capacity_utilization", label: "Capacity utilization", format: pct1, higherIsBetter: null },
+  // Capacity (WP 9.3 / §4 D167). `capacity_utilization` was named here from the
+  // start and was NaN on every run that was not a full-debug inspection, so the
+  // label described a row nobody ever saw. The three beside it are what turn
+  // "how hard did it run" into "did it BIND, and for whom" — a utilization can
+  // be 0.99 with nothing refused, and a count above zero is demand the capacity
+  // actually turned away. `higherIsBetter` is null for the utilizations (high is
+  // efficient AND fragile) and false for the counts, which are refusals.
+  { key: "capacity_utilization", label: "Plant capacity utilization", format: pct1, higherIsBetter: null },
+  { key: "supplier_capacity_utilization", label: "Supplier capacity utilization", format: pct1, higherIsBetter: null },
+  { key: "products_capacity_bound", label: "Products capacity held back", format: units, higherIsBetter: false },
+  { key: "suppliers_capacity_bound", label: "Suppliers capacity held back", format: units, higherIsBetter: false },
   // The total the ten components below sum to — P-X.1's own measure.
   { key: "cost_of_resilience", label: "Cost of resilience", format: money, higherIsBetter: false },
   // ── the ten cost components (`scsim/scsim/core/context.py::COST_COMPONENTS`) ──

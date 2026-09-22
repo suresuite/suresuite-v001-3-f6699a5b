@@ -88,6 +88,8 @@ import {
 import { ksStatistic, welchTTest, welchWarmup, mser5 } from "@/lib/sim/validationStats";
 import { ConvergencePlot } from "@/components/sim/ConvergencePlot";
 import { InventoryOverTime } from "@/components/sim/InventoryOverTime";
+import { CapacityOverTime, type CapacityBinding } from "@/components/sim/CapacityOverTime";
+import { CapacityReadinessPanel } from "@/components/sim/CapacityReadiness";
 import { ItemSeriesExplorer } from "@/components/sim/ItemSeriesExplorer";
 import { ReplicationSeedExplorer } from "@/components/sim/ReplicationSeedExplorer";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
@@ -136,7 +138,12 @@ const KPI_OPTIONS = [
   { id: "demand_value", label: "Demand value", unit: "€" },
   { id: "lost_units", label: "Lost units", unit: "units" },
   { id: "lost_inbound_units", label: "Lost inbound units", unit: "units" },
-  { id: "capacity_utilization", label: "Capacity utilization", unit: "%" },
+  // Capacity (§4 D167). These four were all NaN or absent on every ordinary
+  // run until WP 9.3 made the measurement always-on.
+  { id: "capacity_utilization", label: "Plant capacity utilization", unit: "%" },
+  { id: "supplier_capacity_utilization", label: "Supplier capacity utilization", unit: "%" },
+  { id: "products_capacity_bound", label: "Products capacity held back", unit: "count" },
+  { id: "suppliers_capacity_bound", label: "Suppliers capacity held back", unit: "count" },
   { id: "cost_of_resilience", label: "Cost of resilience", unit: "€" },
   { id: "cost_ss_holding", label: "Cost — safety-stock holding", unit: "€" },
   { id: "cost_backup_premium", label: "Cost — backup premium", unit: "€" },
@@ -1465,6 +1472,20 @@ export function RunValidateStage({
                 )}
               </div>
             )}
+            {/* What capacity the run will use, and whether it is real (§4 D167).
+                Below the findings rather than among them: a product with no
+                capacity figure is NOT a finding — the engine resolves it, and
+                the manifest grades that resolution `recommended`. What the
+                findings cannot say is that the number it resolves to is
+                max(2·demand, 1000), chosen so capacity never binds, so the run
+                about to be dispatched cannot answer "could we have made it". */}
+            <CapacityReadinessPanel
+              products={itemMasters.products}
+              suppliers={itemMasters.suppliers}
+              outbound={itemMasters.lanes.outbound}
+              defaults={defaults}
+              overrides={overrides}
+            />
           </StepShell>
         )}
 
@@ -2698,7 +2719,10 @@ function MultiRunResultsPanel({
 
 function fmtKpi(id: string, v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
-  if (id === "fill_rate" || id === "capacity_utilization") return `${(v * 100).toFixed(1)}%`;
+  if (id === "fill_rate" || id === "capacity_utilization" || id === "supplier_capacity_utilization")
+    return `${(v * 100).toFixed(1)}%`;
+  if (id === "products_capacity_bound" || id === "suppliers_capacity_bound")
+    return v.toFixed(v % 1 === 0 ? 0 : 1);
   return Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(2);
 }
 
@@ -2926,6 +2950,20 @@ function EngineOutputSummary({
             and called it "inventory" — the finished-goods series existed all
             along and was never published (G19 / §4 D164). */}
         <InventoryOverTime reps={reps} warmupWeeks={warmupWeeks} height={200} />
+        {/* 1b — capacity: what the engine offered each week and what the run
+            used, with the per-entity binding behind it (§4 D167). The second
+            thing a modeler checks and the one this page could not answer: the
+            sanity tile below printed "not recorded" for `capacity_utilization`
+            on every run, because the KPI read a full-debug-only matrix. */}
+        <CapacityOverTime
+          reps={reps}
+          binding={
+            ((run.aggregate_kpis as unknown as { _meta?: { capacity_binding?: CapacityBinding } } | null)
+              ?._meta?.capacity_binding) ?? null
+          }
+          warmupWeeks={warmupWeeks}
+          height={180}
+        />
         {/* 2 — the financial statement from the persisted per-rep KPIs. */}
         <FinancialStatement reps={reps} />
         {/* 3 — the remaining persisted weekly series. */}
@@ -3015,12 +3053,40 @@ function SanityScalars({ reps }: { reps: Replication[] }) {
     return v.length > 0 ? v.reduce((a, b) => a + b, 0) / v.length : null;
   };
   const util = avg("capacity_utilization");
+  const supUtil = avg("supplier_capacity_utilization");
+  const prodBound = avg("products_capacity_bound");
+  const supBound = avg("suppliers_capacity_bound");
   const lostInbound = avg("lost_inbound_units");
   return (
     <div className={cn(SURFACE, "grid grid-cols-[repeat(auto-fit,minmax(min(100%,120px),1fr))] gap-2 bg-[#fafafa] px-2.5 py-1.5")}>
+      {/* "NOT RECORDED" USED TO BE THE ONLY ANSWER THIS TILE EVER GAVE — §4 D167.
+          `capacity_utilization` read a full-debug-only matrix, so every
+          ordinary run reported NaN, the bridge wrote null, and this printed
+          "not recorded" for the quantity the engine clips production against
+          every week. It is a number now, and "not recorded" here means what it
+          says: a run from before the measurement existed. */}
       <Stat
-        label="Capacity utilization"
+        label="Plant capacity utilization"
         value={util != null ? fmtKpi("capacity_utilization", util) : "not recorded"}
+      />
+      <Stat
+        label="Supplier capacity utilization"
+        value={
+          supUtil != null
+            ? fmtKpi("capacity_utilization", supUtil)
+            : "no finite capacity"
+        }
+      />
+      {/* Utilization and BINDING are different questions, so they are different
+          tiles: a plant at 99% that refused nothing is healthy, and a plant at
+          60% that turned demand away in the weeks that mattered is not. */}
+      <Stat
+        label="Products capacity held back"
+        value={prodBound != null ? prodBound.toFixed(prodBound % 1 === 0 ? 0 : 1) : "—"}
+      />
+      <Stat
+        label="Suppliers capacity held back"
+        value={supBound != null ? supBound.toFixed(supBound % 1 === 0 ? 0 : 1) : "—"}
       />
       <Stat
         label="Lost inbound units"

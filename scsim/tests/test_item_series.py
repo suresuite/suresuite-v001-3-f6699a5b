@@ -67,9 +67,20 @@ def test_item_series_is_behavior_neutral():
     insp = run_scenario(_scenario(single_chain_network(), model_seeds=1,
                                   trace_verbosity=TraceVerbosity.FULL_DEBUG))
     for key, agg in base.aggregates.items():
-        if key == "capacity_utilization":
-            continue  # measured only with full-debug matrices (NaN otherwise)
-        assert agg["mean"] == insp.aggregates[key]["mean"], key
+        # THE `capacity_utilization` SKIP IS GONE, AND THAT IS THE POINT (WP 9.3).
+        # It read `trace.Q`, so it was NaN on the ordinary run and a number on
+        # the inspection one — a KPI that was NOT behaviour-neutral, excused by
+        # the test built to catch exactly that (§4 D167). It is computed from
+        # the always-on weekly capacity series now, so the two runs agree.
+        #
+        # `supplier_capacity_utilization` is NaN on BOTH when no supplier
+        # declares a finite capacity, which is a measurement that does not
+        # exist rather than one that disagrees — so the comparison is
+        # NaN-aware instead of skipped.
+        mine, theirs = agg["mean"], insp.aggregates[key]["mean"]
+        if np.isnan(mine) and np.isnan(theirs):
+            continue
+        assert mine == theirs, key
     assert np.array_equal(base.fr_series, insp.fr_series)
 
 
