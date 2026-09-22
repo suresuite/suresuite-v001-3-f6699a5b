@@ -2928,6 +2928,234 @@ async function graphLayerWhoWroteIt() {
   });
 }
 
+// ── THE 2026-09-22 USER AUDIT — WP 1: the shape, measured before anything moves ──
+//
+// The audit (F-01…F-37) was written against the REPOSITORY, and said so: no
+// browser, no database, no worker. Five of its findings cannot be sized and three
+// cannot be designed until production answers the questions below — which engine
+// actually runs (F-18), how many stored runs carry the fabricated 1.0 baseline and
+// the censored TTR sentinel (F-03/F-04/F-05), whether `holding_cost_pct` is a
+// fraction everywhere (F-21), whether any upload ever landed (F-01), and whether
+// `node_list.echelon` is in production (F-09). Every probe is every-project (D42)
+// and each is a `tryQ`, so a column the audit guessed wrong reports as a failure
+// line rather than killing the run.
+//
+// ONE PROBE IS NOT SQL. F-16 turns on whether an UNDEPLOYED function is absent or
+// a stale build is live, and SQL cannot see edge functions. The Management API's
+// `GET /v1/projects/{ref}/functions` can, with the token this script already holds.
+// It is a GET — read-only by the verb, as `assertReadOnly` makes the SQL read-only
+// by the keyword — and `apiGet` refuses to be anything else.
+async function apiGet(path) {
+  queryCount += 1;
+  const res = await fetch(`${API}/${ref}${path}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const text = await res.text();
+  if (!res.ok) return { error: `HTTP ${res.status}: ${text.slice(0, 300)}` };
+  try {
+    return { rows: JSON.parse(text) };
+  } catch {
+    return { error: `non-JSON response: ${text.slice(0, 200)}` };
+  }
+}
+
+async function userAuditShape() {
+  section("Audit 2026-09-22 · WP 1 — the shape, before anything moves (F-01…F-37)");
+
+  // Q5 — F-18: which engine ran. `worker-legacy` is the frozen engine.
+  out("**Q5 · F-18 — which engine produced the stored runs** (every status):");
+  report("Q5", await tryQ(`
+    select coalesce(nullif(code_version, ''), '(blank)') as code_version, status,
+           count(*)::int as runs,
+           count(*) filter (where rep_count_done > 0)::int as claiming_reps,
+           min(created_at)::date as first_seen, max(created_at)::date as last_seen
+      from public.simulation_runs
+     group by 1, 2 order by runs desc`), (r) => out(...table(r)));
+
+  // Q6 — F-18: rep_count_done with no evidence rows behind it.
+  out("", "**Q6 · F-18 — `rep_count_done` against the replication rows that exist:**");
+  report("Q6", await tryQ(`
+    with per as (
+      select r.id, coalesce(nullif(r.code_version, ''), '(blank)') as code_version,
+             r.status, r.rep_count_done, count(rr.id)::int as persisted
+        from public.simulation_runs r
+        left join public.run_replications rr on rr.run_id = r.id
+       group by r.id)
+    select code_version, status, count(*)::int as runs,
+           count(*) filter (where persisted <> rep_count_done)::int as count_disagrees,
+           count(*) filter (where persisted = 0 and rep_count_done > 0)::int as claims_over_empty,
+           sum(rep_count_done)::int as claimed, sum(persisted)::int as persisted
+      from per group by 1, 2 order by runs desc`), (r) => out(...table(r)));
+
+  // Q2 — F-04: the fabricated 1.0 baseline.
+  out("", "**Q2 · F-04 — replications whose `pre_disruption_fill_rate` is exactly 1.0**",
+      "(the substituted value when `pre` is empty; a genuine perfect pre-window is also",
+      "1.0, so Q1 below is what separates the two):");
+  report("Q2", await tryQ(`
+    select count(distinct rr.run_id)::int as runs_with_baseline,
+           count(*)::int as reps_with_baseline,
+           count(*) filter (where (rr.kpis->>'pre_disruption_fill_rate')::numeric = 1)::int as reps_at_exactly_1,
+           count(distinct rr.run_id) filter (where (rr.kpis->>'pre_disruption_fill_rate')::numeric = 1)::int as runs_touched
+      from public.run_replications rr
+     where rr.kpis ? 'pre_disruption_fill_rate'
+       and jsonb_typeof(rr.kpis->'pre_disruption_fill_rate') = 'number'`), (r) => out(...table(r)));
+
+  // Q3 — F-05: TTR/TTS censored at the window.
+  out("", "**Q3 · F-05 — TTR/TTS values, and how many sit at the censoring sentinel**",
+      "(the engine window is 52 weeks, so a value ≥ 52 is \"never recovered\"):");
+  report("Q3", await tryQ(`
+    select count(distinct rr.run_id)::int as runs,
+           count(*)::int as reps,
+           count(*) filter (where (rr.kpis->>'ttr_weeks')::numeric >= 52)::int as ttr_at_window,
+           count(*) filter (where (rr.kpis->>'tts_weeks')::numeric >= 52)::int as tts_at_window,
+           count(*) filter (where (rr.kpis->>'ttr_weeks')::numeric = 0)::int as ttr_zero,
+           round(avg((rr.kpis->>'ttr_weeks')::numeric), 2) as mean_ttr,
+           max((rr.kpis->>'ttr_weeks')::numeric) as max_ttr
+      from public.run_replications rr
+     where rr.kpis ? 'ttr_weeks' and jsonb_typeof(rr.kpis->'ttr_weeks') = 'number'`), (r) => out(...table(r)));
+
+  // Q1 — F-03: disruptions that start inside the warm-up. The audit named
+  // `sim_scenarios`; the table is `scenarios` (the export reads `.from("scenarios")`).
+  // `project_map` maps start_day → max(1, round(d/7)); both the RUN's detected
+  // warm-up and the SCENARIO's authored one are compared, because a scenario that
+  // never ran is where the next user meets the default.
+  out("", "**Q1 · F-03 — scheduled disruptions whose mapped start week is inside the warm-up:**");
+  report("Q1 runs", await tryQ(`
+    select count(distinct r.id)::int as done_runs_with_disruptions,
+           count(*)::int as disruptions,
+           count(*) filter (where greatest(1, round((d->>'start_day')::numeric / 7.0)) <= r.warmup_detected_at)::int as start_in_detected_warmup,
+           count(distinct r.id) filter (where greatest(1, round((d->>'start_day')::numeric / 7.0)) <= r.warmup_detected_at)::int as runs_affected,
+           min(r.warmup_detected_at) as min_t_w, max(r.warmup_detected_at) as max_t_w,
+           round(avg(r.warmup_detected_at), 1) as mean_t_w
+      from public.simulation_runs r
+      join public.scenarios s on s.id = r.scenario_id
+     cross join lateral jsonb_array_elements(
+       case when jsonb_typeof(s.disruption_schedule) = 'array' then s.disruption_schedule else '[]'::jsonb end) d
+     where r.status = 'done' and r.warmup_detected_at is not null
+       and (d->>'start_day') ~ '^[0-9.]+$'`), (r) => out(...table(r)));
+  report("Q1 scenarios", await tryQ(`
+    select count(distinct s.id)::int as scenarios_with_disruptions,
+           count(*)::int as disruptions,
+           count(*) filter (where (d->>'start_day')::numeric = 10 and (d->>'duration_days')::numeric = 5)::int as still_the_default,
+           count(*) filter (where (d->>'start_day')::numeric <= coalesce(s.warmup_days, 0))::int as start_inside_authored_warmup,
+           count(*) filter (where (d->>'duration_days')::numeric < 7)::int as shorter_than_one_tick
+      from public.scenarios s
+     cross join lateral jsonb_array_elements(
+       case when jsonb_typeof(s.disruption_schedule) = 'array' then s.disruption_schedule else '[]'::jsonb end) d
+     where (d->>'start_day') ~ '^[0-9.]+$'`), (r) => out(...table(r)));
+
+  // Q4 — F-06/F-07/F-30: cancelled-then-done, stuck, and partial results on failure.
+  out("", "**Q4 · F-06/F-07/F-30 — run states that should not exist:**");
+  report("Q4", await tryQ(`
+    select count(*) filter (where status = 'running' and coalesce(started_at, created_at) < now() - interval '2 hours')::int as running_over_2h,
+           count(*) filter (where status = 'queued' and created_at < now() - interval '2 hours')::int as queued_over_2h,
+           count(*) filter (where status in ('failed','cancelled') and rep_count_done > 0)::int as failed_or_cancelled_with_reps,
+           count(*) filter (where status = 'cancelled')::int as cancelled,
+           count(*) filter (where status = 'done' and error_message ilike '%cancel%')::int as done_mentioning_cancel,
+           count(*)::int as total
+      from public.simulation_runs`), (r) => out(...table(r)));
+
+  // Q7 — F-19(a): how often the gate failed open.
+  out("", "**Q7 · F-19(a) — runs dispatched with the gate skipped:**");
+  report("Q7", await tryQ(`
+    select count(*)::int as runs, count(*) filter (where gate_skipped)::int as gate_skipped_runs,
+           count(distinct project_id) filter (where gate_skipped)::int as projects
+      from public.simulation_runs`), (r) => out(...table(r)));
+
+  // Q8 — F-19(b): the 50 000-row gate ceiling. Reported as the LARGEST project per
+  // table rather than only those over, so a zero is a margin and not a silence.
+  out("", "**Q8 · F-19(b) — the largest project per gate table against the 50 000-row ceiling:**");
+  report("Q8", await tryQ(`
+    select t, max(n)::int as largest_project_rows, count(*) filter (where n >= 50000)::int as projects_over
+      from (
+        select 'inbound_logistics' as t, count(*) as n from public.inbound_logistics group by project_id
+        union all select 'outbound_logistics', count(*) from public.outbound_logistics group by project_id
+        union all select 'bom_multi_level', count(*) from public.bom_multi_level group by project_id
+        union all select 'bom_single_level', count(*) from public.bom_single_level group by project_id
+        union all select 'materials', count(*) from public.materials group by project_id
+      ) x group by t order by t`), (r) => out(...table(r)));
+
+  // Q9/Q10 — F-09: has `echelon` landed, and what does it say?
+  out("", "**Q9/Q10 · F-09 — `node_list.echelon` in production, beside the legacy `node_type`:**");
+  report("Q10", await tryQ(`
+    select coalesce(echelon, '(null)') as echelon, coalesce(node_type, '(null)') as node_type,
+           count(*)::int as nodes, count(distinct project_id)::int as projects
+      from public.node_list group by 1, 2 order by nodes desc`), (r) => out(...table(r)));
+  report("Q9", await tryQ(`
+    select data_source, count(*)::int as edges,
+           count(*) filter (where bom_depth is null)::int as bom_depth_null,
+           count(*) filter (where level is distinct from bom_depth)::int as level_ne_depth,
+           count(distinct level)::int as distinct_levels, min(level) as min_level, max(level) as max_level
+      from public.supply_chain_data_multi_tier group by 1 order by 1`), (r) => out(...table(r)));
+
+  // Q11 — open question 4 / F-21: is holding_cost_pct a fraction everywhere?
+  out("", "**Q11 · F-21 — `materials.holding_cost_pct`: fraction or percent?** (`project_map` multiplies by 100 and clamps to [5, 50])");
+  report("Q11", await tryQ(`
+    select count(*)::int as rows_set, count(distinct project_id)::int as projects,
+           count(*) filter (where holding_cost_pct > 1)::int as looks_like_a_percent,
+           count(*) filter (where holding_cost_pct > 0 and holding_cost_pct < 0.05)::int as below_clamp_floor,
+           count(*) filter (where holding_cost_pct > 0.5 and holding_cost_pct <= 1)::int as above_clamp_ceiling,
+           min(holding_cost_pct) as min, max(holding_cost_pct) as max
+      from public.materials where holding_cost_pct is not null`), (r) => out(...table(r)));
+
+  // Q12 — open question 9: runs with no hash of their own.
+  out("", "**Q12 · F-11 — runs that carry no binding of their own:**");
+  report("Q12", await tryQ(`
+    select count(*) filter (where graph_hash is null)::int as runs_without_hash,
+           count(*) filter (where dataset_version_id is null)::int as runs_without_dsv,
+           count(*)::int as total
+      from public.simulation_runs where status = 'done'`), (r) => out(...table(r)));
+
+  // Q14 — F-01: did anything ever land through ingest_runs, by any source?
+  out("", "**Q14 · F-01 — every `ingest_runs` row by source, ever:**");
+  report("Q14", await tryQ(`
+    select source_kind, count(*)::int as runs, min(created_at)::date as first, max(created_at)::date as last
+      from public.ingest_runs group by 1 order by runs desc`), (r) => out(...table(r)));
+
+  // Q15 — F-15: project-scoped rows whose project is gone.
+  out("", "**Q15 · F-15 — rows whose project no longer exists** (every table with a `project_id` column):");
+  const tabs = await tryQ(`
+    select c.table_name from information_schema.columns c
+      join information_schema.tables t on t.table_schema = c.table_schema and t.table_name = c.table_name
+     where c.table_schema = 'public' and c.column_name = 'project_id' and t.table_type = 'BASE TABLE'
+     order by 1`);
+  if (tabs.error) {
+    out(`- **Q15** — QUERY FAILED: \`${tabs.error.slice(0, 200)}\``);
+  } else {
+    const names = tabs.rows.map((r) => r.table_name).filter((n) => /^[a-z0-9_]+$/.test(n));
+    const union = names.map((n) =>
+      `select '${n}' as t, count(*)::int as orphans from public.${n} x
+        where x.project_id is not null
+          and not exists (select 1 from public.projects p where p.id::text = x.project_id::text)`).join("\nunion all ");
+    report("Q15", await tryQ(`select * from (${union}) o where orphans > 0 order by orphans desc`), (r) => {
+      out(...table(r));
+      out(`- ${names.length} table(s) swept; ${r.length} hold orphaned rows.`);
+    });
+  }
+
+  // F-16 / open question 1: which edge functions production actually serves.
+  out("", "**F-16 · open question 1 — edge functions deployed in production** (Management API, GET):");
+  const fns = await apiGet("/functions");
+  report("functions", fns, (r) => {
+    const rows = (Array.isArray(r) ? r : []).map((f) => ({
+      slug: f.slug, version: f.version, status: f.status, verify_jwt: f.verify_jwt,
+      updated_at: f.updated_at ? new Date(f.updated_at).toISOString().slice(0, 10) : "",
+    })).sort((a, b) => String(a.slug).localeCompare(String(b.slug)));
+    out(...table(rows));
+    let deferred = [];
+    try {
+      const cov = readFileSync(new URL("./coverage.yaml", import.meta.url), "utf8");
+      const block = cov.split(/^functions_not_deployed:/m)[1] ?? "";
+      deferred = [...block.matchAll(/^\s+- fn:\s*(\S+)/gm)].map((m) => m[1]);
+    } catch { /* the register is optional to this read */ }
+    const live = new Set(rows.map((x) => x.slug));
+    for (const fn of deferred) {
+      out(`- \`${fn}\` (registered as not deployed): ${live.has(fn) ? "**A BUILD IS LIVE** — the register is wrong about the product" : "absent"}`);
+    }
+  });
+}
+
 async function main() {
   out(`# PLAN.md §15 — verification SQL, executed`);
   out("");
@@ -2952,6 +3180,7 @@ async function main() {
   await graphLayerBefore();
   await graphLayerWhoWroteIt();
   await wp71Stage0();
+  await userAuditShape();
 
   const project = await pickProject();
   if (!project) {
