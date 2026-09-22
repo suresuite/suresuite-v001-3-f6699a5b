@@ -18909,6 +18909,82 @@ Handoff to next WP:
   `node_list.echelon` once §15 shows the column populated. That removes the
   mirror's only callers.
 
+### Audit 2026-09-22 · WP 9 — one currency, no stub figures, no orphan statistics · 2026-09-22 · no migration
+
+Previous package promised: WP 7 handed F-20, F-34 and F-37 on with nothing
+blocking. WP 6b switched the ENGINE's MSER-5 to the published statistic.
+
+This package found: **WP 6b's switch reached the engine and not the browser.**
+The Run & Validate stage's "mser5" button estimates warm-up in the browser from
+the run's weekly series (`validationStats.mser5`). That code divided the n−1
+sample variance by (n_b − d)², which is the retired statistic. So from 0.2.7 on,
+the button and the engine could name different weeks for the same run. On the
+parity fixture the engine answers 30 and the button answered 25. It is F-37's
+class: a statistical method implemented twice, with nothing comparing the two
+copies. **And the gate for F-37 found a second orphan the audit did not name:**
+`sim_worker/policies.py`, 190 lines of hand-written policy models that nothing
+imports.
+
+**Per finding:**
+
+- **F-20 — FIXED.** One formatter, `src/lib/sim/money.ts`. Its symbol is READ
+  from the engine's declared unit for the money KPIs in the registry export, so
+  it cannot drift from `definitions.py`. Six surfaces wrote their own:
+  `kpiDisplay.money` (`$`, the defect), `NetworkMetricsTable` (`$`),
+  `FirmLevelNetwork` (`$`), and `runQueueLogic`, `RunValidateStage` and
+  `InventoryOverTime` (inline `€`). All six now go through `money.ts`. The admin
+  AI-usage pages keep `$`: that is the provider's billing currency. **Known
+  limit, stated in `money.ts`:** no currency is stored with the data, so `€` is
+  the unit the engine DECLARES, not one read from the project. **Gate:**
+  `oneMoney.test.ts`. It checks the symbol against `definitions.py`, that Results
+  and the run queue format the same revenue identically, and that no file outside
+  the USD-billing list writes its own formatter. **Mutations:** `$` back in
+  `kpiDisplay` → red; a hard-coded symbol → red.
+- **F-34 — FIXED by deletion.** `stubKpiDelta` and `stubPolicyKpiDelta` are gone,
+  and `sim-command` now broadcasts only the command echo. `kpi.delta` has ONE
+  publisher, the worker, tagged `source: "worker"`. **Gate:**
+  `noStubKpis.test.ts`. It also asserts that the worker still publishes, so the
+  gate cannot pass vacuously. **Mutation:** a `kpi.delta` broadcast in
+  `sim-command` → red.
+- **F-37 — FIXED for what is dead, REFUTED for what is not.**
+  - `sim_worker/warmup.py` was imported by nothing, not even the frozen engine.
+    It is deleted, and the audit's off-by-`window//2` goes with it.
+  - `stopping.StoppingRule` was unreferenced and is deleted. `half_width_95`
+    STAYS: the frozen engine's `kpi.aggregate` calls it.
+  - "Most of `kpi.py`" is **refuted**: `ReplicationKpis` and `aggregate` are
+    both imported by `engine.py`. That engine is frozen, not deleted.
+  - `src/lib/sim/warmup.ts`, the browser "mirror" of `warmup.py`, had no
+    importer and is deleted.
+  - **Gate:** `sim-worker/tests/test_no_orphan_module.py` walks the import graph
+    from `__main__` (what `python -m sim_worker` runs) and fails on any module it
+    cannot reach. **Mutation:** restoring `warmup.py` → red.
+  - `policies.py` is the one NAMED exception. Nothing imports it, but the D91
+    break classifier (`chains.mjs`) reads it as SOURCE, and `reorder_point`'s
+    "overridden" class cites its line 41. Deleting it would reclassify a policy
+    break and move that ratchet, which is a change of its own. The exception list
+    fails if it goes stale.
+- **The MSER-5 residue — FIXED.** `validationStats.mser5` now uses White's
+  statistic. **Gate:** `mser5Parity.test.ts`. It pins a series produced by
+  `scsim.stats.warmup.mser5` itself (engine 30, legacy 25) and compares against a
+  from-the-definition reference on 60 series. **Mutation:** the old statistic →
+  2 red.
+
+Discovered:
+- **`main` shipped a stale browser-engine wheel.** a9f7a13 changed
+  `project_map.py` without `build_engine_wheels.sh`. This branch rebuilds the
+  `sim_worker` wheel it changes; the scsim wheel was rebuilt by #268.
+
+Baseline numbers:
+- vitest 1047 → **1056**; sim-worker 116 → **119**; scsim 287 (unchanged)
+- `sim_worker` modules: 14 → **13** (warmup gone); one named unreachable exception (`policies`)
+
+Handoff to next WP:
+- **Owed, unowned:** delete `sim_worker/policies.py` together with the D91
+  classifier's reliance on it. Also a project-level currency, if the product
+  wants anything other than the engine's declared `€`. That is a product
+  decision, not a patch.
+- **WP 10 next**, and it is the last.
+
 ---
 ---
 ## 17. Sequencing

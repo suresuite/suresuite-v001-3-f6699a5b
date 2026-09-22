@@ -68,6 +68,7 @@ import {
   LensAction,
   LensSection,
 } from '@/components/network/MobileLens';
+import { formatMoneyCompact } from '@/lib/sim/money';
 
 
 const TIER_ORDER = ['Tier 1', 'Tier 2', 'Tier 3', 'Plant'] as const;
@@ -1548,7 +1549,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                           <span className="text-sm text-muted-foreground">Revenue:</span>
                           <span className="text-sm font-medium">
                             {selectedNode.data.revenue > 0 
-                              ? `$${(selectedNode.data.revenue / 1000000).toFixed(1)}M` 
+                              ? formatMoneyCompact(selectedNode.data.revenue)
                               : 'N/A'
                             }
                           </span>
