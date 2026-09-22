@@ -18447,6 +18447,97 @@ Handoff to next WP:
   (`RowProvenance`, `TrustReportPanel`, `useErpConnections`) read as `anon` through
   `TO authenticated` policies and show nothing. The session fixes all of them at once.
 
+### Audit 2026-09-22 · WP 4 — run lifecycle honesty · 2026-09-22 · no migration
+
+Previous package promised: WP 1 measured F-06/F-07/F-30 as LATENT in production
+(0 cancelled runs ever, 0 stuck) and F-18's evidence gap as LIVE on the canonical
+engine (4 `scsim-0.2.1`/`0.2.2` runs claim more replications than exist). WP 5
+handed on two `ResultsDashboard` defects: F-07, and a disruption schedule it
+fabricates. WP 5 also made a failed read end a run as `failed` with a message,
+which is only honest if the results screen reads the status.
+
+This package found: **the audit's F-06 fix would not have worked, for a reason
+the audit could not see from reading one function.** It proposed guarding the
+terminal PATCH and handling `experiment.cancel` in the worker. But the worker
+consumes each project's stream **one message at a time**
+(`await self._handle(...)` inside the read loop), so the cancel command is not
+even READ until the run it names has finished. On top of that, the engine's only
+between-replication hook, `_notify_progress`, swallows every observer exception
+by design. A cancel handler placed like the other command branches would have
+run after the run it was meant to stop.
+
+**Per finding:**
+
+- **F-06 — FIXED in all three places it lived.** (1) The ENGINE gains
+  `RunCancelled`, the one exception `_notify_progress` re-raises; every other
+  observer error is still swallowed. (2) The WORKER writes status only through
+  `_transition(run, patch, from_statuses)`, a PATCH guarded by
+  `status=in.(…)` that reports whether a row changed: `queued → running` (a run
+  cancelled before pickup is never started), then `ACTIVE → done/failed` (a
+  cancelled run is never overwritten). The per-replication counter write is also a
+  guarded transition, so **it is the cancel check at no extra request**: when it
+  matches no active row, a `CancelWatch` stops the engine at its next replication.
+  (3) `experiment.cancel` is handled explicitly as a no-op. It used to fall into the
+  default branch and recompute legacy KPIs. **Gates:** `sim-worker/tests/test_run_lifecycle.py`
+  (guard params, a zero-row transition, the counter write flagging a cancel, and a
+  static check that no `_update_run` call writes `status`) and
+  `scsim/tests/test_cancel.py`. **Mutations:** transition always true → 2 red;
+  status guard removed → red; engine swallowing `RunCancelled` → red.
+- **F-07 — FIXED.** `resultsHeader(run)` (`src/lib/sim/runStatus.ts`) derives the
+  badge from `run.status`. Failed and cancelled runs are "not a result" and render
+  no aggregates. A running run is labelled partial. The old `isStub` inference from
+  `code_version` is gone. **Gate:** `runStatus.test.ts`, which also asserts the
+  dashboard uses it on both skins and gates the aggregates.
+- **F-18 — FIXED.** The engine now appears in the desktop header
+  ("Monte Carlo result · 30 replications · scsim-0.2.5"). `rep_count_done` is
+  `len(replications)`: the rows that exist. The legacy path writes none, so it
+  claims none; it used to claim the requested count. **Gate:**
+  `test_run_lifecycle.py`. `test_worker_persist.py::test_scsim_result_shape` had
+  asserted the requested count over a result with no replications (it encoded
+  the defect), and now supplies the 30 rows it counts.
+- **F-30 — FIXED at the point of display.** A queued or running run whose
+  `updated_at` has not moved for `STALE_AFTER_MINUTES` (10) says "No progress for
+  N min — the worker may have stopped". The worker touches the row after every
+  replication, so ten minutes of silence is ten minutes without one. No watchdog
+  writes a status: aging rows out server-side would need a scheduler this repo does
+  not have, and a status nobody wrote is not one to invent. **Gate:** `runStatus.test.ts`.
+- **F-32 — WARNED, not lifted.** A sequential-CI rule on a scenario with no
+  disruptions now produces a `warn` MappingWarning saying it ran a fixed count.
+  Lifting the engine's `and scenario.events` condition would change how every
+  baseline run stops, which is a statistical design decision (audit WP 6), not a
+  lifecycle fix. **Gate:** `test_project_map.py`.
+- **F-33 — FIXED, and it was a class.** `run_replications` is filtered to the run
+  being shown (`run_id=eq.…`). The scan found **`ExperimentResultsPanel`'s
+  `simulation_runs` subscription unfiltered too**, and it is now filtered by
+  project. **Gate:** `realtimeFilters.test.ts` scans every `postgres_changes` in
+  `src/` and fails on an unfiltered one not allow-listed with a reason (one
+  allowed: `recovery_playbooks`, whose system rows have a NULL `project_id`). It
+  fails against the pre-fix sources.
+- **WP 5's handoff — CLOSED.** `ResultsDashboard` no longer invents N events of
+  40% / 5 days / day 10, nor a 90-day horizon, for `RecoveryImpactCard`. The card
+  renders only when the scenario's real schedule and horizon are known. **Gate:**
+  `runStatus.test.ts` ("never invents a disruption schedule or a horizon").
+
+Discovered:
+- **R12 caught my line shifts in `useSimulationRun.tsx` twice in two packages.**
+  `run_replications.surfaces` cites line numbers (now 127/261). Each edit to the
+  hook moves them. The rule is right to fail; the citation form is fragile. →
+  no owner yet; noted for whoever next touches R12.
+
+Baseline numbers:
+- no `ENGINE_VERSION` bump: no KPI value changes (the new warning and `RunCancelled` move no number)
+- unfiltered realtime subscriptions in `src/`: 3 → **1** (declared)
+- tests: scsim 279 → **282**; sim-worker 108 → **115**; vitest 986 → **998**
+
+Handoff to next WP:
+- **The four stored runs whose `rep_count_done` exceeds their rows (WP 1) keep the
+  stored figure.** The header prints `rep_count_done`, which is now honest for new
+  runs only. Recomputing it for old rows is a data fix with a §15 reading either
+  side, and no package in this audit owns one.
+- **Statistical questions pile up for audit WP 6**: the MSER-5 switch (WP 2), the
+  auto-start draw's empty pre-window (WP 3), and whether sequential CI should apply
+  to undisrupted scenarios (F-32 here).
+
 ---
 ---
 ## 17. Sequencing

@@ -61,8 +61,8 @@ it rather than duplicating it.
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `ProjectPolicies.tsx` | hook useSimulationRun → select * from run_replications | `src/hooks/useSimulationRun.tsx:124` | yes |
-| `SimulationLab.tsx` | hook useSimulationRun::loadReps → select * from run_replications | `src/hooks/useSimulationRun.tsx:242` | yes |
+| `ProjectPolicies.tsx` | hook useSimulationRun → select * from run_replications | `src/hooks/useSimulationRun.tsx:127` | yes |
+| `SimulationLab.tsx` | hook useSimulationRun::loadReps → select * from run_replications | `src/hooks/useSimulationRun.tsx:261` | yes |
 | `ProjectPolicies.tsx` | useVerifiableExports → select * from run_replications | `src/hooks/useVerifiableExports.tsx:218` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
@@ -291,6 +291,6 @@ When the row was inserted.
 
 ---
 
-*Generated from data contract `938ca51abe87`, engine `0.2.5`,
+*Generated from data contract `a8b7c98fb3ef`, engine `0.2.5`,
 sidecar `supabase/contract/run_replications.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

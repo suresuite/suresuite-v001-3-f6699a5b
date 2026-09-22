@@ -722,17 +722,30 @@ class ScenarioResult:
 ProgressFn = Callable[[int, int, dict[str, float], dict[str, np.ndarray]], None]
 
 
+class RunCancelled(Exception):
+    """Raised by a progress observer to STOP the run (audit F-06).
+
+    The one exception `_notify_progress` does not swallow. Every other observer
+    error is still ignored — a broken observer must never kill a run — which is
+    exactly why a cancel could not be expressed before this: the only hook the
+    engine calls between replications had no way to say "stop".
+    """
+
+
 def _notify_progress(
     progress: Optional[ProgressFn], done: int, total: int,
     row: dict[str, float], ctx: SimContext,
 ) -> None:
-    """Observer errors must never kill a run — swallow and continue."""
+    """Observer errors must never kill a run — swallow and continue; a
+    deliberate `RunCancelled` is the exception."""
     if progress is None:
         return
     try:
         progress(done, total, row, {
             k: getattr(ctx.trace, k) for k in PUBLISHED_SERIES_KEYS
         })
+    except RunCancelled:
+        raise
     except Exception:  # noqa: BLE001 — observer only, run integrity first
         pass
 

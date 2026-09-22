@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { resultsHeader, type ResultsHeader } from "@/lib/sim/runStatus";
 import { gateNotice } from "@/lib/sim/gateNotice";
 import { KpiStatTable } from "./KpiStatTable";
 import { ConvergencePlot } from "./ConvergencePlot";
@@ -55,6 +56,13 @@ function extractMeta(run: SimulationRun | null, reps: Replication[]): RunMeta | 
   return fromRep ?? null;
 }
 
+const HEADER_TONE: Record<ResultsHeader["tone"], string> = {
+  ok: "border-green-500 text-green-700 bg-green-50",
+  warn: "border-yellow-400 text-yellow-700 bg-yellow-50",
+  bad: "border-red-400 text-red-700 bg-red-50",
+  pending: "border-yellow-400 text-yellow-700 bg-yellow-50",
+};
+
 export function ResultsDashboard({
   run,
   reps,
@@ -72,18 +80,17 @@ export function ResultsDashboard({
   }
   const meta = extractMeta(run, reps);
   const codeVersion = run.code_version ?? "";
-  const isStub = codeVersion.startsWith("stub") || !codeVersion;
   const gateText = gateNotice(run);
-  const disruptions: DisruptionEvent[] =
-    scenario?.disruption_schedule && scenario.disruption_schedule.length > 0
-      ? scenario.disruption_schedule
-      : meta?.disruption_count
-      ? Array.from({ length: meta.disruption_count }).map(() => ({
-          magnitude_pct: 40,
-          duration_days: 5,
-          start_day: 10,
-        }))
-      : [];
+  // What the run IS, from its status (audit F-07/F-18/F-30) — not inferred from
+  // whether `code_version` happens to be set.
+  const header = resultsHeader(run);
+  // The recovery card scores the SCENARIO's schedule. When this view is not
+  // given it, the card is not drawn: it used to invent N events of 40% / 5 days
+  // / day 10 from `_meta.disruption_count` and score those (a number with no
+  // source — T1; audit WP 5 handoff). Its horizon likewise came from a 90-day
+  // default; it now needs a real one.
+  const disruptions: DisruptionEvent[] = scenario?.disruption_schedule ?? [];
+  const horizonDays = scenario?.horizon_days ?? meta?.horizon_days ?? null;
   return (
     <div className={cn('flex flex-col', skin ? 'm-cq gap-2' : 'gap-3')}>
       {skin ? (
@@ -91,25 +98,20 @@ export function ResultsDashboard({
         // (§3). The stub case is amber because it is the firm-level "derived"
         // meaning; a finished run is the process teal.
         <div className="flex flex-wrap items-center gap-1.5">
-          <MobileChip fill={isStub ? M.warnFill : undefined} ink={isStub ? M.warnInk : M.body}>
-            {isStub
-              ? 'Preliminary — engine computing'
-              : `Monte Carlo · ${run?.rep_count_done ?? 0} reps`}
+          <MobileChip
+            fill={header.tone === 'ok' ? undefined : M.warnFill}
+            ink={header.tone === 'ok' ? M.body : M.warnInk}
+          >
+            {header.text}
           </MobileChip>
           {credibility && <CredibilityBadge credibility={credibility} />}
           {gateText && <MobileChip fill={M.warnFill} ink={M.warnInk}>{gateText}</MobileChip>}
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          {isStub ? (
-            <Badge variant="outline" className="text-[11px] gap-1 border-yellow-400 text-yellow-700 bg-yellow-50">
-              Preliminary estimate — Monte Carlo engine computing…
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-[11px] gap-1 border-green-500 text-green-700 bg-green-50">
-              Monte Carlo result · {run?.rep_count_done ?? 0} replications
-            </Badge>
-          )}
+          <Badge variant="outline" className={cn("text-[11px] gap-1", HEADER_TONE[header.tone])}>
+            {header.text}
+          </Badge>
           {credibility && <CredibilityBadge credibility={credibility} />}
           {gateText && (
             <Badge variant="outline" className="text-[11px] gap-1 border-yellow-400 text-yellow-700 bg-yellow-50">
@@ -147,13 +149,14 @@ export function ResultsDashboard({
         )
       )}
 
-      {meta?.recovery && (
+      {header.showAggregates && meta?.recovery && disruptions.length > 0 && horizonDays != null && (
         <RecoveryImpactCard
           recovery={meta.recovery}
           disruptions={disruptions}
-          horizonDays={meta.horizon_days ?? 90}
+          horizonDays={horizonDays}
         />
       )}
+      {!header.showAggregates ? null : (<>
       {/* Inventory over time (G19 / WP 9.1): materials and finished goods,
           in units or value. Plain weekly scalars, so — unlike the per-item
           panel at the bottom — this renders on every run. */}
@@ -181,6 +184,7 @@ export function ResultsDashboard({
         warmupWeeks={run.warmup_detected_at}
       />
       <KpiStatTable reps={reps} primaryKpi={primaryKpi} codeVersion={codeVersion} />
+      </>)}
       {/* `UtilizationHeatmap` WAS HERE AND IS REMOVED — §4 D113.
           It read a per-node `utilization` series from each replication and NO
           ENGINE WRITES ONE: `extra_series` carries exactly the four
