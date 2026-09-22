@@ -321,6 +321,15 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
         try { reason = (await ctx.json())?.error; } catch { /* keep the generic message */ }
       }
       console.error('Project deletion failed:', error ?? data);
+      // supabase-js's FETCH error means no answer reached the browser at all. Usually
+      // the request never left (§15 (7) logged no invocation for the one reported), but
+      // a gateway that cut a slow call off would look the same, and the transaction may
+      // still have committed — so say what is known and reload the list.
+      if ((error as { name?: string } | null)?.name === 'FunctionsFetchError') {
+        toast.error(`No answer from the server while deleting "${project.name}". Check your connection; the list has been reloaded — if the project is still there, nothing was deleted and you can try again.`);
+        loadProjects();
+        return;
+      }
       toast.error(`Could not delete "${project.name}": ${reason || error?.message || 'unknown error'}. Nothing was deleted.`);
       return;
     }
