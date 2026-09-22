@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 346,
-  "migrations_applied": 338,
+  "migrations_found": 347,
+  "migrations_applied": 339,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260922000002_run_binds_seed_and_schedule.sql",
+  "last_migration": "20260922000003_delete_project_whole.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -22622,8 +22622,8 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "comment": "D170 — deletes ONE project and everything scoped to it in a single transaction: ",
+      "defined_by": "20260922000003_delete_project_whole.sql"
     },
     {
       "name": "delete_simulation_result",

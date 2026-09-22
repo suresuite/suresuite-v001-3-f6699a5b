@@ -1,17 +1,17 @@
 {
   "$generator": "scripts/data-contract/generate.mjs",
   "$doc": "The data contract: the introspected schema merged with the authored sidecars and the engine registry snapshot. Generated — do not edit; `npm run contract:check` fails on drift.",
-  "engine_version": "0.2.6",
+  "engine_version": "0.2.7",
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 346,
-      "migrations_applied": 338,
-      "last_migration": "20260922000002_run_binds_seed_and_schedule.sql"
+      "migrations_found": 347,
+      "migrations_applied": 339,
+      "last_migration": "20260922000003_delete_project_whole.sql"
     },
     "sidecars": 55,
     "registry": {
-      "engine_version": "0.2.6",
+      "engine_version": "0.2.7",
       "policies": 23
     }
   },
@@ -2457,7 +2457,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:429",
+          "evidence": "src/pages/DataManager.tsx:403",
           "confirmed": true
         },
         {
@@ -3072,7 +3072,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:429",
+          "evidence": "src/pages/DataManager.tsx:403",
           "confirmed": true
         },
         {
@@ -7952,7 +7952,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:429",
+          "evidence": "src/pages/DataManager.tsx:403",
           "confirmed": true
         },
         {
@@ -13269,7 +13269,7 @@
           "page": "DataManager.tsx",
           "via": "rpc delete_project_dataset",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:718",
+          "evidence": "src/pages/DataManager.tsx:687",
           "confirmed": true
         },
         {
@@ -13693,7 +13693,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:429",
+          "evidence": "src/pages/DataManager.tsx:403",
           "confirmed": true
         },
         {
@@ -14297,7 +14297,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:429",
+          "evidence": "src/pages/DataManager.tsx:403",
           "confirmed": true
         },
         {
@@ -15955,7 +15955,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_node_list",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:441",
+          "evidence": "src/pages/DataManager.tsx:415",
           "confirmed": true
         },
         {
@@ -17763,7 +17763,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:429",
+          "evidence": "src/pages/DataManager.tsx:403",
           "confirmed": true
         },
         {
@@ -27266,7 +27266,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:656",
+          "evidence": "src/pages/DataManager.tsx:630",
           "confirmed": true
         },
         {
@@ -28221,7 +28221,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:656",
+          "evidence": "src/pages/DataManager.tsx:630",
           "confirmed": true
         },
         {
@@ -30846,5 +30846,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "f1a5071b0109"
+  "contract_version": "0b8d9b499d8d"
 }

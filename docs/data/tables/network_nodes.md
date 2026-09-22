@@ -50,7 +50,7 @@ Read follows project reachability (`has_project_access`), uuid-only since WP 3.0
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:429` | yes |
+| `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:403` | yes |
 | `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:227` | yes |
 | `SimulationLab.tsx` | rpc project_freshness | `src/components/trust/useProjectFreshness.ts:24` | yes |
 
@@ -591,6 +591,6 @@ WP 4.3 · when the run that wrote the computed columns finished. It is provenanc
 
 ---
 
-*Generated from data contract `f1a5071b0109`, engine `0.2.6`,
+*Generated from data contract `0b8d9b499d8d`, engine `0.2.7`,
 sidecar `supabase/contract/network_nodes.contract.yaml`, table created by `20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

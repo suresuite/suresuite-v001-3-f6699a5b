@@ -186,3 +186,7 @@ uploaded into Test_Simulation and promoted through the review screen. Exit: inge
 and ingest_staged_rows non-empty for a project, a tier-2 row whose source_row_id resolves
 through ingest_value_chain, and no landable table below the before-read baseline
 (run 35781287043). The fence should read unmoved at 20260922000001.
+
+────────────────────────────────────────────────────────────────────────────────
+Project Manager — can a project be deleted? 2026-09-22, no migration.
+(7) reads `delete-project`'s invocations and console (Management API log GET).
