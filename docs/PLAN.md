@@ -17487,6 +17487,54 @@ Handoff to next WP:
     that WP 5.2k named and did not touch, for the same two reasons.
 
 ---
+### Branch consolidation (follow-up) — the renumber missed eight citations, and a §15 report is what found them · 2026-09-20 · no migration
+
+**Found by reading the §15 report the merge fired, not by a gate.** PR #248's
+report ended `GATE — this run FAILS … (PLAN.md §4 D131)`. D131 in §4 is the graph
+layer's *"a firm appears in more than one lane role"*; the gate meant WP 7.1's
+*"`ingest_runs` still carries a foreign key to `auth.users`"*, which the same PR had
+renumbered to **D156**. A red gate citing the wrong row is worse than a red gate.
+
+Preconditions held?      no. The previous entry claimed the renumber followed
+"every place they are cited" and listed the files. `scripts/data-contract/verification-sql.mjs`
+was not among them **because it was a CONFLICT**: it was resolved by hand as the
+union of both sides' probe calls, and resolving a conflict is not remapping a file.
+The blanket remap ran over a list that excluded it by construction.
+
+Exit checks passed?      yes. `contract:check` ✓ 20 rules · `npm test` ✓ 918/918 ·
+`typecheck` ✓ 21 of 21 · `check:docs` ✓ · `node --check` on the two scripts.
+
+Discovered:
+  - **Eight citations in `verification-sql.mjs`, four in `.github/verify-request`
+    and one in `.github/workflows/supabase-functions.yml`** carried newton's
+    pre-renumber numbers. Each was remapped by matching the EXACT line the branch
+    added, not by a blanket search, because `verification-sql.mjs` holds both
+    meanings at once: newton's probes below line 1500 and the graph layer's above
+    2400, citing overlapping numbers in the same file.
+  - **The verification is the part worth keeping.** "Does this file still contain
+    D131" cannot answer the question — the file legitimately contains D131 in main's
+    meaning. What answers it is: *does any line the branch ADDED still exist
+    verbatim with an old number*. All eight did; none does now.
+  - **This is the gap the previous entry NAMED and did not close**, one commit
+    later: *"nothing gates a D-citation outside §4 … it needs 'which side introduced
+    this reference', which is a property of history rather than of the tree."* That
+    was written as a handoff and it should have been read as a warning about the
+    package writing it.
+
+Baseline numbers (if run):
+  - 13 citations remapped across 3 files · 0 of newton's 8 D-citing lines in
+    `verification-sql.mjs` survive un-remapped · §4 unchanged at 162 rows
+
+Handoff to next WP:
+  - **The §15 gate is still red and is SUPPOSED to be** (D156): `ingest_runs`'
+    two actor columns point at `auth.users` while 0 of 14 approved users exist
+    there, and WP 6.5 (a) publishes `ingest-file` over exactly that path. The
+    citation is now right; the finding is unchanged and still owned.
+  - A rule for the D-citation gap is still unwritten. The check this entry performed
+    by hand — compare a branch's ADDED lines against the renumber map — is what it
+    would automate.
+
+---
 ---
 
 ## 17. Sequencing

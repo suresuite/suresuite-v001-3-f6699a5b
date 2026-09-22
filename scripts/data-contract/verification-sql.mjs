@@ -141,7 +141,7 @@ function report(label, res, render) {
 const gateFailures = [];
 
 // ── schema probe: what does production ACTUALLY have? (D32, D43) ───────────
-// ── THE MIGRATION FENCE (D128) ──────────────────────────────────────────────
+// ── THE MIGRATION FENCE (D153) ──────────────────────────────────────────────
 //
 // §15 must not race a deploy, and the rule for that has always been a HABIT: do
 // not put a probe in the same push as a migration. That habit is satisfiable on a
@@ -185,7 +185,7 @@ async function migrationFenceClose() {
         "  one or both ends, so this run cannot say whether a deploy landed during it.");
     gateFailures.push(
       "the migration fence could not be read, so no count in this report can be " +
-        "dated against the schema it describes (PLAN.md §4 D128).",
+        "dated against the schema it describes (PLAN.md §4 D153).",
     );
     return;
   }
@@ -206,7 +206,7 @@ async function migrationFenceClose() {
       `the migration ledger moved from ${fenceBefore.version} to ${after.version} ` +
         `during this run (${fenceBefore.applied} → ${after.applied} applied): the report ` +
         `straddles a deploy and every count in it is of an unknown shape. Request a ` +
-        `fresh run from a push carrying no migration (PLAN.md §4 D128).`,
+        `fresh run from a push carrying no migration (PLAN.md §4 D153).`,
     );
   } else {
     out(
@@ -1391,9 +1391,9 @@ async function wp71Stage0() {
     out(...table(rows));
     out(
       `- **${rows.length} key(s)**. Expected **6** since \`20260919000012\` re-keyed`,
-      "  `ingest_runs`' two actor columns to `approved_users` (D131); the artifact records",
+      "  `ingest_runs`' two actor columns to `approved_users` (D156); the artifact records",
       "  seven, and the one it is still wrong about is `policy_versions.created_by`, dropped",
-      "  in June and not followed by the introspector (D132).",
+      "  in June and not followed by the introspector (D157).",
       "  A difference is a defect in the artifact, not in the database (D49/D52's class):",
       "  a constraint dropped by a later `ALTER TABLE` that the introspector did not",
       "  follow, and therefore a foreign key this repository believes in and production",
@@ -1417,7 +1417,7 @@ async function wp71Stage0() {
         "`ingest_runs` still carries a foreign key to `auth.users` while 0 of the " +
           "approved users exist there, and `ingest_land_file` both requires a non-NULL " +
           "actor and writes it into that column, so the CSV landing path cannot run in " +
-          "production (PLAN.md §4 D131). It is LATENT, not an outage: `ingest-file` is " +
+          "production (PLAN.md §4 D156). It is LATENT, not an outage: `ingest-file` is " +
           "not deployed (D123), so nothing reaches the path today. This run is red " +
           "because WP 6.5 (a) publishes that function, and publishing it over these two " +
           "keys turns every upload into a foreign-key error — drop them first, the " +
@@ -1439,7 +1439,7 @@ async function wp71Stage0() {
   // that needs the name, the table, the command and both expressions — because
   // PostgreSQL has no `ALTER POLICY … ADD ROLE`: widening a policy's roles means
   // `ALTER POLICY … TO anon, authenticated`, which keeps the predicates, and getting
-  // the list from `grep 'TO anon'` is exactly the mistake D129 was.
+  // the list from `grep 'TO anon'` is exactly the mistake D154 was.
   //
   // The expressions are printed so the migration can be checked against them rather
   // than trusted: `ALTER POLICY … TO` preserves USING and WITH CHECK, and this is what
@@ -1470,7 +1470,7 @@ async function wp71Stage0() {
       "  away, and revertible by the same statement with `TO anon`.",
       "- **This must land BEFORE stage 1 issues a session.** Until it does, every one of",
       "  these reads is available to an anonymous caller and refused to an authenticated",
-      "  one, which is the inversion nothing in §14 had pointed at (D130).",
+      "  one, which is the inversion nothing in §14 had pointed at (D155).",
     );
   });
 }
