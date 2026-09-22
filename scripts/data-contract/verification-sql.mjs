@@ -3379,7 +3379,7 @@ async function wp65aLandingSwitch() {
       left join public.projects p on p.id = r.project_id
      where r.status = 'applied'
      group by 1, 2, 3, 4, 5
-     order by r.applied_at`);
+     order by 5`);
   report("(4b) applied runs — where their rows are", landed, (rows) => {
     out("", "**(4b) every applied run, and how many of its staged rows a tier-2 row still names:**");
     out(...table(rows.map((r) => ({ ...r, run: String(r.run).slice(0, 8) }))));
