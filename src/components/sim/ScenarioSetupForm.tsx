@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { runWindowFooter } from "@/lib/sim/runWindow";
 import { ParameterCard, TimeUnitBar, type ParamGroup, type Provenance } from "./ParameterCard";
 import type { Scenario } from "@/hooks/useScenarios";
 import { SCENARIO_ENGINE_DEFAULTS } from "@/hooks/useScenarios";
@@ -64,7 +65,6 @@ export function ScenarioSetupForm({ scenario, projectId, onSave, section = "all"
     inherited ? "inherited" : differs ? "edited" : null;
   const inherited = !!local.inherited_validation_id;
 
-  const measured = Math.max(0, local.horizon_days - local.warmup_days);
   const simDays = local.replications * local.horizon_days;
 
   const runWindow: ParamGroup = {
@@ -238,7 +238,9 @@ export function ScenarioSetupForm({ scenario, projectId, onSave, section = "all"
         {show("runWindow") ? (
         <ParameterCard
           group={runWindow}
-          footer={`${local.horizon_days} d horizon · ${local.warmup_days} d warm-up · ${measured} d measured`}
+          // The engine's window, not `horizon − warm-up` (audit F-02): the rule is
+          // exported by the engine and pinned by `runWindow.test.ts`.
+          footer={`${local.horizon_days} d horizon · ${runWindowFooter(local)}`}
         />
         ) : null}
         {show("precision") ? (

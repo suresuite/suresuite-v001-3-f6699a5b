@@ -78,6 +78,9 @@ assume week.
 ## 4. Field mapping (the rules)
 
 Priority = first non-null wins. A ⚠ default emits a `warn`; a derived value emits `info`.
+Every **clamp** below that changes a value emits a `warn` naming the value given and the value
+used (the horizon floor and a horizon-forced analysis window emit `info`) — audit 2026-09-22 F-21,
+gated by `scsim/tests/test_mapping_clamps.py`, which fails on a clamp call that omits its warning.
 
 ### SupplierLink (per supplier × material) — from `inbound_logistics`
 Duplicate rows for the same (supplier, material) pair are reduced to one link: the arc with
@@ -119,6 +122,10 @@ the cheapest `unit_price` wins, ties broken by shortest lead time ⚠.
 `horizon_days`→weeks (floor 52, cap 520) · `replications`→`model_seeds` [1,200] · `seed` · `crn` ·
 `ci_level` ∈ {90,95,99} · `warmup_mode=manual`→`warmup_end=warmup_days/7` else auto
 (`most_conservative`) · `stopping_rule.kind=sequential_ci`→`replication_stopping` + `ci_halfwidth_target`.
+`analysis_window` is **not read from the scenario**: the engine measures a fixed 52 weeks after
+warm-up, bounded to `horizon − 13` on a short horizon. The Run-window card prints that window,
+not `horizon − warm-up` (audit F-02); the rule reaches the browser as `run_window` in
+`registry.generated.json`, never as a literal.
 
 ---
 

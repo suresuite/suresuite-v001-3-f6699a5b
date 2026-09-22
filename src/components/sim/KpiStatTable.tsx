@@ -2,8 +2,7 @@ import { useMemo } from "react";
 import { KpiStatTable as KpiStatTableView, type KpiStat } from "./resultTables";
 import { TableBlock } from "@/components/shared";
 import type { Replication } from "@/hooks/useSimulationRun";
-import { summarize } from "@/lib/sim/stats";
-import { KPI_ORDER, kpiDisplay } from "@/lib/sim/kpiDisplay";
+import { buildKpiRows } from "@/lib/sim/kpiRows";
 
 interface Props {
   reps: Replication[];
@@ -34,35 +33,7 @@ interface Props {
  * same shape produce the same table and an unnamed measure does not jump around.
  */
 export function KpiStatTable({ reps, primaryKpi }: Props) {
-  const rows = useMemo<KpiStat[]>(() => {
-    const done = reps.filter((r) => r.status === "done");
-    // Every key any completed replication carries. A disrupted run carries
-    // `ttr_weeks` and an undisrupted one does not, so the union is the honest set
-    // and `n` (below) says how many replications each measure actually came from.
-    const keys = [...new Set(done.flatMap((r) => Object.keys(r.kpis ?? {})))].sort((a, b) => {
-      const ia = KPI_ORDER.get(a);
-      const ib = KPI_ORDER.get(b);
-      if (ia != null && ib != null) return ia - ib;
-      if (ia != null) return -1;
-      if (ib != null) return 1;
-      return a.localeCompare(b);
-    });
-    return keys.map((key) => {
-      const kpi = kpiDisplay(key);
-      const xs = done.map((r) => r.kpis[key]).filter((n): n is number => typeof n === "number");
-      const stat = summarize(xs);
-      return {
-        key,
-        label: kpi.label,
-        mean: kpi.format(stat.mean),
-        ci: `± ${kpi.format(stat.ci95)}`,
-        std: kpi.format(stat.std),
-        min: kpi.format(stat.min),
-        max: kpi.format(stat.max),
-        n: stat.n,
-      };
-    }).filter((row) => row.n > 0);
-  }, [reps]);
+  const rows = useMemo<KpiStat[]>(() => buildKpiRows(reps), [reps]);
 
   return (
     // L1: the table's name reads on the canvas, above the shell.

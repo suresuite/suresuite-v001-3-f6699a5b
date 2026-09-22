@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { disruptionWeeks } from "@/lib/sim/runWindow";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2 } from "lucide-react";
@@ -146,11 +147,27 @@ export function DisruptionScheduleEditor({ value, onChange, projectId }: Props) 
           >
             <Trash2 className="h-4 w-4" />
           </Button>
+          <EngineTicks startDay={d.start_day} durationDays={d.duration_days} />
         </div>
       ))}
       <Button variant="outline" size="sm" className="self-start gap-1" onClick={add}>
         <Plus className="h-3.5 w-3.5" /> Add disruption
       </Button>
     </div>
+  );
+}
+
+/** What the engine will run for this row (audit F-22). Days are authored; the
+ *  engine advances in weekly ticks, so a 3-day and a 10-day disruption are the
+ *  same one-week event. Mobile said so in its sheet header; the desktop editor
+ *  said nothing. The translation comes from the engine's exported rule. */
+export function EngineTicks({ startDay, durationDays }: { startDay: number; durationDays: number }) {
+  const { startWeek, durationWeeks } = disruptionWeeks(startDay, durationDays);
+  const collapsed = startDay % 7 !== 0 || durationDays !== durationWeeks * 7;
+  return (
+    <p className="col-span-2 text-[10px] text-muted-foreground md:col-span-12">
+      Engine runs week {startWeek} for {durationWeeks} wk
+      {collapsed ? " — authored in days; the engine advances in weekly ticks" : ""}
+    </p>
   );
 }

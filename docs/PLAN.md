@@ -18035,6 +18035,122 @@ Handoff to next WP:
 - **WP 10 is re-ordered to highest value**, but its switch still cannot be made on a
   branch. The register correction is branch-safe and owed now.
 
+### Audit 2026-09-22 · WP 2 — the silent-substitution class at the engine boundary · 2026-09-22 · no migration
+
+Previous package promised: audit WP 1 re-scoped this package and moved nothing
+into or out of it except **F-31**, already closed on `main` by §4 D167, and **F-21**,
+not promoted — 562 of 562 `holding_cost_pct` values are 0.2, so the holding clamp
+changes no live value. The findings in scope: F-02, F-21, F-22, F-25, F-31, F-36.
+
+This package found: **the class is real, and the gate that was meant to see it
+could not.** `test_e1_fully_specified_project_has_no_silent_fallbacks` has asserted
+"a fully-specified project maps with ZERO silent fallbacks" since the engine
+retirement gate E1 was written — and on its own fixture, a 364-day horizon, the
+engine measured **39 weeks, not 52**, with nothing said. The analysis window is
+bounded to `horizon − 13`, and `_clamp` returned silently, so E1 was checking a
+list the substitution never reached. Making the clamp speak turned E1 red on its
+first run, and the new `info` is now an explicit member of its residue set.
+
+**Per finding:**
+
+- **F-21 — FIXED as a class, not one clamp at a time.** `_clamp` takes
+  `w`, `entity` and `field` as keyword-only arguments with no default, and warns
+  when it changed the value, naming the value given and the value used. **16 call
+  sites**, not the audit's twelve: it missed the manual warm-up, the sequential-CI
+  ε, the partial-cut capacity factor, the SLA tier floors, the FG service level and
+  the early-warning detection lag. The disruption start's `max(1, …)` floor
+  became a `_clamp`, and the `ci_level` substitution (80 → 95) warns explicitly.
+  **Gate:** `scsim/tests/test_mapping_clamps.py` — eight behavioural cases, plus a
+  static half that parses `project_map.py` and fails if `_clamp` loses its required
+  sink, if any call omits it, or if a `max(min())` / `min(max())` / `.clip()` idiom
+  appears outside `_clamp` (it caught this package's own first draft of the window
+  rule). **Mutation-tested**: silencing the warning → 6 red; a bare
+  `max(1, min(200, …))` replacing one call → 2 red; defaulting `w` → 1 red.
+  D-10 closes with it: `docs/data/field-mapping.md` now says every clamp warns.
+- **F-02 — DECIDED: (b), the card prints the engine's window.** (a) makes
+  `analysis_window` a scenario field, which changes stored-scenario shape, the run
+  gate and the statistical design (a longer window is a different variance), and
+  that is an RFC. (c) derives it from the horizon, which re-baselines every KPI on
+  every run, silently. (b) moves no number and admits the product measures less than
+  the card claimed. At the shipped defaults the footer said **987 d measured** and
+  now says **52 wk (364 d)** measured and **623 d simulated, not measured**. The
+  rule has ONE author (`project_map.analysis_window_weeks` and its constants),
+  exported as `run_window` in `registry.generated.json`. The browser's arithmetic is
+  a second copy by necessity, so the export also carries **eight window cases and six
+  disruption cases computed BY the mapper**. **Gate:** `runWindow.test.ts`, 17
+  assertions, fails if the TS copy disagrees with any row the mapper produced.
+- **F-22 — FIXED at the row, on both surfaces.** `EngineTicks` renders under every
+  disruption row: "Engine runs week N for D wk", plus the weekly-tick caveat when the
+  authored days do not fall on whole weeks. It lives in `DisruptionScheduleEditor`,
+  so desktop gains it and mobile keeps its sheet header. The mapper's own examples
+  confirm the finding: 3 d and 10 d both map to one week. **Gate:**
+  `engineTicks.test.tsx`.
+- **F-36 — FIXED, and measured rather than assumed.** A lead-time draw beyond
+  `ring_width − 2` is bounded and counted per link. `ScenarioResult.lead_time_truncations`
+  carries it, and the bridge appends it to `mapping_warnings`, the one list the run
+  panel renders. On a 40-week lane at cv 1 (lognormal), **24 draws in 20
+  replications** would have landed early before the fix. The audit's "tail-only" is
+  right for a short lane and wrong for a long-haul one. **Gate:** `test_ring_wrap.py`
+  (mutation: clamp off → red) and `test_scsim_bridge.py`'s truncation case.
+- **F-25 — CONFIRMED, NOT SWITCHED; the correct statistic is reported beside the
+  adopted one.** `mser5` divides a population variance by (n_b − d)², which is
+  Σ(·)²/(n_b − d)³, one factor more than White's (1997) definition. Measured on 144
+  auto-warm-up scenarios (4 seeds × 4 lead times × 3 demand CVs × 3 safety-stock
+  settings): the published statistic moves the adopted warm-up in **17 of 144
+  cases, by up to 70 weeks**, and the mean adopted warm-up goes **17.8 → 21.9
+  weeks**. That is too large to land as a patch: the warm-up sets the window, which
+  moves every KPI. So `mser5_published` is added, `WarmupReport.mser5_published_week`
+  carries it, and adoption is unchanged. **The switch is a named decision, owned
+  below.** D-8 closes by the comment moving: "never adopt less than one MSER batch"
+  stood over a no-op and now says there is no floor, and why adding one belongs to
+  the same decision. **Gate:** `test_stats.py` checks `mser5_published` against a
+  from-the-definition reference on 40 series and asserts the two statistics differ
+  on at least one (mutation: revert to the extra factor → red).
+- **F-31 — the "absent" half was STILL LIVE, and it was not the half the audit
+  named.** D167 made `capacity_utilization` measured on every run. But
+  `KpiStatTable` dropped any key with no number on any replication (`n > 0`), and
+  `supplier_capacity_utilization` is NaN → null whenever no supplier declares a
+  finite capacity: **60 of 60 suppliers** in the project §15 measures. That row
+  vanished on the typical project with no reason given. Rows are now built by
+  `buildKpiRows` (`src/lib/sim/kpiRows.ts`), which keeps such a row as **"not
+  measured"** with the catalog's `whenAbsent` reason, or a generic one. **Gate:**
+  `kpiRowsAbsent.test.ts` (mutation: restore the filter → 3 red).
+
+Discovered:
+- **`feasibility_warnings` never reach a user.** The bridge emits them on both paths,
+  the worker lists them among `_NON_BROADCAST_KEYS`, and nothing persists or renders
+  them — a second warning list beside the one that works. F-36 deliberately routes
+  through `mapping_warnings` instead. → affects **audit WP 5** (the failure-swallowing
+  class): persist them onto `mapping_warnings`, or delete the list. No plan edit
+  beyond this line; it is the same class WP 5 owns.
+- **Which MSER-5 is adopted is a decision with no owner in §7–§19.** → the adoption
+  switch (and the one-batch floor with it) is handed to **audit WP 6** (statistical
+  honesty), which already owns F-13's comparable question about the sequential CI.
+  WP 6 must state the golden deltas in its commit.
+
+Baseline numbers:
+- `_clamp` call sites: 12 (audit) → **16 counted, 16 warning**
+- E1 fixture: analysis window **39 wk**, silent → `info`
+- F-02 footer at defaults: 987 d "measured" → **364 d** measured
+- F-36: 24 of 20 replications' draws bounded on a 40-wk cv-1 lane; 0 on cv 0.1
+- F-25: adopted warm-up changes in 17 of 144 cases, max Δ 70 wk, mean 17.8 → 21.9 wk (NOT applied)
+- tests: scsim 253 → **268**; sim-worker 98 → **99**; vitest 949 → **972**
+- `npm run lint`: typecheck 21/21 held · `check:docs` · `audit:ui` 0 new · **eslint RED on
+  `main` before this package and unchanged by it** (`@ts-nocheck` / `no-explicit-any` in
+  files this package does not touch); the files it adds or edits lint clean
+- `contract:rehearse`: not run and not owed — no migration
+
+Handoff to next WP:
+- **WP 3 builds on `_clamp`'s sink.** A disruption start is now a clamped, warned
+  field, so WP 3's "a disruption before `t_w` shifts or raises, never silently
+  vanishes" has a warning mechanism to use. `t_w` is a run-time fact, so the warning
+  must come from the engine side, the way F-36's does.
+- **The F-02 decision is reversible without data loss.** If (a) is ever chosen, the
+  `run_window` export is where the field's bounds come from.
+- **`mser5_published_week` reaches no UI yet.** It is on `WarmupReport`, which the
+  bridge reduces to `warmup_detected_at`. WP 6 decides whether to publish it or to
+  switch to it.
+
 ---
 ---
 ## 17. Sequencing

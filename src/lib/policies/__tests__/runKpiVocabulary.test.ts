@@ -25,13 +25,21 @@ import { deriveRunKpis } from "../../../../scripts/data-contract/chains.mjs";
 import { KPI_BY_KEY, KPI_DISPLAY, kpiDisplay } from "@/lib/sim/kpiDisplay";
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
-const TABLE = readFileSync(join(ROOT, "src", "components", "sim", "KpiStatTable.tsx"), "utf8");
+// The table's rows are built in `kpiRows.ts` since audit WP 2 (F-31) moved them
+// out of the component so the "not measured" row could be tested; the D113
+// shape this suite pins lives there now, and `KpiStatTable` must still use it.
+const TABLE = readFileSync(join(ROOT, "src", "lib", "sim", "kpiRows.ts"), "utf8");
+const COMPONENT = readFileSync(join(ROOT, "src", "components", "sim", "KpiStatTable.tsx"), "utf8");
 const facts = deriveRunKpis(ROOT) as {
   emitted: Array<{ key: string; always: boolean }>;
   display: Array<{ key: string; label: string; emitted: boolean }>;
 };
 
 describe("§4 D113 · the run's measures reach the table", () => {
+  it("the component builds its rows with the tested function", () => {
+    expect(COMPONENT).toMatch(/buildKpiRows\(reps\)/);
+  });
+
   it("the derivation still finds the engine's KPI row", () => {
     expect(facts.emitted.length).toBeGreaterThanOrEqual(15);
     expect(facts.emitted.map((e) => e.key)).toContain("cost_of_resilience");

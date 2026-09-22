@@ -145,6 +145,9 @@ class WarmupReport(BaseModel):
 
     conway_week: int
     mser5_week: int
+    # White's (1997) MSER-5, reported and not adopted (audit F-25): `mser5_week`
+    # carries an extra 1/(n_b − d). −1 where no detector ran (manual warm-up).
+    mser5_published_week: int = -1
     adopted_week: int
     method: WarmupMethod
     series_used: str = "fill_rate"

@@ -72,8 +72,34 @@ def _rate_to_weekly(value: float, unit: Optional[str], default_days: float = 7.0
     return float(value) * 7.0 / days
 
 
-def _clamp(v: float, lo: float, hi: float) -> float:
-    return max(lo, min(hi, v))
+def _fmt(x: float) -> str:
+    return f"{x:g}"
+
+
+def _clamp(
+    v: float, lo: float, hi: float, *,
+    w: list["MappingWarning"], entity: str, field: str,
+    unit: str = "", scale: float = 1.0, level: str = "warn",
+) -> float:
+    """Bound ``v`` to the engine's range — and SAY so when that changed it.
+
+    The only two-sided clamp in this module (audit 2026-09-22, F-21). It used to
+    return silently, and a dozen values the user typed were bounded with the
+    substitution recorded in a comment or in ``docs/data/field-mapping.md``,
+    which is T2's exact prohibition. ``w``, ``entity`` and ``field`` are
+    keyword-only with no default, so a call cannot omit the sink, and
+    ``tests/test_mapping_clamps.py`` fails on any clamp idiom outside this one.
+
+    ``scale`` converts the engine value back to the unit the user typed for the
+    message only (e.g. a holding rate in %/yr against a stored fraction).
+    """
+    used = max(lo, min(hi, v))
+    if used != v:
+        w.append(MappingWarning(
+            level, entity, field,
+            f"{_fmt(v / scale)}{unit} is outside the engine range "
+            f"[{_fmt(lo / scale)}, {_fmt(hi / scale)}]{unit} → {_fmt(used / scale)}{unit} used"))
+    return used
 
 
 # ── Typed, Supabase-agnostic input ────────────────────────────────────────────
@@ -708,7 +734,9 @@ def from_project_data(data: ProjectData) -> MappingResult:
         mrow = mat_lt_dist.get(arc.material_id)
         link = SupplierLink(
             supplier_id=arc.supplier_id, material_id=arc.material_id,
-            cost=cost, lead_time_weeks=int(_clamp(round(lt_weeks), 1, 51)),
+            cost=cost, lead_time_weeks=int(_clamp(
+                round(lt_weeks), 1, 51, w=w, field="lead_time", unit=" wk",
+                entity=f"supply:{arc.supplier_id}->{arc.material_id}")),
             lead_time_dist=LeadTimeDist((mrow.lead_time_dist or "deterministic")) if mrow and mrow.lead_time_dist else LeadTimeDist.DETERMINISTIC,
             lead_time_cv=float(mrow.lead_time_cv) if mrow and mrow.lead_time_cv else 0.0,
             moq=float(mrow.moq) if mrow and mrow.moq else 0.0,
@@ -807,7 +835,9 @@ def from_project_data(data: ProjectData) -> MappingResult:
             w.append(MappingWarning("warn", f"material:{m.id}", "cost",
                                     "no master cost and no supplier price → defaulted to 1.0"))
         hold_pct = m.holding_cost_pct if m.holding_cost_pct is not None else inv.get("holding_cost_pct")
-        holding = _clamp(float(hold_pct) * 100.0, 5.0, 50.0) if hold_pct is not None else 20.0
+        holding = _clamp(float(hold_pct) * 100.0, 5.0, 50.0, w=w, entity=f"material:{m.id}",
+                         field="holding_cost_pct", unit=" %/yr") \
+            if hold_pct is not None else 20.0
         materials.append(Material(
             id=m.id, name=str(m.name or m.id), cost=cost, holding_cost_rate=holding,
             initial_on_hand=(float(m.initial_on_hand) if m.initial_on_hand is not None else None),
@@ -948,20 +978,57 @@ def from_project_data(data: ProjectData) -> MappingResult:
     return MappingResult(scenario=scenario, warnings=w)
 
 
+# ── The run window — ONE author, exported (audit 2026-09-22, F-02) ─────────────
+#
+# The Run-window card printed `horizon − warm-up` days as "measured" while the
+# engine measured a fixed 52-week window after warm-up: 987 days claimed, 364
+# measured, at the shipped defaults. The decision (§16 · audit WP 2) is to keep
+# the engine's window and make the card print IT — so the rule lives here once,
+# and `registry_export.run_window_rule()` hands it to the UI through
+# `registry.generated.json`. Nothing in `src/` may restate 52.
+HORIZON_WEEKS_FLOOR = 52
+HORIZON_WEEKS_CEILING = 520
+ANALYSIS_WINDOW_WEEKS = 52
+ANALYSIS_WINDOW_MIN_WEEKS = 13
+ANALYSIS_WINDOW_MAX_WEEKS = 156
+ANALYSIS_WINDOW_TAIL_WEEKS = 13  # the horizon keeps this many weeks after the window
+
+
+def analysis_window_weeks(horizon: int, w: list[MappingWarning]) -> int:
+    """Weeks measured after warm-up. The engine then takes
+    ``window_end = min(t_w + window, horizon)``, so a late warm-up can shorten it
+    further at run time; that half is reported on the run, not here."""
+    # The upper bound is a derived quantity, not a typed one; the clamp below is
+    # what can change the window, and it says so.
+    room = max(ANALYSIS_WINDOW_MIN_WEEKS, horizon - ANALYSIS_WINDOW_TAIL_WEEKS)
+    hi = min(ANALYSIS_WINDOW_MAX_WEEKS, room)
+    return int(_clamp(ANALYSIS_WINDOW_WEEKS, ANALYSIS_WINDOW_MIN_WEEKS, hi, w=w,
+                      entity="scenario", field="analysis_window", unit=" wk", level="info"))
+
+
 def _build_settings(sc: ScenarioSettings, w: list[MappingWarning]) -> SimulationSettings:
-    horizon = int(_clamp(round(sc.horizon_days / 7.0), 52, 520))
-    if sc.horizon_days / 7.0 < 52:
-        w.append(MappingWarning("info", "scenario", "horizon",
-                                f"horizon raised to engine floor of 52 weeks"))
+    # The horizon FLOOR stays `info`: raising a short horizon to one engine year
+    # was always said. The ceiling was not, and is now `warn` like every other.
+    horizon_weeks = round(sc.horizon_days / 7.0)
+    horizon = int(_clamp(horizon_weeks, HORIZON_WEEKS_FLOOR, HORIZON_WEEKS_CEILING, w=w,
+                         entity="scenario", field="horizon", unit=" wk",
+                         level="info" if horizon_weeks < HORIZON_WEEKS_FLOOR else "warn"))
+    ci_level = int(sc.ci_level) if sc.ci_level in (90, 95, 99) else 95
+    if ci_level != sc.ci_level:
+        w.append(MappingWarning("warn", "scenario", "ci_level",
+                                f"{sc.ci_level}% is not a supported confidence level "
+                                f"(90, 95, 99) → {ci_level}% used"))
     kwargs: dict[str, Any] = dict(
         project_seed=int(sc.seed), horizon=horizon,
-        model_seeds=int(_clamp(sc.replications, 1, 200)),
-        crn_enabled=bool(sc.crn), ci_level=int(sc.ci_level) if sc.ci_level in (90, 95, 99) else 95,
-        analysis_window=int(_clamp(52, 13, min(156, max(13, horizon - 13)))),
+        model_seeds=int(_clamp(sc.replications, 1, 200, w=w, entity="scenario",
+                               field="replications")),
+        crn_enabled=bool(sc.crn), ci_level=ci_level,
+        analysis_window=analysis_window_weeks(horizon, w),
     )
     if str(sc.warmup_mode).lower() == "manual":
         kwargs["warmup_method"] = WarmupMethod.MANUAL
-        kwargs["warmup_end"] = int(_clamp(round(sc.warmup_days / 7.0), 0, horizon // 2))
+        kwargs["warmup_end"] = int(_clamp(round(sc.warmup_days / 7.0), 0, horizon // 2, w=w,
+                                          entity="scenario", field="warmup", unit=" wk"))
     else:
         kwargs["warmup_method"] = WarmupMethod.MOST_CONSERVATIVE
     rule = (sc.stopping_rule or {}).get("kind", "")
@@ -969,7 +1036,8 @@ def _build_settings(sc: ScenarioSettings, w: list[MappingWarning]) -> Simulation
         kwargs["replication_stopping"] = ReplicationStopping.SEQUENTIAL_CI
         eps = (sc.stopping_rule or {}).get("epsilon") or (sc.stopping_rule or {}).get("ci_halfwidth_target")
         if eps is not None:
-            kwargs["ci_halfwidth_target"] = float(_clamp(float(eps), 0.01, 0.10))
+            kwargs["ci_halfwidth_target"] = float(_clamp(
+                float(eps), 0.01, 0.10, w=w, entity="scenario", field="stopping_rule.epsilon"))
     # Single-run inspection mode (G17): full-debug trace so the engine exposes
     # per-item weekly matrices. Strictly single-replication — per-item series
     # at multi-rep scale are deliberately never produced.
@@ -1012,14 +1080,19 @@ def _map_events(
         kwargs: dict[str, Any] = dict(
             target_type=TargetType.NODE_PLANT if is_plant else TargetType.NODE_SUPPLIER,
             target_id=target or "plant",
-            start=max(1, int(start_week)), duration=int(_clamp(dur_weeks, 1, 52)),
+            start=int(_clamp(int(start_week), 1, float("inf"), w=w, entity=f"event:{raw}",
+                             field="start", unit=" wk")),
+            duration=int(_clamp(dur_weeks, 1, 52, w=w, entity=f"event:{raw}",
+                                field="duration", unit=" wk")),
         )
         if magnitude < 100.0:
             # Plant capacity is always finite (products carry production_capacity),
             # so a partial cut always throttles; suppliers need capacity_per_week.
             if is_plant or cap_by_sup.get(target) is not None:
                 kwargs["effect_type"] = EffectType.CAPACITY_REDUCTION
-                kwargs["capacity_factor"] = float(_clamp((100.0 - magnitude) / 100.0, 0.0, 0.999))
+                kwargs["capacity_factor"] = float(_clamp(
+                    (100.0 - magnitude) / 100.0, 0.0, 0.999, w=w, entity=f"event:{target}",
+                    field="magnitude", unit=" (remaining capacity share)"))
             else:
                 w.append(MappingWarning("warn", f"event:{target}", "magnitude",
                                         f"{magnitude:.0f}% cut needs a finite supplier capacity — "
@@ -1208,19 +1281,25 @@ def _map_policies(
     if ss_method in ("service_level", "demand_variability"):
         sl = float(inv.get("service_level_target", 0.95)) * 100.0
         out["safety_stock_materials"] = {"classification": "uniform",
-                                         "uniform_service_level": _clamp(sl, 80.0, 99.9)}
+                                         "uniform_service_level": _clamp(
+                                             sl, 80.0, 99.9, w=w, entity="policy:default",
+                                             field="service_level_target", unit=" %")}
     elif ss_method == "king_method":
         out["safety_stock_materials"] = {"classification": "king"}
     else:
         out["safety_stock_materials"] = {
             "classification": "fixed_days",
-            "fixed_days_cover": _clamp(float(inv.get("safety_stock_days", 7.0)), 0.0, 84.0),
+            "fixed_days_cover": _clamp(float(inv.get("safety_stock_days", 7.0)), 0.0, 84.0,
+                                       w=w, entity="policy:default",
+                                       field="safety_stock_days", unit=" d"),
         }
 
     if bool(fulfil.get("backorder_allowed", False)):
         out["unmet_demand_handling"] = {
             "rule": "backorder",
-            "backorder_horizon": int(_clamp(round(float(fulfil.get("max_backorder_days", 14)) / 7.0), 0, 26)),
+            "backorder_horizon": int(_clamp(
+                round(float(fulfil.get("max_backorder_days", 14)) / 7.0), 0, 26, w=w,
+                entity="policy:default", field="max_backorder_days", unit=" wk")),
             "backorder_penalty": float(fulfil.get("backorder_cost_per_day", 0.0)) * 7.0,
         }
     else:
@@ -1240,7 +1319,8 @@ def _map_policies(
             out["customer_allocation"] = {
                 "rule": "sla_tier",
                 "sla_tiers": {
-                    str(k): _clamp(float(v) * 100.0, 0.0, 100.0)
+                    str(k): _clamp(float(v) * 100.0, 0.0, 100.0, w=w,
+                                   entity=f"policy:tier:{k}", field="tier_overrides", unit=" %")
                     for k, v in (fulfil.get("tier_overrides") or {}).items()
                 },
             }
@@ -1275,13 +1355,17 @@ def _map_policies(
                 out["fg_safety_stock"] = {
                     "sizing": "service_level",
                     "service_level_pct": _clamp(
-                        float(inv.get("fg_service_level_target", 0.95)) * 100.0, 80.0, 99.9),
+                        float(inv.get("fg_service_level_target", 0.95)) * 100.0, 80.0, 99.9,
+                        w=w, entity="policy:default", field="fg_service_level_target",
+                        unit=" %"),
                     "segmentation": "uniform",
                 }
             else:
                 out["fg_safety_stock"] = {
                     "sizing": "fixed_days",
-                    "fixed_days_cover": _clamp(float(inv.get("fg_safety_stock_days", 2.0)), 0.0, 12.0),
+                    "fixed_days_cover": _clamp(
+                        float(inv.get("fg_safety_stock_days", 2.0)), 0.0, 12.0, w=w,
+                        entity="policy:default", field="fg_safety_stock_days", unit=" d"),
                     "segmentation": "uniform",
                 }
             if strat and not strat_is_mts:
@@ -1313,7 +1397,9 @@ def _map_policies(
     if "early_warning" in responses:
         days = float(recovery.get("detection_lag_days", 1.0) or 0.0)
         out["early_warning_failover"] = {
-            "detection_lag_weeks": int(_clamp(round(days / 7.0), 0, 4)),
+            "detection_lag_weeks": int(_clamp(round(days / 7.0), 0, 4, w=w,
+                                              entity="policy:default",
+                                              field="detection_lag_days", unit=" wk")),
         }
 
     # P-P.9 optimized material allocation — per-product priorities fold in

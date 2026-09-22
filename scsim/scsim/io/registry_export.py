@@ -16,6 +16,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from scsim.io import project_map as pm
+
 from scsim import ENGINE_VERSION
 from scsim.core.phases import pipeline_schema
 from scsim.entities.config import SimulationSettings
@@ -86,6 +88,58 @@ def stress_tests() -> list[dict[str, Any]]:
     return out
 
 
+def _run_window_examples() -> list[dict[str, Any]]:
+    """Cases computed BY THE MAPPER, so the UI's arithmetic is pinned to it.
+
+    ``runWindow.test.ts`` asserts the browser reproduces every row; a TS rule
+    that drifted from ``_build_settings`` / ``_map_events`` fails there.
+    ``measured_weeks`` is ``min(t_w + window, horizon) − t_w`` — the engine's
+    ``window_end`` — and is known before the run only for a MANUAL warm-up.
+    """
+    rows: list[dict[str, Any]] = []
+    for horizon_days, mode, warmup_days in (
+        (1092, "manual", 105), (1092, "auto", 105), (364, "manual", 70),
+        (200, "manual", 0), (455, "manual", 210), (4000, "manual", 105),
+        (3000, "auto", 0), (500, "manual", 400),
+    ):
+        st = pm._build_settings(pm.ScenarioSettings(
+            horizon_days=horizon_days, warmup_mode=mode, warmup_days=warmup_days), [])
+        t_w = int(st.warmup_end) if mode == "manual" else None
+        rows.append({
+            "horizon_days": horizon_days, "warmup_mode": mode, "warmup_days": warmup_days,
+            "horizon_weeks": st.horizon, "analysis_window_weeks": st.analysis_window,
+            "warmup_weeks": t_w,
+            "measured_weeks": (min(t_w + st.analysis_window, st.horizon) - t_w)
+            if t_w is not None else None,
+        })
+    return rows
+
+
+def _disruption_examples() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for start_day, duration_days in ((10, 5), (0, 3), (3, 10), (17, 11), (140, 400), (700, 30)):
+        [ev] = pm._map_events([{"target": "supplier:s", "start_day": start_day,
+                                "duration_days": duration_days}], {"s"}, {"s": None}, [])
+        rows.append({"start_day": start_day, "duration_days": duration_days,
+                     "start_week": ev.start, "duration_weeks": ev.duration})
+    return rows
+
+
+def run_window_rule() -> dict[str, Any]:
+    """The constants ``project_map.analysis_window_weeks`` applies, verbatim."""
+    return {
+        "examples": _run_window_examples(),
+        "disruption_examples": _disruption_examples(),
+        "days_per_tick": 7,
+        "horizon_weeks_floor": pm.HORIZON_WEEKS_FLOOR,
+        "horizon_weeks_ceiling": pm.HORIZON_WEEKS_CEILING,
+        "analysis_window_weeks": pm.ANALYSIS_WINDOW_WEEKS,
+        "analysis_window_min_weeks": pm.ANALYSIS_WINDOW_MIN_WEEKS,
+        "analysis_window_max_weeks": pm.ANALYSIS_WINDOW_MAX_WEEKS,
+        "analysis_window_tail_weeks": pm.ANALYSIS_WINDOW_TAIL_WEEKS,
+    }
+
+
 def build_registry() -> dict[str, Any]:
     policies = []
     for entry in catalog():
@@ -133,6 +187,11 @@ def build_registry() -> dict[str, Any]:
         # for the same reason `base_data_requirements` is: the declaration and the
         # reader drift the moment they live apart.
         "policy_bundle_keys": [dict(k) for k in POLICY_BUNDLE_KEYS],
+        # Audit 2026-09-22, F-02 — the weeks the engine MEASURES after warm-up.
+        # The Run-window card printed `horizon − warm-up` as measured while the
+        # engine measured a fixed window; the card now reads this, so the rule
+        # has one author (`project_map.analysis_window_weeks`).
+        "run_window": run_window_rule(),
         "pipeline": pipeline_schema(),
         "kpis": [
             {"name": k.name, "symbol": k.symbol, "definition": k.definition, "unit": k.unit}
