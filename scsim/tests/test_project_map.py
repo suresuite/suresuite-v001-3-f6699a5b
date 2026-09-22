@@ -643,3 +643,16 @@ def test_owner_name_containing_the_separator_still_resolves():
         master=None,
     )
     assert prod.production_capacity == pytest.approx(20.0 * 7.0 * 0.80)
+
+
+def test_sequential_ci_without_disruptions_says_it_runs_a_fixed_count():
+    """Audit F-32: the engine extends replications for a sequential-CI rule only
+    when the scenario has events (`engine.py` gates on `scenario.events`), so a
+    baseline scenario with that rule ran a fixed count and said nothing."""
+    res = from_project_data(_base(stopping_rule={"kind": "sequential_ci", "epsilon": 0.02}))
+    [w] = [w for w in res.warnings if w.field == "stopping_rule"]
+    assert w.level == "warn" and "fixed" in w.reason
+    res2 = from_project_data(_base(
+        stopping_rule={"kind": "sequential_ci"},
+        disruption_schedule=[{"target": "supplier:s1", "start_day": 140, "duration_days": 14}]))
+    assert not [w for w in res2.warnings if w.field == "stopping_rule"]

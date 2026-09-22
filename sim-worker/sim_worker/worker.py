@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 import time
 from typing import Any, Callable
 
@@ -19,7 +20,44 @@ from .policy_snapshot import snapshot_to_policies
 from .schemas import Command
 from .scsim_bridge import compute_kpis_scsim, compute_run_from_project, scsim_enabled
 
+try:  # scsim ships with the canonical path; the legacy-only image lacks it
+    from scsim import RunCancelled
+except ImportError:  # pragma: no cover
+    class RunCancelled(Exception):  # type: ignore[no-redef]
+        pass
+
 log = logging.getLogger(__name__)
+
+# The statuses a run may still leave. Every status write is a TRANSITION out of
+# one of these (audit F-06): the terminal PATCH used to match by id alone and
+# overwrote a user's cancellation with "done".
+ACTIVE = ("queued", "running")
+
+
+class CancelWatch:
+    """Cooperative cancel for one run (audit F-06).
+
+    A project's stream is consumed one message at a time, so an
+    `experiment.cancel` is not even read until the run it names has finished.
+    The cancellation lives on the ROW (sim-command sets it), and the worker
+    notices when its per-replication counter write matches no active row. The
+    engine is then stopped from its progress observer via `RunCancelled`, the
+    one exception it re-raises.
+    """
+
+    def __init__(self) -> None:
+        self._event = threading.Event()
+
+    def cancel(self) -> None:
+        self._event.set()
+
+    @property
+    def cancelled(self) -> bool:
+        return self._event.is_set()
+
+    def check(self) -> None:
+        if self._event.is_set():
+            raise RunCancelled("run cancelled by the user")
 
 # Non-scalar KPI keys that must never be broadcast as a KPI delta.
 _NON_BROADCAST_KEYS = {
@@ -57,7 +95,10 @@ def build_run_update(kpis: dict[str, Any], n_reps: int) -> dict[str, Any]:
         "aggregate_kpis": aggregate,
         "ci_half_widths": {k[len("ci_"):]: v for k, v in kpis.items() if k.startswith("ci_")},
         "code_version": code_version,
-        "rep_count_done": n_reps,
+        # The replications that EXIST, not the ones asked for (audit F-18). The
+        # legacy engine writes no `run_replications` rows, so it claims none;
+        # it used to claim the requested count over an empty table.
+        "rep_count_done": len(kpis.get("replications") or []),
     }
     if kpis.get("mapping_warnings") is not None:
         patch["mapping_warnings"] = kpis["mapping_warnings"]
@@ -317,7 +358,13 @@ class SimWorker:
                         # writer. Map the project's stored data (item masters +
                         # logistics + policies + scenario) → scsim, run it, and
                         # persist runs + per-rep replications idempotently.
-                        await self._update_run(run_id, {"status": "running", "started_at": _now()})
+                        # queued → running, and ONLY from queued: a run cancelled
+                        # before the worker reached it is left cancelled, not run.
+                        if not await self._transition(
+                                run_id, {"status": "running", "started_at": _now()}, ("queued",)):
+                            log.info("run %s is no longer queued — not starting it", run_id)
+                            return  # the outer finally ACKs
+                        watch = CancelWatch()
                         try:
                             project_model = await self._fetch_project_model(cmd.project_id)
                             data = await load_project_data(
@@ -334,9 +381,12 @@ class SimWorker:
                             stream_futs: list = []
 
                             def on_replication(rep: dict, done: int, total: int) -> None:
+                                # Runs in the engine's thread. A cancel noticed by
+                                # an EARLIER replication's write stops the run here.
+                                watch.check()
                                 stream_futs.append(asyncio.run_coroutine_threadsafe(
                                     self._stream_replication(
-                                        run_id, cmd.project_id, rep, done),
+                                        run_id, cmd.project_id, rep, done, watch),
                                     loop,
                                 ))
 
@@ -350,10 +400,15 @@ class SimWorker:
                                     *[asyncio.wrap_future(f) for f in stream_futs],
                                     return_exceptions=True,
                                 )
+                        except RunCancelled:
+                            # The row already says cancelled (sim-command wrote
+                            # it); nothing is published and nothing overwrites it.
+                            log.info("run %s cancelled mid-run — engine stopped", run_id)
+                            return  # the outer finally ACKs
                         except Exception as exc:
-                            await self._update_run(run_id, {
+                            await self._transition(run_id, {
                                 "status": "failed", "error_message": str(exc)[:500],
-                            })
+                            }, ACTIVE)
                             raise
                         kpis["run_id"] = run_id
                         # The final authoritative write. Streamed upserts are
@@ -363,12 +418,12 @@ class SimWorker:
                         reps_ok = await self._write_replications(
                             run_id, cmd.project_id, kpis.get("replications") or [])
                         if not reps_ok:
-                            await self._update_run(run_id, {
+                            await self._transition(run_id, {
                                 "status": "failed",
                                 "error_message": "replication rows failed to persist "
                                                  "(see worker logs) — run aborted to avoid "
                                                  "reporting results with no evidence rows",
-                            })
+                            }, ACTIVE)
                             raise RuntimeError("run_replications upsert failed")
                         # Inspection mode's whole point is the per-item series:
                         # a requested-but-unpersisted inspection run must fail
@@ -378,15 +433,18 @@ class SimWorker:
                             items_ok = await self._write_item_series(
                                 run_id, cmd.project_id, item_rows)
                             if not items_ok:
-                                await self._update_run(run_id, {
+                                await self._transition(run_id, {
                                     "status": "failed",
                                     "error_message": "per-item series failed to persist "
                                                      "(run_item_series upsert; see worker "
                                                      "logs) — inspection run aborted",
-                                })
+                                }, ACTIVE)
                                 raise RuntimeError("run_item_series upsert failed")
-                        await self._update_run(
-                            run_id, build_run_update(kpis, int(kpis.get("n_reps", n_reps))))
+                        if not await self._transition(
+                                run_id, build_run_update(kpis, int(kpis.get("n_reps", n_reps))),
+                                ACTIVE):
+                            log.info("run %s was cancelled before its results landed — "
+                                     "results not published", run_id)
                     else:
                         # Legacy analytical path (no scsim / no run_id).
                         try:
@@ -396,13 +454,22 @@ class SimWorker:
                             )
                         except Exception as exc:
                             if run_id:
-                                await self._update_run(run_id, {
+                                await self._transition(run_id, {
                                     "status": "failed", "error_message": str(exc)[:500],
-                                })
+                                }, ACTIVE)
                             raise
                         kpis["run_id"] = run_id
                         if run_id:
-                            await self._update_run(run_id, build_run_update(kpis, n_reps))
+                            await self._transition(run_id, build_run_update(kpis, n_reps), ACTIVE)
+
+                elif cmd.kind == "experiment.cancel":
+                    # The cancellation is the ROW's status, written by sim-command
+                    # before this message was enqueued; the run it names has
+                    # already stopped (or never started) by the time a
+                    # one-at-a-time stream reaches this. Nothing to compute and
+                    # nothing to broadcast — it used to fall into the branch
+                    # below and recompute legacy KPIs (audit F-06).
+                    return  # the outer finally ACKs
 
                 else:
                     policies = await self._cache.get_effective_policies(cmd.project_id)
@@ -462,14 +529,51 @@ class SimWorker:
             return None
 
     async def _stream_replication(
-        self, run_id: str, project_id: str, rep: dict[str, Any], done: int
+        self, run_id: str, project_id: str, rep: dict[str, Any], done: int,
+        watch: "CancelWatch | None" = None,
     ) -> None:
         """Persist one finished replication mid-run and bump the live counter,
         so researchers watch real data accumulate while the engine runs. The
         final _write_replications/_update_run pass re-upserts everything
-        idempotently — losing a streamed write costs liveness, never data."""
+        idempotently — losing a streamed write costs liveness, never data.
+
+        The counter write is a guarded transition, which makes it the cancel
+        check too (audit F-06): if it matches no ACTIVE row, the run has been
+        cancelled, and the watch stops the engine at its next replication."""
         await self._write_replications(run_id, project_id, [rep])
-        await self._update_run(run_id, {"rep_count_done": done})
+        still_active = await self._transition(run_id, {"rep_count_done": done}, ACTIVE)
+        if not still_active and watch is not None:
+            watch.cancel()
+
+    async def _transition(
+        self, run_id: str, patch: dict[str, Any], from_statuses: tuple[str, ...],
+    ) -> bool:
+        """PATCH the run only while its status is one of ``from_statuses``.
+
+        Returns True when a row changed. False means the run had already left
+        those statuses — typically cancelled by the user — and the patch was not
+        applied. A transport failure returns True (the run is presumed active,
+        so one lost write cannot cancel a run) and is logged."""
+        try:
+            r = await self._http.patch(
+                f"{self._supabase_url}/rest/v1/simulation_runs",
+                params={"id": f"eq.{run_id}", "status": f"in.({','.join(from_statuses)})",
+                        "select": "id"},
+                headers={
+                    "apikey": self._service_role_key,
+                    "Authorization": f"Bearer {self._service_role_key}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=representation",
+                },
+                json=patch,
+            )
+            if r.status_code >= 300:
+                log.warning("run transition failed %s %s", r.status_code, r.text)
+                return True
+            return bool(r.json())
+        except Exception:
+            log.exception("failed to transition run %s", run_id)
+            return True
 
     async def _write_replications(
         self, run_id: str, project_id: str, reps: list[dict[str, Any]]
