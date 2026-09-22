@@ -212,3 +212,19 @@ def test_multi_rep_run_never_emits_item_series():
     )
     out2 = compute_run_from_project(_project_data(replications=2))
     assert not out2.get("item_series")
+
+
+def test_ring_truncations_reach_the_mapping_warnings_list():
+    """Audit F-36: a lead time the engine bounded is said where the run panel
+    reads (`mapping_warnings`), not on a second list nothing renders."""
+    from types import SimpleNamespace
+
+    from sim_worker.scsim_bridge import _truncation_warnings
+
+    res = SimpleNamespace(lead_time_truncations=[
+        {"supplier_id": "s1", "material_id": "m1", "draws": 24,
+         "replications": 20, "bounded_to_weeks": 102}])
+    [w] = _truncation_warnings(res)
+    assert w["level"] == "warn" and w["entity"] == "supply:s1->m1"
+    assert w["field"] == "lead_time" and "24" in w["reason"] and "102" in w["reason"]
+    assert _truncation_warnings(SimpleNamespace()) == []

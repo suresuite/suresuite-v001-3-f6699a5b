@@ -494,7 +494,13 @@ def test_e1_fully_specified_project_has_no_silent_fallbacks():
     warns = [w for w in res.warnings if w.level == "warn"]
     assert warns == [], [w.as_dict() for w in warns]
     info_residue = {(w.entity, w.field) for w in res.warnings if w.level == "info"}
-    assert info_residue <= {("policy:inventory_control", "order_up_to")}, info_residue
+    # The second residue is not new behaviour — it is a substitution that was
+    # SILENT until audit WP 2 (F-21): at a 52-week horizon the analysis window is
+    # bounded to horizon − 13 = 39 weeks, not the nominal 52, and this gate could
+    # not see it because `_clamp` said nothing. It is `info` because the user's
+    # horizon forced it, not a value they typed into the window.
+    assert info_residue <= {("policy:inventory_control", "order_up_to"),
+                            ("scenario", "analysis_window")}, info_residue
 
 
 def test_scenario_runs_end_to_end():

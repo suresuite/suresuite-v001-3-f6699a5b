@@ -329,6 +329,13 @@ def _mech_ship_queue(model: CompiledModel, ctx: SimContext) -> None:
             arrival = t + max(1, lt)
             if ctx.lt_block_end[s] > 0:
                 arrival = max(arrival, int(ctx.lt_block_end[s]))
+            # The ring holds W slots; a delay of W or more writes a slot that is
+            # read EARLIER than the arrival week — the shipment lands early and
+            # nothing downstream can tell (audit F-36). Bound it, and count it:
+            # `lead_time_truncations` on the result, a warning on the run.
+            if arrival - t > W - 2:
+                arrival = t + W - 2
+                ctx.lt_truncated[link] += 1
             ctx.pipeline[link, arrival % W] += qty
 
 
@@ -644,6 +651,7 @@ def resolve_warmup(compiled: CompiledScenario, detection_reps: int = 10) -> Warm
     adopted = min(report.adopted_week, settings.horizon // 2)
     report = WarmupReport(
         conway_week=report.conway_week, mser5_week=report.mser5_week,
+        mser5_published_week=report.mser5_published_week,
         adopted_week=adopted, method=report.method, series_used="fill_rate",
     )
     compiled.warmup = report
@@ -694,6 +702,10 @@ class ScenarioResult:
     # of every product on every run is a table nobody reads, and the absence of
     # a row is the same statement as a zero.
     capacity_binding: Optional[dict] = None
+    # Stochastic lead-time draws bounded to the in-transit ring (audit F-36):
+    # [{"supplier_id", "material_id", "draws", "replications", "bounded_to_weeks"}].
+    # Empty when no draw was bounded — the common case.
+    lead_time_truncations: list = field(default_factory=list)
 
     def kpi_array(self, key: str) -> np.ndarray:
         return np.array([row.get(key, np.nan) for row in self.kpis])
@@ -746,9 +758,24 @@ class _CapacityBindingAccumulator:
             model.sup_capacity[np.isfinite(model.sup_capacity)].sum()
         )
         self.plant_capacity = float(model.capacity.sum())
+        # Not capacity evidence, but the same shape of question — a run-level
+        # count summed over replications — so it rides the same observer rather
+        # than a second parameter through `_extend_until_ci` (audit F-36).
+        self.lt_truncated = np.zeros(model.n_links, dtype=int)
+        self.ring_width = int(model.ring_width)
+        self.link_ids = [(model.sup_ids[model.link_sup[k]], model.mat_ids[model.link_mat[k]])
+                         for k in range(model.n_links)]
+
+    def lead_time_truncations(self) -> list[dict]:
+        return [
+            {"supplier_id": sid, "material_id": mid, "draws": int(self.lt_truncated[k]),
+             "replications": self.reps, "bounded_to_weeks": self.ring_width - 2}
+            for k, (sid, mid) in enumerate(self.link_ids) if self.lt_truncated[k] > 0
+        ]
 
     def observe(self, ctx: SimContext, t_w: int, window_end: int) -> None:
         w = slice(t_w, window_end)
+        self.lt_truncated += ctx.lt_truncated
         self.prod_bound += ctx.trace.prod_cap_bound[:, w].sum(axis=1)
         self.sup_bound += ctx.trace.sup_cap_bound[:, w].sum(axis=1)
         self.reps += 1
@@ -908,6 +935,7 @@ def run_scenario(
         item_series=item_series,
         item_ids=item_ids,
         capacity_binding=cap_acc.summary(compiled.model, t_w, window_end) or None,
+        lead_time_truncations=cap_acc.lead_time_truncations(),
     )
 
 

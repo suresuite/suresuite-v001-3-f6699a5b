@@ -33,7 +33,14 @@ export interface KpiDisplay {
   format: (n: number) => string;
   /** null when "better" is not defined for the KPI (pure descriptors). */
   higherIsBetter: boolean | null;
+  /** Why the engine returns no value for this measure, when that is an answer
+   *  rather than a failure (audit F-31). Shown in place of a vanished row. */
+  whenAbsent?: string;
 }
+
+/** The reason a measure with no value on any replication is shown with, when
+ *  the catalog names none. */
+export const NOT_MEASURED_REASON = "the engine returned no value on any replication";
 
 const pct1 = (n: number) => `${(n * 100).toFixed(1)}%`;
 const pct2 = (n: number) => `${(n * 100).toFixed(2)}%`;
@@ -67,8 +74,10 @@ export const KPI_DISPLAY: KpiDisplay[] = [
   // be 0.99 with nothing refused, and a count above zero is demand the capacity
   // actually turned away. `higherIsBetter` is null for the utilizations (high is
   // efficient AND fragile) and false for the counts, which are refusals.
-  { key: "capacity_utilization", label: "Plant capacity utilization", format: pct1, higherIsBetter: null },
-  { key: "supplier_capacity_utilization", label: "Supplier capacity utilization", format: pct1, higherIsBetter: null },
+  { key: "capacity_utilization", label: "Plant capacity utilization", format: pct1, higherIsBetter: null,
+    whenAbsent: "no plant capacity was offered in the analysis window" },
+  { key: "supplier_capacity_utilization", label: "Supplier capacity utilization", format: pct1, higherIsBetter: null,
+    whenAbsent: "no supplier declares a finite capacity — an unlimited supplier has no utilization" },
   { key: "products_capacity_bound", label: "Products capacity held back", format: units, higherIsBetter: false },
   { key: "suppliers_capacity_bound", label: "Suppliers capacity held back", format: units, higherIsBetter: false },
   // The total the ten components below sum to — P-X.1's own measure.

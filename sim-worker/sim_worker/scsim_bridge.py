@@ -112,6 +112,30 @@ def compute_kpis_scsim(
     return out
 
 
+def _truncation_warnings(result: Any) -> list[dict]:
+    """Lead-time draws the engine bounded to its in-transit ring (audit F-36).
+
+    The mapper's warnings are the one list that reaches the run panel
+    (`RunProgressPanel` → `MappingWarningsCard`), so a substitution the ENGINE
+    made at run time joins it rather than a second list nobody renders —
+    `feasibility_warnings` is what that second list looks like. getattr-guarded
+    so an older engine wheel keeps working.
+    """
+    return [
+        {
+            "level": "warn",
+            "entity": f"supply:{t['supplier_id']}->{t['material_id']}",
+            "field": "lead_time",
+            "reason": (
+                f"{t['draws']} sampled lead time(s) across {t['replications']} "
+                f"replication(s) exceeded the engine's in-transit horizon and were "
+                f"bounded to {t['bounded_to_weeks']} wk rather than wrapping early"
+            ),
+        }
+        for t in (getattr(result, "lead_time_truncations", None) or [])
+    ]
+
+
 def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str, Any]:
     """Canonical experiment path: map a ProjectData (item masters + logistics +
     policies + scenario) into an scsim Scenario, run it, and return both the
@@ -150,7 +174,7 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
         "engine_version": ENGINE_VERSION,
         "n_reps": result.stats.n_replications,
         "below_replication_floor": result.stats.below_replication_floor,
-        "mapping_warnings": mapping.warning_dicts,
+        "mapping_warnings": mapping.warning_dicts + _truncation_warnings(result),
         "warmup_detected_at": (result.warmup.adopted_week if result.warmup else None),
         "feasibility_warnings": [
             {"code": w.code, "message": w.message} for w in result.feasibility_warnings

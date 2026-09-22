@@ -545,6 +545,9 @@ class SimContext:
         self.plant_lt_block_end = 0   # > week ⇒ plant produces nothing this week
         self.plant_cap_factor = 1.0   # φ throttle on the plant's production capacity
         self.lost_inbound_this_week = 0.0
+        # Draws bounded to the in-transit ring, per link (audit F-36). A draw
+        # longer than the ring used to wrap and land EARLY with no symptom.
+        self.lt_truncated = np.zeros(model.n_links, dtype=int)
         # P-S.4 early_warning_failover: monitored detection lag. None → the
         # scenario's settings.detection_lag_weeks applies unchanged.
         self.detection_lag_override: Optional[int] = None
