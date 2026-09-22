@@ -350,6 +350,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D165** | **One deploy step of fourteen carried no `SUPABASE_ACCESS_TOKEN`, so PRODUCTION HAS NOT TAKEN A COMPLETE DEPLOY SINCE 2026-09-19 — and the gate written for exactly this counted the step and called it deployed.** `cda6b57` added `Deploy combine-project` without the `env:` block every one of its thirteen neighbours carries. `supabase functions deploy` exits 1 with *Access token not provided*, and the job runs `bash -e`, so the step AFTER it — `geocode-locations` — has never run either. **Seven consecutive red deploys** (workflow runs 52–58, 2026-09-19 06:52 → 2026-09-22 10:17); run 51 was the last green one and it is the commit before the step was added. **The cost is not the red badge, it is what is in production**: `combine-project/index.ts` is **−367/+111 lines** different from the last version that shipped, and that delta is WP 8.2's ONE ETL — so §16 records the edge function's lane build as deleted while production still runs it, D150's raw-`volume` read included. **This is D123's class a fifth time and the mechanism is new**: D123 was a function with no deploy step; this is a function WITH a deploy step that cannot authenticate. R17 read the intention to deploy rather than the ability to, which is why the history looked green on the commits that mattered | `.github/workflows/supabase-functions.yml:278` against its thirteen sibling steps; workflow runs 52–58 on `main`; `git diff fab91d4..main -- supabase/functions/combine-project` | **CLOSED ✅ (this package)** — the three-line `env:` block, and R17 gains its third clause: a `functions deploy` step with no `SUPABASE_ACCESS_TOKEN` in it fails the gate by name. Mutation-tested both ways (removing the block turns `contract:check` red on `combine-project`; restoring it turns it green). The same package pins `deno-version` away from the `v2.x` float that broke `eval` repo-wide on 2026-09-22 |
 | **D166** | **The engine REFUSED a project the shared grader had just passed, because it treated a master row rather than the BOM as what makes a material real — and the branch written to handle that case could never run.** `from_project_data`'s arc loop skipped any arc whose `material_id` was absent from `materials`, so a material the BOM consumes and the inbound file sources — but which nobody gave a master row — lost its lanes before `cheapest_cost` was built, failed the `unsourced` check, and raised `ValueError: materials with no supplier link` about a material that HAS one. **The mapper already contained the code for this case** (`for mid in sorted(bom_mat_ids - {m.id for m in materials})`), and `bom_mat_ids ⊆ cheapest_cost.keys() ⊆ mat_ids` made that set empty by construction: dead code that looked like handling. **It was also a parity break, which is what makes it more than tidiness**: `grading.ts`'s block rule is *a BOM material with no inbound ARC* and has never asked for a master row, so the browser and the pre-dispatch gate both reported such a project ready to run and the engine then refused it — the exact disagreement `test_validation_parity.py` exists to prevent, in the one direction that suite does not cover (it compares warn findings, not the hard block's preconditions) | `scsim/scsim/io/project_map.py`'s arc filter against its own BOM-only branch and against `supabase/functions/_shared/grading.ts`'s `arcMaterials` rule | **CLOSED ✅ (this package)** — `bom_mat_ids` is computed before the arc loop and the filter accepts a material the BOM consumes, so the branch is reachable and the two surfaces agree. Such a material is simulated from its lanes with the D163 cost chain and **named**: an `info` MappingWarning says it has no row in `materials` and that holding cost, MOQ and lead-time distribution are taking engine defaults (T1). The `ValueError` now means what it always said — no inbound arc at all — and an arc for a material NOTHING consumes is still dropped. Three tests, one per branch |
 | **D167** | **Capacity is the one economic quantity the product measures AND configures, and it was broken at both ends — a chain the display layer could not walk, and a measurement that was `NaN` on every run a user ever made.** **(a) The plant grid showed nothing for a number the run was certain to use.** `products.production_capacity` has declared a machine-readable chain since the reducer library was written — `production_policy_capacity` (grade `info`: the plant grid's units/day × 7 × `utilization_cap_pct`) → `twice_demand_floor_1000` (grade `warn`: max(2·demand, 1000)). The engine walks it, the shared grader walks it, the edge gate grades it. `resolveEffective.ts::derivedValueFor` ended on `return undefined; // production_capacity has no logistics-derived fallback` — true of the LOGISTICS tables and false of the engine, so the cell fell through to `contract`/`default` and a planner never saw the capacity their run would use. **(b) The cell they CAN edit is one the engine often ignores, and only a prose sentence said so.** `POLICY_BUNDLE_KEYS`' `transform` for `capacity_units_per_day` has read "the MASTER `products.production_capacity` shadows it entirely when present" since D90, and a surface cannot act on prose — so the grid rendered an editable line capacity with nothing marking the rows where the run reads the master instead. D18's class, worse: D18's field is consumed by nothing, this one is consumed SOMETIMES. **(c) `utilization_cap_pct` had no column at all**, and it is the other factor in that product's own arithmetic — so 1 000/day became 5 950/week with nothing on screen holding the 0.85. It was also absent from `SCSIM_VISIBLE_FIELDS`, so the moment it got a column it would have rendered `stored-only`: the grid telling a planner the engine ignores the number it is about to multiply the capacity by. **(d) `capacity_utilization` was NaN on every ordinary run.** `_utilization` read `ctx.trace.Q`, a per-product matrix that exists only under `trace_verbosity=full_debug`; a Monte Carlo run allocates none, so the KPI was NaN, `_finite` mapped it to null, and the /policies sanity tile printed **"not recorded"** — for the quantity the engine clips production against in every week of every replication. §4 D113 removed a per-node utilization heatmap and told the next reader the run-level measure "now renders in the table above"; it never did, and the note is what stopped anyone looking. **(e) The declared meaning of an empty supplier capacity had two authors**, and the machine-readable one was the FRONTEND: `columnSpecs.ts::master.nullMeans` carried the `∞` token and the sentence the grid rendered, while the registry said "unlimited" in prose one field over — `single-source` below markdown, the class D101 and D127 name, invisible to `check:docs` | the chain at `scsim/scsim/io/project_map.py::base_data_requirements` (`products.production_capacity`) against the `return undefined` in `resolveEffective.ts::derivedValueFor`; the shadow prose in the same file's `POLICY_BUNDLE_KEYS`; `scsim/scsim/kpi/compute.py::_utilization`'s `if ctx.trace.Q is None: return float("nan")` against `RunValidateStage.tsx`'s `"not recorded"` tile; `test_item_series.py`'s `if key == "capacity_utilization": continue` — the behaviour-neutrality gate EXCUSING the one KPI that was not behaviour-neutral | **CLOSED ✅ (WP 9.3)** — one declaration per fact, and a measurement that exists. `empty_means` (`scsim/scsim/policies/base.py::EmptyMeaning`) is the engine's own statement of what a blank means and `columnSpecs` reads it; `shadowed_by` on both plant capacity keys is the machine-readable form of the prose, and `resolveCell` returns a `supersededBy` the grid strikes through; `derivedFallbackDetails` walks the registry's chain keeping WHICH step answered, so the display can tell the planner's line rate from the floor the engine chose so capacity never binds. `utilization_cap_pct` is a declared bundle key, a plant column and `isScsimVisible`. The measurement is four always-on `WEEKLY_SERIES` (plant and supplier capacity, offered and used) plus per-entity binding matrices measured against the UNCLIPPED want — the clipped plan compared against capacity is equal by construction, which is why the test that would have caught this had to be written inside `_mech_default_plan`. `capacity_utilization` is computed from the series and is a number on every run; `supplier_capacity_utilization` is NaN when no supplier declares a finite capacity, which is a measurement that does not exist rather than a zero. `test_capacity_binding.py` (8), `capacityChain.test.ts` (14) and `capacityReadiness.test.ts` (5) hold it, and `test_item_series.py`'s skip is GONE. *(What is NOT closed: `products.production_capacity` is still `recommended`, so a project with no capacity anywhere still runs green — the two new surfaces say so before and after the run, and making it `required` is a product decision about which projects may be simulated at all, not this package's)* |
+| **D168** | **The functions production SERVES are not the functions the repository describes, in both directions — and R17 cannot see either.** `coverage.yaml :: functions_not_deployed` registers seven functions as not deployed. The Management API's function list (§15 run `35766580502`, read-only GET) shows **five of the seven are LIVE**: `delete-project`, `get-mapbox-token` and the three legacy `ingest-*` functions, every one last deployed **2026-03-17** — six months BEFORE WP 4.1 routed the three `ingest-*` writers through `ingest_legacy_upsert_lane` (§16 · WP 4.1). So production runs builds of those three that predate the change `no-tier-skip` and `audit-actor` record as closing them; whatever the database now enforces, the code a user reaches through the /policies lane editor is not the code either row describes. Only `ingest-file` and `erp-sync-orbit-mrp` are genuinely absent — so every contract-described CSV upload fails at file-select (the wizard calls `ingest-file` with no fallback) and the ERP connector cannot connect. In the OTHER direction, **ten functions are live with no source in this repository at all** — `calculate`, `combine-project-into-supply-chain`, `delete-simulation-job`, `external-simulation-processor`, `get-multi-tier-network-data`, `simulation-availability-checker`, `simulation-cache-manager`, `simulation-runner`, `simulation-status`, `test-prominence` — and nothing in `src/`, `supabase/functions/` or `sim-worker/` names any of them: callable endpoints nobody can read, running under whatever grants they were deployed with. R17 compares the repository with the deploy WORKFLOW; neither side of it can see production, which is D123's lesson one layer further out | §15 run `35766580502` · *Audit 2026-09-22 · WP 1* (the function list and the per-function verdict against the register); `scripts/data-contract/coverage.yaml :: functions_not_deployed` | **OPEN — WP 7.1** *(the register owns five of the seven and says their production copies are undiffed; it is now known they are LIVE and OLDER than the repository. The ten source-less functions are the `no-orphan-table` class for edge functions: each is adopted into the repository, or deleted from production, with a §15 reading either side. The branch-safe halves — the register saying `live, stale` rather than `not deployed`, and the upload wizard failing legibly — are the 2026-09-22 audit's WP 10 (a) and F-16)* |
 
 ### 4.1 Code map — the data layer
 
@@ -17897,6 +17898,142 @@ Handoff to next WP:
   them, which is the gate working. What is still missing is the comparison WP 9.1
   named: `deriveRunKpis` reads the engine's row and nothing holds `KPI_DISPLAY` to
   it beyond that one join.
+
+### Audit 2026-09-22 · WP 1 — the shape, measured before anything moves · 2026-09-22 · no migration
+
+Previous package promised: the end-to-end user audit of 2026-09-22 (37 findings
+F-01…F-37, ten doc-vs-code disagreements D-1…D-10) measured the REPOSITORY at
+`885cb4d` and said so — no browser, no database, no worker — and listed fifteen
+read-only queries (Q1–Q15) that would size what it could not. Five decisions were
+parked behind them: which engine runs (F-18), what `level` and `echelon` hold
+(F-09), whether any upload ever landed (F-01), the blast radius of the fabricated
+baseline and the censored TTR (F-03/F-04/F-05), and whether `holding_cost_pct` is a
+fraction (F-21).
+
+This package found: **production answered all five, and the answers re-scope four
+packages — two smaller, one larger, one different.** Measured by §15 run
+`35766580502` (ledger `20260920000003`, 344 applied, **unmoved** across the run;
+every probe every-project, D42; not taken on a merge, D153). The probes are the
+*Audit 2026-09-22 · WP 1* section of `verification-sql.mjs`; the only source change
+is that section, pushed alone. **Main had moved since the audit**: WP 9.3 (`ac2d08e`)
+landed after `885cb4d`, so every finding is re-read against `main`, not the audit.
+
+**The audit's own queries needed two corrections before they could run.** Q1 joins
+`sim_scenarios`, which does not exist — the table is `scenarios`, which is also what
+the export reads. And Q3 counts `ttr_weeks >= 52` as censored, which is right ONLY
+when the disruption starts at or before `t_w`: the sentinel is `post.size =
+window_end − t_star`, so a disruption starting mid-window is censored at a value
+below 52. Q3 therefore bounds only the F-04 shape, and **F-05's blast radius is not
+recoverable from stored rows at all** — `t_star` is not persisted per replication.
+
+**Per question, and which way the package now goes:**
+
+- **Q5/Q6 → F-18 · the engine is scsim, on every stored run.** 24 `done` runs:
+  `scsim-0.2.3` ×18, `scsim-0.2.2` ×3, `scsim-0.2.1` ×3; 2 `failed` with a blank
+  version; **zero `worker-legacy` runs ever stored.** So audit sections A3–A7
+  describe code users reach, and **WP 3 and WP 4 stay scoped against scsim.** But
+  F-18's second half is live on the CANONICAL engine, not only the legacy one:
+  `rep_count_done` disagrees with the `run_replications` rows behind it on **4
+  runs** — all three `scsim-0.2.1` runs claim 13 replications over **0** rows, and
+  one `scsim-0.2.2` run claims 90 over 60. `scsim-0.2.3` is consistent (284 claimed,
+  284 persisted). WP 4 makes the badge count evidence rows, which fixes both.
+- **Q9/Q10 → F-09 · `echelon` HAS landed, and the audit's "literal 2" is true of
+  one project, not the ETL.** `node_list.echelon` is populated on 1 747 nodes across
+  7 projects — `material` 1 401, `supplier` 236, `subassembly` **58** (2 projects,
+  all still `node_type = material`), `product` 38, `customer` 14. The bom lane's
+  `level` spans **1–4**, not a constant; only `Project AA - ver3` carries a literal 2
+  (§15's WP 8.0 section). What IS true: the inbound lane sits at levels {1, 5}, so the
+  integer ladder types every level-1 supplier as a material, and `bom_depth` is NULL
+  on **all 5 298** lane rows — no project has been re-combined since WP 8.2's
+  writer deployed. **WP 7 reads `node_list.echelon` directly**; the client mirror is
+  no longer required as a stand-in, and `oneClassifier.test.ts` is written either way.
+- **Q14 → F-01 · CONFIRMED. `ingest_runs` holds zero rows of any `source_kind`,
+  ever.** And the function list (below, §4 D168) settles why: `ingest-file` is
+  absent from production. **WP 10 is the highest-value package in the audit, not the
+  last**, and the switch remains WP 6.5's, a merge decision needing a reading either
+  side (§16 · WP 6.3). Nothing about that is branch-safe; the register and the
+  wizard's failure message are.
+- **Q1/Q2/Q3 → F-03/F-04/F-05 · real, and SMALL in stored data.** 7 `done` runs
+  carry 8 scheduled disruptions; **1 disruption in 1 run** has a mapped start week
+  inside its detected warm-up. Detected `t_w` ranges 0–10 weeks, mean 1.3 — the
+  audit's open question 3 answered: short. No stored scenario carries the editor's
+  default (`start_day 10, duration 5`), and none has a start inside its authored
+  warm-up. `pre_disruption_fill_rate` is exactly 1.0 on 20 replications in 4 runs —
+  an UPPER bound on the fabricated baseline, since a perfect pre-window is also 1.0;
+  Q1's one run is the lower bound. No replication sits at TTR ≥ 52. **So WP 3 is
+  urgent for the NEXT user — the default disruption is the one the editor offers —
+  and cheap for the stored ones: at most 4 runs, all identifiable by
+  `code_version`. Stored runs are MARKED, not recomputed** (they cannot be); the mark
+  is WP 3's to design.
+- **Q11 → F-21 · a fraction everywhere.** 562 `materials` rows in 2 projects set
+  `holding_cost_pct`, every one exactly **0.2**; none > 1, none outside the engine's
+  [5, 50] %/yr clamp after ×100. **F-21 is NOT promoted** — it stays in WP 2 as the
+  class fix, with no live value it changes today.
+
+**What the other queries said, for the packages that follow:**
+
+- **Q4 → F-06/F-07/F-30:** 0 `cancelled` runs ever, 0 running or queued > 2 h, 0
+  failed/cancelled runs with replications. All three are LATENT in production — real
+  in code (re-read on `main`: `worker.py` has no `experiment.cancel` branch, and
+  `ResultsDashboard.tsx` reads `status` only on replications), with no stored damage.
+- **Q7/Q8 → F-19:** 0 of 26 runs `gate_skipped`; the largest project per gate table
+  is 2 202 rows (`bom_single_level`) against a 50 000 ceiling — **F-19(b) is latent by
+  a factor of 22**. Both halves stay in WP 5 as fail-open defects, not live ones.
+- **Q12 → open question 9:** every `done` run carries its own `graph_hash` and
+  `dataset_version_id` (24 of 24). The fallback the audit worried about has fired
+  on nothing.
+- **Q15 → F-15:** swept all 49 tables with a `project_id` column (not the audit's
+  four): orphaned rows exist in **two** — `ai_chat_events` 14, `disruption_scenarios`
+  2. D117's "ten tables survive a delete" is not visible as orphans today, which
+  means either deletes have been rare or the survivors are keyed by something other
+  than a live `project_id`; WP 10 reads it before designing a deletion status.
+- **F-31 is already CLOSED on `main`** — §4 D167 (WP 9.3) replaced the unweighted
+  per-product mean with Σused/Σavailable over two always-on weekly series, so the
+  measure exists on every run. The audit read `885cb4d`, one merge earlier. What
+  survives of F-31 is only the "say why the row is absent" half, for runs that
+  predate the measurement, and WP 9.3's panels already say it.
+
+Discovered:
+- **§4 D168** — the functions production serves are not the functions the register
+  describes, in both directions. **Five of the seven "not deployed" functions are
+  LIVE**, all last deployed 2026-03-17, before WP 4.1 routed the three legacy
+  `ingest-*` writers through `ingest_legacy_upsert_lane`; **ten live functions have
+  no source in the repository** and no caller in it. → affects **WP 7.1** (owner of
+  five of the seven registrations; the live copies are now known to be OLDER than the
+  repo, not "undiffed") and the audit's **WP 10** (F-16 is no longer "absent vs
+  stale — unknown": it is stale for four call sites and absent for one; the register
+  must say `live, stale`). → plan edit: the §4 row, and the `no-tier-skip` and
+  `audit-actor` rows in CLAUDE.md now say their WP 4.1 closures describe the
+  repository, citing D168.
+- **The instrument can now see edge functions**, which nothing in this repo could:
+  `verification-sql.mjs` issues one read-only `GET /v1/projects/{ref}/functions`
+  beside its SELECTs and prints each registered deferral's verdict. It REPORTS; it
+  does not gate. Making "a registered not-deployed function is live" a
+  `gateFailures` entry is the obvious next step and is left to the package that
+  corrects the register, so the gate and the correction land together.
+
+Baseline numbers (run `35766580502`):
+- `simulation_runs`: 26 (24 done, 2 failed); by engine 18 / 3 / 3 scsim, 0 legacy
+- `rep_count_done` ≠ persisted replications: 4 runs (3 × `0.2.1`, 1 × `0.2.2`)
+- runs with a disruption: 7 · disruption inside detected warm-up: 1 · `t_w` 0–10 wk
+- replications with baseline exactly 1.0: 20 in 4 runs · TTR ≥ 52: 0
+- `ingest_runs`, all sources: **0**
+- `node_list.echelon` populated: 1 747 nodes · `subassembly` 58 · lane `bom_depth` NULL: 5 298 of 5 298
+- `holding_cost_pct` > 1: 0 of 562 · gate tables over 50 000 rows: 0 · `gate_skipped`: 0 of 26
+- orphaned project rows: `ai_chat_events` 14, `disruption_scenarios` 2
+- edge functions live: 27 · registered-not-deployed yet live: 5 · live with no source: 10
+
+Handoff to next WP:
+- **WP 2 → WP 3 as prompted.** No finding moved into or out of them except F-31
+  (closed by D167) and F-21 (not promoted).
+- **WP 3 must emit censoring as a fact, because stored rows cannot reconstruct it**
+  (`t_star` is not persisted). The stored-run decision is a mark over ≤ 4 runs.
+- **WP 4's evidence-count fix is live on the canonical engine**, not a legacy-only
+  hypothetical — cite the four runs above.
+- **WP 7 reads the column.** The mirror in `ProcessLevelNetwork.tsx` was a stand-in
+  for a column that was not deployed; it is deployed.
+- **WP 10 is re-ordered to highest value**, but its switch still cannot be made on a
+  branch. The register correction is branch-safe and owed now.
 
 ---
 ---
