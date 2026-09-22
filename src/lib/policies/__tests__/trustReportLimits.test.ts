@@ -218,3 +218,19 @@ describe("the limits the 2026-09-22 audit found are published (F-26)", () => {
     expect(text).toMatch(/50 000 rows/);
   });
 });
+
+// Audit F-17. The client-asserted-identity limit named uploads only; the AI apply
+// path takes its actor from the request body and writes with the service role.
+describe("the identity limit names the AI apply path (F-17)", () => {
+  const limits = knownLimits({
+    projectName: "P",
+    freshness: { project_id: "p", graph_hash: null, graph_hash_short: "", dataset_version: null,
+                 measured_at: "t", tables: {}, latest_runs: [] } as never,
+    graded: [], findings: [], ingestHistory: [],
+  });
+  it("says a caller with two ids can apply a proposal in someone else's name", () => {
+    const d28 = limits.filter((l) => l.ref === "§4 D28").map((l) => l.consequence).join("\n");
+    expect(d28).toMatch(/applying an approved proposal/);
+    expect(d28).toMatch(/in that user's name/);
+  });
+});
