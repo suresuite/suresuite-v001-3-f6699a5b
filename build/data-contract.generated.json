@@ -2461,10 +2461,17 @@
           "confirmed": true
         },
         {
+          "page": "InteractiveNetworkSpace.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/pages/InteractiveNetworkSpace.tsx:478",
+          "confirmed": true
+        },
+        {
           "page": "ProcessLevelNetwork.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/ProcessLevelNetwork.tsx:381",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:359",
           "confirmed": true
         },
         {
@@ -2775,10 +2782,17 @@
           },
           "surfaces": [
             {
+              "page": "InteractiveNetworkSpace.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/pages/InteractiveNetworkSpace.tsx:478",
+              "confirmed": true
+            },
+            {
               "page": "ProcessLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/ProcessLevelNetwork.tsx:381",
+              "evidence": "src/pages/ProcessLevelNetwork.tsx:359",
               "confirmed": true
             }
           ],
@@ -22734,14 +22748,14 @@
           "page": "InteractiveNetworkSpace.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/InteractiveNetworkSpace.tsx:353",
+          "evidence": "src/pages/InteractiveNetworkSpace.tsx:339",
           "confirmed": true
         },
         {
           "page": "ProcessLevelNetwork.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/ProcessLevelNetwork.tsx:275",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:253",
           "confirmed": true
         },
         {
@@ -28228,14 +28242,14 @@
           "page": "InteractiveNetworkSpace.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/InteractiveNetworkSpace.tsx:369",
+          "evidence": "src/pages/InteractiveNetworkSpace.tsx:355",
           "confirmed": true
         },
         {
           "page": "ProcessLevelNetwork.tsx",
-          "via": "table read",
+          "via": "rpc get_supply_chain_data_multi_tier",
           "grain": "table",
-          "evidence": "src/pages/ProcessLevelNetwork.tsx:1258",
+          "evidence": "src/services/network.ts:41",
           "confirmed": true
         },
         {
@@ -28423,7 +28437,7 @@
               "page": "InteractiveNetworkSpace.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/InteractiveNetworkSpace.tsx:369",
+              "evidence": "src/pages/InteractiveNetworkSpace.tsx:355",
               "confirmed": true
             }
           ],
@@ -28525,9 +28539,9 @@
           "surfaces": [
             {
               "page": "ProcessLevelNetwork.tsx",
-              "via": "table read",
+              "via": "rpc get_supply_chain_data_multi_tier",
               "grain": "column",
-              "evidence": "src/pages/ProcessLevelNetwork.tsx:1258",
+              "evidence": "src/services/network.ts:41",
               "confirmed": true
             }
           ],
@@ -28725,9 +28739,9 @@
           "surfaces": [
             {
               "page": "ProcessLevelNetwork.tsx",
-              "via": "table read",
+              "via": "rpc get_supply_chain_data_multi_tier",
               "grain": "column",
-              "evidence": "src/pages/ProcessLevelNetwork.tsx:1258",
+              "evidence": "src/services/network.ts:41",
               "confirmed": true
             }
           ],
@@ -30846,5 +30860,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "0b8d9b499d8d"
+  "contract_version": "564d2ea41ba1"
 }

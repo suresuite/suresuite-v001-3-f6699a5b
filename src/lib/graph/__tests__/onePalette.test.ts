@@ -32,7 +32,9 @@ const BASELINE: Record<string, number> = {
   // counts LINES and not matches; the ratchet's own count is the one that decides.
   'src/pages/ProcessLevelNetwork.tsx': 32,
   'src/pages/FirmLevelNetwork.tsx': 13,
-  'src/pages/InteractiveNetworkSpace.tsx': 16,
+  // 16 → 2: audit F-09 replaced the level ramp and the type table with
+  // `colorForEchelon`. The two left are the search highlight and the node border.
+  'src/pages/InteractiveNetworkSpace.tsx': 2,
   'src/components/MapView.tsx': 18,
 };
 

@@ -18836,6 +18836,79 @@ Found while fixing it:
 After read: the user's delete of a project in production, and §15 (7) reading the function's
 console for it, are the exit. They follow the merge.
 
+### Audit 2026-09-22 · WP 7 — one node, one type, no invented measure · 2026-09-22 · no migration
+
+Previous package promised: WP 6 handed nothing to this package. The brief scoped
+F-09, F-10 and F-35 to "the graph layer's remaining readers", and §4 D127 said the
+ratchet stood at two classifiers, one of them `/interactive-network-space`'s
+`getNodeTypeFromLevel`.
+
+This package found: **the rule `/process-level-network` used had no home a second
+page could call.** WP 8.3 migrated that page by writing the placement (type from
+the lane roles, depth from `bom_multi_level`, a supplier one step beyond the
+deepest material it feeds) INSIDE its fetch. That is why the other page kept its
+ladder: nothing it could import said the same thing. The rule now lives in
+`src/lib/graph/placement.ts` as `placeLaneNodes` and both pages call it. The
+second page's layout was also keyed to the old six-step ladder (`levelToColumn`
+hard-coded 6 → 0 … -1 → 4), so a supplier at its derived depth would have shared
+a column with materials. Columns now follow the ordinate. **And the same page
+printed a third ladder nobody had counted:** the node panel's "Chain Position"
+mapped `level` 1 → "Manufacturing", 5 → "Direct Supplier". That is D139's
+fabricated noun in a place WP 8.5 did not reach, and it now reads the echelon.
+
+**Per finding:**
+
+- **F-09 — FIXED.** `/interactive-network-space` places and types nodes through
+  `placeLaneNodes`, the same call `/process-level-network` makes. Its colour is
+  `colorForEchelon`, its legend lists echelons with node counts (it had listed
+  `Level 5 (Suppliers)` from a hard-coded ramp), and its panel shows the echelon
+  label and the BOM depth. **Gate:** `placement.test.ts`, 8 cases. It keeps the
+  deleted ladder verbatim as a witness and shows it calls the finished product a
+  material on the literal-2 shape (§15 run 35433474185). It asserts the whole
+  typing and placement of a 3-deep BOM with a sub-assembly, and that both pages
+  call `placeLaneNodes` and declare no ladder. `oneClassifier.test.ts` 2 → **1**;
+  `onePalette.test.ts` InteractiveNetworkSpace 16 → **2**. **Mutations:** a
+  supplier placed at its lane `level`, BOM depth ignored, and a customer off -1 →
+  each red.
+  **Not done, and why:** the pages read the MIRROR, not `node_list.echelon`. The
+  column is the authority, and `echelonMirror.test.ts` holds the mirror to it.
+  Moving the read is WP 8.3's `useGraphNodes` swap, and it wants a §15 reading
+  showing the column populated in production first. `FirmLevelNetwork`'s
+  `getTierFromDepth` is the last classifier and stays on the ratchet.
+- **F-10 — FIXED by deletion.** The audit's arithmetic reproduces exactly:
+  `0.4 + 0.3(1-h) + 0.3(1-min(h,1))` is `0.4 + 0.6(1-h)` on `h ∈ [0,1]`, and
+  the red alert on `< 0.4` is unreachable (asserted over 101 values). The
+  Resilience tile, its alert, the Bottlenecks row and "the highest-flow assembly
+  step" alert are gone. After F-09 `level === 1` means BOM depth 1, so the tile
+  would have come back to life counting depth-1 materials under a noun no table
+  supports. Defining the measure is the engine's job (the resilience index), not a
+  page's. Path concentration (HHI of top-flow shares) stays: it is a defined
+  measure. **Gate:** `processLens.test.ts`. **Mutation:** re-adding the tile → red.
+- **F-35 — REFUTED as stated, the residue removed.** No Diagnostics BUTTON ships.
+  On `main`, `runDiagnostics` was declared and referenced nowhere, so no surface
+  rendered it. It was dead code, and still the page's only direct read of the
+  deprecated lane `level`, so it is deleted. **Gate:** `processLens.test.ts`
+  (no `runDiagnostics`, no direct `.select('level…')` of the lane table).
+
+Discovered:
+- **WP 8's after-read is TAKEN** (the push after its merge, D153): §15 run
+  `35792503227`, fence unmoved at `20260922000002` (346 applied). The repair PR
+  that carried it (#267) was superseded by #268 and closed.
+- Nothing else outside the three findings. The two lane pages' lineage citations moved
+  with the edit (R12 caught all eight), and `bom_multi_level` gained the read
+  `/interactive-network-space` now makes.
+
+Baseline numbers:
+- `oneClassifier` 2 → **1**; `onePalette` InteractiveNetworkSpace 16 → **2**
+- eslint errors in the two pages: 11 → **7** (nothing new; ProcessLevelNetwork 7 → 3)
+- tests: vitest 1034 → **1047** (two new files); no engine or worker change
+
+Handoff to next WP:
+- **WP 9** takes F-20, F-34 and F-37. Nothing from this package blocks it.
+- **Owed, unowned:** swapping both lane pages from the mirror to
+  `node_list.echelon` once §15 shows the column populated. That removes the
+  mirror's only callers.
+
 ---
 ---
 ## 17. Sequencing
