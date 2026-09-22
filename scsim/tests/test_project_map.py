@@ -124,6 +124,55 @@ def test_material_cost_falls_back_to_cheapest_link_with_warning():
     assert "cheapest" in note.reason
 
 
+def test_bom_material_with_no_master_row_is_simulated_and_named():
+    """§4 D166: a master row is not what makes a material real — the BOM is.
+
+    Before D166 the arc filter dropped this material's lanes, so the `unsourced`
+    check raised and the branch meant to handle it could never run.
+    """
+    d = _base()
+    d.bom.append(BomArc(product_id="p1", material_id="m2", consumption_rate=1.0))
+    d.supply_arcs = d.supply_arcs + [
+        SupplyArc("s1", "m2", unit_price=8.0, lead_time=2, lead_time_unit="week",
+                  volume=300.0, time_unit="week"),
+        SupplyArc("s2", "m2", unit_price=4.0, lead_time=2, lead_time_unit="week",
+                  volume=100.0, time_unit="week"),
+    ]
+    res = from_project_data(d)          # no longer raises
+    m2 = next(m for m in res.scenario.network.materials if m.id == "m2")
+    assert m2.cost == pytest.approx(7.0)   # (8*300 + 4*100) / 400 — the same chain
+    # T1: it is NAMED, not quietly materialized.
+    note = next(w for w in res.warnings
+                if w.entity == "material:m2" and w.field == "master_row")
+    assert note.level == "info"
+    assert "no row in `materials`" in note.reason
+    # …and its lanes are real links, not dropped.
+    assert any(l.material_id == "m2" for l in res.scenario.network.supplier_links)
+
+
+def test_bom_material_with_no_arc_at_all_still_raises():
+    """The error message always claimed this; since D166 it is what it means."""
+    d = _base()
+    d.bom.append(BomArc(product_id="p1", material_id="m_ghost", consumption_rate=1.0))
+    with pytest.raises(ValueError, match="m_ghost"):
+        from_project_data(d)
+
+
+def test_an_arc_for_a_material_nothing_consumes_is_still_dropped():
+    """D166 widened the filter to the BOM, not to everything: a lane for a
+    material no product consumes and no master row names is still noise."""
+    d = _base()
+    d.supply_arcs = d.supply_arcs + [
+        SupplyArc("s9", "m_unused", unit_price=5.0, lead_time=2, lead_time_unit="week",
+                  volume=100.0, time_unit="week"),
+    ]
+    res = from_project_data(d)
+    ids = {m.id for m in res.scenario.network.materials}
+    assert "m_unused" not in ids
+    assert not any(l.material_id == "m_unused"
+                   for l in res.scenario.network.supplier_links)
+
+
 def test_duplicate_supplier_material_arcs_deduped_to_cheapest():
     d = _base()
     d.supply_arcs = [
