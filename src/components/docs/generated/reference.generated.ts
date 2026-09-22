@@ -5496,8 +5496,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "surfaces": [
       {
         "page": "DataManager.tsx",
-        "via": "table read",
-        "evidence": "src/hooks/useIngestRun.tsx:62"
+        "via": "rpc ingest_run_review",
+        "evidence": "src/hooks/useIngestRun.tsx:69"
       }
     ],
     "governance": {
@@ -5824,6 +5824,11 @@ export const REFERENCE_TABLES: RefTable[] = [
         "page": "DataManager.tsx",
         "via": "table read",
         "evidence": "src/hooks/useErpConnections.tsx:65"
+      },
+      {
+        "page": "DataManager.tsx",
+        "via": "rpc ingest_run_review",
+        "evidence": "src/hooks/useIngestRun.tsx:69"
       },
       {
         "page": "SimulationLab.tsx",
@@ -7672,8 +7677,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "surfaces": [
       {
         "page": "DataManager.tsx",
-        "via": "table read",
-        "evidence": "src/hooks/useIngestRun.tsx:63"
+        "via": "rpc ingest_run_review",
+        "evidence": "src/hooks/useIngestRun.tsx:69"
       }
     ],
     "governance": {

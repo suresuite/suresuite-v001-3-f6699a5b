@@ -291,6 +291,6 @@ When the row was inserted.
 
 ---
 
-*Generated from data contract `1fd8380994dc`, engine `0.2.5`,
+*Generated from data contract `938ca51abe87`, engine `0.2.5`,
 sidecar `supabase/contract/run_replications.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

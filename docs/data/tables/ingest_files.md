@@ -60,7 +60,7 @@ RLS reaches the project through the run, the same predicate the staging tables u
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DataManager.tsx` | table read | `src/hooks/useIngestRun.tsx:62` | yes |
+| `DataManager.tsx` | rpc ingest_run_review | `src/hooks/useIngestRun.tsx:69` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -268,6 +268,6 @@ When the bytes were received. Server-stamped, never the client's clock.
 
 ---
 
-*Generated from data contract `1fd8380994dc`, engine `0.2.5`,
+*Generated from data contract `938ca51abe87`, engine `0.2.5`,
 sidecar `supabase/contract/ingest_files.contract.yaml`, table created by `20260916000013_ingest_files_tier0.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

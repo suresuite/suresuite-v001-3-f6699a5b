@@ -61,6 +61,7 @@ RLS keys on the run's own `project_id` — `has_project_access(project_id)` — 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DataManager.tsx` | table read | `src/hooks/useErpConnections.tsx:65` | yes |
+| `DataManager.tsx` | rpc ingest_run_review | `src/hooks/useIngestRun.tsx:69` | yes |
 | `SimulationLab.tsx` | table read | `src/components/trust/TrustReportPanel.tsx:36` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
@@ -471,6 +472,6 @@ Staged rows that a LATER line of the same file repeats on the natural key. The p
 
 ---
 
-*Generated from data contract `1fd8380994dc`, engine `0.2.5`,
+*Generated from data contract `938ca51abe87`, engine `0.2.5`,
 sidecar `supabase/contract/ingest_runs.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
