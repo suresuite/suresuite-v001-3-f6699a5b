@@ -211,6 +211,8 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
         "engine_version": ENGINE_VERSION,
         "n_reps": result.stats.n_replications,
         "below_replication_floor": result.stats.below_replication_floor,
+        # Audit F-13 — getattr-guarded so an older engine wheel keeps working.
+        "stopping_rule": getattr(result.stats, "stopping_rule", "fixed"),
         "mapping_warnings": (mapping.warning_dicts + _truncation_warnings(result)
                              + _event_shift_warnings(result) + _feasibility_warnings(result)),
         "warmup_detected_at": (result.warmup.adopted_week if result.warmup else None),

@@ -18538,6 +18538,107 @@ Handoff to next WP:
   auto-start draw's empty pre-window (WP 3), and whether sequential CI should apply
   to undisrupted scenarios (F-32 here).
 
+### Audit 2026-09-22 · WP 6 — statistical honesty · 2026-09-22 · no migration
+
+Previous package promised: the brief framed F-13, F-14, F-23 and F-24 as "claims
+the UI makes that the statistics do not support". WP 2, WP 3 and WP 4 each
+handed this package a statistical DECISION they would not make as a patch: the
+MSER-5 switch, the auto-start draw's empty pre-window, and whether sequential CI
+applies to undisrupted scenarios.
+
+This package found: **the Compare panel's pairing was wrong in a second way the
+audit did not name, and the first version of this package's fix repeated it.**
+With stochastic disruptions, each model seed carries several event
+replications, so the CRN cell is `(model_rep, event_rep)`. The replication
+explorer keyed its dropdown, its chart series and its selection by `seed_used`,
+which is the SAME for every event draw of one world. Choosing one replication
+could silently select another. My first `pairedDifference` keyed by `model_rep`
+alone and had the same collision; the mutation "pair by position" survived and
+exposed it. Both now key by the cell.
+
+**Per finding:**
+
+- **F-14 — FIXED: the comparison uses the pairing it requires.**
+  `pairedDifference` (`src/lib/sim/pairedCompare.ts`) takes the per-replication
+  difference over the CRN cell `(model_rep, event_rep)`, with a t-interval on
+  those differences. `pairedT` had computed the same statistic for a year with no
+  caller; the test asserts the two agree. `compareRows` draws a winner ONLY when
+  the paired interval excludes 0 (the old rule was `|delta| > 1e-9`), and
+  without replication rows it says "unpaired" and draws no direction. The panel
+  loads both runs' replication rows. The user manual
+  (`ExperimentsAndComparison.tsx`) described the overlap column and now describes
+  the paired test. **Gate:** `pairedCompare.test.ts`, 9 cases. **Mutations:**
+  "any nonzero delta separates" → 2 red; keying by `rep_index` → red; keying
+  by `model_rep` alone → red.
+- **F-23 — FIXED: a replication is named by what identifies it.**
+  `replicationLabel` prints "rep 7 · world 1 · event draw 2" from the engine's
+  own `model_rep` / `event_rep`. `seed_used` (`project_seed·1000 + model_rep`,
+  not a seed) is no longer called one on any surface. The explorer keys by
+  `rep_index`, unique per run. **Gate:** `replicationLabel.test.ts`, which also
+  scans the three surfaces for "seed {…seed_used}" and the selector for
+  seed-keyed items. It caught a fourth site in the explorer this package had
+  missed.
+- **F-13 — LABELLED, not replaced.** `StatisticsReport.stopping_rule` records
+  `"sequential_ci"` when `_extend_until_ci` chose the replication count (and
+  `"fixed"` otherwise, including a sequential rule on an undisrupted scenario).
+  The bridge carries it and the worker puts it on `_meta`. Every measured row of
+  such a run then notes that the interval understates the uncertainty. A
+  fully-sequential procedure whose interval survives the peeking is a
+  methodology change, left to the decision list below. **Gates:** `test_cancel.py`
+  (engine; mutation → red), `test_worker_persist.py`, `kpiRowsRecovery.test.ts`.
+- **F-24 — FIXED, the correct way the brief preferred.** Stochastic lead-time
+  variates are pre-drawn per `(link, week)` from the world stream when the
+  replication's context is built: a standard normal for lognormal links,
+  Γ(1/cv², 1) for gamma links. `_lt_from_variate` applies the shipment's own mean,
+  since a policy may expedite. The distribution is unchanged, and a test pins
+  both means. The property is asserted directly: after a run, the world stream is
+  in the SAME state under continuous and periodic review, which ship on different
+  weeks. **Mutation:** drawing at ship time again → red. The first version of
+  this gate compared two policies that ship the same weeks and passed on the
+  mutant, so it was replaced. `docs/statistics.md`'s CRN caveat and the
+  `lead_time_dist` field note described the old scheme; both now describe this one.
+  **Golden deltas** (9 scenarios: 3 seeds × lognormal cv 0.3/0.6/0.9, 6-week lane,
+  30 replications): fill-rate change from −0.0060 to +0.0052, mixed signs, **every
+  one inside the combined CI**. The same distribution, drawn at a different moment.
+  `ENGINE_VERSION` 0.2.5 → **0.2.6**.
+
+**The three decisions handed to this package — PUT TO THE USER, not made here.**
+Each changes stored-run comparability or every KPI, and the brief says a switch
+of that kind is "a separate, named decision":
+1. **Adopt `mser5_published` (WP 2).** It moves the adopted warm-up in 17 of 144
+   cases, by up to 70 weeks.
+2. ~~**The auto-start draw (WP 3).**~~ **Withdrawn after the user's answer, which
+   corrected the framing.** In the PRODUCT the disruption start is always the
+   user's: `project_map._map_events` and `legacy_graph` both pass the authored
+   `start_day` as a fixed `start`. The random `U{t_w..t_w+2}` branch is reached ONLY
+   by `stress/battery.py`, the engine's reproduction of the manuscript experiment,
+   which no app surface calls (the app's stress presets pass explicit start days).
+   So "one replication in three" describes that battery, not a user's run, and the
+   battery keeps the manuscript's window. For user runs, WP 3's rule stands: a
+   start inside the warm-up is moved to its end and SAID (the editor for a manual
+   warm-up, the run's warnings for an auto one), and a start ON the first measured
+   week says recovery is not measured.
+3. **Sequential CI on undisrupted scenarios (WP 4, F-32)**, and whether to replace
+   the plain t-interval under sequential stopping with a procedure that survives
+   the peeking (F-13's remainder).
+
+Discovered:
+- **The run-results workbook still writes a `seed_used` column** (`verifiableExports.ts`,
+  `replication_kpis`). It is data, correctly named after its column, but the
+  export states no meaning for it. → **audit WP 8** (exports and provenance).
+
+Baseline numbers:
+- `ENGINE_VERSION` 0.2.5 → **0.2.6**; `pipeline_schema.json` re-frozen on `engine_version` only (no phase or hook moved)
+- F-24 fill-rate deltas: 9 of 9 within CI, max |Δ| 0.0060
+- tests: scsim 282 → **287**; sim-worker 115 → **116**; vitest 998 → **1016**
+
+Handoff to next WP:
+- **WP 8 inherits the export column above**, and F-11/F-12/F-26/F-29.
+- **The user answered (2026-09-22):** (1) **switch to the published MSER-5**,
+  which lands as its own package with its golden deltas stated; (2) the disruption
+  start is the user's to set, which it already is on every product path (see the
+  withdrawn item above); (3) **sequential CI stays as labelled**, with no engine change.
+
 ---
 ---
 ## 17. Sequencing

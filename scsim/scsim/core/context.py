@@ -33,6 +33,7 @@ from scsim.core.phases import (
     BoundHook,
 )
 from scsim.entities.enums import (
+    LeadTimeDist,
     DemandModel,
     EffectType,
     FulfillmentMode,
@@ -492,6 +493,24 @@ class SimContext:
         self.events = events
         self.debug = debug
         T = model.settings.horizon
+
+        # Stochastic lead-time variates, pre-drawn per (link, week) from the WORLD
+        # stream before any policy acts (audit F-24). Drawing at ship time made
+        # the number of draws — and so every later lead time — depend on how
+        # many orders the policy shipped, which broke common random numbers
+        # across scenarios. Standardised so the shipment's own mean (a policy
+        # may expedite) is applied at use: a standard normal for lognormal
+        # links, Gamma(shape=1/cv², 1) for gamma links, 0 for the rest.
+        self.lt_variates = np.zeros((model.n_links, T))
+        for k in range(model.n_links):
+            cv = float(model.link_lt_cv[k])
+            dist = model.link_lt_dist[k]
+            if cv <= 0 or dist == LeadTimeDist.DETERMINISTIC:
+                continue
+            if dist == LeadTimeDist.LOGNORMAL:
+                self.lt_variates[k] = streams.leadtime.standard_normal(T)
+            elif dist == LeadTimeDist.GAMMA:
+                self.lt_variates[k] = streams.leadtime.gamma(1.0 / (cv * cv), 1.0, T)
 
         # Persistent state.
         self.on_hand = np.zeros(model.n_mats)

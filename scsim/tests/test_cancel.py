@@ -39,3 +39,21 @@ def test_any_other_observer_error_is_still_swallowed():
 
     res = run_scenario(_sc(), progress=progress)
     assert res.stats.n_replications == 10
+
+
+# ── audit F-13: a sequentially stopped run says so ─────────────────────────
+
+def test_the_result_records_which_stopping_rule_applied():
+    from scsim import DisruptionEvent
+    from scsim.entities.enums import ReplicationStopping
+
+    fixed = run_scenario(_sc())
+    assert fixed.stats.stopping_rule == "fixed"
+
+    seq = Scenario(
+        name="s", network=single_chain_network(),
+        events=[DisruptionEvent(target_id="s1", start=20, duration=6)],
+        settings=make_settings(model_seeds=10,
+                               replication_stopping=ReplicationStopping.SEQUENTIAL_CI,
+                               ci_halfwidth_target=0.05))
+    assert run_scenario(seq).stats.stopping_rule == "sequential_ci"

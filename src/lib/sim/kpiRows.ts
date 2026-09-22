@@ -35,7 +35,16 @@ function versionBefore(codeVersion: string | null | undefined, fix: string): boo
   return false;
 }
 
-export function buildKpiRows(reps: Replication[], codeVersion?: string | null): KpiStat[] {
+/** Beside every measured mean when the run stopped by the sequential-CI rule
+ *  (audit F-13): the interval is a plain t-interval over a sample whose size was
+ *  chosen by watching that interval, so it is narrower than its nominal level. */
+export const SEQUENTIAL_NOTE =
+  "sequential stopping: replications were added until this interval was narrow enough, " +
+  "so it understates the uncertainty";
+
+export function buildKpiRows(
+  reps: Replication[], codeVersion?: string | null, stoppingRule?: string | null,
+): KpiStat[] {
   const done = reps.filter((r) => r.status === "done");
   const flagged = done.some((r) => "recovery_measurable" in (r.kpis ?? {}));
   const preFix = versionBefore(codeVersion, RECOVERY_FIX_ENGINE);
@@ -72,7 +81,10 @@ export function buildKpiRows(reps: Replication[], codeVersion?: string | null): 
   return keys.map((key) => {
     const kpi = kpiDisplay(key);
     const xs = done.map((r) => r.kpis[key]).filter((n): n is number => typeof n === "number");
-    const note = recoveryNote(key);
+    const recovery = recoveryNote(key);
+    const note = stoppingRule === "sequential_ci"
+      ? [recovery, SEQUENTIAL_NOTE].filter(Boolean).join("; ")
+      : recovery;
     if (xs.length === 0) {
       return {
         key, label: kpi.label, mean: "not measured",

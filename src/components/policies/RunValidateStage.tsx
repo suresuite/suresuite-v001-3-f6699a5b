@@ -2709,7 +2709,7 @@ function MultiRunResultsPanel({
           reps={reps}
           warmupWeeks={warmupWeeks}
           confidence={confidence}
-          title="Weekly traces by seed"
+          title="Weekly traces by replication"
         />
         <ConvergencePlot reps={reps} primaryKpi={activeKpi} warmupAt={null} />
       </div>

@@ -50,3 +50,17 @@ describe("recovery measures in the KPI table", () => {
     expect(RECOVERY_FIX_ENGINE).toBe("0.2.4");
   });
 });
+
+// Audit F-13: `_extend_until_ci` stops at the first batch whose half-width
+// crosses ε and the table then prints a plain t-interval over that same sample —
+// biased narrow by the peeking. The interval stays; it is labelled.
+describe("a sequentially stopped run's intervals are labelled", () => {
+  const r = [rep(0, { fill_rate: 0.9 }), rep(1, { fill_rate: 0.8 })];
+  it("every measured row notes the sequential rule", () => {
+    const rows = buildKpiRows(r, "scsim-0.2.5", "sequential_ci");
+    expect(rows.find((x) => x.key === "fill_rate")!.note).toMatch(/sequential/);
+  });
+  it("a fixed-count run carries no such note", () => {
+    expect(buildKpiRows(r, "scsim-0.2.5", "fixed").find((x) => x.key === "fill_rate")!.note).toBeUndefined();
+  });
+});

@@ -6,14 +6,20 @@
 // that before it shows a single number — a paired experiment, never a chart of
 // two arbitrary runs. Pairs that fail the test get the reason instead of a
 // table.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { compareRows } from "@/lib/sim/pairedCompare";
 import { CompareTable, type CompareRow } from "./resultTables";
 import { TableBlock } from "@/components/shared";
 import { M, MobileNote, MobilePanel, MobileRow } from "@/components/mobile";
 import { cn } from "@/lib/utils";
-import { kpiDisplay, signedDelta } from "@/lib/sim/kpiDisplay";
 import type { Scenario } from "@/hooks/useScenarios";
 import type { SimulationRun } from "@/hooks/useSimulationRun";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const sb = supabase as any;
+
+type PairRep = { rep_index: number; status: string; kpis: Record<string, number | null> };
 
 interface Props {
   scenarios: Scenario[];
@@ -98,38 +104,34 @@ export function CompareScenariosPanel({ scenarios, runsByScenario, skin = false 
 
   const failures = useMemo(() => (pair ? comparabilityFailures(pair.a, pair.b) : []), [pair]);
 
+  // Both runs' replication rows, so the delta is the CRN-PAIRED difference
+  // (audit F-14): this panel requires pairing and used to discard it.
+  const [repsA, setRepsA] = useState<PairRep[]>([]);
+  const [repsB, setRepsB] = useState<PairRep[]>([]);
+  const runA = pair && failures.length === 0 ? pair.a.run.id : null;
+  const runB = pair && failures.length === 0 ? pair.b.run.id : null;
+  useEffect(() => {
+    let live = true;
+    const load = async (id: string | null, set: (r: PairRep[]) => void) => {
+      if (!id) return set([]);
+      const { data } = await sb.from("run_replications").select("rep_index,status,kpis").eq("run_id", id);
+      if (live) set((data ?? []) as PairRep[]);
+    };
+    void load(runA, setRepsA);
+    void load(runB, setRepsB);
+    return () => {
+      live = false;
+    };
+  }, [runA, runB]);
+
   const rows = useMemo<CompareRow[]>(() => {
     if (!pair || failures.length > 0) return [];
-    const kA = pair.a.run.aggregate_kpis ?? {};
-    const kB = pair.b.run.aggregate_kpis ?? {};
-    const ciA = pair.a.run.ci_half_widths ?? {};
-    const ciB = pair.b.run.ci_half_widths ?? {};
-    return Object.keys(kA)
-      .filter((key) => typeof kA[key] === "number" && typeof kB[key] === "number")
-      .map((key) => {
-        const d = kpiDisplay(key);
-        const delta = kB[key] - kA[key];
-        const halfA = ciA[key] ?? 0;
-        const halfB = ciB[key] ?? 0;
-        return {
-          key,
-          label: d.label,
-          a: d.format(kA[key]),
-          aci: `± ${d.format(halfA)}`,
-          b: d.format(kB[key]),
-          bci: `± ${d.format(halfB)}`,
-          delta: signedDelta(delta, d.format),
-          better:
-            d.higherIsBetter === null || Math.abs(delta) < 1e-9
-              ? null
-              : d.higherIsBetter
-                ? delta > 0
-                : delta < 0,
-          // intervals that touch cannot separate the two means
-          overlap: Math.abs(delta) <= halfA + halfB,
-        };
-      });
-  }, [pair, failures.length]);
+    return compareRows(
+      pair.a.run.aggregate_kpis ?? {}, pair.b.run.aggregate_kpis ?? {},
+      pair.a.run.ci_half_widths ?? {}, pair.b.run.ci_half_widths ?? {},
+      repsA, repsB,
+    );
+  }, [pair, failures.length, repsA, repsB]);
 
   // The body states, shared by both chromes so a message can never differ
   // between platforms.

@@ -48,6 +48,7 @@
  * objective · disruption schedule · recovery playbook · findings · mapping
  * report.
  */
+import { replicationLabel } from "@/lib/sim/replicationLabel";
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Truck } from "lucide-react";
@@ -644,7 +645,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
                   key={r.id}
                   chevron={false}
                   label={`Rep ${r.rep_index}`}
-                  sub={`seed ${r.seed_used}`}
+                  sub={replicationLabel(r)}
                   value={r.status}
                 />
               ))}
@@ -1047,7 +1048,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
               key={r.id}
               chevron={false}
               label={`Rep ${r.rep_index}`}
-              sub={`seed ${r.seed_used}`}
+              sub={replicationLabel(r)}
               value={r.status}
             />
           ))}

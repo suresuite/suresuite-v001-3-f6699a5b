@@ -119,9 +119,13 @@ export interface CompareRow {
   b: string;
   bci: string;
   delta: string;
-  /** true when B is better than A on this KPI */
+  /** true when B is better than A on this KPI — null unless the PAIRED
+   *  difference's interval excludes 0 (audit F-14) */
   better: boolean | null;
+  /** the paired interval contains 0 (or there is no paired test) */
   overlap: boolean;
+  /** whether the delta is the CRN-paired per-replication difference */
+  basis: "paired" | "unpaired";
 }
 
 export function CompareTable({ rows }: { rows: CompareRow[] }) {
@@ -135,8 +139,8 @@ export function CompareTable({ rows }: { rows: CompareRow[] }) {
           <th className={cn(TH, "text-left pl-1")}>± 95% CI</th>
           <th className={cn(TH, "text-right")}>B mean</th>
           <th className={cn(TH, "text-left pl-1")}>± 95% CI</th>
-          <th className={cn(TH, "text-right")}>B − A</th>
-          <th className={cn(TH, "text-left")}>CI overlap</th>
+          <th className={cn(TH, "text-right")}>B − A (paired, ± 95%)</th>
+          <th className={cn(TH, "text-left")}>Paired test</th>
         </tr>
       </thead>
       <tbody>
@@ -185,7 +189,11 @@ export function CompareTable({ rows }: { rows: CompareRow[] }) {
                     className="whitespace-nowrap text-[11.5px]"
                     style={{ color: r.overlap ? "var(--zinc-quiet)" : "#18181b" }}
                   >
-                    {r.overlap ? "overlapping" : "separated"}
+                    {r.basis === "unpaired"
+                      ? "unpaired — no replication rows"
+                      : r.overlap
+                        ? "not separated"
+                        : "separated"}
                   </span>
                 </span>
               </td>

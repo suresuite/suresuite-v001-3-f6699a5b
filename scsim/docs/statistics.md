@@ -64,12 +64,14 @@ Plain KPI aggregates use Student-t half-widths (`aggregate_mean_ci`).
 
 ## CRN caveats
 
-* **Stochastic lead times** (`lognormal` / `gamma` links) draw from the
-  world leadtime stream only when an order ships. Portfolios with different
-  ordering patterns therefore consume different numbers of draws, which
-  weakens (does not bias) CRN pairing on those links. The manuscript core
-  uses deterministic lead times and is unaffected. A draw-per-(link, week)
-  scheme is the planned fix if stochastic-LT studies become primary.
+* **Stochastic lead times** (`lognormal` / `gamma` links) are drawn
+  per (link, week) from the world leadtime stream at replication start, as
+  standardised variates (a standard normal, or Γ(1/cv², 1)); the shipment's
+  own mean is applied at use. The draw count therefore no longer depends on
+  how many orders a policy ships, and CRN pairing holds on those links too.
+  This was the planned draw-per-(link, week) scheme; it shipped in engine
+  0.2.6 (audit 2026-09-22, F-24). Before it, draws happened at ship time and
+  portfolios with different ordering patterns consumed the stream differently.
 * **Warm-state snapshots** capture world RNG states at `t_w`. Policy streams
   are deliberately not captured (the ✅ policies draw nothing pre-event);
   if a policy ever draws during warm-up, the snapshot is refused for that
