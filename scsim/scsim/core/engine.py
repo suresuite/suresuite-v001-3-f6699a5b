@@ -660,7 +660,7 @@ def resolve_warmup(compiled: CompiledScenario, detection_reps: int = 10) -> Warm
     adopted = min(report.adopted_week, settings.horizon // 2)
     report = WarmupReport(
         conway_week=report.conway_week, mser5_week=report.mser5_week,
-        mser5_published_week=report.mser5_published_week,
+        mser5_legacy_week=report.mser5_legacy_week,
         adopted_week=adopted, method=report.method, series_used="fill_rate",
     )
     compiled.warmup = report
