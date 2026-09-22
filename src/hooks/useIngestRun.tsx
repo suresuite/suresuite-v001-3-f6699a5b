@@ -9,10 +9,16 @@
  * directly would be a promotion whose role gate lives in the same bundle as the
  * button that hides it.
  *
- * IT READS THE TABLES DIRECTLY AND THAT IS NOT A CONTRADICTION: the three
- * `ingest_*` tables grant SELECT to `authenticated` behind an RLS policy that
- * routes through the run's project (`20260916000014`). Reading a staged row is
- * governed; writing tier 2 is not something the browser may ask for at all.
+ * THE READ GOES THROUGH `ingest_run_review`, NOT THROUGH THE TABLES (WP 6.5a,
+ * PLAN.md §4 D169). This hook used to select the three `ingest_*` tables directly,
+ * on the reasoning that they grant SELECT to `authenticated` behind an RLS policy
+ * routed through the run's project. That reasoning assumed a Supabase Auth session,
+ * and this application has none: the browser calls as `anon`, RLS answered zero
+ * rows WITHOUT an error, and the review screen rendered nothing for every upload
+ * the first day `ingest-file` was live — so nothing could be promoted. The RPC takes
+ * the reader as a parameter and authorizes them with `has_project_access`, exactly
+ * as `ingest_value_chain` does, and it REFUSES rather than returning an empty run,
+ * so a reader without access is told so instead of shown a blank.
  *
  * NOTHING HERE BRANCHES ON `source_kind` — §10's gap check for this package.
  * A connector run and a file run are loaded by the same three queries; a
@@ -54,26 +60,28 @@ export function useIngestRun(runId: string | null, userId: string | null): Inges
       return;
     }
     setLoading(true);
+    // `ingest_run_review` is not in the generated Supabase types, which are produced
+    // from the live schema by hand; the same reason `ValueChainPopover` gives.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
     try {
-      const [r, f, s] = await Promise.all([
-        sb.from("ingest_runs").select("*").eq("id", runId).maybeSingle(),
-        sb.from("ingest_files").select("*").eq("ingest_run_id", runId).maybeSingle(),
-        sb.from("ingest_staged_rows").select("*").eq("ingest_run_id", runId)
-          .order("source_row_number", { ascending: true }),
-      ]);
-      if (r.error) throw new Error(r.error.message);
-      setRun((r.data ?? null) as IngestRun | null);
-      setFile((f.data ?? null) as IngestFile | null);
-      setRows((s.data ?? []) as StagedRow[]);
+      if (!userId) throw new Error("Sign in to review this upload.");
+      const { data, error: err } = await sb.rpc("ingest_run_review", {
+        p_user_id: userId,
+        p_run_id: runId,
+      });
+      if (err) throw new Error(err.message);
+      const review = (data ?? {}) as { run?: IngestRun | null; file?: IngestFile | null; rows?: StagedRow[] };
+      setRun(review.run ?? null);
+      setFile(review.file ?? null);
+      setRows(review.rows ?? []);
       setError(null);
     } catch (e) {
       setError(String((e as Error)?.message ?? e));
     } finally {
       setLoading(false);
     }
-  }, [runId]);
+  }, [runId, userId]);
 
   useEffect(() => { void reload(); }, [reload]);
 

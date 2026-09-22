@@ -153,6 +153,6 @@ When the membership was created. Server-stamped.
 
 ---
 
-*Generated from data contract `9c62127cda63`, engine `0.2.6`,
+*Generated from data contract `86174cc37cc0`, engine `0.2.6`,
 sidecar `supabase/contract/organization_members.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -22,9 +22,9 @@ natural_key_unique:
 
 surfaces:
   - page: "DataManager.tsx"
-    via: "table read"
+    via: "rpc ingest_run_review"
     grain: table
-    evidence: "src/hooks/useIngestRun.tsx:62"
+    evidence: "src/hooks/useIngestRun.tsx:69"
     confirmed: true
 
 governance:

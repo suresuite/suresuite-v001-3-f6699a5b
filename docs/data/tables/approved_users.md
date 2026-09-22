@@ -372,6 +372,6 @@ The user's tenant, by uuid — the same organization `organization` names, and t
 
 ---
 
-*Generated from data contract `9c62127cda63`, engine `0.2.6`,
+*Generated from data contract `86174cc37cc0`, engine `0.2.6`,
 sidecar `supabase/contract/approved_users.contract.yaml`, table created by `20250815000000_approved_users_base.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

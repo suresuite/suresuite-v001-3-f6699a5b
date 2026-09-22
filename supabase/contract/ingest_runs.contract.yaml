@@ -23,6 +23,11 @@ surfaces:
     grain: table
     evidence: "src/hooks/useErpConnections.tsx:65"
     confirmed: true
+  - page: "DataManager.tsx"
+    via: "rpc ingest_run_review"
+    grain: table
+    evidence: "src/hooks/useIngestRun.tsx:69"
+    confirmed: true
   - page: "SimulationLab.tsx"
     via: "table read"
     grain: table

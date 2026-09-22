@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 344,
-      "migrations_applied": 336,
-      "last_migration": "20260920000003_one_etl.sql"
+      "migrations_found": 345,
+      "migrations_applied": 337,
+      "last_migration": "20260922000001_ingest_run_review_read.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -8729,9 +8729,9 @@
       "surfaces": [
         {
           "page": "DataManager.tsx",
-          "via": "table read",
+          "via": "rpc ingest_run_review",
           "grain": "table",
-          "evidence": "src/hooks/useIngestRun.tsx:62",
+          "evidence": "src/hooks/useIngestRun.tsx:69",
           "confirmed": true
         }
       ],
@@ -9249,6 +9249,13 @@
           "via": "table read",
           "grain": "table",
           "evidence": "src/hooks/useErpConnections.tsx:65",
+          "confirmed": true
+        },
+        {
+          "page": "DataManager.tsx",
+          "via": "rpc ingest_run_review",
+          "grain": "table",
+          "evidence": "src/hooks/useIngestRun.tsx:69",
           "confirmed": true
         },
         {
@@ -11944,9 +11951,9 @@
       "surfaces": [
         {
           "page": "DataManager.tsx",
-          "via": "table read",
+          "via": "rpc ingest_run_review",
           "grain": "table",
-          "evidence": "src/hooks/useIngestRun.tsx:63",
+          "evidence": "src/hooks/useIngestRun.tsx:69",
           "confirmed": true
         }
       ],
@@ -30839,5 +30846,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "9c62127cda63"
+  "contract_version": "86174cc37cc0"
 }
