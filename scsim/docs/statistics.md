@@ -42,8 +42,10 @@ one shared grid (the engine refuses mismatched grids).
 ## Warm-up (always both detectors)
 
 `resolve_warmup` runs clean replications, averages the weekly fill-rate
-series across them, and computes **MSER-5** (batch means of 5, truncation
-restricted to the first half) and **Conway's rule** (first observation that
+series across them, and computes **MSER-5** (White 1997: batch means of 5,
+z(d) = Σ(b − b̄)² / (n_b − d)², truncation restricted to the first half — the
+published statistic since engine 0.2.7; the earlier one, which divided by one
+factor too many, is reported for one release as `mser5_legacy_week`) and **Conway's rule** (first observation that
 is neither min nor max of the remainder). `most_conservative` adopts the
 later week; both are always reported in `WarmupReport`. `manual` pins
 `warmup_end` (the manuscript uses week 85 on its 156-week horizon).

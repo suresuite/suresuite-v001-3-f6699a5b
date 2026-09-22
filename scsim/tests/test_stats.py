@@ -13,7 +13,7 @@ from scsim.stats.seeds import (
     replication_grid,
     world_streams,
 )
-from scsim.stats.warmup import conway, detect_warmup, mser5, mser5_published
+from scsim.stats.warmup import conway, detect_warmup, mser5, mser5_legacy
 
 
 # ----------------------------------------------------------------- seed tree
@@ -82,28 +82,29 @@ def _mser_reference(series: np.ndarray, batch: int = 5) -> int:
     return int(np.argmin(zs)) * batch
 
 
-def test_mser5_published_is_the_published_statistic():
-    """Audit F-25. `mser5` divides a POPULATION variance by (n_b − d)², which is
-    Σ(·)²/(n_b − d)³ — one factor more than the definition, biasing the argmin
-    toward d = 0. `mser5_published` is the definition; it is REPORTED beside
-    the adopted value and does not move it (the switch is a named decision)."""
+def test_mser5_is_the_published_statistic():
+    """Audit F-25, switched by the user's decision of 2026-09-22. `mser5` now IS
+    White's (1997) definition and is what the engine ADOPTS. The old statistic
+    divided a population variance by (n_b − d)² — one factor too many, biasing
+    the argmin toward d = 0 — and survives one release as `mser5_legacy`,
+    reported and adopted by nothing."""
     rng = np.random.default_rng(3)
     hits = 0
     for k in range(40):
         s = np.concatenate([np.linspace(0.6, 0.93, rng.integers(5, 40)),
                             0.93 + 0.03 * rng.normal(size=160)])
-        assert mser5_published(s) == _mser_reference(s)
-        hits += mser5(s) != mser5_published(s)
+        assert mser5(s) == _mser_reference(s)
+        hits += mser5(s) != mser5_legacy(s)
     assert hits > 0, "the two statistics must be distinguishable, or this proves nothing"
 
 
-def test_warmup_report_carries_both_mser_statistics():
+def test_warmup_report_adopts_the_published_statistic_and_reports_the_legacy():
     rng = np.random.default_rng(4)
     s = np.concatenate([np.linspace(0.5, 0.9, 25), 0.9 + 0.02 * rng.normal(size=150)])
     rep = detect_warmup(s, WarmupMethod.MSER5)
-    assert rep.mser5_week == mser5(s)
-    assert rep.mser5_published_week == mser5_published(s)
-    assert rep.adopted_week == rep.mser5_week  # unchanged until the named switch
+    assert rep.mser5_week == mser5(s) == _mser_reference(s)
+    assert rep.mser5_legacy_week == mser5_legacy(s)
+    assert rep.adopted_week == rep.mser5_week
 
 
 def test_conway_rule():

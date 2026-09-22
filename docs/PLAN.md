@@ -18670,6 +18670,46 @@ Handoff to next WP:
   start is the user's to set, which it already is on every product path (see the
   withdrawn item above); (3) **sequential CI stays as labelled**, with no engine change.
 
+### Audit 2026-09-22 · WP 6b — the MSER-5 switch (user decision) · 2026-09-22 · no migration
+
+Previous package promised: WP 2 put the correct MSER-5 statistic beside the
+adopted one and handed the switch to a named decision. WP 6 put that decision
+to the user, and on 2026-09-22 the user chose **"switch to published MSER"**.
+
+This package found: **the switch moves far less at the run level than WP 2's
+detector-level figure suggested, and the reason is the adoption rule, not the
+statistic.** WP 2 measured MSER-5 alone: the published statistic changes the
+MSER week in 17 of 144 cases, by up to 70 weeks. But the engine's default warm-up
+method is `most_conservative`, which adopts `max(conway, mser5)`, so a change in
+the MSER week moves the ADOPTED warm-up only when MSER was the later of the two.
+
+- **FIXED: `mser5` IS White's (1997) statistic** and is what `detect_warmup`
+  adopts. The pre-0.2.7 statistic survives ONE release as `mser5_legacy`, reported
+  as `WarmupReport.mser5_legacy_week` and adopted by nothing, so a stored run's
+  warm-up can be compared. `mser5_published` / `mser5_published_week` (WP 2) are
+  folded into it. The "no floor" comment now records that the decision switched
+  the statistic and did not ask for a floor. `scsim/docs/statistics.md` states the
+  formula. **Gate:** `test_stats.py`: `mser5` equals the from-the-definition
+  reference on 40 series and differs from the legacy one on at least one; the
+  report adopts the published value and carries the legacy one. **Mutation:**
+  adopting the legacy statistic again → red.
+- **Golden deltas (run level):** 36 auto-warm-up scenarios (4 seeds × lead time
+  1/4/12 wk × demand cv 0.1/0.3/0.6, 20 replications). The adopted warm-up changed
+  in **1 of 36** (week 50 → 60). That run's fill rate moved **+0.0003, inside its
+  CI**. No other KPI moved: the other 35 adopted the same week.
+  `ENGINE_VERSION` 0.2.6 → **0.2.7**.
+
+Baseline numbers:
+- adopted warm-up changed: 1 of 36 runs (detector-level MSER week: 17 of 144, WP 2)
+- `ENGINE_VERSION` 0.2.6 → **0.2.7**; generated pages move one line each; `pipeline_schema.json` re-frozen on `engine_version` only
+- tests: scsim 287 (two replaced, same count); sim-worker 116; vitest 1016
+
+Handoff to next WP:
+- **Remove `mser5_legacy` after one release.** It exists only so a stored run's
+  warm-up can be compared across the switch.
+- **WP 8 next**, then WP 7, WP 9 and WP 10, as the user asked ("continue until we
+  get everything done").
+
 ---
 ---
 ## 17. Sequencing
