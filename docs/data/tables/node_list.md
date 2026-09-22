@@ -65,7 +65,7 @@ Read follows project reachability. Written by `refresh_node_list_for_project`, w
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DataManager.tsx` | rpc get_node_list | `src/pages/DataManager.tsx:415` | yes |
+| `DataManager.tsx` | rpc get_node_list | `src/pages/DataManager.tsx:424` | yes |
 | `FirmLevelNetwork.tsx` | rpc get_node_list | `src/components/MapView.tsx:355` | yes |
 | `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:227` | yes |
 | `SimulationLab.tsx` | rpc project_freshness | `src/components/trust/useProjectFreshness.ts:24` | yes |
@@ -470,6 +470,6 @@ Tiers upstream of the focal plant: 0 the plant itself, 1 a direct supplier, 2 an
 
 ---
 
-*Generated from data contract `564d2ea41ba1`, engine `0.2.7`,
+*Generated from data contract `e0df939da4f9`, engine `0.2.7`,
 sidecar `supabase/contract/node_list.contract.yaml`, table created by `20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

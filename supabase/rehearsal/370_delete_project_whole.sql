@@ -15,8 +15,15 @@
 --   §3 somebody else is REFUSED (42501) and nothing is deleted; an unknown project is
 --      P0002; a NULL actor is 22004.
 --   §4 ATOMIC: a failure part-way leaves every row in place. Forced by a trigger that
---      raises on the `projects` delete — the last step — after the lanes are gone.
+--      raises on the `node_list` delete — the last table — after the project row and
+--      its lanes are gone.
 --   §5 `anon` and `authenticated` cannot EXECUTE it; `service_role` can.
+--   §6 NOTHING IS REBUILT ON THE WAY OUT (`20260922000009`). The first version deleted
+--      the lane sources while the project row still existed, so each source delete
+--      fired the D142 rebuild over what was left: 44 s on a project the size of
+--      production's largest, against an 8 s budget. §6 counts the insert audit rows
+--      the deletion wrote into the derived tables — a rebuild's footprint — and pins
+--      the order in `prosrc`, since a timing assertion would be a flaky one.
 --
 -- The actors exist ONLY in `approved_users`, as all fourteen real ones do (D156).
 --
@@ -44,6 +51,8 @@ DECLARE
   -- and `audit_logs.created_at` defaults to now() — transaction start — so a
   -- wall-clock mark would sit AFTER every audit row this file writes.
   v_since   timestamptz := now();
+  v_rebuilt integer;
+  v_src     text;
 BEGIN
   INSERT INTO public.organizations (id, name, slug) VALUES (v_org, 'D170 Org', 'd170-org-' || substr(v_org::text, 1, 8));
   INSERT INTO public.approved_users (id, email, name, password_hash, role, organization, organization_id) VALUES
@@ -102,17 +111,29 @@ BEGIN
     RAISE EXCEPTION 'D170/370 §3: a NULL actor ended with SQLSTATE %, expected 22004', COALESCE(v_code, '(none)');
   END IF;
 
-  -- ══ §4 · atomic: fail at the LAST step, after the lanes are gone ══
+  -- ══ §4 · atomic: fail at the LAST table, after the project row and its lanes are gone ══
+  -- The failure is forced on `node_list`, the table deleted last — by the cascade from
+  -- `projects` and again by the sweep — so it lands AFTER the project row, the sources
+  -- and the derived lanes have all been removed. (It was forced on `projects` while
+  -- that was the last step; `20260922000009` made it the first, which would have left
+  -- this section proving nothing.)
+  SELECT count(*) INTO v_n FROM public.node_list WHERE project_id = v_q;
+  IF v_n = 0 THEN
+    RAISE EXCEPTION 'D170/370 §4 setup: the atomic project has no node_list rows, so the forced failure could never fire';
+  END IF;
   CREATE FUNCTION pg_temp.d170_refuse() RETURNS trigger LANGUAGE plpgsql AS
     $f$ BEGIN RAISE EXCEPTION 'd170 forced failure'; END $f$;
-  CREATE TRIGGER d170_refuse BEFORE DELETE ON public.projects
-    FOR EACH ROW WHEN (OLD.name = 'D170 atomic') EXECUTE FUNCTION pg_temp.d170_refuse();
+  EXECUTE format('CREATE TRIGGER d170_refuse BEFORE DELETE ON public.node_list
+    FOR EACH ROW WHEN (OLD.project_id = %L::uuid) EXECUTE FUNCTION pg_temp.d170_refuse()', v_q);
   v_code := NULL;
   BEGIN PERFORM public.delete_project(v_q, v_owner, 'd170o@example.invalid');
   EXCEPTION WHEN OTHERS THEN v_code := SQLERRM; END;
-  DROP TRIGGER d170_refuse ON public.projects;
+  DROP TRIGGER d170_refuse ON public.node_list;
   IF v_code IS NULL OR v_code NOT LIKE '%forced failure%' THEN
     RAISE EXCEPTION 'D170/370 §4: the forced failure did not surface (got %)', COALESCE(v_code, '(no error)');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.projects WHERE id = v_q) THEN
+    RAISE EXCEPTION 'D170/370 §4: a delete that FAILED removed the project row — it is not atomic';
   END IF;
   FOREACH v_tbl IN ARRAY ARRAY['inbound_logistics','outbound_logistics','bom_single_level','supply_chain_data'] LOOP
     EXECUTE format('SELECT count(*) FROM public.%I WHERE project_id = $1', v_tbl) INTO v_n USING v_q;
@@ -128,7 +149,13 @@ BEGIN
   -- passed with `delete_project`'s own attribution DELETED: it was reading the value
   -- the setup left behind (mutation-tested; the same trap as §16 · WP 4.1 · E).
   PERFORM set_config('app.current_user_id', '', true);
+  SELECT count(*) INTO v_rebuilt FROM public.audit_logs
+   WHERE plane = 'data' AND action = 'insert'
+     AND target_type IN ('supply_chain_data','supply_chain_data_multi_tier','node_list');
   PERFORM public.delete_project(v_p, v_owner, 'd170o@example.invalid');
+  SELECT count(*) - v_rebuilt INTO v_rebuilt FROM public.audit_logs
+   WHERE plane = 'data' AND action = 'insert'
+     AND target_type IN ('supply_chain_data','supply_chain_data_multi_tier','node_list');
   IF EXISTS (SELECT 1 FROM public.projects WHERE id = v_p) THEN
     RAISE EXCEPTION 'D170/370 §1: the project row survived its own deletion';
   END IF;
@@ -179,5 +206,17 @@ BEGIN
     RAISE EXCEPTION 'D170/370 §5: service_role cannot EXECUTE delete_project, so the edge function cannot delete anything';
   END IF;
 
-  RAISE NOTICE 'D170/370: delete_project is whole, attributed, atomic and service-role only';
+  -- ══ §6 · nothing is rebuilt on the way out ══
+  IF v_rebuilt > 0 THEN
+    RAISE EXCEPTION 'D170/370 §6: deleting the project wrote % insert statement(s) into its derived tables — the D142 rebuild ran on a project being deleted, which is what cost 44 s', v_rebuilt;
+  END IF;
+  SELECT prosrc INTO v_src FROM pg_proc WHERE oid = 'public.delete_project(uuid, uuid, text)'::regprocedure;
+  IF position('DELETE FROM public.projects' IN v_src) = 0
+     OR position('DELETE FROM public.projects' IN v_src) > position('DELETE FROM public.inbound_logistics' IN v_src)
+     OR position('DELETE FROM public.projects' IN v_src) > position('DELETE FROM public.outbound_logistics' IN v_src)
+     OR position('DELETE FROM public.projects' IN v_src) > position('DELETE FROM public.bom_single_level' IN v_src) THEN
+    RAISE EXCEPTION 'D170/370 §6: delete_project deletes a lane source before the project row, so every source delete rebuilds the project it is deleting';
+  END IF;
+
+  RAISE NOTICE 'D170/370: delete_project is whole, attributed, atomic, service-role only, and rebuilds nothing';
 END $d170$;
