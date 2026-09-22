@@ -19,7 +19,7 @@ import '@xyflow/react/dist/style.css';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { typedNodesFromLanes, labelForEchelon, type Echelon } from '@/lib/graph';
+import { placeLaneNodes, echelonToLegacyType, labelForEchelon, type Echelon } from '@/lib/graph';
 import { useAuth } from '@/hooks/useAuth';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
 import { fetchMultiTierNetworkData, MultiTierNetworkData } from '@/services/network';
@@ -184,35 +184,13 @@ function getNodeColor(nodeType: string, level: number, maxLevel: number): string
   return '#6b7280';
 }
 
-/**
- * The legacy four-value vocabulary, DERIVED from the echelon — WP 8.3 · §4 D127.
- *
- * `getNodeTypeFromLevel` and `getDisplayNodeType` used to live here. Both are gone:
- * they inferred a node's type from `supply_chain_data_multi_tier.level`, a column two
- * live writers disagree about (§4 D140) and which the deployed one flattens to a
- * literal 2 on every BOM row. They also disagreed with EACH OTHER — one had an
- * `inbound` override and the other read the level alone — which is two of the eight
- * classifiers D127 counts, in one file.
- *
- * What replaces them is `typedNodesFromLanes`, the declared mirror of
- * `classify_node_echelon`, and this mapping. It is a mapping and not a second rule,
- * exactly as `classify_node_type` is now a mapping over `classify_node_echelon` in
- * SQL — so the page and the database cannot type the same node differently.
- *
- * `subassembly` maps to `material`: a thing the plant both builds and consumes is
- * input to something else, and calling it a product told the map to draw it on the
- * customer side. `plant` and `unknown` map to `material` ONLY for the legacy colour
- * and filter paths that cannot express them; every label a user reads goes through
- * `labelForEchelon`, which says "Unknown" rather than guessing (T1).
+/*
+ * `getNodeTypeFromLevel`, `getDisplayNodeType` and this page's `echelonToLegacyType`
+ * used to live here. The first two inferred type from `level` (§4 D127, D140); the
+ * mapping and the placement rule moved to `src/lib/graph/placement.ts` (audit
+ * 2026-09-22 · F-09) so `/interactive-network-space` could call the same rule
+ * instead of keeping a ladder of its own.
  */
-function echelonToLegacyType(echelon: Echelon): 'supplier' | 'material' | 'product' | 'customer' {
-  switch (echelon) {
-    case 'customer': return 'customer';
-    case 'product': return 'product';
-    case 'supplier': return 'supplier';
-    default: return 'material';
-  }
-}
 
 /**
  * The label for a DEPTH BUCKET, as the level tiles and the flow list describe one.
@@ -392,50 +370,11 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
         );
       }
 
-      const typedNodes = typedNodesFromLanes(multiTierData, bomDepthRows ?? [], projectPlant);
-
-      // The echelon a node resolves to, and the depth to render it at. `bomDepth` is
-      // null for anything outside the BOM — a supplier, a customer — so those keep the
-      // lane ordinate, which is meaningful for them (0 outbound, and the inbound lane's
-      // own position). A NULL depth is never substituted with 0: that is §4 D134.
-      const echelonOf = (id: string): Echelon =>
-        typedNodes.get(id)?.echelon ?? 'unknown';
-      const depthOf = (id: string): number | null =>
-        typedNodes.get(id)?.bomDepth ?? null;
-
-      // ── WHERE A SUPPLIER SITS, derived rather than inherited ───────────────
-      //
-      // A supplier is in no BOM, so it has no BOM depth — and taking the lane's own
-      // ordinate for it is the last place §4 D140 still shows: on the reported
-      // project the inbound lane occupies levels 1 AND 5, from one upload, because
-      // `GREATEST(1, max_level + 1)` was computed against a BOM depth the writer had
-      // already flattened. The page then drew the same kind of firm in two columns
-      // four apart, and called the ones at level 1 materials.
-      //
-      // The position IS in the data: a supplier feeds material M, M has a real BOM
-      // depth d, so the supplier sits one step beyond the deepest material it
-      // supplies. That is what both ETLs were reaching for with `max_level + 1`; the
-      // only thing they got wrong was computing it from the flattened copy.
-      //
-      // A supplier whose materials are all outside the BOM has no derivable position,
-      // and is placed one step beyond the deepest material in the project rather than
-      // at a level that means something else. That is a LAYOUT fallback, not a claim
-      // about the data: `bomDepth` stays null for it and every label it carries comes
-      // from its echelon.
-      const deepestMaterialDepth = Math.max(
-        0,
-        ...[...typedNodes.values()].map((v) => v.bomDepth ?? 0),
-      );
-      const supplierOrdinate = new Map<string, number>();
-      for (const record of multiTierData) {
-        if ((record.data_source ?? '').toLowerCase() !== 'inbound') continue;
-        const supplier = (record.from_location ?? '').trim();
-        if (!supplier) continue;
-        const fedDepth = depthOf((record.to_location ?? '').trim());
-        const candidate = (fedDepth ?? deepestMaterialDepth) + 1;
-        const prev = supplierOrdinate.get(supplier);
-        if (prev === undefined || candidate > prev) supplierOrdinate.set(supplier, candidate);
-      }
+      // Type from the lane ROLES, depth from `bom_multi_level`, a supplier one step
+      // beyond the deepest material it feeds — one rule, shared with
+      // `/interactive-network-space` (audit 2026-09-22 · F-09). A NULL depth is never
+      // substituted with 0 (§4 D134).
+      const placed = placeLaneNodes(multiTierData, bomDepthRows ?? [], projectPlant);
 
       console.log('🔄 Processing nodes and edges from multi-tier data...');
 
@@ -465,16 +404,9 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
         if (!nodeId) return;                 // never a node for a blank endpoint
         if (nodeMap[nodeId]) return;         // first record wins, deterministically
 
-        const echelon = echelonOf(nodeId);
-        // A customer sits at -1 by this page's own convention, which keeps it apart
-        // from a finished product at BOM depth 0. Everything else takes the real BOM
-        // depth where it has one, and the lane ordinate where it does not — a
-        // supplier and a customer are in no BOM, and giving them a depth of 0 would
-        // be §4 D134's substitution in a new place.
-        const level =
-          echelon === 'customer' ? -1
-          : echelon === 'supplier' ? supplierOrdinate.get(nodeId) ?? deepestMaterialDepth + 1
-          : depthOf(nodeId) ?? record.level;
+        const { echelon, level, bomDepth } = placed.get(nodeId) ?? {
+          echelon: 'unknown' as Echelon, level: record.level, bomDepth: null,
+        };
 
         levelNodeCounts[level] = (levelNodeCounts[level] || 0) + 1;
 
@@ -483,7 +415,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
           echelon,
           nodeType: echelonToLegacyType(echelon),
           level,
-          bomLevel: depthOf(nodeId),
+          bomLevel: bomDepth,
           incoming: 0,
           outgoing: 0,
           flowVolume: 0,
@@ -1220,76 +1152,25 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
   }, []);
   const onConnect = useCallback((params: Connection) => setEdges(eds => addEdge(params, eds)), []);
 
+  // Audit 2026-09-22 · F-10: "Resilience" was `0.4 + 0.6(1 - HHI)`, floored at 0.4
+  // with a red alert on `< 0.4` that no input could reach, and "Bottlenecks" counted
+  // `level === 1` nodes as "assembly steps" no table describes. Both are DELETED; a
+  // resilience measure is the engine's to compute. F-35: the unrendered diagnostics
+  // routine (the page's last read of the deprecated lane `level`) went with them.
   const mobileProcessMetrics = useMemo(() => {
     const totalNodes = allNodes.length;
     const networkDepth = Object.keys(levelCounts).length;
-    // Bottlenecks: level-1 nodes in the top flow list (manufacturing / assembly steps)
-    const bottlenecks = topFlowNodes.filter(n => n.level === 1).length;
     // Path concentration: HHI of flow volumes across top-flow nodes
     const flows = topFlowNodes.map(n => n.flow);
     const totalFlow = flows.reduce((s, f) => s + f, 0);
     let pathConc = 0;
     if (totalFlow > 0) flows.forEach(f => { const s = f / totalFlow; pathConc += s * s; });
-    // Top bottleneck node
-    const topL1 = [...topFlowNodes].filter(n => n.level === 1).sort((a, b) => b.flow - a.flow)[0];
-    const topL1Node = topL1 ? allNodes.find(n => n.id === topL1.id) : null;
-    // Resilience: use path concentration as HHI proxy, no SPOF heuristic from flow
-    const resilience = 0.4 + 0.3 * (1 - pathConc) + 0.3 * (1 - Math.min(pathConc, 1));
     return {
       totalNodes,
       networkDepth,
-      bottlenecks,
       pathConcentration: totalFlow > 0 ? pathConc.toFixed(3) : '—',
-      resilience: totalFlow > 0 ? resilience.toFixed(3) : '—',
-      resilienceRed: totalFlow > 0 && resilience < 0.4,
-      topBottleneckName: topL1Node?.data?.label ?? null,
     };
   }, [allNodes, levelCounts, topFlowNodes]);
-
-  // Diagnostics: check BOM level distribution and multi-tier presence (including level 0)
-  const runDiagnostics = useCallback(async () => {
-    if (!user || !globalSelectedProjectId) {
-      toast.info('Select a project first');
-      return;
-    }
-    try {
-      const [{ data: bomRows, error: bomErr }, { data: mtRows, error: mtErr }] = await Promise.all([
-        supabase.from('bom_multi_level').select('level').eq('project_id', globalSelectedProjectId),
-        supabase.from('supply_chain_data_multi_tier').select('level,data_source').eq('project_id', globalSelectedProjectId),
-      ]);
-
-      if (bomErr) throw bomErr;
-      if (mtErr) throw mtErr;
-
-      const bomCounts = (bomRows || []).reduce((acc: Record<number, number>, r: any) => {
-        const lvl = Number(r.level);
-        acc[lvl] = (acc[lvl] || 0) + 1;
-        return acc;
-      }, {} as Record<number, number>);
-
-      const mtCounts = (mtRows || []).reduce((acc: Record<number, number>, r: any) => {
-        const lvl = Number(r.level);
-        acc[lvl] = (acc[lvl] || 0) + 1;
-        return acc;
-      }, {} as Record<number, number>);
-
-      const mtOutboundL0 = (mtRows || []).filter((r: any) => Number(r.level) === 0 && (r.data_source || '').toLowerCase() === 'outbound').length;
-      const bomL0 = bomCounts[0] || 0;
-      const mtL0 = mtCounts[0] || 0;
-
-      const bomSummary = Object.keys(bomCounts).sort((a, b) => Number(a) - Number(b)).map(k => `${k}:${bomCounts[Number(k)]}`).join(', ') || 'none';
-      const mtSummary = Object.keys(mtCounts).sort((a, b) => Number(a) - Number(b)).map(k => `${k}:${mtCounts[Number(k)]}`).join(', ') || 'none';
-
-      toast.success(`Diagnostics — BOM levels: ${bomSummary} | Multi-tier levels: ${mtSummary} | L0 BOM: ${bomL0}, L0 MT: ${mtL0}, L0 MT outbound: ${mtOutboundL0}`);
-
-      if (bomL0 > 0 && mtOutboundL0 === 0) {
-        toast.warning('Level 0 exists in BOM but no level 0 outbound edges were found in multi-tier data. Re-run combine.');
-      }
-    } catch (e: any) {
-      console.error('Diagnostics failed:', e);
-      toast.error(`Diagnostics failed: ${e.message || e}`);
-    }
-  }, [user, globalSelectedProjectId]);
 
   const nodeTypes = useMemo(() => ({ default: TooltipNode }), []);
 
@@ -1507,27 +1388,16 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
               { label: 'Nodes', value: mobileProcessMetrics.totalNodes > 0 ? String(mobileProcessMetrics.totalNodes) : '—' },
               { label: 'Network depth', value: mobileProcessMetrics.networkDepth > 0 ? String(mobileProcessMetrics.networkDepth) : '—' },
               { label: 'Critical path', value: '—' },
-              {
-                label: 'Resilience',
-                value: mobileProcessMetrics.resilience,
-                red: mobileProcessMetrics.resilienceRed,
-              },
             ]}
           />
 
-          <LensSection label="Structural risk" counter="4" tone="primary" lens="teal">
+          <LensSection label="Structural risk" counter="3" tone="primary" lens="teal">
             <LensRisk
               rows={[
                 { label: 'Critical path', value: '—' },
-                { label: 'Bottlenecks', value: mobileProcessMetrics.totalNodes > 0 ? String(mobileProcessMetrics.bottlenecks) : '—' },
                 { label: 'Utilisation headroom', value: '—' },
                 { label: 'Path concentration', value: mobileProcessMetrics.pathConcentration },
               ]}
-              alert={
-                mobileProcessMetrics.bottlenecks > 0 && mobileProcessMetrics.topBottleneckName
-                  ? `${mobileProcessMetrics.topBottleneckName} is the highest-flow assembly step and may constrain the critical path.`
-                  : undefined
-              }
             />
           </LensSection>
 
@@ -1698,12 +1568,10 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                     <div className="flex justify-between">
                       <span>Chain Position:</span>
                       <span className="text-xs text-muted-foreground">
-                        {selectedNode.data.level === -1 ? 'End Customer' :
-                         selectedNode.data.level === 0 ? 'Final Product' :
-                         selectedNode.data.level === 1 ? 'Manufacturing' :
-                         selectedNode.data.level >= 2 && selectedNode.data.level <= 4 ? 'Intermediate' :
-                         selectedNode.data.level === 5 ? 'Direct Supplier' :
-                         'Upstream Supplier'}
+                        {/* F-10's class: this was a ladder over `level` that printed
+                            "Manufacturing" and "Direct Supplier" — nouns no table holds. */}
+                        {labelForEchelon(selectedNode.data.echelon)}
+                        {selectedNode.data.bomLevel != null ? ` · BOM depth ${selectedNode.data.bomLevel}` : ''}
                       </span>
                     </div>
                   </div>
@@ -1801,7 +1669,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
               <CardHeader>
                 <CardTitle className="text-base">Top nodes by flow volume</CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  Nodes handling the most weighted flow — potential bottlenecks
+                  Nodes handling the most weighted flow
                 </p>
               </CardHeader>
               <CardContent className="space-y-3">
