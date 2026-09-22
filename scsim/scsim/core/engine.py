@@ -706,6 +706,9 @@ class ScenarioResult:
     # [{"supplier_id", "material_id", "draws", "replications", "bounded_to_weeks"}].
     # Empty when no draw was bounded — the common case.
     lead_time_truncations: list = field(default_factory=list)
+    # Fixed-start events moved from inside warm-up to t_w (audit F-03):
+    # [{"event_index", "target_id", "authored_week", "used_week", "replications"}].
+    event_shifts: list = field(default_factory=list)
 
     def kpi_array(self, key: str) -> np.ndarray:
         return np.array([row.get(key, np.nan) for row in self.kpis])
@@ -851,8 +854,11 @@ def run_scenario(
     }
     lp_fallbacks = 0
     cap_acc = _CapacityBindingAccumulator(compiled.model)
+    # event index → (authored week, week used). Deterministic per event, so one
+    # entry per event whatever the replication count (audit F-03).
+    shifts: dict[int, tuple[int, int]] = {}
     for n, (i, j) in enumerate(grid):
-        events = resolve_events(compiled.model, t_w, j) if scenario.events else []
+        events = resolve_events(compiled.model, t_w, j, shifts) if scenario.events else []
         ctx = run_replication(
             compiled, i, j, events, debug=debug,
             snapshot_store=snapshot_store, snapshot_digest=snapshot_digest, warmup_week=t_w,
@@ -873,7 +879,7 @@ def run_scenario(
     if settings.replication_stopping == ReplicationStopping.SEQUENTIAL_CI and scenario.events:
         kpis, rows, grid = _extend_until_ci(
             compiled, scenario, kpis, rows, grid, t_w, window_end, debug, progress,
-            cap_acc,
+            cap_acc, shifts=shifts,
         )
 
     # Single-run inspection surface (G17/§9.5.1): expose the full-debug
@@ -936,12 +942,18 @@ def run_scenario(
         item_ids=item_ids,
         capacity_binding=cap_acc.summary(compiled.model, t_w, window_end) or None,
         lead_time_truncations=cap_acc.lead_time_truncations(),
+        event_shifts=[
+            {"event_index": i, "target_id": scenario.events[i].target_id,
+             "authored_week": a, "used_week": u, "replications": len(grid)}
+            for i, (a, u) in sorted(shifts.items())
+        ],
     )
 
 
 def _extend_until_ci(compiled, scenario, kpis, rows, grid, t_w, window_end, debug,
                      progress: Optional[ProgressFn] = None,
-                     cap_acc: Optional["_CapacityBindingAccumulator"] = None):
+                     cap_acc: Optional["_CapacityBindingAccumulator"] = None,
+                     shifts: Optional[dict] = None):
     settings = compiled.model.settings
     e_axis = max({j for _, j in grid}) + 1
     next_i = max({i for i, _ in grid}) + 1
@@ -954,7 +966,7 @@ def _extend_until_ci(compiled, scenario, kpis, rows, grid, t_w, window_end, debu
             for j in range(e_axis):
                 batch.append((i, j))
         for (i, j) in batch:
-            events = resolve_events(compiled.model, t_w, j) if scenario.events else []
+            events = resolve_events(compiled.model, t_w, j, shifts) if scenario.events else []
             ctx = run_replication(compiled, i, j, events, debug=debug)
             row = compute_replication_kpis(ctx, t_w, window_end, events)
             for pol in compiled.policies:

@@ -8,6 +8,8 @@ interface Props {
   reps: Replication[];
   /** The scenario's objective — its row is banded and rule-marked. */
   primaryKpi?: string;
+  /** The run's engine, so rows computed before a fix are marked (audit WP 3). */
+  codeVersion?: string | null;
 }
 
 /**
@@ -32,8 +34,8 @@ interface Props {
  * The ORDER is the catalog's, then alphabetical for the rest, so two runs of the
  * same shape produce the same table and an unnamed measure does not jump around.
  */
-export function KpiStatTable({ reps, primaryKpi }: Props) {
-  const rows = useMemo<KpiStat[]>(() => buildKpiRows(reps), [reps]);
+export function KpiStatTable({ reps, primaryKpi, codeVersion }: Props) {
+  const rows = useMemo<KpiStat[]>(() => buildKpiRows(reps, codeVersion), [reps, codeVersion]);
 
   return (
     // L1: the table's name reads on the canvas, above the shell.

@@ -228,3 +228,18 @@ def test_ring_truncations_reach_the_mapping_warnings_list():
     assert w["level"] == "warn" and w["entity"] == "supply:s1->m1"
     assert w["field"] == "lead_time" and "24" in w["reason"] and "102" in w["reason"]
     assert _truncation_warnings(SimpleNamespace()) == []
+
+
+def test_event_shifts_reach_the_mapping_warnings_list():
+    """Audit F-03: a disruption moved out of warm-up is said on the run."""
+    from types import SimpleNamespace
+
+    from sim_worker.scsim_bridge import _event_shift_warnings
+
+    res = SimpleNamespace(event_shifts=[
+        {"event_index": 0, "target_id": "s1", "authored_week": 1,
+         "used_week": 15, "replications": 30}])
+    [w] = _event_shift_warnings(res)
+    assert w["entity"] == "event:s1" and w["field"] == "start"
+    assert "week 1" in w["reason"] and "week 15" in w["reason"]
+    assert _event_shift_warnings(SimpleNamespace()) == []

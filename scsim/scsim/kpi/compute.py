@@ -68,10 +68,19 @@ def compute_replication_kpis(
         row[f"cost_{name}"] = costs[name]
 
     if events:
-        ttr, tts, baseline = _ttr_tts(tr.fill_rate, t_w, window_end, events)
-        row["ttr_weeks"] = ttr
-        row["tts_weeks"] = tts
-        row["pre_disruption_fill_rate"] = baseline
+        # A measure is present only when it was MEASURED (audit WP 3, F-04/F-05).
+        # No pre-disruption week → no band → none of the three exists; a
+        # censored recovery or survival is a flag, not a number to average.
+        m = _ttr_tts(tr.fill_rate, t_w, window_end, events)
+        row["recovery_measurable"] = 1.0 if m.measurable else 0.0
+        if m.measurable:
+            row["pre_disruption_fill_rate"] = m.baseline
+            row["ttr_censored"] = 1.0 if m.ttr_censored else 0.0
+            row["tts_censored"] = 1.0 if m.tts_censored else 0.0
+            if m.ttr is not None:
+                row["ttr_weeks"] = m.ttr
+            if m.tts is not None:
+                row["tts_weeks"] = m.tts
     return row
 
 
@@ -116,31 +125,68 @@ def _supplier_utilization(ctx: SimContext, t_w: int, window_end: int) -> float:
     return float(tr.supplier_capacity_used_units[t_w:window_end].sum()) / avail
 
 
+@dataclass(frozen=True)
+class RecoveryMeasure:
+    """TTR/TTS for one replication, with what could NOT be measured said.
+
+    ``measurable`` is False when the window holds no week before the first
+    disruption (t* ≤ t_w) or none after it: there is no band to recover to, and
+    the old code invented one — a baseline of 1.0 (audit F-04). ``ttr`` is None
+    and ``ttr_censored`` True when fill rate never re-entered the band inside the
+    window; ``tts`` is None and ``tts_censored`` True when it never left it.
+    The old code returned the window length for both, which the table then
+    averaged with real recoveries (audit F-05).
+    """
+    baseline: float | None
+    ttr: float | None
+    tts: float | None
+    ttr_censored: bool = False
+    tts_censored: bool = False
+
+    @property
+    def measurable(self) -> bool:
+        return self.baseline is not None
+
+
+_UNMEASURABLE = RecoveryMeasure(baseline=None, ttr=None, tts=None)
+
+
 def _ttr_tts(
     fr: np.ndarray, t_w: int, window_end: int, events: list[ResolvedEvent]
-) -> tuple[float, float, float]:
+) -> RecoveryMeasure:
     t_star = min(e.start for e in events)
     t_star = max(t_star, t_w)
     pre = fr[t_w:t_star]
-    baseline = float(pre.mean()) if pre.size else 1.0
+    post = fr[t_star:window_end]
+    if pre.size == 0 or post.size == 0:
+        return _UNMEASURABLE
+    baseline = float(pre.mean())
     band = baseline - FR_BAND_PP
 
-    post = fr[t_star:window_end]
-    if post.size == 0:
-        return 0.0, 0.0, baseline
     below = post < band
     if not below.any():
-        return 0.0, float(post.size), baseline  # never left the band: TTS censored at window
+        # never left the band: nothing to recover from; survival censored
+        return RecoveryMeasure(baseline, ttr=0.0, tts=None, tts_censored=True)
 
-    tts = float(np.argmax(below))  # first week below the band
     first_below = int(np.argmax(below))
-    ttr = float(post.size)  # censored default
     for k in range(first_below, post.size):
         seg = post[k:k + TTR_SUSTAIN_WEEKS]
         if seg.size and (seg >= band).all():
-            ttr = float(k)
-            break
-    return ttr, tts, baseline
+            return RecoveryMeasure(baseline, ttr=float(k), tts=float(first_below))
+    return RecoveryMeasure(baseline, ttr=None, tts=float(first_below), ttr_censored=True)
+
+
+def censored_mean(rows: list[dict], key: str, flag: str, cap: float) -> float | None:
+    """Mean of ``key`` counting a censored replication at ``cap`` (the window).
+
+    For the Resilience Index, which normalizes TTR/TTS by the window: a chain
+    that never recovered scores the full window, which is what the sentinel
+    used to mean — stated here instead of hidden in a KPI a table averaged.
+    Replications where the measure does not exist are excluded. None if none.
+    """
+    xs = [r[key] if key in r else cap for r in rows
+          if r.get("recovery_measurable", 1.0) == 1.0 and (key in r or r.get(flag) == 1.0)]
+    return float(np.mean(xs)) if xs else None
 
 
 # ---------------------------------------------------------------------------

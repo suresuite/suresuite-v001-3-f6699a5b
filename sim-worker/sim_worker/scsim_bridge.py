@@ -136,6 +136,28 @@ def _truncation_warnings(result: Any) -> list[dict]:
     ]
 
 
+def _event_shift_warnings(result: Any) -> list[dict]:
+    """Fixed-start disruptions the engine moved out of warm-up (audit F-03).
+
+    The authored start lay before t_w, which no KPI measures; the engine ran it
+    at t_w instead. Said where the run panel reads, with both weeks, because
+    t_w is a run-time fact the scenario form cannot show under auto warm-up.
+    """
+    return [
+        {
+            "level": "warn",
+            "entity": f"event:{s['target_id']}",
+            "field": "start",
+            "reason": (
+                f"authored start week {s['authored_week']} is inside the warm-up, "
+                f"which no KPI measures → run from week {s['used_week']}, the first "
+                f"measured week; recovery (TTR/TTS) is not measurable for it"
+            ),
+        }
+        for s in (getattr(result, "event_shifts", None) or [])
+    ]
+
+
 def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str, Any]:
     """Canonical experiment path: map a ProjectData (item masters + logistics +
     policies + scenario) into an scsim Scenario, run it, and return both the
@@ -174,7 +196,8 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
         "engine_version": ENGINE_VERSION,
         "n_reps": result.stats.n_replications,
         "below_replication_floor": result.stats.below_replication_floor,
-        "mapping_warnings": mapping.warning_dicts + _truncation_warnings(result),
+        "mapping_warnings": (mapping.warning_dicts + _truncation_warnings(result)
+                             + _event_shift_warnings(result)),
         "warmup_detected_at": (result.warmup.adopted_week if result.warmup else None),
         "feasibility_warnings": [
             {"code": w.code, "message": w.message} for w in result.feasibility_warnings

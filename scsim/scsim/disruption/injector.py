@@ -65,6 +65,7 @@ def resolve_events(
     model: CompiledModel,
     warmup_end: int,
     event_rep: int,
+    shifts: dict[int, tuple[int, int]] | None = None,
 ) -> list[ResolvedEvent]:
     """Draw start/duration per event and bind targets for one replication."""
     resolved: list[ResolvedEvent] = []
@@ -73,7 +74,19 @@ def resolve_events(
         is_plant = ev.target_type == TargetType.NODE_PLANT
         sup_idx = -1 if is_plant else _resolve_supplier(model, ev, i)
         if ev.start is not None:
+            # `start` is an ABSOLUTE week (manuscript §3.7 — t* is absolute, and
+            # the auto branch below draws an absolute week too). A fixed start
+            # before t_w lay wholly or partly in warm-up, which no KPI measures:
+            # the default "day 10" disruption was a no-disruption run with a
+            # fabricated recovery time (audit F-03). It is moved to t_w, the
+            # auto branch's own lower bound, and the caller is told — the engine
+            # counts it (`ScenarioResult.event_shifts`) and the bridge surfaces
+            # it in `mapping_warnings`. Shifted, never silently excluded.
             start = ev.start
+            if start < warmup_end:
+                start = warmup_end
+                if shifts is not None:
+                    shifts[i] = (int(ev.start), int(warmup_end))
         else:
             # Steady state: U{t_w .. t_w+2} (§3.7 — manuscript U{85..87}).
             rng = hazard_rng(seed, event_rep, i, HAZARD_START)
