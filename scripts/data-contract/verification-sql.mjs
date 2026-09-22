@@ -3432,6 +3432,7 @@ async function wp65aLandingSwitch() {
   const list = Array.isArray(fns.rows) ? fns.rows : [];
   const fn = list.find((x) => x.slug === "ingest-file");
   if (!fn?.id) return;
+  // (7) is below; it reuses this window and the `logs` helper for `delete-project`.
   const end = new Date();
   const start = new Date(end.getTime() - 23 * 3600 * 1000);
   const logs = async (sql) => {
@@ -3470,6 +3471,39 @@ async function wp65aLandingSwitch() {
     out("", "**(6) `ingest-file` — its console and runtime events** (`function_logs`, newest first):");
     out(...table(rows.map((r) => ({ ...r, message: String(r.message ?? "").replace(/\s+/g, " ").slice(0, 400) }))));
   });
+
+  // (7) `delete-project` — WHY A PROJECT DID NOT GO AWAY. The after-read found project
+  // `dsds` with its `bom_single_level` rows deleted in 200-row batches with no actor and
+  // the project row itself still present, so the live function (the 2026-03-17 build,
+  // §4 D168) stopped part-way. Its own console says where; errors first.
+  const del = list.find((x) => x.slug === "delete-project");
+  if (del?.id) {
+    const did = String(del.id).replace(/[^A-Za-z0-9-]/g, "");
+    const dedge = await logs(`
+      select cast(t.timestamp as string) as ts, request.method as method, response.status_code as status,
+             m.execution_time_ms as ms
+        from function_edge_logs t
+        cross join unnest(t.metadata) as m
+        cross join unnest(m.response) as response
+        cross join unnest(m.request) as request
+       where m.function_id = '${did}'
+       order by t.timestamp desc limit 20`);
+    report("(7) `delete-project` invocations", dedge, (rows) => {
+      out("", `**(7) \`delete-project\` (version ${del.version}, updated ${del.updated_at ? new Date(del.updated_at).toISOString().slice(0, 10) : "?"}) — invocations, last 23 h:**`);
+      out(...table(rows));
+    });
+    const dcon = await logs(`
+      select cast(t.timestamp as string) as ts, m.level as level, t.event_message as message
+        from function_logs t
+        cross join unnest(t.metadata) as m
+       where m.function_id = '${did}'
+         and m.event_type = 'Log'
+       order by t.timestamp desc limit 80`);
+    report("(7) `delete-project` console", dcon, (rows) => {
+      out("", "**(7) `delete-project` — its console (newest first):**");
+      out(...table(rows.map((r) => ({ ...r, message: String(r.message ?? "").replace(/\s+/g, " ").slice(0, 300) }))));
+    });
+  }
 }
 
 async function main() {
