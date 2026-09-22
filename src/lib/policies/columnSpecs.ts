@@ -210,7 +210,7 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
           // cuts". Measured at 60 of 60 suppliers null in the §15 project, every
           // one of which the grid used to report as a capacity of zero.
           //
-          // READ FROM THE ENGINE SINCE WP 9.3 (§4 D165). The token and the
+          // READ FROM THE ENGINE SINCE WP 9.3 (§4 D167). The token and the
           // sentence were written out here, which made this file the only
           // machine-readable statement of a fact about the ENGINE — the
           // registry said "unlimited" in prose one field over and no surface
@@ -277,7 +277,7 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
         master: { table: "products", field: "demand_mean", idFrom: "product_id" },
       }),
       col("capacity_units_per_day", "production", { defaultWhenMissing: 1000 }),
-      // THE OTHER HALF OF THE ARITHMETIC, AND IT HAD NO COLUMN (§4 D165). The
+      // THE OTHER HALF OF THE ARITHMETIC, AND IT HAD NO COLUMN (§4 D167). The
       // engine builds a product's weekly capacity as units/day × 7 ×
       // utilization_cap_pct, and the grid rendered the first factor and hid the
       // second — so a planner saw 1 000/day become 5 950/week with nothing on

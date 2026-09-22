@@ -60,7 +60,7 @@ export const KPI_DISPLAY: KpiDisplay[] = [
   { key: "avg_fg_value", label: "Average finished-goods inventory (value)", format: money, higherIsBetter: null },
   { key: "avg_on_hand_units", label: "Average material inventory (units)", format: units, higherIsBetter: null },
   { key: "avg_fg_units", label: "Average finished-goods inventory (units)", format: units, higherIsBetter: null },
-  // Capacity (WP 9.3 / §4 D165). `capacity_utilization` was named here from the
+  // Capacity (WP 9.3 / §4 D167). `capacity_utilization` was named here from the
   // start and was NaN on every run that was not a full-debug inspection, so the
   // label described a row nobody ever saw. The three beside it are what turn
   // "how hard did it run" into "did it BIND, and for whom" — a utilization can

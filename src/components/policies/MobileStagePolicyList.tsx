@@ -316,7 +316,7 @@ export function MobileStagePolicyList({
                     // T2 on the phone. The desktop grid puts this sentence in a
                     // hover and a popover, neither of which a phone has — so it
                     // is the row's `sub`, where the skin already puts the line
-                    // that explains the value above it (§4 D165). Same sentence,
+                    // that explains the value above it (§4 D167). Same sentence,
                     // same assembler: `substitutionNote` over the same
                     // `ResolvedCell`, so the two surfaces cannot disagree about
                     // what stood in for a number.

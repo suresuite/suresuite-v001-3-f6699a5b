@@ -41,7 +41,7 @@ interface RunMeta {
   horizon_days?: number;
   engine?: string;
   scsim_notes?: string[];
-  /** Which products/suppliers capacity held back (§4 D165). Written by the
+  /** Which products/suppliers capacity held back (§4 D167). Written by the
    *  worker from `ScenarioResult.capacity_binding`; absent on a run that
    *  predates the measurement, which the panel says rather than assumes. */
   capacity_binding?: CapacityBinding;
@@ -153,7 +153,7 @@ export function ResultsDashboard({
         reps={reps.filter((r) => r.status === "done")}
         warmupWeeks={run.warmup_detected_at}
       />
-      {/* Capacity utilization (§4 D165): the engine's own weekly capacity and the
+      {/* Capacity utilization (§4 D167): the engine's own weekly capacity and the
           part of it the run used, with the per-entity binding behind it. Same
           shape as the inventory chart above — plain weekly scalars, so it
           renders on every run, unlike the per-item panel at the bottom. The
@@ -184,7 +184,7 @@ export function ResultsDashboard({
           measure exists and now renders in the table above, as
           `capacity_utilization`, which the same defect had been hiding.
 
-          AND THAT LAST SENTENCE WAS FALSE FOR THE WHOLE OF ITS LIFE — §4 D165.
+          AND THAT LAST SENTENCE WAS FALSE FOR THE WHOLE OF ITS LIFE — §4 D167.
           `capacity_utilization` read `trace.Q`, which exists only under
           `full_debug`, so on every ordinary run it was NaN, the bridge mapped
           NaN to null, and the row never appeared in the table this comment

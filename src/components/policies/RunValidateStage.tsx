@@ -138,7 +138,7 @@ const KPI_OPTIONS = [
   { id: "demand_value", label: "Demand value", unit: "€" },
   { id: "lost_units", label: "Lost units", unit: "units" },
   { id: "lost_inbound_units", label: "Lost inbound units", unit: "units" },
-  // Capacity (§4 D165). These four were all NaN or absent on every ordinary
+  // Capacity (§4 D167). These four were all NaN or absent on every ordinary
   // run until WP 9.3 made the measurement always-on.
   { id: "capacity_utilization", label: "Plant capacity utilization", unit: "%" },
   { id: "supplier_capacity_utilization", label: "Supplier capacity utilization", unit: "%" },
@@ -1472,7 +1472,7 @@ export function RunValidateStage({
                 )}
               </div>
             )}
-            {/* What capacity the run will use, and whether it is real (§4 D165).
+            {/* What capacity the run will use, and whether it is real (§4 D167).
                 Below the findings rather than among them: a product with no
                 capacity figure is NOT a finding — the engine resolves it, and
                 the manifest grades that resolution `recommended`. What the
@@ -2951,7 +2951,7 @@ function EngineOutputSummary({
             along and was never published (G19 / §4 D164). */}
         <InventoryOverTime reps={reps} warmupWeeks={warmupWeeks} height={200} />
         {/* 1b — capacity: what the engine offered each week and what the run
-            used, with the per-entity binding behind it (§4 D165). The second
+            used, with the per-entity binding behind it (§4 D167). The second
             thing a modeler checks and the one this page could not answer: the
             sanity tile below printed "not recorded" for `capacity_utilization`
             on every run, because the KPI read a full-debug-only matrix. */}
@@ -3059,7 +3059,7 @@ function SanityScalars({ reps }: { reps: Replication[] }) {
   const lostInbound = avg("lost_inbound_units");
   return (
     <div className={cn(SURFACE, "grid grid-cols-[repeat(auto-fit,minmax(min(100%,120px),1fr))] gap-2 bg-[#fafafa] px-2.5 py-1.5")}>
-      {/* "NOT RECORDED" USED TO BE THE ONLY ANSWER THIS TILE EVER GAVE — §4 D165.
+      {/* "NOT RECORDED" USED TO BE THE ONLY ANSWER THIS TILE EVER GAVE — §4 D167.
           `capacity_utilization` read a full-debug-only matrix, so every
           ordinary run reported NaN, the bridge wrote null, and this printed
           "not recorded" for the quantity the engine clips production against

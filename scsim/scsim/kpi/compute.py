@@ -78,7 +78,7 @@ def compute_replication_kpis(
 def _utilization(ctx: SimContext, t_w: int, window_end: int) -> float:
     """Plant capacity utilization over the window — Σ produced / Σ available.
 
-    ── THIS WAS NaN ON EVERY RUN A USER EVER MADE (§4 D165) ──────────────────
+    ── THIS WAS NaN ON EVERY RUN A USER EVER MADE (§4 D167) ──────────────────
 
     It read ``ctx.trace.Q``, the per-product production matrix, which exists
     only under ``trace_verbosity=full_debug``. Every ordinary Monte Carlo run

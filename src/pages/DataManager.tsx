@@ -1248,7 +1248,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                   value={globalSelectedProjectId || ''}
                   onValueChange={(v) => setGlobalSelectedProjectId(v || null)}
                 >
-                  <SelectTrigger className={cn('h-9', HDR_PROJECT_SELECT)}>
+                  <SelectTrigger className={cn('h-11 md:h-9', HDR_PROJECT_SELECT)}>
                     <SelectValue placeholder="Select project" />
                   </SelectTrigger>
                   <SelectContent>

@@ -413,7 +413,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                     desktop literal without a second breakpoint. The desktop
                     header handoff makes that literal the product-wide project
                     select — 200 × 36 with the `--border-strong` hairline. */}
-                <SelectTrigger className={cn('h-9 w-[clamp(130px,42vw,200px)]', HDR_PROJECT_SELECT)}>
+                <SelectTrigger className={cn('h-11 md:h-9 w-[clamp(130px,42vw,200px)]', HDR_PROJECT_SELECT)}>
                   <SelectValue placeholder="Select project" />
                 </SelectTrigger>
                 <SelectContent>
@@ -514,7 +514,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                       />
                     </section>
                     {/* What capacity this run will use, and whether it is real
-                        (§4 D165). Beside the gate rather than inside it: a
+                        (§4 D167). Beside the gate rather than inside it: a
                         product with no capacity figure is not a finding — the
                         engine resolves it — but the number it resolves to is
                         max(2·demand, 1000), chosen so capacity never binds, and

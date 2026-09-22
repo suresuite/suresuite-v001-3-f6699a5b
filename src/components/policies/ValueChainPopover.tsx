@@ -135,7 +135,7 @@ export function ValueChainPopover({
   provenance: ValueChainInput["provenance"];
   displayed: string;
   /** The sentence naming the substitution behind this cell, when there is one
-   *  (`resolveEffective.ts::substitutionNote`) — §4 D165. */
+   *  (`resolveEffective.ts::substitutionNote`) — §4 D167. */
   substitution?: string | null;
   /** True when an item-master column outranks this cell and the run ignores it. */
   superseded?: boolean;

@@ -347,7 +347,9 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D162** | **A RENAMED migration is invisible to `contract:rehearse` — the one gate that executes migrations — and it is invisible in the way that does the most damage: it removes the file's objects from the base AND skips the file that would put them back.** `newMigrations()` asks git for `--diff-filter=A`, and `git diff` detects renames by default, so a migration that was renamed rather than written reads as `R` and is dropped from the rehearsal set. That alone would only mean "not rehearsed". What makes it worse is the OTHER half: the base schema is built from the BASE branch's `build/schema.introspected.json`, and that artifact records, for each function, the migration FILE its body came from. After a rename the base branch's artifact names a file this branch no longer has, so `rehearsal-schema.mjs` prints `function source missing` and builds a base WITHOUT those functions — while the file that defines them sits unrehearsed. The result is a rehearsal against a database missing objects that neither the base nor the branch put there, and every behavioural assertion that calls one fails for a reason that has nothing to do with what it asserts. Found by D151's renumber: three files moved, three `function source missing` warnings appeared, `rehearsing 3 new migration(s)` named only the three that were newly WRITTEN, and `rehearsal/300` and `/310` failed on `function public.refresh_node_list_for_project(uuid, uuid) does not exist` — a function WP 8.1 had created and this branch had not touched. **And the rename is not a corner case but the correct response to D151**: `schema_migrations` is keyed on the version in the filename, so renaming is the only way to give a never-applied migration a version production has not recorded, and `supabase db push` WILL apply that file. It is new work by the only definition that matters, and it was the one kind of new work the gate could not see | `scripts/data-contract/rehearse-migrations.mjs`'s `newMigrations()` against `scripts/data-contract/rehearsal-schema.mjs:330`'s `function source missing` warning; reproduced on this branch before the fix, where all three modes reported `✓ 3 migration(s) apply cleanly` and then failed three behavioural assertions | **CLOSED ✅ (this package)** — `--no-renames` on the diff, so the question the function asks ("which migration files exist here that did not exist at the base") is the question git answers. 3 rehearsed became **6**, the three assertions pass, and all three modes are green. *(The `function source missing` warning is left in place and is now correct rather than misleading: it says the BASE branch's artifact named a file this branch renamed, which is true and stops being true the moment this merges. It is a warning and not a failure because the renamed migration now runs and supplies what the base could not)* |
 | **D163** | **`materials.cost` fell back to the material's CHEAPEST quoted price, while the same engine, from the same `volume` column, split that material's orders across its suppliers by lane share.** P-S.2 allocates a multi-sourced material's replenishment in proportion to each lane's weekly volume; the cost fallback took the MINIMUM over the same lanes. On the golden fixture's two-lane material that is 300/400 of it bought at 10.0 and all of it valued at 6.0 — a 33% understatement of purchase spend and of every inventory value derived from it, on a project whose data is COMPLETE and which the run reports as `info`, the grade meaning "derived from what you uploaded". Nothing was missing and nothing was wrong on the screen; the rule was. **And the asymmetry was visible in the registry the whole time**: `products.sell_price` falls back to the DEMAND-WEIGHTED outbound price, one table over, weighted by exactly the same kind of column. The two halves of the same idea were written differently, and only one of them was the average of what actually happens | `scsim/scsim/io/project_map.py`'s materials loop against the same file's `_map_policies` P-S.2 weights, and `base_data_requirements()`'s two `fallback_spec` chains side by side; reproduced in `supabase/functions/_shared/fixtures/validation_parity/dataset.json`'s `M_MULTI` (10.0×300 + 6.0×100 → 9.0 weighted, 6.0 cheapest) | **CLOSED ✅ (this package)** — the chain is `volume_weighted_inbound_price` (info) → `cheapest_inbound_price` (info) → 1.0 (warn), authored ONCE in the registry and walked by the engine, the shared grader and the display layer. The cheapest step is not deleted: it is what resolves a material whose lanes carry no volume, so a project with no volumes is valued exactly as before. `grading_test.ts` asserts the VALUE and the reducer that produced it (9.0 via the weighted step, 6.0 via the cheapest one when the volumes are removed), `test_project_map.py` asserts the same four cases on the engine, and `test_validation_parity.py` holds both to one fixture |
 | **D164** | **Finished-goods inventory was computed on every replication of every run since the weekly trace was written, and published by nothing — because "which weekly series exist" was authored SIX times and `fg_value` was present in two of them.** `engine.py`'s per-week block writes `on_hand_value` and `fg_value` on adjacent lines, and `io/traces.py::trace_frame` — the golden-trace contract — carries both. But `ScenarioResult.extra_series` was a dict LITERAL naming three series, and it is `extra_series` that the bridge turns into `run_replications.time_series`, so `fg_value` stopped at the engine boundary and no user ever saw it. The other four authors: `WeeklyTrace.__post_init__`'s allocation tuple, `_notify_progress`'s observer dict, `REPLICATION_SERIES` in `ReplicationSeedExplorer.tsx` and `SERIES_CHARTS` in `RunValidateStage.tsx`. **The consequence users actually met**: the /policies chart captioned "Inventory dynamics" plotted `on_hand_value` alone — MATERIAL stock — and called it inventory, so the product's own answer to "how much stock do we hold" omitted every finished good, silently and for the whole life of the trace. **THE GATE FOR THIS CLASS EXISTED AND COULD NOT SEE IT.** `deriveReplicationSeries` was written after §4 D113 to join what the engine WRITES against what the UI OFFERS — and it read the `extra_series` literal, i.e. ONE of the six authors, so a series the engine measured and declined to publish was invisible to the rule built to catch exactly that. A gate that reads one of N authors measures that author, not the fact. **This is `single-source` below markdown, the class §2.1 names after D101 and D127** — a data fact (which series a result carries, and in what unit) authored in TypeScript and Python rather than in §4, with nothing comparing the copies | `scsim/scsim/core/engine.py`'s adjacent `tr.on_hand_value[t]` / `tr.fg_value[t]` writes against the three-key `extra_series=` literal in the same file; `scripts/data-contract/chains.mjs::deriveReplicationSeries`, which parsed that literal | **CLOSED ✅ (WP 9.1)** — `WEEKLY_SERIES` in `scsim/scsim/core/context.py` is the one author: each series declares its key, unit, `aggregation` (`level` / `flow` / `ratio`) and whether it is `published`. The allocation loop, `trace_frame`, `_notify_progress` and `extra_series` all DERIVE from it, so a series cannot exist in one and not another; `deriveReplicationSeries` reads the declaration rather than a literal, and throws if it cannot find it. Four parallel `*_rows` arrays threaded through `_extend_until_ci`'s seven-argument signature became one dict keyed by the declaration — that signature is a large part of WHY adding a fifth series never happened. `test_inventory_series.py` holds the reconciliation that makes the two levels of detail one fact: per-material on-hand summed equals `on_hand_units`, and `fg_value` equals `fg_units` at COGS on an MTS fixture that genuinely holds stock. *(What is NOT closed: the same six-author shape for `kpis`' keys. `deriveRunKpis` reads the engine's KPI row, which is one author and the right one, but nothing compares it to `KPI_DISPLAY` beyond D113's join)* |
-| **D165** | **Capacity is the one economic quantity the product measures AND configures, and it was broken at both ends — a chain the display layer could not walk, and a measurement that was `NaN` on every run a user ever made.** **(a) The plant grid showed nothing for a number the run was certain to use.** `products.production_capacity` has declared a machine-readable chain since the reducer library was written — `production_policy_capacity` (grade `info`: the plant grid's units/day × 7 × `utilization_cap_pct`) → `twice_demand_floor_1000` (grade `warn`: max(2·demand, 1000)). The engine walks it, the shared grader walks it, the edge gate grades it. `resolveEffective.ts::derivedValueFor` ended on `return undefined; // production_capacity has no logistics-derived fallback` — true of the LOGISTICS tables and false of the engine, so the cell fell through to `contract`/`default` and a planner never saw the capacity their run would use. **(b) The cell they CAN edit is one the engine often ignores, and only a prose sentence said so.** `POLICY_BUNDLE_KEYS`' `transform` for `capacity_units_per_day` has read "the MASTER `products.production_capacity` shadows it entirely when present" since D90, and a surface cannot act on prose — so the grid rendered an editable line capacity with nothing marking the rows where the run reads the master instead. D18's class, worse: D18's field is consumed by nothing, this one is consumed SOMETIMES. **(c) `utilization_cap_pct` had no column at all**, and it is the other factor in that product's own arithmetic — so 1 000/day became 5 950/week with nothing on screen holding the 0.85. It was also absent from `SCSIM_VISIBLE_FIELDS`, so the moment it got a column it would have rendered `stored-only`: the grid telling a planner the engine ignores the number it is about to multiply the capacity by. **(d) `capacity_utilization` was NaN on every ordinary run.** `_utilization` read `ctx.trace.Q`, a per-product matrix that exists only under `trace_verbosity=full_debug`; a Monte Carlo run allocates none, so the KPI was NaN, `_finite` mapped it to null, and the /policies sanity tile printed **"not recorded"** — for the quantity the engine clips production against in every week of every replication. §4 D113 removed a per-node utilization heatmap and told the next reader the run-level measure "now renders in the table above"; it never did, and the note is what stopped anyone looking. **(e) The declared meaning of an empty supplier capacity had two authors**, and the machine-readable one was the FRONTEND: `columnSpecs.ts::master.nullMeans` carried the `∞` token and the sentence the grid rendered, while the registry said "unlimited" in prose one field over — `single-source` below markdown, the class D101 and D127 name, invisible to `check:docs` | the chain at `scsim/scsim/io/project_map.py::base_data_requirements` (`products.production_capacity`) against the `return undefined` in `resolveEffective.ts::derivedValueFor`; the shadow prose in the same file's `POLICY_BUNDLE_KEYS`; `scsim/scsim/kpi/compute.py::_utilization`'s `if ctx.trace.Q is None: return float("nan")` against `RunValidateStage.tsx`'s `"not recorded"` tile; `test_item_series.py`'s `if key == "capacity_utilization": continue` — the behaviour-neutrality gate EXCUSING the one KPI that was not behaviour-neutral | **CLOSED ✅ (WP 9.3)** — one declaration per fact, and a measurement that exists. `empty_means` (`scsim/scsim/policies/base.py::EmptyMeaning`) is the engine's own statement of what a blank means and `columnSpecs` reads it; `shadowed_by` on both plant capacity keys is the machine-readable form of the prose, and `resolveCell` returns a `supersededBy` the grid strikes through; `derivedFallbackDetails` walks the registry's chain keeping WHICH step answered, so the display can tell the planner's line rate from the floor the engine chose so capacity never binds. `utilization_cap_pct` is a declared bundle key, a plant column and `isScsimVisible`. The measurement is four always-on `WEEKLY_SERIES` (plant and supplier capacity, offered and used) plus per-entity binding matrices measured against the UNCLIPPED want — the clipped plan compared against capacity is equal by construction, which is why the test that would have caught this had to be written inside `_mech_default_plan`. `capacity_utilization` is computed from the series and is a number on every run; `supplier_capacity_utilization` is NaN when no supplier declares a finite capacity, which is a measurement that does not exist rather than a zero. `test_capacity_binding.py` (8), `capacityChain.test.ts` (14) and `capacityReadiness.test.ts` (5) hold it, and `test_item_series.py`'s skip is GONE. *(What is NOT closed: `products.production_capacity` is still `recommended`, so a project with no capacity anywhere still runs green — the two new surfaces say so before and after the run, and making it `required` is a product decision about which projects may be simulated at all, not this package's)* |
+| **D165** | **One deploy step of fourteen carried no `SUPABASE_ACCESS_TOKEN`, so PRODUCTION HAS NOT TAKEN A COMPLETE DEPLOY SINCE 2026-09-19 — and the gate written for exactly this counted the step and called it deployed.** `cda6b57` added `Deploy combine-project` without the `env:` block every one of its thirteen neighbours carries. `supabase functions deploy` exits 1 with *Access token not provided*, and the job runs `bash -e`, so the step AFTER it — `geocode-locations` — has never run either. **Seven consecutive red deploys** (workflow runs 52–58, 2026-09-19 06:52 → 2026-09-22 10:17); run 51 was the last green one and it is the commit before the step was added. **The cost is not the red badge, it is what is in production**: `combine-project/index.ts` is **−367/+111 lines** different from the last version that shipped, and that delta is WP 8.2's ONE ETL — so §16 records the edge function's lane build as deleted while production still runs it, D150's raw-`volume` read included. **This is D123's class a fifth time and the mechanism is new**: D123 was a function with no deploy step; this is a function WITH a deploy step that cannot authenticate. R17 read the intention to deploy rather than the ability to, which is why the history looked green on the commits that mattered | `.github/workflows/supabase-functions.yml:278` against its thirteen sibling steps; workflow runs 52–58 on `main`; `git diff fab91d4..main -- supabase/functions/combine-project` | **CLOSED ✅ (this package)** — the three-line `env:` block, and R17 gains its third clause: a `functions deploy` step with no `SUPABASE_ACCESS_TOKEN` in it fails the gate by name. Mutation-tested both ways (removing the block turns `contract:check` red on `combine-project`; restoring it turns it green). The same package pins `deno-version` away from the `v2.x` float that broke `eval` repo-wide on 2026-09-22 |
+| **D166** | **The engine REFUSED a project the shared grader had just passed, because it treated a master row rather than the BOM as what makes a material real — and the branch written to handle that case could never run.** `from_project_data`'s arc loop skipped any arc whose `material_id` was absent from `materials`, so a material the BOM consumes and the inbound file sources — but which nobody gave a master row — lost its lanes before `cheapest_cost` was built, failed the `unsourced` check, and raised `ValueError: materials with no supplier link` about a material that HAS one. **The mapper already contained the code for this case** (`for mid in sorted(bom_mat_ids - {m.id for m in materials})`), and `bom_mat_ids ⊆ cheapest_cost.keys() ⊆ mat_ids` made that set empty by construction: dead code that looked like handling. **It was also a parity break, which is what makes it more than tidiness**: `grading.ts`'s block rule is *a BOM material with no inbound ARC* and has never asked for a master row, so the browser and the pre-dispatch gate both reported such a project ready to run and the engine then refused it — the exact disagreement `test_validation_parity.py` exists to prevent, in the one direction that suite does not cover (it compares warn findings, not the hard block's preconditions) | `scsim/scsim/io/project_map.py`'s arc filter against its own BOM-only branch and against `supabase/functions/_shared/grading.ts`'s `arcMaterials` rule | **CLOSED ✅ (this package)** — `bom_mat_ids` is computed before the arc loop and the filter accepts a material the BOM consumes, so the branch is reachable and the two surfaces agree. Such a material is simulated from its lanes with the D163 cost chain and **named**: an `info` MappingWarning says it has no row in `materials` and that holding cost, MOQ and lead-time distribution are taking engine defaults (T1). The `ValueError` now means what it always said — no inbound arc at all — and an arc for a material NOTHING consumes is still dropped. Three tests, one per branch |
+| **D167** | **Capacity is the one economic quantity the product measures AND configures, and it was broken at both ends — a chain the display layer could not walk, and a measurement that was `NaN` on every run a user ever made.** **(a) The plant grid showed nothing for a number the run was certain to use.** `products.production_capacity` has declared a machine-readable chain since the reducer library was written — `production_policy_capacity` (grade `info`: the plant grid's units/day × 7 × `utilization_cap_pct`) → `twice_demand_floor_1000` (grade `warn`: max(2·demand, 1000)). The engine walks it, the shared grader walks it, the edge gate grades it. `resolveEffective.ts::derivedValueFor` ended on `return undefined; // production_capacity has no logistics-derived fallback` — true of the LOGISTICS tables and false of the engine, so the cell fell through to `contract`/`default` and a planner never saw the capacity their run would use. **(b) The cell they CAN edit is one the engine often ignores, and only a prose sentence said so.** `POLICY_BUNDLE_KEYS`' `transform` for `capacity_units_per_day` has read "the MASTER `products.production_capacity` shadows it entirely when present" since D90, and a surface cannot act on prose — so the grid rendered an editable line capacity with nothing marking the rows where the run reads the master instead. D18's class, worse: D18's field is consumed by nothing, this one is consumed SOMETIMES. **(c) `utilization_cap_pct` had no column at all**, and it is the other factor in that product's own arithmetic — so 1 000/day became 5 950/week with nothing on screen holding the 0.85. It was also absent from `SCSIM_VISIBLE_FIELDS`, so the moment it got a column it would have rendered `stored-only`: the grid telling a planner the engine ignores the number it is about to multiply the capacity by. **(d) `capacity_utilization` was NaN on every ordinary run.** `_utilization` read `ctx.trace.Q`, a per-product matrix that exists only under `trace_verbosity=full_debug`; a Monte Carlo run allocates none, so the KPI was NaN, `_finite` mapped it to null, and the /policies sanity tile printed **"not recorded"** — for the quantity the engine clips production against in every week of every replication. §4 D113 removed a per-node utilization heatmap and told the next reader the run-level measure "now renders in the table above"; it never did, and the note is what stopped anyone looking. **(e) The declared meaning of an empty supplier capacity had two authors**, and the machine-readable one was the FRONTEND: `columnSpecs.ts::master.nullMeans` carried the `∞` token and the sentence the grid rendered, while the registry said "unlimited" in prose one field over — `single-source` below markdown, the class D101 and D127 name, invisible to `check:docs` | the chain at `scsim/scsim/io/project_map.py::base_data_requirements` (`products.production_capacity`) against the `return undefined` in `resolveEffective.ts::derivedValueFor`; the shadow prose in the same file's `POLICY_BUNDLE_KEYS`; `scsim/scsim/kpi/compute.py::_utilization`'s `if ctx.trace.Q is None: return float("nan")` against `RunValidateStage.tsx`'s `"not recorded"` tile; `test_item_series.py`'s `if key == "capacity_utilization": continue` — the behaviour-neutrality gate EXCUSING the one KPI that was not behaviour-neutral | **CLOSED ✅ (WP 9.3)** — one declaration per fact, and a measurement that exists. `empty_means` (`scsim/scsim/policies/base.py::EmptyMeaning`) is the engine's own statement of what a blank means and `columnSpecs` reads it; `shadowed_by` on both plant capacity keys is the machine-readable form of the prose, and `resolveCell` returns a `supersededBy` the grid strikes through; `derivedFallbackDetails` walks the registry's chain keeping WHICH step answered, so the display can tell the planner's line rate from the floor the engine chose so capacity never binds. `utilization_cap_pct` is a declared bundle key, a plant column and `isScsimVisible`. The measurement is four always-on `WEEKLY_SERIES` (plant and supplier capacity, offered and used) plus per-entity binding matrices measured against the UNCLIPPED want — the clipped plan compared against capacity is equal by construction, which is why the test that would have caught this had to be written inside `_mech_default_plan`. `capacity_utilization` is computed from the series and is a number on every run; `supplier_capacity_utilization` is NaN when no supplier declares a finite capacity, which is a measurement that does not exist rather than a zero. `test_capacity_binding.py` (8), `capacityChain.test.ts` (14) and `capacityReadiness.test.ts` (5) hold it, and `test_item_series.py`'s skip is GONE. *(What is NOT closed: `products.production_capacity` is still `recommended`, so a project with no capacity anywhere still runs green — the two new surfaces say so before and after the run, and making it `required` is a product decision about which projects may be simulated at all, not this package's)* |
 
 ### 4.1 Code map — the data layer
 
@@ -17682,7 +17684,7 @@ where the damage was.** Capacity is spread across `products.production_capacity`
 policy fields, and only two reach the engine — all true, all already known. What
 nobody had read is that **the chain was already declared and the display layer
 could not walk it**, and that **the run-level measurement already existed and
-returned NaN on every run a user has ever made**. Both are §4 D165.
+returned NaN on every run a user has ever made**. Both are §4 D167.
 
 **(a) `resolveEffective.ts` ended a function on a sentence that was false.**
 
@@ -17793,32 +17795,55 @@ Three decisions worth keeping:
    turned demand away in the weeks that mattered is not. Collapsing them would have
    been cheaper and would have answered neither question.
 
-Exit checks passed?      yes — every gate, against a measured baseline rather than
-an assumed one. `contract:check` ✓ (2 standing warnings, both pre-existing: R10's
-Phase 5 marker and R13's two customer bindings) · `npx vitest run` ✓ **945/945**
-(was 926; +19 new) · `scsim` ✓ **250** (was 239; +11) · `sim-worker` ✓ **98** ·
-`deno test` on `_shared` ✓ **27** · `npm run lint`: eslint **329 errors / 116
-warnings** and `audit:ui` **8** — both EXACTLY the pre-change baseline, measured on
-this tree before the first edit · `typecheck` ✓ 21 of 21 baseline · `check:docs` ✓ ·
-`scripts/build_engine_wheels.sh --check` ✓ (rebuilt, `scsim/` and `sim-worker/` both
-changed).
+Exit checks passed?      yes, twice — before the push and again after merging
+`main`, which is the rule §4 D39 exists for. Post-merge: `contract:check` ✓ (2
+standing warnings, both pre-existing: R10's Phase 5 marker and R13's two customer
+bindings) · `npx vitest run` ✓ **949 passed / 4 skipped** (was 926; the skips are
+`main`'s) · `scsim` ✓ **253** (was 239; +11 mine, +3 `main`'s) · `sim-worker` ✓
+**98** · `deno test` on `_shared` ✓ **27** · agent eval ✓ **291 / 0** ·
+`npm run lint`: eslint **329 errors / 116 warnings** (exactly baseline) and
+`audit:ui` ✓ **CLEAN** · `typecheck` ✓ 21 of 21 baseline · `check:docs` ✓ ·
+`scripts/build_engine_wheels.sh --check` ✓.
 
 Discovered:
 
-- **The brief's own baselines were wrong in two places, and the tree is the
-  authority.** It states `audit:ui 0` and `eval 291/0`. Measured on a pristine tree
-  before any edit: **`audit:ui` is 8** (the same eight §2.4 mobile-floor violations
-  WP 9.1's §16 entry records) and the **eval suite is 290 passed / 1 failed** — the
-  `report_builder_test.ts` five-template registry assertion that §4 D163's entry
-  already recorded as failing on a pristine tree. Both are unchanged by this
-  package. A baseline quoted from a previous session is a number with no owner; the
-  only baseline worth holding to is one taken on the tree you are about to change.
-  → affects **every package that quotes a baseline it did not measure** → recorded
-  here.
+- **A baseline is a property of a COMMIT, and this package measured two different
+  ones an hour apart.** The brief stated `audit:ui 0` and `eval 291/0`. On this
+  branch's merge-base both were false — `audit:ui` was **8** (the eight §2.4
+  mobile-floor violations WP 9.1's entry records) and the eval suite was **290 / 1**
+  (the `report_builder_test.ts` five-template assertion §4 D163 recorded). So the
+  first draft of this entry reported the brief as wrong. It was not: `main` had
+  landed both fixes in PR #254 while this branch was in flight, and the merge below
+  made both green here without a line of this package's code changing. The brief was
+  quoting a `main` newer than the branch point.
+  **The correction is the finding.** "Measure the baseline on the tree you are about
+  to change" is right and insufficient — a branch's baseline goes stale underneath it,
+  and reporting a stale one as the brief's error is worse than quoting the brief,
+  because it puts a false claim about someone else's work into §16. The honest form
+  names the commit: *`audit:ui` 8 and eval 290/1 at merge-base `1b9f42c`; both clean
+  at `main` 885cb4d*.
+  → affects **every package that reports a baseline without naming where it was
+  taken** → recorded here.
 - **`WP 9.2` was already taken and this package is `9.3`.** §17 and §19 both name
   9.2 as the result binding — an unstarted package that owns eight deferred
   run/result tables. Renumbering a planned package to make room is drift; this one
   took the next free number and §17's Phase 9 row now reads `9.1 – 9.3`.
+- **§4 D146 HAPPENED AGAIN, ON THIS BRANCH, AND THE GATE CAUGHT IT.** `contract:check`
+  R16 printed `next free is D165` and this package took it in good faith; `main` then
+  landed **D165** (a deploy step with no token) and **D166** (a master row is not what
+  makes a material real) before the merge. Git reported it as one conflicting line in
+  §4 — which is the whole of what R16 and R19 were built to force, and the reason the
+  collision cost one renumber instead of eleven stale citations.
+  **Resolved the way §16 · WP 8.0 says**: `main`'s rows keep their numbers, because
+  renumbering merged history is the drift, and this package's row became **D167**. The
+  remap was done by matching the lines THIS BRANCH ADDED (`git diff <merge-base>`), not
+  by a blanket search over the tree — after the merge `docs/PLAN.md` legitimately holds
+  three D165 references in `main`'s meaning, and a global replace would have silently
+  rewritten someone else's defect. 29 source files carried the citation and none of
+  them existed in `main` or at the merge-base, which is what made the blanket edit safe
+  *there* and unsafe in `PLAN.md` — verified before editing rather than assumed.
+  → the rule R16 cannot enforce is still unwritten: nothing gates a D-citation
+  **outside** §4, and this is the third package to say so.
 - **`supplier_capacity_per_day`, `capacity_machine_per_day` and
   `capacity_labor_per_day` are still stored, versioned, `policy_hash`-ed and read by
   nothing.** The brief asked for this to be confirmed rather than assumed, and it
@@ -17842,7 +17867,9 @@ Baseline numbers (if run):
 - `WEEKLY_SERIES` 12 → **16**; `PUBLISHED_SERIES_KEYS` 7 → **11**
 - engine KPI row: 4 new keys; `_BRIDGE_KEYS` 12 → **16**
 - `POLICY_BUNDLE_KEYS` 9 → **10**; declared chains 11 → **12**
-- §4: 164 rows → **165**; next free D-number is **D166**
+- §4: 164 rows → **167** — this package's row was renumbered D165 → **D167** on the
+  merge, because `main` had landed its own D165 and D166 while the branch was in
+  flight (see the merge note below); next free D-number is **D168**
 - new test files: `test_capacity_binding.py` (8), `capacityChain.test.ts` (14),
   `capacityReadiness.test.ts` (5)
 
@@ -17886,7 +17913,7 @@ Handoff to next WP:
 | 6 | **6.1 – 6.5** | policy contract, researcher grade | — | **6.1 ✅** · **6.2 ✅** — twenty slices, eight rows closed that arrived while it ran, and FOUR remedies corrected by measurement rather than satisfied (D66, D87, D90, D96); see §16's closing entry. **6.3's five deliverables are DONE** — A1's vocabulary, A2's value-chain popover, A3's Trust Report through `report-render`, A5's Reproducibility Record and §5.4's acceptance test, plus D113 — **and it is NOT ✅, because `coverage.yaml` defers TEN result tables to it and R8 refused the mark.** That is the gate doing the one thing a habit cannot: a package can finish everything it describes and still not be finished. **6.4** carries six decision tables plus D112, D114 and D115's designer. **6.5 is NEW, created by 6.3's gap check**: two changes whose correctness is a fact about PRODUCTION — publishing `ingest-file` (D123) and dropping the computed entity columns (D88) — each needing a §15 reading either side, which no branch can take because both deploy workflows are `branches: [main]` |
 | 7+ | deferred | observations, estimation, backtesting | — | — |
 | **8** | **8.0 – 8.5** | **the graph layer — one node type, one graph layer** | — | **8.0 ✅** the seven §15 probes, and the numbers are NOT in yet: the package deliberately measures and changes nothing, because the diagnosis branches on a BOM depth no work-package session can read. Thirteen defects opened, **D127–D142**, two of which the measurement then CORRECTED from over-claims to latent (D129, D141). The root cause is in the contract already — there is **no type column on either edge table**, so **eight** classifiers each infer one at render time and disagree by construction, and the single `level` column carries **three** incompatible meanings between its writer, its contract and its reader. Two defects silently destroy data (**D128** a dedup guard testing a key it never writes; **D129** an edge emitted to `''` where the BOM root should be) and one label is fabricated outright (**D139** "work station", from `level === 1`, with no routing table anywhere in the contract). It also found **D138** — §16's last twenty-one entries sat AFTER §17 and so outside the slice every gate reads — and the numbering collision that made this Phase 8 rather than Phase 7 (§14 already owns `WP 7.1`, and D28 is owned by it). `check.mjs` now reads its roadmap from two ranges so a Phase 8 package is gated like a Phase 3 one, proved by making R7 fail with the package named. **AND THE SECOND §15 RUN IS WHY THE PACKAGE MATTERED**: the reported project's BOM is exactly four levels deep, so the ladder defect the brief predicted is LATENT there — and the map is wrong anyway, because **two live ETLs write both edge tables with different `level` rules** (**D140**, the finding of the package, and it rescopes WP 8.2 onto the SQL RPC because the edge function the brief named is the undeployed half). Also **D141** (the RPC invents a node called `ROOT`) and **D142** (nothing rebuilds the lane when its sources change, and every timestamp reports it fresh because a DELETE moves no `updated_at` — D12's lesson in a second place). **WP 8.1 ✅** — one classifier, and it found **D143**: the trigger that keeps the typed node projection in sync with the graph reads `NEW` in a STATEMENT-level context, so it has never fired once since 2025-08-29. Fixing it made two rehearsals go red with `forbidden`, because `rebuild_node_list` AUTHORIZES and a derivation running inside somebody else's INSERT can only refuse a writer the database already allowed — D66's shape in a derivation, closed by splitting discovery from authorization. **D132 closed**; **D127**'s data half landed. **WP 8.3 PARTIAL** — `src/lib/graph/` lands with 85 tests: one palette where there were five, encodings that carry data (area-scaled size, log-scaled width, position from the ECHELON and never from `level`), and the subgraph engine EXTRACTED from the orphaned fourth page under a parity suite that runs the original verbatim as a frozen witness. **Taken before WP 8.2 deliberately**: after WP 8.1 a page reading `echelon` and `bom_depth` is independent of `level` entirely, so the layer fixes the reported map without the ETL changing, and WP 8.2 can then alter `level` with nothing reading it. Found **D144** (`includeTerminals` is inverted, so the terminal-stop mechanism has never bounded a walk) and **D145** (a fixed `RETURNS TABLE` is a SECOND authoring of the schema — `get_node_list` could not carry WP 8.1's three columns, so a type that was authored, backfilled and constrained was invisible to every page). **The pages still classify**, and the two gates are RATCHETS that say so in numbers: 6 classifiers, 11/32/13/16/18 colour literals, each may only fall. **WP 8.5 PARTIAL** — the fabricated label is gone: `getDisplayNodeType` no longer returns "work station" (**D139**, a noun on screen no table in this database can produce), the title and empty state say **multi-level bill of materials**, the legend says **Echelons**, and the node panel labels the lane ordinate as the raw column it is. `material level N` went too, because on the measured project that string called 260 materials and 66 products "material level 2" at once. The ROUTE, the sidebar and eight manual bodies keep the old name deliberately — renaming those is D104's class and is named follow-up. **WP 8.2 ✅ — ONE ETL, and the decision was the package's first act.** The SQL RPC lives and the edge function's lane build is deleted; the demand walk was PORTED into SQL as a `WITH RECURSIVE`, because a loop over `level` assumes that column is a topological order and D140 is the finding that it is not. **The rescope's own evidence was stale**: `combine-project` has had a deploy step since WP 6.3 and the Combine BUTTON invokes it, so both writers were live across five call sites — worse than measured, and the structural reason the RPC wins stands either way (the completion trigger cannot call an edge function, and D142's rebuild needs a trigger). `bom_depth` is read from `bom_multi_level.level`; `level` carries the same value as a deprecated alias for one release. **Closed D129, D130, D133, D134, D136's hardcoded zero, D140, D141 and D142's rebuild half**, the last with a statement-level trigger on all four source lanes — which made four existing rehearsals go red, every one because it wrote a DERIVED table by hand and then touched its source, and each was repaired by following its own assertion rather than weakening it. Opened **D149** (a fallback read that raises on every call, for two independent reasons, found by DROPPING D133's column) and **D150** (**D2 was closed in the edge function and never in the RPC**, so the deployed writer read every lane `volume` raw for another year — a fix applied to one of two writers is not a fix). `rehearsal/310`, ten sections, six mutations verified red. **AND IT DOES NOT BACKFILL**: the fix changes what a combine WRITES, so `Project AA - ver3` must have Combine re-run after this deploys. **WP 8.3 + 8.4 THEN MADE IT VISIBLE**, after a reader said the one thing that mattered — *no differences in the result*. They were right: the migration deploys on MERGE, no page referenced `echelon`, and nothing imported the layer at all. Now both pages read the data. Process-level takes depth from `bom_multi_level` (so a 4-deep BOM renders as 5 columns instead of 1) and type from the lane roles; Product-level is the four echelons the reader specified — Supplier → purchased Material → finished Product → Customer — with the BOM COLLAPSED and the flow PROPAGATED down the tree rather than one hop of it, plus edge width by flow and arrowheads. **Four classifiers deleted, ratchet 6 → 4 → 2.** **D128, D135, D136 closed** (D136 by inverting it: the collapse is the view's intent, drawing the tree was the bug). **BOTH HALVES ARE NOW IN ONE PLACE, WHICH NEITHER BRANCH COULD SAY.** WP 8.2 wrote the ETL that WP 8.3 + 8.4's pages were computing for themselves, and each branch's §17 row ended by naming the other as what remained. What is left of the phase is the RATCHET's last two classifiers (6 → 4 → 2, and `oneClassifier.test.ts` fails if the list shrinks without the baseline shrinking with it) and WP 8.5's named follow-up — the ROUTE rename with a redirect, the eight manual bodies and the registry entry, in one commit. **And nothing in this phase is in production**: the three migrations behind it never deployed, because `main` carried two migration versions twice (§4 D151, closed here with `contract:check` R20). |
-| **9** | **9.1 – 9.3** | **results: inventory over time, capacity, and the result binding** | — | **9.1 ✅** the weekly-series vocabulary is authored ONCE (`WEEKLY_SERIES`, scsim/core/context.py) and the engine's six copies derive from it — which is how §4 D164 was found and closed: `fg_value`, finished-goods inventory, had been computed on every replication since the trace was written and published by nothing, so the chart captioned "Inventory dynamics" showed MATERIAL stock and called it inventory. Materials and finished goods now both reach a user, in units or value, on BOTH result surfaces, on ordinary multi-replication runs. It also describes `run_replications` — the first of the nine run/result tables to leave the deferral — and re-homes the other eight, whose owner (WP 6.3) had shipped, which is the state R8 exists to refuse. **9.2** is what those eight owe and 9.1 does not pay: `result-binding` — every result binds dataset + policy + scenario + engine version. A5's Reproducibility Record (WP 6.3) assembles that at EXPORT time from rows that could each have been written by a different world; the invariant asks for it on the ROW, and D88 is the precondition — 8 577 derived rows predate provenance  **9.3 ✅** capacity becomes a recorded datum at both ends — §4 D165. The chain `products.production_capacity` declares was already machine-readable and the display layer could not walk it (`resolveEffective.ts` ended on a comment true of the logistics tables and false of the engine), so the plant grid showed nothing for the one number the run was certain to use; and `capacity_utilization` read a `full_debug`-only matrix, so it was NaN on every run a user ever made and the sanity tile printed "not recorded" — while D113's own closing note told the next reader the measure rendered, and `test_item_series.py`'s behaviour-neutrality gate carried a written exemption for the one KPI that was not behaviour-neutral. Closed with one author per fact (`EmptyMeaning`, `shadowed_by`, `derivedFallbackDetails`) and four always-on weekly capacity series plus per-entity binding measured against the UNCLIPPED want. **9.2** remains what the eight deferred run/result tables owe and neither 9.1 nor 9.3 pays |
+| **9** | **9.1 – 9.3** | **results: inventory over time, capacity, and the result binding** | — | **9.1 ✅** the weekly-series vocabulary is authored ONCE (`WEEKLY_SERIES`, scsim/core/context.py) and the engine's six copies derive from it — which is how §4 D164 was found and closed: `fg_value`, finished-goods inventory, had been computed on every replication since the trace was written and published by nothing, so the chart captioned "Inventory dynamics" showed MATERIAL stock and called it inventory. Materials and finished goods now both reach a user, in units or value, on BOTH result surfaces, on ordinary multi-replication runs. It also describes `run_replications` — the first of the nine run/result tables to leave the deferral — and re-homes the other eight, whose owner (WP 6.3) had shipped, which is the state R8 exists to refuse. **9.2** is what those eight owe and 9.1 does not pay: `result-binding` — every result binds dataset + policy + scenario + engine version. A5's Reproducibility Record (WP 6.3) assembles that at EXPORT time from rows that could each have been written by a different world; the invariant asks for it on the ROW, and D88 is the precondition — 8 577 derived rows predate provenance  **9.3 ✅** capacity becomes a recorded datum at both ends — §4 D167. The chain `products.production_capacity` declares was already machine-readable and the display layer could not walk it (`resolveEffective.ts` ended on a comment true of the logistics tables and false of the engine), so the plant grid showed nothing for the one number the run was certain to use; and `capacity_utilization` read a `full_debug`-only matrix, so it was NaN on every run a user ever made and the sanity tile printed "not recorded" — while D113's own closing note told the next reader the measure rendered, and `test_item_series.py`'s behaviour-neutrality gate carried a written exemption for the one KPI that was not behaviour-neutral. Closed with one author per fact (`EmptyMeaning`, `shadowed_by`, `derivedFallbackDetails`) and four always-on weekly capacity series plus per-entity binding measured against the UNCLIPPED want. **9.2** remains what the eight deferred run/result tables owe and neither 9.1 nor 9.3 pays |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -18855,6 +18882,141 @@ that carries its own spread — which `materials.contract.yaml`'s `resolution.no
 already says the engine has nowhere to put (`Material.cost` is a bare float) and
 which §14's RFC owns. This package makes the single number the right single
 number; it does not make it two.
+### CI · the deploy that never deployed, and the gate that said it had · 2026-09-22 · no migration
+
+**Where this came from.** A survey after four PRs merged, asking the plain
+question "what is red now". `main`'s own workflow list answered it: **Deploy
+Supabase Functions had failed on every push since 2026-09-19** and nobody had
+read the log.
+
+**── D165: A DEPLOY STEP IS NOT A DEPLOY ──**
+
+One step of fourteen carried no `SUPABASE_ACCESS_TOKEN`. `supabase functions
+deploy combine-project` exits 1 with *Access token not provided*; the job is
+`bash -e`; `geocode-locations` sits after it and has therefore never run. Seven
+consecutive red deploys, runs 52–58.
+
+**The badge is not the damage.** `combine-project/index.ts` in production is
+−367/+111 lines behind `main`, and that delta is WP 8.2's ONE ETL. §16 records
+the edge function's lane build as deleted; production has been running it the
+whole time, D150's raw-`volume` read included. **A Combine in production today
+does what WP 8.2 says nothing does any more.**
+
+**What makes this D123's class rather than a typo.** D123 was a function with no
+deploy step. This is a function WITH one that cannot authenticate — and R17,
+written for D123, counted the step. The gate read the INTENTION to deploy. Its
+third clause now reads the ability to: a `functions deploy` step with no
+`SUPABASE_ACCESS_TOKEN` fails `contract:check` by name. Mutation-tested in both
+directions, because a gate nobody has seen fail is a gate nobody has tested.
+
+**And the toolchain float is pinned.** `deno-version: v2.x` resolved to 2.9.7
+on 2026-09-22 and turned `eval` red on every branch simultaneously — a repo-wide
+break no commit caused, which cost this session two PRs to diagnose and route
+(#252, and the stand-down comment on #250). Three workflows now name 2.9.7
+exactly, with the reason written beside it: bump deliberately, fixing what the
+bump surfaces in the same PR.
+
+**Discovered:**
+
+- **Nothing re-checks a deploy after it runs.** R17 is static: it reads the
+  workflow file, not the workflow's history. A step could be deleted, or the
+  secret rotated, and the next signal would again be a red badge nobody reads.
+  The honest fix is a post-merge check that asserts the last `main` deploy
+  concluded success. → affects **no package yet** → recorded here.
+- **The `Combine` button's production behaviour is unknown until this deploys.**
+  Nothing in this package can verify it; the merge is what ships it, and a §15
+  reading afterwards is what would confirm the lane rebuild now matches the RPC.
+  → affects **whoever owns the next §15 run**.
+
+### CI · the last two red gates · 2026-09-22 · no migration
+
+Both were **stale expectations, not broken code**, and both had been red long
+enough that the badges had stopped meaning anything.
+
+**`eval`.** `report_builder_test.ts:639` asserted `REPORT_TEMPLATE_IDS` was the
+five v1 templates; the registry carries six. The sixth is `data-trust` — the
+Trust Report's own template, added deliberately and rendered by WP 6.3 (§499,
+asset A3). The list was catching up with a shipped package, so the assertion
+gained the element rather than losing its teeth. **The suite is now 291 passed
+/ 0 failed** — green for the first time since the template landed.
+
+**`audit:ui`.** Eight §2.4 violations, every one a header `SelectTrigger` with
+`h-9` (`h-8` on /policies) and no mobile floor: /project-manager,
+/simulation-lab, /policies and the five network pages. Each took the audit's own
+prescription, `h-11 md:h-9` — a 44px touch target on a phone, the existing
+height from `md` up. **The audit now exits 0.**
+
+**Why the floor is on the line and not in `HDR_PROJECT_SELECT`.** The shared
+constant is where a single-source instinct says to put it, and it would not
+work: `audit-adaptive-ui.mjs` matches the JSX text of the LINE, so a floor
+living in an imported constant is invisible to it and the gate stays red while
+the pixels are right. The rule as written wants the height visible at the call
+site. Worth knowing before someone "fixes" this properly and reopens it.
+
+**Discovered:**
+
+- **Both of these were reported as "pre-existing on `main`" twice in this
+  session before anyone fixed them** — once on #250's stand-down comment, once
+  on #252's body. A failure that is correctly attributed and then left is still
+  a red gate, and two of them made `main`'s CI unreadable at a glance: the
+  seven-deploy outage (D165) sat in the same list and nobody saw it.
+  → affects **no package** → recorded as the reason this cleanup was worth a
+  package of its own.
+
+### Engine · a master row is not what makes a material real · 2026-09-22 · no migration
+
+**Where this came from.** WP 8.6's gap check recorded the BOM-only branch in
+`from_project_data` as unreachable and explicitly did NOT fix it: *"making it
+live changes which projects can be simulated at all, which is a product
+decision and not this package's."* This package is the decision.
+
+**── D166: THE DEAD BRANCH WAS A PARITY BREAK ──**
+
+The arc loop skipped any arc whose `material_id` had no row in `materials`. So
+a material the BOM consumes and the inbound file sources — but which nobody
+typed a master row for — lost its lanes, failed the `unsourced` check, and
+raised `ValueError: materials with no supplier link` **about a material that
+has one**.
+
+What turns this from tidiness into a defect is the other surface.
+`grading.ts`'s block rule is *a BOM material with no inbound ARC*; it has never
+asked for a master row. So the browser verification and the pre-dispatch gate
+both reported such a project ready to run, and the engine then refused it. The
+validation-parity suite could not catch it: it compares WARN findings against
+MappingWarnings, and this is the hard block's precondition, which nothing
+compares.
+
+**The fix is the filter, and the branch it makes reachable was already written.**
+`bom_mat_ids` moves above the loop; the filter accepts a material the BOM
+consumes. The BOM-only branch then does what its author meant — costs the
+material through D163's chain — and **names it**: an `info` warning says the row
+is absent from `materials` and that holding cost, MOQ and lead-time
+distribution are taking engine defaults, because a material that appears in a
+run with three silent defaults is three numbers without a source (T1).
+
+Two boundaries kept deliberately: the `ValueError` still fires for a BOM
+material with **no arc at all** — which is what its message always claimed — and
+an arc for a material nothing consumes is still dropped, because widening the
+filter to the BOM is not widening it to everything.
+
+**Discovered:**
+
+- **`ensure_item_masters` is why nobody hit this in the product.** The RPC
+  creates a master row for every id the logistics and BOM tables reference, so
+  the product path never presents the engine with this shape. The worker's
+  `datamap.build_project_data` has no such guarantee, and neither does any
+  caller of `from_project_data` outside the app. The defect was reachable by
+  every path EXCEPT the one anybody exercised, which is why dead-looking code
+  stayed dead-looking for a year. → affects **no package** → recorded.
+- **The parity suite's blind spot is structural, not an oversight.**
+  `test_validation_parity.py` asserts engine WARN ≡ grader warn. The hard
+  block — the one thing that stops a run entirely — is asserted only as "the
+  unsourced variant raises", never as "the two agree on WHICH datasets are
+  unsourced". A grader that blocks a runnable project, or passes an
+  unrunnable one, would look identical to a green suite.
+  → affects **whoever next touches §8.2 parity** → recorded here rather than
+  fixed, because the fix is a new fixture variant per disagreement shape.
+
 ---
 ---
 
@@ -18930,7 +19092,7 @@ for which products and suppliers.
 **What was already true, and what that hid.** Capacity had five authors and two of
 them reached the engine — which the brief said, and which was the smaller half of
 the problem. The larger half is that **the chain was already declared and nobody
-read it**, and **the measurement already existed and was NaN**. Both are in §4 D165.
+read it**, and **the measurement already existed and was NaN**. Both are in §4 D167.
 
 - `products.production_capacity` has carried a machine-readable `fallback_spec`
   since the reducer library was written: `production_policy_capacity` (grade

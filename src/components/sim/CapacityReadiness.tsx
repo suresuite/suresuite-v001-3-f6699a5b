@@ -1,6 +1,6 @@
 // BEFORE THE RUN: what capacity this run will use, and whether it is real.
 //
-// ── WHY THIS PANEL EXISTS (§4 D165) ─────────────────────────────────────────
+// ── WHY THIS PANEL EXISTS (§4 D167) ─────────────────────────────────────────
 //
 // `products.production_capacity` is `recommended`, and its chain ends in a step
 // that ALWAYS resolves: `twice_demand_floor_1000` — max(2 × demand, 1 000),

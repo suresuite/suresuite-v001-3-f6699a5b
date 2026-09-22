@@ -26,6 +26,17 @@
  *   · /docs still resolves to the front door — the index route is one word,
  *     and reverting it to DocPage silently reopens the manual mid-article
  *
+ * THE ADVERTISING CAN BE SWITCHED OFF, AND THIS FILE IS WHY IT IS A SWITCH.
+ * `DOCS_PUBLIC_ENTRY_POINTS` (src/lib/ui/docsVisibility.ts) hides every one of
+ * them at once. Hiding them by DELETING the markup would have meant
+ * deleting the assertions below with it — and then the invariant §6.5 argues
+ * for survives only as a comment, which is the same silent failure one level
+ * up. So the flag is the single source and this gate reads it:
+ *   · flag ON  — every surface links to the manual, exactly as before
+ *   · flag OFF — every surface still CARRIES that markup, and every one of
+ *     them is guarded by the flag, so flipping one line restores the links and
+ *     these assertions together. A surface deleted outright fails either way.
+ *
  * Source text rather than a render: what is being asserted is that the LINK
  * EXISTS IN THE TREE, and a render test of Landing would need auth, viewport
  * and three.js to say the same thing less directly.
@@ -34,6 +45,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getPage } from "../registry";
+import { DOCS_PUBLIC_ENTRY_POINTS } from "../../../lib/ui/docsVisibility";
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
 const read = (...parts: string[]) => readFileSync(join(ROOT, ...parts), "utf8");
@@ -58,7 +70,43 @@ function docSlugs(source: string) {
   return [...new Set([...literal, ...fields])].filter((slug) => !slug.includes("$"));
 }
 
-describe("the public site points at the manual", () => {
+const GUARD = "DOCS_PUBLIC_ENTRY_POINTS";
+
+/**
+ * One surface of the public site, as a SLICE of its page's source.
+ *
+ * Bounded rather than whole-file, and the reason is a bug this file already
+ * had: the first draft of the drawer assertion sliced to end-of-file and went
+ * on passing on the FOOTER's link after the drawer's was deleted — the
+ * assertion was true of the file rather than of the surface it named. Every
+ * bound below is a marker that would have to be deleted for the slice to be
+ * wrong, and `cut` fails loudly when one goes missing.
+ */
+type Surface = { name: string; source: string; from: string; to?: string };
+
+function cut({ name, source, from, to }: Surface): string {
+  const start = source.indexOf(from);
+  expect(start, `${name}: no "${from}" left to bound the slice`).toBeGreaterThan(-1);
+  if (to === undefined) return source.slice(start);
+  const end = source.indexOf(to, start + from.length);
+  expect(end, `${name}: no "${to}" after "${from}"`).toBeGreaterThan(start);
+  return source.slice(start, end);
+}
+
+/** Every surface §6.5 puts the manual on, across both public pages. The
+ *  desktop row and the phone drawer are listed separately on purpose: the
+ *  desktop links carry `hidden md:inline-flex`, so a link present in one and
+ *  not the other is invisible on the device most first visits arrive on. */
+const SURFACES: Surface[] = [
+  { name: "Landing desktop top bar", source: LANDING, from: "{/* Top bar */}", to: "{/* Mobile nav drawer */}" },
+  { name: "Landing phone drawer", source: LANDING, from: "Mobile nav drawer", to: "<main" },
+  { name: "Landing Documentation section", source: LANDING, from: "Documentation — the manual, in public", to: "{/* Technical Architecture */}" },
+  { name: "Landing footer", source: LANDING, from: "<footer" },
+  { name: "About desktop top bar", source: ABOUT, from: "<header", to: "</header>" },
+  { name: "About footer", source: ABOUT, from: "<footer" },
+];
+
+describe.runIf(DOCS_PUBLIC_ENTRY_POINTS)("the public site points at the manual", () => {
   it.each([
     ["Landing.tsx", LANDING],
     ["About.tsx", ABOUT],
@@ -83,6 +131,30 @@ describe("the public site points at the manual", () => {
   it("links to the manual from the footer as well as the nav", () => {
     const footer = LANDING.slice(LANDING.indexOf("<footer"));
     expect(footer).toMatch(/to="\/docs"/);
+  });
+});
+
+describe.runIf(!DOCS_PUBLIC_ENTRY_POINTS)("the manual is hidden by the flag, not by deletion", () => {
+  it.each([
+    ["Landing.tsx", LANDING],
+    ["About.tsx", ABOUT],
+  ])("%s reads the flag rather than hard-coding the answer", (_name, source) => {
+    expect(source).toContain(GUARD);
+  });
+
+  it.each(SURFACES.map((s) => [s.name, s] as const))("%s still carries the link, guarded", (_name, surface) => {
+    const slice = cut(surface);
+    expect(
+      slice,
+      `${surface.name} no longer mentions /docs at all. The flag is meant to be ` +
+        `flipped back — hiding a surface means guarding its markup, not deleting it.`,
+    ).toMatch(/to="\/docs"/);
+    expect(
+      slice,
+      `${surface.name} links /docs but names no ${GUARD}. Either the guard was ` +
+        `removed — the link is live again while the flag says it is not — or the ` +
+        `surface was rewritten without one.`,
+    ).toContain(GUARD);
   });
 });
 

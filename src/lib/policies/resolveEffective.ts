@@ -26,7 +26,7 @@ export interface DerivedMaps {
   demandMean: Map<string, number>;
   /**
    * `products.production_capacity`, resolved through the registry's own chain,
-   * carrying the STEP that answered (§4 D165).
+   * carrying the STEP that answered (§4 D167).
    *
    * It is a `DerivedValue` rather than a bare number because the two steps mean
    * opposite things — the plant grid's converted line rate (`info`) versus the
@@ -66,7 +66,7 @@ export function derivedValueFor(
     const v = derived.demandMean.get(id) ?? 0;
     return v > 0 ? v : undefined;
   }
-  // THE LINE THAT USED TO BE HERE WAS WRONG, AND THE COMMENT SAID WHY (§4 D165):
+  // THE LINE THAT USED TO BE HERE WAS WRONG, AND THE COMMENT SAID WHY (§4 D167):
   //
   //     return undefined; // production_capacity has no logistics-derived fallback
   //
@@ -224,7 +224,7 @@ export interface ResolvedCell {
   /** The sentence explaining that token, for the cell's own tooltip. */
   placeholderTitle?: string;
   /**
-   * The registry step that supplied this value, when a fallback did (§4 D165).
+   * The registry step that supplied this value, when a fallback did (§4 D167).
    *
    * `provenance: "derived"` already says A fallback answered; this says WHICH,
    * and at what grade — the difference between "your plant grid's line rate,
@@ -235,7 +235,7 @@ export interface ResolvedCell {
   derivedVia?: DerivedValue;
   /**
    * This cell is EDITABLE and the engine will not read it, because another
-   * field outranks it (§4 D165). Today the only case is the plant grid's
+   * field outranks it (§4 D167). Today the only case is the plant grid's
    * `capacity_units_per_day` / `utilization_cap_pct` under a product that
    * carries a master `products.production_capacity`.
    *
@@ -310,7 +310,7 @@ export function resolveCell(args: {
   const derivedVia = derivedVal !== undefined ? derivedStepFor(col, row, derived) : undefined;
 
   /**
-   * IS THIS EDITABLE CELL ONE THE ENGINE WILL READ? (§4 D165)
+   * IS THIS EDITABLE CELL ONE THE ENGINE WILL READ? (§4 D167)
    *
    * Asked of the registry, per row. `shadowedBy` returns the `dataset.column`
    * that outranks this bundle key — `products.production_capacity` for the

@@ -40,7 +40,7 @@ def build_run_update(kpis: dict[str, Any], n_reps: int) -> dict[str, Any]:
         "engine": kpis.get("source", "worker"),
         **({"scsim_notes": kpis["scsim_notes"]} if kpis.get("scsim_notes") else {}),
         # WHICH products/suppliers capacity bound, and for how many weeks of the
-        # analysis window (WP 9.3 / §4 D165). A run-level fact about the run, so
+        # analysis window (WP 9.3 / §4 D167). A run-level fact about the run, so
         # it rides `_meta` beside the conversion notes rather than becoming a
         # scalar KPI — `products_capacity_bound` is the scalar, and it cannot
         # name a product.

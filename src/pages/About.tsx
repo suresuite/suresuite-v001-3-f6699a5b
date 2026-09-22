@@ -20,6 +20,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import HeroLattice from '@/components/about/HeroLattice';
+import { DOCS_PUBLIC_ENTRY_POINTS } from '@/lib/ui/docsVisibility';
 
 const ACCENT = '#BF2330';
 const KICKER = 'font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground';
@@ -277,10 +278,13 @@ export default function About() {
             <Button asChild variant="secondary" size="sm" className="hidden md:inline-flex">
               <Link to="/about">About</Link>
             </Button>
-            {/* Same row as About on every public page — see Landing.tsx. */}
-            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
-              <Link to="/docs">Docs</Link>
-            </Button>
+            {/* Same row as About on every public page — see Landing.tsx, and
+                hidden with it while `DOCS_PUBLIC_ENTRY_POINTS` is off. */}
+            {DOCS_PUBLIC_ENTRY_POINTS && (
+              <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
+                <Link to="/docs">Docs</Link>
+              </Button>
+            )}
             <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
               <Link to="/#video">Demo</Link>
             </Button>
@@ -434,9 +438,11 @@ export default function About() {
             <Link to="/#video" className="hover:text-foreground md:hidden">
               Demo
             </Link>
-            <Link to="/docs" className="hover:text-foreground">
-              Docs
-            </Link>
+            {DOCS_PUBLIC_ENTRY_POINTS && (
+              <Link to="/docs" className="hover:text-foreground">
+                Docs
+              </Link>
+            )}
             <Link to="/auth" className="hover:text-foreground">
               Sign in
             </Link>

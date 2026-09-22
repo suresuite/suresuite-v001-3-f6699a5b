@@ -1,4 +1,4 @@
-// AFTER THE RUN: did capacity bind, and for whom (§4 D165 / WP 9.3).
+// AFTER THE RUN: did capacity bind, and for whom (§4 D167 / WP 9.3).
 //
 // `InventoryOverTime` (WP 9.1) is the pattern — an aggregate weekly series with
 // per-item evidence behind it — and this is its capacity sibling. What it shows

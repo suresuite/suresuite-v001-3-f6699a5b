@@ -123,7 +123,7 @@ export const reducerLabel = (via: string): string => REDUCER_LABEL[via] ?? via;
  * `production_policy_capacity` (info) → `twice_demand_floor_1000` (warn), the
  * shared grader has walked it since the reducer library was written, and the
  * plant grid showed an empty cell for a number the run was certain to use
- * (§4 D165).
+ * (§4 D167).
  *
  * The two steps are opposite statements, which is why this returns the STEP
  * and not just the number:

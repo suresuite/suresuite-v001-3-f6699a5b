@@ -6,7 +6,7 @@
 // product's capacity comes from `fallback_spec` through `derivedProductionCapacity`,
 // and the meaning of an empty supplier capacity from `empty_means`. The one
 // constant is the NAME of the engine's give-up step, which is a registry
-// identifier rather than a threshold (§4 D165).
+// identifier rather than a threshold (§4 D167).
 
 import { derivedProductionCapacity } from "@/lib/policies/effectiveEconomics";
 import type { ProductRow, SupplierRow } from "@/hooks/useItemMasters";

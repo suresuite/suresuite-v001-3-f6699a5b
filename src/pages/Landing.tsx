@@ -6,6 +6,7 @@ import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { DOCS_PUBLIC_ENTRY_POINTS } from '@/lib/ui/docsVisibility';
 
 // three.js + drei are ~1.5 MB of the bundle and this is the only thing on the
 // public landing page that needs them. Eager, they were downloaded and parsed
@@ -327,10 +328,13 @@ export default function Landing() {
             </Button>
             {/* The manual is public and needs no account (PLAN.md §6.5), so it
                 belongs in the same row as About rather than behind the login —
-                the people it is written for arrive before they have one. */}
-            <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
-              <Link to="/docs">Docs</Link>
-            </Button>
+                the people it is written for arrive before they have one. Hidden
+                while `DOCS_PUBLIC_ENTRY_POINTS` is off; the route still serves. */}
+            {DOCS_PUBLIC_ENTRY_POINTS && (
+              <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
+                <Link to="/docs">Docs</Link>
+              </Button>
+            )}
             <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
               <a href="#video">Demo</a>
             </Button>
@@ -367,13 +371,18 @@ export default function Landing() {
             >
               About
             </Link>
-            <Link
-              to="/docs"
-              onClick={() => setMobileNavOpen(false)}
-              className="flex min-h-11 items-center border-b border-[--hair-rule] text-sm font-medium"
-            >
-              Docs
-            </Link>
+            {/* The phone's half of the same row — hidden with it, because a
+                link present on one breakpoint and not the other is the failure
+                `docsEntryPoints.test.ts` was written for, in reverse. */}
+            {DOCS_PUBLIC_ENTRY_POINTS && (
+              <Link
+                to="/docs"
+                onClick={() => setMobileNavOpen(false)}
+                className="flex min-h-11 items-center border-b border-[--hair-rule] text-sm font-medium"
+              >
+                Docs
+              </Link>
+            )}
             <a
               href="#video"
               onClick={() => setMobileNavOpen(false)}
@@ -584,45 +593,47 @@ export default function Landing() {
             all want to know how the thing is put together BEFORE they have an
             account, and making them create one first answers a different
             question than the one they asked. */}
-        <section id="docs" className="border-b border-[--hair-rule]">
-          <div className="mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 py-[clamp(48px,12vw,96px)] md:px-6">
-            <div className="max-w-2xl">
-              <span className={KICKER}>Documentation</span>
-              <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold tracking-tight">
-                Read how it works —{' '}
-                <span className="font-serif italic font-medium">before you sign up.</span>
-              </h2>
-              <p className="mt-4 text-base text-muted-foreground">
-                The manual is open to everyone: the architecture, the data model, every unit and
-                convention, and a page that states plainly what this tool does not model. No
-                account, no sales call.
-              </p>
-            </div>
+        {DOCS_PUBLIC_ENTRY_POINTS && (
+          <section id="docs" className="border-b border-[--hair-rule]">
+            <div className="mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 py-[clamp(48px,12vw,96px)] md:px-6">
+              <div className="max-w-2xl">
+                <span className={KICKER}>Documentation</span>
+                <h2 className="mt-3 text-[length:clamp(22px,5.5vw,30px)] font-semibold tracking-tight">
+                  Read how it works —{' '}
+                  <span className="font-serif italic font-medium">before you sign up.</span>
+                </h2>
+                <p className="mt-4 text-base text-muted-foreground">
+                  The manual is open to everyone: the architecture, the data model, every unit and
+                  convention, and a page that states plainly what this tool does not model. No
+                  account, no sales call.
+                </p>
+              </div>
 
-            <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {DOC_ENTRIES.map((d) => (
-                <Link
-                  key={d.slug}
-                  to={`/docs/${d.slug}`}
-                  className="group rounded-sm border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-muted/40"
-                >
-                  <d.icon className="h-4 w-4 text-primary" />
-                  <h3 className="mt-2.5 text-sm font-semibold group-hover:text-primary">{d.title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{d.body}</p>
-                </Link>
-              ))}
-            </div>
+              <div className="mt-10 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {DOC_ENTRIES.map((d) => (
+                  <Link
+                    key={d.slug}
+                    to={`/docs/${d.slug}`}
+                    className="group rounded-sm border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-muted/40"
+                  >
+                    <d.icon className="h-4 w-4 text-primary" />
+                    <h3 className="mt-2.5 text-sm font-semibold group-hover:text-primary">{d.title}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{d.body}</p>
+                  </Link>
+                ))}
+              </div>
 
-            <div className="mt-8">
-              <Button asChild variant="outline" size="lg" className="group h-11 rounded-sm">
-                <Link to="/docs">
-                  Open the documentation
-                  <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-              </Button>
+              <div className="mt-8">
+                <Button asChild variant="outline" size="lg" className="group h-11 rounded-sm">
+                  <Link to="/docs">
+                    Open the documentation
+                    <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                </Button>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Technical Architecture */}
         {/* <section className="border-t border-[--hair-rule]">
@@ -902,7 +913,9 @@ export default function Landing() {
           <span>© {new Date().getFullYear()} SuReSuite</span>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <a href="#video" className="hover:text-foreground md:hidden">Demo</a>
-            <Link to="/docs" className="hover:text-foreground">Docs</Link>
+            {DOCS_PUBLIC_ENTRY_POINTS && (
+              <Link to="/docs" className="hover:text-foreground">Docs</Link>
+            )}
             <Link to="/about" className="hover:text-foreground">About</Link>
             <Link to="/auth" className="hover:text-foreground">Sign in</Link>
           </div>

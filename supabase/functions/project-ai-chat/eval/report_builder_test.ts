@@ -636,8 +636,13 @@ Deno.test("prompt template carries the verbatim §16.1 + AGENT_COMMON blocks; th
 
   // §16.1 registry (DEFAULT v1 set) — templates only ever resolve through
   // registered read tools / persisted runs.
+  // Six, not the five of v1: `data-trust` is the Trust Report's own template,
+  // added deliberately and rendered by WP 6.3 (PLAN.md §499, asset A3). The
+  // assertion is the registry's contents, and the registry gained a member —
+  // this is the list catching up with a shipped package, not a rule relaxed.
   assertEquals([...REPORT_TEMPLATE_IDS], [
     "risk-posture", "run-results", "run-comparison", "disruption-brief", "data-readiness",
+    "data-trust",
   ]);
   assertEquals(REPORT_TEMPLATES["disruption-brief"].narrativeRequired, true);
   assertEquals(REPORT_TEMPLATES["risk-posture"].requiredRuns({}), []);

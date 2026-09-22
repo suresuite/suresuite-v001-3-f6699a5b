@@ -1,5 +1,5 @@
 // "What capacity will this run use, and is it real?" — the pre-dispatch split
-// (§4 D165 / WP 9.3).
+// (§4 D167 / WP 9.3).
 //
 // The distinction this suite exists to hold is the one the /policies gate
 // cannot make: a product with no capacity figure is NOT a finding, because the

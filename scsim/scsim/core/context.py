@@ -366,7 +366,7 @@ WEEKLY_SERIES: tuple[WeeklySeries, ...] = (
     WeeklySeries("fg_units", "units", "level", True,
                  "Finished-goods inventory on hand at the end of the week, in units. "
                  "Summed across products, with the same caveat as `on_hand_units`."),
-    # ── Capacity (WP 9.3 / §4 D165) ──────────────────────────────────────────
+    # ── Capacity (WP 9.3 / §4 D167) ──────────────────────────────────────────
     # `capacity_utilization` has been a KPI since the KPI module was written and
     # it read `trace.Q`, which exists only under `full_debug` — so on every
     # Monte Carlo run it was NaN, and the /policies sanity panel printed "not

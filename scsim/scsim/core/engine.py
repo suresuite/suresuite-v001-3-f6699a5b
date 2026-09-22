@@ -201,7 +201,7 @@ def _mech_default_plan(model: CompiledModel, ctx: SimContext) -> None:
     else:
         want = want_mto
     cap = _effective_prod_capacity(model, ctx)
-    # CAPACITY BINDING IS MEASURED HERE AND NOWHERE ELSE (WP 9.3 / §4 D165).
+    # CAPACITY BINDING IS MEASURED HERE AND NOWHERE ELSE (WP 9.3 / §4 D167).
     #
     # This is the only point in the week where the UNCLIPPED want still exists:
     # `ctx.production_plan` is the clipped figure, so `plan > cap` downstream is
@@ -682,7 +682,7 @@ class ScenarioResult:
     # Row labels for item_series: {"material": [...ids], "product": [...ids]}.
     item_ids: Optional[dict[str, list[str]]] = None
     # WHICH products and suppliers the capacity held back, over the analysis
-    # window, averaged across replications (WP 9.3 / §4 D165). Present on EVERY
+    # window, averaged across replications (WP 9.3 / §4 D167). Present on EVERY
     # run — unlike `item_series`, which needs a single-replication full-debug
     # inspection run, and which is why "for which products did capacity bind"
     # had no answer a user could reach. Shape:

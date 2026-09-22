@@ -63,7 +63,12 @@ jobs:
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          # PINNED, not `v2.x` (§4 D165). The float resolved to 2.9.7 on
+          # 2026-09-22, which tightened inference on a PostgREST `.map()` and
+          # turned `eval` red on every branch at once — a repo-wide CI break
+          # that no commit caused and no gate could attribute. Bump this
+          # deliberately, with the type errors it surfaces fixed in the same PR.
+          deno-version: 2.9.7
 
       # ubuntu-latest ships Postgres server binaries (initdb/pg_ctl/psql);
       # the harness boots its own throwaway cluster — no service container.

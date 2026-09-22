@@ -285,7 +285,7 @@ class MappingResult:
 #
 # `shadowed_by` is OPTIONAL and names the entity field that, when present,
 # makes this key's value unreachable. Two keys carry it and both name
-# `products.production_capacity` (§4 D165).
+# `products.production_capacity` (§4 D167).
 POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     {
         "key": "supply_share",
@@ -332,7 +332,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
         "transform": "units/day x 7 x utilization_cap_pct (default 0.85) -> units/week. "
                      "The MASTER `products.production_capacity` shadows it entirely when "
                      "present, and the mapper warns that the grid entry is not applied",
-        # THE SHADOW, MACHINE-READABLE (§4 D165). The sentence above has been in
+        # THE SHADOW, MACHINE-READABLE (§4 D167). The sentence above has been in
         # this table since D90 and no surface could act on it: the plant grid
         # rendered an editable `capacity_units_per_day` cell with nothing saying
         # the engine would ignore it whenever the product carried a master
@@ -471,7 +471,7 @@ def base_data_requirements() -> tuple:
             # engine honours the blank instead of substituting for it. Declared
             # here because the sentence had TWO authors — this table said
             # "unlimited" in prose and `columnSpecs.ts::master.nullMeans` carried
-            # the token and the tooltip the grid actually rendered (§4 D165).
+            # the token and the tooltip the grid actually rendered (§4 D167).
             empty_means=EmptyMeaning(
                 token="∞",
                 meaning="No capacity limit. An empty supplier capacity means "
@@ -648,6 +648,10 @@ def from_project_data(data: ProjectData) -> MappingResult:
 
     mat_ids = {m.id for m in data.materials}
     prod_ids = {p.id for p in data.products}
+    # Computed HERE rather than beside its `unsourced` check below, because the
+    # arc loop needs it: a material the BOM consumes is part of this project
+    # whether or not anyone gave it a master row (§4 D166).
+    bom_mat_ids = {b.material_id for b in data.bom if b.product_id in prod_ids}
     sup_ids = {s.id for s in data.suppliers}
 
     # ── Supplier links (per supplier×material) + the materials.cost fallback ──
@@ -680,7 +684,12 @@ def from_project_data(data: ProjectData) -> MappingResult:
     vol_price_den: dict[str, float] = {}
     mat_lt_dist = {m.id: m for m in data.materials}
     for arc in data.supply_arcs:
-        if arc.material_id not in mat_ids:
+        # A master row is not what makes a material real — the BOM is. An arc
+        # whose material the BOM consumes counts even with no row in
+        # `materials`, which is what makes the BOM-only branch below reachable
+        # (§4 D166). An arc for a material NOTHING consumes is still noise and
+        # is still dropped.
+        if arc.material_id not in mat_ids and arc.material_id not in bom_mat_ids:
             continue
         sup_ids.add(arc.supplier_id)
         cost = float(arc.unit_price or 0.0)
@@ -742,8 +751,9 @@ def from_project_data(data: ProjectData) -> MappingResult:
 
     links = list(links_by_key.values())
 
-    # BOM materials with no source link cannot be simulated.
-    bom_mat_ids = {b.material_id for b in data.bom if b.product_id in prod_ids}
+    # BOM materials with no source link cannot be simulated. Since D166 this
+    # says what it always claimed: a material here has NO inbound arc at all,
+    # rather than merely no master row.
     unsourced = bom_mat_ids - cheapest_cost.keys()
     if unsourced:
         raise ValueError(f"materials with no supplier link: {sorted(unsourced)}")
@@ -802,11 +812,21 @@ def from_project_data(data: ProjectData) -> MappingResult:
             id=m.id, name=str(m.name or m.id), cost=cost, holding_cost_rate=holding,
             initial_on_hand=(float(m.initial_on_hand) if m.initial_on_hand is not None else None),
         ))
-    # Materials referenced only by BOM but lacking a master row. Same chain as
-    # above — a row with no master cannot have one, so the fallback is all it has.
+    # Materials the BOM consumes that have no master row. REACHABLE since §4
+    # D166 — before it, the arc filter above dropped their arcs, so the
+    # `unsourced` check raised first and this loop could only ever see an empty
+    # set. Same chain as above: a row with no master cannot have a master cost,
+    # so the fallback is all it has, and every such material is NAMED rather
+    # than quietly materialized (T1 — no number without a source).
     for mid in sorted(bom_mat_ids - {m.id for m in materials}):
         derived = _inbound_cost(mid)
-        materials.append(Material(id=mid, name=mid, cost=derived[0] if derived else 1.0))
+        cost = derived[0] if derived else 1.0
+        w.append(MappingWarning(
+            "info", f"material:{mid}", "master_row",
+            "no row in `materials` — simulated from its BOM and inbound lanes, "
+            f"cost {'derived from those lanes' if derived else 'defaulted to 1.0'}; "
+            "holding cost, MOQ and lead-time distribution take engine defaults"))
+        materials.append(Material(id=mid, name=mid, cost=cost))
 
     # ── Products ──
     # The plant grid keys its production overrides "<focal plant>::<product>",

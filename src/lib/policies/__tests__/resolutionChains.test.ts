@@ -305,7 +305,7 @@ describe("§4 D90 · door 3 is a DECLARATION, not a scan", () => {
     // both the supplier and the plant stage, which is why the chain count and the
     // key count differ and why D90's "nine" was never wrong.
     //
-    // `utilization_cap_pct` is the tenth (WP 9.3 / §4 D165). It was on the
+    // `utilization_cap_pct` is the tenth (WP 9.3 / §4 D167). It was on the
     // parity test's `not_rendered` list — the list of bundle keys that are NOT
     // grid cells — while the arithmetic it performs is half of what the plant
     // stage exists to show: the engine builds a product's weekly capacity as

@@ -32,7 +32,7 @@ _BRIDGE_KEYS = (
     # replication and never as a run figure. The other three arrive with the
     # material/finished-goods split.
     "avg_on_hand_value", "avg_fg_value", "avg_on_hand_units", "avg_fg_units",
-    # Capacity (WP 9.3 / §4 D165). `capacity_utilization` was computed by
+    # Capacity (WP 9.3 / §4 D167). `capacity_utilization` was computed by
     # `compute_replication_kpis` and never aggregated here, so it reached a user
     # per replication and never as a run figure — the same omission this list
     # had for `avg_on_hand_value` one line above. It was also NaN on every run

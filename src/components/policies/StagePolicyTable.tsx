@@ -203,7 +203,7 @@ export function StagePolicyTable({
   } = useItemMasters(projectId);
   // The economics maps plus the capacity chain, which needs the bundle and its
   // overrides as well as the lanes — assembled by the one hook both grid
-  // surfaces call, never per surface (§4 D165).
+  // surfaces call, never per surface (§4 D167).
   const derived = useDerivedMaps({
     derived: derivedEconomics,
     products,
@@ -1316,7 +1316,7 @@ export function StagePolicyTable({
           } = resolved;
           // T1/T2 — one sentence, assembled from the registry's own chain, used
           // by the hover AND by the popover so the two cannot disagree about
-          // what stood in for this number (§4 D165).
+          // what stood in for this number (§4 D167).
           const substitution = substitutionNote(resolved);
 
           const firms = r.__firms_available as string[] | undefined;

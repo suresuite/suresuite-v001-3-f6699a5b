@@ -1,5 +1,5 @@
 // The `products.production_capacity` chain is ONE rule with three readers, and
-// the display layer was not one of them (§4 D165).
+// the display layer was not one of them (§4 D167).
 //
 // `resolveEffective.ts::derivedValueFor` ended on
 // `return undefined; // production_capacity has no logistics-derived fallback`
@@ -239,7 +239,7 @@ describe("the declarations the surfaces read", () => {
     expect(
       unclaimed,
       "these keys are declared as reaching the engine and SCSIM_VISIBLE_FIELDS " +
-        "does not list them, so the grid would badge them `stored-only` (§4 D165)",
+        "does not list them, so the grid would badge them `stored-only` (§4 D167)",
     ).toEqual([]);
   });
 

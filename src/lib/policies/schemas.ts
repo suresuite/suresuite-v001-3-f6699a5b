@@ -442,7 +442,7 @@ export const SCSIM_VISIBLE_FIELDS: Partial<Record<PolicyFamily, ReadonlySet<stri
     "backorder_cost_per_day",
     "tier_overrides",
   ]),
-  // `utilization_cap_pct` JOINED IN WP 9.3 AND WAS ALWAYS READ (§4 D165).
+  // `utilization_cap_pct` JOINED IN WP 9.3 AND WAS ALWAYS READ (§4 D167).
   // `project_map.py`'s capacity branch has read it since the mapper was
   // written; omitting it here meant that the moment it got a column it would
   // have rendered with a `stored-only` badge — the grid telling a planner the

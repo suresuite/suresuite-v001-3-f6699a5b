@@ -70,7 +70,7 @@ def test_item_series_is_behavior_neutral():
         # THE `capacity_utilization` SKIP IS GONE, AND THAT IS THE POINT (WP 9.3).
         # It read `trace.Q`, so it was NaN on the ordinary run and a number on
         # the inspection one — a KPI that was NOT behaviour-neutral, excused by
-        # the test built to catch exactly that (§4 D165). It is computed from
+        # the test built to catch exactly that (§4 D167). It is computed from
         # the always-on weekly capacity series now, so the two runs agree.
         #
         # `supplier_capacity_utilization` is NaN on BOTH when no supplier

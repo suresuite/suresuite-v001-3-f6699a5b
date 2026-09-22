@@ -58,7 +58,7 @@ export interface RegistryBundleKey {
   transform: string;
   /**
    * The entity field that makes this key's value unreachable when it is set
-   * (§4 D165). Two keys carry it and both name `products.production_capacity`:
+   * (§4 D167). Two keys carry it and both name `products.production_capacity`:
    * a product with a master capacity is built from that column and the plant
    * grid's line capacity is read by nothing — which the engine has warned about
    * since the mapper was written, and which no surface could act on while the
@@ -152,7 +152,7 @@ const SHADOWED_BY = new Map<string, string>(
 );
 
 /**
- * The `dataset.column` that outranks this bundle key, or undefined (§4 D165).
+ * The `dataset.column` that outranks this bundle key, or undefined (§4 D167).
  *
  * A surface asks this to find out whether the cell it is about to render is one
  * the engine will read. Answered from the engine's own declaration, so the grid
@@ -164,7 +164,7 @@ export const shadowedBy = (bundleKey: string): string | undefined =>
   SHADOWED_BY.get(bundleKey);
 
 /**
- * What an EMPTY value of a declared field MEANS, or undefined (§4 D165).
+ * What an EMPTY value of a declared field MEANS, or undefined (§4 D167).
  *
  * The engine's own statement, so the token a cell renders in place of a number
  * and the sentence beside it have ONE author. `columnSpecs.ts` used to carry

@@ -103,7 +103,7 @@ export interface ValueChainInput {
   /** What the grid is showing, already formatted. */
   displayed: string;
   /**
-   * The substitution behind this cell, when there is one (§4 D165).
+   * The substitution behind this cell, when there is one (§4 D167).
    *
    * `provenance` says a fallback answered; this says WHICH, in a sentence the
    * resolver assembles from the registry's declared chain
@@ -313,7 +313,7 @@ export function buildValueChain(input: ValueChainInput): ValueChain {
   // T2 — the substitution is visible at the POINT OF DISPLAY, and this popover
   // is that point. Rendered before the engine hop because "the run uses a
   // different number than this cell" outranks "here is what the engine does
-  // with this cell" (§4 D165).
+  // with this cell" (§4 D167).
   push({
     key: "substitution",
     label: input.superseded ? "The run does NOT use this cell" : "How this value was arrived at",

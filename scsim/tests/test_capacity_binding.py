@@ -1,4 +1,4 @@
-"""Capacity as a MEASURED OUTPUT, not a restated input (WP 9.3 / §4 D165).
+"""Capacity as a MEASURED OUTPUT, not a restated input (WP 9.3 / §4 D167).
 
 `capacity_utilization` existed as a KPI from the day the KPI module was written
 and was NaN on every run a user ever made: it read `trace.Q`, which exists only

@@ -372,7 +372,7 @@ def test_registry_publishes_the_policy_bundle_keys():
     assert [k["key"] for k in entity] == [
         "capacity_units_per_day", "utilization_cap_pct"], entity
     # Both of them are also SHADOWED, and by the same master column — the plant
-    # grid's two capacity cells are unreachable together or not at all (§4 D165).
+    # grid's two capacity cells are unreachable together or not at all (§4 D167).
     assert {k["key"]: k.get("shadowed_by") for k in entity} == {
         "capacity_units_per_day": "products.production_capacity",
         "utilization_cap_pct": "products.production_capacity",
@@ -385,7 +385,7 @@ def test_registry_publishes_the_policy_bundle_keys():
             assert k["shadowed_by"] in fields, k
 
 
-# --------------------------------------------- what an EMPTY column means (D165)
+# --------------------------------------------- what an EMPTY column means (D167)
 
 def test_empty_means_is_declared_for_the_one_column_that_has_one():
     """`suppliers.capacity_per_week` is NULL = ∞, and the registry now says so.

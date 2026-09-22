@@ -369,7 +369,7 @@ export function NumCell({
    */
   dot?: React.ReactNode;
   /**
-   * THIS CELL IS EDITABLE AND THE RUN WILL NOT READ IT (§4 D165).
+   * THIS CELL IS EDITABLE AND THE RUN WILL NOT READ IT (§4 D167).
    *
    * Struck through rather than badged, and deliberately not a new provenance
    * state: the dot still answers "where did this number come from", which is
