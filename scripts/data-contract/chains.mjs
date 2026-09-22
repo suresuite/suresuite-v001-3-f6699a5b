@@ -23,7 +23,7 @@
 // derivation disagree, and CI runs it on every pull request.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -1334,19 +1334,26 @@ export function deriveProjectDeletion(root) {
     return null;
   };
 
-  const src = readFileSync(join(root, "supabase", "functions", "delete-project", "index.ts"), "utf8");
-  if (!/deleteTableByProjectId\(/.test(src)) {
-    throw new Error(
-      "chains: delete-project no longer sweeps tables by name. Re-read it — the page states " +
-        "which tables are swept explicitly and which rely on a cascade.",
-    );
+  // WHERE THE LIST LIVES NOW (§4 D170). The edge function used to delete a
+  // hand-written list over PostgREST, in batches, in the background. Since
+  // `20260922000002` the whole deletion is `public.delete_project`, one transaction,
+  // and the function only relays its answer — so the list is read from the LATEST
+  // migration that defines it, which is the definition production runs.
+  const migDir = join(root, "supabase", "migrations");
+  const defining = readdirSync(migDir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()
+    .filter((f) => /FUNCTION\s+public\.delete_project\s*\(/i.test(readFileSync(join(migDir, f), "utf8")));
+  if (!defining.length) {
+    throw new Error("chains: no migration defines public.delete_project — the page cannot say what a deletion reaches.");
   }
-  const swept = new Set([
-    ...[...src.matchAll(/deleteTableByProjectId\('(\w+)'\)/g)].map((m) => m[1]),
-    ...[...src.matchAll(/deleteByIds\('(\w+)'/g)].map((m) => m[1]),
-    // The disruption children are deleted by their profile id, not by project.
-    ...[...src.matchAll(/^\s+'(disruption_scenario_\w+)',$/gm)].map((m) => m[1]),
-  ]);
+  const sql = readFileSync(join(migDir, defining[defining.length - 1]), "utf8");
+  const body = sql.slice(sql.search(/FUNCTION\s+public\.delete_project\s*\(/i));
+  const fnBody = body.slice(0, body.indexOf("\n$$;") > 0 ? body.indexOf("\n$$;") : body.length);
+  const swept = new Set(
+    [...fnBody.matchAll(/DELETE\s+FROM\s+public\.(\w+)/gi)].map((m) => m[1]).filter((t) => t !== "projects"),
+  );
+  const src = readFileSync(join(root, "supabase", "functions", "delete-project", "index.ts"), "utf8");
   if (swept.size < 5) throw new Error(`chains: parsed ${swept.size} swept tables in delete-project`);
 
   const cascade = [];
@@ -1367,8 +1374,8 @@ export function deriveProjectDeletion(root) {
     detached: detached.sort(),
     sweptOnly: sweptOnly.sort(),
     neither: neither.sort(),
-    /** The response is 202 before any row is touched — see the function. */
-    asynchronous: /status: 202/.test(src) && /Deletion started/.test(src),
+    /** True while the function answers before the deletion has happened (it did until D170). */
+    asynchronous: /EdgeRuntime\.waitUntil\(/.test(src) || /status:\s*202/.test(src),
   };
 }
 

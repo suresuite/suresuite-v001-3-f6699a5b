@@ -299,62 +299,36 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
     }
   };
 
-  const handleDeleteProject = async (project: Project, forceDelete = false) => {
-    if (!canModify || !user?.id || !user.email) return;
+  // THE DELETION'S ANSWER IS THE DATABASE'S, AND IT IS SHOWN (§4 D170). This used to
+  // toast "Deletion started" on a 202 the function sent before doing anything, then
+  // poll the list and hope; production's function failed every time in the
+  // background, after removing some of the project's rows. `delete-project` now
+  // waits for `public.delete_project` — one transaction, all or nothing — and a
+  // refusal or failure arrives here with its reason.
+  const handleDeleteProject = async (project: Project) => {
+    if (!canModify || !user?.id) return;
 
-    try {
-      const isComplex = forceDelete || (project.deep_tier_enabled && project.bom_level === 'multi_level');
+    const { data, error } = await supabase.functions.invoke('delete-project', {
+      body: { projectId: project.id, userId: user.id, userEmail: user.email ?? '' },
+    });
 
-      // Use edge function to run deletion in background to avoid timeouts
-      const { data, error } = await supabase.functions.invoke('delete-project', {
-        body: {
-          projectId: project.id,
-          userId: user.id,
-          userEmail: user.email,
-          force: isComplex,
-        },
-      });
-
-      if (error) throw error;
-
-      toast.success(`Deletion started for "${project.name}". This may take a few seconds...`);
-
-      if (selectedProject?.id === project.id) {
-        setSelectedProject(null);
+    if (error || !data?.success) {
+      // A non-2xx reaches supabase-js as an error whose body is on `context`; read it
+      // so the person sees "may not delete" or "not found" rather than "non-2xx".
+      let reason = data?.error as string | undefined;
+      const ctx = (error as { context?: Response } | null)?.context;
+      if (!reason && ctx && typeof ctx.json === 'function') {
+        try { reason = (await ctx.json())?.error; } catch { /* keep the generic message */ }
       }
-      if (globalSelectedProjectId === project.id) {
-        setGlobalSelectedProjectId(null);
-      }
-
-      // Refresh projects a few times to reflect background completion
-      setTimeout(loadProjects, 2000);
-      setTimeout(loadProjects, 5000);
-    } catch (error: any) {
-      console.error('Project deletion error:', error);
-      
-      // Handle different error formats from Supabase
-      let errorMessage = 'Unknown error';
-      
-      if (error?.message) {
-        errorMessage = error.message;
-      } else if (error?.code === '57014' || error?.code === 57014) {
-        errorMessage = 'Statement timeout - project deletion took too long';
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      }
-      
-      // Check for timeout in various formats
-      const isTimeout = errorMessage.includes('timeout') || 
-                       errorMessage.includes('canceling statement') ||
-                       error?.code === '57014' || 
-                       error?.code === 57014;
-      
-      if (isTimeout && !forceDelete) {
-        toast.error(`Project deletion timed out. This project has complex data that requires force deletion. Try again - it will automatically clean data first.`);
-      } else {
-        toast.error(`Failed to delete project: ${errorMessage}`);
-      }
+      console.error('Project deletion failed:', error ?? data);
+      toast.error(`Could not delete "${project.name}": ${reason || error?.message || 'unknown error'}. Nothing was deleted.`);
+      return;
     }
+
+    toast.success(`Project "${project.name}" deleted.`);
+    if (selectedProject?.id === project.id) setSelectedProject(null);
+    if (globalSelectedProjectId === project.id) setGlobalSelectedProjectId(null);
+    loadProjects();
   };
 
   const handleDuplicateProject = async (project: Project) => {
@@ -686,13 +660,8 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
       return;
     }
     
-    const isComplexProject = selectedProject.deep_tier_enabled && selectedProject.bom_level === 'multi_level';
-    const message = isComplexProject 
-      ? `Delete project "${selectedProject.name}"? This is a complex project that will be force-deleted (all data cleaned first).`
-      : `Are you sure you want to delete project "${selectedProject.name}"?`;
-      
-    if (confirm(message)) {
-      handleDeleteProject(selectedProject, isComplexProject);
+    if (confirm(`Delete project "${selectedProject.name}" and all of its data? This cannot be undone.`)) {
+      handleDeleteProject(selectedProject);
     }
   };
 

@@ -1,13 +1,48 @@
-// @ts-nocheck
+// `delete-project` — the Project Manager's "Delete project" (§4 D170).
+//
+// THIS FUNCTION USED TO DO THE DELETION ITSELF, AND THAT WAS THE DEFECT. It answered
+// `202 Deletion started` before touching anything, then deleted table by table in
+// 200-row batches through a service-role client inside `EdgeRuntime.waitUntil`.
+// Production ran a 2026-03-17 build of it (§4 D168) that still deleted
+// `product_code_map`, a table `20260916000003` dropped, so every deletion failed in
+// the background — AFTER removing some of the project's rows, with no actor on any
+// audit row, and with the person told it had worked (§15 run `35790886083` (7): six
+// attempts on one project, six `PGRST205` errors, the project still present).
+//
+// Now it authorizes nothing and deletes nothing by hand. It calls
+// `public.delete_project` (`20260922000002`), which does the whole deletion in ONE
+// transaction — all of it or none of it — names the actor on every audit row, and
+// decides who may delete. This function waits for the answer and relays it, so a
+// refusal or a failure reaches the person who clicked instead of a server log.
+//
+// It stays an edge function rather than a browser RPC for one reason: the browser
+// calls as `anon`, whose statement timeout is seconds, and the largest project in
+// production holds thousands of rows behind statement-level triggers. The service
+// role has the headroom; the decision is still the database's.
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
-import { sameOrganization } from '../_shared/orgIdentity.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+function json(body: unknown, status: number) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+// SQLSTATE → HTTP, so the page can tell "not allowed" from "not there" from "broken".
+function statusFor(code: string | undefined): number {
+  if (code === '42501') return 403;   // insufficient_privilege
+  if (code === 'P0002') return 404;   // no_data_found
+  if (code === '22004') return 400;   // null_value_not_allowed
+  return 500;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -15,225 +50,32 @@ serve(async (req) => {
   }
 
   try {
-    const { projectId, userId, userEmail, force } = await req.json();
-
-    if (!projectId || !userId || !userEmail) {
-      return new Response(JSON.stringify({ success: false, error: 'Missing required fields' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    const { projectId, userId, userEmail } = await req.json();
+    if (!projectId || !userId) {
+      return json({ success: false, error: 'Missing projectId or userId.' }, 400);
     }
 
-    const supabaseAdmin = createClient(
+    const admin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    // Background deletion to avoid timeouts
-    EdgeRuntime.waitUntil((async () => {
-      const BATCH_SIZE = 200;
-      const MAX_RETRIES = 3;
-
-      const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
-
-      async function withRetry<T>(fn: () => Promise<T>, label: string, attempt = 1): Promise<T> {
-        try {
-          return await fn();
-        } catch (err) {
-          console.error(`[delete-project] ${label} failed (attempt ${attempt})`, err);
-          if (attempt >= MAX_RETRIES) throw err;
-          await sleep(250 * Math.pow(2, attempt - 1));
-          return withRetry(fn, label, attempt + 1);
-        }
-      }
-
-      async function authorize() {
-        // Fetch project
-        const { data: project, error: projErr } = await withRetry(
-          () => supabaseAdmin
-            .from('projects')
-            .select('id, organization, organization_id, modeler_id')
-            .eq('id', projectId)
-            .single(),
-          'load project'
-        );
-        if (projErr || !project) throw new Error(`project_not_found: ${projErr?.message ?? ''}`);
-
-        // Fetch user
-        const { data: user, error: userErr } = await withRetry(
-          () => supabaseAdmin
-            .from('approved_users')
-            .select('id, role, organization, organization_id')
-            .eq('id', userId)
-            .single(),
-          'load user'
-        );
-        if (userErr || !user) throw new Error(`user_not_found: ${userErr?.message ?? ''}`);
-
-        const isOwner = project.modeler_id === userId;
-        const isAdmin = (user.role === 'admin');
-        // D13: the uuid plane when both sides carry one, text as the fallback.
-        // This runs as the service role, so it is the whole authorization.
-        const sameOrg = sameOrganization(project, user);
-        if (!sameOrg || !(isOwner || isAdmin)) {
-          throw new Error('forbidden: user not allowed to delete project');
-        }
-
-        return { project, user } as const;
-      }
-
-      async function deleteByIds(table: string, idColumn: string, ids: string[]) {
-        if (ids.length === 0) return;
-        await withRetry(
-          () => supabaseAdmin.from(table).delete().in(idColumn, ids),
-          `delete batch from ${table} (${ids.length})`
-        );
-      }
-
-      async function deleteTableByProjectId(table: string) {
-        let total = 0;
-        for (;;) {
-          const { data: rows, error } = await withRetry(
-            () => supabaseAdmin
-              .from(table)
-              .select('id')
-              .eq('project_id', projectId)
-              .order('id', { ascending: true })
-              .limit(BATCH_SIZE),
-            `select batch from ${table}`
-          );
-          if (error) throw error;
-          const ids = (rows ?? []).map((r: any) => r.id);
-          if (!ids.length) break;
-          await deleteByIds(table, 'id', ids);
-          total += ids.length;
-          console.log(`[delete-project] ${table}: deleted ${total} so far`);
-        }
-      }
-
-      async function deleteDisruptionProfilesAndChildren() {
-        for (;;) {
-          const { data: profiles, error: profErr } = await withRetry(
-            () => supabaseAdmin
-              .from('disruption_scenario_profiles')
-              .select('id')
-              .eq('project_id', projectId)
-              .order('id', { ascending: true })
-              .limit(BATCH_SIZE),
-            'select disruption profiles batch'
-          );
-          if (profErr) throw profErr;
-          const profileIds = (profiles ?? []).map((r: any) => r.id);
-          if (!profileIds.length) break;
-
-          // Delete children
-          for (const child of [
-            'disruption_scenario_effects',
-            'disruption_scenario_settings',
-            'disruption_scenario_targets',
-          ]) {
-            await withRetry(
-              () => supabaseAdmin.from(child).delete().in('profile_id', profileIds),
-              `delete child ${child} (${profileIds.length} profiles)`
-            );
-          }
-
-          // Delete profiles
-          await deleteByIds('disruption_scenario_profiles', 'id', profileIds);
-          console.log(`[delete-project] disruption profiles: deleted ${profileIds.length}`);
-        }
-      }
-
-      try {
-        console.log('[delete-project] Authorization start', { projectId, userId, force });
-        await authorize();
-
-        console.log('[delete-project] Deleting related data in batches (force:', force, ')');
-
-        // 1) Simulation results (if any)
-        await deleteTableByProjectId('simulation_results');
-
-        // 2) Disruption scenarios (v2 profile model)
-        await deleteDisruptionProfilesAndChildren();
-
-        // 3) Deep-tier network data
-        await deleteTableByProjectId('network_edges');
-        await deleteTableByProjectId('network_nodes');
-
-        // ── WP 8.2 · SOURCES BEFORE DERIVED, WHICH IS THE ORDER THAT WAS
-        //    ALWAYS RIGHT AND IS NOW LOAD-BEARING ────────────────────────────
-        //
-        // This block used to delete `node_list` and `supply_chain_data` FIRST and
-        // the four source lanes after. Deleting derived data before the data it
-        // is derived from is backwards on any reading; since `20260920000003`
-        // (§4 D142) it is also wrong, because the four source tables carry a
-        // statement trigger that REBUILDS both edge tables. Deleting a source
-        // would have re-derived the graph a moment after the graph was deleted,
-        // and `node_list` and `supply_chain_data_multi_tier` carry NO cascade
-        // from `projects` (D117 took seven tables and not these two), so the
-        // resurrected rows would have outlived the project.
-        //
-        // In the new order the source deletes leave the lanes EMPTY BY
-        // CONSTRUCTION — a rebuild from empty sources writes nothing — and the
-        // explicit deletes below are the belt to that braces.
-
-        // 4) Source datasets and related tables
-        // If "force" or complex, we make sure to clear all regardless
-        await deleteTableByProjectId('inbound_logistics');
-        await deleteTableByProjectId('outbound_logistics');
-        await deleteTableByProjectId('bom_multi_level');
-        await deleteTableByProjectId('bom_single_level');
-        await deleteTableByProjectId('multi_tier_supply_chain');
-        // `product_code_map` was deleted here in Phase 1 / WP 1.4 (D3): the table
-        // exists in no migration, so this call could only ever fail. A delete of a
-        // table that does not exist is not harmless bookkeeping — it is a line
-        // that makes the list look complete.
-
-        // 5) Combined supply chain data — both lanes, now that nothing can
-        //    re-derive them.
-        await deleteTableByProjectId('supply_chain_data');
-        await deleteTableByProjectId('supply_chain_data_multi_tier');
-
-        // 6) Derived node list, last: the lane deletes above refresh it.
-        await deleteTableByProjectId('node_list');
-
-        // 7) Views and legacy tables (if present in older data)
-        // Note: simulation_result_scenarios is a view, may not need deletion
-        try {
-          await deleteTableByProjectId('simulation_result_scenarios');
-        } catch (e) {
-          console.log('[delete-project] simulation_result_scenarios skip (likely a view):', String(e?.message || e));
-        }
-
-        let legacyDone = false;
-        try {
-          await deleteTableByProjectId('disruption_scenarios');
-          legacyDone = true;
-        } catch (e) {
-          console.log('[delete-project] legacy disruption_scenarios skip or error:', String(e?.message || e));
-        }
-
-        console.log('[delete-project] All related data deleted. Removing project row...');
-        await withRetry(
-          () => supabaseAdmin.from('projects').delete().eq('id', projectId),
-          'delete project row'
-        );
-
-        console.log('[delete-project] Project deleted successfully', projectId, { legacyDone });
-      } catch (e) {
-        console.error('[delete-project] Background deletion failed', e);
-      }
-    })());
-
-    return new Response(JSON.stringify({ success: true, message: 'Deletion started' }), {
-      status: 202,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    console.log('[delete-project] start', { projectId, userId });
+    const { error } = await admin.rpc('delete_project', {
+      p_project_id: projectId,
+      p_user_id: userId,
+      p_user_email: userEmail ?? '',
     });
-  } catch (error) {
-    console.error('[delete-project] Request handling error', error);
-    return new Response(JSON.stringify({ success: false, error: String(error?.message || error) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+
+    if (error) {
+      console.error('[delete-project] refused or failed; nothing was deleted', error);
+      return json({ success: false, error: error.message, code: error.code }, statusFor(error.code));
+    }
+
+    console.log('[delete-project] deleted', { projectId });
+    return json({ success: true, message: 'Project deleted.' }, 200);
+  } catch (e) {
+    console.error('[delete-project] handler error', e);
+    return json({ success: false, error: String((e as Error)?.message ?? e) }, 500);
   }
 });
