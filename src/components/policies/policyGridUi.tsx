@@ -333,6 +333,7 @@ export function NumCell({
   placeholder = "—",
   title,
   dot,
+  superseded,
 }: {
   value: number | undefined;
   provenance: Provenance;
@@ -367,6 +368,22 @@ export function NumCell({
    * anchors to, and because it keeps this module presentational.
    */
   dot?: React.ReactNode;
+  /**
+   * THIS CELL IS EDITABLE AND THE RUN WILL NOT READ IT (§4 D165).
+   *
+   * Struck through rather than badged, and deliberately not a new provenance
+   * state: the dot still answers "where did this number come from", which is
+   * unchanged and still true. What is false is the IMPLICATION that typing here
+   * changes the run, and a strike is the one marker that says so in zero
+   * horizontal pixels — `columnFit` computes every column's width and a chip
+   * inside a 96px capacity cell would reflow the grid.
+   *
+   * The cell stays editable on purpose. The shadow depends on the ROW (a
+   * product with a master capacity), so the column as a whole is live, and
+   * disabling the input would make a planner unable to prepare the value they
+   * will need the moment they clear the master.
+   */
+  superseded?: boolean;
 }) {
   const derived = provenance === "derived";
   const formatted = (v: number) =>
@@ -389,7 +406,13 @@ export function NumCell({
             const raw = e.target.value.replace("≈", "").trim();
             onCommit(raw === "" ? undefined : parseFloat(raw.replace(",", ".")));
           }}
-          style={{ boxSizing: "border-box", minWidth: 0 }}
+          style={{
+            boxSizing: "border-box",
+            minWidth: 0,
+            ...(superseded
+              ? { textDecoration: "line-through", textDecorationThickness: "1px", opacity: 0.5 }
+              : {}),
+          }}
           className="h-5 w-full rounded-sm border border-transparent bg-transparent px-[5px] text-right font-mono text-[11.5px] tabular-nums outline-none hover:bg-[#fafafa] focus:border-[--zinc-border] focus:bg-background"
         />
         {unit && <span className="text-[9px] text-[#a3a3a3]">{unit}</span>}

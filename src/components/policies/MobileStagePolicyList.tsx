@@ -28,10 +28,12 @@ import { lineNeedsInput, groupHasPrimary, type ResolveField } from "@/lib/polici
 import { inventoryParamsForType } from "@/lib/policies/registryPolicyTypes";
 import {
   resolveCell,
+  substitutionNote,
   getEffectiveValue,
   type MasterRowMaps,
 } from "@/lib/policies/resolveEffective";
 import { useItemMasters } from "@/hooks/useItemMasters";
+import { useDerivedMaps } from "@/hooks/useDerivedMaps";
 import type { StageRowsQuery } from "@/hooks/useStageGuards";
 import type { FulfillmentStrategy, PolicyBundle, PolicyFamily } from "@/lib/policies/schemas";
 import type { StageKey } from "@/lib/policies/stages";
@@ -94,7 +96,12 @@ export function MobileStagePolicyList({
   const spec = specFor(stageKey);
   const families = useMemo(() => familiesForStage(stageKey), [stageKey]);
   const { rows: dataRows, loading } = stageRows;
-  const { materials, products, suppliers, derived } = useItemMasters(projectId);
+  const {
+    materials, products, suppliers, derived: derivedEconomics, lanes,
+  } = useItemMasters(projectId);
+  const derived = useDerivedMaps({
+    derived: derivedEconomics, products, outbound: lanes.outbound, defaults, overrides,
+  });
   const [openRowKey, setOpenRowKey] = useState<string | null>(null);
   // A group can hold forty lanes. The panel shows what the device can hold and
   // the rest is one tap away, in full (§10, v2 §5.4) — never sliced off.
@@ -304,15 +311,27 @@ export function MobileStagePolicyList({
                   counter={`${cols.length + activeParams.length}`}
                 >
                   {cols.map((col) => {
-                    const { value, provenance, placeholder } = resolveCol(openRow, col);
+                    const cell = resolveCol(openRow, col);
+                    const { value, provenance, placeholder, supersededBy } = cell;
+                    // T2 on the phone. The desktop grid puts this sentence in a
+                    // hover and a popover, neither of which a phone has — so it
+                    // is the row's `sub`, where the skin already puts the line
+                    // that explains the value above it (§4 D165). Same sentence,
+                    // same assembler: `substitutionNote` over the same
+                    // `ResolvedCell`, so the two surfaces cannot disagree about
+                    // what stood in for a number.
+                    const note = substitutionNote(cell);
                     return (
                       <MobileRow
                         key={col.field}
                         chevron={false}
                         label={col.label}
+                        sub={note}
                         value={
                           <span className="inline-flex items-center gap-1.5">
-                            {formatValue(col, value, placeholder)}
+                            <span style={supersededBy ? { textDecoration: "line-through", opacity: 0.5 } : undefined}>
+                              {formatValue(col, value, placeholder)}
+                            </span>
                             <span className="relative inline-block h-2 w-2">
                               <ProvenanceDot p={provenance} />
                             </span>

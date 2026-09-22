@@ -300,14 +300,20 @@ describe("§4 D90 · door 3 is a DECLARATION, not a scan", () => {
     ).toEqual([]);
   });
 
-  it("the nine declared keys carry their target and their transform", () => {
-    // NINE KEYS, ELEVEN CHAINS: `type` and `safety_stock_days` are rendered by
+  it("the ten declared keys carry their target and their transform", () => {
+    // TEN KEYS, TWELVE CHAINS: `type` and `safety_stock_days` are rendered by
     // both the supplier and the plant stage, which is why the chain count and the
     // key count differ and why D90's "nine" was never wrong.
+    //
+    // `utilization_cap_pct` is the tenth (WP 9.3 / §4 D165). It was on the
+    // parity test's `not_rendered` list — the list of bundle keys that are NOT
+    // grid cells — while the arithmetic it performs is half of what the plant
+    // stage exists to show: the engine builds a product's weekly capacity as
+    // units/day × 7 × utilization, and the grid rendered the first factor only.
     const byDeclaration = chains.filter((c) =>
       /declared policy-bundle key/.test(c.hops.find((h) => h.kind === "engine")?.detail ?? ""));
-    expect(byDeclaration.length).toBe(11);
-    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(9);
+    expect(byDeclaration.length).toBe(12);
+    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(10);
     for (const c of byDeclaration) {
       const detail = c.hops.find((h) => h.kind === "engine")!.detail;
       // The TARGET is what makes the chain followable; the TRANSFORM is what makes
@@ -317,7 +323,7 @@ describe("§4 D90 · door 3 is a DECLARATION, not a scan", () => {
     }
   });
 
-  it("the one key that lands on an ENTITY field says so", () => {
+  it("the keys that land on an ENTITY field say so", () => {
     // `capacity_units_per_day` feeds `Product.production_capacity`, not a policy
     // parameter — which is why door 2 could never have declared it and why adding
     // a Params field would have been the wrong fix.

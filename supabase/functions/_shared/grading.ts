@@ -59,6 +59,20 @@ export interface FallbackStep {
   constant: number | null;
 }
 
+/** What an EMPTY column MEANS, when empty means something — the registry's
+ *  own declaration (scsim base.py::EmptyMeaning), not a second author's.
+ *
+ *  A `fallback_spec` says what the engine SUBSTITUTES for a blank. This says
+ *  the opposite: the engine HONOURS the blank. `suppliers.capacity_per_week`
+ *  is the one field that carries it — NULL is `np.inf`, not "missing" — and
+ *  until WP 9.3 the sentence a user actually read lived in the frontend's
+ *  `columnSpecs.ts` while the engine said "unlimited" in prose. A requirement
+ *  declares one or the other, never both; the engine refuses both at once. */
+export interface EmptyMeaning {
+  token: string;
+  meaning: string;
+}
+
 export interface RegistryRequirement {
   field: string;
   level: "required" | "recommended" | "defaulted";
@@ -66,6 +80,7 @@ export interface RegistryRequirement {
   fallback: string | null;
   condition: string | null;
   fallback_spec?: FallbackStep[];
+  empty_means?: EmptyMeaning | null;
 }
 
 /** The slice of registry.generated.json this module reads. */
@@ -310,13 +325,55 @@ export function derivedFallbackValues(
   ctx: ReducerCtx,
 ): Map<string, number> {
   const out = new Map<string, number>();
+  for (const [id, d] of derivedFallbackDetails(steps, ids, ctx)) out.set(id, d.value);
+  return out;
+}
+
+/** One resolved fallback step: the number, the reducer that produced it, and
+ *  the grade the registry attaches to that step. */
+export interface DerivedValue {
+  value: number;
+  /** The reducer name as the registry declares it (`production_policy_capacity`). */
+  via: string;
+  /** "info" — derived from project data · "warn" — the engine giving up. */
+  grade: "info" | "warn";
+}
+
+/**
+ * The same walk as `derivedFallbackValues`, keeping WHICH step answered.
+ *
+ * ── WHY THE VALUE ALONE IS NOT ENOUGH, AND WHY THIS IS NOT A SECOND WALK ───
+ *
+ * `products.production_capacity` is the chain that forced this. Its two steps
+ * are BOTH reducers — `production_policy_capacity` (grade `info`: the plant
+ * grid's own units/day × 7 × utilization) and `twice_demand_floor_1000` (grade
+ * `warn`: max(2·demand, 1000), which always resolves and is the engine saying
+ * capacity will not bind). A surface that receives only the number cannot tell
+ * a planner's line rate from the floor that makes capacity a non-constraint,
+ * and those are opposite statements about the same run. T2 — the substitution
+ * is visible AT THE POINT OF DISPLAY — is not satisfiable without the step.
+ *
+ * `derivedFallbackValues` delegates here rather than the other way round, so
+ * there is exactly one implementation of "walk the chain until a step
+ * resolves". Two walks is how a chain starts disagreeing with itself.
+ *
+ * A NEUTRAL CONSTANT still ends the walk without contributing: a constant is
+ * the engine giving up rather than a value derived from the project, and an id
+ * absent from the result is one no data-derived step resolves.
+ */
+export function derivedFallbackDetails(
+  steps: FallbackStep[] | undefined,
+  ids: Iterable<string>,
+  ctx: ReducerCtx,
+): Map<string, DerivedValue> {
+  const out = new Map<string, DerivedValue>();
   if (!steps) return out;
   for (const id of ids) {
     for (const step of steps) {
       if (step.reducer == null) break;
       const value = REDUCERS[step.reducer]?.(id, ctx);
       if (value !== undefined) {
-        out.set(id, value);
+        out.set(id, { value, via: step.reducer, grade: step.grade });
         break;
       }
     }

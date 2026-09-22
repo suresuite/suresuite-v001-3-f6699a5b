@@ -126,12 +126,19 @@ export function ValueChainPopover({
   target,
   provenance,
   displayed,
+  substitution,
+  superseded,
   userId,
   children,
 }: {
   target: ValueChainTarget;
   provenance: ValueChainInput["provenance"];
   displayed: string;
+  /** The sentence naming the substitution behind this cell, when there is one
+   *  (`resolveEffective.ts::substitutionNote`) — §4 D165. */
+  substitution?: string | null;
+  /** True when an item-master column outranks this cell and the run ignores it. */
+  superseded?: boolean;
   userId: string | null;
   children: React.ReactNode;
 }) {
@@ -146,6 +153,8 @@ export function ValueChainPopover({
     field: target.field,
     provenance,
     displayed,
+    substitution,
+    superseded,
   });
 
   return (

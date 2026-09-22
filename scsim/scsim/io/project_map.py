@@ -277,8 +277,15 @@ class MappingResult:
 # READ by this module, and every bundle key this module reads must be here —
 # `scsim/tests/test_registry_io.py` asserts both directions against the source.
 #
-# NINE KEYS, ELEVEN CHAINS: `type` and `safety_stock_days` are rendered by both
-# the supplier and the plant stage, so the grid has eleven cells for nine keys.
+# TEN KEYS, TWELVE CHAINS: `type` and `safety_stock_days` are rendered by both
+# the supplier and the plant stage, so the grid has twelve cells for ten keys.
+# (`utilization_cap_pct` joined in WP 9.3 — it was on the test's `not_rendered`
+# list, which is the list of keys that are NOT grid cells, while the arithmetic
+# it performs is half of what the plant stage exists to show.)
+#
+# `shadowed_by` is OPTIONAL and names the entity field that, when present,
+# makes this key's value unreachable. Two keys carry it and both name
+# `products.production_capacity` (§4 D165).
 POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     {
         "key": "supply_share",
@@ -325,6 +332,27 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
         "transform": "units/day x 7 x utilization_cap_pct (default 0.85) -> units/week. "
                      "The MASTER `products.production_capacity` shadows it entirely when "
                      "present, and the mapper warns that the grid entry is not applied",
+        # THE SHADOW, MACHINE-READABLE (§4 D165). The sentence above has been in
+        # this table since D90 and no surface could act on it: the plant grid
+        # rendered an editable `capacity_units_per_day` cell with nothing saying
+        # the engine would ignore it whenever the product carried a master
+        # capacity. A surface cannot read prose. It can read this.
+        "shadowed_by": "products.production_capacity",
+    },
+    {
+        # The OTHER half of the same arithmetic, and it had no declaration and no
+        # column — so a planner saw 1 000 units/day become 5 950 units/week with
+        # nothing on screen holding the 0.85. It is read by `_map_policies`'s
+        # capacity branch exactly as `capacity_units_per_day` is.
+        "key": "utilization_cap_pct",
+        "family": "production",
+        "target": "Product.production_capacity",
+        "catalog_ref": None,
+        "transform": "percent / 100, multiplied into the weekly capacity above; the "
+                     "mapper substitutes 85 when the production policy sets none and "
+                     "says so. Read ONLY on the branch that derives capacity from the "
+                     "grid — a master production_capacity shadows this too",
+        "shadowed_by": "products.production_capacity",
     },
     {
         "key": "fg_safety_stock",
@@ -373,7 +401,7 @@ def base_data_requirements() -> tuple:
     # (supabase/functions/_shared/grading.ts) dispatches on, and each step's
     # grade matches the MappingWarning level the mapper emits when that step
     # is what resolves the field — the validation-parity tests pin this.
-    from scsim.policies.base import DataRequirement, FallbackStep
+    from scsim.policies.base import DataRequirement, EmptyMeaning, FallbackStep
 
     return (
         DataRequirement(
@@ -439,6 +467,18 @@ def base_data_requirements() -> tuple:
                    "magnitude supplier disruptions need a finite capacity to "
                    "throttle, else they degrade to full outages.",
             fallback="unlimited",
+            # NOT a fallback: `context.py` builds `np.inf` from the NULL, so the
+            # engine honours the blank instead of substituting for it. Declared
+            # here because the sentence had TWO authors — this table said
+            # "unlimited" in prose and `columnSpecs.ts::master.nullMeans` carried
+            # the token and the tooltip the grid actually rendered (§4 D165).
+            empty_means=EmptyMeaning(
+                token="∞",
+                meaning="No capacity limit. An empty supplier capacity means "
+                        "unlimited, so this supplier never throttles shipments — "
+                        "and a partial-magnitude disruption on it degrades to a "
+                        "full outage. Enter a number to model a finite capacity.",
+            ),
         ),
     )
 

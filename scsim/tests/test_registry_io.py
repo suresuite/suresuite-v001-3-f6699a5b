@@ -336,7 +336,7 @@ def test_policy_bundle_keys_match_what_the_mapper_reads():
     not_rendered = {
         "ratios", "strategy", "safety_stock_method", "backorder_allowed",
         "max_backorder_days", "backorder_cost_per_day", "allocation",
-        "tier_overrides", "utilization_cap_pct", "fulfillment_strategy",
+        "tier_overrides", "fulfillment_strategy",
         "min_share_pct", "reorder_point", "order_up_to", "review_period_days",
         "primary_source", "material_price", "initial_on_hand", "holding_cost_pct",
         "sourcing_firm", "moq", "lead_time_distribution", "ordering_cost",
@@ -369,4 +369,66 @@ def test_registry_publishes_the_policy_bundle_keys():
     # that is the case door 2 could never have covered — a Params addition would
     # have been the wrong fix.
     entity = [k for k in keys if k["catalog_ref"] is None]
-    assert [k["key"] for k in entity] == ["capacity_units_per_day"], entity
+    assert [k["key"] for k in entity] == [
+        "capacity_units_per_day", "utilization_cap_pct"], entity
+    # Both of them are also SHADOWED, and by the same master column — the plant
+    # grid's two capacity cells are unreachable together or not at all (§4 D165).
+    assert {k["key"]: k.get("shadowed_by") for k in entity} == {
+        "capacity_units_per_day": "products.production_capacity",
+        "utilization_cap_pct": "products.production_capacity",
+    }
+    # A `shadowed_by` that names nothing the engine reads is fiction, so it must
+    # resolve to a declared base data requirement.
+    fields = {r["field"] for r in reg["base_data_requirements"]}
+    for k in keys:
+        if k.get("shadowed_by"):
+            assert k["shadowed_by"] in fields, k
+
+
+# --------------------------------------------- what an EMPTY column means (D165)
+
+def test_empty_means_is_declared_for_the_one_column_that_has_one():
+    """`suppliers.capacity_per_week` is NULL = ∞, and the registry now says so.
+
+    Until WP 9.3 the statement had two authors: this table said "unlimited" in
+    the prose `fallback` field, and the frontend's `columnSpecs.ts` carried the
+    token and the tooltip the grid actually rendered. The frontend's copy was
+    the only machine-readable one, so the engine's own declaration could not be
+    read by the surface that displayed it — §2.1 `single-source`, one layer
+    below markdown, which is the class §4 D101/D127 name.
+    """
+    from scsim.io.project_map import base_data_requirements
+
+    reqs = {r.field: r for r in base_data_requirements()}
+    cap = reqs["suppliers.capacity_per_week"]
+    assert cap.empty_means is not None
+    assert cap.empty_means.token == "∞"
+    assert "unlimited" in cap.empty_means.meaning.lower()
+    # It is the declared meaning of a blank, NOT a substitution — the two are
+    # opposite answers and `DataRequirement` refuses both at once.
+    assert cap.fallback_spec == ()
+
+
+def test_a_requirement_may_not_declare_both_a_fallback_and_an_empty_meaning():
+    from scsim.policies.base import DataRequirement, EmptyMeaning, FallbackStep
+
+    with pytest.raises(ValueError, match="never both"):
+        DataRequirement(
+            field="x.y", level="defaulted", reason="r",
+            fallback_spec=(FallbackStep(grade="warn", constant=1.0),),
+            empty_means=EmptyMeaning(token="∞", meaning="unlimited"),
+        )
+
+
+def test_the_registry_publishes_empty_means():
+    reg = build_registry()
+    rows = {r["field"]: r for r in reg["base_data_requirements"]}
+    assert rows["suppliers.capacity_per_week"]["empty_means"] == {
+        "token": "∞",
+        "meaning": rows["suppliers.capacity_per_week"]["empty_means"]["meaning"],
+    }
+    # Every OTHER requirement declares None, so a surface can test the key
+    # rather than special-casing one field name.
+    others = [f for f, r in rows.items()
+              if r["empty_means"] is not None and f != "suppliers.capacity_per_week"]
+    assert others == [], others

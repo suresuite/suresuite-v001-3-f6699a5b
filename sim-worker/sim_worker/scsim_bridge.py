@@ -32,6 +32,13 @@ _BRIDGE_KEYS = (
     # replication and never as a run figure. The other three arrive with the
     # material/finished-goods split.
     "avg_on_hand_value", "avg_fg_value", "avg_on_hand_units", "avg_fg_units",
+    # Capacity (WP 9.3 / §4 D165). `capacity_utilization` was computed by
+    # `compute_replication_kpis` and never aggregated here, so it reached a user
+    # per replication and never as a run figure — the same omission this list
+    # had for `avg_on_hand_value` one line above. It was also NaN on every run
+    # that was not a full-debug inspection, which is why nobody noticed.
+    "capacity_utilization", "supplier_capacity_utilization",
+    "products_capacity_bound", "suppliers_capacity_bound",
 )
 
 
@@ -195,6 +202,15 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
     # ready for the run_item_series persistence shape. Present ONLY when the
     # engine produced them (trace full_debug + exactly 1 replication).
     # getattr-guarded so an older engine wheel keeps working.
+    # WHICH products/suppliers capacity bound (WP 9.3). A run-level fact, not a
+    # per-replication one, so it travels beside the aggregates rather than on
+    # every replication row. getattr-guarded like its neighbours so an older
+    # engine wheel keeps working — an absent key reads as "this run predates the
+    # measurement", which the surface says rather than drawing an empty table.
+    capacity_binding = getattr(result, "capacity_binding", None)
+    if capacity_binding:
+        out["capacity_binding"] = capacity_binding
+
     item_series = getattr(result, "item_series", None)
     item_ids = getattr(result, "item_ids", None)
     if item_series and item_ids:

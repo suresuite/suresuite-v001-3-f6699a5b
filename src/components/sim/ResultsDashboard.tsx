@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { KpiStatTable } from "./KpiStatTable";
 import { ConvergencePlot } from "./ConvergencePlot";
 import { InventoryOverTime } from "./InventoryOverTime";
+import { CapacityOverTime, type CapacityBinding } from "./CapacityOverTime";
 import { ItemSeriesExplorer } from "./ItemSeriesExplorer";
 import { ReplicationSeedExplorer } from "./ReplicationSeedExplorer";
 import { RecoveryImpactCard } from "./RecoveryImpactCard";
@@ -40,6 +41,10 @@ interface RunMeta {
   horizon_days?: number;
   engine?: string;
   scsim_notes?: string[];
+  /** Which products/suppliers capacity held back (§4 D165). Written by the
+   *  worker from `ScenarioResult.capacity_binding`; absent on a run that
+   *  predates the measurement, which the panel says rather than assumes. */
+  capacity_binding?: CapacityBinding;
 }
 
 function extractMeta(run: SimulationRun | null, reps: Replication[]): RunMeta | null {
@@ -148,6 +153,17 @@ export function ResultsDashboard({
         reps={reps.filter((r) => r.status === "done")}
         warmupWeeks={run.warmup_detected_at}
       />
+      {/* Capacity utilization (§4 D165): the engine's own weekly capacity and the
+          part of it the run used, with the per-entity binding behind it. Same
+          shape as the inventory chart above — plain weekly scalars, so it
+          renders on every run, unlike the per-item panel at the bottom. The
+          run-level `capacity_utilization` KPI in the table below is the window
+          aggregate of exactly these two series. */}
+      <CapacityOverTime
+        reps={reps.filter((r) => r.status === "done")}
+        binding={meta?.capacity_binding ?? null}
+        warmupWeeks={run.warmup_detected_at}
+      />
       <ConvergencePlot reps={reps} primaryKpi={primaryKpi} warmupAt={run.warmup_detected_at} />
       {/* Per-seed filter over the persisted weekly traces (W1 / G17): default
           is the cross-rep mean ± CI band; selecting a seed overlays or
@@ -166,7 +182,15 @@ export function ResultsDashboard({
           can only ever be empty is a placeholder, not a state, and removing it is
           a smaller change than emitting a series no policy needs. The run-level
           measure exists and now renders in the table above, as
-          `capacity_utilization`, which the same defect had been hiding. */}
+          `capacity_utilization`, which the same defect had been hiding.
+
+          AND THAT LAST SENTENCE WAS FALSE FOR THE WHOLE OF ITS LIFE — §4 D165.
+          `capacity_utilization` read `trace.Q`, which exists only under
+          `full_debug`, so on every ordinary run it was NaN, the bridge mapped
+          NaN to null, and the row never appeared in the table this comment
+          points at. It is computed from always-on weekly series now, and
+          `CapacityOverTime` above is the panel this comment judged not worth
+          building — which it was not, until the series it needs existed. */}
       {/* Per-item weekly series (W3 / G17): inspection runs only. This page
           dispatches no inspection run, so before WP 9.1 the panel was empty
           here on every run and said nothing about why — the dead end §4 D113

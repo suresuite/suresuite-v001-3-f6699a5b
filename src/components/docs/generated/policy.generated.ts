@@ -817,6 +817,36 @@ export const CHAINS: PolicyChain[] = [
   },
   {
     "stage": "plant",
+    "field": "utilization_cap_pct",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `utilization_cap_pct` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → Product.production_capacity — an ENTITY field, not a policy parameter. Transform: percent / 100, multiplied into the weekly capacity above; the mapper substitutes 85 when the production policy sets none and says so. Read ONLY on the branch that derives capacity from the grid — a master production_capacity shadows this too",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
     "field": "type",
     "family": "inventory",
     "hops": [
@@ -2264,6 +2294,18 @@ export const RUN_KPIS: RunKpis = {
       "always": true
     },
     {
+      "key": "supplier_capacity_utilization",
+      "always": true
+    },
+    {
+      "key": "products_capacity_bound",
+      "always": true
+    },
+    {
+      "key": "suppliers_capacity_bound",
+      "always": true
+    },
+    {
       "key": "cost_of_resilience",
       "always": true
     },
@@ -2383,7 +2425,22 @@ export const RUN_KPIS: RunKpis = {
     },
     {
       "key": "capacity_utilization",
-      "label": "Capacity utilization",
+      "label": "Plant capacity utilization",
+      "emitted": true
+    },
+    {
+      "key": "supplier_capacity_utilization",
+      "label": "Supplier capacity utilization",
+      "emitted": true
+    },
+    {
+      "key": "products_capacity_bound",
+      "label": "Products capacity held back",
+      "emitted": true
+    },
+    {
+      "key": "suppliers_capacity_bound",
+      "label": "Suppliers capacity held back",
       "emitted": true
     },
     {
@@ -2575,7 +2632,11 @@ export const REPLICATION_SERIES_FACTS: ReplicationSeries = {
     "on_hand_value",
     "fg_value",
     "on_hand_units",
-    "fg_units"
+    "fg_units",
+    "plant_capacity_units",
+    "plant_capacity_used_units",
+    "supplier_capacity_units",
+    "supplier_capacity_used_units"
   ],
   "declared": [
     {
@@ -2648,6 +2709,30 @@ export const REPLICATION_SERIES_FACTS: ReplicationSeries = {
       "key": "fg_units",
       "unit": "units",
       "aggregation": "level",
+      "published": true
+    },
+    {
+      "key": "plant_capacity_units",
+      "unit": "units",
+      "aggregation": "flow",
+      "published": true
+    },
+    {
+      "key": "plant_capacity_used_units",
+      "unit": "units",
+      "aggregation": "flow",
+      "published": true
+    },
+    {
+      "key": "supplier_capacity_units",
+      "unit": "units",
+      "aggregation": "flow",
+      "published": true
+    },
+    {
+      "key": "supplier_capacity_used_units",
+      "unit": "units",
+      "aggregation": "flow",
       "published": true
     }
   ],
@@ -3731,5 +3816,5 @@ export const READ_EXPOSURE: ReadExposure = {
   ]
 };
 
-export const CHAIN_COUNT = 38;
+export const CHAIN_COUNT = 39;
 export const BROKEN_COUNT = 10;

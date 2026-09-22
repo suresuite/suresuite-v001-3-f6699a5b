@@ -31,6 +31,7 @@ import {
   type StressTestPreset,
 } from "@/components/sim/StressTestCard";
 import { PreRunValidationPanel } from "@/components/sim/PreRunValidationPanel";
+import { CapacityReadinessPanel } from "@/components/sim/CapacityReadiness";
 import { GateBar } from "@/components/sim/RunGate";
 import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
 import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
@@ -58,6 +59,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const { runsByScenario } = useScenarioRuns(projectId);
   const {
     defaults: policyDefaults,
+    overrides: policyOverrides,
     versions: policyVersions,
     selectedVersionId: policyVersionId,
     isDirty: policyDirty,
@@ -511,6 +513,20 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                         onShowFindings={() => setPane("run")}
                       />
                     </section>
+                    {/* What capacity this run will use, and whether it is real
+                        (§4 D165). Beside the gate rather than inside it: a
+                        product with no capacity figure is not a finding — the
+                        engine resolves it — but the number it resolves to is
+                        max(2·demand, 1000), chosen so capacity never binds, and
+                        a run that answers "could we have made it" with an
+                        assumed yes has to say so BEFORE it is dispatched. */}
+                    <CapacityReadinessPanel
+                      products={itemMasters.products}
+                      suppliers={itemMasters.suppliers}
+                      outbound={itemMasters.lanes.outbound}
+                      defaults={policyDefaults}
+                      overrides={policyOverrides}
+                    />
                     <PreRunValidationPanel
                       projectId={projectId}
                       findings={gateFindings}

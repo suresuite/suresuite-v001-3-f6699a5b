@@ -61,6 +61,31 @@ class FallbackStep:
 
 
 @dataclass(frozen=True)
+class EmptyMeaning:
+    """What an EMPTY column MEANS, when empty means something.
+
+    A ``fallback_spec`` says what the engine SUBSTITUTES when a column has no
+    value. It cannot express the other case: a column whose emptiness is itself
+    a modelling choice the engine honours. ``suppliers.capacity_per_week`` is
+    the one this was written for — NULL is not "missing", it is "unlimited", and
+    the engine builds ``np.inf`` from it.
+
+    Declared here so the statement has ONE author. Until this existed the
+    sentence lived in the frontend's ``columnSpecs.ts`` (``master.nullMeans``)
+    while the registry said "unlimited" in prose one table over — two authors of
+    one fact, which is the §2.1 `single-source` class the plan's D101/D127 are
+    about. ``token`` is what a surface renders in place of a number; ``meaning``
+    is the sentence it shows beside it.
+    """
+
+    token: str
+    meaning: str
+
+    def as_dict(self) -> dict:
+        return {"token": self.token, "meaning": self.meaning}
+
+
+@dataclass(frozen=True)
 class DataRequirement:
     """Facet 5 of the policy interface — the parameter-requirement contract
     (design blueprint §8.1): an entity field this policy needs from the
@@ -78,6 +103,11 @@ class DataRequirement:
     machine-readable form — ordered steps the graders resolve without
     hand-coding per-field logic; ``condition`` scopes the
     requirement to a parameterization (e.g. ``"segmentation=abc_by_revenue"``).
+    ``empty_means`` declares the OTHER case — a column whose emptiness the
+    engine HONOURS rather than substitutes for (see :class:`EmptyMeaning`). A
+    requirement carries a ``fallback_spec`` or an ``empty_means``, never both:
+    they are opposite answers to "this column is blank", and a surface that saw
+    both would have to pick one, which is a decision no surface owns.
     """
 
     field: str
@@ -86,6 +116,15 @@ class DataRequirement:
     fallback: Optional[str] = None
     condition: Optional[str] = None
     fallback_spec: tuple[FallbackStep, ...] = ()
+    empty_means: Optional[EmptyMeaning] = None
+
+    def __post_init__(self) -> None:
+        if self.fallback_spec and self.empty_means is not None:
+            raise ValueError(
+                f"{self.field}: a requirement declares a fallback chain OR what an "
+                "empty column means, never both — they are opposite answers to the "
+                "same blank cell"
+            )
 
     def as_dict(self) -> dict:
         return {
@@ -95,6 +134,7 @@ class DataRequirement:
             "fallback": self.fallback,
             "condition": self.condition,
             "fallback_spec": [s.as_dict() for s in self.fallback_spec],
+            "empty_means": self.empty_means.as_dict() if self.empty_means else None,
         }
 
 

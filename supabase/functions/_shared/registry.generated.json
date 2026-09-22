@@ -2,6 +2,7 @@
   "base_data_requirements": [
     {
       "condition": null,
+      "empty_means": null,
       "fallback": "volume-weighted average inbound unit_price across the material's supply lanes; the cheapest quoted price when no lane carries a volume",
       "fallback_spec": [
         {
@@ -26,6 +27,7 @@
     },
     {
       "condition": null,
+      "empty_means": null,
       "fallback": "demand-weighted average outbound unit_price",
       "fallback_spec": [
         {
@@ -45,6 +47,7 @@
     },
     {
       "condition": null,
+      "empty_means": null,
       "fallback": "\u03a3 weekly outbound volume",
       "fallback_spec": [
         {
@@ -64,6 +67,7 @@
     },
     {
       "condition": null,
+      "empty_means": null,
       "fallback": "production policy capacity_units_per_day \u00d7 7 \u00d7 utilization",
       "fallback_spec": [
         {
@@ -83,6 +87,7 @@
     },
     {
       "condition": null,
+      "empty_means": null,
       "fallback": null,
       "fallback_spec": [
         {
@@ -97,6 +102,7 @@
     },
     {
       "condition": null,
+      "empty_means": null,
       "fallback": null,
       "fallback_spec": [
         {
@@ -111,6 +117,10 @@
     },
     {
       "condition": null,
+      "empty_means": {
+        "meaning": "No capacity limit. An empty supplier capacity means unlimited, so this supplier never throttles shipments \u2014 and a partial-magnitude disruption on it degrades to a full outage. Enter a number to model a finite capacity.",
+        "token": "\u221e"
+      },
       "fallback": "unlimited",
       "fallback_spec": [],
       "field": "suppliers.capacity_per_week",
@@ -1362,6 +1372,7 @@
       "data_requirements": [
         {
           "condition": null,
+          "empty_means": null,
           "fallback": null,
           "fallback_spec": [],
           "field": "outbound_logistics.volume",
@@ -1370,6 +1381,7 @@
         },
         {
           "condition": null,
+          "empty_means": null,
           "fallback": "Customer.priority_weight's own default, 1.0 \u2014 every customer equal, which makes the `priority` rule inert",
           "fallback_spec": [],
           "field": "customers.priority_weight",
@@ -1378,6 +1390,7 @@
         },
         {
           "condition": null,
+          "empty_means": null,
           "fallback": "Customer.segment's own default, \"default\" \u2014 every customer in one segment, so no `sla_tiers` key can match and every declared floor resolves to 0.0",
           "fallback_spec": [],
           "field": "customers.segment",
@@ -1563,6 +1576,7 @@
       "data_requirements": [
         {
           "condition": null,
+          "empty_means": null,
           "fallback": "0 (no minimum)",
           "fallback_spec": [],
           "field": "materials.moq",
@@ -1571,6 +1585,7 @@
         },
         {
           "condition": null,
+          "empty_means": null,
           "fallback": "policy inventory.holding_cost_pct, then 20%",
           "fallback_spec": [],
           "field": "materials.holding_cost_pct",
@@ -1844,6 +1859,7 @@
       "data_requirements": [
         {
           "condition": null,
+          "empty_means": null,
           "fallback": "scenario demand_model.cv, then 0.30",
           "fallback_spec": [],
           "field": "products.demand_cv",
@@ -1974,6 +1990,7 @@
       "data_requirements": [
         {
           "condition": "segmentation=abc_by_revenue",
+          "empty_means": null,
           "fallback": "demand-weighted average outbound unit_price",
           "fallback_spec": [],
           "field": "products.sell_price",
@@ -1982,6 +1999,7 @@
         },
         {
           "condition": null,
+          "empty_means": null,
           "fallback": "scenario demand_model.cv, then 0.30",
           "fallback_spec": [],
           "field": "products.demand_cv",
@@ -2094,6 +2112,7 @@
       "data_requirements": [
         {
           "condition": null,
+          "empty_means": null,
           "fallback": "production policy capacity_units_per_day x 7 x utilization",
           "fallback_spec": [],
           "field": "products.production_capacity",
@@ -2323,6 +2342,7 @@
       "data_requirements": [
         {
           "condition": null,
+          "empty_means": null,
           "fallback": "demand-weighted average outbound unit_price",
           "fallback_spec": [],
           "field": "products.sell_price",
@@ -2436,6 +2456,7 @@
       "data_requirements": [
         {
           "condition": null,
+          "empty_means": null,
           "fallback": null,
           "fallback_spec": [],
           "field": "inbound_logistics.unit_price",
@@ -2444,6 +2465,7 @@
         },
         {
           "condition": null,
+          "empty_means": null,
           "fallback": "1.0",
           "fallback_spec": [],
           "field": "suppliers.reliability_score",
@@ -2569,6 +2591,7 @@
       "data_requirements": [
         {
           "condition": null,
+          "empty_means": null,
           "fallback": null,
           "fallback_spec": [],
           "field": "inbound_logistics.volume",
@@ -3177,8 +3200,17 @@
       "catalog_ref": null,
       "family": "production",
       "key": "capacity_units_per_day",
+      "shadowed_by": "products.production_capacity",
       "target": "Product.production_capacity",
       "transform": "units/day x 7 x utilization_cap_pct (default 0.85) -> units/week. The MASTER `products.production_capacity` shadows it entirely when present, and the mapper warns that the grid entry is not applied"
+    },
+    {
+      "catalog_ref": null,
+      "family": "production",
+      "key": "utilization_cap_pct",
+      "shadowed_by": "products.production_capacity",
+      "target": "Product.production_capacity",
+      "transform": "percent / 100, multiplied into the weekly capacity above; the mapper substitutes 85 when the production policy sets none and says so. Read ONLY on the branch that derives capacity from the grid \u2014 a master production_capacity shadows this too"
     },
     {
       "catalog_ref": "P-P.4",

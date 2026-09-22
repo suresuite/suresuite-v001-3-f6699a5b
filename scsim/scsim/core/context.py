@@ -366,6 +366,35 @@ WEEKLY_SERIES: tuple[WeeklySeries, ...] = (
     WeeklySeries("fg_units", "units", "level", True,
                  "Finished-goods inventory on hand at the end of the week, in units. "
                  "Summed across products, with the same caveat as `on_hand_units`."),
+    # ── Capacity (WP 9.3 / §4 D165) ──────────────────────────────────────────
+    # `capacity_utilization` has been a KPI since the KPI module was written and
+    # it read `trace.Q`, which exists only under `full_debug` — so on every
+    # Monte Carlo run it was NaN, and the /policies sanity panel printed "not
+    # recorded" for a quantity the engine clips production against every single
+    # week. These four are plain weekly scalars, so the measure exists on EVERY
+    # run, and the KPI is computed from them.
+    #
+    # A `flow` and not a `level`: capacity is a quantity the week can pass, and
+    # the honest cross-week aggregate of a utilization is Σused / Σavailable —
+    # which is why the pair is published rather than the ratio.
+    WeeklySeries("plant_capacity_units", "units", "flow", True,
+                 "Plant production capacity available this week, summed across "
+                 "products — after any disruption throttle and any short-term "
+                 "capacity (P-P.5) the portfolio added."),
+    WeeklySeries("plant_capacity_used_units", "units", "flow", True,
+                 "Units actually produced this week, summed across products. "
+                 "Below the line above either because demand did not need the "
+                 "capacity or because materials ran out — capacity BINDING is a "
+                 "different measure, carried per product in `capacity_binding`."),
+    WeeklySeries("supplier_capacity_units", "units", "flow", True,
+                 "Weekly shipping capacity of the suppliers that declare a FINITE "
+                 "one, after any disruption throttle. A supplier whose "
+                 "`capacity_per_week` is empty is unlimited and contributes to "
+                 "neither this series nor the one below — so a project that "
+                 "declares no capacity at all reports 0/0 rather than a "
+                 "utilization computed against infinity."),
+    WeeklySeries("supplier_capacity_used_units", "units", "flow", True,
+                 "Units shipped this week by those same finite-capacity suppliers."),
 )
 
 WEEKLY_SERIES_KEYS: tuple[str, ...] = tuple(s.key for s in WEEKLY_SERIES)
@@ -382,6 +411,7 @@ class WeeklyTrace:
     n_prods: int
     n_mats: int
     keep_matrices: bool
+    n_sups: int = 0
     demand_value: np.ndarray = field(init=False)
     fulfilled_value: np.ndarray = field(init=False)   # capped at demand (FR numerator)
     revenue_value: np.ndarray = field(init=False)     # u·F including backlog clearing
@@ -394,6 +424,22 @@ class WeeklyTrace:
     fg_value: np.ndarray = field(init=False)
     on_hand_units: np.ndarray = field(init=False)
     fg_units: np.ndarray = field(init=False)
+    plant_capacity_units: np.ndarray = field(init=False)
+    plant_capacity_used_units: np.ndarray = field(init=False)
+    supplier_capacity_units: np.ndarray = field(init=False)
+    supplier_capacity_used_units: np.ndarray = field(init=False)
+    # Per-entity capacity BINDING, always on rather than gated on `full_debug`
+    # (WP 9.3). 1.0 in the weeks where capacity was the thing that clipped the
+    # plan / the shipment, 0.0 otherwise. Two `[n, horizon]` float matrices is
+    # the price of answering "for WHICH products" on an ordinary Monte Carlo
+    # run, which the `full_debug`-only matrices below cannot: they exist on
+    # single-replication inspection runs and nowhere else.
+    #
+    # Deliberately NOT weekly series: a per-entity matrix is not a scalar, and
+    # widening WEEKLY_SERIES to carry one would make every declared aggregation
+    # rule ("level"/"flow"/"ratio") a lie about half its rows.
+    prod_cap_bound: np.ndarray = field(init=False)
+    sup_cap_bound: np.ndarray = field(init=False)
     D: Optional[np.ndarray] = None
     Q: Optional[np.ndarray] = None
     F: Optional[np.ndarray] = None
@@ -413,6 +459,8 @@ class WeeklyTrace:
         # carried its own copy of the list.
         for name in WEEKLY_SERIES_KEYS:
             setattr(self, name, np.zeros(T))
+        self.prod_cap_bound = np.zeros((self.n_prods, T))
+        self.sup_cap_bound = np.zeros((self.n_sups, T))
         if self.keep_matrices:
             self.D = np.zeros((self.n_prods, T))
             self.Q = np.zeros((self.n_prods, T))
@@ -505,7 +553,8 @@ class SimContext:
         self.visibility_horizon: int = 0
         self._forward_mat_cum: Optional[np.ndarray] = None
 
-        self.trace = WeeklyTrace(T, model.n_prods, model.n_mats, keep_matrices)
+        self.trace = WeeklyTrace(T, model.n_prods, model.n_mats, keep_matrices,
+                                 n_sups=model.n_sups)
         self._active_hook: Optional[BoundHook] = None
         self._params: dict[str, object] = {}
 

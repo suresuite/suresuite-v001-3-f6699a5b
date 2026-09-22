@@ -1,6 +1,8 @@
 import { effectivePolicy, type OverrideRow } from "./resolve";
 import type { PolicyBundle, PolicyFamily } from "./schemas";
 import type { ColSpec } from "./columnSpecs";
+import { reducerLabel, type DerivedValue } from "./effectiveEconomics";
+import { shadowedBy } from "./registryAccess";
 import type { Provenance } from "@/components/policies/policyGridUi";
 
 /**
@@ -22,6 +24,21 @@ export interface DerivedMaps {
   materialCost: Map<string, number>;
   sellPrice: Map<string, number>;
   demandMean: Map<string, number>;
+  /**
+   * `products.production_capacity`, resolved through the registry's own chain,
+   * carrying the STEP that answered (§4 D165).
+   *
+   * It is a `DerivedValue` rather than a bare number because the two steps mean
+   * opposite things — the plant grid's converted line rate (`info`) versus the
+   * engine's max(2·demand, 1000) floor (`warn`), which is the engine declaring
+   * that capacity will not bind. A cell showing the second as if it were the
+   * first is T1 broken: a number with no honest source.
+   *
+   * Optional so a caller that predates this (and every test fixture that builds
+   * a `DerivedMaps` by hand) keeps compiling and simply resolves no capacity —
+   * which is exactly the behaviour it had before.
+   */
+  productionCapacity?: Map<string, DerivedValue>;
 }
 
 export function masterValueFor(
@@ -49,7 +66,34 @@ export function derivedValueFor(
     const v = derived.demandMean.get(id) ?? 0;
     return v > 0 ? v : undefined;
   }
-  return undefined; // production_capacity has no logistics-derived fallback
+  // THE LINE THAT USED TO BE HERE WAS WRONG, AND THE COMMENT SAID WHY (§4 D165):
+  //
+  //     return undefined; // production_capacity has no logistics-derived fallback
+  //
+  // True of the LOGISTICS tables and false of the engine. `project_map.py` has
+  // always built a weekly capacity from the plant grid's units/day × 7 ×
+  // utilization, and `base_data_requirements` has declared that chain
+  // machine-readably since the reducer library existed — the shared grader
+  // resolves it, the edge gate grades it, and only the grid could not see it.
+  // So the one cell the run was CERTAIN to use a number for was the one cell
+  // that showed nothing.
+  if (col.master.field === "production_capacity") {
+    return derived.productionCapacity?.get(id)?.value;
+  }
+  return undefined;
+}
+
+/** The registry step behind a derived master value, when there is one and the
+ *  caller supplied the map that carries it. Only `production_capacity` has a
+ *  chain whose steps disagree about what the number MEANS; the rest resolve to
+ *  one kind of answer and need no step. */
+function derivedStepFor(
+  col: ColSpec,
+  row: Record<string, unknown>,
+  derived: DerivedMaps,
+): DerivedValue | undefined {
+  if (col.master?.field !== "production_capacity") return undefined;
+  return derived.productionCapacity?.get(String(row[col.master.idFrom] ?? ""));
 }
 
 /** `getEffective` — data prefill → override → default; master-backed columns
@@ -179,6 +223,42 @@ export interface ResolvedCell {
   placeholder?: string;
   /** The sentence explaining that token, for the cell's own tooltip. */
   placeholderTitle?: string;
+  /**
+   * The registry step that supplied this value, when a fallback did (§4 D165).
+   *
+   * `provenance: "derived"` already says A fallback answered; this says WHICH,
+   * and at what grade — the difference between "your plant grid's line rate,
+   * converted" and "the engine's max(2·demand, 1000) floor, chosen so capacity
+   * never binds". T2 asks for the substitution to be visible AT THE POINT OF
+   * DISPLAY, and one dot cannot carry two opposite meanings.
+   */
+  derivedVia?: DerivedValue;
+  /**
+   * This cell is EDITABLE and the engine will not read it, because another
+   * field outranks it (§4 D165). Today the only case is the plant grid's
+   * `capacity_units_per_day` / `utilization_cap_pct` under a product that
+   * carries a master `products.production_capacity`.
+   *
+   * Not a provenance state: the cell's own value still comes from wherever the
+   * dot says it does. What is false is the IMPLICATION that typing here
+   * changes the run — which is the same defect class as §4 D18, a field shown
+   * and consumed by nothing, one step worse because this one is consumed
+   * SOMETIMES.
+   */
+  supersededBy?: { field: string; note: string };
+}
+
+/**
+ * Human sentence for a shadowed cell. The RULE is the registry's
+ * (`policy_bundle_keys[].shadowed_by`); this is the sentence for it.
+ */
+export function supersededNote(shadowingField: string, label: string): string {
+  return (
+    `Not applied on this row. ${shadowingField} has a value, and the engine ` +
+    `reads the item master before the plant grid — so the run uses that ` +
+    `number and this ${label} is stored but ignored. Clear the master value ` +
+    `to make this cell decide the capacity again.`
+  );
 }
 
 /**
@@ -227,6 +307,31 @@ export function resolveCell(args: {
 
   const masterSet = col.master ? masterValueFor(col, row, masterRowById) !== undefined : false;
   const derivedVal = col.master && !masterSet ? derivedValueFor(col, row, derived) : undefined;
+  const derivedVia = derivedVal !== undefined ? derivedStepFor(col, row, derived) : undefined;
+
+  /**
+   * IS THIS EDITABLE CELL ONE THE ENGINE WILL READ? (§4 D165)
+   *
+   * Asked of the registry, per row. `shadowedBy` returns the `dataset.column`
+   * that outranks this bundle key — `products.production_capacity` for the
+   * plant grid's two capacity cells — and the row is shadowed when the master
+   * column named there carries a value. The master COLUMN is found through
+   * `masterColByField`, which already knows which row field holds the id, so
+   * this needs no second convention for resolving `dataset.column` against a
+   * grid row (and stays silent on a stage that renders no such column).
+   */
+  const shadowField = col.master ? undefined : shadowedBy(col.field);
+  let supersededBy: ResolvedCell["supersededBy"];
+  if (shadowField) {
+    const [, shadowCol] = shadowField.split(".");
+    const spec = shadowCol ? masterColByField.get(shadowCol) : undefined;
+    if (spec && masterValueFor(spec, row, masterRowById) !== undefined) {
+      supersededBy = {
+        field: shadowField,
+        note: supersededNote(spec.label, col.label.toLowerCase()),
+      };
+    }
+  }
 
   const bundleVal = (
     effectivePolicy(defaults, overrides, scope, rowKey)[col.family] as Record<string, unknown> | undefined
@@ -320,7 +425,31 @@ export function resolveCell(args: {
     edited,
     placeholder: declaredEmpty ? nullMeans!.token : undefined,
     placeholderTitle: declaredEmpty ? nullMeans!.title : undefined,
+    derivedVia: derivedFallback ? derivedVia : undefined,
+    supersededBy,
   };
+}
+
+/**
+ * The one sentence a capacity cell owes its reader (T1/T2), or undefined.
+ *
+ * Assembled from the resolved cell rather than from the column, so the same
+ * call answers for the desktop grid's `title`, the mobile stage list and the
+ * value-chain popover. Order matters and is the order of the claims: a cell the
+ * engine will not read says that FIRST — a correct provenance for a number
+ * nothing consumes is still the wrong headline.
+ */
+export function substitutionNote(cell: ResolvedCell): string | undefined {
+  if (cell.supersededBy) return cell.supersededBy.note;
+  if (cell.derivedVia) {
+    const lead =
+      cell.derivedVia.grade === "warn"
+        ? "No value for this, so the engine substitutes"
+        : "Derived for the run from";
+    return `${lead} ${reducerLabel(cell.derivedVia.via)}.`;
+  }
+  if (cell.placeholderTitle) return cell.placeholderTitle;
+  return undefined;
 }
 
 /**

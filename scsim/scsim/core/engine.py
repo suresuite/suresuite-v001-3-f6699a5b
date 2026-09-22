@@ -200,15 +200,34 @@ def _mech_default_plan(model: CompiledModel, ctx: SimContext) -> None:
         want = np.where(model.mts_mask, gap, want_mto)
     else:
         want = want_mto
-    ctx.production_plan = np.minimum(want, _effective_prod_capacity(model, ctx))
+    cap = _effective_prod_capacity(model, ctx)
+    # CAPACITY BINDING IS MEASURED HERE AND NOWHERE ELSE (WP 9.3 / §4 D165).
+    #
+    # This is the only point in the week where the UNCLIPPED want still exists:
+    # `ctx.production_plan` is the clipped figure, so `plan > cap` downstream is
+    # false by construction and an "did capacity bind" test written there would
+    # answer no on every week of every run. The flag is what lets a result say
+    # WHICH products the capacity held back, rather than only that utilization
+    # was high — those are different statements and only one of them is an
+    # answer to "should I buy another line".
+    ctx.trace.prod_cap_bound[:, ctx.week] = (want > cap + 1e-9) & (cap > 0.0)
+    ctx.production_plan = np.minimum(want, cap)
 
 
 def _mech_production_execute(model: CompiledModel, ctx: SimContext) -> None:
     # Eq. 8: greedy in fixed product order; P-P.9 pre-shapes the plan when active.
-    plan = np.minimum(ctx.production_plan, _effective_prod_capacity(model, ctx))
+    cap = _effective_prod_capacity(model, ctx)
+    plan = np.minimum(ctx.production_plan, cap)
     Q, remaining = greedy_feasible(model, plan, ctx.on_hand)
     ctx.production_output = Q
     ctx.on_hand = remaining
+    # The capacity the week offered, and the output that used it. Recorded from
+    # the SAME `cap` the clip above used, so the two can never describe
+    # different weeks — including under a plant disruption, where `cap` is the
+    # throttled figure and a utilization against the nominal one would read as
+    # a collapse in demand rather than a loss of capacity.
+    ctx.trace.plant_capacity_units[ctx.week] = float(cap.sum())
+    ctx.trace.plant_capacity_used_units[ctx.week] = float(Q.sum())
     if model.mts_mask.any():
         # Eq. 9: MTS output replenishes FG (same-week completion, W^FG = 0 in v1).
         ctx.fg_on_hand = ctx.fg_on_hand + np.where(model.mts_mask, Q, 0.0)
@@ -269,14 +288,27 @@ def _mech_ship_queue(model: CompiledModel, ctx: SimContext) -> None:
     for s in range(model.n_sups):
         links = model.links_of_sup[s]
         total_q = float(ctx.queue[links].sum())
+        cap_eff = model.sup_capacity[s] * ctx.cap_factor[s]
+        # A FINITE capacity is the only one that can be utilized, and an empty
+        # `suppliers.capacity_per_week` is `np.inf` by construction
+        # (`context.py`), which is the declared meaning of the blank rather
+        # than a missing value. So an unlimited supplier contributes to NEITHER
+        # side of the ratio: counting its shipments against an infinite
+        # denominator would report 0% forever, and against its own shipments
+        # would report 100% forever. Both are answers to a question nobody asked.
+        finite = not np.isinf(cap_eff)
+        if finite:
+            ctx.trace.supplier_capacity_units[t] += float(cap_eff)
         if total_q <= 0:
             continue
-        cap_eff = model.sup_capacity[s] * ctx.cap_factor[s]
+        if finite:
+            ctx.trace.sup_cap_bound[s, t] = float(total_q > cap_eff + 1e-9)
         if np.isinf(cap_eff):
             shipped = ctx.queue[links].copy()
             ctx.queue[links] = 0.0
         else:
             ship_total = min(total_q, float(cap_eff))
+            ctx.trace.supplier_capacity_used_units[t] += ship_total
             factor = ship_total / total_q
             shipped = ctx.queue[links] * factor
             ctx.queue[links] -= shipped
@@ -649,6 +681,19 @@ class ScenarioResult:
     item_series: Optional[dict[str, np.ndarray]] = None
     # Row labels for item_series: {"material": [...ids], "product": [...ids]}.
     item_ids: Optional[dict[str, list[str]]] = None
+    # WHICH products and suppliers the capacity held back, over the analysis
+    # window, averaged across replications (WP 9.3 / §4 D165). Present on EVERY
+    # run — unlike `item_series`, which needs a single-replication full-debug
+    # inspection run, and which is why "for which products did capacity bind"
+    # had no answer a user could reach. Shape:
+    #   {"window_weeks": int, "replications": int,
+    #    "products":  [{"id", "bound_weeks", "capacity", "produced", "utilization"}],
+    #    "suppliers": [{"id", "bound_weeks", "capacity", "shipped", "utilization"}],
+    #    "unlimited_suppliers": int}
+    # Only entities the capacity bound for at least one week are listed: a list
+    # of every product on every run is a table nobody reads, and the absence of
+    # a row is the same statement as a zero.
+    capacity_binding: Optional[dict] = None
 
     def kpi_array(self, key: str) -> np.ndarray:
         return np.array([row.get(key, np.nan) for row in self.kpis])
@@ -675,6 +720,75 @@ def _notify_progress(
         })
     except Exception:  # noqa: BLE001 — observer only, run integrity first
         pass
+
+
+
+class _CapacityBindingAccumulator:
+    """Per-entity capacity evidence, summed across replications as they run.
+
+    Kept OUTSIDE the trace because a trace belongs to one replication and this
+    question is asked of the run: "which products did capacity hold back", not
+    "which products did capacity hold back in replication 7". Accumulating here
+    also means the matrices are never retained — each replication's context is
+    discarded as before, and what survives is two float vectors per entity kind.
+    """
+
+    def __init__(self, model) -> None:
+        self.prod_ids = list(model.prod_ids)
+        self.sup_ids = list(model.sup_ids)
+        self.prod_bound = np.zeros(model.n_prods)
+        self.sup_bound = np.zeros(model.n_sups)
+        self.reps = 0
+        # `np.inf` is the declared meaning of an empty `capacity_per_week`, so
+        # this counts the suppliers that opted OUT of being a constraint.
+        self.unlimited_suppliers = int(np.isinf(model.sup_capacity).sum())
+        self.finite_capacity = float(
+            model.sup_capacity[np.isfinite(model.sup_capacity)].sum()
+        )
+        self.plant_capacity = float(model.capacity.sum())
+
+    def observe(self, ctx: SimContext, t_w: int, window_end: int) -> None:
+        w = slice(t_w, window_end)
+        self.prod_bound += ctx.trace.prod_cap_bound[:, w].sum(axis=1)
+        self.sup_bound += ctx.trace.sup_cap_bound[:, w].sum(axis=1)
+        self.reps += 1
+
+    def summary(self, model, t_w: int, window_end: int) -> dict:
+        if self.reps == 0:
+            return {}
+        n = float(self.reps)
+        products = [
+            {
+                "id": self.prod_ids[i],
+                "bound_weeks": round(float(self.prod_bound[i]) / n, 3),
+                "capacity": round(float(model.capacity[i]), 4),
+            }
+            for i in range(len(self.prod_ids))
+            if self.prod_bound[i] > 0
+        ]
+        suppliers = [
+            {
+                "id": self.sup_ids[i],
+                "bound_weeks": round(float(self.sup_bound[i]) / n, 3),
+                "capacity": (
+                    None if np.isinf(model.sup_capacity[i])
+                    else round(float(model.sup_capacity[i]), 4)
+                ),
+            }
+            for i in range(len(self.sup_ids))
+            if self.sup_bound[i] > 0
+        ]
+        products.sort(key=lambda r: (-r["bound_weeks"], r["id"]))
+        suppliers.sort(key=lambda r: (-r["bound_weeks"], r["id"]))
+        return {
+            "window_weeks": int(window_end - t_w),
+            "replications": self.reps,
+            "products": products,
+            "suppliers": suppliers,
+            "unlimited_suppliers": self.unlimited_suppliers,
+            "finite_supplier_capacity": self.finite_capacity,
+            "plant_capacity": self.plant_capacity,
+        }
 
 
 def run_scenario(
@@ -709,6 +823,7 @@ def run_scenario(
         k: np.zeros((len(grid), settings.horizon)) for k in PUBLISHED_SERIES_KEYS
     }
     lp_fallbacks = 0
+    cap_acc = _CapacityBindingAccumulator(compiled.model)
     for n, (i, j) in enumerate(grid):
         events = resolve_events(compiled.model, t_w, j) if scenario.events else []
         ctx = run_replication(
@@ -722,6 +837,7 @@ def run_scenario(
         kpis.append(row)
         for k in PUBLISHED_SERIES_KEYS:
             rows[k][n] = getattr(ctx.trace, k)
+        cap_acc.observe(ctx, t_w, window_end)
         lp_fallbacks += int(ctx.policy_state.get("material_allocation", {}).get("lp_fallbacks", 0))
         _notify_progress(progress, n + 1, len(grid), row, ctx)
 
@@ -730,6 +846,7 @@ def run_scenario(
     if settings.replication_stopping == ReplicationStopping.SEQUENTIAL_CI and scenario.events:
         kpis, rows, grid = _extend_until_ci(
             compiled, scenario, kpis, rows, grid, t_w, window_end, debug, progress,
+            cap_acc,
         )
 
     # Single-run inspection surface (G17/§9.5.1): expose the full-debug
@@ -790,11 +907,13 @@ def run_scenario(
         extra_series={k: v for k, v in rows.items() if k != "fill_rate"},
         item_series=item_series,
         item_ids=item_ids,
+        capacity_binding=cap_acc.summary(compiled.model, t_w, window_end) or None,
     )
 
 
 def _extend_until_ci(compiled, scenario, kpis, rows, grid, t_w, window_end, debug,
-                     progress: Optional[ProgressFn] = None):
+                     progress: Optional[ProgressFn] = None,
+                     cap_acc: Optional["_CapacityBindingAccumulator"] = None):
     settings = compiled.model.settings
     e_axis = max({j for _, j in grid}) + 1
     next_i = max({i for i, _ in grid}) + 1
@@ -816,6 +935,13 @@ def _extend_until_ci(compiled, scenario, kpis, rows, grid, t_w, window_end, debu
             kpis.append(row)
             for k in PUBLISHED_SERIES_KEYS:
                 rows[k] = np.vstack([rows[k], getattr(ctx.trace, k)[None, :]])
+            # The extension replications are replications: leaving them out
+            # would make `bound_weeks` a mean over a denominator that no longer
+            # matches the run (`replications` below would disagree with
+            # `stats.n_replications`, which is exactly the kind of silent
+            # divergence §2.1 `single-source` is about).
+            if cap_acc is not None:
+                cap_acc.observe(ctx, t_w, window_end)
             # The final total is unknown while extending — report the current
             # count as both done and total so observers see monotone progress.
             _notify_progress(progress, len(kpis), len(kpis), row, ctx)

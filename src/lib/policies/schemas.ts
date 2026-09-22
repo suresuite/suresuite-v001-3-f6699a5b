@@ -442,7 +442,16 @@ export const SCSIM_VISIBLE_FIELDS: Partial<Record<PolicyFamily, ReadonlySet<stri
     "backorder_cost_per_day",
     "tier_overrides",
   ]),
-  production: new Set(["capacity_units_per_day", "allocation_priority_weight"]),
+  // `utilization_cap_pct` JOINED IN WP 9.3 AND WAS ALWAYS READ (§4 D165).
+  // `project_map.py`'s capacity branch has read it since the mapper was
+  // written; omitting it here meant that the moment it got a column it would
+  // have rendered with a `stored-only` badge — the grid telling a planner the
+  // engine ignores the number it is about to multiply the capacity by.
+  // `policyBundleKeys.test.ts` now fails when a declared bundle key is not in
+  // this map, so the next such omission fails on the commit that makes it.
+  production: new Set([
+    "capacity_units_per_day", "utilization_cap_pct", "allocation_priority_weight",
+  ]),
   recovery: new Set(["response", "detection_lag_days"]),
 };
 

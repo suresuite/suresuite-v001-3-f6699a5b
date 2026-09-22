@@ -40,6 +40,31 @@ export interface RegistryDataRequirement {
     reducer: string | null;
     constant: number | null;
   }>;
+  /** What an EMPTY column MEANS, when the engine honours the blank rather than
+   *  substituting for it (scsim base.py::EmptyMeaning). Mutually exclusive with
+   *  `fallback_spec` — they are opposite answers to the same blank cell. */
+  empty_means?: { token: string; meaning: string } | null;
+}
+
+/**
+ * §4 D90 — a /policies bundle key and what it feeds in the engine, declared in
+ * `project_map.py::POLICY_BUNDLE_KEYS` and published here.
+ */
+export interface RegistryBundleKey {
+  key: string;
+  family: string;
+  target: string;
+  catalog_ref: string | null;
+  transform: string;
+  /**
+   * The entity field that makes this key's value unreachable when it is set
+   * (§4 D165). Two keys carry it and both name `products.production_capacity`:
+   * a product with a master capacity is built from that column and the plant
+   * grid's line capacity is read by nothing — which the engine has warned about
+   * since the mapper was written, and which no surface could act on while the
+   * statement existed only inside `transform`'s prose.
+   */
+  shadowed_by?: string | null;
 }
 
 export interface RegistryPolicy {
@@ -61,6 +86,7 @@ interface RegistryPayload {
   engine_version: string;
   policies: RegistryPolicy[];
   base_data_requirements: RegistryDataRequirement[];
+  policy_bundle_keys?: RegistryBundleKey[];
   pipeline: unknown;
   kpis: Array<{ name: string; symbol: string; definition: string; unit: string }>;
   entities: Record<string, unknown>;
@@ -114,3 +140,40 @@ export const baseDataRequirements = (): RegistryDataRequirement[] =>
 /** Entity fields a specific policy declares it reads (facet 5). */
 export const policyDataRequirements = (policyId: string): RegistryDataRequirement[] =>
   BY_ID.get(policyId)?.data_requirements ?? [];
+
+/** The /policies bundle keys the engine reads, as it declares them (§4 D90). */
+export const policyBundleKeys = (): RegistryBundleKey[] =>
+  REGISTRY.policy_bundle_keys ?? [];
+
+const SHADOWED_BY = new Map<string, string>(
+  (REGISTRY.policy_bundle_keys ?? [])
+    .filter((k) => !!k.shadowed_by)
+    .map((k) => [k.key, k.shadowed_by as string]),
+);
+
+/**
+ * The `dataset.column` that outranks this bundle key, or undefined (§4 D165).
+ *
+ * A surface asks this to find out whether the cell it is about to render is one
+ * the engine will read. Answered from the engine's own declaration, so the grid
+ * cannot go on claiming an edit reaches the run after the engine stops reading
+ * it — the failure mode §4 D18 is, with the extra twist that this one depends
+ * on the ROW.
+ */
+export const shadowedBy = (bundleKey: string): string | undefined =>
+  SHADOWED_BY.get(bundleKey);
+
+/**
+ * What an EMPTY value of a declared field MEANS, or undefined (§4 D165).
+ *
+ * The engine's own statement, so the token a cell renders in place of a number
+ * and the sentence beside it have ONE author. `columnSpecs.ts` used to carry
+ * both — which made the FRONTEND the only machine-readable statement of a fact
+ * about the engine, while the registry said the same thing in prose one field
+ * over. That is §2.1 `single-source` below markdown, the class §4 D101 and D127
+ * name, and `check:docs` can see none of it.
+ */
+export const emptyMeansFor = (
+  field: string,
+): { token: string; meaning: string } | undefined =>
+  baseDataRequirements().find((r) => r.field === field)?.empty_means ?? undefined;

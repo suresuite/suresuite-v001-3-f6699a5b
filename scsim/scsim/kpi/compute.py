@@ -51,6 +51,17 @@ def compute_replication_kpis(
         "avg_on_hand_units": float(tr.on_hand_units[w].mean()) if window_len else 0.0,
         "avg_fg_units": float(tr.fg_units[w].mean()) if window_len else 0.0,
         "capacity_utilization": _utilization(ctx, t_w, window_end),
+        "supplier_capacity_utilization": _supplier_utilization(ctx, t_w, window_end),
+        # HOW MANY entities the capacity actually held back, over the window.
+        # A utilization near 1.0 and a binding count of zero is a plant running
+        # hot and coping; a binding count above zero is demand the capacity
+        # refused, which is a different decision.
+        "products_capacity_bound": float(
+            (ctx.trace.prod_cap_bound[:, w].sum(axis=1) > 0).sum()
+        ),
+        "suppliers_capacity_bound": float(
+            (ctx.trace.sup_cap_bound[:, w].sum(axis=1) > 0).sum()
+        ),
         "cost_of_resilience": c_res,
     }
     for name in COST_COMPONENTS:
@@ -65,11 +76,44 @@ def compute_replication_kpis(
 
 
 def _utilization(ctx: SimContext, t_w: int, window_end: int) -> float:
-    if ctx.trace.Q is None:
-        return float("nan")  # needs full_debug matrices; diagnostic only
-    q = ctx.trace.Q[:, t_w:window_end]
-    cap = ctx.model.capacity[:, None]
-    return float((q / cap).mean())
+    """Plant capacity utilization over the window — Σ produced / Σ available.
+
+    ── THIS WAS NaN ON EVERY RUN A USER EVER MADE (§4 D165) ──────────────────
+
+    It read ``ctx.trace.Q``, the per-product production matrix, which exists
+    only under ``trace_verbosity=full_debug``. Every ordinary Monte Carlo run
+    allocates no matrices, so this returned NaN, the bridge mapped NaN to null,
+    and the /policies sanity panel printed **"not recorded"** — for the one
+    quantity the engine clips production against in every week of every
+    replication. §4 D113 removed a per-node utilization heatmap and told the
+    reader the run-level measure survived "in the table above"; it did not.
+
+    It is computed from the two weekly scalars now, so it is measured on every
+    run. The aggregation is the one ``WeeklySeries`` declares for a ratio:
+    the quotient of the summed parts, not the mean of the weekly quotients —
+    the old form weighted a week that produced nothing exactly as heavily as
+    the week the plant ran flat out.
+    """
+    tr = ctx.trace
+    avail = float(tr.plant_capacity_units[t_w:window_end].sum())
+    if avail <= 0:
+        return float("nan")  # no capacity offered in the window: not measurable
+    return float(tr.plant_capacity_used_units[t_w:window_end].sum()) / avail
+
+
+def _supplier_utilization(ctx: SimContext, t_w: int, window_end: int) -> float:
+    """Shipping utilization of the suppliers that declare a FINITE capacity.
+
+    NaN — not 0.0 — when no supplier declares one, because that is the answer:
+    an empty ``suppliers.capacity_per_week`` means unlimited, and there is no
+    denominator to divide by. Reporting 0% would say the suppliers were idle;
+    reporting 100% would say they were the constraint. Both are inventions.
+    """
+    tr = ctx.trace
+    avail = float(tr.supplier_capacity_units[t_w:window_end].sum())
+    if avail <= 0:
+        return float("nan")
+    return float(tr.supplier_capacity_used_units[t_w:window_end].sum()) / avail
 
 
 def _ttr_tts(
