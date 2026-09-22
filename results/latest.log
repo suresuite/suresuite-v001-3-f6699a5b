@@ -1,0 +1,9 @@
+run_id: 35797376769  outcome: success
+trigger: push  ref: main  sha: c524e071c2a6b6a2589d65ff4b04722d6331ef06
+──────────────────────────────────────
+Connecting to remote database...
+Do you want to push these migrations to the remote database?
+ • 20260922000009_delete_project_row_first.sql
+ [Y/n] 
+Applying migration 20260922000009_delete_project_row_first.sql...
+Finished supabase db push.
