@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 344,
-  "migrations_applied": 336,
+  "migrations_found": 345,
+  "migrations_applied": 337,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260920000003_one_etl.sql",
+  "last_migration": "20260922000001_ingest_run_review_read.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 283,
+    "functions": 284,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -23497,6 +23497,19 @@
       "volatility": "STABLE",
       "comment": "§5.4's acceptance test, export side (WP 6.3): one row per tier-2 row of a ",
       "defined_by": "20260919000004_row_provenance.sql"
+    },
+    {
+      "name": "ingest_run_review",
+      "signature": "ingest_run_review(uuid, uuid)",
+      "args": [
+        "p_user_id uuid",
+        "p_run_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "WP 6.5a / D169 — the review screen's read of ONE ingestion run: the run, its ",
+      "defined_by": "20260922000001_ingest_run_review_read.sql"
     },
     {
       "name": "ingest_target_is_promotable",
