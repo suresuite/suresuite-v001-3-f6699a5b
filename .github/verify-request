@@ -176,3 +176,13 @@ project 50141cd1) parsed on file-select and then failed on `mode=land` with
 supabase-js's "Failed to send a request to the Edge Function" — a fetch error, i.e.
 no readable response. This read adds (6): the function's own invocations and console
 from the Management API log endpoint (GET), plus the landing tables as they stand.
+
+────────────────────────────────────────────────────────────────────────────────
+WP 6.5 (a) — THE AFTER READ. 2026-09-22, no migration in this push.
+
+A push AFTER the merges (D153): #259 published `ingest-file`, #262 applied
+`20260922000001` (Deploy Supabase Migrations run 35786422362, success). The user has
+uploaded into Test_Simulation and promoted through the review screen. Exit: ingest_files
+and ingest_staged_rows non-empty for a project, a tier-2 row whose source_row_id resolves
+through ingest_value_chain, and no landable table below the before-read baseline
+(run 35781287043). The fence should read unmoved at 20260922000001.
