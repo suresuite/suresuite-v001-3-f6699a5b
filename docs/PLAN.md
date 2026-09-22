@@ -347,6 +347,8 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D162** | **A RENAMED migration is invisible to `contract:rehearse` — the one gate that executes migrations — and it is invisible in the way that does the most damage: it removes the file's objects from the base AND skips the file that would put them back.** `newMigrations()` asks git for `--diff-filter=A`, and `git diff` detects renames by default, so a migration that was renamed rather than written reads as `R` and is dropped from the rehearsal set. That alone would only mean "not rehearsed". What makes it worse is the OTHER half: the base schema is built from the BASE branch's `build/schema.introspected.json`, and that artifact records, for each function, the migration FILE its body came from. After a rename the base branch's artifact names a file this branch no longer has, so `rehearsal-schema.mjs` prints `function source missing` and builds a base WITHOUT those functions — while the file that defines them sits unrehearsed. The result is a rehearsal against a database missing objects that neither the base nor the branch put there, and every behavioural assertion that calls one fails for a reason that has nothing to do with what it asserts. Found by D151's renumber: three files moved, three `function source missing` warnings appeared, `rehearsing 3 new migration(s)` named only the three that were newly WRITTEN, and `rehearsal/300` and `/310` failed on `function public.refresh_node_list_for_project(uuid, uuid) does not exist` — a function WP 8.1 had created and this branch had not touched. **And the rename is not a corner case but the correct response to D151**: `schema_migrations` is keyed on the version in the filename, so renaming is the only way to give a never-applied migration a version production has not recorded, and `supabase db push` WILL apply that file. It is new work by the only definition that matters, and it was the one kind of new work the gate could not see | `scripts/data-contract/rehearse-migrations.mjs`'s `newMigrations()` against `scripts/data-contract/rehearsal-schema.mjs:330`'s `function source missing` warning; reproduced on this branch before the fix, where all three modes reported `✓ 3 migration(s) apply cleanly` and then failed three behavioural assertions | **CLOSED ✅ (this package)** — `--no-renames` on the diff, so the question the function asks ("which migration files exist here that did not exist at the base") is the question git answers. 3 rehearsed became **6**, the three assertions pass, and all three modes are green. *(The `function source missing` warning is left in place and is now correct rather than misleading: it says the BASE branch's artifact named a file this branch renamed, which is true and stops being true the moment this merges. It is a warning and not a failure because the renamed migration now runs and supplies what the base could not)* |
 | **D163** | **`materials.cost` fell back to the material's CHEAPEST quoted price, while the same engine, from the same `volume` column, split that material's orders across its suppliers by lane share.** P-S.2 allocates a multi-sourced material's replenishment in proportion to each lane's weekly volume; the cost fallback took the MINIMUM over the same lanes. On the golden fixture's two-lane material that is 300/400 of it bought at 10.0 and all of it valued at 6.0 — a 33% understatement of purchase spend and of every inventory value derived from it, on a project whose data is COMPLETE and which the run reports as `info`, the grade meaning "derived from what you uploaded". Nothing was missing and nothing was wrong on the screen; the rule was. **And the asymmetry was visible in the registry the whole time**: `products.sell_price` falls back to the DEMAND-WEIGHTED outbound price, one table over, weighted by exactly the same kind of column. The two halves of the same idea were written differently, and only one of them was the average of what actually happens | `scsim/scsim/io/project_map.py`'s materials loop against the same file's `_map_policies` P-S.2 weights, and `base_data_requirements()`'s two `fallback_spec` chains side by side; reproduced in `supabase/functions/_shared/fixtures/validation_parity/dataset.json`'s `M_MULTI` (10.0×300 + 6.0×100 → 9.0 weighted, 6.0 cheapest) | **CLOSED ✅ (this package)** — the chain is `volume_weighted_inbound_price` (info) → `cheapest_inbound_price` (info) → 1.0 (warn), authored ONCE in the registry and walked by the engine, the shared grader and the display layer. The cheapest step is not deleted: it is what resolves a material whose lanes carry no volume, so a project with no volumes is valued exactly as before. `grading_test.ts` asserts the VALUE and the reducer that produced it (9.0 via the weighted step, 6.0 via the cheapest one when the volumes are removed), `test_project_map.py` asserts the same four cases on the engine, and `test_validation_parity.py` holds both to one fixture |
 | **D164** | **Finished-goods inventory was computed on every replication of every run since the weekly trace was written, and published by nothing — because "which weekly series exist" was authored SIX times and `fg_value` was present in two of them.** `engine.py`'s per-week block writes `on_hand_value` and `fg_value` on adjacent lines, and `io/traces.py::trace_frame` — the golden-trace contract — carries both. But `ScenarioResult.extra_series` was a dict LITERAL naming three series, and it is `extra_series` that the bridge turns into `run_replications.time_series`, so `fg_value` stopped at the engine boundary and no user ever saw it. The other four authors: `WeeklyTrace.__post_init__`'s allocation tuple, `_notify_progress`'s observer dict, `REPLICATION_SERIES` in `ReplicationSeedExplorer.tsx` and `SERIES_CHARTS` in `RunValidateStage.tsx`. **The consequence users actually met**: the /policies chart captioned "Inventory dynamics" plotted `on_hand_value` alone — MATERIAL stock — and called it inventory, so the product's own answer to "how much stock do we hold" omitted every finished good, silently and for the whole life of the trace. **THE GATE FOR THIS CLASS EXISTED AND COULD NOT SEE IT.** `deriveReplicationSeries` was written after §4 D113 to join what the engine WRITES against what the UI OFFERS — and it read the `extra_series` literal, i.e. ONE of the six authors, so a series the engine measured and declined to publish was invisible to the rule built to catch exactly that. A gate that reads one of N authors measures that author, not the fact. **This is `single-source` below markdown, the class §2.1 names after D101 and D127** — a data fact (which series a result carries, and in what unit) authored in TypeScript and Python rather than in §4, with nothing comparing the copies | `scsim/scsim/core/engine.py`'s adjacent `tr.on_hand_value[t]` / `tr.fg_value[t]` writes against the three-key `extra_series=` literal in the same file; `scripts/data-contract/chains.mjs::deriveReplicationSeries`, which parsed that literal | **CLOSED ✅ (WP 9.1)** — `WEEKLY_SERIES` in `scsim/scsim/core/context.py` is the one author: each series declares its key, unit, `aggregation` (`level` / `flow` / `ratio`) and whether it is `published`. The allocation loop, `trace_frame`, `_notify_progress` and `extra_series` all DERIVE from it, so a series cannot exist in one and not another; `deriveReplicationSeries` reads the declaration rather than a literal, and throws if it cannot find it. Four parallel `*_rows` arrays threaded through `_extend_until_ci`'s seven-argument signature became one dict keyed by the declaration — that signature is a large part of WHY adding a fifth series never happened. `test_inventory_series.py` holds the reconciliation that makes the two levels of detail one fact: per-material on-hand summed equals `on_hand_units`, and `fg_value` equals `fg_units` at COGS on an MTS fixture that genuinely holds stock. *(What is NOT closed: the same six-author shape for `kpis`' keys. `deriveRunKpis` reads the engine's KPI row, which is one author and the right one, but nothing compares it to `KPI_DISPLAY` beyond D113's join)* |
+| **D165** | **One deploy step of fourteen carried no `SUPABASE_ACCESS_TOKEN`, so PRODUCTION HAS NOT TAKEN A COMPLETE DEPLOY SINCE 2026-09-19 — and the gate written for exactly this counted the step and called it deployed.** `cda6b57` added `Deploy combine-project` without the `env:` block every one of its thirteen neighbours carries. `supabase functions deploy` exits 1 with *Access token not provided*, and the job runs `bash -e`, so the step AFTER it — `geocode-locations` — has never run either. **Seven consecutive red deploys** (workflow runs 52–58, 2026-09-19 06:52 → 2026-09-22 10:17); run 51 was the last green one and it is the commit before the step was added. **The cost is not the red badge, it is what is in production**: `combine-project/index.ts` is **−367/+111 lines** different from the last version that shipped, and that delta is WP 8.2's ONE ETL — so §16 records the edge function's lane build as deleted while production still runs it, D150's raw-`volume` read included. **This is D123's class a fifth time and the mechanism is new**: D123 was a function with no deploy step; this is a function WITH a deploy step that cannot authenticate. R17 read the intention to deploy rather than the ability to, which is why the history looked green on the commits that mattered | `.github/workflows/supabase-functions.yml:278` against its thirteen sibling steps; workflow runs 52–58 on `main`; `git diff fab91d4..main -- supabase/functions/combine-project` | **CLOSED ✅ (this package)** — the three-line `env:` block, and R17 gains its third clause: a `functions deploy` step with no `SUPABASE_ACCESS_TOKEN` in it fails the gate by name. Mutation-tested both ways (removing the block turns `contract:check` red on `combine-project`; restoring it turns it green). The same package pins `deno-version` away from the `v2.x` float that broke `eval` repo-wide on 2026-09-22 |
+| **D166** | **The engine REFUSED a project the shared grader had just passed, because it treated a master row rather than the BOM as what makes a material real — and the branch written to handle that case could never run.** `from_project_data`'s arc loop skipped any arc whose `material_id` was absent from `materials`, so a material the BOM consumes and the inbound file sources — but which nobody gave a master row — lost its lanes before `cheapest_cost` was built, failed the `unsourced` check, and raised `ValueError: materials with no supplier link` about a material that HAS one. **The mapper already contained the code for this case** (`for mid in sorted(bom_mat_ids - {m.id for m in materials})`), and `bom_mat_ids ⊆ cheapest_cost.keys() ⊆ mat_ids` made that set empty by construction: dead code that looked like handling. **It was also a parity break, which is what makes it more than tidiness**: `grading.ts`'s block rule is *a BOM material with no inbound ARC* and has never asked for a master row, so the browser and the pre-dispatch gate both reported such a project ready to run and the engine then refused it — the exact disagreement `test_validation_parity.py` exists to prevent, in the one direction that suite does not cover (it compares warn findings, not the hard block's preconditions) | `scsim/scsim/io/project_map.py`'s arc filter against its own BOM-only branch and against `supabase/functions/_shared/grading.ts`'s `arcMaterials` rule | **CLOSED ✅ (this package)** — `bom_mat_ids` is computed before the arc loop and the filter accepts a material the BOM consumes, so the branch is reachable and the two surfaces agree. Such a material is simulated from its lanes with the D163 cost chain and **named**: an `info` MappingWarning says it has no row in `materials` and that holding cost, MOQ and lead-time distribution are taking engine defaults (T1). The `ValueError` now means what it always said — no inbound arc at all — and an arc for a material NOTHING consumes is still dropped. Three tests, one per branch |
 
 ### 4.1 Code map — the data layer
 
@@ -18649,6 +18651,141 @@ that carries its own spread — which `materials.contract.yaml`'s `resolution.no
 already says the engine has nowhere to put (`Material.cost` is a bare float) and
 which §14's RFC owns. This package makes the single number the right single
 number; it does not make it two.
+### CI · the deploy that never deployed, and the gate that said it had · 2026-09-22 · no migration
+
+**Where this came from.** A survey after four PRs merged, asking the plain
+question "what is red now". `main`'s own workflow list answered it: **Deploy
+Supabase Functions had failed on every push since 2026-09-19** and nobody had
+read the log.
+
+**── D165: A DEPLOY STEP IS NOT A DEPLOY ──**
+
+One step of fourteen carried no `SUPABASE_ACCESS_TOKEN`. `supabase functions
+deploy combine-project` exits 1 with *Access token not provided*; the job is
+`bash -e`; `geocode-locations` sits after it and has therefore never run. Seven
+consecutive red deploys, runs 52–58.
+
+**The badge is not the damage.** `combine-project/index.ts` in production is
+−367/+111 lines behind `main`, and that delta is WP 8.2's ONE ETL. §16 records
+the edge function's lane build as deleted; production has been running it the
+whole time, D150's raw-`volume` read included. **A Combine in production today
+does what WP 8.2 says nothing does any more.**
+
+**What makes this D123's class rather than a typo.** D123 was a function with no
+deploy step. This is a function WITH one that cannot authenticate — and R17,
+written for D123, counted the step. The gate read the INTENTION to deploy. Its
+third clause now reads the ability to: a `functions deploy` step with no
+`SUPABASE_ACCESS_TOKEN` fails `contract:check` by name. Mutation-tested in both
+directions, because a gate nobody has seen fail is a gate nobody has tested.
+
+**And the toolchain float is pinned.** `deno-version: v2.x` resolved to 2.9.7
+on 2026-09-22 and turned `eval` red on every branch simultaneously — a repo-wide
+break no commit caused, which cost this session two PRs to diagnose and route
+(#252, and the stand-down comment on #250). Three workflows now name 2.9.7
+exactly, with the reason written beside it: bump deliberately, fixing what the
+bump surfaces in the same PR.
+
+**Discovered:**
+
+- **Nothing re-checks a deploy after it runs.** R17 is static: it reads the
+  workflow file, not the workflow's history. A step could be deleted, or the
+  secret rotated, and the next signal would again be a red badge nobody reads.
+  The honest fix is a post-merge check that asserts the last `main` deploy
+  concluded success. → affects **no package yet** → recorded here.
+- **The `Combine` button's production behaviour is unknown until this deploys.**
+  Nothing in this package can verify it; the merge is what ships it, and a §15
+  reading afterwards is what would confirm the lane rebuild now matches the RPC.
+  → affects **whoever owns the next §15 run**.
+
+### CI · the last two red gates · 2026-09-22 · no migration
+
+Both were **stale expectations, not broken code**, and both had been red long
+enough that the badges had stopped meaning anything.
+
+**`eval`.** `report_builder_test.ts:639` asserted `REPORT_TEMPLATE_IDS` was the
+five v1 templates; the registry carries six. The sixth is `data-trust` — the
+Trust Report's own template, added deliberately and rendered by WP 6.3 (§499,
+asset A3). The list was catching up with a shipped package, so the assertion
+gained the element rather than losing its teeth. **The suite is now 291 passed
+/ 0 failed** — green for the first time since the template landed.
+
+**`audit:ui`.** Eight §2.4 violations, every one a header `SelectTrigger` with
+`h-9` (`h-8` on /policies) and no mobile floor: /project-manager,
+/simulation-lab, /policies and the five network pages. Each took the audit's own
+prescription, `h-11 md:h-9` — a 44px touch target on a phone, the existing
+height from `md` up. **The audit now exits 0.**
+
+**Why the floor is on the line and not in `HDR_PROJECT_SELECT`.** The shared
+constant is where a single-source instinct says to put it, and it would not
+work: `audit-adaptive-ui.mjs` matches the JSX text of the LINE, so a floor
+living in an imported constant is invisible to it and the gate stays red while
+the pixels are right. The rule as written wants the height visible at the call
+site. Worth knowing before someone "fixes" this properly and reopens it.
+
+**Discovered:**
+
+- **Both of these were reported as "pre-existing on `main`" twice in this
+  session before anyone fixed them** — once on #250's stand-down comment, once
+  on #252's body. A failure that is correctly attributed and then left is still
+  a red gate, and two of them made `main`'s CI unreadable at a glance: the
+  seven-deploy outage (D165) sat in the same list and nobody saw it.
+  → affects **no package** → recorded as the reason this cleanup was worth a
+  package of its own.
+
+### Engine · a master row is not what makes a material real · 2026-09-22 · no migration
+
+**Where this came from.** WP 8.6's gap check recorded the BOM-only branch in
+`from_project_data` as unreachable and explicitly did NOT fix it: *"making it
+live changes which projects can be simulated at all, which is a product
+decision and not this package's."* This package is the decision.
+
+**── D166: THE DEAD BRANCH WAS A PARITY BREAK ──**
+
+The arc loop skipped any arc whose `material_id` had no row in `materials`. So
+a material the BOM consumes and the inbound file sources — but which nobody
+typed a master row for — lost its lanes, failed the `unsourced` check, and
+raised `ValueError: materials with no supplier link` **about a material that
+has one**.
+
+What turns this from tidiness into a defect is the other surface.
+`grading.ts`'s block rule is *a BOM material with no inbound ARC*; it has never
+asked for a master row. So the browser verification and the pre-dispatch gate
+both reported such a project ready to run, and the engine then refused it. The
+validation-parity suite could not catch it: it compares WARN findings against
+MappingWarnings, and this is the hard block's precondition, which nothing
+compares.
+
+**The fix is the filter, and the branch it makes reachable was already written.**
+`bom_mat_ids` moves above the loop; the filter accepts a material the BOM
+consumes. The BOM-only branch then does what its author meant — costs the
+material through D163's chain — and **names it**: an `info` warning says the row
+is absent from `materials` and that holding cost, MOQ and lead-time
+distribution are taking engine defaults, because a material that appears in a
+run with three silent defaults is three numbers without a source (T1).
+
+Two boundaries kept deliberately: the `ValueError` still fires for a BOM
+material with **no arc at all** — which is what its message always claimed — and
+an arc for a material nothing consumes is still dropped, because widening the
+filter to the BOM is not widening it to everything.
+
+**Discovered:**
+
+- **`ensure_item_masters` is why nobody hit this in the product.** The RPC
+  creates a master row for every id the logistics and BOM tables reference, so
+  the product path never presents the engine with this shape. The worker's
+  `datamap.build_project_data` has no such guarantee, and neither does any
+  caller of `from_project_data` outside the app. The defect was reachable by
+  every path EXCEPT the one anybody exercised, which is why dead-looking code
+  stayed dead-looking for a year. → affects **no package** → recorded.
+- **The parity suite's blind spot is structural, not an oversight.**
+  `test_validation_parity.py` asserts engine WARN ≡ grader warn. The hard
+  block — the one thing that stops a run entirely — is asserted only as "the
+  unsourced variant raises", never as "the two agree on WHICH datasets are
+  unsourced". A grader that blocks a runnable project, or passes an
+  unrunnable one, would look identical to a green suite.
+  → affects **whoever next touches §8.2 parity** → recorded here rather than
+  fixed, because the fix is a new fixture variant per disagreement shape.
+
 ---
 ---
 

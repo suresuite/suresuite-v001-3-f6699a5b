@@ -873,7 +873,7 @@ Result: We return the induced subgraph (nodes + edges) matching your filters, la
                 value={globalSelectedProjectId || ''}
                 onValueChange={setGlobalSelectedProjectId}
               >
-                <SelectTrigger className={cn('h-9', HDR_PROJECT_SELECT)}>
+                <SelectTrigger className={cn('h-11 md:h-9', HDR_PROJECT_SELECT)}>
                   <SelectValue placeholder="Select Project" />
                 </SelectTrigger>
                 <SelectContent>

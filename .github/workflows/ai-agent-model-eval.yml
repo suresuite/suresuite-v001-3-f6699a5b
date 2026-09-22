@@ -121,7 +121,12 @@ jobs:
       - uses: denoland/setup-deno@v2
         if: steps.params.outputs.mode != 'state-only'
         with:
-          deno-version: v2.x
+          # PINNED, not `v2.x` (§4 D165). The float resolved to 2.9.7 on
+          # 2026-09-22, which tightened inference on a PostgREST `.map()` and
+          # turned `eval` red on every branch at once — a repo-wide CI break
+          # that no commit caused and no gate could attribute. Bump this
+          # deliberately, with the type errors it surfaces fixed in the same PR.
+          deno-version: 2.9.7
 
       # ── Tier 1 (§7.4): deterministic, no LLM — must be green in the SAME
       # run that produces flag-flip evidence. ubuntu-latest ships Postgres

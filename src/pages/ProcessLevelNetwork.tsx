@@ -1350,7 +1350,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
               {level1Nodes.length > 0 && (
                 <>
               <Select value={selectedLevel1Node || 'all'} onValueChange={handleLevel1NodeSelect}>
-                <SelectTrigger className={cn('h-9 w-[160px]', HDR_FILTER_SELECT)}>
+                <SelectTrigger className={cn('h-11 md:h-9 w-[160px]', HDR_FILTER_SELECT)}>
                   <SelectValue placeholder="Level 1 Filter" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1455,7 +1455,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
                     resolves to the desktop literal without an `md:`. The
                     handoff raises that desktop literal to the product-wide
                     200px project select. */}
-                <SelectTrigger className={cn('h-9 w-[clamp(120px,38vw,180px)]', HDR_PROJECT_SELECT)}>
+                <SelectTrigger className={cn('h-11 md:h-9 w-[clamp(120px,38vw,180px)]', HDR_PROJECT_SELECT)}>
                   <SelectValue placeholder="Select Project" />
                 </SelectTrigger>
                 <SelectContent>
