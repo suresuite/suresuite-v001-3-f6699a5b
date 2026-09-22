@@ -26,6 +26,12 @@ log = logging.getLogger(__name__)
 _BRIDGE_KEYS = (
     "fill_rate", "revenue", "lost_sales_value", "cost_of_resilience",
     "max_backlog", "lost_inbound_units", "ttr_weeks", "tts_weeks",
+    # Inventory window averages (G19). `avg_on_hand_value` was computed by
+    # `compute_replication_kpis` and offered as a focal KPI by the /policies
+    # grid, but was never aggregated here — so it reached a user per
+    # replication and never as a run figure. The other three arrive with the
+    # material/finished-goods split.
+    "avg_on_hand_value", "avg_fg_value", "avg_on_hand_units", "avg_fg_units",
 )
 
 
@@ -157,9 +163,12 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
 
     seed = project_seed
     cells = result.rep_cells or [(i, 0) for i in range(len(result.kpis))]
-    # Weekly per-rep series: fill_rate plus any extra series the engine
-    # exposes (backlog_units, on_hand_value, revenue_value). getattr-guarded
-    # so an older engine wheel without extra_series keeps working.
+    # Weekly per-rep series: fill_rate plus whatever else the engine publishes
+    # (scsim's `WEEKLY_SERIES`, the `published` subset). Iterated generically
+    # rather than by name, so a series added to the engine's declaration
+    # arrives here without a change — which is why this loop was already right
+    # when `fg_value` was added and the two hand-kept lists around it were not.
+    # getattr-guarded so an older engine wheel without extra_series keeps working.
     extra = getattr(result, "extra_series", None) or {}
 
     def _series_for(i: int) -> dict:

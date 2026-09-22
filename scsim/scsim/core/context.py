@@ -299,6 +299,81 @@ class CostLedger:
         return {name: float(window[i]) for i, name in enumerate(COST_INDEX)}
 
 
+@dataclass(frozen=True)
+class WeeklySeries:
+    """One always-on weekly scalar, declared once.
+
+    `key` is BOTH the attribute name on `WeeklyTrace` and the name the series
+    travels under everywhere downstream — the golden-trace column, the progress
+    observer, `ScenarioResult.extra_series`, `run_replications.time_series` and
+    the chart that reads it. One name, one place it is written down.
+
+    `aggregation` says what may honestly be done to the series across weeks:
+
+        level  — a stock measured at the end of the week (on-hand, backlog).
+                 Averaging is meaningful; summing is not: adding a stock to
+                 itself week after week counts the same goods repeatedly.
+        flow   — a quantity that happened during the week (revenue, lost units).
+                 Summing is meaningful; averaging gives a per-week rate.
+        ratio  — a quotient (fill rate). NEITHER sum nor plain mean is correct
+                 across weeks; the honest aggregate is the ratio of the summed
+                 numerator to the summed denominator.
+
+    `published` marks the series that leave the engine and reach a user. The
+    rest stay in the golden trace. Before this declaration existed that subset
+    was a second hand-maintained list, and `fg_value` — finished-goods
+    inventory, computed on every replication of every run since the trace was
+    written — fell into the gap between the two and was discarded for the whole
+    of its life (§4 D163 / G19).
+    """
+
+    key: str
+    unit: str
+    aggregation: str       # "level" | "flow" | "ratio"
+    published: bool
+    doc: str
+
+
+# THE weekly-series vocabulary. Adding a series is one row here; nothing else
+# in the engine keeps a parallel list. `WeeklyTrace.__post_init__` allocates
+# from it, `io.traces.trace_frame` orders the golden trace by it, and
+# `core.engine` builds both `fr_series` and `extra_series` from it.
+WEEKLY_SERIES: tuple[WeeklySeries, ...] = (
+    WeeklySeries("demand_value", "currency", "flow", False,
+                 "Demand valued at sell price."),
+    WeeklySeries("fulfilled_value", "currency", "flow", False,
+                 "Demand served, capped at demand — the fill-rate numerator."),
+    WeeklySeries("revenue_value", "currency", "flow", True,
+                 "Units shipped at sell price, including backlog clearing."),
+    WeeklySeries("lost_value", "currency", "flow", False,
+                 "Demand lost rather than backlogged, at sell price."),
+    WeeklySeries("lost_units", "units", "flow", False,
+                 "Demand lost rather than backlogged, in units."),
+    WeeklySeries("backlog_units", "units", "level", True,
+                 "Unserved demand still owed at the end of the week."),
+    WeeklySeries("fill_rate", "fraction", "ratio", True,
+                 "Fulfilled value over demand value; 1.0 in a week with no demand."),
+    WeeklySeries("inbound_rejected", "units", "flow", False,
+                 "Inbound material refused this week."),
+    WeeklySeries("on_hand_value", "currency", "level", True,
+                 "Material inventory on hand at the end of the week, at unit cost."),
+    WeeklySeries("fg_value", "currency", "level", True,
+                 "Finished-goods inventory on hand at the end of the week, at unit COGS."),
+    WeeklySeries("on_hand_units", "units", "level", True,
+                 "Material inventory on hand at the end of the week, in units. "
+                 "Summed across materials, which carry no declared unit of "
+                 "measure — see the note this obliges at the point of display."),
+    WeeklySeries("fg_units", "units", "level", True,
+                 "Finished-goods inventory on hand at the end of the week, in units. "
+                 "Summed across products, with the same caveat as `on_hand_units`."),
+)
+
+WEEKLY_SERIES_KEYS: tuple[str, ...] = tuple(s.key for s in WEEKLY_SERIES)
+PUBLISHED_SERIES_KEYS: tuple[str, ...] = tuple(
+    s.key for s in WEEKLY_SERIES if s.published
+)
+
+
 @dataclass
 class WeeklyTrace:
     """Always-on weekly scalars + optional per-entity matrices (full_debug)."""
@@ -317,6 +392,8 @@ class WeeklyTrace:
     inbound_rejected: np.ndarray = field(init=False)
     on_hand_value: np.ndarray = field(init=False)
     fg_value: np.ndarray = field(init=False)
+    on_hand_units: np.ndarray = field(init=False)
+    fg_units: np.ndarray = field(init=False)
     D: Optional[np.ndarray] = None
     Q: Optional[np.ndarray] = None
     F: Optional[np.ndarray] = None
@@ -331,10 +408,10 @@ class WeeklyTrace:
 
     def __post_init__(self) -> None:
         T = self.horizon
-        for name in (
-            "demand_value", "fulfilled_value", "revenue_value", "lost_value", "lost_units",
-            "backlog_units", "fill_rate", "inbound_rejected", "on_hand_value", "fg_value",
-        ):
+        # Allocated FROM the declaration, so a series cannot be declared and
+        # then not exist — the failure mode this loop used to have when it
+        # carried its own copy of the list.
+        for name in WEEKLY_SERIES_KEYS:
             setattr(self, name, np.zeros(T))
         if self.keep_matrices:
             self.D = np.zeros((self.n_prods, T))

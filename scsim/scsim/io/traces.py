@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from scsim.core.context import COST_COMPONENTS, SimContext
+from scsim.core.context import COST_COMPONENTS, WEEKLY_SERIES, SimContext
 
 try:  # optional dependency (scsim[io])
     import pyarrow as pa
@@ -27,22 +27,17 @@ except ImportError:  # pragma: no cover
 
 
 def trace_frame(ctx: SimContext) -> dict[str, np.ndarray]:
-    """Weekly scalar columns in deterministic order (golden-trace contract)."""
+    """Weekly scalar columns in deterministic order (golden-trace contract).
+
+    The order is `WEEKLY_SERIES`'s order, after `week`. It was a literal here
+    until the declaration existed, which is how this frame and the engine's
+    published subset came to disagree about `fg_value` (§4 D164 / G19).
+    """
     tr = ctx.trace
     T = tr.horizon
-    cols: dict[str, np.ndarray] = {
-        "week": np.arange(T, dtype=np.int64),
-        "demand_value": tr.demand_value,
-        "fulfilled_value": tr.fulfilled_value,
-        "revenue_value": tr.revenue_value,
-        "lost_value": tr.lost_value,
-        "lost_units": tr.lost_units,
-        "backlog_units": tr.backlog_units,
-        "fill_rate": tr.fill_rate,
-        "inbound_rejected": tr.inbound_rejected,
-        "on_hand_value": tr.on_hand_value,
-        "fg_value": tr.fg_value,
-    }
+    cols: dict[str, np.ndarray] = {"week": np.arange(T, dtype=np.int64)}
+    for s in WEEKLY_SERIES:
+        cols[s.key] = getattr(tr, s.key)
     for i, name in enumerate(COST_COMPONENTS):
         cols[f"cost_{name}"] = ctx.cost.weekly[i]
     return cols

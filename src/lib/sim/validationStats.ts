@@ -13,6 +13,23 @@ const variance = (xs: number[]): number => {
   return xs.reduce((a, b) => a + (b - m) ** 2, 0) / (xs.length - 1);
 };
 
+/** Mean and CI half-width across replications, for one week or one KPI.
+ *
+ *  Lives here rather than in a component because two result panels need it —
+ *  the per-seed explorer and the inventory chart — and a shared function
+ *  exported from a component file is a shared function in the wrong place.
+ */
+export function meanCI(
+  values: number[],
+  confidence: number,
+): { mean: number; half: number; n: number } {
+  const n = values.length;
+  if (n === 0) return { mean: 0, half: 0, n: 0 };
+  const m = avg(values);
+  const z = confidence >= 0.99 ? 2.576 : confidence >= 0.95 ? 1.96 : 1.645;
+  return { mean: m, half: (z * Math.sqrt(variance(values))) / Math.sqrt(n), n };
+}
+
 /** Element-wise mean across replications: series[rep][week] → mean[week]. */
 export function crossRepMean(series: number[][]): number[] {
   const n = Math.min(...series.map((s) => s.length));

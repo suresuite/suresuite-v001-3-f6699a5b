@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { KpiStatTable } from "./KpiStatTable";
 import { ConvergencePlot } from "./ConvergencePlot";
+import { InventoryOverTime } from "./InventoryOverTime";
 import { ItemSeriesExplorer } from "./ItemSeriesExplorer";
 import { ReplicationSeedExplorer } from "./ReplicationSeedExplorer";
 import { RecoveryImpactCard } from "./RecoveryImpactCard";
@@ -140,6 +141,13 @@ export function ResultsDashboard({
           horizonDays={meta.horizon_days ?? 90}
         />
       )}
+      {/* Inventory over time (G19 / WP 9.1): materials and finished goods,
+          in units or value. Plain weekly scalars, so — unlike the per-item
+          panel at the bottom — this renders on every run. */}
+      <InventoryOverTime
+        reps={reps.filter((r) => r.status === "done")}
+        warmupWeeks={run.warmup_detected_at}
+      />
       <ConvergencePlot reps={reps} primaryKpi={primaryKpi} warmupAt={run.warmup_detected_at} />
       {/* Per-seed filter over the persisted weekly traces (W1 / G17): default
           is the cross-rep mean ± CI band; selecting a seed overlays or
@@ -159,9 +167,21 @@ export function ResultsDashboard({
           a smaller change than emitting a series no policy needs. The run-level
           measure exists and now renders in the table above, as
           `capacity_utilization`, which the same defect had been hiding. */}
-      {/* Per-item weekly series (W3 / G17): inspection runs only — renders
-          nothing when the run persisted no run_item_series rows. */}
-      <ItemSeriesExplorer runId={run.id} warmupWeeks={run.warmup_detected_at} />
+      {/* Per-item weekly series (W3 / G17): inspection runs only. This page
+          dispatches no inspection run, so before WP 9.1 the panel was empty
+          here on every run and said nothing about why — the dead end §4 D113
+          warns about. It now names where an inspection run is started. The
+          inventory chart above needs none of this: its series are plain weekly
+          scalars present on every run. */}
+      <ItemSeriesExplorer
+        runId={run.id}
+        warmupWeeks={run.warmup_detected_at}
+        emptyHint={
+          "this run has none. Per-item evidence comes from an inspection run " +
+          "(one replication, full trace), started from Run & Validate on the " +
+          "Policies page; it then appears here too."
+        }
+      />
     </div>
   );
 }

@@ -87,6 +87,7 @@ import {
 } from "@/lib/sim/pyodideEngine";
 import { ksStatistic, welchTTest, welchWarmup, mser5 } from "@/lib/sim/validationStats";
 import { ConvergencePlot } from "@/components/sim/ConvergencePlot";
+import { InventoryOverTime } from "@/components/sim/InventoryOverTime";
 import { ItemSeriesExplorer } from "@/components/sim/ItemSeriesExplorer";
 import { ReplicationSeedExplorer } from "@/components/sim/ReplicationSeedExplorer";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
@@ -128,7 +129,8 @@ interface Props {
 const KPI_OPTIONS = [
   { id: "fill_rate", label: "Fill rate", unit: "%" },
   { id: "max_backlog", label: "Max backlog", unit: "units" },
-  { id: "avg_on_hand_value", label: "On-hand value", unit: "€" },
+  { id: "avg_on_hand_value", label: "Material inventory", unit: "€" },
+  { id: "avg_fg_value", label: "Finished-goods inventory", unit: "€" },
   { id: "revenue", label: "Revenue", unit: "€" },
   { id: "lost_sales_value", label: "Lost sales", unit: "€" },
   { id: "demand_value", label: "Demand value", unit: "€" },
@@ -160,10 +162,20 @@ const COST_COMPONENT_OPTIONS = KPI_OPTIONS.filter(
 const SERIES_CHARTS = [
   { key: "fill_rate", label: "Fill rate", unit: "fraction" },
   { key: "backlog_units", label: "Backlog", unit: "units" },
-  { key: "on_hand_value", label: "On-hand value", unit: "€" },
+  { key: "on_hand_value", label: "Material inventory", unit: "€" },
+  { key: "fg_value", label: "Finished-goods inventory", unit: "€" },
+  { key: "on_hand_units", label: "Material inventory", unit: "units" },
+  { key: "fg_units", label: "Finished-goods inventory", unit: "units" },
   { key: "revenue_value", label: "Revenue", unit: "€/week" },
 ] as const;
 type SeriesKey = (typeof SERIES_CHARTS)[number]["key"];
+
+// The four stock series `InventoryOverTime` owns. They stay in SERIES_CHARTS
+// because that list is the weekly vocabulary this page reads, but they are not
+// repeated as small single-series charts below it.
+const INVENTORY_SERIES: readonly SeriesKey[] = [
+  "on_hand_value", "fg_value", "on_hand_units", "fg_units",
+];
 
 // Weekly per-rep series persisted by the worker (run_replications.time_series
 // keys) per KPI. lost_sales has no weekly trace → per-rep scalars only.
@@ -171,6 +183,7 @@ const SERIES_KEY: Partial<Record<KpiId, SeriesKey>> = {
   fill_rate: "fill_rate",
   max_backlog: "backlog_units",
   avg_on_hand_value: "on_hand_value",
+  avg_fg_value: "fg_value",
   revenue: "revenue_value",
 };
 
@@ -2907,20 +2920,17 @@ function EngineOutputSummary({
       </div>
       <div className="flex flex-col gap-2 p-2">
         {/* 1 — inventory dynamics: does stock settle where the policies say
-            it should? The first thing a modeler checks. */}
-        <WeeklySeriesChart
-          seriesKey="on_hand_value"
-          title="Inventory dynamics — on-hand value"
-          unit="€"
-          reps={reps}
-          warmupWeeks={warmupWeeks}
-          height={180}
-        />
+            it should? The first thing a modeler checks, and the direct
+            feedback loop for P-P.1's coverage weeks and P-P.3's safety stock.
+            WAS a single `on_hand_value` chart, which showed the MATERIAL half
+            and called it "inventory" — the finished-goods series existed all
+            along and was never published (G19 / §4 D164). */}
+        <InventoryOverTime reps={reps} warmupWeeks={warmupWeeks} height={200} />
         {/* 2 — the financial statement from the persisted per-rep KPIs. */}
         <FinancialStatement reps={reps} />
         {/* 3 — the remaining persisted weekly series. */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          {SERIES_CHARTS.filter((s) => s.key !== "on_hand_value").map((s) => (
+          {SERIES_CHARTS.filter((s) => !INVENTORY_SERIES.includes(s.key)).map((s) => (
             <WeeklySeriesChart
               key={s.key}
               seriesKey={s.key}
