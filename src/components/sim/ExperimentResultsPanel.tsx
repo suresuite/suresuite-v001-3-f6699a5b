@@ -74,14 +74,16 @@ export function ExperimentResultsPanel({ experiment, playbooks, primaryKpi }: Pr
       .channel(`exp_runs:${experiment.id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "simulation_runs" },
+        // Filtered to this experiment's project (audit F-33 — the same class:
+        // unfiltered, every project's run woke this panel).
+        { event: "*", schema: "public", table: "simulation_runs", filter: `project_id=eq.${experiment.project_id}` },
         () => void load(),
       )
       .subscribe();
     return () => {
       sb.removeChannel(ch);
     };
-  }, [experiment.id, load]);
+  }, [experiment.id, experiment.project_id, load]);
 
   const playbookLookup = useMemo(() => new Map(playbooks.map((p) => [p.id, p.name])), [playbooks]);
   const runByScenario = useMemo(() => new Map(runs.map((r) => [r.scenario_id, r])), [runs]);

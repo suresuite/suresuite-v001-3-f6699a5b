@@ -949,6 +949,15 @@ def from_project_data(data: ProjectData) -> MappingResult:
 
     settings = _build_settings(sc, w)
     events = _map_events(sc.disruption_schedule, sup_ids, cap_by_sup, w)
+    # The engine extends replications under a sequential-CI rule only when the
+    # scenario HAS events (`run_scenario` gates on `scenario.events`). A baseline
+    # scenario with that rule ran its fixed count and said nothing (audit F-32).
+    if (settings.replication_stopping == ReplicationStopping.SEQUENTIAL_CI
+            and not events):
+        w.append(MappingWarning(
+            "warn", "scenario", "stopping_rule",
+            f"sequential-CI stopping applies to disrupted scenarios only — this one has "
+            f"no disruptions, so it ran a fixed {settings.model_seeds} replications"))
     sups_by_mat: dict[str, set[str]] = {}
     for link in links:
         sups_by_mat.setdefault(link.material_id, set()).add(link.supplier_id)

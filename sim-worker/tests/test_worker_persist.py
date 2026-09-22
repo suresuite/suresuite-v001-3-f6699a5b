@@ -13,6 +13,8 @@ def test_scsim_result_shape():
         "ci_revenue": 30.0,
         "fill_rate": 0.93,
         "run_id": "abc",
+        # rep_count_done counts these, not n_reps (audit F-18)
+        "replications": [{"rep_index": i} for i in range(30)],
     }
     patch = build_run_update(kpis, n_reps=30)
 

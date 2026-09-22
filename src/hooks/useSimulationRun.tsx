@@ -27,6 +27,9 @@ export interface SimulationRun {
   policy_hash: string | null;
   mapping_warnings: MappingWarning[] | null;
   created_at: string;
+  /** Touched by every worker write, including the per-replication counter —
+   *  what `runStatus.ts` reads to notice a run that stopped moving (F-30). */
+  updated_at?: string | null;
   /** Baseline fingerprint stamped at dispatch (Phase B0 / G13 / §9.5). */
   scenario_hash?: string | null;
   /** The model-validation card in force at dispatch — immutable history. */
@@ -158,17 +161,33 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
         { event: "*", schema: "public", table: "simulation_runs", filter: `scenario_id=eq.${scenarioId}` },
         scheduleReload,
       )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "run_replications" },
-        scheduleReload,
-      )
       .subscribe();
     return () => {
       if (reloadTimer.current != null) window.clearTimeout(reloadTimer.current);
       sb.removeChannel(ch);
     };
   }, [scenarioId, loadLatest, scheduleReload]);
+
+  // Replication rows of the run this hook SHOWS, and no other (audit F-33).
+  // This used to subscribe to `run_replications` with no filter, so every
+  // replication of every project woke every open Lab. `run_replications` has no
+  // `scenario_id`; the displayed run's id is the exact filter, and a new run
+  // arrives through the `simulation_runs` subscription above, which re-keys this.
+  const latestRunId = latestRun?.id ?? null;
+  useEffect(() => {
+    if (!latestRunId) return;
+    const ch = sb
+      .channel(`sim_reps:${latestRunId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "run_replications", filter: `run_id=eq.${latestRunId}` },
+        scheduleReload,
+      )
+      .subscribe();
+    return () => {
+      sb.removeChannel(ch);
+    };
+  }, [latestRunId, scheduleReload]);
 
   const runExperiment = useCallback(
     async (
