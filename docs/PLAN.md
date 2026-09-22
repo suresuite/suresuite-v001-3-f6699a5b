@@ -18156,6 +18156,103 @@ Handoff to next WP:
   bridge reduces to `warmup_detected_at`. WP 6 decides whether to publish it or to
   switch to it.
 
+### Audit 2026-09-22 · WP 3 — disruption timing and recovery metrics · 2026-09-22 · no migration
+
+Previous package promised: WP 2 gave `_clamp` a warning sink and handed WP 3
+"a disruption start is now a clamped, warned field", adding that `t_w` is a
+run-time fact, so the warning must come from the engine side, the way F-36's
+does. WP 1 sized the stored damage: 1 disruption in 1 run inside its detected
+warm-up; at most 4 runs with a 1.0 baseline; 0 replications at TTR ≥ 52; and the
+F-05 blast radius is not recoverable, because `t_star` is not persisted.
+
+This package found: **the audit's first proposed fix would have broken the engine,
+and the defect it pointed at was real in a place the audit did not name.**
+
+**(a) The two branches of `resolve_events` do NOT disagree.** The audit said a
+fixed `ev.start` is absolute while the drawn one is relative to warm-up, and
+proposed resolving the fixed one relative to `warmup_end`. Checked against the
+manuscript §3.7 semantics, as the brief required: `DisruptionEvent.start` is
+documented as t*, an absolute week, and the auto branch draws an absolute week
+too, `U{t_w .. t_w+2}` (the manuscript's `U{85..87}` with t_w = 85). Thirty-odd
+engine tests author absolute starts. Re-basing the fixed branch would have
+silently moved every one of them. **The engine's semantics stand**; the defect is
+that a start before t_w was silently lost from every KPI.
+
+**(b) The fabricated baseline was reachable from the AUTO branch too, a third of
+the time.** `_ttr_tts` took `t_star = max(min(start), t_w)` and
+`pre = fr[t_w:t_star]`, which is empty whenever `t_star ≤ t_w`. The auto branch
+draws t_w itself with probability 1/3. So the manuscript's own design
+substituted a 1.0 baseline on a third of its replications, not only the UI's
+day-10 default.
+
+**Per finding:**
+
+- **F-03 — FIXED: shifted and said, never silently excluded.** A fixed start
+  before t_w moves to t_w (the auto branch's own lower bound). The engine records
+  it per event on `ScenarioResult.event_shifts`, and the bridge adds it to
+  `mapping_warnings` with both weeks. The editor's default is no longer day 10
+  (engine week 1, inside every warm-up) but four measured weeks after the
+  scenario's warm-up. Under a MANUAL warm-up each row says when it falls inside
+  it; under AUTO the editor states the rule once, because no row can be judged
+  before the run. **Gates:** `test_recovery_honesty.py` (shift counted, and the
+  shifted event's fill rate is below the undisrupted run's; mutation: no shift →
+  red); `engineTicks.test.tsx` (default start, and the manual note).
+- **F-04 — FIXED: no substituted baseline.** `_ttr_tts` returns a
+  `RecoveryMeasure`. With no pre-disruption week, or none after it, the row
+  carries **none** of `ttr_weeks`, `tts_weeks` or `pre_disruption_fill_rate`, and
+  `recovery_measurable = 0` says why. **Gate:** `test_recovery_honesty.py` asserts
+  no row carries a substituted baseline (mutation: restore `else 1.0` → 2 red).
+- **F-05 — FIXED: censoring is a flag, not a value.** A chain that never
+  recovered inside the window has no `ttr_weeks` and has `ttr_censored = 1`. One
+  that never left the band has TTR 0 (a real measurement), no `tts_weeks`, and
+  `tts_censored = 1`. `KpiStatTable` folds the flags into a note beside the
+  mean, e.g. "not in the mean: 1 of 3 never recovered inside the window; 1 of 3
+  had no pre-disruption week", and keeps an all-censored row as "not measured".
+  **Gates:** `test_recovery_honesty.py` (mutation: return the window length →
+  red); `kpiRowsRecovery.test.ts` (flags are not rows; counts; mutation: flags as
+  rows → red).
+- **The Resilience Index was about to regress, and the suite could not see it.**
+  `stress/battery.py` read the aggregate TTR/TTS means with defaults of 0 and the
+  window. Once censored rows drop out, those means exclude every chain that never
+  recovered, so a battery cell where nothing recovered would have scored a
+  PERFECT TTR. All 275 tests passed at that point. It now uses `censored_mean`,
+  which counts a censored replication at the full window (what the old sentinel
+  meant, now said in one place). **Gate:** `test_recovery_honesty.py::test_resilience_index_counts_a_censored_recovery_at_the_full_window`.
+- **Stored runs — MARKED, not recomputed and not refused.** They cannot be
+  recomputed (`t_star` is not stored), and refusing would hide the other KPIs, which
+  are sound. `ENGINE_VERSION` 0.2.3 → **0.2.4**. `buildKpiRows` takes the run's
+  `code_version`, and the three recovery rows of any scsim run before 0.2.4 carry
+  "computed before scsim-0.2.4: may rest on a substituted 100% baseline …
+  re-run to trust it". WP 1 measured the population: 10 runs carry the measures,
+  and at most 4 have a baseline of exactly 1.0. **Gate:**
+  `kpiRowsRecovery.test.ts` (mutation: drop the mark → red).
+
+Discovered:
+- **`scsim/docs/statistics.md` describes the auto start correctly and says nothing
+  about its empty pre-window.** One replication in three has no recovery
+  measurement by design. Whether the draw should be `U{t_w+1 .. t_w+3}` is a
+  manuscript question, not a patch → **audit WP 6** (statistical honesty), beside
+  the MSER-5 switch WP 2 handed it.
+
+Baseline numbers:
+- `ENGINE_VERSION` 0.2.3 → **0.2.4** (the generated table pages carry it; 56 files move by one line each).
+  `scsim/scsim/pipeline_schema.json` is re-frozen on its `engine_version` field **only**.
+  `test_pipeline_schema_snapshot_frozen` asks for an ADR on a deliberate **Tier-3** change,
+  meaning phase order or the hook contract, and this package changes neither: no phase,
+  hook, read or write moved. So no ADR is owed, and the diff to the snapshot is one line.
+- auto-branch replications with no measurable recovery: **1 in 3** by construction (was: a substituted 1.0)
+- tests: scsim 268 → **276**; sim-worker 99 → **100**; vitest 972 → **980**
+
+Handoff to next WP:
+- **WP 4 and WP 5 inherit a cleaner `mapping_warnings`.** It now carries mapper
+  substitutions (WP 2), ring truncations (WP 2) and event shifts (this package).
+  `feasibility_warnings` is still the second list nobody renders (WP 2's handoff to WP 5).
+- **The recovery flags are not in `KPI_DISPLAY`**, on purpose: they are
+  annotations, and `buildKpiRows` consumes them. A surface that reads
+  `run_replications.kpis` directly (the `/v1` API, the AI chat tool) will see
+  them raw. That is correct data with no label, and WP 8's export work should
+  decide their presentation there.
+
 ---
 
 ### WP 6.5a — Publish `ingest-file` · 2026-09-22 · no migration

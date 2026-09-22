@@ -26,7 +26,7 @@ from scsim.entities.config import WarmupReport
 from scsim.entities.disruption import DisruptionEvent
 from scsim.entities.enums import EffectType, RunMode, SupplierProfile, TargetType
 from scsim.entities.scenario import Scenario
-from scsim.kpi.compute import ResilienceIndex, resilience_index
+from scsim.kpi.compute import ResilienceIndex, censored_mean, resilience_index
 from scsim.stats.bootstrap import aggregate_mean_ci
 
 ST_DEFINITIONS: dict[str, str] = {
@@ -221,10 +221,18 @@ def _cell_sla_ri(
     mean_clean_rev = float(np.mean([clean_revenue_by_rep[i] for i, _ in res.rep_cells]))
     ri = resilience_index(
         service_loss_area=float(sla.mean()),
-        ttr_weeks=float(res.aggregates.get("ttr_weeks", {}).get("mean", 0.0)),
-        tts_weeks=float(res.aggregates.get("tts_weeks", {}).get("mean", window)),
+        # Censored replications count at the full window (audit WP 3, F-05): the
+        # aggregate means now exclude them, and reading those here would score a
+        # chain that never recovered as a fast recovery. An unmeasurable cell
+        # (no pre-disruption week) keeps the old neutral defaults, said here.
+        ttr_weeks=_or(censored_mean(res.kpis, "ttr_weeks", "ttr_censored", window), 0.0),
+        tts_weeks=_or(censored_mean(res.kpis, "tts_weeks", "tts_censored", window), window),
         cost_of_resilience=float(res.aggregates["cost_of_resilience"]["mean"]),
         window_weeks=window,
         clean_revenue=mean_clean_rev,
     )
     return sla, ri
+
+
+def _or(x: float | None, default: float) -> float:
+    return float(default if x is None else x)

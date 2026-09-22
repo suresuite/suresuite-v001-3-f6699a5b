@@ -963,6 +963,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
                 value={selected.disruption_schedule}
                 onChange={(v) => onSaveScenario({ disruption_schedule: v })}
                 projectId={projectId}
+                warmup={{ days: selected.warmup_days, mode: selected.warmup_mode, horizonDays: selected.horizon_days }}
               />
             </div>
           </MobileSheet>

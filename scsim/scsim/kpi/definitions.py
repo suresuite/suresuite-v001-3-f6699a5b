@@ -26,9 +26,12 @@ KPI_DICTIONARY: tuple[KpiSpec, ...] = (
     KpiSpec("delta_revenue", "ΔR_i", "Σu_p(Q_i − Q_S0) / Σu_p(D − Q_S0), CRN-paired "
             "(Eq. 25-style); share of S0's lost revenue recovered.", "%"),
     KpiSpec("ttr_weeks", "TTR", "Weeks from disruption start until weekly FR re-enters the "
-            "pre-disruption band (3-week sustained); 0 if FR never left the band.", "wks"),
+            "pre-disruption band (3-week sustained); 0 if FR never left the band. ABSENT when "
+            "censored (never recovered inside the window — ttr_censored=1) or when the window "
+            "holds no pre-disruption week (recovery_measurable=0); never a sentinel.", "wks"),
     KpiSpec("tts_weeks", "TTS", "Weeks from disruption start that FR survives inside the "
-            "band (time-to-survive under the shock).", "wks"),
+            "band (time-to-survive under the shock). ABSENT when censored (never left the "
+            "band — tts_censored=1) or unmeasurable.", "wks"),
     KpiSpec("service_loss_area", "SLA", "∫ max(0, FR_clean − FR_disrupted) dt over the window, "
             "CRN-paired against the same portfolio without events.", "%·wks"),
     KpiSpec("max_backlog", "—", "Peak Σ_p B_p within the window.", "units"),
