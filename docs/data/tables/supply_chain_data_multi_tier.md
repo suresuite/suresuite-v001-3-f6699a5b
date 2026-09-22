@@ -347,6 +347,6 @@ How deep in the BILL OF MATERIALS this edge's UPSTREAM end sits — 0 a finished
 
 ---
 
-*Generated from data contract `d1fbba79d35d`, engine `0.2.4`,
+*Generated from data contract `1fd8380994dc`, engine `0.2.5`,
 sidecar `supabase/contract/supply_chain_data_multi_tier.contract.yaml`, table created by `20250908191450_810873d6-5329-4d67-80f4-e96bbe46c340.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

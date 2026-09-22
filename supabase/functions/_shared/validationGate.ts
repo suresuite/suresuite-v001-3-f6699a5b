@@ -161,6 +161,23 @@ export function runValidationGate(args: {
     ),
   );
 
+  // A graded SLICE is not a pass (audit F-19b). `loadGateDataset` has always
+  // reported a table that came back at the ceiling, and this function never
+  // read it — so a large project cleared the gate on part of its data while
+  // the run row recorded a clean pass. It is a `warn`: the caller must see it
+  // and acknowledge it, like any other finding the engine could survive.
+  if (dataset.truncated?.length) {
+    findings.push({
+      severity: "warn",
+      field: "dataset.truncated",
+      policy: "validation_gate",
+      rows: [...dataset.truncated],
+      message:
+        `${dataset.truncated.join(", ")} reached the ${GATE_ROW_CEILING}-row read ceiling, so this ` +
+        "check graded a slice of the project, not all of it. Findings beyond the slice are unknown.",
+    });
+  }
+
   const blocks = findings.filter((f) => f.severity === "block");
   const warns = findings.filter((f) => f.severity === "warn");
   if (blocks.length > 0) return { status: "blocked", findings };

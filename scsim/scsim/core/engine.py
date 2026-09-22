@@ -959,7 +959,10 @@ def _extend_until_ci(compiled, scenario, kpis, rows, grid, t_w, window_end, debu
     next_i = max({i for i, _ in grid}) + 1
     while next_i < 200:
         fr = np.array([r["fill_rate"] for r in kpis])
-        if t_halfwidth(fr, settings.ci_level) <= settings.ci_halfwidth_target:
+        fr = fr[np.isfinite(fr)]
+        # No measured fill rate (no demand in the window) → nothing to converge
+        # on; extending to 200 replications would change nothing (audit F-08).
+        if fr.size == 0 or t_halfwidth(fr, settings.ci_level) <= settings.ci_halfwidth_target:
             break
         batch = []
         for i in range(next_i, min(next_i + 10, 200)):
