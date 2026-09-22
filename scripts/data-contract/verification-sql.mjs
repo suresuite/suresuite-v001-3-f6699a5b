@@ -3369,6 +3369,58 @@ async function wp65aLandingSwitch() {
       ? `- **LIVE** — version ${f.version}, status ${f.status}, verify_jwt ${f.verify_jwt}, updated ${f.updated_at ? new Date(f.updated_at).toISOString() : "?"}.`
       : "- **ABSENT.** The upload wizard calls it on file-select with no fallback, so every upload on /project-manager fails there (D123, D168).");
   });
+
+  // (6) WHAT THE FUNCTION ITSELF SAID — its invocations and its console, from the
+  // Management API's log endpoint (a GET, read-only by the verb, like F-16's).
+  //
+  // Added after the first production upload failed in the browser with "Failed to
+  // send a request to the Edge Function" on `mode=land`, while `mode=parse` on the
+  // same file had succeeded. That message is supabase-js's FETCH error: the request
+  // never produced a response the browser could read — typically a gateway answer
+  // with no CORS headers (a worker that crashed, hit a resource limit or timed out).
+  // Nothing in the database can show that, and no session can reach the function
+  // (the egress proxy denies it), so the function's own logs are the only witness.
+  const list = Array.isArray(fns.rows) ? fns.rows : [];
+  const fn = list.find((x) => x.slug === "ingest-file");
+  if (!fn?.id) return;
+  const end = new Date();
+  const start = new Date(end.getTime() - 23 * 3600 * 1000);
+  const logs = async (sql) => {
+    const qs = new URLSearchParams({
+      iso_timestamp_start: start.toISOString(),
+      iso_timestamp_end: end.toISOString(),
+      sql,
+    });
+    const res = await apiGet(`/analytics/endpoints/logs.all?${qs}`);
+    if (res.error) return res;
+    const body = res.rows ?? {};
+    if (body.error) return { error: JSON.stringify(body.error).slice(0, 300) };
+    return { rows: Array.isArray(body.result) ? body.result : [] };
+  };
+  const fid = String(fn.id).replace(/[^A-Za-z0-9-]/g, "");
+  const edge = await logs(`
+    select cast(t.timestamp as string) as ts, request.method as method, response.status_code as status,
+           m.execution_time_ms as ms, request.url as url
+      from function_edge_logs t
+      cross join unnest(t.metadata) as m
+      cross join unnest(m.response) as response
+      cross join unnest(m.request) as request
+     where m.function_id = '${fid}'
+     order by t.timestamp desc limit 40`);
+  report("(6) `ingest-file` invocations", edge, (rows) => {
+    out("", "**(6) `ingest-file` — every invocation in the last 23 h** (`function_edge_logs`, newest first):");
+    out(...table(rows.map((r) => ({ ...r, url: String(r.url ?? "").replace(/\?.*$/, "") }))));
+  });
+  const con = await logs(`
+    select cast(t.timestamp as string) as ts, m.level as level, m.event_type as event, t.event_message as message
+      from function_logs t
+      cross join unnest(t.metadata) as m
+     where m.function_id = '${fid}'
+     order by t.timestamp desc limit 60`);
+  report("(6) `ingest-file` console", con, (rows) => {
+    out("", "**(6) `ingest-file` — its console and runtime events** (`function_logs`, newest first):");
+    out(...table(rows.map((r) => ({ ...r, message: String(r.message ?? "").replace(/\s+/g, " ").slice(0, 400) }))));
+  });
 }
 
 async function main() {

@@ -166,3 +166,13 @@ section, "WP 6.5 (a) — the landing switch", asks:
   (5) whether production serves `ingest-file` (expected: absent).
 
 The fence should read unmoved at 20260920000003.
+
+────────────────────────────────────────────────────────────────────────────────
+WP 6.5 (a) — THE FIRST PRODUCTION UPLOAD FAILED. 2026-09-22, no migration.
+
+`ingest-file` is live (Deploy Supabase Functions run 35782380695, step "Deploy
+ingest-file" published 233 kB). A user's first upload (`bom_single_level`, 2 rows,
+project 50141cd1) parsed on file-select and then failed on `mode=land` with
+supabase-js's "Failed to send a request to the Edge Function" — a fetch error, i.e.
+no readable response. This read adds (6): the function's own invocations and console
+from the Management API log endpoint (GET), plus the landing tables as they stand.
