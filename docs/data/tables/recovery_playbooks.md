@@ -220,6 +220,6 @@ When it was last changed, server-stamped.
 
 ---
 
-*Generated from data contract `f1a5071b0109`, engine `0.2.6`,
+*Generated from data contract `1cd93c3a7dd8`, engine `0.2.7`,
 sidecar `supabase/contract/recovery_playbooks.contract.yaml`, table created by `20260607125247_efb67f7c-335b-482c-8292-59a47554251d.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
