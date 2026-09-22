@@ -1,43 +1,209 @@
 // §6.3 section 13 — roles and capabilities.
 //
 // The page that has to say D66: `min_project_role` is declared on every table
-// in the contract and read by NOTHING. The count is computed from the generated
-// module so the sentence cannot go stale in either direction.
+// in the contract and read by almost nothing. The count is computed from the
+// generated module so the sentence cannot go stale in either direction.
+//
+// The three role vocabularies and the project-role matrix are DERIVED, not
+// authored here: the matrix and the rank ladder come from
+// `capabilities.generated.ts` (read out of the migration seeds — I1, D101),
+// and the screen table comes from the route guard itself. The only
+// hand-written facts on this page are glosses.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
 import { DocFigure } from "@/components/docs/DocFigure";
 import { REFERENCE_TABLES } from "@/components/docs/generated/reference.generated";
-import { FEATURE_CAPABILITIES, PAGE_CAPABILITIES } from "@/lib/capabilities.generated";
+import {
+  FEATURE_CAPABILITIES,
+  PAGE_CAPABILITIES,
+  PROJECT_ROLES,
+  PROJECT_ROLE_RANK,
+  PROJECT_ROLE_DEFAULTS,
+} from "@/lib/capabilities.generated";
+import { ROUTE_PERMISSIONS } from "@/lib/permissions";
+import type { UserRole } from "@/hooks/useUserRole";
+import { FROZEN_CELL } from "@/components/shared/frozenCell";
+
+/** Display order for the global vocabulary: widest first, like PROJECT_ROLES. */
+const GLOBAL_ROLES: UserRole[] = ["super_admin", "admin", "modeler", "user"];
+
+const GLOBAL_GLOSS: Record<UserRole, string> = {
+  super_admin:
+    "Everything, everywhere — the checks below are skipped entirely, and this is the only role that opens the administration area.",
+  admin:
+    "The full working surface: every workspace, the Project Manager and the Developer API, with every feature on by default.",
+  modeler:
+    "The builder's role. The same default surface as admin — the two differ by what older row rules name and by convention, not by their default grants.",
+  user:
+    "Read and analyse. Every workspace opens, but creating projects, editing data and running simulations are off by default.",
+};
+
+const ORG_ROLES: { role: string; gloss: string }[] = [
+  { role: "owner", gloss: "The organization's principal. Together with admin, may issue and revoke the organization's API keys." },
+  { role: "admin", gloss: "Manages the organization. The same API-key right as owner." },
+  { role: "member", gloss: "Belongs. Sees their own membership row and nothing about who else is in the organization." },
+];
+
+const PROJECT_GLOSS: Record<string, string> = {
+  owner: "The project's principal — a project's creator holds this automatically.",
+  editor: "May rewrite the measured inputs and the decisions alike.",
+  analyst: "May retune decisions, and may not rewrite the measured data those decisions are judged against.",
+  viewer: "May look.",
+};
+
+/** The four grid rows, in the order the split is best explained in. */
+const MATRIX_KEYS = ["data_edit_inputs", "data_edit_policies", "simulation_lab", "export"];
+
+function YesNo({ allowed }: { allowed: boolean }) {
+  return allowed ? (
+    <span className="font-semibold text-foreground">yes</span>
+  ) : (
+    <span className="text-muted-foreground/70" aria-label="no">&mdash;</span>
+  );
+}
 
 export default function RolesAndCapabilities() {
   const declared = REFERENCE_TABLES.filter((t) => t.governance?.minProjectRole).length;
-  const roles = [...new Set(REFERENCE_TABLES.map((t) => t.governance?.minProjectRole).filter(Boolean))];
   const capabilities = PAGE_CAPABILITIES.length + FEATURE_CAPABILITIES.length;
+
+  // Route → allowed roles, folding the `/admin/*` wildcard into `/admin`.
+  const routes = Object.entries(ROUTE_PERMISSIONS).filter(([path]) => !path.endsWith("/*"));
+  const pageLabel = new Map(PAGE_CAPABILITIES.map((c) => [c.key, c.label]));
+  const featureLabel = new Map(FEATURE_CAPABILITIES.map((c) => [c.key, c.label]));
+
+  const grant = new Map(
+    PROJECT_ROLE_DEFAULTS.map((g) => [`${g.projectRole}:${g.capabilityKey}`, g.allowed]),
+  );
 
   return (
     <>
-      <PageTitle lead="What a role may do, where that is decided, and where it is only declared.">
+      <PageTitle lead="The three kinds of role you can hold, what each one may do, and where that is decided.">
         Roles and capabilities
       </PageTitle>
 
-      <Section id="two-systems" title="Two systems, and they are not the same system">
+      <Section id="three-vocabularies" title="Three vocabularies, one person">
         <Key>
-          A <em>capability</em> is a named thing you may do. A <em>role</em> is a bundle of them.
-          Both exist here, and so does a third answer — the database's own row rules — which is the
-          one that actually decides whether you see a row.
+          You hold up to three roles at once: one on the platform, one in your organization, and
+          one on each project. They are separate vocabularies, deliberately — a grant in one never
+          silently becomes a grant in another.
         </Key>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Platform
+            </div>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+              One per account, set by an administrator. A new account starts as{" "}
+              <Term>user</Term>, the least of the four.
+            </p>
+            <ul className="mt-3 space-y-2">
+              {GLOBAL_ROLES.map((r) => (
+                <li key={r}>
+                  <Term>{r}</Term>
+                  <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
+                    {GLOBAL_GLOSS[r]}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Organization
+            </div>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+              Your standing inside the tenant wall —{" "}
+              <DocLink to="organizations-and-members">the boundary itself</DocLink> is drawn by
+              which organization you are in, not by this role.
+            </p>
+            <ul className="mt-3 space-y-2">
+              {ORG_ROLES.map(({ role, gloss }) => (
+                <li key={role}>
+                  <Term>{role}</Term>
+                  <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{gloss}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Project
+            </div>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+              Which rooms, inside the wall. Four levels, strictly ordered — the ladder below and
+              the matrix under it.
+            </p>
+            <ul className="mt-3 space-y-2">
+              {PROJECT_ROLES.map((r) => (
+                <li key={r}>
+                  <Term>{r}</Term>
+                  <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
+                    {PROJECT_GLOSS[r]}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <Callout title="The word owner appears twice and means two things">
+          <p>
+            An organization <Term>owner</Term> and a project <Term>owner</Term> are different
+            standings in different vocabularies. Neither implies the other, and the system never
+            translates between them — overloading one for the other is how a project grant would
+            silently become an organization grant.
+          </p>
+        </Callout>
+      </Section>
+
+      <Section id="global-roles" title="What each platform role opens">
         <P>
-          Understanding which of the three refused you is most of understanding an access problem in
-          this product.
+          The screens, from the route guard the application actually runs. A super administrator
+          passes every check, so the first column is uniform by construction.
+        </P>
+        <div className="overflow-x-auto rounded-sm border border-border bg-card shadow-xs">
+          <table className="w-full min-w-[520px] border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-border">
+                <th className={`p-3 text-left font-semibold text-foreground ${FROZEN_CELL}`}>Screen</th>
+                {GLOBAL_ROLES.map((r) => (
+                  <th key={r} className="p-3 text-center font-mono text-[11px] font-semibold text-foreground">
+                    {r}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {routes.map(([path, allowed]) => (
+                <tr key={path} className="border-b border-border last:border-b-0">
+                  <td className={`p-3 ${FROZEN_CELL}`}>
+                    <span className="text-foreground">{pageLabel.get(path) ?? path}</span>{" "}
+                    <span className="font-mono text-[11px] text-muted-foreground">{path}</span>
+                  </td>
+                  {GLOBAL_ROLES.map((r) => (
+                    <td key={r} className="p-3 text-center">
+                      <YesNo allowed={r === "super_admin" || allowed.includes(r)} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <P>
+          Features follow the same split: <Term>admin</Term> and <Term>modeler</Term> carry every
+          feature by default, while <Term>user</Term> carries the read-oriented ones — the AI
+          assistant, Project Intelligence and export — and not data editing or the Simulation Lab.
+          Any of it can be changed per organization or per person, which is the next section.
         </P>
       </Section>
 
       <Section id="capabilities" title={`The ${capabilities} capabilities, and how one is resolved`}>
         <P>
-          There are two kinds. A <strong>page</strong> capability decides whether a route opens at
-          all; a <strong>feature</strong> capability decides whether something inside one is
-          available. {PAGE_CAPABILITIES.length} pages and {FEATURE_CAPABILITIES.length} features,
-          and the list is the whole vocabulary — a name that is not in it can never be granted.
+          A <em>capability</em> is a named thing you may do; a role is a bundle of them. There are
+          two kinds. A <strong>page</strong> capability decides whether a route opens at all; a{" "}
+          <strong>feature</strong> capability decides whether something inside one is available.{" "}
+          {PAGE_CAPABILITIES.length} pages and {FEATURE_CAPABILITIES.length} features, and the
+          list is the whole vocabulary — a name that is not in it can never be granted.
         </P>
         <div className="space-y-4">
           <div>
@@ -94,8 +260,9 @@ export default function RolesAndCapabilities() {
         <div className="divide-y divide-border rounded-sm border border-border bg-card shadow-xs">
           {[
             ["you", "a grant or denial set on your own account"],
+            ["your role on this project", "what your project role carries — consulted when the question is about a project"],
             ["your organization", "a grant or denial set for everyone in it"],
-            ["your role", "what the role you hold carries by default"],
+            ["your platform role", "what the role you hold carries by default"],
             ["nobody", "no row anywhere — the answer is no, not yes"],
           ].map(([who, what], i) => (
             <div key={who} className="flex gap-3 p-4">
@@ -124,23 +291,72 @@ export default function RolesAndCapabilities() {
         </Callout>
         <P>
           A capability the catalog does not contain resolves to nothing at all, which is why the
-          list above is the whole vocabulary rather than a summary of it.
+          list above is the whole vocabulary rather than a summary of it. On a screen that is not
+          about one project — the admin area, your profile — the project layer is simply skipped.
         </P>
       </Section>
 
-      <Section id="project-roles" title="Project roles">
+      <Section id="project-roles" title="Project roles — the ladder and the matrix">
         <P>
-          Separately from organization-wide capabilities, a project has members with roles —{" "}
-          {roles.map((r, i) => (
+          The four levels are strictly ordered —{" "}
+          {PROJECT_ROLES.map((r, i) => (
             <span key={r}>
-              {i > 0 && ", "}
-              <Term>{r as string}</Term>
+              {i > 0 && <span className="text-muted-foreground"> &gt; </span>}
+              <Term>{r}</Term>
             </span>
           ))}{" "}
-          are the levels the contract names. A role can be delegated to somebody else, and a
-          delegation can only <em>subtract</em>: you cannot grant more than you hold, and every
-          delegation expires.
+          — and the ordering is written in exactly one place, so "is this grant bigger than mine"
+          cannot be answered two different ways. What each level carries by default:
         </P>
+        <div className="overflow-x-auto rounded-sm border border-border bg-card shadow-xs">
+          <table className="w-full min-w-[520px] border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-border">
+                <th className={`p-3 text-left font-semibold text-foreground ${FROZEN_CELL}`}>May they…</th>
+                {PROJECT_ROLES.map((r) => (
+                  <th key={r} className="p-3 text-center font-mono text-[11px] font-semibold text-foreground">
+                    {r}
+                    <span className="block font-sans text-[10px] font-normal text-muted-foreground">
+                      rank {PROJECT_ROLE_RANK[r]}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {MATRIX_KEYS.map((key) => (
+                <tr key={key} className="border-b border-border last:border-b-0">
+                  <td className={`p-3 ${FROZEN_CELL}`}>
+                    <span className="text-foreground">{featureLabel.get(key) ?? key}</span>
+                    <span className="block text-[11px] text-muted-foreground">
+                      {FEATURE_CAPABILITIES.find((c) => c.key === key)?.description}
+                    </span>
+                  </td>
+                  {PROJECT_ROLES.map((r) => (
+                    <td key={r} className="p-3 text-center">
+                      <YesNo allowed={grant.get(`${r}:${key}`) ?? false} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <P>
+          The split in the first two rows is the point of the vocabulary: an{" "}
+          <Term>analyst</Term> may retune the decisions and may not rewrite the measured inputs
+          those decisions are judged against. Roles can also be lent for a time — a delegation
+          only <em>subtracts</em> (never more than the grantor holds) and always expires.{" "}
+          <DocLink to="project-access">Project access</DocLink> has the two rules, the columns of
+          both tables, and the honest note that there is no screen for any of it yet.
+        </P>
+        <Callout title="One gate reads the ladder today">
+          <p>
+            Promoting reviewed data into your project's canonical tables refuses anyone below{" "}
+            <Term>editor</Term>, and the audit row the promotion writes records the role it
+            resolved. That is the one live reader; the next callout is about all the others.
+          </p>
+        </Callout>
       </Section>
 
       <Callout tone="limit" title="Every table declares a minimum role. Almost nothing reads it.">
@@ -167,11 +383,12 @@ export default function RolesAndCapabilities() {
           <DocLink to="admin-screens">Admin screens</DocLink>
         </P>
         <P>
-          Managed at <AppLink to="/admin/roles">/admin/roles</AppLink>.
+          Managed at <AppLink to="/admin/roles">/admin/roles</AppLink> (role defaults) and{" "}
+          <AppLink to="/admin/users">/admin/users</AppLink> (who holds which).
         </P>
       </Section>
 
-      <Provenance from="the governance block every sidecar declares, and the capability catalog generated from the migrations that seed it — the resolution order is read from the capabilities_for_user function itself" />
+      <Provenance from="the governance block every sidecar declares; the capability catalog, the project-role ladder and the project-role matrix generated from the migrations that seed them; the screen table read from the route guard itself — the resolution order is read from the capabilities_for_user function" />
     </>
   );
 }

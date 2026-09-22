@@ -81,3 +81,58 @@ export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
 ];
 
 export const FEATURE_KEYS: FeatureKey[] = FEATURE_CAPABILITIES.map((c) => c.key as FeatureKey);
+
+/**
+ * The project-role vocabulary, rank ascending, read from `project_role_rank()`
+ * — the one place the ordering is written (its own COMMENT says so).
+ */
+export type ProjectRole =
+  | 'viewer'
+  | 'analyst'
+  | 'editor'
+  | 'owner';
+
+export const PROJECT_ROLE_RANK: Record<ProjectRole, number> = {
+  viewer: 1,
+  analyst: 2,
+  editor: 3,
+  owner: 4,
+};
+
+/** Rank DESCENDING — the order an access table reads best in. */
+export const PROJECT_ROLES: ProjectRole[] = [
+  'owner',
+  'editor',
+  'analyst',
+  'viewer',
+];
+
+export interface ProjectRoleGrant {
+  projectRole: ProjectRole;
+  capabilityKey: string;
+  allowed: boolean;
+}
+
+/**
+ * The default grant each project role carries, from the
+ * `project_role_capabilities` seed. Defaults: a super admin bypasses them,
+ * and a per-user or per-org row can override any one of them.
+ */
+export const PROJECT_ROLE_DEFAULTS: ProjectRoleGrant[] = [
+  { projectRole: 'owner', capabilityKey: 'simulation_lab', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'owner', capabilityKey: 'data_edit_inputs', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'owner', capabilityKey: 'data_edit_policies', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'owner', capabilityKey: 'export', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'editor', capabilityKey: 'simulation_lab', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'editor', capabilityKey: 'data_edit_inputs', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'editor', capabilityKey: 'data_edit_policies', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'editor', capabilityKey: 'export', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'analyst', capabilityKey: 'simulation_lab', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'analyst', capabilityKey: 'data_edit_inputs', allowed: false },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'analyst', capabilityKey: 'data_edit_policies', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'analyst', capabilityKey: 'export', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'viewer', capabilityKey: 'simulation_lab', allowed: false },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'viewer', capabilityKey: 'data_edit_inputs', allowed: false },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'viewer', capabilityKey: 'data_edit_policies', allowed: false },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'viewer', capabilityKey: 'export', allowed: false },  // 20260915000005_project_membership_and_delegation.sql
+];
