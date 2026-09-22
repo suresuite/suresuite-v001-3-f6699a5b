@@ -563,7 +563,11 @@ export function buildRunResultsWorkbook(
     done.reduce((s, r) => (Object.keys(r.kpis ?? {}).forEach((k) => s.add(k)), s), new Set<string>()),
   ).sort();
   const repRows: (string | number | boolean | null)[][] = [
-    ["rep_index", "seed_used", ...kpiKeys],
+    // `seed_used` is `project_seed × 1000 + model_rep`, a display key and NOT a
+    // seed — entering it as a project seed reproduces nothing (audit F-23; WP 6
+    // handed the export's column to WP 8). The header says so; the value is
+    // unchanged so an existing reader's column still lines up.
+    ["rep_index", "seed_used (display key, not a seed)", ...kpiKeys],
     ...done.map((r) => [
       r.rep_index,
       r.seed_used,

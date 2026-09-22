@@ -36,6 +36,8 @@ const COMPLETE: ReproducibilityRecordInput = {
   policyHash: "b".repeat(64),
   scenarioId: "44444444-4444-4444-8444-444444444444",
   scenarioSeed: 42,
+  scenarioSeedSource: "simulation_runs.seed (stamped at dispatch)",
+  disruptionSchedule: "1 event(s) · fnv1a 0badc0de",
   engineCodeVersion: "0.2.3",
   browserEngineVersion: "0.2.3",
   analyses: [],
@@ -107,6 +109,7 @@ describe("A5 · `reproducible` is derived, not asserted", () => {
       "policyHash",
       "scenarioId",
       "scenarioSeed",
+      "disruptionSchedule",
       "engineCodeVersion",
     ] as const) {
       const r = buildReproducibilityRecord({ ...COMPLETE, [key]: null });
@@ -280,7 +283,11 @@ describe("A5 · the record reaches a reader", () => {
     // re-authoring, and passes `graded: null` honestly — which `knownLimits` turns
     // into a declared limit of its own rather than an empty section.
     expect(HOOK).toMatch(/knownLimits\(/);
-    expect(HOOK).toMatch(/graded: null/);
+    // Audit WP 8 (F-12): `graded: null` now lives in `exportTrustInput`, the same
+    // input shape the report builds, and the hook passes the REAL freshness —
+    // `tables: {}` is what suppressed the two counted limits.
+    expect(HOOK).toMatch(/knownLimits\(exportTrustInput\(/);
+    expect(HOOK).not.toMatch(/tables: \{\}/);
   });
 
   it("`unknown` is never bound as a browser engine version", () => {
@@ -292,8 +299,10 @@ describe("A5 · the record reaches a reader", () => {
   it("the analysis list is the LATEST per kind, not every run", () => {
     // A record is a binding, not a log. Every historical run would make the sheet
     // unreadable and would not say which one a screen actually showed.
-    expect(HOOK).toMatch(/latestByKind/);
-    expect(HOOK).toMatch(/if \(!kind \|\| latestByKind\.has\(kind\)\) continue;/);
+    // Audit WP 8 (F-29): still one per kind, and now the latest finished BEFORE
+    // the run was dispatched — `analysesAtRun`, whose behaviour
+    // `exportTrustInputs.test.ts` pins.
+    expect(HOOK).toMatch(/analysesAtRun\(/);
   });
 
   it("a failed lookup becomes an absent binding, not a failed export", () => {
@@ -302,5 +311,25 @@ describe("A5 · the record reaches a reader", () => {
     // better served than one holding an error toast.
     expect(HOOK).toMatch(/\.maybeSingle\(\)/);
     expect(HOOK).toMatch(/browserEngineVersion = null;/);
+  });
+});
+
+
+// Audit F-11 / D-3 — the schedule is bound, and the seed says where it came from.
+describe("A5 · the scenario binding names what ran", () => {
+  it("the disruption schedule is a required binding", () => {
+    const b = buildReproducibilityRecord(COMPLETE).bindings.find((x) => x.key === "scenario.disruption_schedule");
+    expect(b?.value).toBe("1 event(s) · fnv1a 0badc0de");
+    expect(b?.level).toBe("required");
+  });
+  it("the seed's source is the stamp, not the live scenario row", () => {
+    const b = buildReproducibilityRecord(COMPLETE).bindings.find((x) => x.key === "scenario.seed");
+    expect(b?.source).toBe("simulation_runs.seed (stamped at dispatch)");
+    expect(b?.source).not.toMatch(/sim_scenarios/);
+  });
+  it("an unproven seed carries the resolver's reason", () => {
+    const r = buildReproducibilityRecord({ ...COMPLETE, scenarioSeed: null,
+      scenarioSeedReason: "the scenario was edited after this run" });
+    expect(r.bindings.find((x) => x.key === "scenario.seed")?.absentBecause).toMatch(/edited after this run/);
   });
 });

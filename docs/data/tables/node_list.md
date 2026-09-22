@@ -470,6 +470,6 @@ Tiers upstream of the focal plant: 0 the plant itself, 1 a direct supplier, 2 an
 
 ---
 
-*Generated from data contract `6c0a62cf6ba7`, engine `0.2.7`,
+*Generated from data contract `f1a5071b0109`, engine `0.2.6`,
 sidecar `supabase/contract/node_list.contract.yaml`, table created by `20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

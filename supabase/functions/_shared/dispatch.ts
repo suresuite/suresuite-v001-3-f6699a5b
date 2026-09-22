@@ -15,6 +15,7 @@ import {
   type GateResult,
 } from "./validationGate.ts";
 import { fireWakeWorker } from "./wakeWorker.ts";
+import { isMissingStampColumn, runStamp } from "./runStamp.ts";
 
 // Matches sim-command's Zod CommandSchema output; the API gateway constructs
 // these directly from its own validated request bodies.
@@ -357,10 +358,17 @@ export async function dispatchExperimentRun(
   // and an RLS/migration-ordering gap must never 500 a dispatch. The anon
   // grants migration (20260706000001) remains required for the FRONTEND to
   // read runs/replications + receive their realtime events.
-  // deno-lint-ignore no-explicit-any
-  const { data: run, error: runErr } = await (svc as any)
-    .from("simulation_runs")
-    .insert({
+  // What ran is stamped on the run (audit F-11): the seed and the disruption
+  // schedule, so an export binds THESE rather than whatever the scenario row says
+  // later. A database without `20260922000002` rejects the unknown columns with
+  // PGRST204; the insert is retried without them once, so a function deployed
+  // ahead of its migration still dispatches (both deploy on merge, in no fixed
+  // order) — and the export then resolves the run as "not stamped", honestly.
+  const stamp = runStamp(scenario as Record<string, unknown>);
+  const insertRun = (withStamp: boolean) =>
+    // deno-lint-ignore no-explicit-any
+    (svc as any).from("simulation_runs").insert({
+      ...(withStamp ? stamp : {}),
       scenario_id: scenario.id,
       project_id: scenario.project_id,
       status: "queued",
@@ -376,9 +384,12 @@ export async function dispatchExperimentRun(
       ...(scenarioHash ? { scenario_hash: scenarioHash } : {}),
       ...(modelValidationId ? { model_validation_id: modelValidationId } : {}),
       ...(gateSkipped ? { gate_skipped: true } : {}),
-    })
-    .select()
-    .single();
+    }).select().single();
+  let { data: run, error: runErr } = await insertRun(true);
+  if (runErr && isMissingStampColumn(runErr)) {
+    console.error("run stamp columns missing — dispatching unstamped (migration pending?)", runErr);
+    ({ data: run, error: runErr } = await insertRun(false));
+  }
   if (runErr || !run) throw new Error(`run insert failed: ${runErr?.message}`);
 
   // Browser/offline runs (payload.compute === "client") go through the same

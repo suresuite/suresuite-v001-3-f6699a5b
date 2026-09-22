@@ -21,7 +21,9 @@ import {
   buildReproducibilityRecord,
   type AnalysisBinding,
 } from "@/lib/trust/reproducibilityRecord";
-import { knownLimits } from "@/lib/trust/trustReport";
+import { knownLimits, type FreshnessPayload } from "@/lib/trust/trustReport";
+import { analysesAtRun, exportTrustInput, ingestHistoryFrom } from "@/lib/trust/exportTrustInputs";
+import { resolveRunScenarioBinding, scheduleDigest } from "@/lib/trust/runScenarioBinding";
 import { INGEST_DATASETS } from "../../supabase/functions/_shared/ingestSpec.generated";
 
 /**
@@ -211,7 +213,7 @@ export function useVerifiableExports(
         if (runErr || !run) throw runErr ?? new Error("run not readable");
         const { data: scenario } = await sb
           .from("scenarios")
-          .select("id,name,seed,replications,crn,horizon_days,warmup_mode,warmup_days,disruption_schedule")
+          .select("id,name,seed,replications,crn,horizon_days,warmup_mode,warmup_days,disruption_schedule,updated_at")
           .eq("id", (run as SimulationRun).scenario_id)
           .maybeSingle();
         const { data: reps, error: repErr } = await sb
@@ -254,32 +256,29 @@ export function useVerifiableExports(
           .from("analysis_runs")
           .select("id,analysis_kind,code_version,input_hash,params_hash,finished_at,status")
           .eq("project_id", projectId)
-          .eq("status", "succeeded")
-          .order("started_at", { ascending: false });
+          .eq("status", "succeeded");
+        // The analyses that existed when this run was DISPATCHED (audit F-29) —
+        // not the latest project-wide, which may have finished after it.
+        const analysesBound = analysesAtRun(
+          (analysisRows ?? []) as Array<Record<string, unknown>>,
+          (run as SimulationRun).created_at, runRow.graph_hash);
 
-        // The LATEST succeeded run per kind — the one a screen's dual read would
-        // have preferred. Listing every historical run would make the record a log
-        // rather than a binding.
-        const latestByKind = new Map<string, AnalysisBinding>();
-        for (const a of (analysisRows ?? []) as Array<Record<string, unknown>>) {
-          const kind = String(a.analysis_kind ?? "");
-          if (!kind || latestByKind.has(kind)) continue;
-          const inputHash = (a.input_hash as string | null) ?? null;
-          latestByKind.set(kind, {
-            kind,
-            runId: (a.id as string | null) ?? null,
-            codeVersion: (a.code_version as string | null) ?? null,
-            inputHash,
-            paramsHash: (a.params_hash as string | null) ?? null,
-            finishedAt: (a.finished_at as string | null) ?? null,
-            // Compared against the DATASET VERSION the run was taken over, not
-            // against "now": this workbook is a record of a run, and a hash that
-            // was current then is the fact being recorded. NULL when either side
-            // is unknown — unknown is not stale (D70).
-            inputHashIsCurrent:
-              inputHash == null || !runRow.graph_hash ? null : inputHash === runRow.graph_hash,
-          });
-        }
+        // The seed and schedule that RAN (audit F-11): the dispatch stamp, or the
+        // live row only when provably unchanged since dispatch.
+        const ran = resolveRunScenarioBinding(
+          run as { created_at?: string; seed?: number | null; disruption_schedule?: unknown[] | null },
+          (scenario ?? null) as { seed?: number; disruption_schedule?: unknown[]; updated_at?: string } | null,
+        );
+
+        // The Trust Report's own inputs (audit F-12): the real freshness payload
+        // and ingest history. An empty `tables` map suppressed the two counted limits.
+        const { data: freshness } = await sb.rpc("project_freshness", { p_project_id: projectId });
+        const { data: ingestRows } = await sb
+          .from("ingest_runs")
+          .select("id,source_kind,applied_at,applied_by_user_id,rows_fetched")
+          .eq("project_id", projectId)
+          .order("created_at", { ascending: false })
+          .limit(10);
 
         // The browser engine's own version, from the manifest the frontend ships.
         // A separate binding from the worker's `code_version` because the wheels
@@ -300,36 +299,34 @@ export function useVerifiableExports(
 
         const record = buildReproducibilityRecord({
           projectId,
-          projectName: runRow.scenario_id ? `project ${projectId.slice(0, 8)}` : projectId,
+          // The project's NAME (audit F-29) — it was `"project " + id.slice(0, 8)`.
+          projectName: projectName ?? projectId,
           graphHash: runRow.graph_hash ?? (dsv?.graph_hash as string | null) ?? null,
           datasetVersionId: runRow.dataset_version_id ?? (dsv?.id as string | null) ?? null,
           hashSchemaVersion: (dsv?.schema_version as number | null) ?? null,
           policyVersionId: (run as SimulationRun).policy_version_id ?? null,
           policyHash: (run as SimulationRun).policy_hash ?? null,
           scenarioId: (scenario?.id as string | null) ?? (run as SimulationRun).scenario_id ?? null,
-          scenarioSeed: (scenario?.seed as number | null) ?? null,
+          scenarioSeed: ran.seed,
+          scenarioSeedSource: ran.seedSource,
+          scenarioSeedReason: ran.reason,
+          disruptionSchedule: ran.schedule === null ? null : scheduleDigest(ran.schedule),
           engineCodeVersion: (run as SimulationRun).code_version ?? null,
           browserEngineVersion,
-          analyses: [...latestByKind.values()],
-          // VERBATIM from the Trust Report's own computation — §4 D103 is what a
-          // second copy of a limits list costs. `graded: null` is honest here: this
-          // export has the run, not the graded manifest, and `knownLimits` turns
-          // that into a declared limit of its own.
-          limits: knownLimits({
-            projectName: projectId,
-            freshness: {
-              project_id: projectId,
-              graph_hash: runRow.graph_hash ?? null,
-              graph_hash_short: (runRow.graph_hash ?? "").slice(0, 12),
-              dataset_version: null,
-              measured_at: new Date().toISOString(),
-              tables: {},
-              latest_runs: [],
-            },
-            graded: null,
-            findings: [],
-            ingestHistory: [],
-          }),
+          analyses: analysesBound,
+          // The Trust Report's own computation over the Trust Report's own inputs
+          // — the function was shared before; now the inputs are too (F-12, D-6).
+          // A freshness read that failed is not "nothing stale": it is declared.
+          limits: freshness
+            ? knownLimits(exportTrustInput(projectName ?? projectId,
+                freshness as FreshnessPayload,
+                ingestHistoryFrom((ingestRows ?? []) as Array<Record<string, unknown>>)))
+            : [{
+                ref: "T3",
+                limit: "Data freshness could not be read when this workbook was exported.",
+                consequence: "The counted limits (rows with no input hash, rows from a different " +
+                  "dataset) are unknown for this export — their absence here is not evidence of none.",
+              }],
           measuredAt: new Date().toISOString(),
         });
 

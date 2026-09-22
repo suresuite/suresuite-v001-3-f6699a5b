@@ -10,6 +10,7 @@
  * section it could not compute is a report claiming a clean bill it never
  * checked, which is the T1 breach the whole standard exists to prevent.
  */
+import { ingestHistoryFrom } from "@/lib/trust/exportTrustInputs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -44,13 +45,7 @@ export function TrustReportPanel({ projectId, projectName, findings }: Props) {
         // says which: `null` means we could not look, `[]` means there is
         // nothing recorded. `knownLimits` turns the second into a declared limit.
         if (e) { setIngest(null); return; }
-        setIngest((data ?? []).map((r) => ({
-          run_id: String(r.id),
-          fact_class: (r.source_kind as string) ?? null,
-          landed_at: (r.applied_at as string) ?? null,
-          uploaded_by: (r.applied_by_user_id as string) ?? null,
-          rows: (r.rows_fetched as number) ?? null,
-        })));
+        setIngest(ingestHistoryFrom((data ?? []) as Array<Record<string, unknown>>));
       });
     return () => { cancelled = true; };
   }, [projectId]);
