@@ -210,6 +210,6 @@ When the grant was made. Server-stamped.
 
 ---
 
-*Generated from data contract `e1e8503b65c8`, engine `0.2.7`,
+*Generated from data contract `d2e688a54983`, engine `0.2.7`,
 sidecar `supabase/contract/delegation_grants.contract.yaml`, table created by `20260915000005_project_membership_and_delegation.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

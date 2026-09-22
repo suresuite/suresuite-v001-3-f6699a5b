@@ -98,7 +98,16 @@ export interface ReproducibilityRecordInput {
   policyVersionId: string | null;
   policyHash: string | null;
   scenarioId: string | null;
+  /** The seed that RAN (audit F-11) — resolved by `resolveRunScenarioBinding`,
+   *  never read from the live scenario row unless that row is proven unchanged. */
   scenarioSeed: number | null;
+  /** Where the seed came from: the dispatch stamp, or the unchanged live row. */
+  scenarioSeedSource?: string;
+  /** Why no seed is bound, when none is (the resolver's own reason). */
+  scenarioSeedReason?: string | null;
+  /** A fingerprint of the disruption schedule that ran (`scheduleDigest`). The
+   *  I8 row claimed the schedule was bound; until audit WP 8 it was not (D-3). */
+  disruptionSchedule: string | null;
   /** The engine the WORKER ran, from `simulation_runs.code_version`. */
   engineCodeVersion: string | null;
   /**
@@ -214,9 +223,22 @@ export function bindingsOf(input: ReproducibilityRecordInput): Binding[] {
       "scenario.seed",
       "Root seed",
       input.scenarioSeed === null ? null : String(input.scenarioSeed),
-      "sim_scenarios.seed",
+      input.scenarioSeedSource ?? "simulation_runs.seed",
       "required",
-      "without the seed the run is not repeatable even with identical inputs",
+      input.scenarioSeedReason ??
+        "without the seed the run is not repeatable even with identical inputs",
+    ),
+    bind(
+      "scenario.disruption_schedule",
+      "Disruption schedule",
+      input.disruptionSchedule,
+      input.scenarioSeedSource?.startsWith("scenarios.")
+        ? "scenarios.disruption_schedule (row unchanged since the run was dispatched)"
+        : "simulation_runs.disruption_schedule (stamped at dispatch)",
+      "required",
+      input.scenarioSeedReason ??
+        "the disruptions this run simulated are unrecorded, so its figures cannot be " +
+          "attributed to a schedule",
     ),
     bind(
       "engine.worker_code_version",

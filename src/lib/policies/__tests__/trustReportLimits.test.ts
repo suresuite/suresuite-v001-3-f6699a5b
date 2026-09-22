@@ -37,6 +37,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { knownLimits } from "@/lib/trust/trustReport";
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
 const PLAN = readFileSync(join(ROOT, "docs", "PLAN.md"), "utf8");
@@ -191,5 +192,29 @@ describe("the Trust Report's known limits (§4 D103)", () => {
         "it from the migrations. A number in this prose is a second authority for " +
         "one fact (I1), and it is what D103 was.",
     ).toBeNull();
+  });
+});
+
+// Audit F-26. T3 was met for the data layer and not for the engine or the
+// deployment: nothing said the analysis window is fixed, that production serves
+// edge-function builds this repository does not describe, or that the pre-run
+// check fails open. Each is always true today, so each is always stated.
+describe("the limits the 2026-09-22 audit found are published (F-26)", () => {
+  const limits = knownLimits({
+    projectName: "P",
+    freshness: { project_id: "p", graph_hash: null, graph_hash_short: "", dataset_version: null,
+                 measured_at: "t", tables: {}, latest_runs: [] } as never,
+    graded: [], findings: [], ingestHistory: [{ run_id: "r", fact_class: "csv", landed_at: "t", uploaded_by: "u", rows: 1 }],
+  });
+  const text = limits.map((l) => `${l.ref} ${l.limit} ${l.consequence}`).join("\n");
+  it("the analysis window is fixed and shorter than the horizon", () => {
+    expect(text).toMatch(/52 weeks after the warm-up/);
+  });
+  it("production's edge functions are not the repository's (§4 D168)", () => {
+    expect(limits.some((l) => l.ref === "§4 D168")).toBe(true);
+  });
+  it("the pre-run data check can fail open and grades a bounded slice", () => {
+    expect(text).toMatch(/pre-run data check/);
+    expect(text).toMatch(/50 000 rows/);
   });
 });

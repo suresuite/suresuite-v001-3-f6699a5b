@@ -1278,6 +1278,22 @@ def _map_policies(
             f"{dropped_fulfil} per-node fulfillment override(s) not applied — backorder, "
             "allocation and service level are consumed at the project default scope only"))
 
+    # Surface per-node inventory overrides the engine will not apply.
+    # inventory_control is resolved from policies["default"]["inventory"] only
+    # (see `inv = default.get("inventory") or {}` below); node-scoped inventory
+    # overrides are accepted into the snapshot/hash but never reach the engine.
+    dropped_inventory = sum(
+        1 for k, fams in policies.items()
+        if isinstance(k, str) and k.startswith("node:")
+        and (fams.get("inventory") or {})
+    )
+    if dropped_inventory:
+        w.append(MappingWarning(
+            "warn", "policy:inventory_control", "inventory",
+            f"{dropped_inventory} per-node inventory override(s) not applied — "
+            "inventory policy type, safety stock and FG stock are consumed at the "
+            "project default scope only"))
+
     type_map = {
         "min_max": "min_max", "s_S": "min_max", "continuous_review": "min_max",
         "base_stock": "base_stock", "rop": "rop_q", "periodic_review": "periodic",

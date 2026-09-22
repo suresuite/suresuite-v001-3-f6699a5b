@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 346,
-  "migrations_applied": 338,
+  "migrations_found": 347,
+  "migrations_applied": 339,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260922000002_delete_project_whole.sql",
+  "last_migration": "20260922000002_run_binds_seed_and_schedule.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -18522,6 +18522,30 @@
             "on_delete": "SET NULL"
           },
           "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "seed",
+          "quoted": false,
+          "type": "bigint",
+          "type_raw": "bigint",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260922000002_run_binds_seed_and_schedule.sql"
+        },
+        {
+          "name": "disruption_schedule",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260922000002_run_binds_seed_and_schedule.sql"
         }
       ],
       "constraints": [
