@@ -75,7 +75,7 @@ partially or get corrected — the write fails.
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:404` | yes |
+| `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:413` | yes |
 | `ProjectPolicies.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:194` | yes |
 | `SimulationLab.tsx` | rpc ensure_item_masters | `src/hooks/useItemMasters.tsx:194` | yes |
 
@@ -440,6 +440,6 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `16b1e1279dc7`, engine `0.2.7`,
+*Generated from data contract `928460063ab6`, engine `0.2.7`,
 sidecar `supabase/contract/inbound_logistics.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

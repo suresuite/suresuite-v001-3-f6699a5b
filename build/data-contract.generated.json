@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 347,
-      "migrations_applied": 339,
-      "last_migration": "20260922000003_delete_project_whole.sql"
+      "migrations_found": 348,
+      "migrations_applied": 340,
+      "last_migration": "20260922000009_delete_project_row_first.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -2457,7 +2457,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:404",
+          "evidence": "src/pages/DataManager.tsx:413",
           "confirmed": true
         },
         {
@@ -3086,7 +3086,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:404",
+          "evidence": "src/pages/DataManager.tsx:413",
           "confirmed": true
         },
         {
@@ -7966,7 +7966,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:404",
+          "evidence": "src/pages/DataManager.tsx:413",
           "confirmed": true
         },
         {
@@ -13283,7 +13283,7 @@
           "page": "DataManager.tsx",
           "via": "rpc delete_project_dataset",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:688",
+          "evidence": "src/pages/DataManager.tsx:697",
           "confirmed": true
         },
         {
@@ -13707,7 +13707,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:404",
+          "evidence": "src/pages/DataManager.tsx:413",
           "confirmed": true
         },
         {
@@ -14311,7 +14311,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:404",
+          "evidence": "src/pages/DataManager.tsx:413",
           "confirmed": true
         },
         {
@@ -15969,7 +15969,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_node_list",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:416",
+          "evidence": "src/pages/DataManager.tsx:425",
           "confirmed": true
         },
         {
@@ -17777,7 +17777,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:404",
+          "evidence": "src/pages/DataManager.tsx:413",
           "confirmed": true
         },
         {
@@ -27280,7 +27280,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:631",
+          "evidence": "src/pages/DataManager.tsx:640",
           "confirmed": true
         },
         {
@@ -28235,7 +28235,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:631",
+          "evidence": "src/pages/DataManager.tsx:640",
           "confirmed": true
         },
         {
@@ -30860,5 +30860,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "16b1e1279dc7"
+  "contract_version": "928460063ab6"
 }
