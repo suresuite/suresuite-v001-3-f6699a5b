@@ -43,13 +43,20 @@ export default function OrganizationsAndMembers() {
         <SuppliedAndComputed table={org} />
       </Section>
 
-      <Callout tone="limit" title="One read path still matches on name">
+      <Callout title="The rule's last exception is closed">
         <p>
-          The organizations table's own read rule still accepts a match on the display name or the
-          slug, which is the last remaining place the rule above is not absolute. It governs reading
-          the organization row itself — not its projects or its data, which are matched by identity
-          — and it is recorded rather than glossed because a rule with one exception is a rule whose
-          exception you should know.
+          Reading the organization row itself was, for a while, the one place the rule above was
+          not absolute: that read still accepted a match on the display name or the slug. It is
+          identity-only now, and proved the same way — a rename still matches, a tenant with the
+          same name does not, and a tenant whose slug equals another's name is no longer readable
+          across the wall.
+        </p>
+        <p>
+          The closure has one visible consequence: your account must carry its organization by
+          identity, and the system <em>refuses to guess</em> when two organizations share the
+          display name your account was created with. An account in that state belongs to no
+          tenant until an administrator resolves it — which is the correct failure, because
+          guessing either way would put the account inside a wall nobody chose.
         </p>
       </Callout>
 

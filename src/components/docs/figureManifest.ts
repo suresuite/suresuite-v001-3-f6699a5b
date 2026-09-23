@@ -540,18 +540,21 @@ export const FIGURE_SLOTS: FigureSlot[] = [
     id: "capability-layers",
     page: "roles-and-capabilities",
     file: "capability-layers.svg",
-    title: "Four layers, two answers",
+    title: "Five layers, two answers",
     alt:
-      "The four capability layers as a chain — you, your organization, your role, nobody — " +
-      "each with two different exits: a solid arrow out to the side when a row exists, true " +
-      "or false, and a dashed arrow down to the next layer when no row does.",
+      "The five capability layers as a chain — you, your role on this project, your " +
+      "organization, your platform role, nobody — each with two different exits: a solid " +
+      "arrow out to the side when a row exists, true or false, and a dashed arrow down to " +
+      "the next layer when no row does.",
     caption:
       "A denial is not a missing grant. Removing a grant hands the decision back down the " +
       "chain; setting it to false takes it away outright.",
     shows:
-      "The four layers narrowest first, and the two kinds of arrow drawn DIFFERENTLY — 'a row " +
-      "exists, so stop' against 'no row, ask the next layer'. That difference is the whole " +
-      "figure, and it is the thing administrators get wrong.",
+      "The five layers narrowest first — the project layer sits between the person and " +
+      "their organization and is consulted when the question is about a project — and the " +
+      "two kinds of arrow drawn DIFFERENTLY: 'a row exists, so stop' against 'no row, ask " +
+      "the next layer'. That difference is the whole figure, and it is the thing " +
+      "administrators get wrong.",
   },
   {
     id: "validation-binding",
