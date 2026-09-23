@@ -31,7 +31,7 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc delete_project_dataset"
     grain: table
-    evidence: "src/pages/DataManager.tsx:718"
+    evidence: "src/pages/DataManager.tsx:697"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "rpc get_project_datasets"

@@ -350,8 +350,9 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D165** | **One deploy step of fourteen carried no `SUPABASE_ACCESS_TOKEN`, so PRODUCTION HAS NOT TAKEN A COMPLETE DEPLOY SINCE 2026-09-19 — and the gate written for exactly this counted the step and called it deployed.** `cda6b57` added `Deploy combine-project` without the `env:` block every one of its thirteen neighbours carries. `supabase functions deploy` exits 1 with *Access token not provided*, and the job runs `bash -e`, so the step AFTER it — `geocode-locations` — has never run either. **Seven consecutive red deploys** (workflow runs 52–58, 2026-09-19 06:52 → 2026-09-22 10:17); run 51 was the last green one and it is the commit before the step was added. **The cost is not the red badge, it is what is in production**: `combine-project/index.ts` is **−367/+111 lines** different from the last version that shipped, and that delta is WP 8.2's ONE ETL — so §16 records the edge function's lane build as deleted while production still runs it, D150's raw-`volume` read included. **This is D123's class a fifth time and the mechanism is new**: D123 was a function with no deploy step; this is a function WITH a deploy step that cannot authenticate. R17 read the intention to deploy rather than the ability to, which is why the history looked green on the commits that mattered | `.github/workflows/supabase-functions.yml:278` against its thirteen sibling steps; workflow runs 52–58 on `main`; `git diff fab91d4..main -- supabase/functions/combine-project` | **CLOSED ✅ (this package)** — the three-line `env:` block, and R17 gains its third clause: a `functions deploy` step with no `SUPABASE_ACCESS_TOKEN` in it fails the gate by name. Mutation-tested both ways (removing the block turns `contract:check` red on `combine-project`; restoring it turns it green). The same package pins `deno-version` away from the `v2.x` float that broke `eval` repo-wide on 2026-09-22 |
 | **D166** | **The engine REFUSED a project the shared grader had just passed, because it treated a master row rather than the BOM as what makes a material real — and the branch written to handle that case could never run.** `from_project_data`'s arc loop skipped any arc whose `material_id` was absent from `materials`, so a material the BOM consumes and the inbound file sources — but which nobody gave a master row — lost its lanes before `cheapest_cost` was built, failed the `unsourced` check, and raised `ValueError: materials with no supplier link` about a material that HAS one. **The mapper already contained the code for this case** (`for mid in sorted(bom_mat_ids - {m.id for m in materials})`), and `bom_mat_ids ⊆ cheapest_cost.keys() ⊆ mat_ids` made that set empty by construction: dead code that looked like handling. **It was also a parity break, which is what makes it more than tidiness**: `grading.ts`'s block rule is *a BOM material with no inbound ARC* and has never asked for a master row, so the browser and the pre-dispatch gate both reported such a project ready to run and the engine then refused it — the exact disagreement `test_validation_parity.py` exists to prevent, in the one direction that suite does not cover (it compares warn findings, not the hard block's preconditions) | `scsim/scsim/io/project_map.py`'s arc filter against its own BOM-only branch and against `supabase/functions/_shared/grading.ts`'s `arcMaterials` rule | **CLOSED ✅ (this package)** — `bom_mat_ids` is computed before the arc loop and the filter accepts a material the BOM consumes, so the branch is reachable and the two surfaces agree. Such a material is simulated from its lanes with the D163 cost chain and **named**: an `info` MappingWarning says it has no row in `materials` and that holding cost, MOQ and lead-time distribution are taking engine defaults (T1). The `ValueError` now means what it always said — no inbound arc at all — and an arc for a material NOTHING consumes is still dropped. Three tests, one per branch |
 | **D167** | **Capacity is the one economic quantity the product measures AND configures, and it was broken at both ends — a chain the display layer could not walk, and a measurement that was `NaN` on every run a user ever made.** **(a) The plant grid showed nothing for a number the run was certain to use.** `products.production_capacity` has declared a machine-readable chain since the reducer library was written — `production_policy_capacity` (grade `info`: the plant grid's units/day × 7 × `utilization_cap_pct`) → `twice_demand_floor_1000` (grade `warn`: max(2·demand, 1000)). The engine walks it, the shared grader walks it, the edge gate grades it. `resolveEffective.ts::derivedValueFor` ended on `return undefined; // production_capacity has no logistics-derived fallback` — true of the LOGISTICS tables and false of the engine, so the cell fell through to `contract`/`default` and a planner never saw the capacity their run would use. **(b) The cell they CAN edit is one the engine often ignores, and only a prose sentence said so.** `POLICY_BUNDLE_KEYS`' `transform` for `capacity_units_per_day` has read "the MASTER `products.production_capacity` shadows it entirely when present" since D90, and a surface cannot act on prose — so the grid rendered an editable line capacity with nothing marking the rows where the run reads the master instead. D18's class, worse: D18's field is consumed by nothing, this one is consumed SOMETIMES. **(c) `utilization_cap_pct` had no column at all**, and it is the other factor in that product's own arithmetic — so 1 000/day became 5 950/week with nothing on screen holding the 0.85. It was also absent from `SCSIM_VISIBLE_FIELDS`, so the moment it got a column it would have rendered `stored-only`: the grid telling a planner the engine ignores the number it is about to multiply the capacity by. **(d) `capacity_utilization` was NaN on every ordinary run.** `_utilization` read `ctx.trace.Q`, a per-product matrix that exists only under `trace_verbosity=full_debug`; a Monte Carlo run allocates none, so the KPI was NaN, `_finite` mapped it to null, and the /policies sanity tile printed **"not recorded"** — for the quantity the engine clips production against in every week of every replication. §4 D113 removed a per-node utilization heatmap and told the next reader the run-level measure "now renders in the table above"; it never did, and the note is what stopped anyone looking. **(e) The declared meaning of an empty supplier capacity had two authors**, and the machine-readable one was the FRONTEND: `columnSpecs.ts::master.nullMeans` carried the `∞` token and the sentence the grid rendered, while the registry said "unlimited" in prose one field over — `single-source` below markdown, the class D101 and D127 name, invisible to `check:docs` | the chain at `scsim/scsim/io/project_map.py::base_data_requirements` (`products.production_capacity`) against the `return undefined` in `resolveEffective.ts::derivedValueFor`; the shadow prose in the same file's `POLICY_BUNDLE_KEYS`; `scsim/scsim/kpi/compute.py::_utilization`'s `if ctx.trace.Q is None: return float("nan")` against `RunValidateStage.tsx`'s `"not recorded"` tile; `test_item_series.py`'s `if key == "capacity_utilization": continue` — the behaviour-neutrality gate EXCUSING the one KPI that was not behaviour-neutral | **CLOSED ✅ (WP 9.3)** — one declaration per fact, and a measurement that exists. `empty_means` (`scsim/scsim/policies/base.py::EmptyMeaning`) is the engine's own statement of what a blank means and `columnSpecs` reads it; `shadowed_by` on both plant capacity keys is the machine-readable form of the prose, and `resolveCell` returns a `supersededBy` the grid strikes through; `derivedFallbackDetails` walks the registry's chain keeping WHICH step answered, so the display can tell the planner's line rate from the floor the engine chose so capacity never binds. `utilization_cap_pct` is a declared bundle key, a plant column and `isScsimVisible`. The measurement is four always-on `WEEKLY_SERIES` (plant and supplier capacity, offered and used) plus per-entity binding matrices measured against the UNCLIPPED want — the clipped plan compared against capacity is equal by construction, which is why the test that would have caught this had to be written inside `_mech_default_plan`. `capacity_utilization` is computed from the series and is a number on every run; `supplier_capacity_utilization` is NaN when no supplier declares a finite capacity, which is a measurement that does not exist rather than a zero. `test_capacity_binding.py` (8), `capacityChain.test.ts` (14) and `capacityReadiness.test.ts` (5) hold it, and `test_item_series.py`'s skip is GONE. *(What is NOT closed: `products.production_capacity` is still `recommended`, so a project with no capacity anywhere still runs green — the two new surfaces say so before and after the run, and making it `required` is a product decision about which projects may be simulated at all, not this package's)* |
-| **D168** | **The functions production SERVES are not the functions the repository describes, in both directions — and R17 cannot see either.** `coverage.yaml :: functions_not_deployed` registers seven functions as not deployed. The Management API's function list (§15 run `35766580502`, read-only GET) shows **five of the seven are LIVE**: `delete-project`, `get-mapbox-token` and the three legacy `ingest-*` functions, every one last deployed **2026-03-17** — six months BEFORE WP 4.1 routed the three `ingest-*` writers through `ingest_legacy_upsert_lane` (§16 · WP 4.1). So production runs builds of those three that predate the change `no-tier-skip` and `audit-actor` record as closing them; whatever the database now enforces, the code a user reaches through the /policies lane editor is not the code either row describes. Only `ingest-file` and `erp-sync-orbit-mrp` are genuinely absent — so every contract-described CSV upload fails at file-select (the wizard calls `ingest-file` with no fallback) and the ERP connector cannot connect. In the OTHER direction, **ten functions are live with no source in this repository at all** — `calculate`, `combine-project-into-supply-chain`, `delete-simulation-job`, `external-simulation-processor`, `get-multi-tier-network-data`, `simulation-availability-checker`, `simulation-cache-manager`, `simulation-runner`, `simulation-status`, `test-prominence` — and nothing in `src/`, `supabase/functions/` or `sim-worker/` names any of them: callable endpoints nobody can read, running under whatever grants they were deployed with. R17 compares the repository with the deploy WORKFLOW; neither side of it can see production, which is D123's lesson one layer further out | §15 run `35766580502` · *Audit 2026-09-22 · WP 1* (the function list and the per-function verdict against the register); `scripts/data-contract/coverage.yaml :: functions_not_deployed` | **OPEN — WP 7.1** *(**`ingest-file` is no longer one of the two absent functions: WP 6.5 (a) publishes it through the workflow, and §16 · WP 6.5a reads the F-16 row either side of the merge.** `erp-sync-orbit-mrp` remains the one genuinely absent function.)* *(**And the stale half has now cost something measurable**: §15 run `35789034585` (4c) reads the live `delete-project` removing 271 freshly promoted `bom_single_level` rows in two statements of 200 and 71, both `actor_known: false`. It is the 2026-03-17 build's batch size, writing through a service-role client with no actor. `audit-actor` holds in the repository and not in the function a user reaches — §16 · WP 6.5a.)* *(the register owns five of the seven and says their production copies are undiffed; it is now known they are LIVE and OLDER than the repository. The ten source-less functions are the `no-orphan-table` class for edge functions: each is adopted into the repository, or deleted from production, with a §15 reading either side. The branch-safe halves — the register saying `live, stale` rather than `not deployed`, and the upload wizard failing legibly — are the 2026-09-22 audit's WP 10 (a) and F-16)* |
+| **D168** | **The functions production SERVES are not the functions the repository describes, in both directions — and R17 cannot see either.** `coverage.yaml :: functions_not_deployed` registers seven functions as not deployed. The Management API's function list (§15 run `35766580502`, read-only GET) shows **five of the seven are LIVE**: `delete-project`, `get-mapbox-token` and the three legacy `ingest-*` functions, every one last deployed **2026-03-17** — six months BEFORE WP 4.1 routed the three `ingest-*` writers through `ingest_legacy_upsert_lane` (§16 · WP 4.1). So production runs builds of those three that predate the change `no-tier-skip` and `audit-actor` record as closing them; whatever the database now enforces, the code a user reaches through the /policies lane editor is not the code either row describes. Only `ingest-file` and `erp-sync-orbit-mrp` are genuinely absent — so every contract-described CSV upload fails at file-select (the wizard calls `ingest-file` with no fallback) and the ERP connector cannot connect. In the OTHER direction, **ten functions are live with no source in this repository at all** — `calculate`, `combine-project-into-supply-chain`, `delete-simulation-job`, `external-simulation-processor`, `get-multi-tier-network-data`, `simulation-availability-checker`, `simulation-cache-manager`, `simulation-runner`, `simulation-status`, `test-prominence` — and nothing in `src/`, `supabase/functions/` or `sim-worker/` names any of them: callable endpoints nobody can read, running under whatever grants they were deployed with. R17 compares the repository with the deploy WORKFLOW; neither side of it can see production, which is D123's lesson one layer further out | §15 run `35766580502` · *Audit 2026-09-22 · WP 1* (the function list and the per-function verdict against the register); `scripts/data-contract/coverage.yaml :: functions_not_deployed` | **OPEN — WP 7.1** *(**`ingest-file` is no longer one of the two absent functions: WP 6.5 (a) publishes it through the workflow, and §16 · WP 6.5a reads the F-16 row either side of the merge.** `erp-sync-orbit-mrp` remains the one genuinely absent function.)* *(**`delete-project` left the register under D170**: its live copy failed every deletion, which is the diff the deferral asked for. The published build deletes nothing itself.)* *(**And the stale half has now cost something measurable**: §15 run `35789034585` (4c) reads the live `delete-project` removing 271 freshly promoted `bom_single_level` rows in two statements of 200 and 71, both `actor_known: false`. It is the 2026-03-17 build's batch size, writing through a service-role client with no actor. `audit-actor` holds in the repository and not in the function a user reaches — §16 · WP 6.5a.)* *(the register owns five of the seven and says their production copies are undiffed; it is now known they are LIVE and OLDER than the repository. The ten source-less functions are the `no-orphan-table` class for edge functions: each is adopted into the repository, or deleted from production, with a §15 reading either side. The branch-safe halves — the register saying `live, stale` rather than `not deployed`, and the upload wizard failing legibly — are the 2026-09-22 audit's WP 10 (a) and F-16)* |
 | **D169** | **The review screen could not read the run it had just landed, so after `ingest-file` went live every upload stopped at tier 1 with nothing on screen.** `useIngestRun` read `ingest_runs`, `ingest_files` and `ingest_staged_rows` straight through PostgREST, on the stated reasoning that the three tables grant SELECT to `authenticated` behind an RLS policy routed through the run's project. Each is correct alone. **Together they are unsatisfiable in this application**: it authenticates against `approved_users`, not Supabase Auth, so the browser calls as `anon` (D28; D155's session is inert until its secret is set). The one policy on each table is `FOR ALL TO authenticated`, and RLS answers a refused read with ZERO ROWS rather than an error. So `maybeSingle()` returned `null`, `IngestRunPanel` rendered `null`, and the person who uploaded saw neither a review nor a promote button. **Found by the first production upload, not by any gate**: §15 run `35783395994` read 2 runs, 2 files and 4 staged rows in `Test_Simulation`, every `ingest-file` invocation 200, and a user reporting that nothing happened. **Why nothing caught it**: `rehearsal/070` and `100` exercise the landing and the promotion as the database owner and through the RPCs, never through the browser's read path as `anon`, and `ingestDiffReview.test.ts` tests the screen's arithmetic on fixtures. **It is the same class as D156 one layer up**: a path proved in a world with a Supabase Auth identity, which production has never had. **Widening the policies to `anon` would not work**: `has_project_access` resolves the reader through `get_current_user_id()`, and an anonymous request carries no session, no GUC and no email claim, so the predicate is false for every row | `src/hooks/useIngestRun.tsx`'s three `.from()` reads (before `20260922000001`) against `20260916000012`–`14`'s `TO authenticated` policies; §15 run `35783395994` (6) | **CLOSED ✅ for the review screen (WP 6.5a, `20260922000001`)** — `ingest_run_review(p_user_id, p_run_id)` takes `ingest_value_chain`'s shape: the reader arrives as a parameter, the GUC is set LOCAL, `has_project_access` is asked about that reader, and a refusal RAISES (42501) instead of returning an empty review. `rehearsal/350` reproduces the defect as `anon` with RLS enabled, then reads the whole review as `anon` for an approved-users-only reader, refuses an outsider, an unknown run and a NULL reader. Mutation-tested twice: without the access check §3 fails, and with `is_local = false` §5 fails. **OPEN for the three other readers of the same tables, same cause**: `RowProvenance.tsx` (`ingest_staged_rows`, `ingest_files`), `TrustReportPanel.tsx` and `useErpConnections.tsx` (`ingest_runs`) still read directly and will show nothing as `anon`. None blocks an upload. **Owned by WP 7.1**, whose stage 1b session is the general fix: once requests arrive as `authenticated` with a subject, all four read paths work unchanged |
+| **D170** | **No project could be deleted in production, and every attempt destroyed part of one.** "Delete project" calls the `delete-project` edge function, whose live build is from 2026-03-17 (D168). It answered `202 Deletion started` before touching anything, then deleted table by table in 200-row batches inside `EdgeRuntime.waitUntil` through a service-role client. It still deleted `product_code_map`, which `20260916000003` dropped, so every run died with `PGRST205`. By then it had already removed rows (`node_list`, the source lanes), with `actor_known: false` on every audit row, and the page had already said it worked. **Measured, not inferred**: §15 run `35790886083` (7) reads the function's own console. There were six attempts on project `dsds` between 21:35 and 22:07 on 2026-09-22, six identical failures, and the project was still present. The first attempt removed 136 `node_list` and 271 `bom_single_level` rows. **Three defects stacked**: a build from before the drop (D168), a deletion that was not a transaction (N batches can leave N−1 committed), and an answer sent before the work was done. **And the database's own `delete_project` could not have replaced it as written**: it tested existence through the display-org text, deleted derived lanes before their sources (which D142's triggers rebuild), omitted every table with no foreign key, and carried NO grant, so PUBLIC (`anon` included) held EXECUTE on a SECURITY DEFINER delete whose actor is a parameter | `supabase/functions/delete-project/index.ts` (before D170) · §15 run `35790886083` (7) · `20260915000004`'s `delete_project` | **CLOSED ✅ (`20260922000003`, `rehearsal/370`)** — `public.delete_project` is the whole deletion in one transaction, sources before derived, every no-FK table swept, logs kept. The actor is set LOCAL so every audit row names them. It refuses a non-owner non-admin (42501), an unknown project (P0002) and a NULL actor (22004), and EXECUTE is `service_role` only. `delete-project` now calls it synchronously and relays the answer, the page shows the database's reason, and the function is published through the workflow (removed from `functions_not_deployed`). `rehearsal/370` proves: nothing scoped remains in any table; a failure forced at the last step leaves every row in place; every delete audit row names the owner with the session actor blanked first; an org admin may delete. Mutation-tested: without the attribution §2 fails, without a sweep §1 fails. **And `20260922000009` made it deletable at size**: the first version deleted the lane sources while the project row still existed, so each source delete fired the D142 rebuild over what was left — 44 s on a project the size of production's largest, against the 8 s `statement_timeout` the service role inherits from `authenticator` (§15 run `35795239732` (8c)); every project with data would have been cancelled and rolled back. The row now goes first, the cascade (D117) removes the sources and the rebuild skips a project that is gone: 0.5 s. `rehearsal/370` §6 counts the rebuild's insert rows and pins the order in `prosrc` (mutation: without the migration, §6 fails with 3 rebuild inserts). **Left open, and deliberately**: a `super_admin` is admitted by `canAccessRoute` and `canModify`, but by NO project write gate (`has_project_access`, the combine RPC, this delete), so the card shows such a user no project actions. Widening one gate would make a card that offers Delete and then refuses Upload. Widening them together is D66's access-control decision, **WP 7.1** |
 
 ### 4.1 Code map — the data layer
 
@@ -18789,7 +18790,312 @@ Handoff to next WP:
 - **WP 7 next** (network classification), then WP 9 and WP 10.
 
 ---
+
+### D170 — Project deletion: one transaction, attributed, and published · 2026-09-22 · `20260922000003`
+
+Previous package promised: WP 6.5a's after-read explained one applied run's missing rows as
+the live `delete-project` deleting them with no actor (D168), and left the function to WP
+7.1 as "destructive and undiffed". The user then reported that no project could be deleted.
+
+This package found, by reading the function's own console through §15 (7) (run
+`35790886083`): **every deletion in production fails**. There were six attempts on one
+project, six `PGRST205 … product_code_map`, and each attempt first removed rows it could not
+put back. The page toasted "Deletion started" on a 202 sent before anything ran. So the
+deferral's premise, "undiffed", no longer held. The diff was readable, and it was total
+failure.
+
+What changed:
+- `20260922000003` replaces `public.delete_project`. It is one transaction; it deletes sources
+  before derived (D142); it sweeps every `project_id` table with no foreign key; it keeps the
+  three logs; it attributes every audit row; it is `service_role` only. It refuses with a
+  SQLSTATE the page can explain.
+- `delete-project` calls it and waits. `EdgeRuntime.waitUntil`, the batches and the
+  hand-written table list are gone, and the function is published through the workflow (R17:
+  14 deployed, 5 deferred).
+- `DataManager` shows the database's answer ("Nothing was deleted" on failure). The confirm
+  no longer promises a "force delete" that never existed.
+- `chains.mjs :: deriveProjectDeletion` reads the swept list from the SQL, so the manual's
+  "Deleting a project" page stops describing the batches, and its "confirmed before it has
+  happened" warning drops out because it is no longer true.
+- `rehearsal/370`, five sections and two mutations caught. It also records two mutations it
+  cannot catch, and why.
+
+Found while fixing it:
+- **The session actor hid a missing attribution.** §2 first passed with `delete_project`'s
+  attribution deleted, because the setup's `ingest_land_file` had left
+  `app.current_user_id` set for the whole file-long transaction. The GUC is blanked before
+  the call now (§16 · WP 4.1 · E, again).
+- **`super_admin` is admitted by no project write gate** (D170's open half, WP 7.1). The first
+  draft widened the delete and the card for it, then was reverted: Upload, Edit and Combine
+  would still have refused.
+- **The two "orphan" handlers are not features to restore.** "Duplicate project" creates an
+  EMPTY project and toasts "duplicated". "Delete all data" still exists but has no button.
+  Both have had no caller since at least 2026-06-10. Neither is re-wired here; the first would
+  be a feature that lies.
+
+After read: the user's delete of a project in production, and §15 (7) reading the function's
+console for it, are the exit. They follow the merge.
+
+### Audit 2026-09-22 · WP 7 — one node, one type, no invented measure · 2026-09-22 · no migration
+
+Previous package promised: WP 6 handed nothing to this package. The brief scoped
+F-09, F-10 and F-35 to "the graph layer's remaining readers", and §4 D127 said the
+ratchet stood at two classifiers, one of them `/interactive-network-space`'s
+`getNodeTypeFromLevel`.
+
+This package found: **the rule `/process-level-network` used had no home a second
+page could call.** WP 8.3 migrated that page by writing the placement (type from
+the lane roles, depth from `bom_multi_level`, a supplier one step beyond the
+deepest material it feeds) INSIDE its fetch. That is why the other page kept its
+ladder: nothing it could import said the same thing. The rule now lives in
+`src/lib/graph/placement.ts` as `placeLaneNodes` and both pages call it. The
+second page's layout was also keyed to the old six-step ladder (`levelToColumn`
+hard-coded 6 → 0 … -1 → 4), so a supplier at its derived depth would have shared
+a column with materials. Columns now follow the ordinate. **And the same page
+printed a third ladder nobody had counted:** the node panel's "Chain Position"
+mapped `level` 1 → "Manufacturing", 5 → "Direct Supplier". That is D139's
+fabricated noun in a place WP 8.5 did not reach, and it now reads the echelon.
+
+**Per finding:**
+
+- **F-09 — FIXED.** `/interactive-network-space` places and types nodes through
+  `placeLaneNodes`, the same call `/process-level-network` makes. Its colour is
+  `colorForEchelon`, its legend lists echelons with node counts (it had listed
+  `Level 5 (Suppliers)` from a hard-coded ramp), and its panel shows the echelon
+  label and the BOM depth. **Gate:** `placement.test.ts`, 8 cases. It keeps the
+  deleted ladder verbatim as a witness and shows it calls the finished product a
+  material on the literal-2 shape (§15 run 35433474185). It asserts the whole
+  typing and placement of a 3-deep BOM with a sub-assembly, and that both pages
+  call `placeLaneNodes` and declare no ladder. `oneClassifier.test.ts` 2 → **1**;
+  `onePalette.test.ts` InteractiveNetworkSpace 16 → **2**. **Mutations:** a
+  supplier placed at its lane `level`, BOM depth ignored, and a customer off -1 →
+  each red.
+  **Not done, and why:** the pages read the MIRROR, not `node_list.echelon`. The
+  column is the authority, and `echelonMirror.test.ts` holds the mirror to it.
+  Moving the read is WP 8.3's `useGraphNodes` swap, and it wants a §15 reading
+  showing the column populated in production first. `FirmLevelNetwork`'s
+  `getTierFromDepth` is the last classifier and stays on the ratchet.
+- **F-10 — FIXED by deletion.** The audit's arithmetic reproduces exactly:
+  `0.4 + 0.3(1-h) + 0.3(1-min(h,1))` is `0.4 + 0.6(1-h)` on `h ∈ [0,1]`, and
+  the red alert on `< 0.4` is unreachable (asserted over 101 values). The
+  Resilience tile, its alert, the Bottlenecks row and "the highest-flow assembly
+  step" alert are gone. After F-09 `level === 1` means BOM depth 1, so the tile
+  would have come back to life counting depth-1 materials under a noun no table
+  supports. Defining the measure is the engine's job (the resilience index), not a
+  page's. Path concentration (HHI of top-flow shares) stays: it is a defined
+  measure. **Gate:** `processLens.test.ts`. **Mutation:** re-adding the tile → red.
+- **F-35 — REFUTED as stated, the residue removed.** No Diagnostics BUTTON ships.
+  On `main`, `runDiagnostics` was declared and referenced nowhere, so no surface
+  rendered it. It was dead code, and still the page's only direct read of the
+  deprecated lane `level`, so it is deleted. **Gate:** `processLens.test.ts`
+  (no `runDiagnostics`, no direct `.select('level…')` of the lane table).
+
+Discovered:
+- **WP 8's after-read is TAKEN** (the push after its merge, D153): §15 run
+  `35792503227`, fence unmoved at `20260922000002` (346 applied). The repair PR
+  that carried it (#267) was superseded by #268 and closed.
+- Nothing else outside the three findings. The two lane pages' lineage citations moved
+  with the edit (R12 caught all eight), and `bom_multi_level` gained the read
+  `/interactive-network-space` now makes.
+
+Baseline numbers:
+- `oneClassifier` 2 → **1**; `onePalette` InteractiveNetworkSpace 16 → **2**
+- eslint errors in the two pages: 11 → **7** (nothing new; ProcessLevelNetwork 7 → 3)
+- tests: vitest 1034 → **1047** (two new files); no engine or worker change
+
+Handoff to next WP:
+- **WP 9** takes F-20, F-34 and F-37. Nothing from this package blocks it.
+- **Owed, unowned:** swapping both lane pages from the mirror to
+  `node_list.echelon` once §15 shows the column populated. That removes the
+  mirror's only callers.
+
+### Audit 2026-09-22 · WP 9 — one currency, no stub figures, no orphan statistics · 2026-09-22 · no migration
+
+Previous package promised: WP 7 handed F-20, F-34 and F-37 on with nothing
+blocking. WP 6b switched the ENGINE's MSER-5 to the published statistic.
+
+This package found: **WP 6b's switch reached the engine and not the browser.**
+The Run & Validate stage's "mser5" button estimates warm-up in the browser from
+the run's weekly series (`validationStats.mser5`). That code divided the n−1
+sample variance by (n_b − d)², which is the retired statistic. So from 0.2.7 on,
+the button and the engine could name different weeks for the same run. On the
+parity fixture the engine answers 30 and the button answered 25. It is F-37's
+class: a statistical method implemented twice, with nothing comparing the two
+copies. **And the gate for F-37 found a second orphan the audit did not name:**
+`sim_worker/policies.py`, 190 lines of hand-written policy models that nothing
+imports.
+
+**Per finding:**
+
+- **F-20 — FIXED.** One formatter, `src/lib/sim/money.ts`. Its symbol is READ
+  from the engine's declared unit for the money KPIs in the registry export, so
+  it cannot drift from `definitions.py`. Six surfaces wrote their own:
+  `kpiDisplay.money` (`$`, the defect), `NetworkMetricsTable` (`$`),
+  `FirmLevelNetwork` (`$`), and `runQueueLogic`, `RunValidateStage` and
+  `InventoryOverTime` (inline `€`). All six now go through `money.ts`. The admin
+  AI-usage pages keep `$`: that is the provider's billing currency. **Known
+  limit, stated in `money.ts`:** no currency is stored with the data, so `€` is
+  the unit the engine DECLARES, not one read from the project. **Gate:**
+  `oneMoney.test.ts`. It checks the symbol against `definitions.py`, that Results
+  and the run queue format the same revenue identically, and that no file outside
+  the USD-billing list writes its own formatter. **Mutations:** `$` back in
+  `kpiDisplay` → red; a hard-coded symbol → red.
+- **F-34 — FIXED by deletion.** `stubKpiDelta` and `stubPolicyKpiDelta` are gone,
+  and `sim-command` now broadcasts only the command echo. `kpi.delta` has ONE
+  publisher, the worker, tagged `source: "worker"`. **Gate:**
+  `noStubKpis.test.ts`. It also asserts that the worker still publishes, so the
+  gate cannot pass vacuously. **Mutation:** a `kpi.delta` broadcast in
+  `sim-command` → red.
+- **F-37 — FIXED for what is dead, REFUTED for what is not.**
+  - `sim_worker/warmup.py` was imported by nothing, not even the frozen engine.
+    It is deleted, and the audit's off-by-`window//2` goes with it.
+  - `stopping.StoppingRule` was unreferenced and is deleted. `half_width_95`
+    STAYS: the frozen engine's `kpi.aggregate` calls it.
+  - "Most of `kpi.py`" is **refuted**: `ReplicationKpis` and `aggregate` are
+    both imported by `engine.py`. That engine is frozen, not deleted.
+  - `src/lib/sim/warmup.ts`, the browser "mirror" of `warmup.py`, had no
+    importer and is deleted.
+  - **Gate:** `sim-worker/tests/test_no_orphan_module.py` walks the import graph
+    from `__main__` (what `python -m sim_worker` runs) and fails on any module it
+    cannot reach. **Mutation:** restoring `warmup.py` → red.
+  - `policies.py` is the one NAMED exception. Nothing imports it, but the D91
+    break classifier (`chains.mjs`) reads it as SOURCE, and `reorder_point`'s
+    "overridden" class cites its line 41. Deleting it would reclassify a policy
+    break and move that ratchet, which is a change of its own. The exception list
+    fails if it goes stale.
+- **The MSER-5 residue — FIXED.** `validationStats.mser5` now uses White's
+  statistic. **Gate:** `mser5Parity.test.ts`. It pins a series produced by
+  `scsim.stats.warmup.mser5` itself (engine 30, legacy 25) and compares against a
+  from-the-definition reference on 60 series. **Mutation:** the old statistic →
+  2 red.
+
+Discovered:
+- **`main` shipped a stale browser-engine wheel.** a9f7a13 changed
+  `project_map.py` without `build_engine_wheels.sh`. This branch rebuilds the
+  `sim_worker` wheel it changes; the scsim wheel was rebuilt by #268.
+
+Baseline numbers:
+- vitest 1047 → **1056**; sim-worker 116 → **119**; scsim 287 (unchanged)
+- `sim_worker` modules: 14 → **13** (warmup gone); one named unreachable exception (`policies`)
+
+Handoff to next WP:
+- **Owed, unowned:** delete `sim_worker/policies.py` together with the D91
+  classifier's reliance on it. Also a project-level currency, if the product
+  wants anything other than the engine's declared `€`. That is a product
+  decision, not a patch.
+- **WP 10 next**, and it is the last.
+
+### Audit 2026-09-22 · WP 10 — destructive paths and trust posture · 2026-09-22 · no migration
+
+Previous package promised: the brief said WP 10 cannot be completed on a branch.
+Production-changing deploys go to the user with a §15 reading, and never as
+drive-bys. WP 9 handed nothing on.
+
+This package found: **D170 (#268, another session) closed F-15 before this
+package shipped, and closed it properly.** `delete_project` is one transaction,
+`delete-project` waits for it and is now deployed, and the page shows the
+database's answer. This package's first draft solved F-15 on the client instead,
+by watching the project list, and that half is DROPPED. What D170 left is the
+question the user answers BEFORE the delete: the confirmation was still written
+out three times and still said nothing about what survives. **And three
+functions, not one, had no declared trust model:** `get-mapbox-token`,
+`geocode-locations` and `erp-sync-orbit-mrp`.
+
+**Per finding:**
+
+- **F-15 — FIXED BY D170**, not by this package. See D170's §16 entry.
+- **F-27 — FIXED.** One confirmation, `src/lib/projects/projectDeletion.ts`,
+  used by all three delete buttons in two components. It states the scope from
+  the DERIVED `PROJECT_DELETION`, the same numbers the manual's
+  `exporting-and-deleting` page publishes. **Deleted:** 44 tables, named by kind,
+  including the user's policy decisions and simulation runs. **Kept:** the three
+  account usage logs, D117's decision. **Detached:** chat threads and uploaded
+  files. **Gate:** `projectDeletion.test.ts`. **Mutation:** a component writing
+  its own `Delete project…` confirm literal → red.
+- **F-17 / D-7 — the LIMIT is fixed; the defect is DEFERRED to §4 D28 (PLAN WP
+  7.1).** The audit's premise is half right. The report already published
+  "identity is asserted by the client", but only for uploads. It now also says
+  the AI functions take the actor from the request and write with elevated
+  rights, so "a caller who knows a user's id and a proposal's id can apply it in
+  that user's name". Verifying a JWT is not available: the application
+  authenticates against `approved_users`, so there is no user token to verify.
+  That is D28's decision, not a patch. **Gate:** `trustReportLimits.test.ts`
+  (F-17 case).
+- **F-28 — DECLARED; the caller check is DEFERRED to D28.** `config.toml` now
+  declares `verify_jwt = true` for the three undeclared functions. Every caller
+  carries a JWT: the browser sends the anon key and the pg_cron ERP sweep sends
+  the service-role key. So this is the CLI's default made a decision, and it
+  changes nothing at deploy. The comment says the real control on a PUBLIC Mapbox
+  token is its URL restriction in the Mapbox account. **Gate:**
+  `functionsDeclared.test.ts`: every function with an `index.ts` has a block with
+  an explicit `verify_jwt`. **Mutation:** removing one → red.
+- **F-16 — PARTLY OVERTAKEN, the rest PUT TO THE USER.** D170 published
+  `delete-project`. `get-mapbox-token`, `ingest-inbound-logistics` and
+  `erp-sync-orbit-mrp` remain on R17's `functions_not_deployed` list, owned by
+  PLAN WP 7.1, and production may run pre-WP-4.1 builds of them (D168). "Deploy,
+  or gate the buttons" either changes what production runs or removes a working
+  feature (the map). That needs a decision and a §15 reading either side.
+- **D-2 — CORRECTED.** The `normalize-at-promotion` row now names THREE
+  downstream converters, adding the one the engine reads (`project_map.py`'s
+  `_duration_to_weeks`/`_rate_to_weekly`).
+- **D-5 — OVERTAKEN.** Since WP 6.5a's after-read, `ingest-file` is deployed
+  and the I7 row says so. The consequence the audit wanted stated ("uploads
+  fail") is no longer true.
+
+Discovered:
+- **Two sessions fixed one finding in parallel**, and the first merged won. D170
+  was not an audit package, and the audit register did not know it was coming.
+  The duplicate half cost a rebuild of this package, not a conflict.
+
+Baseline numbers:
+- undeclared edge functions 3 → **0**; delete-confirmation literals 3 → **0** (one module)
+- vitest 1056 → **1080**; no engine, worker or migration change
+
+Handoff:
+- **To the user: F-16's remaining deploy decision** (three functions). Take a
+  §15 reading before and after, in the push after the merge (D153).
+- **§4 D28 / PLAN WP 7.1** owns identity: F-17's service-role writes under a
+  client-asserted actor, and F-28's per-caller check.
+- **The audit's 37 findings and 10 doc findings are each now fixed, refuted,
+  overtaken or deferred with a named owner.** The per-finding table is in this
+  package's PR.
+
 ---
+---
+### D170, second half — a project is deleted before its lane sources · 2026-09-22 · `20260922000009`
+
+Previous package promised: D170's first half made `delete_project` one transaction, published
+the function, and named its exit as "the user's delete of a project in production, and §15 (7)
+reading the function's console for it".
+
+This package found two things, one of them in the exit itself:
+
+- **The exit's reading.** The user reported "Failed to delete project: Failed to send a request
+  to the Edge Function". Two facts from §15 run `35795239732` (probe (8), added for this):
+  (7) logged NO invocation of `delete-project` after its 22:47Z redeploy, not even an
+  `OPTIONS`, so the request never reached Supabase (the same shape as WP 6.5a's one upload
+  error); and the toast's wording, "Failed to delete project:", exists only in the page
+  BEFORE #268, so the browser was running a stale bundle. Neither is a server defect. The page
+  now names that error for what it is and reloads the list, instead of calling it a
+  deletion failure.
+- **A defect the exit would have hit next.** (8c) shows `service_role` sets no
+  `statement_timeout`, so a PostgREST call runs under `authenticator`'s 8 s. Measured on the
+  rehearsal database with a project the size of production's largest (Aumovio: 2 575 lanes,
+  2 202 BOM rows; seeded as 2 200 BOM + 2 200 inbound + 400 outbound + 1 400 deep-tier
+  nodes), `delete_project` took **44 s**: 17.5 s, 12.9 s and 3.0 s went to the three source
+  deletes, each firing the D142 rebuild over the rows still left. Only an empty project could
+  ever have been deleted. `20260922000009` changes one thing, the order: the project row goes
+  first, the cascade removes the sources, and the rebuild skips a project that no longer
+  exists. **0.5 s**, with nothing left in any table. On freshly bulk-loaded tables with no
+  statistics it took 5.7 s; production's tables are analyzed.
+- `rehearsal/370` §4 moved its forced failure from `projects` (no longer the last step) to
+  `node_list`, the last table, so atomicity is still proved AFTER the row and the lanes are
+  gone. §6 is new. Mutation: rehearsed without `20260922000009`, §6 fails with "3 insert
+  statement(s)".
+
+After read: still the user's. The deletion must be retried from a reloaded page once this
+merges, and §15 (7)/(8e) read in the push after.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |

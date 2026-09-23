@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 346,
-      "migrations_applied": 338,
-      "last_migration": "20260922000002_run_binds_seed_and_schedule.sql"
+      "migrations_found": 348,
+      "migrations_applied": 340,
+      "last_migration": "20260922000009_delete_project_row_first.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -2457,14 +2457,21 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:429",
+          "evidence": "src/pages/DataManager.tsx:413",
+          "confirmed": true
+        },
+        {
+          "page": "InteractiveNetworkSpace.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/pages/InteractiveNetworkSpace.tsx:478",
           "confirmed": true
         },
         {
           "page": "ProcessLevelNetwork.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/ProcessLevelNetwork.tsx:381",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:359",
           "confirmed": true
         },
         {
@@ -2775,10 +2782,17 @@
           },
           "surfaces": [
             {
+              "page": "InteractiveNetworkSpace.tsx",
+              "via": "table read",
+              "grain": "column",
+              "evidence": "src/pages/InteractiveNetworkSpace.tsx:478",
+              "confirmed": true
+            },
+            {
               "page": "ProcessLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/ProcessLevelNetwork.tsx:381",
+              "evidence": "src/pages/ProcessLevelNetwork.tsx:359",
               "confirmed": true
             }
           ],
@@ -3072,7 +3086,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:429",
+          "evidence": "src/pages/DataManager.tsx:413",
           "confirmed": true
         },
         {
@@ -7952,7 +7966,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:429",
+          "evidence": "src/pages/DataManager.tsx:413",
           "confirmed": true
         },
         {
@@ -13269,7 +13283,7 @@
           "page": "DataManager.tsx",
           "via": "rpc delete_project_dataset",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:718",
+          "evidence": "src/pages/DataManager.tsx:697",
           "confirmed": true
         },
         {
@@ -13693,7 +13707,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:429",
+          "evidence": "src/pages/DataManager.tsx:413",
           "confirmed": true
         },
         {
@@ -14297,7 +14311,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:429",
+          "evidence": "src/pages/DataManager.tsx:413",
           "confirmed": true
         },
         {
@@ -15955,7 +15969,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_node_list",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:441",
+          "evidence": "src/pages/DataManager.tsx:425",
           "confirmed": true
         },
         {
@@ -17763,7 +17777,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:429",
+          "evidence": "src/pages/DataManager.tsx:413",
           "confirmed": true
         },
         {
@@ -22713,7 +22727,7 @@
           "page": "DataManager.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:199",
+          "evidence": "src/pages/DataManager.tsx:200",
           "confirmed": true
         },
         {
@@ -22734,14 +22748,14 @@
           "page": "InteractiveNetworkSpace.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/InteractiveNetworkSpace.tsx:353",
+          "evidence": "src/pages/InteractiveNetworkSpace.tsx:339",
           "confirmed": true
         },
         {
           "page": "ProcessLevelNetwork.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/ProcessLevelNetwork.tsx:275",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:253",
           "confirmed": true
         },
         {
@@ -27266,7 +27280,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:656",
+          "evidence": "src/pages/DataManager.tsx:640",
           "confirmed": true
         },
         {
@@ -28221,21 +28235,21 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:656",
+          "evidence": "src/pages/DataManager.tsx:640",
           "confirmed": true
         },
         {
           "page": "InteractiveNetworkSpace.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/InteractiveNetworkSpace.tsx:369",
+          "evidence": "src/pages/InteractiveNetworkSpace.tsx:355",
           "confirmed": true
         },
         {
           "page": "ProcessLevelNetwork.tsx",
-          "via": "table read",
+          "via": "rpc get_supply_chain_data_multi_tier",
           "grain": "table",
-          "evidence": "src/pages/ProcessLevelNetwork.tsx:1258",
+          "evidence": "src/services/network.ts:41",
           "confirmed": true
         },
         {
@@ -28423,7 +28437,7 @@
               "page": "InteractiveNetworkSpace.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/InteractiveNetworkSpace.tsx:369",
+              "evidence": "src/pages/InteractiveNetworkSpace.tsx:355",
               "confirmed": true
             }
           ],
@@ -28525,9 +28539,9 @@
           "surfaces": [
             {
               "page": "ProcessLevelNetwork.tsx",
-              "via": "table read",
+              "via": "rpc get_supply_chain_data_multi_tier",
               "grain": "column",
-              "evidence": "src/pages/ProcessLevelNetwork.tsx:1258",
+              "evidence": "src/services/network.ts:41",
               "confirmed": true
             }
           ],
@@ -28725,9 +28739,9 @@
           "surfaces": [
             {
               "page": "ProcessLevelNetwork.tsx",
-              "via": "table read",
+              "via": "rpc get_supply_chain_data_multi_tier",
               "grain": "column",
-              "evidence": "src/pages/ProcessLevelNetwork.tsx:1258",
+              "evidence": "src/services/network.ts:41",
               "confirmed": true
             }
           ],
@@ -30846,5 +30860,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "1cd93c3a7dd8"
+  "contract_version": "928460063ab6"
 }

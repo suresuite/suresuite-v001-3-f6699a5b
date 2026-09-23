@@ -84,3 +84,22 @@ verify_jwt = true
 # unset, which it is today. A wrong password and an unknown address get the same 401, so
 # the endpoint does not say whether an address is registered.
 verify_jwt = false
+
+# Audit 2026-09-22 · F-28 — the last three UNDECLARED functions. Each inherited the
+# CLI default, which is this same value; declared because a default is not a
+# decision (D105). Every caller carries a JWT: the browser invokes all three with
+# the anon key (`MapView.tsx`, `useErpConnections.tsx`, `OrbitMrpCallback.tsx`),
+# and the pg_cron ERP sweep sends the service-role key.
+#
+# `get-mapbox-token` returns a Mapbox PUBLIC token. Verification bounds an
+# anonymous `curl`, not a determined caller — the anon key is public — so the real
+# control is the token's URL restriction in the Mapbox account. A per-user check
+# needs a user identity the server can prove, which is §4 D28 (PLAN WP 7.1).
+[functions.get-mapbox-token]
+verify_jwt = true
+
+[functions.geocode-locations]
+verify_jwt = true
+
+[functions.erp-sync-orbit-mrp]
+verify_jwt = true

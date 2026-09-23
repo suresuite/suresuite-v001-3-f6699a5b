@@ -195,6 +195,6 @@ When it was last changed. Server-stamped by DEFAULT only; no trigger maintains i
 
 ---
 
-*Generated from data contract `1cd93c3a7dd8`, engine `0.2.7`,
+*Generated from data contract `928460063ab6`, engine `0.2.7`,
 sidecar `supabase/contract/project_members.contract.yaml`, table created by `20260915000005_project_membership_and_delegation.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

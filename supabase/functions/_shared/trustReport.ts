@@ -232,7 +232,10 @@ export function knownLimits(input: TrustReportInput): KnownLimit[] {
       "This application authenticates against its own user table rather than " +
       "Supabase Auth. An uploader's name is a real constraint — the database " +
       "refuses a landing into a project that user cannot reach — but it is not " +
-      "proof of identity.",
+      "proof of identity. The AI functions (applying an approved proposal, chat, " +
+      "health checks, report rendering) take the acting user's id from the " +
+      "request and write with elevated rights, so a caller who knows a user's id " +
+      "and a proposal's id can apply it in that user's name (audit F-17).",
   });
 
   // ── THE ENGINE AND THE DEPLOYMENT (audit 2026-09-22, F-26) ──────────────

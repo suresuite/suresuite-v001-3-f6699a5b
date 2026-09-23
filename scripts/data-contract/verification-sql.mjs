@@ -3432,6 +3432,7 @@ async function wp65aLandingSwitch() {
   const list = Array.isArray(fns.rows) ? fns.rows : [];
   const fn = list.find((x) => x.slug === "ingest-file");
   if (!fn?.id) return;
+  // (7) is below; it reuses this window and the `logs` helper for `delete-project`.
   const end = new Date();
   const start = new Date(end.getTime() - 23 * 3600 * 1000);
   const logs = async (sql) => {
@@ -3470,6 +3471,146 @@ async function wp65aLandingSwitch() {
     out("", "**(6) `ingest-file` — its console and runtime events** (`function_logs`, newest first):");
     out(...table(rows.map((r) => ({ ...r, message: String(r.message ?? "").replace(/\s+/g, " ").slice(0, 400) }))));
   });
+
+  // (7) `delete-project` — WHY A PROJECT DID NOT GO AWAY. The after-read found project
+  // `dsds` with its `bom_single_level` rows deleted in 200-row batches with no actor and
+  // the project row itself still present, so the live function (the 2026-03-17 build,
+  // §4 D168) stopped part-way. Its own console says where; errors first.
+  const del = list.find((x) => x.slug === "delete-project");
+  if (del?.id) {
+    const did = String(del.id).replace(/[^A-Za-z0-9-]/g, "");
+    const dedge = await logs(`
+      select cast(t.timestamp as string) as ts, request.method as method, response.status_code as status,
+             m.execution_time_ms as ms
+        from function_edge_logs t
+        cross join unnest(t.metadata) as m
+        cross join unnest(m.response) as response
+        cross join unnest(m.request) as request
+       where m.function_id = '${did}'
+       order by t.timestamp desc limit 20`);
+    report("(7) `delete-project` invocations", dedge, (rows) => {
+      out("", `**(7) \`delete-project\` (version ${del.version}, updated ${del.updated_at ? new Date(del.updated_at).toISOString().slice(0, 10) : "?"}) — invocations, last 23 h:**`);
+      out(...table(rows));
+    });
+    const dcon = await logs(`
+      select cast(t.timestamp as string) as ts, m.level as level, m.event_type as event, t.event_message as message
+        from function_logs t
+        cross join unnest(t.metadata) as m
+       where m.function_id = '${did}'
+       order by t.timestamp desc limit 80`);
+    report("(7) `delete-project` console", dcon, (rows) => {
+      out("", "**(7) `delete-project` — its console (newest first):**");
+      out(...table(rows.map((r) => ({ ...r, message: String(r.message ?? "").replace(/\s+/g, " ").slice(0, 300) }))));
+    });
+  }
+}
+
+// (8) §4 D170 — THE DELETION STILL FAILS IN THE BROWSER, AFTER THE FIX SHIPPED.
+// "Failed to send a request to the Edge Function" is supabase-js's FETCH error: no
+// response the browser could read. The fixed function answers every refusal with a
+// CORS-bearing JSON, so that message means the worker did not answer at all — it
+// ran past a limit, crashed, or the database call never returned. (7) now shows every
+// runtime event, not only `Log`; this reads the three things only production knows:
+// the triggers that fire under `delete_project`'s deletes, the time budget the
+// service role runs under, and what Postgres itself logged about the call.
+async function d170DeleteStillFails() {
+  out("", "## (8) §4 D170 — why a deletion still fails after the fix shipped", "");
+  const T = ["disruption_scenarios", "simulation_results", "network_edges", "network_nodes",
+    "inbound_logistics", "outbound_logistics", "bom_single_level", "bom_multi_level",
+    "multi_tier_supply_chain", "supply_chain_data", "supply_chain_data_multi_tier", "node_list", "projects"];
+  const trg = await tryQ(`
+    select c.relname as tbl, t.tgname as trigger,
+           case when t.tgtype & 1 = 1 then 'row' else 'statement' end as level,
+           case when t.tgtype & 2 = 2 then 'before' when t.tgtype & 64 = 64 then 'instead' else 'after' end as timing,
+           concat_ws('/', case when t.tgtype & 4 = 4 then 'ins' end, case when t.tgtype & 8 = 8 then 'del' end,
+                          case when t.tgtype & 16 = 16 then 'upd' end, case when t.tgtype & 32 = 32 then 'trunc' end) as events,
+           p.proname as fn, t.tgenabled as enabled
+      from pg_trigger t
+      join pg_class c on c.oid = t.tgrelid
+      join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+      join pg_proc p on p.oid = t.tgfoid
+     where not t.tgisinternal
+       and c.relname in (${T.map((t) => `'${t}'`).join(", ")})
+       and t.tgtype & 8 = 8
+     order by 1, 2`);
+  report("(8a) delete triggers under delete_project", trg, (rows) => {
+    out("", "**(8a) every trigger that fires on a DELETE of a table `delete_project` empties:**");
+    out(...table(rows));
+  });
+  const fk = await tryQ(`
+    select cl.relname as child, pc.relname as parent, c.confdeltype as on_delete,
+           exists (select 1 from pg_index i where i.indrelid = c.conrelid and i.indkey[0] = c.conkey[1]) as child_indexed
+      from pg_constraint c
+      join pg_class cl on cl.oid = c.conrelid
+      join pg_class pc on pc.oid = c.confrelid
+     where c.contype = 'f'
+       and pc.relname in (${T.map((t) => `'${t}'`).join(", ")})
+     order by 2, 1`);
+  report("(8b) foreign keys into those tables", fk, (rows) => {
+    out("", "**(8b) foreign keys pointing INTO them** (`on_delete`: a=no action, r=restrict, c=cascade, n=set null; an unindexed child makes every parent delete a scan):");
+    out(...table(rows));
+  });
+  const budget = await tryQ(`
+    select r.rolname as role, s.setconfig::text as settings
+      from pg_roles r
+      left join pg_db_role_setting s on s.setrole = r.oid
+     where r.rolname in ('service_role', 'authenticator', 'anon', 'authenticated', 'postgres')
+     order by 1`);
+  report("(8c) role time budgets", budget, (rows) => {
+    out("", "**(8c) the time budget each role runs under** (`statement_timeout` in `settings`):");
+    out(...table(rows));
+  });
+  const sizes = await tryQ(`
+    select p.name, p.id::text as id, p.updated_at::text as updated,
+           (select count(*) from public.network_nodes x where x.project_id = p.id) as nn,
+           (select count(*) from public.network_edges x where x.project_id = p.id) as ne,
+           (select count(*) from public.supply_chain_data x where x.project_id = p.id) as scd,
+           (select count(*) from public.supply_chain_data_multi_tier x where x.project_id = p.id) as scdmt,
+           (select count(*) from public.node_list x where x.project_id = p.id) as nl,
+           (select count(*) from public.bom_single_level x where x.project_id = p.id) as bsl,
+           (select count(*) from public.simulation_results x where x.project_id = p.id) as sr
+      from public.projects p
+     order by p.name`);
+  report("(8d) every project and its size", sizes, (rows) => {
+    out("", "**(8d) every project still present, with the rows a deletion must remove:**");
+    out(...table(rows));
+  });
+  const aud = await tryQ(`
+    select a.created_at::text as at, a.target_type as tbl, a.action,
+           coalesce(u.email, a.actor_user_id::text, '(unknown)') as actor
+      from public.audit_logs a
+      left join public.approved_users u on u.id = a.actor_user_id
+     where a.created_at >= '2026-09-22 22:47:00+00'
+       and (a.action ilike '%delete%' or a.target_type = 'projects')
+     order by a.created_at desc
+     limit 40`);
+  report("(8e) deletions audited since the fix deployed", aud, (rows) => {
+    out("", "**(8e) every delete the audit recorded since `delete-project` was republished (22:47Z):**");
+    out(...table(rows));
+  });
+  // Postgres's own log: a statement cancelled, a lock wait, an error raised inside the call.
+  const end = new Date();
+  const start = new Date(end.getTime() - 23 * 3600 * 1000);
+  const qs = new URLSearchParams({
+    iso_timestamp_start: start.toISOString(),
+    iso_timestamp_end: end.toISOString(),
+    sql: `select cast(t.timestamp as string) as ts, p.error_severity as severity, p.user_name as usr, t.event_message as message
+            from postgres_logs t
+            cross join unnest(t.metadata) as m
+            cross join unnest(m.parsed) as p
+           where t.timestamp > '2026-09-22T22:47:00Z'
+             and (p.error_severity in ('ERROR', 'FATAL', 'PANIC')
+                  or t.event_message ilike '%delete_project%'
+                  or t.event_message ilike '%statement timeout%'
+                  or t.event_message ilike '%canceling statement%')
+           order by t.timestamp desc limit 60`,
+  });
+  const pl = await apiGet(`/analytics/endpoints/logs.all?${qs}`);
+  const plRes = pl.error ? pl : (pl.rows?.error ? { error: JSON.stringify(pl.rows.error).slice(0, 300) } : { rows: Array.isArray(pl.rows?.result) ? pl.rows.result : [] });
+  report("(8f) postgres log since the fix deployed", plRes, (rows) => {
+    out("", "**(8f) Postgres's own log since 22:47Z — errors, cancellations, and anything naming `delete_project`:**");
+    out(...table(rows.map((r) => ({ ...r, message: String(r.message ?? "").replace(/\s+/g, " ").slice(0, 300) }))));
+  });
 }
 
 async function main() {
@@ -3489,6 +3630,7 @@ async function main() {
   await boundaryDecisions();
   await ingestTables();
   await wp65aLandingSwitch();
+  await d170DeleteStillFails();
   await graphHashBlastRadius();
   await wp42Smear();
   await wp42Landed();

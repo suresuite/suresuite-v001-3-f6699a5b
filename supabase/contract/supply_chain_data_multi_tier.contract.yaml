@@ -28,17 +28,17 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc combine_project_into_supply_chain"
     grain: table
-    evidence: "src/pages/DataManager.tsx:656"
+    evidence: "src/pages/DataManager.tsx:640"
     confirmed: true
   - page: "InteractiveNetworkSpace.tsx"
     via: "table read"
     grain: table
-    evidence: "src/pages/InteractiveNetworkSpace.tsx:369"
+    evidence: "src/pages/InteractiveNetworkSpace.tsx:355"
     confirmed: true
   - page: "ProcessLevelNetwork.tsx"
-    via: "table read"
+    via: "rpc get_supply_chain_data_multi_tier"
     grain: table
-    evidence: "src/pages/ProcessLevelNetwork.tsx:1258"
+    evidence: "src/services/network.ts:41"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "rpc get_supply_chain_data_multi_tier"
@@ -91,7 +91,7 @@ fields:
       - page: "InteractiveNetworkSpace.tsx"
         via: "table read"
         grain: column
-        evidence: "src/pages/InteractiveNetworkSpace.tsx:369"
+        evidence: "src/pages/InteractiveNetworkSpace.tsx:355"
         confirmed: true
     resolution: null
   project_id:
@@ -148,9 +148,9 @@ fields:
       validate: null
     surfaces:
       - page: "ProcessLevelNetwork.tsx"
-        via: "table read"
+        via: "rpc get_supply_chain_data_multi_tier"
         grain: column
-        evidence: "src/pages/ProcessLevelNetwork.tsx:1258"
+        evidence: "src/services/network.ts:41"
         confirmed: true
     resolution: null
   from_location:
@@ -286,9 +286,9 @@ fields:
       validate: null
     surfaces:
       - page: "ProcessLevelNetwork.tsx"
-        via: "table read"
+        via: "rpc get_supply_chain_data_multi_tier"
         grain: column
-        evidence: "src/pages/ProcessLevelNetwork.tsx:1258"
+        evidence: "src/services/network.ts:41"
         confirmed: true
     resolution: null
   bom_depth:

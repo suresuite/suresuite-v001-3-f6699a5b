@@ -68,8 +68,9 @@ it rather than duplicating it.
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:429` | yes |
-| `ProcessLevelNetwork.tsx` | table read | `src/pages/ProcessLevelNetwork.tsx:381` | yes |
+| `DataManager.tsx` | rpc get_project_dataset_status | `src/pages/DataManager.tsx:413` | yes |
+| `InteractiveNetworkSpace.tsx` | table read | `src/pages/InteractiveNetworkSpace.tsx:478` | yes |
+| `ProcessLevelNetwork.tsx` | table read | `src/pages/ProcessLevelNetwork.tsx:359` | yes |
 | `ProjectPolicies.tsx` | table read | `src/lib/policies/projectLanes.ts:48` | yes |
 | `SimulationLab.tsx` | table read | `src/lib/policies/projectLanes.ts:48` | yes |
 
@@ -179,7 +180,7 @@ Depth in the BOM tree. Level 1 is directly under the finished product; higher nu
 | Read by the engine | `project_map.py::_map_bom -> collapse order` |
 | Transform | int() |
 | Validated at ingest | integer >= 0 — level 0 is a root component, which both live parsers admit and always have (WP 3.2 §16) |
-| Rendered at | `[object Object]` |
+| Rendered at | `[object Object]`, `[object Object]` |
 
 **Resolution** — how a value is decided when more than one source could supply one.
 
@@ -193,7 +194,7 @@ Depth in the BOM tree. Level 1 is directly under the finished product; higher nu
 
 Depth in the BOM tree is structure, not measurement.
 
-**Rendered on** `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:381`) —
+**Rendered on** `InteractiveNetworkSpace.tsx` (`src/pages/InteractiveNetworkSpace.tsx:478`), `ProcessLevelNetwork.tsx` (`src/pages/ProcessLevelNetwork.tsx:359`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -314,6 +315,6 @@ The tier-1 staged row this was promoted from (WP 3.3). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `1cd93c3a7dd8`, engine `0.2.7`,
+*Generated from data contract `928460063ab6`, engine `0.2.7`,
 sidecar `supabase/contract/bom_multi_level.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

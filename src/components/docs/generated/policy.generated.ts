@@ -3567,7 +3567,7 @@ export const PROJECT_DELETION: ProjectDeletion = {
     "ai_usage_logs",
     "api_request_logs"
   ],
-  "asynchronous": true
+  "asynchronous": false
 };
 
 /**

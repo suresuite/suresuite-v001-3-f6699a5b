@@ -215,17 +215,12 @@ deferred:
 # edits cannot travel apart. Its deferral was never about its source; it was that
 # publishing it switches every upload in production at once, and that needed a §15
 # reading either side of the merge (§16 · WP 6.5a).
+#
+# `delete-project` LEFT IT under §4 D170. Its deferral said "destructive and undiffed";
+# §15 then diffed it the only way available — by reading production's copy fail. Every
+# deletion died on a dropped table after removing rows. The published build deletes
+# nothing by hand: it calls `public.delete_project`, one transaction.
 functions_not_deployed:
-  - fn: delete-project
-    wp: "7.1"
-    why: >-
-      DESTRUCTIVE AND UNDIFFED. It deletes a project and, per §4 D117, leaves ten
-      project-scoped tables behind — including the user's own policy decisions. The
-      repo's copy and production's copy have not been compared, and deploying a
-      newer delete path sight-unseen is the one case where being wrong is not
-      recoverable. It also writes through `delete_project_dataset`, whose
-      `multi_tier` branch WP 6.2 verified is live (§4 D58). The auth package owns it
-      because the grants it runs under are the same question.
   - fn: erp-sync-orbit-mrp
     wp: "7.1"
     why: >-

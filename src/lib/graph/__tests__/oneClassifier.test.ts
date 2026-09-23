@@ -42,7 +42,9 @@ const BASELINE: Record<string, string[]> = {
   // maps to the legacy vocabulary in one place. Four remain, on three pages.
   'src/pages/ProcessLevelNetwork.tsx': [],
   'src/pages/FirmLevelNetwork.tsx': ['getTierFromDepth'],
-  'src/pages/InteractiveNetworkSpace.tsx': ['getNodeTypeFromLevel'],
+  // Audit 2026-09-22 · F-09 migrated this page: its ladder is GONE and it places nodes
+  // with `placeLaneNodes`, the same call `/process-level-network` makes.
+  'src/pages/InteractiveNetworkSpace.tsx': [],
 };
 
 /** Files that must never declare one at all — including this module's own folder. */
@@ -119,9 +121,9 @@ describe('one classifier — the ratchet that stops eight becoming nine', () => 
     // two of the eight. Six are in `src/`, and this is the number that must fall.
     const total = Object.values(BASELINE).reduce((a, names) => a + names.length, 0);
     // 6 when this gate landed · 4 after WP 8.3 migrated ProcessLevelNetwork · 2 after
-    // WP 8.4 migrated ProductLevelNetwork. Asserted rather than described, so a
-    // migration cannot happen quietly and the remaining work is a number a reader can
-    // check in one line: FirmLevelNetwork and the orphaned InteractiveNetworkSpace.
-    expect(total).toBe(2);
+    // WP 8.4 migrated ProductLevelNetwork · 1 after audit F-09 migrated
+    // InteractiveNetworkSpace. Asserted rather than described, so a migration cannot
+    // happen quietly: what remains is FirmLevelNetwork's `getTierFromDepth`.
+    expect(total).toBe(1);
   });
 });

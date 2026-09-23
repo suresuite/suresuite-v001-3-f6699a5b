@@ -1544,12 +1544,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:429"
+        "evidence": "src/pages/DataManager.tsx:413"
+      },
+      {
+        "page": "InteractiveNetworkSpace.tsx",
+        "via": "table read",
+        "evidence": "src/pages/InteractiveNetworkSpace.tsx:478"
       },
       {
         "page": "ProcessLevelNetwork.tsx",
         "via": "table read",
-        "evidence": "src/pages/ProcessLevelNetwork.tsx:381"
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:359"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -1902,7 +1907,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:429"
+        "evidence": "src/pages/DataManager.tsx:413"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -5040,7 +5045,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:429"
+        "evidence": "src/pages/DataManager.tsx:413"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -8475,7 +8480,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc delete_project_dataset",
-        "evidence": "src/pages/DataManager.tsx:718"
+        "evidence": "src/pages/DataManager.tsx:697"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -8743,7 +8748,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:429"
+        "evidence": "src/pages/DataManager.tsx:413"
       },
       {
         "page": "ProductLevelNetwork.tsx",
@@ -9148,7 +9153,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:429"
+        "evidence": "src/pages/DataManager.tsx:413"
       },
       {
         "page": "ProductLevelNetwork.tsx",
@@ -10284,7 +10289,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_node_list",
-        "evidence": "src/pages/DataManager.tsx:441"
+        "evidence": "src/pages/DataManager.tsx:425"
       },
       {
         "page": "FirmLevelNetwork.tsx",
@@ -11466,7 +11471,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:429"
+        "evidence": "src/pages/DataManager.tsx:413"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -14606,7 +14611,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/DataManager.tsx:199"
+        "evidence": "src/pages/DataManager.tsx:200"
       },
       {
         "page": "DeveloperApi.tsx",
@@ -14621,12 +14626,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "InteractiveNetworkSpace.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/InteractiveNetworkSpace.tsx:353"
+        "evidence": "src/pages/InteractiveNetworkSpace.tsx:339"
       },
       {
         "page": "ProcessLevelNetwork.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/ProcessLevelNetwork.tsx:275"
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:253"
       },
       {
         "page": "ProductLevelNetwork.tsx",
@@ -17598,7 +17603,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc combine_project_into_supply_chain",
-        "evidence": "src/pages/DataManager.tsx:656"
+        "evidence": "src/pages/DataManager.tsx:640"
       },
       {
         "page": "FirmLevelNetwork.tsx",
@@ -18169,17 +18174,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc combine_project_into_supply_chain",
-        "evidence": "src/pages/DataManager.tsx:656"
+        "evidence": "src/pages/DataManager.tsx:640"
       },
       {
         "page": "InteractiveNetworkSpace.tsx",
         "via": "table read",
-        "evidence": "src/pages/InteractiveNetworkSpace.tsx:369"
+        "evidence": "src/pages/InteractiveNetworkSpace.tsx:355"
       },
       {
         "page": "ProcessLevelNetwork.tsx",
-        "via": "table read",
-        "evidence": "src/pages/ProcessLevelNetwork.tsx:1258"
+        "via": "rpc get_supply_chain_data_multi_tier",
+        "evidence": "src/services/network.ts:41"
       },
       {
         "page": "ProjectPolicies.tsx",

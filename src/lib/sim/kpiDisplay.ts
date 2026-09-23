@@ -1,3 +1,5 @@
+import { formatMoney } from './money';
+
 // One KPI display vocabulary for the Simulation Lab: label, formatter, and
 // direction of improvement. The results table, the recovery-impact table and
 // the compare table all read from here so a KPI never renders under two names
@@ -44,7 +46,8 @@ export const NOT_MEASURED_REASON = "the engine returned no value on any replicat
 
 const pct1 = (n: number) => `${(n * 100).toFixed(1)}%`;
 const pct2 = (n: number) => `${(n * 100).toFixed(2)}%`;
-const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
+// F-20: the one formatter, whose symbol is the engine's declared unit.
+const money = formatMoney;
 const fixed = (d: number) => (n: number) => n.toFixed(d);
 
 const units = (n: number) => Math.round(n).toLocaleString();

@@ -3,6 +3,7 @@
 // queue position, segment cells — is unit-testable in isolation and doesn't
 // trip react-refresh's "only export components" rule.
 import type { SimulationRun, Replication } from "@/hooks/useSimulationRun";
+import { formatMoney } from '@/lib/sim/money';
 
 export type JobStatus = SimulationRun["status"]; // queued | running | done | cancelled | failed
 export type QueueFilter = "all" | "active" | "done" | "failed";
@@ -121,6 +122,6 @@ export function resultLine(job: SimulationRun): string {
     const half = ci.fill_rate != null ? ` ±${(ci.fill_rate * 100).toFixed(1)}` : "";
     parts.push(`fill ${(agg.fill_rate * 100).toFixed(1)}%${half}`);
   }
-  if (agg.revenue != null) parts.push(`€${Math.round(agg.revenue).toLocaleString()}`);
+  if (agg.revenue != null) parts.push(formatMoney(agg.revenue));
   return parts.length > 0 ? parts.join(" · ") : "no aggregate KPIs";
 }

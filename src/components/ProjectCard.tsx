@@ -46,6 +46,7 @@ import {
   MobileToggle,
 } from '@/components/mobile';
 import { cn } from '@/lib/utils';
+import { confirmProjectDeletion } from '@/lib/projects/projectDeletion';
 
 interface Project {
   id: string;
@@ -511,11 +512,7 @@ export function ProjectCard({
             {action(
               'Delete project',
               () => {
-                const isComplexProject = project.deep_tier_enabled && project.bom_level === 'multi_level';
-                const message = isComplexProject
-                  ? `Delete project "${project.name}"? This is a complex project that will be force-deleted (all data cleaned first).`
-                  : `Are you sure you want to delete project "${project.name}"?`;
-                if (confirm(message)) {
+                if (confirmProjectDeletion(project.name)) {
                   onDelete(project);
                   setSheet(false);
                 }
@@ -793,11 +790,7 @@ export function ProjectCard({
                       <DropdownMenuItem
                         className="text-[#bf2330] focus:text-[#bf2330]"
                         onClick={() => {
-                          const isComplexProject = project.deep_tier_enabled && project.bom_level === 'multi_level';
-                          const message = isComplexProject
-                            ? `Delete project "${project.name}"? This is a complex project that will be force-deleted (all data cleaned first).`
-                            : `Are you sure you want to delete project "${project.name}"?`;
-                          if (confirm(message)) onDelete(project);
+                          if (confirmProjectDeletion(project.name)) onDelete(project);
                         }}
                       >
                         <Trash2 className="mr-2 h-4 w-4" /> Delete project

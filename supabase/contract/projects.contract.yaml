@@ -24,7 +24,7 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc list_projects"
     grain: table
-    evidence: "src/pages/DataManager.tsx:199"
+    evidence: "src/pages/DataManager.tsx:200"
     confirmed: true
   - page: "DeveloperApi.tsx"
     via: "rpc list_projects"
@@ -39,12 +39,12 @@ surfaces:
   - page: "InteractiveNetworkSpace.tsx"
     via: "rpc list_projects"
     grain: table
-    evidence: "src/pages/InteractiveNetworkSpace.tsx:353"
+    evidence: "src/pages/InteractiveNetworkSpace.tsx:339"
     confirmed: true
   - page: "ProcessLevelNetwork.tsx"
     via: "rpc list_projects"
     grain: table
-    evidence: "src/pages/ProcessLevelNetwork.tsx:275"
+    evidence: "src/pages/ProcessLevelNetwork.tsx:253"
     confirmed: true
   - page: "ProductLevelNetwork.tsx"
     via: "rpc list_projects"

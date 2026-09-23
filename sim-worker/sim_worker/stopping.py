@@ -1,9 +1,14 @@
-"""Sequential stopping rules for replication count (Law–Kelton)."""
+"""Student-t 95% half-width for the frozen legacy engine's `kpi.aggregate`.
+
+The module used to carry `StoppingRule`, a Law–Kelton sequential rule nothing
+called; it was deleted with `warmup.py` (audit 2026-09-22, F-37). The product's
+stopping rule is scsim's (`scsim.stats`), and `test_no_orphan_module.py` fails if
+an unreachable module comes back.
+"""
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 from typing import Sequence
 
 
@@ -31,30 +36,3 @@ def half_width_95(xs: Sequence[float]) -> float:
     v = sum((x - m) ** 2 for x in xs) / (n - 1)
     s = math.sqrt(v)
     return t_critical_95(n - 1) * s / math.sqrt(n)
-
-
-@dataclass
-class StoppingRule:
-    kind: str  # 'fixed_horizon' | 'ci_halfwidth'
-    epsilon: float = 0.01
-    max_wall_seconds: float = 600
-    max_reps: int = 200
-    min_reps: int = 3
-
-    def should_stop(
-        self,
-        kpi_series: Sequence[float],
-        elapsed_wall: float,
-        target_reps: int,
-    ) -> bool:
-        if elapsed_wall >= self.max_wall_seconds:
-            return True
-        if self.kind == "fixed_horizon":
-            return len(kpi_series) >= target_reps
-        if self.kind == "ci_halfwidth":
-            if len(kpi_series) < self.min_reps:
-                return False
-            if len(kpi_series) >= self.max_reps:
-                return True
-            return half_width_95(kpi_series) <= self.epsilon
-        return len(kpi_series) >= target_reps

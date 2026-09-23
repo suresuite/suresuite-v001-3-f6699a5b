@@ -40,12 +40,17 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc get_project_dataset_status"
     grain: table
-    evidence: "src/pages/DataManager.tsx:429"
+    evidence: "src/pages/DataManager.tsx:413"
+    confirmed: true
+  - page: "InteractiveNetworkSpace.tsx"
+    via: "table read"
+    grain: table
+    evidence: "src/pages/InteractiveNetworkSpace.tsx:478"
     confirmed: true
   - page: "ProcessLevelNetwork.tsx"
     via: "table read"
     grain: table
-    evidence: "src/pages/ProcessLevelNetwork.tsx:381"
+    evidence: "src/pages/ProcessLevelNetwork.tsx:359"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "table read"
@@ -173,10 +178,15 @@ fields:
       validate: "integer >= 0 — level 0 is a root component, which both live parsers admit and always have (WP 3.2 §16)"
       rule: {kind: integer, min: 0, blank: reject}
     surfaces:
+      - page: "InteractiveNetworkSpace.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/pages/InteractiveNetworkSpace.tsx:478"
+        confirmed: true
       - page: "ProcessLevelNetwork.tsx"
         via: "table read"
         grain: column
-        evidence: "src/pages/ProcessLevelNetwork.tsx:381"
+        evidence: "src/pages/ProcessLevelNetwork.tsx:359"
         confirmed: true
     resolution:
       default_mode: asserted

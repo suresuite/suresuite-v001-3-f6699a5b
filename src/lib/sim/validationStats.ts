@@ -72,8 +72,10 @@ export function welchWarmup(series: number[][], window = 5, tol = 0.02): number 
 
 /**
  * MSER-5 (White 1997): batch the cross-rep mean into batches of 5, then pick
- * the truncation point d minimizing the MSER statistic
- * (variance of remaining batches) / (n_remaining²). Returns weeks (d × 5).
+ * the truncation point d minimizing z(d) = Σ(b − b̄)² / (n_b − d)² over the batch
+ * means after d — the engine's `scsim.stats.warmup.mser5` since 0.2.7. Returns
+ * weeks (d × 5). It divided the n−1 sample VARIANCE by (n_b − d)², one factor too
+ * many, until `mser5Parity.test.ts` found the button disagreeing with the engine.
  */
 export function mser5(series: number[][]): number {
   const m = crossRepMean(series);
@@ -89,7 +91,8 @@ export function mser5(series: number[][]): number {
   // Standard practice: don't truncate more than half the run.
   for (let d = 0; d <= Math.floor(nBatches / 2); d++) {
     const rest = means.slice(d);
-    const stat = variance(rest) / (rest.length * rest.length);
+    const mu = avg(rest);
+    const stat = rest.reduce((a, v) => a + (v - mu) ** 2, 0) / (rest.length * rest.length);
     if (stat < bestStat) {
       bestStat = stat;
       bestD = d;

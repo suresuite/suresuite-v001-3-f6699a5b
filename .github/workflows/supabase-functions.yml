@@ -41,6 +41,8 @@ on:
       # function redeploys it; `_shared/**` below covers the parser, the validator and
       # the generated ingest spec it bundles.
       - 'supabase/functions/ingest-file/**'
+      # §4 D170 — "Delete project". Its own path, so the relay redeploys when it changes.
+      - 'supabase/functions/delete-project/**'
       - 'supabase/functions/_shared/**'
       - 'supabase/config.toml'
       - '.github/workflows/supabase-functions.yml'
@@ -239,6 +241,19 @@ jobs:
       # anon key, as it does `sim-command` and `combine-project`.
       - name: Deploy ingest-file
         run: supabase functions deploy ingest-file --project-ref wckdrutwkytwcomrlpib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # `delete-project` — PUBLISHED BY §4 D170, and deferred to WP 7.1 until then as
+      # "destructive and undiffed". It is no longer undiffed: §15 run `35790886083` (7)
+      # read production's copy — the 2026-03-17 build — failing EVERY deletion on
+      # `product_code_map` (a dropped table) after it had already removed rows, with no
+      # actor and a `202 Deletion started` to the person who clicked. The build this
+      # step publishes deletes nothing itself: it calls `public.delete_project`
+      # (`20260922000003`), one transaction, and relays the database's answer.
+      # `verify_jwt = true` is declared in `supabase/config.toml`.
+      - name: Deploy delete-project
+        run: supabase functions deploy delete-project --project-ref wckdrutwkytwcomrlpib
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
