@@ -18985,6 +18985,81 @@ Handoff to next WP:
   decision, not a patch.
 - **WP 10 next**, and it is the last.
 
+### Audit 2026-09-22 · WP 10 — destructive paths and trust posture · 2026-09-22 · no migration
+
+Previous package promised: the brief said WP 10 cannot be completed on a branch.
+Production-changing deploys go to the user with a §15 reading, and never as
+drive-bys. WP 9 handed nothing on.
+
+This package found: **D170 (#268, another session) closed F-15 before this
+package shipped, and closed it properly.** `delete_project` is one transaction,
+`delete-project` waits for it and is now deployed, and the page shows the
+database's answer. This package's first draft solved F-15 on the client instead,
+by watching the project list, and that half is DROPPED. What D170 left is the
+question the user answers BEFORE the delete: the confirmation was still written
+out three times and still said nothing about what survives. **And three
+functions, not one, had no declared trust model:** `get-mapbox-token`,
+`geocode-locations` and `erp-sync-orbit-mrp`.
+
+**Per finding:**
+
+- **F-15 — FIXED BY D170**, not by this package. See D170's §16 entry.
+- **F-27 — FIXED.** One confirmation, `src/lib/projects/projectDeletion.ts`,
+  used by all three delete buttons in two components. It states the scope from
+  the DERIVED `PROJECT_DELETION`, the same numbers the manual's
+  `exporting-and-deleting` page publishes. **Deleted:** 44 tables, named by kind,
+  including the user's policy decisions and simulation runs. **Kept:** the three
+  account usage logs, D117's decision. **Detached:** chat threads and uploaded
+  files. **Gate:** `projectDeletion.test.ts`. **Mutation:** a component writing
+  its own `Delete project…` confirm literal → red.
+- **F-17 / D-7 — the LIMIT is fixed; the defect is DEFERRED to §4 D28 (PLAN WP
+  7.1).** The audit's premise is half right. The report already published
+  "identity is asserted by the client", but only for uploads. It now also says
+  the AI functions take the actor from the request and write with elevated
+  rights, so "a caller who knows a user's id and a proposal's id can apply it in
+  that user's name". Verifying a JWT is not available: the application
+  authenticates against `approved_users`, so there is no user token to verify.
+  That is D28's decision, not a patch. **Gate:** `trustReportLimits.test.ts`
+  (F-17 case).
+- **F-28 — DECLARED; the caller check is DEFERRED to D28.** `config.toml` now
+  declares `verify_jwt = true` for the three undeclared functions. Every caller
+  carries a JWT: the browser sends the anon key and the pg_cron ERP sweep sends
+  the service-role key. So this is the CLI's default made a decision, and it
+  changes nothing at deploy. The comment says the real control on a PUBLIC Mapbox
+  token is its URL restriction in the Mapbox account. **Gate:**
+  `functionsDeclared.test.ts`: every function with an `index.ts` has a block with
+  an explicit `verify_jwt`. **Mutation:** removing one → red.
+- **F-16 — PARTLY OVERTAKEN, the rest PUT TO THE USER.** D170 published
+  `delete-project`. `get-mapbox-token`, `ingest-inbound-logistics` and
+  `erp-sync-orbit-mrp` remain on R17's `functions_not_deployed` list, owned by
+  PLAN WP 7.1, and production may run pre-WP-4.1 builds of them (D168). "Deploy,
+  or gate the buttons" either changes what production runs or removes a working
+  feature (the map). That needs a decision and a §15 reading either side.
+- **D-2 — CORRECTED.** The `normalize-at-promotion` row now names THREE
+  downstream converters, adding the one the engine reads (`project_map.py`'s
+  `_duration_to_weeks`/`_rate_to_weekly`).
+- **D-5 — OVERTAKEN.** Since WP 6.5a's after-read, `ingest-file` is deployed
+  and the I7 row says so. The consequence the audit wanted stated ("uploads
+  fail") is no longer true.
+
+Discovered:
+- **Two sessions fixed one finding in parallel**, and the first merged won. D170
+  was not an audit package, and the audit register did not know it was coming.
+  The duplicate half cost a rebuild of this package, not a conflict.
+
+Baseline numbers:
+- undeclared edge functions 3 → **0**; delete-confirmation literals 3 → **0** (one module)
+- vitest 1056 → **1080**; no engine, worker or migration change
+
+Handoff:
+- **To the user: F-16's remaining deploy decision** (three functions). Take a
+  §15 reading before and after, in the push after the merge (D153).
+- **§4 D28 / PLAN WP 7.1** owns identity: F-17's service-role writes under a
+  client-asserted actor, and F-28's per-caller check.
+- **The audit's 37 findings and 10 doc findings are each now fixed, refuted,
+  overtaken or deferred with a named owner.** The per-finding table is in this
+  package's PR.
+
 ---
 ---
 ### D170, second half — a project is deleted before its lane sources · 2026-09-22 · `20260922000009`

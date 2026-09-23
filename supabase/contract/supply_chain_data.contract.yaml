@@ -25,7 +25,7 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc combine_project_into_supply_chain"
     grain: table
-    evidence: "src/pages/DataManager.tsx:639"
+    evidence: "src/pages/DataManager.tsx:640"
     confirmed: true
   - page: "FirmLevelNetwork.tsx"
     via: "rpc get_prediction_stats"

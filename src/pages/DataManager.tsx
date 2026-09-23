@@ -45,6 +45,7 @@ import { getDefaultSimulationDateRange, formatDateForDatabase } from '@/utils/da
 import UploadWizard from '@/components/UploadWizard';
 import { ProjectCard } from '@/components/ProjectCard';
 import { ErpConnectionsPanel } from '@/components/erp/ErpConnectionsPanel';
+import { confirmProjectDeletion } from '@/lib/projects/projectDeletion';
 
 interface Project {
   id: string;
@@ -669,7 +670,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
       return;
     }
     
-    if (confirm(`Delete project "${selectedProject.name}" and all of its data? This cannot be undone.`)) {
+    if (confirmProjectDeletion(selectedProject.name)) {
       handleDeleteProject(selectedProject);
     }
   };

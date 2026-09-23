@@ -66,7 +66,7 @@ Tier G rather than a data tier: `projects` holds no measured quantity. It is the
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DataManager.tsx` | rpc list_projects | `src/pages/DataManager.tsx:199` | yes |
+| `DataManager.tsx` | rpc list_projects | `src/pages/DataManager.tsx:200` | yes |
 | `DeveloperApi.tsx` | rpc list_projects | `src/pages/DeveloperApi.tsx:263` | yes |
 | `FirmLevelNetwork.tsx` | rpc list_projects | `src/pages/FirmLevelNetwork.tsx:244` | yes |
 | `InteractiveNetworkSpace.tsx` | rpc list_projects | `src/pages/InteractiveNetworkSpace.tsx:339` | yes |
@@ -445,6 +445,6 @@ The owning organization by uuid. This is what the public /v1 API authorizes on (
 
 ---
 
-*Generated from data contract `e0df939da4f9`, engine `0.2.7`,
+*Generated from data contract `928460063ab6`, engine `0.2.7`,
 sidecar `supabase/contract/projects.contract.yaml`, table created by `20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
