@@ -44,11 +44,14 @@ function EventLine({ e }: { e: (typeof STRESS_PRESETS)[number]["events"][number]
       {e.resolves === "plant" && (
         <Badge variant="secondary" className="text-[10px]">reaches the engine</Badge>
       )}
+      {e.resolves === "resolved-at-launch" && (
+        <Badge variant="secondary" className="text-[10px]">resolved at launch to your top-volume supplier</Badge>
+      )}
       {e.resolves === "supplier-id" && (
-        <Badge variant="outline" className="text-[10px]">only if a supplier is called “primary”</Badge>
+        <Badge variant="outline" className="text-[10px]">only if your project has a supplier with this exact id</Badge>
       )}
       {e.resolves === "unsupported" && (
-        <Badge variant="outline" className="text-[10px] text-destructive">skipped, with a warning</Badge>
+        <Badge variant="outline" className="text-[10px] text-destructive">preset disabled — the engine cannot hit this target yet</Badge>
       )}
     </div>
   );
@@ -65,21 +68,26 @@ export default function StressTests() {
         Stress tests
       </PageTitle>
 
-      <Callout tone="limit" title={`Read this first: ${skipped.length} of the ${STRESS_PRESETS.length} presets do not reach the engine as shipped`}>
+      <Callout tone="limit" title={`Read this first: ${skipped.length} of the ${STRESS_PRESETS.length} presets cannot reach the engine yet, and the drawer says so`}>
         <p>
-          Every preset creates a scenario you can run, and the run completes. But the thing each
-          preset says it hits is written as a placeholder — <Term>supplier:primary</Term>,{" "}
-          <Term>material:critical</Term>, <Term>customer:all</Term> — and the engine resolves a
-          target against <strong>your own supplier ids</strong> or the plant, not against words
-          like those.
+          The engine disrupts <strong>suppliers and the plant</strong> — not materials, customers
+          or lanes. A preset whose schedule names one of those (<Term>material:critical</Term>,{" "}
+          <Term>customer:all</Term>, <Term>edge:inbound</Term>, <Term>node:nexus</Term>) is{" "}
+          <strong>disabled in the drawer with this reason</strong> rather than launchable: a run
+          whose event was dropped would report the undisrupted baseline under a stress-test name.{" "}
+          <Term>supplier:primary</Term> is different — it is a placeholder the{" "}
+          <strong>launch resolves</strong> to the supplier carrying the largest share of your
+          weekly inbound volume (the resolution is written into the scenario's description), and a
+          project with no inbound lanes gets a refusal, not a hollow scenario.
         </p>
         <p>
-          A target it cannot resolve is <strong>dropped</strong>, and the run continues as a
-          baseline with the disruption silently absent from the physics. It is not silent on
-          screen: the run reports{" "}
-          <Term>unsupported target skipped (material/edge land later in M7)</Term> under its
-          mapping warnings, and that line is the difference between a stress test and an expensive
-          repeat of your baseline.
+          A hand-edited schedule can still name an unresolvable target. The engine{" "}
+          <strong>drops</strong> it and says so in the run's mapping warnings —{" "}
+          <Term>…targets cannot be disrupted yet (land later in M7) — event skipped</Term> for a
+          target kind it does not support, or{" "}
+          <Term>no supplier or plant named '…' in this project's data — event skipped</Term> for a
+          supplier id the project does not have — and that line is the difference between a stress
+          test and an expensive repeat of your baseline.
         </p>
         <p>
           <strong>Read the mapping warnings on every stress run before you read its KPIs.</strong>{" "}

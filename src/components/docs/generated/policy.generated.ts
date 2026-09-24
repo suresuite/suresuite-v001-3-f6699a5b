@@ -1363,12 +1363,12 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:532, src/hooks/useStageRows.tsx:547."
+      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:604, src/hooks/useStageRows.tsx:619."
     ],
     "breakClass": "app-routing",
     "breakEvidence": [
-      "src/hooks/useStageRows.tsx:532",
-      "src/hooks/useStageRows.tsx:547"
+      "src/hooks/useStageRows.tsx:604",
+      "src/hooks/useStageRows.tsx:619"
     ]
   }
 ];
@@ -1694,8 +1694,8 @@ export type StressPresetEvent = {
   startDay: number;
   durationDays: number;
   magnitudePct: number;
-  /** `plant` always maps · `supplier-id` maps only on a matching project · `unsupported` never maps. */
-  resolves: "plant" | "supplier-id" | "unsupported";
+  /** `plant` always maps · `resolved-at-launch` is substituted with a real supplier id (or the launch refuses) · `supplier-id` maps only on a matching project · `unsupported` never maps. */
+  resolves: "plant" | "resolved-at-launch" | "supplier-id" | "unsupported";
 };
 
 export type StressPreset = {
@@ -1712,29 +1712,29 @@ export const STRESS_PRESETS: StressPreset[] = [
     "id": "single_supplier_outage",
     "label": "Single-supplier outage",
     "scenarioName": "[Stress] Single-supplier outage",
-    "description": "Primary supplier offline for 14 days starting on day 30.",
+    "description": "Top-volume supplier (resolved at launch) offline for 14 days from day 120, past the default warm-up.",
     "events": [
       {
         "target": "supplier:primary",
         "targetType": "node",
-        "startDay": 30,
+        "startDay": 120,
         "durationDays": 14,
         "magnitudePct": 100,
-        "resolves": "supplier-id"
+        "resolves": "resolved-at-launch"
       }
     ],
-    "reachesEngine": false
+    "reachesEngine": true
   },
   {
     "id": "plant_shutdown",
     "label": "Plant shutdown",
     "scenarioName": "[Stress] Plant shutdown",
-    "description": "Plant production halted for 14 days starting on day 30.",
+    "description": "Plant production halted for 14 days starting on day 120, past the default warm-up.",
     "events": [
       {
         "target": "node:plant",
         "targetType": "node",
-        "startDay": 30,
+        "startDay": 120,
         "durationDays": 14,
         "magnitudePct": 100,
         "resolves": "plant"
@@ -1751,7 +1751,7 @@ export const STRESS_PRESETS: StressPreset[] = [
       {
         "target": "material:critical",
         "targetType": "node",
-        "startDay": 30,
+        "startDay": 120,
         "durationDays": 21,
         "magnitudePct": 50,
         "resolves": "unsupported"
@@ -1768,7 +1768,7 @@ export const STRESS_PRESETS: StressPreset[] = [
       {
         "target": "edge:inbound",
         "targetType": "edge",
-        "startDay": 30,
+        "startDay": 120,
         "durationDays": 28,
         "magnitudePct": 200,
         "resolves": "unsupported"
@@ -1780,12 +1780,12 @@ export const STRESS_PRESETS: StressPreset[] = [
     "id": "demand_surge",
     "label": "Demand surge",
     "scenarioName": "[Stress] Demand surge",
-    "description": "Aggregate demand +40% for 21 days starting on day 30.",
+    "description": "Aggregate demand +40% for 21 days starting on day 120.",
     "events": [
       {
         "target": "customer:all",
         "targetType": "node",
-        "startDay": 30,
+        "startDay": 120,
         "durationDays": 21,
         "magnitudePct": 40,
         "resolves": "unsupported"
@@ -1797,20 +1797,20 @@ export const STRESS_PRESETS: StressPreset[] = [
     "id": "multi_hit",
     "label": "Multi-hit (compound)",
     "scenarioName": "[Stress] Multi-hit compound",
-    "description": "Supplier outage on day 30, demand surge on day 45.",
+    "description": "Supplier outage on day 120, demand surge on day 135.",
     "events": [
       {
         "target": "supplier:primary",
         "targetType": "node",
-        "startDay": 30,
+        "startDay": 120,
         "durationDays": 14,
         "magnitudePct": 100,
-        "resolves": "supplier-id"
+        "resolves": "resolved-at-launch"
       },
       {
         "target": "customer:all",
         "targetType": "node",
-        "startDay": 45,
+        "startDay": 135,
         "durationDays": 14,
         "magnitudePct": 30,
         "resolves": "unsupported"
@@ -1827,7 +1827,7 @@ export const STRESS_PRESETS: StressPreset[] = [
       {
         "target": "node:nexus",
         "targetType": "node",
-        "startDay": 30,
+        "startDay": 120,
         "durationDays": 14,
         "magnitudePct": 100,
         "resolves": "unsupported"

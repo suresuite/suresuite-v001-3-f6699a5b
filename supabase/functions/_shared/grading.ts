@@ -779,6 +779,85 @@ export function gradeManifest(
     });
   }
 
+  // §4 D174 — the OTHER two engine hard failures, which passed this gate for
+  // as long as it existed and killed the run after dispatch with a raw
+  // `pydantic.ValidationError` as the run's error message (acceptance audit
+  // 2026-09-23). The gate exists to say "the engine will refuse this" BEFORE
+  // the dispatch; these mirror `Network`'s own validation exactly.
+  //
+  // (a) `materials with no qualified supplier` fires for EVERY material the
+  // network holds, and a master row is a material whether or not any BOM row
+  // reaches it — the block above only swept the BOM's materials, so an
+  // unconnected master row (upload materials, forget its inbound lane) was
+  // invisible until the engine raised.
+  const masterUnsourced = dataset.materials
+    .map((m) => String(m.material_id ?? "").trim())
+    .filter((m) => m && !arcMaterials.has(m))
+    .sort();
+  if (masterUnsourced.length > 0) {
+    out.push({
+      field: "materials.supplier_link",
+      level: "required",
+      policyRef: "engine",
+      policyName: "engine mechanics",
+      reason:
+        "A material with no inbound lane cannot be simulated — the engine " +
+        "refuses the whole network (`materials with no qualified supplier`). " +
+        "Give it a supplier in Inbound Logistics, or remove the master row.",
+      fallbackProse: null,
+      evaluable: true,
+      set: [],
+      resolved: [],
+      missing: [...new Set(masterUnsourced)],
+    });
+  }
+
+  // (b) `products with empty BoM`. A product the engine will simulate needs a
+  // bill of materials; a master product CONSUMED by another product is a
+  // sub-assembly, which the mapper models through the BOM rather than as a
+  // finished product (datamap drops it from the product list with a mapping
+  // warning), so it is exempt here — the check names only the genuinely
+  // finished products the engine would refuse.
+  // Consumed = named as the CHILD of a real parent: a single-level row's
+  // `material_id`, or a multi-level row's `material_id` under a non-blank
+  // `higher_level_component_id`. A parentless level-0 row is NOT consumption —
+  // it is the root-row shape §4 D171 settled (the product's own root), and
+  // counting it would let a BOM-less product slip past the empty-BOM block by
+  // uploading itself as a level-0 row.
+  const consumedIds = new Set(
+    dataset.bom
+      .filter(
+        (r) =>
+          r.product_id != null ||
+          String(r.higher_level_component_id ?? "").trim() !== "",
+      )
+      .map((r) => String(r.material_id ?? "").trim())
+      .filter(Boolean),
+  );
+  const bomProductIds = new Set(
+    normalizeBomRows(dataset.bom).map((r) => String(r.product_id ?? "").trim()).filter(Boolean),
+  );
+  const emptyBom = [...productIds]
+    .filter((p) => p && !consumedIds.has(p) && !bomProductIds.has(p))
+    .sort();
+  if (emptyBom.length > 0) {
+    out.push({
+      field: "products.bom",
+      level: "required",
+      policyRef: "engine",
+      policyName: "engine mechanics",
+      reason:
+        "A finished product with no bill of materials cannot be simulated — " +
+        "the engine refuses the whole network (`products with empty BoM`). " +
+        "Upload BOM rows for it, or remove the master row.",
+      fallbackProse: null,
+      evaluable: true,
+      set: [],
+      resolved: [],
+      missing: emptyBom,
+    });
+  }
+
   return out;
 }
 

@@ -170,6 +170,26 @@ def build_project_data(
             )
             for r in (customers or []) if r.get("customer_id")
         ],
+        # §4 D174 — a master product CONSUMED by another product is a
+        # sub-assembly. Declared here from the RAW BOM shape (the flattened
+        # arcs above no longer show which nodes were intermediate): a
+        # multi-level row's `material_id` under a real parent, or a
+        # single-level row's `material_id`, is consumed. A parentless
+        # multi-level row is NOT consumption — it is the root-row shape D171
+        # settled. The mapper (`from_project_data`) excludes these ids from
+        # the engine's product list with a mapping warning; without this, the
+        # canonical sub-assembly dataset made every run impossible
+        # (`products with empty BoM`).
+        subassemblies=sorted({
+            str(r["material_id"]).strip()
+            for r in bom
+            if r.get("material_id")
+            and (r.get("product_id")
+                 or str(r.get("higher_level_component_id") or "").strip())
+            and str(r["material_id"]).strip() in {
+                str(p["product_id"]).strip() for p in products if p.get("product_id")
+            }
+        }),
         policies=policies or {},
         scenario=ScenarioSettings(
             horizon_days=int(_num(scenario.get("horizon_days")) or 1092),

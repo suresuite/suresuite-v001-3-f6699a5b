@@ -271,9 +271,13 @@ const MAPPER_ANCHORS = [
   `return raw.lower().startswith("plant:") or stripped.lower() == "plant"`,
   // The strip: everything before the last colon is discarded.
   `target = raw.rsplit(":", 1)[1] if ":" in raw else raw`,
-  // The skip branch, and the warning the user sees when it fires.
+  // The skip branch, and the two warnings the user sees when it fires — an
+  // unsupported target KIND versus a supplier id the project does not have
+  // (split by the D172 fix; the old single message blamed material/edge even
+  // when the target was a supplier).
   `if target not in sup_ids and not is_plant:`,
-  `"unsupported target skipped (material/edge land later in M7)"`,
+  `targets cannot be disrupted yet (land later in M7) — event skipped`,
+  `no supplier or plant named {target!r} in this project's data — event skipped`,
   // The cap: events beyond the fifth are dropped with a warning.
   `for entry in schedule[:5]:`,
   // Partial magnitudes become a capacity cut; a full one does not.
@@ -309,6 +313,13 @@ function assertMapperUnchanged(root) {
 function classifyTarget(raw) {
   const stripped = raw.includes(":") ? raw.slice(raw.lastIndexOf(":") + 1) : raw;
   if (raw.toLowerCase().startsWith("plant:") || stripped.toLowerCase() === "plant") return "plant";
+  // `supplier:primary` never reaches the mapper as written: `launchStress`
+  // replaces it with the project's top-volume supplier before the scenario is
+  // created, and REFUSES the launch when no supplier can be resolved — §4
+  // D172. `assertResolverUnchanged` pins that substitution the way
+  // `assertMapperUnchanged` pins the mapper, so this class goes red if the
+  // launch ever stops resolving.
+  if (raw === "supplier:primary") return "resolved-at-launch";
   // The mapper's remaining door is `target in sup_ids`. A preset target that
   // names a node, material, customer or edge cannot pass it whatever the
   // project holds, because the prefix is stripped before the comparison and
@@ -318,8 +329,37 @@ function classifyTarget(raw) {
   return "unsupported";
 }
 
+/**
+ * The launch-time resolution `classifyTarget` relies on for its
+ * `resolved-at-launch` answer — §4 D172. Pinned like the mapper: if the
+ * resolver or the launch call moves, this throws instead of publishing a
+ * classification the product no longer performs.
+ */
+const RESOLVER_ANCHORS = [
+  ["src/lib/sim/stressTargets.ts", `export const RESOLVABLE_PLACEHOLDER = "supplier:primary";`],
+  ["src/lib/sim/stressTargets.ts", `e.target === RESOLVABLE_PLACEHOLDER ? { ...e, target: \`supplier:\${primary.supplierId}\` } : e`],
+  ["src/pages/SimulationLab.tsx", `resolveStressSchedule(`],
+  ["src/pages/SimulationLab.tsx", `if ("error" in resolved)`],
+];
+
+function assertResolverUnchanged(root) {
+  for (const [file, anchor] of RESOLVER_ANCHORS) {
+    const src = readFileSync(join(root, ...file.split("/")), "utf8");
+    if (!src.includes(anchor)) {
+      throw new Error(
+        `chains: ${file} no longer contains\n  ${anchor}\n` +
+          "The `resolved-at-launch` class in the stress-preset classification " +
+          "mirrors that substitution. Re-read the launch path and update both, " +
+          "rather than publishing a page that says a placeholder is resolved " +
+          "when it may no longer be.",
+      );
+    }
+  }
+}
+
 export function deriveStressPresets(root) {
   assertMapperUnchanged(root);
+  assertResolverUnchanged(root);
   const src = readFileSync(join(root, "src", "components", "sim", "StressTestCard.tsx"), "utf8");
   const block = /export const STRESS_TESTS:\s*StressTest\[\]\s*=\s*\[([\s\S]*?)\n\];/.exec(src);
   if (!block) {
@@ -360,10 +400,16 @@ export function deriveStressPresets(root) {
       scenarioName: m[3],
       description: m[4].replace(/\\"/g, '"'),
       events,
-      // A preset reaches the engine when at least one of its events does, on
-      // every project. `supplier-id` is deliberately NOT counted: it reaches
-      // the engine only on a project whose supplier is called `primary`.
-      reachesEngine: events.some((x) => x.resolves === "plant"),
+      // A preset reaches the engine when EVERY event does, on every project a
+      // launch admits. `plant` always maps; `resolved-at-launch` maps because
+      // the launch substitutes a real supplier id or refuses (D172).
+      // `supplier-id` is deliberately NOT counted: it reaches the engine only
+      // on a project whose supplier happens to carry the placeholder's name.
+      // And SOME is the wrong quantifier: a compound preset with one live and
+      // one dropped event claims a compound test it does not perform.
+      reachesEngine: events.every(
+        (x) => x.resolves === "plant" || x.resolves === "resolved-at-launch",
+      ),
     });
   }
   if (presets.length < 5) {

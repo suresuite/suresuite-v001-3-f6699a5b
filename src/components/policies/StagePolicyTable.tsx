@@ -1211,6 +1211,17 @@ export function StagePolicyTable({
                   needs supplier
                 </RowFlag>
               )}
+              {/* §4 D175 — the two material classes this stage used to hide. */}
+              {i === 0 && r.__in_house && (
+                <RowFlag title="Consumed by another BOM item and produced from its own components — modeled through the BOM. There is no supplier to configure; sourcing does not apply to this line.">
+                  made in-house
+                </RowFlag>
+              )}
+              {i === 0 && r.__not_in_bom && (
+                <RowFlag title="In the item master but in no BOM and no inbound lane. The pre-run check blocks a simulation while such a row exists — assign a supplier lane, add it to the BOM, or remove the master row.">
+                  not in BOM
+                </RowFlag>
+              )}
               {i === 0 &&
                 !r.__needs_supplier &&
                 Number(r.__lane_count ?? 0) > 1 &&

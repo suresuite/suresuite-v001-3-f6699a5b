@@ -18,7 +18,7 @@ __version__ = "0.2.0"
 # Engine semantic version. Bump per change-governance tiers (Part IX §9.5):
 #   Tier 2 (new variable, behavior-neutral default) -> patch
 #   Tier 3 (new phase / contract change)            -> minor or major + ADR
-ENGINE_VERSION = "0.2.7"  # audit F-25 switch (user decision 2026-09-22): MSER-5 is White (1997); the old statistic is reported as mser5_legacy_week
+ENGINE_VERSION = "0.2.8"  # §4 D174/D172: sub-assembly products excluded from the engine's product list (with a mapping warning); the event-skip warning names its real cause
 
 from scsim.entities.config import SimulationSettings, StatisticsReport  # noqa: E402,F401
 from scsim.entities.network import (  # noqa: E402,F401
