@@ -40,6 +40,7 @@ import {
   type ColSpecCtx,
 } from "@/lib/policies/columnSpecs";
 import { fitColumns, foldNote, type FitCol } from "@/lib/policies/columnFit";
+import { buildBomTreeView, type TreeEntry } from "@/lib/policies/bomTreeView";
 import { groupByKeyA, summarise } from "@/lib/policies/groupRows";
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
@@ -651,6 +652,28 @@ export function StagePolicyTable({
   const rowGroups = useMemo(
     () => groupByKeyA(filtered as Record<string, unknown>[], spec.keyCols[0]?.id ?? ""),
     [filtered, spec.keyCols],
+  );
+
+  // §4 D176 — the Supplier stage's BOM tree (multi-level projects only).
+  // Presentation only: `filtered` is still the flat row set every guard,
+  // prefill and verifier reads; the tree orders it and interleaves read-only
+  // structural rows built from the upload's shape + the derived lane's
+  // numbers (`bomTreeView.ts`). An active column sort shows the flat view —
+  // the tree has its own order.
+  const treeAvailable =
+    stageKey === "supplier" && (stageRows.bomLevel ?? "").includes("multi");
+  const [viewMode, setViewMode] = useState<"tree" | "flat">("tree");
+  const treeActive = treeAvailable && viewMode === "tree" && sort === null;
+  const treeEntries = useMemo<TreeEntry[]>(
+    () =>
+      treeActive
+        ? buildBomTreeView({
+            bomRows: stageRows.bomRows ?? [],
+            deepRows: stageRows.deepRows ?? [],
+            supplierRows: filtered as Array<Record<string, unknown> & { key: string }>,
+          })
+        : [],
+    [treeActive, stageRows.bomRows, stageRows.deepRows, filtered],
   );
   const collapsibleGroups = useMemo(() => rowGroups.filter((g) => g.members.length > 1), [rowGroups]);
   const anyGroupExpanded = collapsibleGroups.some((g) => !collapsedGroups.has(`${stageKey}::${g.id}`));
@@ -1523,7 +1546,34 @@ export function StagePolicyTable({
             />
           ))}
         </div>
-        {collapsibleGroups.length > 0 && (
+        {treeAvailable && (
+          <span className="inline-flex h-[22px] items-center overflow-hidden rounded-sm border border-[--zinc-border] bg-white font-mono text-[10px]">
+            {(["tree", "flat"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setViewMode(m)}
+                className={cn(
+                  "px-[7px] py-0 h-full",
+                  viewMode === m ? "bg-[#171717] text-white" : "text-muted-foreground hover:text-foreground",
+                )}
+                title={
+                  m === "tree"
+                    ? "Order the grid by the BOM structure: finished product → sub-assembly → purchased material, with supplier lanes under each material"
+                    : "Today's flat lane grid"
+                }
+              >
+                {m === "tree" ? "BOM tree" : "flat"}
+              </button>
+            ))}
+          </span>
+        )}
+        {treeAvailable && viewMode === "tree" && sort !== null && (
+          <span className="font-mono text-[10px] text-muted-foreground">
+            sorted — showing flat (clear the sort to see the tree)
+          </span>
+        )}
+        {!treeActive && collapsibleGroups.length > 0 && (
           <button
             type="button"
             onClick={toggleAllGroups}
@@ -1770,6 +1820,158 @@ export function StagePolicyTable({
               </tr>
             )}
             {!loading &&
+              treeActive &&
+              (() => {
+                // §4 D176 — the tree render pass. Structural rows are
+                // read-only; lane rows go through renderRow UNCHANGED (the ↳
+                // continuation form, since the material is named by the
+                // structural row above). A collapsed node hides its subtree.
+                const fmt = (n: number | null): string => {
+                  if (n === null) return "—";
+                  const a = Math.abs(n);
+                  return a >= 100 ? n.toFixed(0) : String(Number(n.toFixed(2)));
+                };
+                const isHidden = (path: string[]): boolean => {
+                  for (let d = 1; d < path.length; d++) {
+                    if (collapsedGroups.has(`tree::${path.slice(0, d).join("/")}`)) return true;
+                  }
+                  return false;
+                };
+                const stripSpan = Math.max(1, visible.length);
+                const structuralRow = (
+                  key: string,
+                  depth: number,
+                  colA: React.ReactNode,
+                  colB: string,
+                  strip: React.ReactNode,
+                  tone: "root" | "node" | "section",
+                ) => (
+                  <tr key={key} className="group">
+                    <td
+                      className="sticky z-20 border-b border-r border-[--hair-divider] px-2 py-[3px] font-mono text-[11px]"
+                      style={{
+                        left: keyLeft(0),
+                        width: keyWidths[0],
+                        minWidth: keyWidths[0],
+                        maxWidth: keyWidths[0],
+                        background: tone === "root" ? "#f0f0f0" : tone === "section" ? "#fafafa" : "#f7f7f7",
+                        borderLeft: tone === "root" ? "2px solid #171717" : "2px solid transparent",
+                        paddingLeft: 8 + depth * 12,
+                      }}
+                    >
+                      {colA}
+                    </td>
+                    <td
+                      className="sticky z-20 border-b border-r border-[--hair-divider] px-2 py-[3px] font-mono text-[10px] text-muted-foreground"
+                      style={{
+                        left: keyLeft(1),
+                        width: keyWidths[1],
+                        minWidth: keyWidths[1],
+                        maxWidth: keyWidths[1],
+                        background: tone === "root" ? "#f0f0f0" : tone === "section" ? "#fafafa" : "#f7f7f7",
+                      }}
+                    >
+                      {colB}
+                    </td>
+                    <td
+                      colSpan={stripSpan}
+                      className="border-b border-[--hair-divider] px-2 py-[3px] font-mono text-[10.5px] text-muted-foreground"
+                      style={{ background: tone === "root" ? "#f0f0f0" : tone === "section" ? "#fafafa" : "#f7f7f7" }}
+                    >
+                      {strip}
+                    </td>
+                  </tr>
+                );
+                const chevron = (path: string[]) => {
+                  const id = `tree::${path.join("/")}`;
+                  const closed = collapsedGroups.has(id);
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(id)}
+                      className="mr-1 grid h-[15px] w-[15px] shrink-0 place-items-center font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                      title={closed ? "Expand this branch" : "Collapse this branch"}
+                    >
+                      {closed ? "▸" : "▾"}
+                    </button>
+                  );
+                };
+                return treeEntries.map((e, idx) => {
+                  if (e.kind === "root") {
+                    return structuralRow(
+                      `t-root-${e.nodeId}`,
+                      0,
+                      <span className="flex items-center">
+                        {chevron(e.path)}
+                        <span className="min-w-0 flex-1 truncate font-medium text-foreground" title={e.nodeId}>{e.nodeId}</span>
+                      </span>,
+                      "finished product",
+                      e.demandPerWeek !== null
+                        ? <>demand <span className="text-foreground">{fmt(e.demandPerWeek)}/wk</span> · from its outbound lanes</>
+                        : <>no outbound demand — flows below cannot be derived</>,
+                      "root",
+                    );
+                  }
+                  if (e.kind === "node") {
+                    if (isHidden(e.path)) return null;
+                    const depth = e.path.length - 1;
+                    return structuralRow(
+                      `t-node-${idx}-${e.path.join("/")}`,
+                      depth,
+                      <span className="flex items-center">
+                        {chevron(e.path)}
+                        <span className="min-w-0 flex-1 truncate" title={e.nodeId}>{e.nodeId}</span>
+                        <span className="ml-1 shrink-0 rounded-sm bg-[#ececec] px-1 text-[9px] uppercase tracking-wide">
+                          {e.echelon === "subassembly" ? "sub" : "mat"}
+                        </span>
+                      </span>,
+                      e.echelon === "subassembly" ? "sub-assembly" : "material",
+                      !e.derived ? (
+                        <span title="The uploaded BOM edge has no row in the derived lane — run Combine on the Data Manager, or the ETL has not seen this upload yet.">
+                          L{e.depth ?? "?"} · not derived — run Combine
+                        </span>
+                      ) : (
+                        <span title={`level ${e.depth ?? "?"} · edge consumption rate ×${fmt(e.edgeRate)} · effective rate from ${e.rootId} ×${fmt(e.effRate)} · inherited weekly flow ${fmt(e.flowPerWeek)}/wk — read from the derived lane (supply_chain_data_multi_tier); eff = flow ÷ root demand`}>
+                          L{e.depth ?? "?"} · rate <span className="text-foreground">×{fmt(e.edgeRate)}</span> · eff{" "}
+                          <span className="text-foreground">×{fmt(e.effRate)}</span> ·{" "}
+                          <span className="text-foreground">{fmt(e.flowPerWeek)}/wk</span>
+                          {!e.carriesLanes && e.canonicalPath && (
+                            <span className="ml-2 text-[10px]">↗ sourced under {e.canonicalPath[Math.max(0, e.canonicalPath.length - 2)]}</span>
+                          )}
+                        </span>
+                      ),
+                      "node",
+                    );
+                  }
+                  if (e.kind === "lane") {
+                    if (isHidden(e.path)) return null;
+                    return renderRow(e.row as Record<string, unknown>, {
+                      isFirstOfGroup: false,
+                      isContinuation: true,
+                      groupId: `tree::${e.path.join("/")}`,
+                    });
+                  }
+                  // section
+                  return structuralRow(
+                    `t-section-${e.id}`,
+                    0,
+                    <span className="font-medium text-foreground">
+                      {e.id === "unreachable" ? "Not reaching any shipping product" : "Not in the BOM"}
+                    </span>,
+                    e.id === "unreachable" ? `${e.count} edges` : `${e.count} materials`,
+                    e.id === "unreachable" ? (
+                      <span title="Derived lane edges whose walk found no shipping product above them — check the BOM rows and outbound demand.">
+                        derived edges with no route to a finished product
+                      </span>
+                    ) : (
+                      <span>lanes whose material appears in no BOM — see each line's flag</span>
+                    ),
+                    "section",
+                  );
+                });
+              })()}
+            {!loading &&
+              !treeActive &&
               rowGroups.flatMap((group) => {
                 const isCollapsible = group.members.length > 1;
                 const groupId = `${stageKey}::${group.id}`;

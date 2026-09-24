@@ -40,6 +40,14 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
   // D20: lane tables whose read hit the ceiling. The grid RENDERS this; it is
   // not a log line. An empty array is the normal case and the honest one.
   const [truncated, setTruncated] = useState<string[]>([]);
+  // §4 D176 — the Supplier stage's BOM-tree presentation. Raw upload rows and
+  // the derived deep-lane rows ride along on the supplier stage of a
+  // multi-level project so the grid can render the structure. They decorate
+  // the presentation ONLY: `rows` above stays the flat set every guard,
+  // prefill and verification reads.
+  const [bomLevel, setBomLevel] = useState<string>("single");
+  const [bomRows, setBomRows] = useState<Record<string, unknown>[]>([]);
+  const [deepRows, setDeepRows] = useState<Record<string, unknown>[]>([]);
   // Bumped by reload() to refetch after a write (e.g. assigning a supplier).
   const [tick, setTick] = useState(0);
 
@@ -52,6 +60,9 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
     setLoading(true);
     setFallback(false);
     setTruncated([]);
+    setBomLevel("single");
+    setBomRows([]);
+    setDeepRows([]);
 
     (async () => {
       const sb = supabase as any;
@@ -78,6 +89,40 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
         // Multi-level BOM shape only; single-level projects have no
         // higher_level_component_id hierarchy (matches previous behavior).
         const bom = lanes.bomLevel.includes("multi") ? lanes.bom : [];
+        if (!cancelled) {
+          setBomLevel(lanes.bomLevel);
+          setBomRows(bom);
+        }
+
+        // §4 D176 — the derived deep lane, read for the supplier stage's tree
+        // on multi-level projects. Same RPC and paging the network pages use;
+        // the numbers on the tree are THESE rows, never a client-side walk.
+        if (stage === "supplier" && lanes.bomLevel.includes("multi")) {
+          const pageSize = 1000;
+          let all: Record<string, unknown>[] = [];
+          let offset = 0;
+          for (let page = 0; page < 50; page++) {
+            const { data: mt, error: mtErr } = await sb.rpc("get_supply_chain_data_multi_tier", {
+              p_project_id: projectId,
+              p_user_id: user.id,
+              p_user_email: user.email,
+              p_limit: pageSize,
+              p_offset: offset,
+            });
+            if (mtErr) {
+              // The tree degrades loudly in the grid ("not derived"); the flat
+              // rows above are unaffected. Never fail the stage over this read.
+              console.warn("[useStageRows] deep-lane read failed — tree numbers unavailable", mtErr);
+              all = [];
+              break;
+            }
+            if (!mt || mt.length === 0) break;
+            all = all.concat(mt as Record<string, unknown>[]);
+            if (mt.length < pageSize) break;
+            offset += pageSize;
+          }
+          if (!cancelled) setDeepRows(all);
+        }
 
         // Unit contract (docs/data-simulation-mapping.md §3): `time_unit`
         // describes the VOLUME period only (day/week/month/yearly/…), while
@@ -643,5 +688,5 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
 
   const reload = () => setTick((t) => t + 1);
 
-  return { rows, loading, fallback, truncated, reload };
+  return { rows, loading, fallback, truncated, reload, bomLevel, bomRows, deepRows };
 }
