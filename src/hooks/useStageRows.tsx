@@ -356,6 +356,78 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             });
           }
 
+          // §4 D175 — EVERY material the project knows gets a line on this
+          // stage. Until now the grid held (a) one line per supplier×material
+          // lane and (b) BOM LEAF materials with no lane — two whole classes
+          // were invisible with nothing saying so (AA-ver3: 260 BOM
+          // materials, 35 with lanes; §15 run `35433474185`):
+          //
+          //   · INTERMEDIATE BOM materials (sub-assemblies — also a parent in
+          //     the BOM): made, not bought. Listed as "(made in-house)", no
+          //     "needs supplier" alarm — a supplier is not what they lack.
+          //   · MASTER materials in no BOM and no lane: since D174 the
+          //     pre-run gate BLOCKS a run over these, so hiding them here hid
+          //     a run-blocker behind an unrelated page.
+          const pairedMaterials = new Set(
+            [...seen.values()].map((r) => String(r.material_id ?? "")),
+          );
+          const outboundProductIds = new Set(
+            outbound.map((r) => String(r.product_id ?? "").trim()).filter(Boolean),
+          );
+          const bomMaterialIds = new Set<string>();
+          for (const r of bom) {
+            const id = String(r.material_id ?? "").trim();
+            if (id) bomMaterialIds.add(id);
+          }
+          for (const mat of bomMaterialIds) {
+            // Intermediate: consumed AND consuming — and not a shipped
+            // product's own root row (the D171 shape).
+            if (!isParent.has(mat) || outboundProductIds.has(mat)) continue;
+            if (pairedMaterials.has(mat)) continue;
+            const key = `(made in-house)::${mat}`;
+            if (seen.has(key)) continue;
+            seen.set(key, {
+              key,
+              supplier_id: "(made in-house)",
+              material_id: mat,
+              __in_house: true,
+              __supplier_count: 0,
+              __lane_count: 0,
+            });
+            pairedMaterials.add(mat);
+          }
+          try {
+            // Same direct read the Item Master editor uses (its RLS admits it;
+            // the lane tables' does not — see projectLanes.ts).
+            const { data: masterRows, error: masterErr } = await sb
+              .from("materials")
+              .select("material_id")
+              .eq("project_id", projectId)
+              .limit(50_000);
+            if (masterErr) throw masterErr;
+            for (const m of (masterRows ?? []) as Record<string, unknown>[]) {
+              const mat = String(m.material_id ?? "").trim();
+              if (!mat || pairedMaterials.has(mat) || bomMaterialIds.has(mat)) continue;
+              const key = `(unassigned supplier)::${mat}`;
+              if (seen.has(key)) continue;
+              seen.set(key, {
+                key,
+                supplier_id: "(unassigned supplier)",
+                material_id: mat,
+                __needs_supplier: true,
+                __not_in_bom: true,
+                __supplier_count: 0,
+                __lane_count: 0,
+              });
+              pairedMaterials.add(mat);
+            }
+          } catch (masterReadErr) {
+            // A failed master read may not silently shrink the list back to
+            // the lanes-only view: the rows below are still complete for the
+            // BOM; only master-only materials are unknown. Say so.
+            console.warn("[useStageRows] materials master read failed — master-only materials are not listed", masterReadErr);
+          }
+
           if (!cancelled)
             setRows(
               [...seen.values()].sort(

@@ -1363,12 +1363,12 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:532, src/hooks/useStageRows.tsx:547."
+      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:604, src/hooks/useStageRows.tsx:619."
     ],
     "breakClass": "app-routing",
     "breakEvidence": [
-      "src/hooks/useStageRows.tsx:532",
-      "src/hooks/useStageRows.tsx:547"
+      "src/hooks/useStageRows.tsx:604",
+      "src/hooks/useStageRows.tsx:619"
     ]
   }
 ];
