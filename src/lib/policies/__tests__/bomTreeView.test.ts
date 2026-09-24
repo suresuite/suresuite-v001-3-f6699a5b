@@ -1,5 +1,5 @@
 /**
- * §4 D176 — the Supplier stage's BOM tree is a READ of the derivation.
+ * §4 D177 — the Supplier stage's BOM tree is a READ of the derivation.
  *
  * The fixture mirrors `supabase/rehearsal/310_one_etl_depth_and_demand.sql`'s
  * hand-checked math: PROD ships 10/week, the chain is
@@ -37,7 +37,7 @@ const supplierRows = [
 const nodes = (es: TreeEntry[]) => es.filter((e): e is Extract<TreeEntry, { kind: "node" }> => e.kind === "node");
 const lanes = (es: TreeEntry[]) => es.filter((e): e is Extract<TreeEntry, { kind: "lane" }> => e.kind === "lane");
 
-describe("buildBomTreeView (D176)", () => {
+describe("buildBomTreeView (D177)", () => {
   const out = buildBomTreeView({ bomRows, deepRows, supplierRows });
 
   it("the 240 check: every displayed number is the derivation's, eff = flow ÷ root demand", () => {

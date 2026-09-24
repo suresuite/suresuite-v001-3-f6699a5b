@@ -21,7 +21,7 @@ export interface StageRowsQuery {
    *  (`LaneTruncationNotice`) — these rows are a slice when it is non-empty. */
   truncated: string[];
   reload: () => void;
-  /** §4 D176 — presentation-only extras for the supplier stage's BOM tree.
+  /** §4 D177 — presentation-only extras for the supplier stage's BOM tree.
    *  `rows` above remains the flat set every guard and verifier reads. */
   bomLevel: string;
   bomRows: Record<string, unknown>[];

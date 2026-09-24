@@ -1,5 +1,5 @@
 /**
- * The Supplier stage's BOM tree — §4 D176.
+ * The Supplier stage's BOM tree — §4 D177.
  *
  * On a multi-level project the flat lane grid answered "which lanes exist" and
  * nothing else: the structure (which finished product a material feeds, through

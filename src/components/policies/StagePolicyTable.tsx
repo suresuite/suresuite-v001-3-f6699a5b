@@ -50,6 +50,7 @@ import {
   getEffectiveValue as getEffectiveValueShared,
   isPrefillPersistable,
   resolveCell,
+  rowHasSeedableField,
   substitutionNote,
 } from "@/lib/policies/resolveEffective";
 import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
@@ -654,7 +655,7 @@ export function StagePolicyTable({
     [filtered, spec.keyCols],
   );
 
-  // §4 D176 — the Supplier stage's BOM tree (multi-level projects only).
+  // §4 D177 — the Supplier stage's BOM tree (multi-level projects only).
   // Presentation only: `filtered` is still the flat row set every guard,
   // prefill and verifier reads; the tree orders it and interleaves read-only
   // structural rows built from the upload's shape + the derived lane's
@@ -896,9 +897,15 @@ export function StagePolicyTable({
     }
   };
 
-  // Whether any row has at least one field backed by real uploaded data.
-  const hasRealProjectData = useMemo(
-    () => dataRows.some((r) => Object.keys((r as any).__from_data ?? {}).length > 0),
+  // Whether the prefill has anything to persist: a field backed by uploaded
+  // data OR a routing decision the stage derived from the uploads. Asked of
+  // `rowHasSeedableField` (which derives from `prefillSourceFor`), not read
+  // off `__from_data` directly — that narrower reading made the auto-seed
+  // unreachable on the customer stage, whose only persistable fields are
+  // `__decided` routing (§4 D23), so the suggested primary sourcing firm
+  // never reached the saved bundle the pre-run gate reads (blueprint G16).
+  const hasSeedableData = useMemo(
+    () => dataRows.some((r) => rowHasSeedableField(r as Record<string, unknown>)),
     [dataRows],
   );
   // Whether any override already targets a row in this stage.
@@ -1006,7 +1013,7 @@ export function StagePolicyTable({
     const marker = `${projectId}::${stageKey}`;
     if (autoSeededRef.current.has(marker)) return;
     if (loading || applying || dataRows.length === 0) return;
-    if (!hasRealProjectData || hasOverridesForStage) return;
+    if (!hasSeedableData || hasOverridesForStage) return;
     autoSeededRef.current.add(marker);
     // An effect body cannot await; it does not need to. `applyPrefill` raises
     // `applying` synchronously before it touches a row, and this effect's own
@@ -1014,7 +1021,7 @@ export function StagePolicyTable({
     // user did not ask for it, so it does not toast.
     void applyPrefill({ silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, applying, dataRows, hasRealProjectData, hasOverridesForStage]);
+  }, [loading, applying, dataRows, hasSeedableData, hasOverridesForStage]);
 
   // Banner state: derived from project data presence + override existence.
   const dataBannerState = useMemo(():
@@ -1023,7 +1030,7 @@ export function StagePolicyTable({
     | "seeded"
     | "none_applicable"
     | "pending" => {
-    if (!hasRealProjectData) return "no_data";
+    if (!hasSeedableData) return "no_data";
     if (applying) return "seeding";
     if (hasOverridesForStage) return "seeded";
     // Prefill has run and the uploaded data had nothing to say about any of
@@ -1031,7 +1038,7 @@ export function StagePolicyTable({
     // press a button that does nothing.
     if (prefillSettled) return "none_applicable";
     return "pending";
-  }, [hasRealProjectData, applying, hasOverridesForStage, prefillSettled]);
+  }, [hasSeedableData, applying, hasOverridesForStage, prefillSettled]);
 
   /** Reset one row: drop drafts + delete all saved overrides on that row. */
   const resetRow = async (rowKey: string) => {
@@ -1822,7 +1829,7 @@ export function StagePolicyTable({
             {!loading &&
               treeActive &&
               (() => {
-                // §4 D176 — the tree render pass. Structural rows are
+                // §4 D177 — the tree render pass. Structural rows are
                 // read-only; lane rows go through renderRow UNCHANGED (the ↳
                 // continuation form, since the material is named by the
                 // structural row above). A collapsed node hides its subtree.

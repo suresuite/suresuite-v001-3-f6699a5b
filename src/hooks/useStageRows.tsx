@@ -40,7 +40,7 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
   // D20: lane tables whose read hit the ceiling. The grid RENDERS this; it is
   // not a log line. An empty array is the normal case and the honest one.
   const [truncated, setTruncated] = useState<string[]>([]);
-  // §4 D176 — the Supplier stage's BOM-tree presentation. Raw upload rows and
+  // §4 D177 — the Supplier stage's BOM-tree presentation. Raw upload rows and
   // the derived deep-lane rows ride along on the supplier stage of a
   // multi-level project so the grid can render the structure. They decorate
   // the presentation ONLY: `rows` above stays the flat set every guard,
@@ -94,7 +94,7 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
           setBomRows(bom);
         }
 
-        // §4 D176 — the derived deep lane, read for the supplier stage's tree
+        // §4 D177 — the derived deep lane, read for the supplier stage's tree
         // on multi-level projects. Same RPC and paging the network pages use;
         // the numbers on the tree are THESE rows, never a client-side walk.
         if (stage === "supplier" && lanes.bomLevel.includes("multi")) {
@@ -440,6 +440,31 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               __lane_count: 0,
             });
             pairedMaterials.add(mat);
+          }
+          // §4 D176 — D175's sweep read the MULTI-level shape only. `bom`
+          // above is empty on a single-level project (the hierarchy walk
+          // needs `higher_level_component_id`, which the single shape lacks),
+          // so a material living only in `bom_single_level` — uploaded BOM,
+          // no inbound lane, no master row — had no source left and stayed
+          // invisible: the exact class D175 closed, one table over. The
+          // single shape has no intermediates (every row is product ←
+          // material), so an unpaired id here is bought and needs a supplier.
+          if (!lanes.bomLevel.includes("multi")) {
+            for (const r of lanes.bom) {
+              const mat = String(r.material_id ?? "").trim();
+              if (!mat || pairedMaterials.has(mat) || outboundProductIds.has(mat)) continue;
+              const key = `(unassigned supplier)::${mat}`;
+              if (seen.has(key)) continue;
+              seen.set(key, {
+                key,
+                supplier_id: "(unassigned supplier)",
+                material_id: mat,
+                __needs_supplier: true,
+                __supplier_count: 0,
+                __lane_count: 0,
+              });
+              pairedMaterials.add(mat);
+            }
           }
           try {
             // Same direct read the Item Master editor uses (its RLS admits it;
