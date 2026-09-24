@@ -327,7 +327,7 @@ export const FIELD_GROUPS: Record<PolicyFamily, Record<string, string[]>> = {
     Contract: ["contract_type"],
   },
   inventory: {
-    Basics: ["type", "reorder_point", "order_up_to", "min_stock", "max_stock"],
+    Basics: ["type", "reorder_point", "order_up_to", "rop_q_quantity", "min_stock", "max_stock"],
     "Safety stock": [
       "safety_stock_method",
       "safety_stock_days",
@@ -427,6 +427,7 @@ export const SCSIM_VISIBLE_FIELDS: Partial<Record<PolicyFamily, ReadonlySet<stri
   sourcing: new Set(["strategy", "ratios", "supply_share"]),
   inventory: new Set([
     "type",
+    "rop_q_quantity",
     "safety_stock_method",
     "safety_stock_days",
     "service_level_target",

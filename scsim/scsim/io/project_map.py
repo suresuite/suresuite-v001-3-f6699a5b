@@ -1342,6 +1342,8 @@ def _map_policies(
         "base_stock": "base_stock", "rop": "rop_q", "periodic_review": "periodic",
     }
     out["inventory_control"] = {"policy_type": type_map.get(str(inv.get("type", "min_max")), "min_max")}
+    if out["inventory_control"]["policy_type"] == "rop_q" and inv.get("rop_q_quantity") is not None:
+        out["inventory_control"]["rop_q_quantity"] = float(inv["rop_q_quantity"])
     w.append(MappingWarning("info", "policy:inventory_control", "order_up_to",
                             "legacy absolute order_up_to replaced by coverage-based κ (≈8 weeks)"))
 
