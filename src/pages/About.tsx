@@ -39,16 +39,6 @@ const PROGRAMMES = [
     statusClass: 'text-[#BF2330] border-[#BF2330]/30',
     detail: 'GA 101138269 · 01/12/2023 → 30/11/2026',
   },
-  {
-    key: 'eurofmx',
-    logo: '/funding/EUF-MX-Logo.png',
-    alt: 'euroFMX',
-    line: 'Horizon Europe',
-    status: 'Next',
-    statusClass: 'text-muted-foreground border-border',
-    // HORIZON-CL4-2025-03-DIGITAL-EMERGING-07 · 48 months from 01/06/2026
-    detail: 'GA 101299128 · 01/06/2026 → 31/05/2030',
-  },
 ];
 
 type Person = {

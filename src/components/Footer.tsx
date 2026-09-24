@@ -45,7 +45,7 @@ const Footer: React.FC<FooterProps> = ({ isCollapsed = false, hasNavBar = true }
         }}
       >
         Developed by <span className="font-semibold">Phu Nguyen</span> &{" "}
-        <span className="font-semibold">Prof. Dmitry Ivanov</span> (HWR Berlin) · WP4 - ACCURATE project, funded by the European Union
+        <span className="font-semibold">Prof. Dmitry Ivanov</span> (HWR Berlin) - ACCURATE project, funded by the European Union
       </div>
     </footer>
   );
