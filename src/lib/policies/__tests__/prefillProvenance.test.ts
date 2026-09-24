@@ -9,7 +9,7 @@
 // defects, and a grep is the only thing that keeps it from coming back.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { isPrefillPersistable, resolveCell } from "../resolveEffective";
+import { isPrefillPersistable, resolveCell, rowHasSeedableField } from "../resolveEffective";
 import { DEFAULT_BUNDLE, type PolicyFamily } from "../schemas";
 import { STAGE_TABLE_SPEC, type ColSpec } from "../columnSpecs";
 import type { OverrideRow } from "../resolve";
@@ -124,6 +124,42 @@ describe("D16 — the provenance dot tells the truth", () => {
 
   it("marks an unsaved edit as edited", () => {
     expect(cell(row, supplierCol("material_price"), [], 3).provenance).toBe("edited");
+  });
+});
+
+describe("G16 — the auto-seed trigger sees routing decisions", () => {
+  // The customer stage's rows carry NO `__from_data` at all: every persistable
+  // field there is a routing decision in `__decided` (§4 D23 moved them out).
+  // The auto-seed used to gate on `__from_data` alone, so on that stage it
+  // could never fire — the grid showed a suggested primary sourcing firm that
+  // never reached the saved bundle, which is the only place the pre-run gate
+  // reads, and verification blocked a pair the page displayed as resolved.
+  it("a customer row whose only persistable fields are decided routing is seedable", () => {
+    const customerRow = {
+      key: "C001::P001",
+      customer_id: "C001",
+      product_id: "P001",
+      sourcing_firm: "Test Plant",
+      primary_source: true,
+      __from_data: {},
+      __imputed: {},
+      __decided: { sourcing_firm: true, primary_source: true },
+    };
+    expect(rowHasSeedableField(customerRow)).toBe(true);
+  });
+
+  it("a row with nothing persistable is not seedable", () => {
+    expect(rowHasSeedableField({ key: "k", __from_data: {}, __imputed: {}, __decided: {} })).toBe(false);
+    expect(rowHasSeedableField({ key: "k" })).toBe(false);
+  });
+
+  it("derives from prefillSourceFor — an imputed field never makes a row seedable", () => {
+    const imputedOnly = {
+      key: "k",
+      __from_data: { material_price: true },
+      __imputed: { material_price: true },
+    };
+    expect(rowHasSeedableField(imputedOnly)).toBe(false);
   });
 });
 

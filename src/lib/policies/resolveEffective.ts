@@ -536,3 +536,24 @@ export function isPrefillPersistable(
 ): boolean {
   return prefillSourceFor(row, field, draft) !== null;
 }
+
+/**
+ * Does the prefill have anything to persist on this row? Derived from
+ * `prefillSourceFor` — never a second reading of the markers — because the
+ * auto-seed's trigger used to BE that second reading (`__from_data` only),
+ * and the customer stage has no data-backed column at all: every one of its
+ * persistable fields is a routing decision in `__decided`. Gated that way,
+ * the auto-seed was unreachable there, so the grid showed a suggested
+ * primary sourcing firm that never reached the saved bundle — which is the
+ * only place the pre-run gate reads (blueprint G16, §4 D23).
+ */
+export function rowHasSeedableField(row: Record<string, unknown>): boolean {
+  const candidates = new Set([
+    ...Object.keys((row.__from_data ?? {}) as Record<string, true>),
+    ...Object.keys((row.__decided ?? {}) as Record<string, true>),
+  ]);
+  for (const field of candidates) {
+    if (prefillSourceFor(row, field) !== null) return true;
+  }
+  return false;
+}
