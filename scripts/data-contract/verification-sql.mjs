@@ -2270,6 +2270,62 @@ async function section15(pid) {
 }
 
 /**
+ * §15 · D175 follow-up — WHERE does each project's notion of "a material" live?
+ *
+ * D175 closed the Supplier stage's visibility gap by appending two row classes
+ * (BOM intermediates, master-only materials) to the lane rows. What the fix
+ * still cannot list is a material that exists ONLY in `bom_single_level` —
+ * `useStageRows` reads the multi-level shape only (its line-80 guard), and a
+ * single-level-only id that is also absent from `materials` has no source left.
+ * A user report (2026-09-24, project `Test_Simulation`: "2 materials, 1 shown")
+ * is either that shape, a not-yet-loaded frontend build, or an id that is a
+ * PRODUCT to the model. Only production can say which, so this reads it —
+ * every project, per §4 D42, with a per-id breakdown where the id count is
+ * small enough to print.
+ */
+async function d175MaterialVisibility() {
+  section("§15 · D175 follow-up — where each project's materials live, per source");
+  const counts = await tryQ(`
+    select p.name as project,
+           (select count(distinct m.material_id) from public.materials m where m.project_id = p.id) as master,
+           (select count(distinct b.material_id) from public.bom_single_level b where b.project_id = p.id) as bom_single,
+           (select count(distinct b.material_id) from public.bom_multi_level b where b.project_id = p.id) as bom_multi,
+           (select count(distinct l.material_id) from public.inbound_logistics l where l.project_id = p.id) as inbound,
+           (select count(distinct s.to_location) from public.supply_chain_data s
+             where s.project_id = p.id and s.data_source = 'inbound') as scd_inbound
+      from public.projects p
+     order by p.name`);
+  report("(D175a) distinct material ids per source, every project", counts, (rows) => {
+    out("", "**(D175a) distinct material ids per source per project** — the Supplier grid renders `scd_inbound` lanes; D175 adds `bom_multi` leaves/intermediates and `master`; nothing renders a `bom_single`-only id:");
+    out(...table(rows));
+  });
+  const perId = await tryQ(`
+    with ids as (
+      select project_id, material_id as id from public.materials
+      union select project_id, material_id from public.bom_single_level
+      union select project_id, material_id from public.bom_multi_level
+      union select project_id, material_id from public.inbound_logistics
+      union select project_id, to_location from public.supply_chain_data where data_source = 'inbound'
+    )
+    select p.name as project, i.id as material,
+           exists(select 1 from public.materials m where m.project_id = i.project_id and m.material_id = i.id) as master,
+           exists(select 1 from public.bom_single_level b where b.project_id = i.project_id and b.material_id = i.id) as bom_single,
+           exists(select 1 from public.bom_multi_level b where b.project_id = i.project_id and b.material_id = i.id) as bom_multi,
+           exists(select 1 from public.inbound_logistics l where l.project_id = i.project_id and l.material_id = i.id) as lane,
+           exists(select 1 from public.supply_chain_data s where s.project_id = i.project_id
+                     and s.data_source = 'inbound' and s.to_location = i.id) as scd_inbound,
+           exists(select 1 from public.products pr where pr.project_id = i.project_id and pr.product_id = i.id) as is_product
+      from ids i
+      join public.projects p on p.id = i.project_id
+     where (select count(*) from ids x where x.project_id = i.project_id) <= 30
+     order by p.name, i.id`);
+  report("(D175b) per-id breakdown for projects with ≤ 30 ids", perId, (rows) => {
+    out("", "**(D175b) every material id in every SMALL project (≤ 30 ids), and which source knows it** — an id with every visibility column false except `bom_single` is invisible on the Supplier stage even after D175; an id with `is_product` true belongs to the Focal-plant stage instead:");
+    out(...table(rows));
+  });
+}
+
+/**
  * §15 measures ONE project. Phase 3's scope depends on how much D5/D7/D8 damage
  * exists AT ALL, and a single clean project is not that answer — least of all if
  * it is the seeded one. This sweep runs the three counting defects across every
@@ -3651,6 +3707,7 @@ async function main() {
     await section15(project.id);
   }
 
+  await d175MaterialVisibility();
   await allProjectsSweep();
   await migrationFenceClose();
 
