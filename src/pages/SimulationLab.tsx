@@ -30,6 +30,9 @@ import {
   STRESS_TESTS,
   type StressTestPreset,
 } from "@/components/sim/StressTestCard";
+import { RESOLVABLE_PLACEHOLDER, resolveStressSchedule } from "@/lib/sim/stressTargets";
+import { fetchProjectLanes } from "@/lib/policies/projectLanes";
+import { useAuth } from "@/hooks/useAuth";
 import { PreRunValidationPanel } from "@/components/sim/PreRunValidationPanel";
 import { CapacityReadinessPanel } from "@/components/sim/CapacityReadiness";
 import { GateBar } from "@/components/sim/RunGate";
@@ -53,6 +56,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const { globalSelectedProjectId, setGlobalSelectedProjectId } = useGlobalProject();
+  const { user } = useAuth();
   const projectId = globalSelectedProjectId;
   const { projects } = useProjects();
   const { scenarios, loading, create, update, remove, duplicate } = useScenarios(projectId);
@@ -306,11 +310,43 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     if (selectedId === id) setSelectedId(null);
   };
   const launchStress = async (preset: StressTestPreset) => {
+    // §4 D172 — a placeholder target never reaches a scenario. `supplier:primary`
+    // is resolved here to the project's top-volume supplier (the same weekly
+    // normalization the lane ETL applies), and a project that cannot name one
+    // gets a refusal with the reason — not a scenario whose event the engine
+    // will silently drop, whose run would then present the undisrupted
+    // baseline under a stress-test name.
+    let schedule = preset.disruption_schedule;
+    let description = preset.description;
+    if (schedule.some((e) => e.target === RESOLVABLE_PLACEHOLDER)) {
+      if (!globalSelectedProjectId) {
+        toast.error("Select a project first — the primary supplier is resolved from its inbound lanes.");
+        return;
+      }
+      // The one established read for the lane tables (they are absent from the
+      // generated client types; `projectLanes` is the module that owns that
+      // fact and the truncation reporting that comes with it).
+      const lanes = await fetchProjectLanes(globalSelectedProjectId, user);
+      if (lanes.truncated.includes("inbound_logistics")) {
+        toast.error(
+          "Cannot resolve the primary supplier: the inbound read came back truncated, " +
+          "so the largest supplier cannot be named with confidence.",
+        );
+        return;
+      }
+      const resolved = resolveStressSchedule(schedule, lanes.inbound);
+      if ("error" in resolved) {
+        toast.error(`Cannot launch this stress test: ${resolved.error}.`);
+        return;
+      }
+      schedule = resolved.schedule;
+      if (resolved.note) description = `${description} ${resolved.note}`;
+    }
     const s = await create(preset.name);
     if (!s) return;
     await update(s.id, {
-      description: preset.description,
-      disruption_schedule: preset.disruption_schedule,
+      description,
+      disruption_schedule: schedule,
     });
     // Stress scenarios share the baseline world (events are excluded from the
     // fingerprint, §2.3) — they inherit too.

@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 348,
-  "migrations_applied": 340,
+  "migrations_found": 349,
+  "migrations_applied": 341,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260922000009_delete_project_row_first.sql",
+  "last_migration": "20260924000001_bom_root_rows_are_not_edges.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -24006,7 +24006,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D140. THE supply-chain lane derivation — the ONE writer of both ",
-      "defined_by": "20260920000003_one_etl.sql"
+      "defined_by": "20260924000001_bom_root_rows_are_not_edges.sql"
     },
     {
       "name": "recompute_project_completion",

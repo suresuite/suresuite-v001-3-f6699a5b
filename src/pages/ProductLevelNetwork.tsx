@@ -963,23 +963,29 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
   }, []);
   const onConnect = useCallback((params: Connection) => setEdges(eds => addEdge(params, eds)), []);
 
+  // §4 D173 — F-10's cousin on THIS page, found by the 2026-09-23 acceptance
+  // audit. "Resilience" here was `(hasSPOF ? 0 : 0.4) + 0.3(1−HHI) +
+  // 0.3(1−peak prominence)`, red below 0.4 — the same class of ad-hoc
+  // composite the Process page deleted as F-10, alive one lens over. DELETED
+  // for the same reason: it resolves to no data, no named rule and no stated
+  // default (§5 T1), and a resilience measure is the engine's to compute.
+  // "Peak prominence" replaces it in the band: the largest prominence the
+  // analysis store holds, a number a reader can trace to a run.
   const mobileProductMetrics = useMemo(() => {
     const totalNodes = (groupCounts.A || 0) + (groupCounts.B || 0) + (groupCounts.C || 0) + (groupCounts.D || 0);
     const networkDepth = ['A', 'B', 'C', 'D'].filter(k => (groupCounts[k as GroupKey] || 0) > 0).length;
     const totalVolume = supplierVolumes.reduce((s, v) => s + v.volume, 0);
     let hhi = 0;
     if (totalVolume > 0) supplierVolumes.forEach(v => { const s = v.volume / totalVolume; hhi += s * s; });
-    const peakBetweenness = networkMetrics.reduce((m, n) => Math.max(m, n.prominence ?? 0), 0);
+    const peakProminence = networkMetrics.reduce((m, n) => Math.max(m, n.prominence ?? 0), 0);
     const nexusMaterials = networkMetrics.filter(n => (n.prominence ?? 0) >= 0.8).length;
     const hasSPOF = nexusMaterials > 0;
-    const resilience = (hasSPOF ? 0 : 0.4) + 0.3 * (1 - hhi) + 0.3 * (1 - peakBetweenness);
     const topNexus = [...networkMetrics].sort((a, b) => (b.prominence ?? 0) - (a.prominence ?? 0))[0];
     return {
       totalNodes,
       networkDepth,
       hhi: hhi.toFixed(3),
-      resilience: resilience.toFixed(3),
-      resilienceRed: resilience < 0.4,
+      peakProminence: peakProminence.toFixed(3),
       nexusMaterials,
       hasSPOF,
       topNexusName: topNexus?.name ?? null,
@@ -1186,11 +1192,15 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
             items={[
               { label: 'Nodes', value: mobileProductMetrics.totalNodes > 0 ? String(mobileProductMetrics.totalNodes) : '—' },
               { label: 'Network depth', value: mobileProductMetrics.networkDepth > 0 ? String(mobileProductMetrics.networkDepth) : '—' },
-              { label: 'Critical path', value: '—' },
+              // §4 D173 — "Critical path" was a HARDCODED '—' (a permanent
+              // placeholder in a band of real figures) and "Resilience" an
+              // invented composite; both deleted. These two are measured
+              // (nexus counts stay in the Structural-risk rows below):
+              { label: 'Materials measured', value: networkMetrics.length > 0 ? String(networkMetrics.length) : '—' },
               {
-                label: 'Resilience',
-                value: mobileProductMetrics.totalNodes > 0 ? mobileProductMetrics.resilience : '—',
-                red: mobileProductMetrics.resilienceRed && mobileProductMetrics.totalNodes > 0,
+                label: 'Peak prominence',
+                value: networkMetrics.length > 0 ? mobileProductMetrics.peakProminence : '—',
+                red: mobileProductMetrics.hasSPOF,
               },
             ]}
           />

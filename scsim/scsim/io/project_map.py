@@ -14,7 +14,7 @@ every fallback is recorded as a warning.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal, Optional
 
 from scsim.entities.config import SimulationSettings
@@ -238,6 +238,13 @@ class ProjectData:
     # The ATTRIBUTES of the customers the `customers` table describes. Additive
     # to `customers` above, which remains the id list — see `CustomerRow` (D69).
     customer_rows: list[CustomerRow] = field(default_factory=list)
+    # §4 D174 — master products CONSUMED by another product (sub-assemblies).
+    # Stamped by the caller from the RAW BOM shape, because the flattened
+    # `bom` arcs no longer show which nodes were intermediate. The mapper
+    # excludes these from the engine's product list WITH a warning; a
+    # ProductRow for one would otherwise reach `Network` with an empty BoM
+    # and the engine would refuse the whole project.
+    subassemblies: list[str] = field(default_factory=list)
     policies: dict[str, Any] = field(default_factory=dict)   # {"default": {...}, "node:<id>": {...}}
     scenario: ScenarioSettings = field(default_factory=ScenarioSettings)
     project_model: Optional[str] = None  # projects.supply_chain_model
@@ -673,6 +680,33 @@ def from_project_data(data: ProjectData) -> MappingResult:
     sc = data.scenario
 
     mat_ids = {m.id for m in data.materials}
+
+    # §4 D174 — a master product consumed by another product is a SUB-ASSEMBLY,
+    # not a finished product. The BOM flatten models it through its components
+    # (root→leaf arcs), so a ProductRow for it would reach `Network` with an
+    # empty BoM and the engine would refuse the whole project — which is what
+    # the 2026-09-23 acceptance audit hit with the canonical sub-assembly
+    # dataset. Excluded here, and SAID: info when the exclusion is pure
+    # modeling, warn when the sub-assembly also ships (its own outbound demand
+    # is then not simulated, and silence about that would be a T2 breach).
+    if data.subassemblies:
+        sub = set(data.subassemblies)
+        shipping = {o.product_id for o in data.outbound}
+        for pid in sorted(sub):
+            if pid in shipping:
+                w.append(MappingWarning(
+                    "warn", f"product:{pid}", "subassembly",
+                    "consumed by another product — modeled through the BOM as a component; "
+                    "its OWN outbound demand is not simulated (spare-parts demand on a "
+                    "sub-assembly is not supported yet)"))
+            else:
+                w.append(MappingWarning(
+                    "info", f"product:{pid}", "subassembly",
+                    "consumed by another product — modeled through the BOM as a component, "
+                    "not as a finished product"))
+        if any(p.id in sub for p in data.products):
+            data = replace(data, products=[p for p in data.products if p.id not in sub])
+
     prod_ids = {p.id for p in data.products}
     # Computed HERE rather than beside its `unsourced` check below, because the
     # arc loop needs it: a material the BOM consumes is part of this project
@@ -1077,8 +1111,17 @@ def _map_events(
         target = raw.rsplit(":", 1)[1] if ":" in raw else raw
         is_plant = target not in sup_ids and _is_plant_target(raw, target)
         if target not in sup_ids and not is_plant:
-            w.append(MappingWarning("warn", f"event:{raw}", "target",
-                                    "unsupported target skipped (material/edge land later in M7)"))
+            # Two different failures, said apart (acceptance audit 2026-09-23):
+            # a target KIND the mapper cannot disrupt yet, versus a supplier id
+            # this project simply does not have. The old single message blamed
+            # "material/edge" even when the target was `supplier:primary`.
+            kind = raw.split(":", 1)[0].lower() if ":" in raw else ""
+            if kind in ("material", "edge", "customer", "lane"):
+                w.append(MappingWarning("warn", f"event:{raw}", "target",
+                                        f"{kind} targets cannot be disrupted yet (land later in M7) — event skipped"))
+            else:
+                w.append(MappingWarning("warn", f"event:{raw}", "target",
+                                        f"no supplier or plant named {target!r} in this project's data — event skipped"))
             continue
         start_days = float(entry.get("start_day", entry.get("start_week", 0)) or 0)
         # 'start_week' already weeks; 'start_day' days
