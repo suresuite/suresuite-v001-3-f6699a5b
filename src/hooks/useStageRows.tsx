@@ -396,6 +396,31 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             });
             pairedMaterials.add(mat);
           }
+          // §4 D176 — D175's sweep read the MULTI-level shape only. `bom`
+          // above is empty on a single-level project (the hierarchy walk
+          // needs `higher_level_component_id`, which the single shape lacks),
+          // so a material living only in `bom_single_level` — uploaded BOM,
+          // no inbound lane, no master row — had no source left and stayed
+          // invisible: the exact class D175 closed, one table over. The
+          // single shape has no intermediates (every row is product ←
+          // material), so an unpaired id here is bought and needs a supplier.
+          if (!lanes.bomLevel.includes("multi")) {
+            for (const r of lanes.bom) {
+              const mat = String(r.material_id ?? "").trim();
+              if (!mat || pairedMaterials.has(mat) || outboundProductIds.has(mat)) continue;
+              const key = `(unassigned supplier)::${mat}`;
+              if (seen.has(key)) continue;
+              seen.set(key, {
+                key,
+                supplier_id: "(unassigned supplier)",
+                material_id: mat,
+                __needs_supplier: true,
+                __supplier_count: 0,
+                __lane_count: 0,
+              });
+              pairedMaterials.add(mat);
+            }
+          }
           try {
             // Same direct read the Item Master editor uses (its RLS admits it;
             // the lane tables' does not — see projectLanes.ts).
