@@ -216,6 +216,116 @@ async function migrationFenceClose() {
   }
 }
 
+// ── TEMPORARY session diagnostic (branch claude/rq-scenario-revenue-zero) ───
+// Read-only look at one project's runs: an (R,Q) scenario reports revenue 0
+// while the (s,S) scenario on the same project does not. Removed after the
+// diagnosis; every statement is a SELECT like the rest of the file.
+const DIAG_PROJECT = "50141cd1-9285-4d91-a7d1-dbd91a3ffcb5";
+const DIAG_SCENARIO = "9a3aecb6-c2b4-462f-b5b9-034ca87608e8";
+
+async function rqScenarioDiagnostic() {
+  section("TEMPORARY DIAGNOSTIC — (R,Q) scenario revenue 0");
+  out(`- project \`${DIAG_PROJECT}\`, scenario \`${DIAG_SCENARIO}\``);
+  out("");
+
+  const runs = await tryQ(`
+    select r.id, r.scenario_id, s.name as scenario_name, r.status, r.code_version,
+           r.rep_count_done, r.rep_count_target, r.created_at, r.ended_at,
+           r.aggregate_kpis->>'revenue'          as revenue,
+           r.aggregate_kpis->>'fill_rate'        as fill_rate,
+           r.aggregate_kpis->>'lost_sales_value' as lost_sales_value,
+           r.aggregate_kpis->'_meta'->>'engine'  as engine,
+           left(coalesce(r.error_message, ''), 240) as error_message
+    from simulation_runs r
+    left join scenarios s on s.id = r.scenario_id
+    where r.project_id = '${DIAG_PROJECT}'
+    order by r.created_at desc
+    limit 14`);
+  out("**All recent runs in the project (both scenarios, newest first):**");
+  report("runs", runs, (rows) => out(...table(rows, [
+    "id", "scenario_name", "status", "code_version", "rep_count_done",
+    "revenue", "fill_rate", "lost_sales_value", "engine", "created_at", "error_message",
+  ])));
+
+  const kpis = await tryQ(`
+    select id, status, created_at, aggregate_kpis::text as aggregate_kpis
+    from simulation_runs
+    where project_id = '${DIAG_PROJECT}' and scenario_id = '${DIAG_SCENARIO}'
+    order by created_at desc
+    limit 2`);
+  out("", "**Full aggregate_kpis of the newest runs on the named scenario:**");
+  report("kpis", kpis, (rows) => {
+    for (const r of rows) {
+      out(`- run \`${r.id}\` (${r.status}, ${r.created_at}):`);
+      out("  ```json", "  " + String(r.aggregate_kpis ?? "null").slice(0, 6000), "  ```");
+    }
+  });
+
+  const warns = await tryQ(`
+    select r.id as run_id, w->>'level' as level, w->>'entity' as entity,
+           w->>'field' as field, left(w->>'message', 220) as message
+    from simulation_runs r,
+         jsonb_array_elements(coalesce(r.mapping_warnings, '[]'::jsonb)) w
+    where r.project_id = '${DIAG_PROJECT}' and r.scenario_id = '${DIAG_SCENARIO}'
+      and r.created_at = (select max(created_at) from simulation_runs
+                          where project_id = '${DIAG_PROJECT}'
+                            and scenario_id = '${DIAG_SCENARIO}')
+    limit 60`);
+  out("", "**Mapping warnings on the newest run of the named scenario:**");
+  report("warnings", warns, (rows) => out(...table(rows)));
+
+  const pol = await tryQ(`
+    select r.id as run_id, pv.label,
+           coalesce(pv.snapshot->'default'->'inventory',
+                    pv.snapshot->'policies'->'default'->'inventory')::text as inventory_default,
+           (select string_agg(k, ', ') from jsonb_object_keys(pv.snapshot) k) as snapshot_keys
+    from simulation_runs r
+    join policy_versions pv on pv.id = r.policy_version_id
+    where r.project_id = '${DIAG_PROJECT}'
+    order by r.created_at desc
+    limit 4`);
+  out("", "**Policy snapshot's default inventory block, per recent run:**");
+  report("policy", pol, (rows) => {
+    for (const r of rows) {
+      out(`- run \`${r.run_id}\` · version "${r.label}" · snapshot keys: ${String(r.snapshot_keys).slice(0, 300)}`);
+      out(`  inventory default: \`${String(r.inventory_default).slice(0, 800)}\``);
+    }
+  });
+
+  const reps = await tryQ(`
+    select rr.run_id, rr.rep_index, rr.status,
+           rr.kpis->>'revenue' as revenue, rr.kpis->>'fill_rate' as fill_rate,
+           rr.kpis->>'lost_sales_value' as lost_sales_value
+    from run_replications rr
+    where rr.run_id in (select id from simulation_runs
+                        where project_id = '${DIAG_PROJECT}'
+                          and scenario_id = '${DIAG_SCENARIO}')
+    order by rr.run_id, rr.rep_index
+    limit 12`);
+  out("", "**Replication rows for the named scenario's runs:**");
+  report("replications", reps, (rows) => out(...table(rows)));
+
+  const scen = await tryQ(`
+    select id, name, horizon_days, time_step, warmup_mode, warmup_days,
+           replications, seed, crn, primary_kpi, from_network,
+           left(demand_model::text, 500) as demand_model,
+           left(disruption_schedule::text, 300) as disruption_schedule
+    from scenarios
+    where project_id = '${DIAG_PROJECT}'
+    order by created_at desc
+    limit 6`);
+  out("", "**The project's scenarios (newest first):**");
+  report("scenarios", scen, (rows) => {
+    for (const r of rows) {
+      out(`- \`${r.id}\` **${r.name}** — horizon ${r.horizon_days}d, step ${r.time_step}, ` +
+          `warmup ${r.warmup_mode}/${r.warmup_days}, reps ${r.replications}, seed ${r.seed}, ` +
+          `crn ${r.crn}, primary_kpi ${r.primary_kpi}, from_network ${r.from_network}`);
+      out(`  demand_model: \`${String(r.demand_model).slice(0, 500)}\``);
+      out(`  disruptions: \`${String(r.disruption_schedule).slice(0, 300)}\``);
+    }
+  });
+}
+
 async function schemaProbe() {
   section("Schema probe — production vs. the migrations (D32, D43)");
 
@@ -3678,6 +3788,8 @@ async function main() {
   out(`- every statement is a \`select\`; \`assertReadOnly()\` refuses anything else.`);
 
   await migrationFenceOpen();
+
+  await rqScenarioDiagnostic();
 
   await schemaProbe();
   await viewSecurity();
