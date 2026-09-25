@@ -262,33 +262,34 @@ async function rqScenarioDiagnostic() {
   });
 
   const warns = await tryQ(`
-    select r.id as run_id, w->>'level' as level, w->>'entity' as entity,
-           w->>'field' as field, left(w->>'message', 220) as message
+    select r.id as run_id, r.created_at, w->>'level' as level, w->>'entity' as entity,
+           w->>'field' as field, left(w->>'reason', 200) as reason
     from simulation_runs r,
          jsonb_array_elements(coalesce(r.mapping_warnings, '[]'::jsonb)) w
-    where r.project_id = '${DIAG_PROJECT}' and r.scenario_id = '${DIAG_SCENARIO}'
-      and r.created_at = (select max(created_at) from simulation_runs
-                          where project_id = '${DIAG_PROJECT}'
-                            and scenario_id = '${DIAG_SCENARIO}')
-    limit 60`);
-  out("", "**Mapping warnings on the newest run of the named scenario:**");
-  report("warnings", warns, (rows) => out(...table(rows)));
+    where r.id in ('33b669c0-b52e-49d2-be6c-105081b08912',
+                   '154d7032-a01c-4456-9f04-f4dc86549a5b')
+    order by r.created_at, w->>'entity'
+    limit 90`);
+  out("", "**Mapping warnings on the two Test New runs (154d7032 = the (R,Q) one):**");
+  report("warnings", warns, (rows) => out(...table(rows, [
+    "run_id", "level", "entity", "field", "reason",
+  ])));
 
   const pol = await tryQ(`
     select r.id as run_id, pv.label,
-           coalesce(pv.snapshot->'default'->'inventory',
-                    pv.snapshot->'policies'->'default'->'inventory')::text as inventory_default,
-           (select string_agg(k, ', ') from jsonb_object_keys(pv.snapshot) k) as snapshot_keys
+           pv.snapshot->'defaults'->'inventory'   as inventory_default,
+           left((pv.snapshot->'overrides')::text, 4000) as overrides
     from simulation_runs r
     join policy_versions pv on pv.id = r.policy_version_id
     where r.project_id = '${DIAG_PROJECT}'
     order by r.created_at desc
     limit 4`);
-  out("", "**Policy snapshot's default inventory block, per recent run:**");
+  out("", "**Policy snapshot per recent run — default inventory + overrides:**");
   report("policy", pol, (rows) => {
     for (const r of rows) {
-      out(`- run \`${r.run_id}\` · version "${r.label}" · snapshot keys: ${String(r.snapshot_keys).slice(0, 300)}`);
-      out(`  inventory default: \`${String(r.inventory_default).slice(0, 800)}\``);
+      out(`- run \`${r.run_id}\` · version "${r.label}"`);
+      out(`  inventory default: \`${String(r.inventory_default).slice(0, 1200)}\``);
+      out(`  overrides: \`${String(r.overrides).slice(0, 4000)}\``);
     }
   });
 
