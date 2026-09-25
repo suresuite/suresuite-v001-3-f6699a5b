@@ -789,10 +789,13 @@ export function gradeManifest(
   // network holds, and a master row is a material whether or not any BOM row
   // reaches it — the block above only swept the BOM's materials, so an
   // unconnected master row (upload materials, forget its inbound lane) was
-  // invisible until the engine raised.
+  // invisible until the engine raised. A material the BOM sweep already
+  // blocked is excluded: this sweep exists for the master rows THAT sweep
+  // cannot see, and one missing lane is one finding, not two.
+  const bomBlocked = new Set(unsourced);
   const masterUnsourced = dataset.materials
     .map((m) => String(m.material_id ?? "").trim())
-    .filter((m) => m && !arcMaterials.has(m))
+    .filter((m) => m && !arcMaterials.has(m) && !bomBlocked.has(m))
     .sort();
   if (masterUnsourced.length > 0) {
     out.push({
