@@ -277,7 +277,8 @@ async function rqScenarioDiagnostic() {
 
   const pol = await tryQ(`
     select r.id as run_id, pv.label,
-           pv.snapshot->'defaults'->'inventory'   as inventory_default,
+           (pv.snapshot->'defaults'->'inventory')::text as inventory_default,
+           left((pv.snapshot->'defaults')::text, 2500)  as defaults_all,
            left((pv.snapshot->'overrides')::text, 4000) as overrides
     from simulation_runs r
     join policy_versions pv on pv.id = r.policy_version_id
@@ -289,6 +290,7 @@ async function rqScenarioDiagnostic() {
     for (const r of rows) {
       out(`- run \`${r.run_id}\` · version "${r.label}"`);
       out(`  inventory default: \`${String(r.inventory_default).slice(0, 1200)}\``);
+      out(`  defaults (all families): \`${String(r.defaults_all).slice(0, 2500)}\``);
       out(`  overrides: \`${String(r.overrides).slice(0, 4000)}\``);
     }
   });
