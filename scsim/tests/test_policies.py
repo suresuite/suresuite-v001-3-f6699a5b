@@ -37,6 +37,60 @@ def test_pp1_variants_sustain_service(variant):
     assert res.aggregates["fill_rate"]["mean"] == pytest.approx(1.0), variant
 
 
+def test_pp1_rop_q_without_q_orders_up_to_S():
+    """(R,Q) with no positive Q must fall back to the DECLARED order-up-to lot
+    (T2) — the old behavior ordered max(0, moq)=0 forever, so inventory drained
+    once and never recovered."""
+    res = run(single_chain_network(), policies={"inventory_control": {"policy_type": "rop_q"}})
+    assert res.aggregates["fill_rate"]["mean"] == pytest.approx(1.0)
+    assert res.aggregates["avg_on_hand_units"]["mean"] > 0
+
+
+def test_pp1_material_override_switches_type_and_q():
+    """A supplier-grid row override (material_overrides) switches one material
+    to (R,Q) with its own lot while the project default stays min_max."""
+    res = run(single_chain_network(), policies={"inventory_control": {
+        "policy_type": "min_max",
+        "material_overrides": {"m1": {"policy_type": "rop_q", "rop_q_quantity": 900.0}},
+    }})
+    assert res.aggregates["fill_rate"]["mean"] == pytest.approx(1.0)
+
+
+def test_pp1_material_override_absolute_levels_move_inventory():
+    """Absolute row-level s/S replace the formula band for that material:
+    a higher S carries visibly more on-hand than the formula default."""
+    base = run(single_chain_network(), policies={"inventory_control": {"policy_type": "min_max"}})
+    high = run(single_chain_network(), policies={"inventory_control": {
+        "policy_type": "min_max",
+        "material_overrides": {"m1": {"reorder_point": 400.0, "order_up_to": 2000.0}},
+    }})
+    assert high.aggregates["fill_rate"]["mean"] == pytest.approx(1.0)
+    assert high.aggregates["avg_on_hand_units"]["mean"] > \
+        base.aggregates["avg_on_hand_units"]["mean"]
+
+
+def test_pp1_material_override_kappa_scales_order_up_to():
+    """A per-material κ override moves S = E[D]·(T_s+κ) for that material."""
+    low = run(single_chain_network(), policies={"inventory_control": {
+        "material_overrides": {"m1": {"coverage_weeks": 2.0}}}})
+    hi = run(single_chain_network(), policies={"inventory_control": {
+        "material_overrides": {"m1": {"coverage_weeks": 20.0}}}})
+    assert hi.aggregates["avg_on_hand_units"]["mean"] > \
+        low.aggregates["avg_on_hand_units"]["mean"]
+
+
+def test_pp1_material_override_rejects_inverted_band():
+    with pytest.raises(Exception):
+        run(single_chain_network(), policies={"inventory_control": {
+            "material_overrides": {"m1": {"reorder_point": 500.0, "order_up_to": 400.0}}}})
+
+
+def test_pp1_material_override_unknown_material_is_ignored():
+    res = run(single_chain_network(), policies={"inventory_control": {
+        "material_overrides": {"no_such_mat": {"coverage_weeks": 20.0}}}})
+    assert res.aggregates["fill_rate"]["mean"] == pytest.approx(1.0)
+
+
 def test_pp1_crisis_kappa_raises_order_up_to():
     """During a visible disruption the κ strip moves nominal→crisis (8→12)."""
     res_nominal = run(single_chain_network(), OUTAGE,

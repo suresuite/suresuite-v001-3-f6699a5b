@@ -113,8 +113,15 @@ export const InventoryPolicy = z.object({
   basis: PolicyBasis.default("days_of_supply"),
   reorder_point: z.number().min(0).default(50),
   order_up_to: z.number().min(0).default(200),
-  // (R, Q) fixed lot — the Q of the rop policy type (§III.3).
+  // (R, Q) fixed lot — the Q of the rop policy type (§III.3). 0 = UNSET: the
+  // engine mapping treats a non-positive Q as "no lot stated" and (R,Q)
+  // materials then order up to S — a declared substitution, never a zero order.
   rop_q_quantity: z.number().min(0).default(0),
+  // κ — order-up-to cover beyond lead time (P-P.1, §II.4). The engine default
+  // strip is 8/10/12 (nominal/alert/crisis); a number here fixes κ in every
+  // mode — at project scope for all materials, on a supplier row for that
+  // material only. Default 8 = the engine's own nominal.
+  coverage_weeks: z.number().min(0).max(26).default(8),
   max_stock: z.number().min(0).default(500),
   min_stock: z.number().min(0).default(0),
   safety_stock_method: SafetyStockMethod.default("fixed_days"),
@@ -327,7 +334,7 @@ export const FIELD_GROUPS: Record<PolicyFamily, Record<string, string[]>> = {
     Contract: ["contract_type"],
   },
   inventory: {
-    Basics: ["type", "reorder_point", "order_up_to", "rop_q_quantity", "min_stock", "max_stock"],
+    Basics: ["type", "reorder_point", "order_up_to", "rop_q_quantity", "coverage_weeks", "min_stock", "max_stock"],
     "Safety stock": [
       "safety_stock_method",
       "safety_stock_days",
@@ -428,6 +435,11 @@ export const SCSIM_VISIBLE_FIELDS: Partial<Record<PolicyFamily, ReadonlySet<stri
   inventory: new Set([
     "type",
     "rop_q_quantity",
+    // Consumed per material via supplier-row overrides since the
+    // material_overrides mapping (P-P.1): absolute s/S and a row-level κ.
+    "reorder_point",
+    "order_up_to",
+    "coverage_weeks",
     "safety_stock_method",
     "safety_stock_days",
     "service_level_target",
@@ -510,6 +522,7 @@ export const FIELD_LABELS: Record<string, string> = {
   rop_q_quantity: "Order quantity (Q)",
   reorder_point: "Reorder point (s)",
   order_up_to: "Order-up-to (S)",
+  coverage_weeks: "Coverage κ (weeks)",
   max_stock: "Max stock",
   min_stock: "Min stock",
   safety_stock_method: "Safety stock method",

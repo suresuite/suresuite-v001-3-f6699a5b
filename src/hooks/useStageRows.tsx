@@ -266,6 +266,29 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
           return plantName || "Focal plant";
         })();
 
+        // Engine-formula ingredient for the replenishment placeholders: the
+        // same E[D_m] shape the engine derives — product demand × BOM rate,
+        // per WEEK — summed over every BOM line that names the material and
+        // whose parent has an outbound demand. Deeper multi-level conversion
+        // is the engine's job; this feeds a PLACEHOLDER (s = E[D]·T_s,
+        // S = E[D]·(T_s+κ)), never a stored value.
+        const matDemandPerWeek = new Map<string, number>();
+        for (const r of lanes.bom as Array<Record<string, unknown>>) {
+          const mat = String(r.material_id ?? "").trim();
+          const parent = String(
+            (r.product_id ?? r.higher_level_component_id) ?? "",
+          ).trim();
+          if (!mat || !parent) continue;
+          const dPerDay = avg(outVolByProduct.get(parent) ?? []);
+          if (dPerDay === undefined) continue;
+          const rate = Number(r.consumption_rate);
+          const eff = Number.isFinite(rate) && rate > 0 ? rate : 1;
+          matDemandPerWeek.set(
+            mat,
+            (matDemandPerWeek.get(mat) ?? 0) + dPerDay * eff * 7,
+          );
+        }
+
         if (stage === "supplier") {
           const seen = new Map<string, any>();
 
@@ -352,6 +375,15 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               enrich.unit_price,
               impute(inPriceByMaterial, String(material), inPriceGlobal),
             );
+            // The lane's effective lead time — the T_s of the level formulas.
+            // Same resolve/impute contract as material_price: uploaded lane
+            // value first, per-material average, then the project average.
+            const lead_time_days = resolveField(
+              prov,
+              "lead_time_days",
+              enrich.lead_time_days,
+              impute(inLeadByMaterial, String(material), inLeadGlobal),
+            );
             const primary_source = count === 1 ? true : isSuggested;
             seen.set(key, {
               key,
@@ -359,6 +391,8 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               material_id: material,
               // Real uploaded data where available, else smart-average imputed.
               material_price,
+              lead_time_days,
+              __mat_demand_per_week: matDemandPerWeek.get(String(material)),
               // NOTE (D1/D16): no constants are written here. A row carries a
               // field ONLY when the project data says something about it —
               // anything else is supplied live by the policy bundle default or

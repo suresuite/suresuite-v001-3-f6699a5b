@@ -48,6 +48,7 @@ import {
   masterValueFor as masterValueForShared,
   derivedValueFor as derivedValueForShared,
   getEffectiveValue as getEffectiveValueShared,
+  savedOverrideValue,
   isPrefillPersistable,
   resolveCell,
   rowHasSeedableField,
@@ -567,18 +568,61 @@ export function StagePolicyTable({
     const type = String(getEffective(rowKey, r, "type", "inventory") ?? "min_max");
     const regParams = inventoryParamsForType(type).filter((p) => p.field !== "basis");
     const basis = String(getEffective(rowKey, r, "basis", "inventory") ?? "days_of_supply");
+
+    // The engine's own default band, computed from the row's data with the
+    // engine formulas (P-P.1 Eqs. 2–3): s = E[D]·T_s, S = E[D]·(T_s+κ). An
+    // EMPTY level cell resolves to these in the run, so they render as the
+    // greyed placeholder — the global policy made visible per row. A number
+    // typed into the cell becomes THIS material's override and replaces the
+    // formula for it (inventory_control.material_overrides).
+    const ltDays = Number(getEffective(rowKey, r, "lead_time_days", "sourcing"));
+    const ltWeeks = Number.isFinite(ltDays) && ltDays > 0 ? ltDays / 7 : undefined;
+    const dWeek = Number((r as Record<string, unknown>).__mat_demand_per_week);
+    const kappaRaw = Number(getEffective(rowKey, r, "coverage_weeks", "inventory"));
+    const kappa = Number.isFinite(kappaRaw) ? kappaRaw : 8;
+    const canCompute = ltWeeks !== undefined && Number.isFinite(dWeek) && dWeek > 0;
+    const sDefault = canCompute ? dWeek * ltWeeks! : undefined;
+    const SDefault = canCompute ? dWeek * (ltWeeks! + kappa) : undefined;
+    const fmt = (n: number | undefined) => (n === undefined ? undefined : String(Math.round(n)));
+    const placeholderFor: Record<string, string | undefined> = {
+      reorder_point: fmt(sDefault),
+      order_up_to: fmt(SDefault),
+    };
+
+    // Level cells resolve ROW-SCOPE only (draft → this row's saved override):
+    // the family bundle always carries the Zod defaults (50/200), which the
+    // engine never reads at project scope — showing them as the value would
+    // repeat the defect where the grid said one number and the run used
+    // another. Empty cell = the formula placeholder above. A stored Q ≤ 0 is
+    // the schema's UNSET marker, not a zero lot (the mapping skips it).
+    const LEVEL_FIELDS = new Set(["reorder_point", "order_up_to"]);
+    const valueFor = (field: string): unknown => {
+      if (LEVEL_FIELDS.has(field)) {
+        const draft = drafts[rowKey]?.[field];
+        if (draft !== undefined) return draft;
+        return savedOverrideValue(overrides, rowKey, field, "inventory", families);
+      }
+      const v = getEffective(rowKey, r, field, "inventory");
+      if (field === "rop_q_quantity") {
+        const n = Number(v);
+        return Number.isFinite(n) && n > 0 ? n : undefined;
+      }
+      return v;
+    };
+
     return (
       <ReplenishmentCell
         policyType={type}
         paramW={paramW}
         params={regParams.map((p) => {
-          const value = getEffective(rowKey, r, p.field, "inventory");
+          const value = valueFor(p.field);
           const n = typeof value === "number" ? value : value == null ? undefined : Number(value);
           return {
             field: p.field,
             value: n !== undefined && Number.isFinite(n) ? n : undefined,
             onCommit: (v: number | undefined) => onCellChange(rowKey, p.field, v),
             invalid: paramFeasibility(p, value ?? undefined) ?? undefined,
+            placeholder: placeholderFor[p.field],
           };
         })}
         labelFor={(f) => adaptLabel(invParamColByField.get(f)?.label ?? f)}

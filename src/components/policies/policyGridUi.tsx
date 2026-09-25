@@ -465,15 +465,21 @@ export const POLICY_PARAMS: Record<string, Array<{ field: string; symbol: string
   min_max: [
     { field: "reorder_point", symbol: "s" },
     { field: "order_up_to", symbol: "S" },
+    { field: "coverage_weeks", symbol: "κ" },
   ],
-  base_stock: [{ field: "order_up_to", symbol: "S" }],
+  base_stock: [
+    { field: "order_up_to", symbol: "S" },
+    { field: "coverage_weeks", symbol: "κ" },
+  ],
   rop: [
     { field: "rop_q_quantity", symbol: "Q" },
     { field: "reorder_point", symbol: "R" },
+    { field: "coverage_weeks", symbol: "κ" },
   ],
   periodic_review: [
     { field: "review_period_days", symbol: "T" },
     { field: "order_up_to", symbol: "S" },
+    { field: "coverage_weeks", symbol: "κ" },
   ],
 };
 
@@ -499,7 +505,16 @@ export function ReplenishmentCell({
   paramW,
 }: {
   policyType: string;
-  params: Array<{ field: string; value: number | undefined; onCommit: (v: number | undefined) => void; invalid?: string }>;
+  params: Array<{
+    field: string;
+    value: number | undefined;
+    onCommit: (v: number | undefined) => void;
+    invalid?: string;
+    /** The engine-default number an EMPTY cell resolves to (e.g. the computed
+     *  s = E[D]·T_s), rendered greyed in place — so the global default is
+     *  visible on every row, and typing replaces it for that row only. */
+    placeholder?: string;
+  }>;
   labelFor: (field: string) => string;
   basis: "days_of_supply" | "forward_visible";
   onBasisChange: (b: "days_of_supply" | "forward_visible") => void;
@@ -523,7 +538,8 @@ export function ReplenishmentCell({
             <input
               key={String(p?.value)}
               defaultValue={p?.value ?? ""}
-              placeholder="—"
+              placeholder={p?.placeholder ?? "—"}
+              title={p?.placeholder ? `engine default: ${p.placeholder}` : undefined}
               size={1}
               onBlur={(e) => {
                 const raw = e.target.value.trim();

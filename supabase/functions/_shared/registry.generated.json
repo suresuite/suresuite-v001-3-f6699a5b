@@ -1624,6 +1624,100 @@
       "milestone": null,
       "params_schema": {
         "$defs": {
+          "MaterialInventoryOverride": {
+            "additionalProperties": false,
+            "description": "Per-material replenishment override (P-P.1, \u00a7II.3): the supplier grid's\nrow-level adjustments. Every field is optional \u2014 an absent field keeps the\nproject-default behavior (the Eqs. 2\u20133 formula levels), so an override row\nnever silently replaces a formula it does not name.",
+            "properties": {
+              "coverage_weeks": {
+                "anyOf": [
+                  {
+                    "maximum": 26,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "notes": "Fixed \u03ba for this material (all modes); absent \u2192 the strip.",
+                "scope": "M",
+                "title": "Coverage Weeks",
+                "unit": "weeks"
+              },
+              "order_up_to": {
+                "anyOf": [
+                  {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "notes": "Absolute S replacing E[D]\u00b7(T_s+\u03ba) for this material.",
+                "scope": "M",
+                "title": "Order Up To",
+                "unit": "units"
+              },
+              "policy_type": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "min_max",
+                      "base_stock",
+                      "rop_q",
+                      "periodic"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "notes": "Row-level policy type; absent \u2192 project default.",
+                "scope": "M",
+                "title": "Policy Type",
+                "unit": "enum"
+              },
+              "reorder_point": {
+                "anyOf": [
+                  {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "notes": "Absolute s (R for rop_q) replacing E[D]\u00b7T_s for this material.",
+                "scope": "M",
+                "title": "Reorder Point",
+                "unit": "units"
+              },
+              "rop_q_quantity": {
+                "anyOf": [
+                  {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "notes": "Fixed (R,Q) lot for this material.",
+                "scope": "M",
+                "title": "Rop Q Quantity",
+                "unit": "units"
+              }
+            },
+            "title": "MaterialInventoryOverride",
+            "type": "object"
+          },
           "ModeStrip": {
             "additionalProperties": false,
             "description": "nominal/alert/crisis parameter strip (Part IV header). v1 engines use\nnominal normally and crisis while any event is firm-visible; alert engages\nonce P-S.4 early warning lands (M7).",
@@ -1670,6 +1764,16 @@
             "range": "[0, 26]",
             "scope": "G/M",
             "unit": "weeks"
+          },
+          "material_overrides": {
+            "additionalProperties": {
+              "$ref": "#/$defs/MaterialInventoryOverride"
+            },
+            "notes": "material_id \u2192 row-level override from the supplier grid (\u00a7II.3). Unknown material ids are ignored at runtime.",
+            "scope": "M",
+            "title": "Material Overrides",
+            "type": "object",
+            "unit": "map"
           },
           "periodic_review_weeks": {
             "default": 4,
@@ -3239,6 +3343,34 @@
       "key": "allocation_priority_weight",
       "target": "material_allocation.priority_weights",
       "transform": "per-product weight, collected from composite `node:<node>::<product>` override keys. Read only when the scenario asks for `allocate_materials`, and its presence switches the objective to priority_weighted"
+    },
+    {
+      "catalog_ref": "P-P.1",
+      "family": "inventory",
+      "key": "rop_q_quantity",
+      "target": "inventory_control.rop_q_quantity",
+      "transform": "units; 0 means UNSET (the frontend schema's default), never a zero lot \u2014 an (R,Q) scope with no positive Q orders up to S instead, and the substitution is warned at dispatch"
+    },
+    {
+      "catalog_ref": "P-P.1",
+      "family": "inventory",
+      "key": "coverage_weeks",
+      "target": "inventory_control.coverage_weeks",
+      "transform": "weeks, clamped 0-26. At default scope the one number becomes a fixed strip (nominal=alert=crisis); per material it fixes that material's \u03ba in every mode"
+    },
+    {
+      "catalog_ref": "P-P.1",
+      "family": "inventory",
+      "key": "reorder_point",
+      "target": "inventory_control.material_overrides[*].reorder_point",
+      "transform": "absolute units replacing s = E[D]\u00b7T_s for that material only; read from supplier-row overrides, not at default scope (the default s stays the formula)"
+    },
+    {
+      "catalog_ref": "P-P.1",
+      "family": "inventory",
+      "key": "order_up_to",
+      "target": "inventory_control.material_overrides[*].order_up_to",
+      "transform": "absolute units replacing S = E[D]\u00b7(T_s+\u03ba) for that material only; dropped with a warning when it does not exceed the row's reorder point. Not read at default scope"
     }
   ],
   "run_window": {

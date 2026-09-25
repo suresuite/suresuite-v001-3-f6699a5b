@@ -235,13 +235,15 @@ describe("WP 6.1 · the chains that cannot be written down", () => {
     "customer.primary_source",
     "customer.sourcing_firm",
     "plant.initial_on_hand",
-    "plant.order_up_to",
-    "plant.reorder_point",
     "plant.review_period_days",
-    "supplier.order_up_to",
     "supplier.primary_source",
-    "supplier.reorder_point",
     "supplier.review_period_days",
+    // reorder_point / order_up_to left this list when the supplier grid's
+    // replenishment cells started reaching the engine as
+    // `inventory_control.material_overrides` (P-P.1). The PLANT stage's copies
+    // resolve through the same declaration; its transform states the scope
+    // ("read from supplier-row overrides"), so a plant cell's chain says
+    // where the value would have to be entered to count.
   ];
 
   const broken = () => chains.filter((c) => c.breaks.length).map((c) => `${c.stage}.${c.field}`).sort();
@@ -300,20 +302,26 @@ describe("§4 D90 · door 3 is a DECLARATION, not a scan", () => {
     ).toEqual([]);
   });
 
-  it("the ten declared keys carry their target and their transform", () => {
-    // TEN KEYS, TWELVE CHAINS: `type` and `safety_stock_days` are rendered by
-    // both the supplier and the plant stage, which is why the chain count and the
-    // key count differ and why D90's "nine" was never wrong.
+  it("the fourteen declared keys carry their target and their transform", () => {
+    // FOURTEEN KEYS: `type` and `safety_stock_days` are rendered by both the
+    // supplier and the plant stage, which is why the chain count and the key
+    // count differ and why D90's "nine" was never wrong.
     //
-    // `utilization_cap_pct` is the tenth (WP 9.3 / §4 D167). It was on the
-    // parity test's `not_rendered` list — the list of bundle keys that are NOT
-    // grid cells — while the arithmetic it performs is half of what the plant
-    // stage exists to show: the engine builds a product's weekly capacity as
-    // units/day × 7 × utilization, and the grid rendered the first factor only.
+    // `utilization_cap_pct` was the tenth (WP 9.3 / §4 D167). The four
+    // replenishment cells — Q, κ, s, S — joined when the supplier grid's
+    // row overrides started reaching the engine as
+    // `inventory_control.material_overrides` (P-P.1): before that,
+    // reorder_point/order_up_to sat on the parity test's `not_rendered` list
+    // while being rendered, and rop_q_quantity was read by the mapper with
+    // nothing declaring it — the exact gap the (R,Q) inventory-flatline
+    // defect fell through.
     const byDeclaration = chains.filter((c) =>
       /declared policy-bundle key/.test(c.hops.find((h) => h.kind === "engine")?.detail ?? ""));
-    expect(byDeclaration.length).toBe(12);
-    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(10);
+    expect(byDeclaration.length).toBe(16);
+    // 12 rendered fields resolve by declaration (rop_q_quantity and
+    // coverage_weeks resolve through their own doors on some stages, so the
+    // field count trails the 14 keys project_map declares).
+    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(12);
     for (const c of byDeclaration) {
       const detail = c.hops.find((h) => h.kind === "engine")!.detail;
       // The TARGET is what makes the chain followable; the TRANSFORM is what makes
