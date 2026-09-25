@@ -337,7 +337,7 @@ def test_policy_bundle_keys_match_what_the_mapper_reads():
         "ratios", "strategy", "safety_stock_method", "backorder_allowed",
         "max_backorder_days", "backorder_cost_per_day", "allocation",
         "tier_overrides", "fulfillment_strategy",
-        "min_share_pct", "reorder_point", "order_up_to", "review_period_days",
+        "min_share_pct", "review_period_days",
         "primary_source", "material_price", "initial_on_hand", "holding_cost_pct",
         "sourcing_firm", "moq", "lead_time_distribution", "ordering_cost",
         "supplier_capacity_per_day", "capacity_machine_per_day",

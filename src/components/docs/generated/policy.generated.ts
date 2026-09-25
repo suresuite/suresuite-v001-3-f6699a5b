@@ -105,12 +105,12 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:371, src/hooks/useStageRows.tsx:385."
+      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:405, src/hooks/useStageRows.tsx:419."
     ],
     "breakClass": "app-routing",
     "breakEvidence": [
-      "src/hooks/useStageRows.tsx:371",
-      "src/hooks/useStageRows.tsx:385"
+      "src/hooks/useStageRows.tsx:405",
+      "src/hooks/useStageRows.tsx:419"
     ]
   },
   {
@@ -315,6 +315,31 @@ export const CHAINS: PolicyChain[] = [
   },
   {
     "stage": "supplier",
+    "field": "lead_time_days",
+    "family": "sourcing",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the supplier grid as `lead_time_days` (family `sourcing`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "supplier",
     "field": "type",
     "family": "inventory",
     "hops": [
@@ -394,18 +419,14 @@ export const CHAINS: PolicyChain[] = [
         "evidence": null
       },
       {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 50` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.material_overrides[*].reorder_point (P-P.1). Transform: absolute units replacing s = E[D]·T_s for that material only; read from supplier-row overrides, not at default scope (the default s stays the formula)",
+        "evidence": null
       }
     ],
-    "breaks": [
-      "is accepted, stored and hashed while the engine COMPUTES the same quantity and never consults it — the grid takes a number that changes no run. The worst of the five shapes, because the cell looks exactly like one that works. Evidence: sim-worker/sim_worker/policies.py:41."
-    ],
-    "breakClass": "overridden",
-    "breakEvidence": [
-      "sim-worker/sim_worker/policies.py:41"
-    ]
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
   },
   {
     "stage": "supplier",
@@ -428,18 +449,14 @@ export const CHAINS: PolicyChain[] = [
         "evidence": null
       },
       {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 200` — shown when nothing above resolves",
-        "evidence": "src/lib/policies/columnSpecs.ts"
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.material_overrides[*].order_up_to (P-P.1). Transform: absolute units replacing S = E[D]·(T_s+κ) for that material only; dropped with a warning when it does not exceed the row's reorder point. Not read at default scope",
+        "evidence": null
       }
     ],
-    "breaks": [
-      "reaches NO scsim field, and is read only by the FROZEN legacy engine (`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field is editable, stored and hashed into `policy_hash` while the strategic engine ignores it — and no catalog policy is planned that would change that. Evidence: sim-worker/sim_worker/engine.py:332."
-    ],
-    "breakClass": "legacy-only",
-    "breakEvidence": [
-      "sim-worker/sim_worker/engine.py:332"
-    ]
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
   },
   {
     "stage": "supplier",
@@ -462,9 +479,34 @@ export const CHAINS: PolicyChain[] = [
         "evidence": null
       },
       {
-        "kind": "substitution",
-        "detail": "`defaultWhenMissing: 0` — shown when nothing above resolves",
+        "kind": "engine",
+        "detail": "declared policy parameter (`params_schema`) — the registry export is the single source for policy schemas (§6.2)",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "supplier",
+    "field": "coverage_weeks",
+    "family": "inventory",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the supplier grid as `coverage_weeks` (family `inventory`)",
         "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`policy_overrides.patch` → `policy_defaults.bundle` (the effective bundle)",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
+        "evidence": null
       },
       {
         "kind": "engine",
@@ -929,15 +971,16 @@ export const CHAINS: PolicyChain[] = [
         "kind": "substitution",
         "detail": "`defaultWhenMissing: 50` — shown when nothing above resolves",
         "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.material_overrides[*].reorder_point (P-P.1). Transform: absolute units replacing s = E[D]·T_s for that material only; read from supplier-row overrides, not at default scope (the default s stays the formula)",
+        "evidence": null
       }
     ],
-    "breaks": [
-      "is accepted, stored and hashed while the engine COMPUTES the same quantity and never consults it — the grid takes a number that changes no run. The worst of the five shapes, because the cell looks exactly like one that works. Evidence: sim-worker/sim_worker/policies.py:41."
-    ],
-    "breakClass": "overridden",
-    "breakEvidence": [
-      "sim-worker/sim_worker/policies.py:41"
-    ]
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
   },
   {
     "stage": "plant",
@@ -963,15 +1006,16 @@ export const CHAINS: PolicyChain[] = [
         "kind": "substitution",
         "detail": "`defaultWhenMissing: 200` — shown when nothing above resolves",
         "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → inventory_control.material_overrides[*].order_up_to (P-P.1). Transform: absolute units replacing S = E[D]·(T_s+κ) for that material only; dropped with a warning when it does not exceed the row's reorder point. Not read at default scope",
+        "evidence": null
       }
     ],
-    "breaks": [
-      "reaches NO scsim field, and is read only by the FROZEN legacy engine (`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field is editable, stored and hashed into `policy_hash` while the strategic engine ignores it — and no catalog policy is planned that would change that. Evidence: sim-worker/sim_worker/engine.py:332."
-    ],
-    "breakClass": "legacy-only",
-    "breakEvidence": [
-      "sim-worker/sim_worker/engine.py:332"
-    ]
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
   },
   {
     "stage": "plant",
@@ -1333,12 +1377,12 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:371, src/hooks/useStageRows.tsx:385."
+      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:405, src/hooks/useStageRows.tsx:419."
     ],
     "breakClass": "app-routing",
     "breakEvidence": [
-      "src/hooks/useStageRows.tsx:371",
-      "src/hooks/useStageRows.tsx:385"
+      "src/hooks/useStageRows.tsx:405",
+      "src/hooks/useStageRows.tsx:419"
     ]
   },
   {
@@ -1363,12 +1407,12 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:674, src/hooks/useStageRows.tsx:689."
+      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:708, src/hooks/useStageRows.tsx:723."
     ],
     "breakClass": "app-routing",
     "breakEvidence": [
-      "src/hooks/useStageRows.tsx:674",
-      "src/hooks/useStageRows.tsx:689"
+      "src/hooks/useStageRows.tsx:708",
+      "src/hooks/useStageRows.tsx:723"
     ]
   }
 ];
@@ -1380,14 +1424,8 @@ export const BREAKS_BY_CLASS: Record<string, string[]> = {
     "customer.primary_source",
     "customer.sourcing_firm"
   ],
-  "overridden": [
-    "supplier.reorder_point",
-    "plant.reorder_point"
-  ],
   "legacy-only": [
-    "supplier.order_up_to",
     "supplier.review_period_days",
-    "plant.order_up_to",
     "plant.review_period_days",
     "plant.initial_on_hand"
   ]
@@ -3828,5 +3866,5 @@ export const READ_EXPOSURE: ReadExposure = {
   ]
 };
 
-export const CHAIN_COUNT = 39;
-export const BROKEN_COUNT = 10;
+export const CHAIN_COUNT = 41;
+export const BROKEN_COUNT = 6;

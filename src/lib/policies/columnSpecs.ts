@@ -228,15 +228,26 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // engine registry (registryPolicyTypes / inventory_control). s, S and R,Q
       // are stored + versioned now and consumed once the Quantity basis lands
       // (§II.4) — the info button (6.B) discloses this per parameter.
+      // The effective inbound lead time (weeks in the engine, shown in days
+      // like every other duration cell) — the T_s of the level formulas
+      // s = E[D]·T_s and S = E[D]·(T_s+κ). Read-only: the engine reads it
+      // from the uploaded inbound lane, so an editable copy here would be a
+      // second author for one fact (the same reason the transport band keeps
+      // no lead-time column, see the note below).
+      col("lead_time_days", "sourcing", { readOnly: true, label: "Lead time (days)" }),
       col("type", "inventory"),
       // Type-specific level/lot params render inside this one dynamic vector cell
       // (§II.3) — only the params the chosen type needs; the discrete gated
       // columns below feed it (vectorGroup) and are hidden from the header.
       col("__inv_params", "inventory", { synthetic: true, label: "Replenishment parameters" }),
       col("basis", "inventory", { vectorGroup: "invParams" }),
-      col("reorder_point", "inventory", { visibleWhen: invTypeIn("min_max", "rop"), defaultWhenMissing: 50, vectorGroup: "invParams" }),
-      col("order_up_to", "inventory", { visibleWhen: invTypeIn("min_max", "base_stock", "periodic_review"), defaultWhenMissing: 200, vectorGroup: "invParams" }),
-      col("rop_q_quantity", "inventory", { visibleWhen: invTypeIn("rop"), defaultWhenMissing: 0, vectorGroup: "invParams" }),
+      col("reorder_point", "inventory", { visibleWhen: invTypeIn("min_max", "rop"), vectorGroup: "invParams" }),
+      col("order_up_to", "inventory", { visibleWhen: invTypeIn("min_max", "base_stock", "periodic_review"), vectorGroup: "invParams" }),
+      col("rop_q_quantity", "inventory", { visibleWhen: invTypeIn("rop"), vectorGroup: "invParams" }),
+      // κ — order-up-to cover beyond lead time. Reaches the engine per
+      // material via inventory_control.material_overrides; empty = the
+      // engine's own 8/10/12 strip.
+      col("coverage_weeks", "inventory", { vectorGroup: "invParams" }),
       col("review_period_days", "inventory", { visibleWhen: invTypeIn("periodic_review"), defaultWhenMissing: 1, vectorGroup: "invParams" }),
       col("initial_on_hand", "inventory", {
         master: { table: "materials", field: "initial_on_hand", idFrom: "material_id" },

@@ -65,6 +65,44 @@ def _primary_link_lts(net: Network) -> dict[str, int]:
     return out
 
 
+class MaterialInventoryOverride(PolicyParams):
+    """Per-material replenishment override (P-P.1, §II.3): the supplier grid's
+    row-level adjustments. Every field is optional — an absent field keeps the
+    project-default behavior (the Eqs. 2–3 formula levels), so an override row
+    never silently replaces a formula it does not name."""
+
+    policy_type: Optional[Literal["min_max", "base_stock", "rop_q", "periodic"]] = Field(
+        None, json_schema_extra={"unit": "enum", "scope": "M",
+                                 "notes": "Row-level policy type; absent → project default."},
+    )
+    rop_q_quantity: Optional[float] = Field(
+        None, gt=0,
+        json_schema_extra={"unit": "units", "scope": "M", "notes": "Fixed (R,Q) lot for this material."},
+    )
+    coverage_weeks: Optional[float] = Field(
+        None, ge=0, le=26,
+        json_schema_extra={"unit": "weeks", "scope": "M",
+                           "notes": "Fixed κ for this material (all modes); absent → the strip."},
+    )
+    reorder_point: Optional[float] = Field(
+        None, ge=0,
+        json_schema_extra={"unit": "units", "scope": "M",
+                           "notes": "Absolute s (R for rop_q) replacing E[D]·T_s for this material."},
+    )
+    order_up_to: Optional[float] = Field(
+        None, gt=0,
+        json_schema_extra={"unit": "units", "scope": "M",
+                           "notes": "Absolute S replacing E[D]·(T_s+κ) for this material."},
+    )
+
+    @model_validator(mode="after")
+    def _levels_ordered(self) -> "MaterialInventoryOverride":
+        if (self.reorder_point is not None and self.order_up_to is not None
+                and self.order_up_to <= self.reorder_point):
+            raise ValueError("order_up_to must exceed reorder_point")
+        return self
+
+
 class InventoryControlParams(PolicyParams):
     policy_type: Literal["min_max", "base_stock", "rop_q", "periodic"] = Field(
         "min_max",
@@ -96,6 +134,14 @@ class InventoryControlParams(PolicyParams):
     )
     periodic_review_weeks: int = Field(
         4, ge=1, le=13, json_schema_extra={"unit": "weeks", "scope": "G"},
+    )
+    material_overrides: dict[str, MaterialInventoryOverride] = Field(
+        default_factory=dict,
+        json_schema_extra={
+            "unit": "map", "scope": "M",
+            "notes": "material_id → row-level override from the supplier grid "
+                     "(§II.3). Unknown material ids are ignored at runtime.",
+        },
     )
 
     @field_validator("coverage_weeks")
@@ -204,6 +250,37 @@ class InventoryControl(PolicyPlugin):
         strip: ModeStrip = self.params.coverage_weeks
         return strip.crisis if ctx.events_visible() else strip.nominal
 
+    _TYPE_CODE = {"min_max": 0, "base_stock": 1, "rop_q": 2, "periodic": 3}
+
+    def _override_arrays(
+        self, m,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Per-material vectors from `material_overrides`: (type_code, Q, κ,
+        absolute s, absolute S). NaN means "no override" for the float arrays;
+        unknown material ids are skipped (the mapping already filtered them)."""
+        p: InventoryControlParams = self.params
+        n = m.n_mats
+        type_code = np.full(n, self._TYPE_CODE[p.policy_type], dtype=int)
+        q = np.full(n, p.rop_q_quantity if p.rop_q_quantity is not None else np.nan)
+        kappa = np.full(n, np.nan)
+        s_abs = np.full(n, np.nan)
+        S_abs = np.full(n, np.nan)
+        for mid, ov in p.material_overrides.items():
+            i = m.mat_index.get(mid)
+            if i is None:
+                continue
+            if ov.policy_type is not None:
+                type_code[i] = self._TYPE_CODE[ov.policy_type]
+            if ov.rop_q_quantity is not None:
+                q[i] = ov.rop_q_quantity
+            if ov.coverage_weeks is not None:
+                kappa[i] = ov.coverage_weeks
+            if ov.reorder_point is not None:
+                s_abs[i] = ov.reorder_point
+            if ov.order_up_to is not None:
+                S_abs[i] = ov.order_up_to
+        return type_code, q, kappa, s_abs, S_abs
+
     def on_phase(self, phase: PhaseId, ctx: SimContext) -> None:
         if phase == PhaseId.PH70:
             self._set_levels(ctx)
@@ -213,20 +290,32 @@ class InventoryControl(PolicyPlugin):
     def _set_levels(self, ctx: SimContext) -> None:
         m = ctx.model
         kappa = self._kappa(ctx)
+        _types, _q, k_ov, s_abs, S_abs = self._override_arrays(m)
+        kappa_vec = np.where(np.isnan(k_ov), float(kappa), k_ov)
         if self.params.basis == "forward_visible":
             # §II.4 Forward-visible schedule (WSC-2026 MTO), inclusive windows:
             # s_m[t] = Σ_{τ=t}^{t+T_s} D̂_m[τ]; S_m[t] = Σ_{τ=t}^{t+T_s+κ} D̂_m[τ].
+            # cover_weeks accepts an (n_mats,) array, so per-material κ folds in.
             lt = m.link_lt[m.primary_link]
             t = ctx.week
             s = ctx.forward_material_demand(t, lt)
-            S = ctx.forward_material_demand(t, lt + int(kappa))
-            ctx.write_levels(s, S)
-            return
-        # Eqs. 2–3: s_m = E[D_m]·T_s ; S_m = E[D_m]·(T_s + κ). P-P.3 adds SS after us.
-        exp_d = ctx.material_demand
-        lt = m.link_lt[m.primary_link].astype(float)
-        s = exp_d * lt
-        S = exp_d * (lt + kappa)
+            S = ctx.forward_material_demand(t, lt + kappa_vec.astype(int))
+        else:
+            # Eqs. 2–3: s_m = E[D_m]·T_s ; S_m = E[D_m]·(T_s + κ). P-P.3 adds SS after us.
+            exp_d = ctx.material_demand
+            lt = m.link_lt[m.primary_link].astype(float)
+            s = exp_d * lt
+            S = exp_d * (lt + kappa_vec)
+        # Absolute row-level levels (supplier grid) replace the formula where
+        # present; S is kept ≥ s so a lone absolute s cannot invert the band
+        # (both-set inversions are refused at validation).
+        has_s = ~np.isnan(s_abs)
+        has_S = ~np.isnan(S_abs)
+        if has_s.any():
+            s = np.where(has_s, s_abs, s)
+        if has_S.any():
+            S = np.where(has_S, S_abs, S)
+        S = np.maximum(S, s)
         ctx.write_levels(s, S)
 
     def _release(self, ctx: SimContext) -> None:
@@ -235,24 +324,29 @@ class InventoryControl(PolicyPlugin):
         position = ctx.on_hand + ctx.pipeline_on_order()
         orders_mat = np.zeros(m.n_mats)
         moq = m.link_moq[m.primary_link]
+        type_code, qv, _k, _s, _S = self._override_arrays(m)
+        short = position < ctx.level_s
+        deficit = ctx.level_S - position
 
-        if p.policy_type == "min_max":
-            if ctx.week % p.review_cadence_weeks == 0:
-                short = position < ctx.level_s
-                orders_mat[short] = np.maximum(ctx.level_S[short] - position[short], moq[short])
-        elif p.policy_type == "base_stock":
-            deficit = ctx.level_S - position
-            up = deficit > 1e-12
-            orders_mat[up] = np.maximum(deficit[up], moq[up])
-        elif p.policy_type == "rop_q":
-            short = position < ctx.level_s
-            q = p.rop_q_quantity if p.rop_q_quantity is not None else 0.0
-            orders_mat[short] = np.maximum(q, moq[short])
-        else:  # periodic
-            if ctx.week % p.periodic_review_weeks == 0:
-                deficit = ctx.level_S - position
-                up = deficit > 1e-12
-                orders_mat[up] = np.maximum(deficit[up], moq[up])
+        mm = type_code == self._TYPE_CODE["min_max"]
+        if ctx.week % p.review_cadence_weeks == 0:
+            sel = mm & short
+            orders_mat[sel] = np.maximum(deficit[sel], moq[sel])
+
+        bs = (type_code == self._TYPE_CODE["base_stock"]) & (deficit > 1e-12)
+        orders_mat[bs] = np.maximum(deficit[bs], moq[bs])
+
+        rq = (type_code == self._TYPE_CODE["rop_q"]) & short
+        # DECLARED fallback (T2): an (R,Q) material with no Q orders up to S —
+        # the min_max lot — never a silent zero order. The mapping states this
+        # substitution as a MappingWarning at dispatch.
+        q_sel = qv[rq]
+        orders_mat[rq] = np.maximum(np.where(np.isnan(q_sel), deficit[rq], q_sel), moq[rq])
+
+        pr = type_code == self._TYPE_CODE["periodic"]
+        if ctx.week % p.periodic_review_weeks == 0:
+            sel = pr & (deficit > 1e-12)
+            orders_mat[sel] = np.maximum(deficit[sel], moq[sel])
 
         orders = np.zeros(m.n_links)
         nonzero = orders_mat > 0

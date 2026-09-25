@@ -310,8 +310,10 @@ class MappingResult:
 # READ by this module, and every bundle key this module reads must be here —
 # `scsim/tests/test_registry_io.py` asserts both directions against the source.
 #
-# TEN KEYS, TWELVE CHAINS: `type` and `safety_stock_days` are rendered by both
-# the supplier and the plant stage, so the grid has twelve cells for ten keys.
+# FOURTEEN KEYS: `type` and `safety_stock_days` are rendered by both
+# the supplier and the plant stage, so the grid has more cells than keys; the
+# four replenishment cells (Q, κ, s, S) joined when supplier-row overrides
+# started reaching the engine as `inventory_control.material_overrides`.
 # (`utilization_cap_pct` joined in WP 9.3 — it was on the test's `not_rendered`
 # list, which is the list of keys that are NOT grid cells, while the arithmetic
 # it performs is half of what the plant stage exists to show.)
@@ -421,6 +423,49 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
                      "override keys. Read only when the scenario asks for "
                      "`allocate_materials`, and its presence switches the objective to "
                      "priority_weighted",
+    },
+    # The four supplier-grid replenishment cells. At the project default scope
+    # only `rop_q_quantity` and `coverage_weeks` are read; all four are read
+    # from `node:<supplier>::<material>` override keys into
+    # `inventory_control.material_overrides[<material>]`, which is how a
+    # row-level adjustment reaches the engine (before this, node-scoped
+    # inventory was dropped with a warning — the D-class the (R,Q)
+    # inventory-flatline defect exposed).
+    {
+        "key": "rop_q_quantity",
+        "family": "inventory",
+        "target": "inventory_control.rop_q_quantity",
+        "catalog_ref": "P-P.1",
+        "transform": "units; 0 means UNSET (the frontend schema's default), never a "
+                     "zero lot — an (R,Q) scope with no positive Q orders up to S "
+                     "instead, and the substitution is warned at dispatch",
+    },
+    {
+        "key": "coverage_weeks",
+        "family": "inventory",
+        "target": "inventory_control.coverage_weeks",
+        "catalog_ref": "P-P.1",
+        "transform": "weeks, clamped 0-26. At default scope the one number becomes a "
+                     "fixed strip (nominal=alert=crisis); per material it fixes that "
+                     "material's κ in every mode",
+    },
+    {
+        "key": "reorder_point",
+        "family": "inventory",
+        "target": "inventory_control.material_overrides[*].reorder_point",
+        "catalog_ref": "P-P.1",
+        "transform": "absolute units replacing s = E[D]·T_s for that material only; "
+                     "read from supplier-row overrides, not at default scope (the "
+                     "default s stays the formula)",
+    },
+    {
+        "key": "order_up_to",
+        "family": "inventory",
+        "target": "inventory_control.material_overrides[*].order_up_to",
+        "catalog_ref": "P-P.1",
+        "transform": "absolute units replacing S = E[D]·(T_s+κ) for that material "
+                     "only; dropped with a warning when it does not exceed the row's "
+                     "reorder point. Not read at default scope",
     },
 )
 
@@ -1321,31 +1366,109 @@ def _map_policies(
             f"{dropped_fulfil} per-node fulfillment override(s) not applied — backorder, "
             "allocation and service level are consumed at the project default scope only"))
 
-    # Surface per-node inventory overrides the engine will not apply.
-    # inventory_control is resolved from policies["default"]["inventory"] only
-    # (see `inv = default.get("inventory") or {}` below); node-scoped inventory
-    # overrides are accepted into the snapshot/hash but never reach the engine.
+    type_map = {
+        "min_max": "min_max", "s_S": "min_max", "continuous_review": "min_max",
+        "base_stock": "base_stock", "rop": "rop_q", "periodic_review": "periodic",
+    }
+
+    # Per-material replenishment overrides from the supplier grid. Its rows key
+    # overrides as node:<supplier_id>::<material_id> (columnSpecs targetKey), so
+    # a key whose second token is a KNOWN material carries this material's
+    # row-level inventory adjustments — policy type, (R,Q) lot, κ, absolute
+    # s/S — and reaches the engine as inventory_control.material_overrides.
+    # Node-scoped inventory that does not parse this way (plant FG rows, keys
+    # without a material token) stays default-scope-only, and is still counted
+    # and surfaced below rather than dropped silently.
+    known_mats = set(sups_by_mat)
+    mat_over: dict[str, dict] = {}
+    consumed_keys: set[str] = set()
+    for k in sorted(k for k in policies if isinstance(k, str) and k.startswith("node:")):
+        sup, sep, mat = k[len("node:"):].partition("::")
+        inv_o = (policies[k] or {}).get("inventory") or {}
+        if not sep or mat not in known_mats or not inv_o:
+            continue
+        entry = mat_over.setdefault(mat, {})
+
+        def _take(field: str, value, conflict_from: str = sup) -> None:
+            if field in entry and entry[field] != value:
+                w.append(MappingWarning(
+                    "warn", f"material:{mat}", field,
+                    f"conflicting per-supplier values for one material — "
+                    f"kept {entry[field]}, ignored {value} (from {conflict_from})"))
+                return
+            entry[field] = value
+
+        if inv_o.get("type") is not None:
+            _take("policy_type", type_map.get(str(inv_o["type"]), "min_max"))
+        # The grid's unset markers: Q and S default to 0 in the frontend
+        # schema, and the engine refuses a non-positive lot or ceiling.
+        for dst, v in (("rop_q_quantity", inv_o.get("rop_q_quantity")),
+                       ("coverage_weeks", inv_o.get("coverage_weeks")),
+                       ("reorder_point", inv_o.get("reorder_point")),
+                       ("order_up_to", inv_o.get("order_up_to"))):
+            if v is None:
+                continue
+            v = float(v)
+            if v <= 0 and dst in ("rop_q_quantity", "order_up_to"):
+                continue
+            _take(dst, v)
+        if not entry:
+            mat_over.pop(mat, None)
+        else:
+            consumed_keys.add(k)
+    # An absolute band a row states inverted (s ≥ S) would be refused by the
+    # engine's validator and abort the run; keep the reorder point (the half
+    # that triggers) and say what was dropped.
+    for mat, entry in mat_over.items():
+        s_v, S_v = entry.get("reorder_point"), entry.get("order_up_to")
+        if s_v is not None and S_v is not None and S_v <= s_v:
+            entry.pop("order_up_to")
+            w.append(MappingWarning(
+                "warn", f"material:{mat}", "order_up_to",
+                f"order-up-to {S_v} ≤ reorder point {s_v} — S dropped, formula S used"))
+
+    # Surface per-node inventory overrides the engine will not apply (plant FG
+    # rows and keys without a known material token).
     dropped_inventory = sum(
         1 for k, fams in policies.items()
-        if isinstance(k, str) and k.startswith("node:")
+        if isinstance(k, str) and k.startswith("node:") and k not in consumed_keys
         and (fams.get("inventory") or {})
     )
     if dropped_inventory:
         w.append(MappingWarning(
             "warn", "policy:inventory_control", "inventory",
             f"{dropped_inventory} per-node inventory override(s) not applied — "
-            "inventory policy type, safety stock and FG stock are consumed at the "
-            "project default scope only"))
+            "safety stock and FG stock are consumed at the project default "
+            "scope only; supplier-row replenishment overrides ARE applied"))
 
-    type_map = {
-        "min_max": "min_max", "s_S": "min_max", "continuous_review": "min_max",
-        "base_stock": "base_stock", "rop": "rop_q", "periodic_review": "periodic",
-    }
     out["inventory_control"] = {"policy_type": type_map.get(str(inv.get("type", "min_max")), "min_max")}
-    if out["inventory_control"]["policy_type"] == "rop_q" and inv.get("rop_q_quantity") is not None:
-        out["inventory_control"]["rop_q_quantity"] = float(inv["rop_q_quantity"])
+    if out["inventory_control"]["policy_type"] == "rop_q":
+        q_default = inv.get("rop_q_quantity")
+        if q_default is not None and float(q_default) > 0:
+            out["inventory_control"]["rop_q_quantity"] = float(q_default)
+        else:
+            # DECLARED substitution (T2): (R,Q) with no positive Q orders up to
+            # S (the min_max lot) — stated here, enacted in the plugin.
+            w.append(MappingWarning(
+                "warn", "policy:inventory_control", "rop_q_quantity",
+                "(R,Q) selected with no positive Q at project scope — such "
+                "materials order up to S (min_max lot) instead"))
+    if inv.get("coverage_weeks") is not None:
+        k_scalar = _clamp(float(inv["coverage_weeks"]), 0.0, 26.0, w=w,
+                          entity="policy:default", field="coverage_weeks", unit=" wk")
+        # The UI states one κ; the engine's strip gets that value in every
+        # mode — a fixed cover, not a mode-scaled one.
+        out["inventory_control"]["coverage_weeks"] = {
+            "nominal": k_scalar, "alert": k_scalar, "crisis": k_scalar}
+    if mat_over:
+        out["inventory_control"]["material_overrides"] = mat_over
+        w.append(MappingWarning(
+            "info", "policy:inventory_control", "material_overrides",
+            f"{len(mat_over)} material(s) carry supplier-grid replenishment "
+            "overrides (type/Q/κ/absolute levels) — applied per material"))
     w.append(MappingWarning("info", "policy:inventory_control", "order_up_to",
-                            "legacy absolute order_up_to replaced by coverage-based κ (≈8 weeks)"))
+                            "legacy absolute order_up_to replaced by coverage-based κ (≈8 weeks); "
+                            "a supplier-grid row's absolute s/S IS applied to that material"))
 
     ss_method = str(inv.get("safety_stock_method", "fixed_days"))
     if ss_method in ("service_level", "demand_variability"):

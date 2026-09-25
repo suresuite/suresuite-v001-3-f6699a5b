@@ -656,3 +656,91 @@ def test_sequential_ci_without_disruptions_says_it_runs_a_fixed_count():
         stopping_rule={"kind": "sequential_ci"},
         disruption_schedule=[{"target": "supplier:s1", "start_day": 140, "duration_days": 14}]))
     assert not [w for w in res2.warnings if w.field == "stopping_rule"]
+
+
+# ------------------------- supplier-grid replenishment overrides (P-P.1)
+
+def test_supplier_row_inventory_override_reaches_engine():
+    """A node:<supplier>::<material> inventory patch becomes a per-material
+    engine override — the class of edit that was silently dropped before."""
+    d = _base()
+    d.policies = {"node:s1::m1": {"inventory": {
+        "type": "rop", "rop_q_quantity": 900, "coverage_weeks": 4,
+    }}}
+    res = from_project_data(d)
+    inv = res.scenario.policies["inventory_control"]
+    assert inv["material_overrides"]["m1"] == {
+        "policy_type": "rop_q", "rop_q_quantity": 900.0, "coverage_weeks": 4.0}
+    assert any(w.level == "info" and w.field == "material_overrides"
+               for w in res.warnings)
+    assert not any(w.field == "inventory" and w.level == "warn"
+                   for w in res.warnings)
+
+
+def test_supplier_row_zero_q_is_unset_not_a_zero_lot():
+    """The frontend schema defaults rop_q_quantity to 0; a stored 0 means
+    'unset', never a zero lot (and never a gt=0 validation crash)."""
+    d = _base()
+    d.policies = {"node:s1::m1": {"inventory": {"rop_q_quantity": 0}}}
+    res = from_project_data(d)
+    assert "material_overrides" not in res.scenario.policies["inventory_control"]
+
+
+def test_default_scope_rop_without_q_declares_the_fallback():
+    """(R,Q) at project scope with no positive Q: the substitution (order up
+    to S) is DECLARED as a warning, and no zero/absent Q reaches pydantic."""
+    d = _base()
+    d.policies = {"default": {"inventory": {"type": "rop", "rop_q_quantity": 0}}}
+    res = from_project_data(d)
+    inv = res.scenario.policies["inventory_control"]
+    assert inv["policy_type"] == "rop_q"
+    assert "rop_q_quantity" not in inv
+    assert any(w.level == "warn" and w.field == "rop_q_quantity" for w in res.warnings)
+
+
+def test_default_scope_coverage_weeks_maps_to_a_fixed_strip():
+    d = _base()
+    d.policies = {"default": {"inventory": {"coverage_weeks": 4}}}
+    res = from_project_data(d)
+    assert res.scenario.policies["inventory_control"]["coverage_weeks"] == {
+        "nominal": 4.0, "alert": 4.0, "crisis": 4.0}
+
+
+def test_conflicting_supplier_rows_warn_and_keep_first():
+    """Two suppliers of one material stating different κ: deterministic keep
+    (sorted key order, first wins) and an ANNOUNCED conflict, not a silent pick."""
+    d = _base()
+    d.suppliers.append(SupplierRow(id="s2"))
+    d.supply_arcs.append(SupplyArc(supplier_id="s2", material_id="m1",
+                                   unit_price=2.5, lead_time=3, lead_time_unit="week"))
+    d.policies = {
+        "node:s1::m1": {"inventory": {"coverage_weeks": 4}},
+        "node:s2::m1": {"inventory": {"coverage_weeks": 9}},
+    }
+    res = from_project_data(d)
+    inv = res.scenario.policies["inventory_control"]
+    assert inv["material_overrides"]["m1"]["coverage_weeks"] == 4.0
+    assert any(w.level == "warn" and w.entity == "material:m1"
+               and w.field == "coverage_weeks" for w in res.warnings)
+
+
+def test_inverted_absolute_band_drops_S_with_warning():
+    d = _base()
+    d.policies = {"node:s1::m1": {"inventory": {
+        "reorder_point": 500, "order_up_to": 400}}}
+    res = from_project_data(d)
+    ov = res.scenario.policies["inventory_control"]["material_overrides"]["m1"]
+    assert ov == {"reorder_point": 500.0}
+    assert any(w.level == "warn" and w.entity == "material:m1"
+               and w.field == "order_up_to" for w in res.warnings)
+
+
+def test_plant_row_inventory_stays_default_scope_and_warns():
+    """A plant-stage node key (second token is a product, not a material) is
+    still dropped for inventory — and still counted, not silent."""
+    d = _base()
+    d.policies = {"node:Focal plant::p1": {"inventory": {"type": "rop"}}}
+    res = from_project_data(d)
+    assert "material_overrides" not in res.scenario.policies["inventory_control"]
+    assert any(w.level == "warn" and w.field == "inventory"
+               and "not applied" in w.reason for w in res.warnings)

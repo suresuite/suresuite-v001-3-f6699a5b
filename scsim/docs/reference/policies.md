@@ -129,6 +129,7 @@ Everyday replenishment rule (min-max / base-stock / (R,Q) / periodic). The basel
 | `review_cadence_weeks` | weeks | G | 1 | {1, 2, 4} |  |
 | `rop_q_quantity` | units | M | — | see schema | Fixed (R,Q) lot; ≥ MOQ enforced. |
 | `periodic_review_weeks` | weeks | G | 4 | [1, 13] |  |
+| `material_overrides` | map | M | — | — | material_id → row-level override from the supplier grid (§II.3). Unknown material ids are ignored at runtime. |
 
 ## `repurposing`
 

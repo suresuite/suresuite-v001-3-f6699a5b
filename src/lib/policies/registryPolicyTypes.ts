@@ -81,10 +81,17 @@ function frontendParam(field: string): RegistryParam {
   };
 }
 
+// Fields whose GRID schema is the frontend scalar even though the registry
+// also declares the name: the engine's `coverage_weeks` is a ModeStrip object
+// (nominal/alert/crisis) while the cell edits ONE number that the mapping
+// spreads across the strip — rendering the registry's object schema here
+// would give the cell an uneditable "object" input.
+const FRONTEND_SCHEMA_FIRST = new Set(["coverage_weeks"]);
+
 function toParam(policyId: string, field: string): RegistryParam {
   const p: RegistryParamProp | undefined = paramProp(policyId, field);
   // Fall back to the frontend schema for stored fields the engine doesn't expose.
-  if (!p) return frontendParam(field);
+  if (!p || FRONTEND_SCHEMA_FIRST.has(field)) return frontendParam(field);
   const t = (p.type ?? "unknown") as RegistryParam["type"];
   return {
     field,
@@ -118,10 +125,10 @@ const INVENTORY_TYPES: Array<{
   headline: string[];
   rest: string[];
 }> = [
-  { registryValue: "min_max", storedValue: "min_max", label: "Min-max (s, S)", headline: ["reorder_point", "order_up_to"], rest: ["basis"] },
-  { registryValue: "base_stock", storedValue: "base_stock", label: "Base stock (S)", headline: ["order_up_to"], rest: ["basis"] },
-  { registryValue: "rop_q", storedValue: "rop", label: "(R, Q)", headline: ["rop_q_quantity", "reorder_point"], rest: ["basis"] },
-  { registryValue: "periodic", storedValue: "periodic_review", label: "Periodic review (T, S)", headline: ["review_period_days", "order_up_to"], rest: ["basis"] },
+  { registryValue: "min_max", storedValue: "min_max", label: "Min-max (s, S)", headline: ["reorder_point", "order_up_to"], rest: ["coverage_weeks", "basis"] },
+  { registryValue: "base_stock", storedValue: "base_stock", label: "Base stock (S)", headline: ["order_up_to"], rest: ["coverage_weeks", "basis"] },
+  { registryValue: "rop_q", storedValue: "rop", label: "(R, Q)", headline: ["rop_q_quantity", "reorder_point"], rest: ["coverage_weeks", "basis"] },
+  { registryValue: "periodic", storedValue: "periodic_review", label: "Periodic review (T, S)", headline: ["review_period_days", "order_up_to"], rest: ["coverage_weeks", "basis"] },
 ];
 
 function buildInventoryCategory(): PolicyCategory {
