@@ -41,6 +41,7 @@ import {
 } from "@/lib/policies/columnSpecs";
 import { fitColumns, foldNote, type FitCol } from "@/lib/policies/columnFit";
 import { buildBomTreeView, type TreeEntry } from "@/lib/policies/bomTreeView";
+import { stageEmptyMessage, treeFallbackReason } from "@/lib/policies/stageGridState";
 import { groupByKeyA, summarise } from "@/lib/policies/groupRows";
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
@@ -708,18 +709,36 @@ export function StagePolicyTable({
   const treeAvailable =
     stageKey === "supplier" && (stageRows.bomLevel ?? "").includes("multi");
   const [viewMode, setViewMode] = useState<"tree" | "flat">("tree");
-  const treeActive = treeAvailable && viewMode === "tree" && sort === null;
-  const treeEntries = useMemo<TreeEntry[]>(
-    () =>
-      treeActive
-        ? buildBomTreeView({
-            bomRows: stageRows.bomRows ?? [],
-            deepRows: stageRows.deepRows ?? [],
-            supplierRows: filtered as Array<Record<string, unknown> & { key: string }>,
-          })
-        : [],
-    [treeActive, stageRows.bomRows, stageRows.deepRows, filtered],
-  );
+  const treeWanted = treeAvailable && viewMode === "tree" && sort === null;
+  // §4 D178 — the tree may never blank the grid. The build is guarded (no
+  // error boundary protects this render path), and a tree with no structure
+  // while flat rows exist falls back to the flat lanes WITH the reason —
+  // rendering it would show the whole stage as one "Not in the BOM" tail, or
+  // nothing at all, while the flat set holds every line.
+  const treeBuild = useMemo<{ entries: TreeEntry[]; error: string | null }>(() => {
+    if (!treeWanted) return { entries: [], error: null };
+    try {
+      return {
+        entries: buildBomTreeView({
+          bomRows: stageRows.bomRows ?? [],
+          deepRows: stageRows.deepRows ?? [],
+          supplierRows: filtered as Array<Record<string, unknown> & { key: string }>,
+        }),
+        error: null,
+      };
+    } catch (err) {
+      return { entries: [], error: err instanceof Error ? err.message : String(err) };
+    }
+  }, [treeWanted, stageRows.bomRows, stageRows.deepRows, filtered]);
+  const treeFallback = treeFallbackReason({
+    wanted: treeWanted,
+    buildError: treeBuild.error,
+    hasStructure: treeBuild.entries.some((e) => e.kind === "root" || e.kind === "node"),
+    flatRowCount: filtered.length,
+    deepError: stageRows.deepError ?? null,
+  });
+  const treeActive = treeWanted && treeFallback === null;
+  const treeEntries = treeBuild.entries;
   const collapsibleGroups = useMemo(() => rowGroups.filter((g) => g.members.length > 1), [rowGroups]);
   const anyGroupExpanded = collapsibleGroups.some((g) => !collapsedGroups.has(`${stageKey}::${g.id}`));
   const toggleAllGroups = () => {
@@ -1624,6 +1643,24 @@ export function StagePolicyTable({
             sorted — showing flat (clear the sort to see the tree)
           </span>
         )}
+        {treeFallback && (
+          <span className="font-mono text-[10px]" style={{ color: LAYER.firm }}>
+            {treeFallback}
+          </span>
+        )}
+        {stageRows.loadError && (
+          <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px]" style={{ color: LAYER.brand }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: LAYER.brand }} />
+            lines could not be loaded — {stageRows.loadError}
+            <button
+              type="button"
+              onClick={reloadRows}
+              className="rounded-sm border border-current px-1.5 py-px hover:bg-[#fafafa]"
+            >
+              retry
+            </button>
+          </span>
+        )}
         {!treeActive && collapsibleGroups.length > 0 && (
           <button
             type="button"
@@ -1863,10 +1900,28 @@ export function StagePolicyTable({
                 </td>
               </tr>
             )}
-            {!loading && filtered.length === 0 && (
+            {!loading && filtered.length === 0 && !(treeActive && treeEntries.length > 0) && (
               <tr>
                 <td colSpan={colCount} className="py-8 text-center font-mono text-[11px] text-muted-foreground">
-                  no {stageKey === "plant" ? "focal plant" : `${stageKey}`} lines for this project
+                  {/* §4 D178 — the empty body always states WHY (read failed /
+                      filtered out / genuinely no lines); a blank or a false
+                      "no lines" over a failed read is §5.3 T2 broken. */}
+                  {stageEmptyMessage({
+                    stageLabel: stageKey === "plant" ? "focal plant" : stageKey,
+                    loading,
+                    loadError: stageRows.loadError ?? null,
+                    totalRows: dataRows.length,
+                    filteredRows: filtered.length,
+                  })}
+                  {stageRows.loadError && (
+                    <button
+                      type="button"
+                      onClick={reloadRows}
+                      className="ml-2 rounded-sm border border-[--zinc-border] px-1.5 py-px hover:bg-[#fafafa]"
+                    >
+                      retry
+                    </button>
+                  )}
                 </td>
               </tr>
             )}

@@ -126,3 +126,51 @@ describe("buildBomTreeView (D177)", () => {
     expect(m3?.echelon).toBe("material");
   });
 });
+
+/**
+ * §4 D178 — degenerate inputs. The 2026-09-24 report was a supplier grid with
+ * NO rows at all after three fixes; whatever the reads deliver, the tree may
+ * never hold back a supplier row the flat set has, and truly-empty must be the
+ * component's empty-state message, never a blank body. These pin the builder's
+ * half of that contract: every supplier row survives every degenerate shape.
+ */
+describe("buildBomTreeView never drops a supplier row (D178)", () => {
+  const supplierRows = [
+    { key: "S1::M001", supplier_id: "S1", material_id: "M001" },
+    { key: "S2::M001", supplier_id: "S2", material_id: "M001" },
+    { key: "(unassigned supplier)::M002", supplier_id: "(unassigned supplier)", material_id: "M002", __needs_supplier: true },
+  ];
+  const laneKeys = (es: TreeEntry[]) =>
+    es.filter((e): e is Extract<TreeEntry, { kind: "lane" }> => e.kind === "lane").map((e) => e.row.key);
+
+  it("empty deepRows (no derivation yet): every supplier row still renders, in the tail section", () => {
+    const es = buildBomTreeView({ bomRows: [], deepRows: [], supplierRows });
+    expect(laneKeys(es).sort()).toEqual(supplierRows.map((r) => r.key).sort());
+    expect(es.find((e) => e.kind === "section" && e.id === "not_in_bom")).toMatchObject({ count: 2 });
+    // and no structural entries were invented from nothing
+    expect(es.some((e) => e.kind === "root" || e.kind === "node")).toBe(false);
+  });
+
+  it("empty bomRows with a derivation present: rows without a walkable shape still all render", () => {
+    const es = buildBomTreeView({
+      bomRows: [],
+      deepRows: [{ data_source: "outbound", from_location: "P1", to_location: "C1", weighted: 10 }],
+      supplierRows,
+    });
+    expect(laneKeys(es).sort()).toEqual(supplierRows.map((r) => r.key).sort());
+    expect(es.find((e) => e.kind === "root")).toMatchObject({ nodeId: "P1" });
+  });
+
+  it("all three inputs empty: no entries — the component's empty-state message owns that case", () => {
+    expect(buildBomTreeView({ bomRows: [], deepRows: [], supplierRows: [] })).toEqual([]);
+  });
+
+  it("hostile rows (nulls, numbers, missing keys) neither throw nor lose a supplier row", () => {
+    const es = buildBomTreeView({
+      bomRows: [{ material_id: null, higher_level_component_id: 7 }, {}],
+      deepRows: [{ data_source: "bom" }, { data_source: null, weighted: "x" }],
+      supplierRows,
+    });
+    expect(laneKeys(es).sort()).toEqual(supplierRows.map((r) => r.key).sort());
+  });
+});

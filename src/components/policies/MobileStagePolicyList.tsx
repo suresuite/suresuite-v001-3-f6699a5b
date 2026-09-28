@@ -188,7 +188,12 @@ export function MobileStagePolicyList({
     return (
       <MobilePanel label={spec.keyCols[0].label}>
         <p className="px-3 py-8 text-center text-[13px] leading-relaxed text-[#525252]">
-          {loading ? "Loading lines…" : "No lines for this stage."}
+          {/* §4 D178 — a failed read must not read as "no lines" (§5.3 T2). */}
+          {loading
+            ? "Loading lines…"
+            : stageRows.loadError
+              ? `Lines could not be loaded — ${stageRows.loadError}`
+              : "No lines for this stage."}
         </p>
       </MobilePanel>
     );
