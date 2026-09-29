@@ -158,6 +158,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
     saveSnapshot,
     updateVersionNotes,
     deleteVersion,
+    deleteVersions,
     exportVersion,
   } = usePolicies(projectId);
 
@@ -472,6 +473,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
           onRestore={restoreVersion}
           onExport={exportVersion}
           onDelete={deleteVersion}
+          onDeleteMany={deleteVersions}
           onUpdateNotes={updateVersionNotes}
           exportsSection={
             projectId ? (

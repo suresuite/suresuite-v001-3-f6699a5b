@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-is-mobile";
@@ -117,6 +118,7 @@ export function PolicyHistorySheet({
   onRestore,
   onExport,
   onDelete,
+  onDeleteMany,
   onUpdateNotes,
   exportsSection,
 }: {
@@ -128,6 +130,8 @@ export function PolicyHistorySheet({
   onRestore: (id: string) => Promise<void>;
   onExport?: (version: PolicyVersion) => Promise<void>;
   onDelete?: (versionId: string) => Promise<boolean>;
+  /** Batch delete; returns the ids actually deleted. Enables multi-select. */
+  onDeleteMany?: (versionIds: string[]) => Promise<string[]>;
   onUpdateNotes?: (versionId: string, notes: string) => Promise<void>;
   exportsSection?: React.ReactNode;
 }) {
@@ -135,6 +139,44 @@ export function PolicyHistorySheet({
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Multi-select delete. A version bound to a run or model card is never
+  // checkable — the server would refuse it anyway (delete_policy_version).
+  const [selecting, setSelecting] = useState(false);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const isReferenced = (v: PolicyVersion) => (v.run_count ?? 0) + (v.card_count ?? 0) > 0;
+  const deletable = versions.filter((v) => !isReferenced(v));
+  const checkedIds = deletable.filter((v) => checked.has(v.id)).map((v) => v.id);
+  const allChecked = deletable.length > 0 && checkedIds.length === deletable.length;
+  const exitSelecting = () => {
+    setSelecting(false);
+    setChecked(new Set());
+  };
+  const toggleChecked = (id: string, on: boolean) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  const deleteChecked = async () => {
+    if (!onDeleteMany || checkedIds.length === 0) return;
+    const n = checkedIds.length;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Delete ${n} version${n === 1 ? "" : "s"}? This cannot be undone.`)
+    )
+      return;
+    setBulkBusy(true);
+    const deleted = await onDeleteMany(checkedIds);
+    setBulkBusy(false);
+    setChecked((prev) => {
+      const next = new Set(prev);
+      deleted.forEach((id) => next.delete(id));
+      return next;
+    });
+    if (deleted.length === n) setSelecting(false);
+  };
   const parentLabel = (id: string | null) =>
     versions.find((v) => v.id === id)?.label || (id ? id.slice(0, 8) : "—");
 
@@ -156,7 +198,13 @@ export function PolicyHistorySheet({
     : "font-mono text-[11px] text-muted-foreground";
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) exitSelecting();
+        onOpenChange(v);
+      }}
+    >
       <SheetContent
         side={isMobile ? "bottom" : "right"}
         className={cn(
@@ -189,6 +237,57 @@ export function PolicyHistorySheet({
             <MonoChip>Live</MonoChip>
           </button>
 
+          {onDeleteMany && deletable.length > 0 && (
+            <div
+              className={cn(
+                "flex flex-wrap items-center gap-2",
+                "[&_button]:min-h-11 md:[&_button]:min-h-0",
+              )}
+            >
+              {selecting ? (
+                <>
+                  <label className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                    <Checkbox
+                      checked={allChecked}
+                      onCheckedChange={(on) =>
+                        setChecked(on ? new Set(deletable.map((v) => v.id)) : new Set())
+                      }
+                      aria-label="Select all deletable versions"
+                    />
+                    all ({deletable.length})
+                  </label>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="ml-auto h-[26px] px-2.5 text-[11.5px]"
+                    disabled={checkedIds.length === 0 || bulkBusy}
+                    onClick={deleteChecked}
+                  >
+                    {bulkBusy ? "Deleting…" : `Delete ${checkedIds.length}`}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-[26px] px-2.5 text-[11.5px]"
+                    disabled={bulkBusy}
+                    onClick={exitSelecting}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto h-[26px] px-2.5 text-[11.5px]"
+                  onClick={() => setSelecting(true)}
+                >
+                  Select multiple
+                </Button>
+              )}
+            </div>
+          )}
+
           {versions.length === 0 && (
             <p className="py-6 text-center font-mono text-[11px] text-muted-foreground">
               no saved versions
@@ -216,7 +315,24 @@ export function PolicyHistorySheet({
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className={label}>{versionDisplayName(v)}</span>
+                  {selecting ? (
+                    <label className="flex min-w-0 items-center gap-2">
+                      <Checkbox
+                        checked={checked.has(v.id)}
+                        disabled={referenced || bulkBusy}
+                        onCheckedChange={(on) => toggleChecked(v.id, on === true)}
+                        aria-label={`Select ${versionDisplayName(v)} for deletion`}
+                        title={
+                          referenced
+                            ? `Can't delete — referenced by ${v.run_count ?? 0} run(s) and ${v.card_count ?? 0} model card(s)`
+                            : undefined
+                        }
+                      />
+                      <span className={label}>{versionDisplayName(v)}</span>
+                    </label>
+                  ) : (
+                    <span className={label}>{versionDisplayName(v)}</span>
+                  )}
                   <div className="flex shrink-0 items-center gap-1">
                     {referenced && (
                       <MonoChip>
