@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 351,
-  "migrations_applied": 343,
+  "migrations_found": 352,
+  "migrations_applied": 344,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260929000002_admin_users_read.sql",
+  "last_migration": "20260929000003_account_self_service_names_its_user.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 297,
+    "functions": 299,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -2835,7 +2835,7 @@
           "type": "timestamp with time zone",
           "type_raw": "timestamptz",
           "nullable": false,
-          "default": "(now() + interval '90 days')",
+          "default": "(now() + public.password_max_age())",
           "primary_key": false,
           "unique": false,
           "references": null,
@@ -2883,6 +2883,18 @@
             "on_delete": "SET NULL"
           },
           "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "avatar_color",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000003_account_self_service_names_its_user.sql"
         }
       ],
       "constraints": [
@@ -2905,6 +2917,13 @@
           "definition": "UNIQUE (email)",
           "implicit": true,
           "added_by": "20250815000000_approved_users_base.sql"
+        },
+        {
+          "name": "approved_users_avatar_color_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ( avatar_color IS NULL OR avatar_color IN ( 'slate', 'red', 'orange', 'amber', 'green', 'teal', 'blue', 'indigo', 'violet', 'pink'))",
+          "added_by": "20260929000003_account_self_service_names_its_user.sql"
         }
       ],
       "indexes": [
@@ -21151,6 +21170,18 @@
       "defined_by": "20260715000001_agent_proposals.sql"
     },
     {
+      "name": "account_self_resolve",
+      "signature": "account_self_resolve(uuid)",
+      "args": [
+        "p_user_id uuid"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D206 — the user an account self-service RPC acts for: the named user, or the ",
+      "defined_by": "20260929000003_account_self_service_names_its_user.sql"
+    },
+    {
       "name": "active_model_validation",
       "signature": "active_model_validation(uuid, text, text)",
       "args": [
@@ -22283,16 +22314,17 @@
     },
     {
       "name": "change_own_password",
-      "signature": "change_own_password(text, text)",
+      "signature": "change_own_password(text, text, uuid)",
       "args": [
         "p_old_password text",
-        "p_new_password text"
+        "p_new_password text",
+        "p_user_id uuid DEFAULT NULL"
       ],
-      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "returns": "timestamptz LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+      "comment": "D206 — the signed-in user sets a new password. Requires the current one (checked ",
+      "defined_by": "20260929000003_account_self_service_names_its_user.sql"
     },
     {
       "name": "chat_quick_thread_id",
@@ -23182,13 +23214,15 @@
     },
     {
       "name": "get_my_profile",
-      "signature": "get_my_profile()",
-      "args": [],
-      "returns": "TABLE( id uuid, email text, name text, display_name text, phone text, avatar_url text, role text, organization text, is_active boolean, force_password_change boolean, password_changed_at timestamptz, password_expires_at timestamptz )",
+      "signature": "get_my_profile(uuid)",
+      "args": [
+        "p_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "TABLE( id uuid, email text, name text, display_name text, phone text, avatar_color text, role text, organization text, is_active boolean, force_password_change boolean, password_changed_at timestamptz, password_expires_at timestamptz, password_expired boolean, password_max_age_days integer )",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+      "comment": "D206 — the signed-in user's own account row, with password_expired computed on the ",
+      "defined_by": "20260929000003_account_self_service_names_its_user.sql"
     },
     {
       "name": "get_network_edges_for_prominence",
@@ -24122,6 +24156,16 @@
       "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
+      "name": "password_max_age",
+      "signature": "password_max_age()",
+      "args": [],
+      "returns": "interval LANGUAGE sql IMMUTABLE PARALLEL SAFE AS",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": "D206 — how long a password is valid after it is set. The one statement of the ",
+      "defined_by": "20260929000003_account_self_service_names_its_user.sql"
+    },
+    {
       "name": "project_freshness",
       "signature": "project_freshness(uuid)",
       "args": [
@@ -24758,17 +24802,18 @@
     },
     {
       "name": "update_own_profile",
-      "signature": "update_own_profile(text, text, text)",
+      "signature": "update_own_profile(text, text, text, uuid)",
       "args": [
         "p_display_name text DEFAULT NULL",
         "p_phone text DEFAULT NULL",
-        "p_avatar_url text DEFAULT NULL"
+        "p_avatar_color text DEFAULT NULL",
+        "p_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+      "comment": "D206 — the signed-in user edits their own display name, phone and avatar colour. NULL ",
+      "defined_by": "20260929000003_account_self_service_names_its_user.sql"
     },
     {
       "name": "update_policy_version_notes",

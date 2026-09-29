@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "c1b8c906bac6";
+export const CONTRACT_VERSION = "ff8dd81afee0";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20260929000002_admin_users_read.sql";
+export const LAST_MIGRATION = "20260929000003_account_self_service_names_its_user.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
   "tablesDescribed": 55,
-  "columnsDescribed": 687,
+  "columnsDescribed": 688,
   "tablesUndescribed": 26
 } as const;
 
@@ -321,7 +321,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "approved_users",
         "grain": "One person who may sign in. This is the authentication table: the product does not use Supabase Auth for its own users, so a row here IS an account — credential, role, tenant and profile in one.",
-        "columns": 16,
+        "columns": 17,
         "owner": "platform"
       },
       {

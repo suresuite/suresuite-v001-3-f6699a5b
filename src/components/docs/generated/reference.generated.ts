@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 687;
+export const REFERENCE_COLUMN_COUNT = 688;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -756,7 +756,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "email"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "approved_users_avatar_color_check",
+        "definition": "CHECK ( avatar_color IS NULL OR avatar_color IN ( 'slate', 'red', 'orange', 'amber', 'green', 'teal', 'blue', 'indigo', 'violet', 'pink'))"
+      }
+    ],
     "ingestDataset": null,
     "surfaces": [
       {
@@ -767,7 +772,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "Profile.tsx",
         "via": "rpc change_own_password",
-        "evidence": "src/pages/Profile.tsx:110"
+        "evidence": "src/pages/Profile.tsx:111"
       }
     ],
     "governance": {
@@ -1022,7 +1027,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "URL of the user's profile image, if they uploaded one.",
+        "meaning": "URL of a profile image uploaded to the `avatars` bucket. RETIRED by §4 D206: the upload was refused for every `anon` caller by its storage policies, and the owner chose an avatar colour instead, so no RPC reads or writes this column any more. Kept rather than dropped so nothing uploaded before is destroyed.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1094,14 +1099,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "When the current password stops being accepted — `now() + 90 days` at the time the row was written.",
+        "meaning": "When the current password expires — `now() + password_max_age()` (90 days) when the password was last set. Expiry does not refuse a sign-in: it sends the user to /profile and closes every other page until the password is changed (`RoleGuard`, reading `get_my_profile`'s server-computed `password_expired`; §4 D206). Rows that predate `20260527011429` were stamped by that migration's column default, not by a real password change.",
         "primaryKey": false,
         "unique": false,
         "references": null,
         "substitutions": [
           {
             "when": "no expiry is supplied",
-            "value": "90 days after the row is written",
+            "value": "password_max_age() (90 days) after the row is written",
             "provenance": "default",
             "visibleAs": "the column default; the account pages render the resulting date"
           }
@@ -1125,7 +1130,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Whether the user must set a new password before continuing. Set when an administrator resets an account.",
+        "meaning": "Whether the user must set a new password before continuing. Set when an administrator creates or resets an account; cleared by `change_own_password`. Enforced by `RoleGuard`, which could not see it until §4 D206.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1149,7 +1154,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. Before that the only check was the browser's, through a call that fails for anon, so the column was set and never read. It is not consulted by any RLS policy, so suspending a user does not end a browser session that is already signed in (D28's client-asserted identity).",
+        "meaning": "Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. The browser also checks it through `get_my_profile` at login and on every reload — a check that, until §4 D206, raised for every user and was ignored, so before these two changes the column was set and never read. It is not consulted by any RLS policy, so between reloads a suspended user's open session is not revoked (D28's client-asserted identity).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1194,6 +1199,37 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "avatar_color",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "one of the palette tokens in the CHECK",
+        "meaning": "The colour of the user's initial on their avatar — one token of a fixed palette, CHECK-constrained; the page maps each token to its fill (`src/lib/avatarColors.ts`, pinned to the CHECK by `avatarColors.test.ts`). §4 D206.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "the user has not chosen a colour (NULL)",
+            "value": "the theme's primary colour",
+            "provenance": "default",
+            "visibleAs": "the \"Default\" swatch, selected, on /profile"
+          }
+        ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
         "computedBy": null
       }
     ]
@@ -11937,17 +11973,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectIntelligence.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:141"
+        "evidence": "src/hooks/usePolicies.tsx:145"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:141"
+        "evidence": "src/hooks/usePolicies.tsx:145"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:141"
+        "evidence": "src/hooks/usePolicies.tsx:145"
       }
     ],
     "governance": {
@@ -12360,17 +12396,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectIntelligence.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:142"
+        "evidence": "src/hooks/usePolicies.tsx:146"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:142"
+        "evidence": "src/hooks/usePolicies.tsx:146"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:142"
+        "evidence": "src/hooks/usePolicies.tsx:146"
       }
     ],
     "governance": {
@@ -12899,7 +12935,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:458"
+        "evidence": "src/hooks/usePolicies.tsx:462"
       }
     ],
     "governance": {
