@@ -22,7 +22,26 @@ export function groupByKeyA<T extends { [k: string]: unknown }>(
   return out;
 }
 
-export type AggKind = "int" | "num" | "toggle" | "type" | "vector" | "chip" | "text";
+/**
+ * How a group member's key-A cell renders — §4 D179.
+ *
+ * Only a CONTINUATION member (the 2nd, 3rd … row of a group of two or more)
+ * may replace key A with "↳", because the first member directly above it
+ * names the same id. Every other row names itself. The rule this replaces
+ * drew "↳" for every row that was not the first of a COLLAPSIBLE group, and a
+ * group of one is not collapsible — so every material with exactly one line
+ * (every single-supplier material, and every "(made in-house)", "needs
+ * supplier" and "not in BOM" line D175/D176 added) rendered with no id at all.
+ */
+export function memberDisplay(
+  groupSize: number,
+  index: number,
+): { isFirstOfGroup: boolean; isContinuation: boolean } {
+  const collapsible = groupSize > 1;
+  return { isFirstOfGroup: collapsible && index === 0, isContinuation: collapsible && index > 0 };
+}
+
+export type AggKind ="int" | "num" | "toggle" | "type" | "vector" | "chip" | "text";
 
 /**
  * Aggregate a value column across a group's members for the collapsed summary

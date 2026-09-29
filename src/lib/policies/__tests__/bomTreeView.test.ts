@@ -174,3 +174,59 @@ describe("buildBomTreeView never drops a supplier row (D178)", () => {
     expect(laneKeys(es).sort()).toEqual(supplierRows.map((r) => r.key).sort());
   });
 });
+
+/**
+ * §4 D179 — a lane shows "↳" for its material only when the entry directly
+ * above names that material. D177 marked EVERY lane a continuation, so the
+ * "Not in the BOM" tail — which has no node row — listed nameless lanes, and a
+ * project whose tree had no structure showed no material id anywhere.
+ */
+describe("buildBomTreeView — every material is named on screen (D179)", () => {
+  const nameOf = (e: TreeEntry): string | null =>
+    e.kind === "root" || e.kind === "node" ? e.nodeId : null;
+
+  const visibleMaterials = (es: TreeEntry[]): Set<string> => {
+    const shown = new Set<string>();
+    for (const e of es) {
+      const n = nameOf(e);
+      if (n) shown.add(n);
+      if (e.kind === "lane" && !e.continuation) shown.add(String(e.row.material_id));
+    }
+    return shown;
+  };
+
+  it("a continuation lane always sits under an entry naming its own material", () => {
+    const es = buildBomTreeView({ bomRows, deepRows, supplierRows });
+    for (let i = 0; i < es.length; i++) {
+      const e = es[i];
+      if (e.kind !== "lane" || !e.continuation) continue;
+      let j = i - 1;
+      while (j >= 0 && es[j].kind === "lane" && (es[j] as { row: { material_id?: unknown } }).row.material_id === e.row.material_id) j--;
+      const above = es[j];
+      const namesIt =
+        (above && nameOf(above) === String(e.row.material_id)) ||
+        (es[i - 1]?.kind === "lane" && (es[i - 1] as { row: { material_id?: unknown } }).row.material_id === e.row.material_id);
+      expect(namesIt, `lane ${e.row.key} shows ↳ with nothing above naming ${String(e.row.material_id)}`).toBe(true);
+    }
+  });
+
+  it("the tail's first lane per material names the material; later ones continue it", () => {
+    const tail = [
+      { key: "S1::X", supplier_id: "S1", material_id: "X", __not_in_bom: true },
+      { key: "S2::X", supplier_id: "S2", material_id: "X", __not_in_bom: true },
+      { key: "S3::Y", supplier_id: "S3", material_id: "Y", __not_in_bom: true },
+    ];
+    const lanesOut = lanes(buildBomTreeView({ bomRows: [], deepRows: [], supplierRows: tail }));
+    expect(lanesOut.map((l) => l.continuation)).toEqual([false, true, false]);
+  });
+
+  it("every supplier row's material is visible, with structure and without", () => {
+    for (const input of [
+      { bomRows, deepRows, supplierRows },
+      { bomRows: [], deepRows: [], supplierRows },
+    ]) {
+      const shown = visibleMaterials(buildBomTreeView(input));
+      for (const r of supplierRows) expect(shown.has(String(r.material_id))).toBe(true);
+    }
+  });
+});

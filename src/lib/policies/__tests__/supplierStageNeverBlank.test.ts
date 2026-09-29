@@ -77,3 +77,33 @@ describe("the mobile list tells a failed read from an empty stage (D178)", () =>
     expect(read(MOBILE)).toMatch(/stageRows\.loadError[\s\S]{0,120}Lines could not be loaded/);
   });
 });
+
+describe("the Material column names every material (D179)", () => {
+  const src = read(TABLE);
+
+  it("the ↳ glyph is keyed on isContinuation — never on 'not first of a collapsible group'", () => {
+    expect(src).toMatch(/i === 0 && groupMeta\?\.isContinuation \? \(/);
+    expect(
+      /groupMeta && !groupMeta\.isFirstOfGroup/.test(src),
+      "the 2026-09-19 rule is back: a group of one is not collapsible, so every " +
+        "one-line material renders as a bare ↳ with no id (§4 D179)",
+    ).toBe(false);
+  });
+
+  it("a continuation line still WRITES its material id — the ↳ only marks the group", () => {
+    const at = src.indexOf("i === 0 && groupMeta?.isContinuation ? (");
+    const branch = src.slice(at, src.indexOf(") : c.id === \"supplier_id\"", at));
+    expect(branch, "the continuation branch must render r[c.id], not a bare glyph").toMatch(
+      /<span className="truncate">\{String\(r\[c\.id\] \?\? ""\)\}<\/span>/,
+    );
+  });
+
+  it("the flat pass takes its member display from memberDisplay (unit-tested)", () => {
+    expect(src).toMatch(/\.\.\.memberDisplay\(group\.members\.length, mi\)/);
+  });
+
+  it("the tree pass takes each lane's continuation from the tree builder, not a constant", () => {
+    expect(src).toMatch(/isContinuation: e\.continuation/);
+    expect(/isContinuation: true,\s*groupId: `tree::/.test(src)).toBe(false);
+  });
+});

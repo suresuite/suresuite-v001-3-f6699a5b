@@ -42,7 +42,7 @@ import {
 import { fitColumns, foldNote, type FitCol } from "@/lib/policies/columnFit";
 import { buildBomTreeView, type TreeEntry } from "@/lib/policies/bomTreeView";
 import { stageEmptyMessage, treeFallbackReason } from "@/lib/policies/stageGridState";
-import { groupByKeyA, summarise } from "@/lib/policies/groupRows";
+import { groupByKeyA, memberDisplay, summarise } from "@/lib/policies/groupRows";
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
 import {
@@ -1210,14 +1210,18 @@ export function StagePolicyTable({
                   ▾
                 </button>
               )}
-              {i === 0 && groupMeta && !groupMeta.isFirstOfGroup ? (
-                // Continuation member of an expanded group: key A repeats the
-                // same id as the first member — show ↳ instead of restating it.
+              {i === 0 && groupMeta?.isContinuation ? (
+                // Continuation member of a group: key A is the same id as the
+                // row above, and it is STILL WRITTEN — every line names its own
+                // material (owner-directed, §4 D179). A bare ↳ in place of the
+                // id made a one-line material look like another material's
+                // supplier; the ↳ and the lighter tone now only mark the group.
                 <span
-                  className="w-[15px] shrink-0 text-center font-mono text-[10px] text-[#c4c4c4]"
+                  className="flex min-w-[62px] flex-1 items-center gap-1 truncate text-[#8a8a8a]"
                   title={String(r[c.id] ?? "")}
                 >
-                  ↳
+                  <span className="shrink-0 text-[10px] text-[#c4c4c4]">↳</span>
+                  <span className="truncate">{String(r[c.id] ?? "")}</span>
                 </span>
               ) : c.id === "supplier_id" && r.__needs_supplier ? (
                 newSupplierFor === rowKey ? (
@@ -2053,7 +2057,7 @@ export function StagePolicyTable({
                     if (isHidden(e.path)) return null;
                     return renderRow(e.row as Record<string, unknown>, {
                       isFirstOfGroup: false,
-                      isContinuation: true,
+                      isContinuation: e.continuation,
                       groupId: `tree::${e.path.join("/")}`,
                     });
                   }
@@ -2086,8 +2090,7 @@ export function StagePolicyTable({
                 if (!isGroupCollapsed) {
                   return group.members.map((m, mi) =>
                     renderRow(m.row as Record<string, unknown>, {
-                      isFirstOfGroup: isCollapsible && mi === 0,
-                      isContinuation: isCollapsible && mi > 0,
+                      ...memberDisplay(group.members.length, mi),
                       groupId,
                     }),
                   );
