@@ -48,6 +48,13 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
   const [bomLevel, setBomLevel] = useState<string>("single");
   const [bomRows, setBomRows] = useState<Record<string, unknown>[]>([]);
   const [deepRows, setDeepRows] = useState<Record<string, unknown>[]>([]);
+  // §4 D178 — a failed read is a RENDERED state, not a console line. When the
+  // catch below fires, `rows` is empty for a reason the project's data did not
+  // choose, and the grid must say which read failed instead of claiming
+  // "no lines for this project". Same rule for the deep-lane read: its failure
+  // only degrades the tree, but the degradation must name itself.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [deepError, setDeepError] = useState<string | null>(null);
   // Bumped by reload() to refetch after a write (e.g. assigning a supplier).
   const [tick, setTick] = useState(0);
 
@@ -63,6 +70,8 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
     setBomLevel("single");
     setBomRows([]);
     setDeepRows([]);
+    setLoadError(null);
+    setDeepError(null);
 
     (async () => {
       const sb = supabase as any;
@@ -74,7 +83,13 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
           p_user_id: user.id,
           p_user_email: user.email,
         });
-        if (scdErr) throw scdErr;
+        if (scdErr) {
+          // Name the read: the catch renders this, and "failed" without a
+          // source is not a diagnosis anyone can act on (§4 D178).
+          throw new Error(
+            `get_supply_chain_data: ${String((scdErr as { message?: string })?.message ?? JSON.stringify(scdErr))}`,
+          );
+        }
         const edges: SCDRow[] = (scd ?? []).filter(
           (d: SCDRow) => d.data_source && d.data_source !== "multi_tier",
         );
@@ -86,18 +101,32 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
         if (!cancelled) setTruncated(lanes.truncated);
         const inbound = lanes.inbound;
         const outbound = lanes.outbound;
-        // Multi-level BOM shape only; single-level projects have no
-        // higher_level_component_id hierarchy (matches previous behavior).
-        const bom = lanes.bomLevel.includes("multi") ? lanes.bom : [];
+        // §4 D178 — THE ROWS' SHAPE DECIDES, NOT `projects.bom_level`. This
+        // used to gate on the declared `lanes.bomLevel` label. A project
+        // whose label disagrees with the
+        // rows it holds then took every wrong branch at once: the D176
+        // single-level sweep never ran (its gate read the same label), the
+        // D177 tree offered itself with no hierarchy to show, and the
+        // materials the BOM knows had no source left. The multi-level
+        // hierarchy IS "a row carries `higher_level_component_id`" — read
+        // that, and the label can drift without the grid lying.
+        // (The label's own writer, `get_project_datasets`, still picks WHICH
+        // BOM table it aggregates by comparing the label to 'single' exactly;
+        // that latent half is recorded in the D178 row, not fixed here.)
+        const hasMultiShape = lanes.bom.some(
+          (r) =>
+            String((r as Record<string, unknown>).higher_level_component_id ?? "").trim() !== "",
+        );
+        const bom = hasMultiShape ? lanes.bom : [];
         if (!cancelled) {
-          setBomLevel(lanes.bomLevel);
+          setBomLevel(hasMultiShape ? "multi" : "single");
           setBomRows(bom);
         }
 
         // §4 D177 — the derived deep lane, read for the supplier stage's tree
         // on multi-level projects. Same RPC and paging the network pages use;
         // the numbers on the tree are THESE rows, never a client-side walk.
-        if (stage === "supplier" && lanes.bomLevel.includes("multi")) {
+        if (stage === "supplier" && hasMultiShape) {
           const pageSize = 1000;
           let all: Record<string, unknown>[] = [];
           let offset = 0;
@@ -110,9 +139,15 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               p_offset: offset,
             });
             if (mtErr) {
-              // The tree degrades loudly in the grid ("not derived"); the flat
-              // rows above are unaffected. Never fail the stage over this read.
+              // The tree degrades in the grid; the flat rows above are
+              // unaffected. Never fail the stage over this read — but the
+              // degradation names itself: `deepError` reaches the toolbar
+              // (§4 D178), a console line is not a display (§5.3 T2).
               console.warn("[useStageRows] deep-lane read failed — tree numbers unavailable", mtErr);
+              if (!cancelled)
+                setDeepError(
+                  `get_supply_chain_data_multi_tier: ${String((mtErr as { message?: string })?.message ?? JSON.stringify(mtErr))}`,
+                );
               all = [];
               break;
             }
@@ -483,7 +518,11 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
           // invisible: the exact class D175 closed, one table over. The
           // single shape has no intermediates (every row is product ←
           // material), so an unpaired id here is bought and needs a supplier.
-          if (!lanes.bomLevel.includes("multi")) {
+          // §4 D178 — gated on the rows' SHAPE, not the declared level: this
+          // sweep must run whenever the BOM rows carry no hierarchy, whatever
+          // `projects.bom_level` claims, or a mislabelled project loses its
+          // BOM-only materials with nothing saying so.
+          if (!hasMultiShape) {
             for (const r of lanes.bom) {
               const mat = String(r.material_id ?? "").trim();
               if (!mat || pairedMaterials.has(mat) || outboundProductIds.has(mat)) continue;
@@ -734,6 +773,14 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
         if (!cancelled) {
           setRows([]);
           setFallback(true);
+          // §4 D178 — the empty grid this leaves behind must say WHY it is
+          // empty. Rendering it as "no lines for this project" was the same
+          // silent swallow D3/D4 closed one layer down (loudFailure.test.ts).
+          setLoadError(
+            err instanceof Error
+              ? err.message
+              : String((err as { message?: string })?.message ?? err),
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -747,5 +794,5 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
 
   const reload = () => setTick((t) => t + 1);
 
-  return { rows, loading, fallback, truncated, reload, bomLevel, bomRows, deepRows };
+  return { rows, loading, fallback, truncated, reload, bomLevel, bomRows, deepRows, loadError, deepError };
 }

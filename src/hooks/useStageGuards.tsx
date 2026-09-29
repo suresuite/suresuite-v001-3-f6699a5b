@@ -26,6 +26,13 @@ export interface StageRowsQuery {
   bomLevel: string;
   bomRows: Record<string, unknown>[];
   deepRows: Record<string, unknown>[];
+  /** §4 D178 — the read that emptied `rows`, named, or null. The grid RENDERS
+   *  this in its empty state; "no lines for this project" over a failed read
+   *  is a false statement about the project's data. */
+  loadError: string | null;
+  /** §4 D178 — the deep-lane read's failure, named. Degrades the D177 tree
+   *  only, and the toolbar says so instead of showing a structureless tree. */
+  deepError: string | null;
 }
 
 interface Args {
