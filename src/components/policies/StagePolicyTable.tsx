@@ -25,6 +25,7 @@ import {
   ProvenanceDot,
   ProvenanceLegend,
   ReplenishmentCell,
+  ColResizeHandle,
   RowFlag,
   SortHeader,
   rowAccent,
@@ -39,7 +40,7 @@ import {
   type ColSpec,
   type ColSpecCtx,
 } from "@/lib/policies/columnSpecs";
-import { fitColumns, foldNote, type FitCol } from "@/lib/policies/columnFit";
+import { clampColWidth, fitColumns, foldNote, type FitCol } from "@/lib/policies/columnFit";
 import {
   buildBomTreeModel,
   expandToLevel,
@@ -196,6 +197,23 @@ function writeTreePrefs(projectId: string | null | undefined, prefs: TreePrefs):
     localStorage.setItem(TREE_PREFS_KEY, JSON.stringify(all));
   } catch {
     /* noop — a preference, never state that must persist */
+  }
+}
+
+/**
+ * User-dragged column widths, per stage → column key (value columns by field,
+ * key columns by their `KeyColDef.id`). A preference beside the family
+ * collapse: presentation only, never read by a guard, a save or an export.
+ */
+const COL_WIDTHS_KEY = "policy.table.colWidths";
+type ColWidths = Record<string, Record<string, number>>;
+function readColWidths(): ColWidths {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = JSON.parse(localStorage.getItem(COL_WIDTHS_KEY) ?? "{}");
+    return raw && typeof raw === "object" ? (raw as ColWidths) : {};
+  } catch {
+    return {};
   }
 }
 
@@ -477,6 +495,32 @@ export function StagePolicyTable({
     [collapsed],
   );
 
+  // Column widths the user dragged, persisted per stage.
+  const [allColWidths, setAllColWidths] = useState<ColWidths>(readColWidths);
+  useEffect(() => {
+    try {
+      localStorage.setItem(COL_WIDTHS_KEY, JSON.stringify(allColWidths));
+    } catch {
+      /* noop */
+    }
+  }, [allColWidths]);
+  const colWidths = useMemo(() => allColWidths[stageKey] ?? {}, [allColWidths, stageKey]);
+  const setColWidth = (key: string, w: number) =>
+    setAllColWidths((cur) => ({ ...cur, [stageKey]: { ...(cur[stageKey] ?? {}), [key]: clampColWidth(w) } }));
+  const resetColWidth = (key: string) =>
+    setAllColWidths((cur) => {
+      const { [key]: _drop, ...rest } = cur[stageKey] ?? {};
+      return { ...cur, [stageKey]: rest };
+    });
+  const resetAllColWidths = () =>
+    setAllColWidths((cur) => {
+      const { [stageKey]: _drop, ...rest } = cur;
+      return rest;
+    });
+  const resizeHandle = (key: string, label: string) => (
+    <ColResizeHandle label={label} onResize={(w) => setColWidth(key, w)} onReset={() => resetColWidth(key)} />
+  );
+
   // Row-group collapse (§5) — a material's suppliers, a plant's products, a
   // customer's product lanes. State resets per stage on purpose (§5 note).
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -578,7 +622,7 @@ export function StagePolicyTable({
   // cells. Flat (and every other stage) is exactly the two `KEY_W` columns.
   type KeyColDef = { id: string; w: number; left: number | null };
   const treeKeyA = treeKeyWidthFor(winWidth);
-  const keyDefs: KeyColDef[] = useMemo(() => {
+  const designKeyDefs: KeyColDef[] = useMemo(() => {
     if (!treeActive) {
       return spec.keyCols.map((c, i) => ({ id: c.id, w: i === 0 ? keyW.a : keyW.b, left: i === 0 ? 0 : keyW.a }));
     }
@@ -598,6 +642,18 @@ export function StagePolicyTable({
       { id: supplierCol, w: keyW.b, left: null },
     ];
   }, [treeActive, treePivot, treeKeyA, treeLevelCount, keyW.a, keyW.b, spec.keyCols]);
+  // User widths replace the design width; the sticky `left` offsets are then
+  // re-accumulated from the widths actually rendered (columnFit.ts §0.2).
+  const keyDefs: KeyColDef[] = useMemo(() => {
+    let left = 0;
+    return designKeyDefs.map((d) => {
+      const user = colWidths[d.id];
+      const w = typeof user === "number" ? clampColWidth(user) : d.w;
+      const out = { ...d, w, left: d.left === null ? null : left };
+      left += w;
+      return out;
+    });
+  }, [designKeyDefs, colWidths]);
   const keyBlockW = keyDefs.reduce((a, d) => a + d.w, 0);
 
   const avail = Math.max(0, containerW - 2 - 24 - (treePivot ? 0 : keyBlockW));
@@ -609,8 +665,9 @@ export function StagePolicyTable({
         collapsedFamilies,
         enabled: fitEnabled,
         narrow: narrowFamily,
+        widths: colWidths,
       }),
-    [fitCols, avail, collapsedFamilies, fitEnabled, narrowFamily],
+    [fitCols, avail, collapsedFamilies, fitEnabled, narrowFamily, colWidths],
   );
   const { visible, folded, fills } = fit;
   const totalCols = visible.length + folded.length;
@@ -629,8 +686,8 @@ export function StagePolicyTable({
   }, [visible]);
 
   // Frozen key columns: cumulative left offsets from the breakpoint widths.
-  const keyWidths = [keyW.a, keyW.b];
-  const keyLeft = (i: number) => (i === 0 ? 0 : keyW.a);
+  const keyWidths = keyDefs.map((d) => d.w);
+  const keyLeft = (i: number) => keyDefs[i]?.left ?? 0;
   const keyTotal = keyBlockW;
   const tableMinWidth = keyTotal + fit.valueWidth;
 
@@ -2290,6 +2347,7 @@ export function StagePolicyTable({
             </span>
             <span className="text-[9px] leading-[1.2] text-white/55">{i === 0 ? "finished product" : "uploaded level"}</span>
           </button>
+          {resizeHandle(`__lvl${i}`, i === 0 ? "Product" : `L${i - 1}`)}
         </th>
       ))
     ) : (
@@ -2303,6 +2361,7 @@ export function StagePolicyTable({
           onFilter={(v) => setColFilter(matCol.id, v)}
           filterPlaceholder={filterPlaceholder}
         />
+        {resizeHandle(keyDefs[0].id, matCol.label)}
       </th>
     );
     return [
@@ -2316,6 +2375,7 @@ export function StagePolicyTable({
           <span className="text-[10px] font-medium uppercase leading-[1.2] tracking-[0.08em]">Qty / assy</span>
           <span className="text-[9px] leading-[1.2] text-white/55">per parent</span>
         </div>
+        {resizeHandle("__qty", "Qty / assy")}
       </th>,
       <th key={supCol.id} className={headCls} style={pos(supDef)}>
         <SortHeader
@@ -2325,6 +2385,7 @@ export function StagePolicyTable({
           filter={colFilters[supCol.id] ?? ""}
           onFilter={(v) => setColFilter(supCol.id, v)}
         />
+        {resizeHandle(supDef.id, supCol.label)}
       </th>,
     ];
   };
@@ -2455,6 +2516,16 @@ export function StagePolicyTable({
               : folded.length > 0
                 ? `${folded.length} folded · ${visible.length}/${totalCols}`
                 : `all ${totalCols} columns fit`}
+          </button>
+        )}
+        {Object.keys(colWidths).length > 0 && (
+          <button
+            type="button"
+            onClick={resetAllColWidths}
+            className="inline-flex h-[22px] items-center gap-1 rounded-sm border border-[--zinc-border] bg-white px-[7px] font-mono text-[10px] text-muted-foreground hover:text-foreground"
+            title="Return every column on this stage to its default width"
+          >
+            reset {Object.keys(colWidths).length} column width{Object.keys(colWidths).length === 1 ? "" : "s"}
           </button>
         )}
         {dataBannerState === "pending" && (
@@ -2620,6 +2691,7 @@ export function StagePolicyTable({
                       filter={colFilters[c.id] ?? ""}
                       onFilter={(v) => setColFilter(c.id, v)}
                     />
+                    {resizeHandle(c.id, c.label)}
                   </th>
                 ))
               )}
@@ -2634,6 +2706,7 @@ export function StagePolicyTable({
                       style={{ width, minWidth: width, borderRight: isLast ? "none" : "1px solid rgba(255,255,255,0.22)" }}
                     >
                       {fc.foldedFamily} field{fc.foldedFamily === 1 ? "" : "s"} folded
+                      {resizeHandle(fc.key, fc.label)}
                     </th>
                   );
                 }
@@ -2662,6 +2735,7 @@ export function StagePolicyTable({
                           </span>
                         )}
                       </div>
+                      {resizeHandle(fc.key, adaptLabel(fc.label))}
                     </th>
                   );
                 }
@@ -2683,6 +2757,7 @@ export function StagePolicyTable({
                       filter={fc.filterable === false ? undefined : (colFilters[col.field] ?? "")}
                       onFilter={fc.filterable === false ? undefined : (v) => setColFilter(col.field, v)}
                     />
+                    {resizeHandle(fc.key, adaptLabel(fc.label))}
                   </th>
                 );
               })}

@@ -55,7 +55,14 @@ export interface FitCol {
   shortChip?: boolean; // chip shows its short code, full value on hover
   foldedFamily?: number; // this is a collapsed-family summary column
   wasKeep?: boolean; // folded despite keep (last resort)
+  userSized?: boolean; // `w` is a width the user dragged, not the design width
 }
+
+/** Bounds on a user-dragged column width, px. */
+export const COL_W_MIN = 48;
+export const COL_W_MAX = 640;
+export const clampColWidth = (w: number): number =>
+  Math.round(Math.min(COL_W_MAX, Math.max(COL_W_MIN, w)));
 
 export interface FitInput {
   cols: FitCol[];
@@ -66,6 +73,12 @@ export interface FitInput {
   enabled: boolean;
   /** viewport < 860px — shrinks the family summary column. */
   narrow: boolean;
+  /**
+   * Widths the user dragged, by column key. Applied BEFORE the fold so the
+   * fold measures what will render. A user-sized column is never compacted and
+   * folds only as a last resort — it is the one the user asked to see.
+   */
+  widths?: Record<string, number>;
 }
 
 export interface FitResult {
@@ -124,8 +137,12 @@ export function fitColumns({
   collapsedFamilies,
   enabled,
   narrow,
+  widths,
 }: FitInput): FitResult {
-  const modelled = applyFamilyCollapse(cols, collapsedFamilies, narrow);
+  const modelled = applyFamilyCollapse(cols, collapsedFamilies, narrow).map((c) => {
+    const w = widths?.[c.key];
+    return typeof w === "number" && Number.isFinite(w) ? { ...c, w: clampColWidth(w), userSized: true } : c;
+  });
 
   if (!enabled) {
     return { visible: modelled, folded: [], fills: false, valueWidth: sum(modelled) };
@@ -136,7 +153,7 @@ export function fitColumns({
 
   // 1.1 — fold non-keep columns, lowest priority first.
   const byPrio = modelled
-    .filter((c) => !c.keep)
+    .filter((c) => !c.keep && !c.userSized)
     .sort((a, b) => (a.prio ?? 99) - (b.prio ?? 99));
   let i = 0;
   while (sum(visible) > avail && i < byPrio.length) {
@@ -151,6 +168,7 @@ export function fitColumns({
   const keepWidth = sum(modelled.filter((c) => c.keep));
   if (avail < keepWidth + 40) {
     visible = visible.map((c) => {
+      if (c.userSized) return c;
       if (c.key === "type") return { ...c, sub: "active ▾", w: 74, compact: true };
       if (c.key === "params" || c.key === "__inv_params")
         return { ...c, sub: "levels", w: 148, paramW: 42 };
@@ -163,16 +181,17 @@ export function fitColumns({
 
   // 1.3 — last resort: no stage may be unfittable by construction. Protected
   //       columns fold too — widest first, then rightmost — but never the
-  //       identity toggle, and never below three value columns.
+  //       identity toggle, and never below three value columns. A column the
+  //       user sized is protected like a decision field.
   const byWidth = visible
-    .filter((c) => c.keep && c.kind !== "toggle")
+    .filter((c) => (c.keep || c.userSized) && c.kind !== "toggle")
     .map((c, idx) => ({ c, idx }))
     .sort((a, b) => b.c.w - a.c.w || b.idx - a.idx);
   let k = 0;
   while (sum(visible) > avail && k < byWidth.length && visible.length > 3) {
     const drop = byWidth[k++].c;
     visible = visible.filter((c) => c.key !== drop.key);
-    folded.push({ ...drop, wasKeep: true });
+    folded.push(drop.keep ? { ...drop, wasKeep: true } : drop);
   }
 
   return { visible, folded, fills: sum(visible) < avail, valueWidth: sum(visible) };
