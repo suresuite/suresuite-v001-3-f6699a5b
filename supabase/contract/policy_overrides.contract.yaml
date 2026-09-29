@@ -24,7 +24,7 @@ surfaces:
   - page: "ProductLevelNetwork.tsx"
     via: "rpc project_freshness"
     grain: table
-    evidence: "src/pages/ProductLevelNetwork.tsx:227"
+    evidence: "src/pages/ProductLevelNetwork.tsx:270"
     confirmed: true
   - page: "ProjectIntelligence.tsx"
     via: "table read"

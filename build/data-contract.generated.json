@@ -366,7 +366,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -2590,7 +2590,7 @@
           "page": "ProcessLevelNetwork.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/ProcessLevelNetwork.tsx:359",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:383",
           "confirmed": true
         },
         {
@@ -2911,7 +2911,7 @@
               "page": "ProcessLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/ProcessLevelNetwork.tsx:359",
+              "evidence": "src/pages/ProcessLevelNetwork.tsx:383",
               "confirmed": true
             }
           ],
@@ -4506,7 +4506,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -13833,7 +13833,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc get_network_metrics_for_materials",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:241",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:284",
           "confirmed": true
         }
       ],
@@ -14437,7 +14437,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -15551,7 +15551,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -16102,7 +16102,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -19199,7 +19199,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -22860,7 +22860,7 @@
           "page": "FirmLevelNetwork.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/FirmLevelNetwork.tsx:244",
+          "evidence": "src/pages/FirmLevelNetwork.tsx:258",
           "confirmed": true
         },
         {
@@ -22874,14 +22874,14 @@
           "page": "ProcessLevelNetwork.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/ProcessLevelNetwork.tsx:253",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:282",
           "confirmed": true
         },
         {
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:196",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:239",
           "confirmed": true
         },
         {
@@ -24167,14 +24167,14 @@
           "page": "FirmLevelNetwork.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/FirmLevelNetwork.tsx:303",
+          "evidence": "src/pages/FirmLevelNetwork.tsx:315",
           "confirmed": true
         },
         {
           "page": "ProductLevelNetwork.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:518",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:559",
           "confirmed": true
         }
       ],
@@ -24317,14 +24317,14 @@
               "page": "FirmLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/FirmLevelNetwork.tsx:303",
+              "evidence": "src/pages/FirmLevelNetwork.tsx:315",
               "confirmed": true
             },
             {
               "page": "ProductLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/ProductLevelNetwork.tsx:518",
+              "evidence": "src/pages/ProductLevelNetwork.tsx:559",
               "confirmed": true
             }
           ],
@@ -24371,14 +24371,14 @@
               "page": "FirmLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/FirmLevelNetwork.tsx:303",
+              "evidence": "src/pages/FirmLevelNetwork.tsx:315",
               "confirmed": true
             },
             {
               "page": "ProductLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/ProductLevelNetwork.tsx:518",
+              "evidence": "src/pages/ProductLevelNetwork.tsx:559",
               "confirmed": true
             }
           ],
@@ -27420,7 +27420,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -30979,5 +30979,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "bbda57e7cc8b"
+  "contract_version": "2930c0b65674"
 }

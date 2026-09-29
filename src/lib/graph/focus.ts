@@ -97,3 +97,43 @@ export function focusSubgraphIds(
   walk('up');
   return included;
 }
+
+/**
+ * The process-level focus: the path THROUGH a node, for a BOM of any depth.
+ *
+ * Two directional walks — downstream follows only outgoing edges, upstream only
+ * incoming ones — so a mid-level material brings in its suppliers and the
+ * products and customers it reaches, and never its sibling materials. The walk it
+ * replaces followed both directions from every visited node, which pulled in the
+ * siblings and, on most projects, the whole connected component.
+ *
+ * Direction alone, not echelon rank: the process lens draws the BOM as it is, so
+ * a sub-assembly-to-sub-assembly edge is part of the path whatever the two roles.
+ */
+export function directedFocusIds(edges: readonly FocusEdge[], focusId: string): Set<string> {
+  const outgoing = new Map<string, string[]>();
+  const incoming = new Map<string, string[]>();
+  for (const e of edges) {
+    if (!outgoing.has(e.source)) outgoing.set(e.source, []);
+    if (!incoming.has(e.target)) incoming.set(e.target, []);
+    outgoing.get(e.source)!.push(e.target);
+    incoming.get(e.target)!.push(e.source);
+  }
+  const included = new Set<string>([focusId]);
+  const walk = (adjacency: Map<string, string[]>) => {
+    const seen = new Set<string>([focusId]);
+    const stack = [focusId];
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      for (const next of adjacency.get(id) ?? []) {
+        if (seen.has(next)) continue;
+        seen.add(next);
+        included.add(next);
+        stack.push(next);
+      }
+    }
+  };
+  walk(outgoing);
+  walk(incoming);
+  return included;
+}

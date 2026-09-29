@@ -323,7 +323,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "SimulationLab.tsx",
@@ -1620,7 +1620,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProcessLevelNetwork.tsx",
         "via": "table read",
-        "evidence": "src/pages/ProcessLevelNetwork.tsx:359"
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:383"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -2784,7 +2784,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -8819,7 +8819,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc get_network_metrics_for_materials",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:241"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:284"
       }
     ],
     "governance": {
@@ -9224,7 +9224,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "SimulationLab.tsx",
@@ -9989,7 +9989,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "SimulationLab.tsx",
@@ -10365,7 +10365,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "SimulationLab.tsx",
@@ -12355,7 +12355,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "ProjectIntelligence.tsx",
@@ -14687,7 +14687,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "FirmLevelNetwork.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/FirmLevelNetwork.tsx:244"
+        "evidence": "src/pages/FirmLevelNetwork.tsx:258"
       },
       {
         "page": "InteractiveNetworkSpace.tsx",
@@ -14697,12 +14697,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProcessLevelNetwork.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/ProcessLevelNetwork.tsx:253"
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:282"
       },
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:196"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:239"
       },
       {
         "page": "ProjectIntelligence.tsx",
@@ -15528,12 +15528,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "FirmLevelNetwork.tsx",
         "via": "table read",
-        "evidence": "src/pages/FirmLevelNetwork.tsx:303"
+        "evidence": "src/pages/FirmLevelNetwork.tsx:315"
       },
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "table read",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:518"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:559"
       }
     ],
     "governance": {
@@ -17684,7 +17684,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "ProjectPolicies.tsx",
