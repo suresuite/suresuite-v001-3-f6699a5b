@@ -256,7 +256,7 @@ BEGIN
 
   FOREACH v_fn IN ARRAY ARRAY[
     'public.get_my_profile(uuid)',
-    'public.update_own_profile(text, text, text, uuid)',
+    'public.update_own_profile(text, text, text, uuid, text, text)',  -- D207 appended the name parts
     'public.change_own_password(text, text, uuid)'] LOOP
     FOREACH v_role IN ARRAY ARRAY['anon', 'authenticated'] LOOP
       IF NOT EXISTS (

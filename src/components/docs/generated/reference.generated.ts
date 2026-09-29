@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 688;
+export const REFERENCE_COLUMN_COUNT = 690;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -772,7 +772,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "Profile.tsx",
         "via": "rpc change_own_password",
-        "evidence": "src/pages/Profile.tsx:111"
+        "evidence": "src/pages/Profile.tsx:139"
       }
     ],
     "governance": {
@@ -821,7 +821,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": "non-empty",
-        "meaning": "The person's name as entered when the account was approved.",
+        "meaning": "The person's full name — as entered when the account was approved, and editable since §4 D207 by its owner on /profile as a first and a last name. One fact with `first_name` / `last_name`: the `approved_users_sync_name` trigger rewrites it when a part changes and re-derives the parts when only it changes, whatever writes the row.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1003,7 +1003,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The name the user chose for themselves, overriding `name` in the UI.",
+        "meaning": "The name the user chose for themselves, overriding `name` in the UI. Distinct from `first_name` / `last_name`, which edit `name` itself (§4 D207).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1219,6 +1219,68 @@ export const REFERENCE_TABLES: RefTable[] = [
             "value": "the theme's primary colour",
             "provenance": "default",
             "visibleAs": "the \"Default\" swatch, selected, on /profile"
+          }
+        ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "first_name",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "non-empty",
+        "meaning": "The first part of `name` (§4 D207). Edited by its owner on /profile through `update_own_profile`; a blank first name is refused (`first_name_required`) because `name` is NOT NULL.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "the name was written whole — by an administrator, or before D207",
+            "value": "the first word of `name` (`split_person_name`)",
+            "provenance": "default",
+            "visibleAs": "the First name field on /profile, which its owner can correct"
+          }
+        ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "last_name",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The rest of `name` after the first name (§4 D207); NULL when the name is one word. Edited by its owner on /profile; a blank clears it.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "the name was written whole — by an administrator, or before D207",
+            "value": "everything in `name` after its first word (`split_person_name`)",
+            "provenance": "default",
+            "visibleAs": "the Last name field on /profile, which its owner can correct"
           }
         ],
         "engineChain": null,

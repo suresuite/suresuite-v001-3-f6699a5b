@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 351,
-  "migrations_applied": 343,
+  "migrations_found": 352,
+  "migrations_applied": 344,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260929000003_account_self_service_names_its_user.sql",
+  "last_migration": "20260930000001_account_first_and_last_name.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 292,
+    "functions": 294,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -2895,6 +2895,30 @@
           "unique": false,
           "references": null,
           "added_by": "20260929000003_account_self_service_names_its_user.sql"
+        },
+        {
+          "name": "first_name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000001_account_first_and_last_name.sql"
+        },
+        {
+          "name": "last_name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000001_account_first_and_last_name.sql"
         }
       ],
       "constraints": [
@@ -21757,6 +21781,16 @@
       "defined_by": "20260918000001_org_row_uuid_only.sql"
     },
     {
+      "name": "approved_users_sync_name",
+      "signature": "approved_users_sync_name()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path",
+      "security_definer": false,
+      "volatility": null,
+      "comment": "D207 — keeps approved_users.name and its first_name / last_name parts one fact: a ",
+      "defined_by": "20260930000001_account_first_and_last_name.sql"
+    },
+    {
       "name": "archive_project_memory",
       "signature": "archive_project_memory(uuid)",
       "args": [
@@ -23148,11 +23182,11 @@
       "args": [
         "p_user_id uuid DEFAULT NULL"
       ],
-      "returns": "TABLE( id uuid, email text, name text, display_name text, phone text, avatar_color text, role text, organization text, is_active boolean, force_password_change boolean, password_changed_at timestamptz, password_expires_at timestamptz, password_expired boolean, password_max_age_days integer )",
+      "returns": "TABLE( id uuid, email text, name text, first_name text, last_name text, display_name text, phone text, avatar_color text, role text, organization text, is_active boolean, force_password_change boolean, password_changed_at timestamptz, password_expires_at timestamptz, password_expired boolean, password_max_age_days integer )",
       "security_definer": true,
       "volatility": null,
-      "comment": "D206 — the signed-in user's own account row, with password_expired computed on the ",
-      "defined_by": "20260929000003_account_self_service_names_its_user.sql"
+      "comment": "D206/D207 — the signed-in user's own account row, with their name as a whole and ",
+      "defined_by": "20260930000001_account_first_and_last_name.sql"
     },
     {
       "name": "get_network_edges_for_prominence",
@@ -24674,6 +24708,18 @@
       "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
+      "name": "split_person_name",
+      "signature": "split_person_name(text)",
+      "args": [
+        "p_name text"
+      ],
+      "returns": "text[] LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": "D207 — a full name as {first word, the rest}, each NULL when empty. The one ",
+      "defined_by": "20260930000001_account_first_and_last_name.sql"
+    },
+    {
       "name": "supersede_agent_proposal",
       "signature": "supersede_agent_proposal(uuid, uuid)",
       "args": [
@@ -24722,18 +24768,20 @@
     },
     {
       "name": "update_own_profile",
-      "signature": "update_own_profile(text, text, text, uuid)",
+      "signature": "update_own_profile(text, text, text, uuid, text, text)",
       "args": [
         "p_display_name text DEFAULT NULL",
         "p_phone text DEFAULT NULL",
         "p_avatar_color text DEFAULT NULL",
-        "p_user_id uuid DEFAULT NULL"
+        "p_user_id uuid DEFAULT NULL",
+        "p_first_name text DEFAULT NULL",
+        "p_last_name text DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": "D206 — the signed-in user edits their own display name, phone and avatar colour. NULL ",
-      "defined_by": "20260929000003_account_self_service_names_its_user.sql"
+      "comment": "D206/D207 — the signed-in user edits their own first and last name (which rewrite ",
+      "defined_by": "20260930000001_account_first_and_last_name.sql"
     },
     {
       "name": "update_policy_version_notes",

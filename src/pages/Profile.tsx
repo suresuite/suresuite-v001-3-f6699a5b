@@ -17,7 +17,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { PAGE_CAPABILITIES, FEATURE_CAPABILITIES } from '@/lib/capabilities';
-import { AlertCircle, Ban, Check, Loader2 } from 'lucide-react';
+import { AlertCircle, Ban, Check, Copy, Loader2 } from 'lucide-react';
 import { describeExpiry, formatDate, passwordStatus, relativeDay } from '@/lib/auth/passwordPolicy';
 import { AVATAR_COLORS, DEFAULT_AVATAR_CLASS, avatarClass, isAvatarColor } from '@/lib/avatarColors';
 
@@ -31,6 +31,7 @@ function accountError(message: string | undefined): string {
   if (m.includes('invalid_current_password')) return 'Your current password is incorrect.';
   if (m.includes('password_too_short')) return 'New password must be at least 8 characters.';
   if (m.includes('password_unchanged')) return 'The new password must be different from your current one.';
+  if (m.includes('first_name_required')) return 'First name is required.';
   if (m.includes('account_inactive')) return 'Your account has been deactivated. Contact your administrator.';
   if (m.includes('not_authenticated')) return 'Your session could not be verified. Please sign out and sign in again.';
   return m || 'Unknown error.';
@@ -52,6 +53,11 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   const initialTab = locked || params.get('tab') === 'password' ? 'password' : 'profile';
 
   const [tab, setTab] = useState(initialTab);
+  // The two parts of the account name. Saving them rewrites `name` itself, which is
+  // what every other page shows — the database keeps the three equal (D207).
+  const [firstName, setFirstName] = useState(user?.first_name ?? '');
+  const [lastName, setLastName] = useState(user?.last_name ?? '');
+  const [copiedId, setCopiedId] = useState(false);
   // The stored display name only; the account name is the placeholder, not a value
   // that "Save changes" would silently copy into display_name.
   const [displayName, setDisplayName] = useState(user?.display_name ?? '');
@@ -67,23 +73,34 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   const [savingPw, setSavingPw] = useState(false);
 
   useEffect(() => {
+    setFirstName(user?.first_name ?? '');
+    setLastName(user?.last_name ?? '');
     setDisplayName(user?.display_name ?? '');
     setPhone(user?.phone ?? '');
     setAvatarColor(isAvatarColor(user?.avatar_color) ? user.avatar_color : '');
-  }, [user?.id, user?.display_name, user?.phone, user?.avatar_color]);
+  }, [user?.id, user?.first_name, user?.last_name, user?.display_name, user?.phone, user?.avatar_color]);
 
   useEffect(() => {
     if (locked) setTab('password');
   }, [locked]);
 
+  const nameChanged =
+    firstName.trim() !== (user?.first_name ?? '') || lastName.trim() !== (user?.last_name ?? '');
+
   const onSaveProfile = async () => {
+    if (nameChanged && !firstName.trim()) {
+      toast({ title: 'Could not save', description: accountError('first_name_required'), variant: 'destructive' });
+      return;
+    }
     setSavingProfile(true);
-    // A blank string CLEARS the field; NULL would leave it unchanged (D206).
+    // A blank string CLEARS the field; NULL would leave it unchanged (D206). The name
+    // parts are sent only when edited, so an unchanged name never rewrites `name`.
     const { error } = await supabase.rpc('update_own_profile', {
       p_display_name: displayName.trim(),
       p_phone: phone.trim(),
       p_avatar_color: avatarColor,
       p_user_id: user?.id,
+      ...(nameChanged ? { p_first_name: firstName.trim(), p_last_name: lastName.trim() } : {}),
     });
     setSavingProfile(false);
     if (error) {
@@ -92,6 +109,17 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
     }
     await refreshProfile();
     toast({ title: 'Profile updated' });
+  };
+
+  const onCopyId = async () => {
+    if (!user?.id) return;
+    try {
+      await navigator.clipboard.writeText(user.id);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 1500);
+    } catch {
+      toast({ title: 'Could not copy', description: 'Select the ID and copy it manually.', variant: 'destructive' });
+    }
   };
 
   const onChangePassword = async () => {
@@ -167,7 +195,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
           <Card>
             <CardHeader>
               <CardTitle>Profile information</CardTitle>
-              <CardDescription>Your name and contact details visible to teammates.</CardDescription>
+              <CardDescription>Your account ID, your name and the contact details visible to teammates.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center gap-4">
@@ -202,6 +230,27 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="user_id">User ID</Label>
+                  <div className="flex gap-2">
+                    <Input id="user_id" value={user?.id ?? ''} readOnly className="font-mono text-xs md:text-sm" onFocus={(e) => e.target.select()} />
+                    <Button type="button" variant="outline" size="icon" className="h-11 w-11 md:h-10 md:w-10 shrink-0" onClick={onCopyId} aria-label="Copy user ID" title="Copy user ID">
+                      {copiedId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Your account's permanent identifier — it does not change when your name or email does.
+                    API keys you create on the Developer API page are recorded as created by this ID.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="first_name">First name</Label>
+                  <Input id="first_name" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="last_name">Last name</Label>
+                  <Input id="last_name" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" placeholder="Optional" />
+                </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
                   <Input value={user?.email ?? ''} disabled />
@@ -216,7 +265,8 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="display_name">Display name</Label>
-                  <Input id="display_name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={user?.name ?? ''} />
+                  <Input id="display_name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={[firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || user?.name || ''} />
+                  <p className="text-xs text-muted-foreground">Optional. Shown instead of your full name in the navigation bar and account menu.</p>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="phone">Phone</Label>
