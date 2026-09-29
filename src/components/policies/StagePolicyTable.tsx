@@ -276,7 +276,7 @@ export function StagePolicyTable({
   const spec = specFor(stageKey);
   const families = familiesForStage(stageKey);
   const { rows: dataRows, loading, fallback, reload: reloadRows } = stageRows;
-  const { adaptLabel } = useTimeUnit(projectId);
+  const { adaptLabel: adaptUnitLabel, isDayField, fromDays } = useTimeUnit(projectId);
   const { user } = useAuth();
   const { selectedProject } = useGlobalProject();
 
@@ -832,7 +832,7 @@ export function StagePolicyTable({
             placeholder: placeholderFor[p.field],
           };
         })}
-        labelFor={(f) => adaptLabel(invParamColByField.get(f)?.label ?? f)}
+        labelFor={(f) => adaptLabel(invParamColByField.get(f)?.label ?? f, f)}
         basis={basis as "days_of_supply" | "forward_visible"}
         onBasisChange={(b) => onCellChange(rowKey, "basis", b)}
       />
@@ -1388,6 +1388,14 @@ export function StagePolicyTable({
     [dataRows],
   );
 
+  // A label may name the planning unit (weeks) only where the VALUE under it is
+  // converted too — today that is the read-only columns, whose display divides
+  // by the unit's days below. Editable day-stored fields keep their "(days)"
+  // label: relabelling them without converting what is typed would show a day
+  // count under a week header.
+  const adaptLabel = (label: string, field?: string) =>
+    field && specColByField.get(field)?.readOnly && isDayField(field) ? adaptUnitLabel(label) : label;
+
   /** Which control a column's value renders as. */
   const kindOf = (
     col: ColSpec,
@@ -1752,7 +1760,10 @@ export function StagePolicyTable({
                 >
                   {(() => {
                     const raw = cellValue ?? liveDefault;
-                    const n = typeof raw === "number" ? raw : null;
+                    const stored = typeof raw === "number" ? raw : null;
+                    // Day-stored read-only values render in the planning unit
+                    // (weeks), matching the header adaptLabel gives them.
+                    const n = stored != null && isDayField(col.field) ? Number(fromDays(stored).toFixed(2)) : stored;
                     if (n != null && Number.isFinite(n)) return col.format ? col.format(n) : String(n);
                     return typeof raw === "string" && raw !== "" ? raw : "—";
                   })()}
@@ -2746,7 +2757,7 @@ export function StagePolicyTable({
                     style={{ width, minWidth: width }}
                   >
                     <SortHeader
-                      label={adaptLabel(fc.label)}
+                      label={adaptLabel(fc.label, col.field)}
                       sub={fc.sub}
                       dir={sort?.col === col.field ? sort.dir : null}
                       onSort={() => toggleSort(col.field)}
@@ -2757,7 +2768,7 @@ export function StagePolicyTable({
                       filter={fc.filterable === false ? undefined : (colFilters[col.field] ?? "")}
                       onFilter={fc.filterable === false ? undefined : (v) => setColFilter(col.field, v)}
                     />
-                    {resizeHandle(fc.key, adaptLabel(fc.label))}
+                    {resizeHandle(fc.key, adaptLabel(fc.label, col.field))}
                   </th>
                 );
               })}

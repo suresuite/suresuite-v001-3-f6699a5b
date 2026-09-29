@@ -1,7 +1,13 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { FROZEN_CELL_ON_TINT } from "@/components/shared";
-import { DAYS_PER_UNIT, UNIT_LABEL_PLURAL, type TimeUnit } from "@/hooks/useTimeUnit";
+import {
+  DAYS_PER_UNIT,
+  PLANNING_UNIT_NOTE,
+  UNIT_LABEL_PLURAL,
+  isSelectableUnit,
+  type TimeUnit,
+} from "@/hooks/useTimeUnit";
 
 /**
  * One parameter group = one titled card holding a Parameter | Value | Unit table.
@@ -277,7 +283,8 @@ export function TimeUnitBar({
       <Segmented
         value={unit}
         onChange={(v) => onUnit(v as TimeUnit)}
-        options={(Object.keys(DAYS_PER_UNIT) as TimeUnit[]).map((u) => ({
+        // Week only for now — see useTimeUnit's PLANNING_UNIT.
+        options={(Object.keys(DAYS_PER_UNIT) as TimeUnit[]).filter(isSelectableUnit).map((u) => ({
           value: u,
           label: UNIT_LABEL_PLURAL[u],
         }))}
@@ -285,6 +292,9 @@ export function TimeUnitBar({
       <span className="text-[13px] tabular-nums text-[#52525b]">
         {horizonDays} days
         {unit === "day" ? "" : ` · ${(horizonDays / factor).toFixed(1)} ${UNIT_LABEL_PLURAL[unit]}`}
+      </span>
+      <span className="text-[12px] text-[#71717a]" title={PLANNING_UNIT_NOTE}>
+        lead times in weeks
       </span>
     </div>
   );
