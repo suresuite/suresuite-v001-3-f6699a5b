@@ -19373,8 +19373,13 @@ like every other /admin RPC. (4) Five rehearsals (`010`, `070`, `090`, `130`, `3
 cleared `audit_logs` to isolate their counts; they now lift the guard around those
 DELETEs inside their own rolled-back transaction, and `090`'s "surrogate key only"
 example moved from `audit_logs` (which now has a unique `seq`) to `ai_usage_logs`.
-(5) Reads of the log are still not themselves recorded. No later package changes
-because of these findings.
+(5) Reads of the log are still not themselves recorded. (6) CI's bundle-size gate
+went red on this PR: `total-js` 1945.3 kB against a 1942.6 kB ceiling, of which this
+change is +3.85 kB gzip, all lazy (AdminAudit +2.7, DocPage +1.2); `main` alone
+measured 1941.7 kB. `total-js` was re-recorded ALONE, WP 5.2j's precedent, and the
+re-record also absorbs ~91.6 kB `main` had grown since 2026-09-19 inside tolerance —
+stated in the baseline's note. `initial-graph` did not move and was not re-recorded.
+No later package changes because of these findings.
 
 **Measured locally.** `contract:rehearse` in all three modes against PostgreSQL 16:
 38 of 38 files pass, `390` included. Nothing reaches production until this branch
