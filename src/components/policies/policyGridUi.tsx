@@ -6,7 +6,7 @@
  * sort glyph and the per-cell <Select>s. Everything here is presentational;
  * resolution/draft logic stays in StagePolicyTable.
  */
-import React from "react";
+import React, { useRef } from "react";
 import { cn } from "@/lib/utils";
 import { LAYER, tint } from "@/components/intelligence/piUi";
 
@@ -226,6 +226,62 @@ export function FamilyChip({
       />
       {family}
     </button>
+  );
+}
+
+/**
+ * Drag handle on a header cell's right edge — the user sets the column's width.
+ * Sits inside a `<th>` (sticky, so already a positioning context). Reports the
+ * dragged width live; double-click hands the column back to its design width.
+ * The widths it produces feed the fit (columnFit.ts), never a DOM measurement
+ * of their own — the <colgroup> stays the only source of width (§0.1).
+ */
+export function ColResizeHandle({
+  label,
+  onResize,
+  onReset,
+}: {
+  label: string;
+  onResize: (width: number) => void;
+  onReset: () => void;
+}) {
+  const drag = useRef<{ x: number; w: number } | null>(null);
+  return (
+    <span
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={`Resize ${label} column`}
+      title="Drag to resize · double-click to reset"
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const th = e.currentTarget.closest("th");
+        if (!th) return;
+        drag.current = { x: e.clientX, w: th.getBoundingClientRect().width };
+        e.currentTarget.setPointerCapture(e.pointerId);
+        document.body.style.cursor = "col-resize";
+      }}
+      onPointerMove={(e) => {
+        if (!drag.current) return;
+        onResize(drag.current.w + e.clientX - drag.current.x);
+      }}
+      onPointerUp={(e) => {
+        drag.current = null;
+        document.body.style.cursor = "";
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+        document.body.style.cursor = "";
+      }}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        onReset();
+      }}
+      className="absolute right-0 top-0 z-10 h-full w-[6px] cursor-col-resize touch-none select-none hover:bg-white/40 active:bg-white/60"
+    />
   );
 }
 
