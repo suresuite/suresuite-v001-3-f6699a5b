@@ -386,6 +386,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D201** | **The reason WP 8.2 gave for choosing the SQL writer — "the RPC is reached by a DATABASE TRIGGER, `auto_combine_on_completion` on `projects`" — is false in the repository and in production.** `20250908151650` drops both `project_completion_auto_combine` and `trg_projects_auto_combine_on_completion` and no later migration recreates either; production's `projects` carries seven triggers and none calls `auto_combine_on_completion` (F8, `36553935324`). The decision stands on its other three reasons, but D140's "Closed by", the `20260920000003` header and §16 · WP 8.2 all repeat the claim — a fact about the data layer authored outside §4's evidence, which is `single-source` failing on the plan itself. F8 also shows `set_project_defaults` attached to `projects` THREE times (`set_project_defaults_trigger`, `trg_projects_set_defaults`, `trg_set_project_defaults`) — latent, idempotent today | `supabase/migrations/20250908151650_*.sql` (the two DROPs); `supabase/migrations/20260920000003_one_etl.sql` header reason 1; §15 `36553935324` F8 | **OPEN** — owner to be decided (a text correction plus the triple trigger) |
 | **D202** | **`Project AA - ver3`'s rows sit on a plant its project record does not name, so plant identity has two authors.** Every lane join and the natural key include `plant_name`; the landing, `assign_*` and the legacy lane function stamp `projects.plant_name`, while the seed inserts, `upload_node_list_data` and the network inserts take the payload's. **LIVE (F4 `36553935324`, F4b `36554690802`)**: `projects.plant_name` is `Plant AA` and the project's data is on `Plant AA Rocherfort` — all 396 BOM rows, 305 of 321 inbound lanes, the outbound lane, all 242 `node_list` rows and all 1 385 `network_nodes`. The other **16 inbound lanes are on `Plant AA`**: the Supplier grid's assignments, stamped with the project record's plant (they are D140's `inbound` level-1 rows). The lane writer joins on plant, so those 16 suppliers form an island with no demand, no BOM and no tree position, while the engine (`_flatten_multi_level_bom` and the arc loop ignore `plant_name`) simulates them as ordinary suppliers of the same materials. Symptom: a lane assigned from the Supplier grid lands under `Plant AA` and joins nothing the rest of the project's graph is on; `ProjectDataViewer` filters the node list by the project's plant with an exact compare | §15 `36553935324` F4, `36554690802` F4b; `src/components/policies/StagePolicyTable.tsx` (the fallback's plant resolution) | **OPEN** — owner to be decided |
 | **D203** | **Five more surfaces render a failed read or write as absence or success — the D178 / audit-WP-5 class, one layer over.** `useProjectContext`'s catch sets `hasData = false`, and `FocusedStage` then tells the owner "no supply-chain data — upload and combine datasets"; DataManager's manual combine ignores the `{ error }` of `combine_project_into_supply_chain` and `rebuild_node_list` (`supabase.rpc` does not throw) and toasts "You can now download the node list"; `MapView` logs a `get_node_list` error and renders an empty map; `FirmLevelNetwork` builds its top-20 "connections" chart from the `networkNodes` STATE set in the same tick, so the first load renders it from `[]`, and it computes its own prominence composite (0.6 × degree …) for any node with no stored value and mixes it into the stats unmarked — LATENT today: K2 finds 0 of 1 824 `network_nodes` without a stored prominence. Wrong statements shown; **rendered cells NOT observed** | `src/hooks/useProjectContext.tsx` (catch); `src/pages/DataManager.tsx` (the combine handler); `src/components/MapView.tsx`; `src/pages/FirmLevelNetwork.tsx` (`connectionData`, `calculateNodeImportance`); §15 `36555223774` K2 | **OPEN** — owner to be decided |
+| **D204** | **The policies page shows one policy and the run uses another, two ways: a project-default key never saved is filled with the UI's default on screen and with the ENGINE's default in the run, and most per-row inventory cells are stored, versioned and dropped.** (a) `policy_defaults` is seeded `{}` per family (`create_default_policy_defaults`); `usePolicies` parses each family through the Zod bundle, which fills every missing key, while `_build_policy_snapshot` copies the stored JSON raw and `project_map.py::_map_policies` reads a missing key with its own default: `backorder_allowed` UI **true** / engine **false (lost sales)**, `backorder_cost_per_day` 2 / 0, `allocation` "priority" / no rule, `coverage_weeks` 8 / the 8-10-12 strip that rises during disruptions. **Measured (§15 run `36629798467`, L1/L3, every project): the fulfillment family is empty in 9 of 10 projects and κ is saved in none**, and the last completed run of Aumovio, Example, TRON-ver1, Test_MTS and Test_Simulation was sent an empty fulfillment family — every one simulated lost sales while the Fulfillment card said backorders are allowed. (b) `_map_policies` applies supplier-row inventory overrides only for type, s, S, Q and κ; every other per-row inventory field, and every plant-row inventory field, is dropped with a run-log warning. **Stored and dropped (L2)**: `holding_cost_pct` 817, `safety_stock_days` 340, `basis` 495, `service_level_target` 2, plus `material_price` 452 and `primary_source` 866 + 12 that no reader has — all hashed into each policy version. (c) Since presets and the strategy selector were removed from /policies (`e86f875f`), only the Fulfillment card can save a default; the inventory, sourcing and recovery defaults have no control but Excel import and version restore | `src/hooks/usePolicies.tsx` (`parseFamily` on load); `_build_policy_snapshot` (`20260612000001_policy_version_snapshots.sql`); `scsim/scsim/io/project_map.py` (`_map_policies`); §15 run `36629798467` L1, L2, L3; the column-by-column account on /policies → Data map (`policyColumnCheck.ts`) | **OPEN** — owner to be decided |
 
 ### 4.1 Code map — the data layer
 
@@ -19566,6 +19567,39 @@ Handoff to next WP:
   - D201 means D140's "Closed by" cell, the `20260920000003` header and §16 · WP 8.2
     state a false reason; correcting that text belongs to whichever package fixes
     D187, because both are about what the one writer is reached by.
+
+#### Addendum · the /policies Data map, column by column; D204 · 2026-09-29
+
+Owner-directed: document, on /policies → Data map, every column of the page —
+what the cell shows and from where, where an edit is saved, what the engine uses
+(and its default when blank), and whether an edit changes a run. Re-checked first
+against `main` after the day's merges (`cc24b90c`: planning unit fixed to week,
+presets and the strategy selector removed, the BOM tree) and against production
+(§15 run `36629798467`, ledger `20260929000001`, 10 projects: `Project AA - ver3`
+was rebuilt at 10:57 and its 16 critical flags went with it, as D196 predicted;
+`Project 2` is still a retired writer's graph).
+
+Shipped: `policyColumnCheck.ts` (the verdicts) rendered by `PolicyColumnCheck.tsx`
+above the uploaded-column grid. It authors no column list: the columns, labels and
+sub-labels are read from `STAGE_TABLE_SPEC` / `COLUMN_FIT` / `shortLabelFor`, and
+`policyColumnCheck.test.ts` fails when a column exists without a verdict or a
+verdict names a column that does not exist, when a column claims to reach the
+engine while being neither master-backed nor in `SCSIM_VISIBLE_FIELDS`, when the
+Fulfillment card section drifts from the fields the card renders, and when a cited
+§4 row does not exist. `policyColumnCheckRender.test.tsx` renders it. Verified by
+a headless-Chromium render of the static markup with the built CSS — not against
+production, which no session can log in to.
+
+Found while doing it, recorded as **§4 D204**: a project-default key never saved is
+the UI's default on screen and the ENGINE's default in the run (backorder allowed
+true / lost sales; κ 8 / the 8-10-12 strip), with the fulfillment family empty in
+9 of 10 projects; and 817 holding-cost, 340 safety-stock and 495 basis per-row
+overrides are stored and dropped. Also corrected: the policy fulfillment strategy
+and `projects.supply_chain_model` disagree in **6** of 10 projects (the chat answer
+before this addendum said 7).
+
+The same merge renumbered this audit's rows D180–D196 → **D187–D203**: `main` had
+taken D180–D186 for other defects the same day (D146's shape; R16 held).
 
 
 ## 17. Sequencing
