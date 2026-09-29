@@ -15,7 +15,7 @@ interface RoleGuardProps {
  * Route-level access guard. Must be rendered inside <ProtectedRoute>.
  * - If user is missing → redirect to /auth.
  * - If the password must be changed — an administrator forced it, or it has
- *   expired (`passwordStatus`, PLAN.md §4 D205) → redirect to /profile (Change
+ *   expired (`passwordStatus`, PLAN.md §4 D206) → redirect to /profile (Change
  *   Password tab), unless we're already there.
  * - Otherwise gate on the user's *effective page capability* (role default merged
  *   with org/user overrides), falling back to role-based routing while the

@@ -1,5 +1,5 @@
 // @ts-nocheck — schema mismatch: this file uses RPCs (update_own_profile, change_own_password) not present in the current types. Remove once RPCs land.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,17 +17,15 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { PAGE_CAPABILITIES, FEATURE_CAPABILITIES } from '@/lib/capabilities';
-import { AlertCircle, Ban, Check, Loader2, Upload } from 'lucide-react';
+import { AlertCircle, Ban, Check, Loader2 } from 'lucide-react';
 import { describeExpiry, formatDate, passwordStatus, relativeDay } from '@/lib/auth/passwordPolicy';
+import { AVATAR_COLORS, DEFAULT_AVATAR_CLASS, avatarClass, isAvatarColor } from '@/lib/avatarColors';
 
 /** `super_admin` → "Super admin". The stored value is an enum token, not a label. */
 const roleLabel = (role: string | undefined | null) =>
   role ? role.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : '';
 
-/** What the avatar picker says it takes — "PNG or JPG" — and nothing else. */
-const AVATAR_TYPES = ['image/png', 'image/jpeg'];
-
-/** The RPCs' refusals, in words (see PLAN.md §4 D205 for where each is raised). */
+/** The RPCs' refusals, in words (see PLAN.md §4 D206 for where each is raised). */
 function accountError(message: string | undefined): string {
   const m = message ?? '';
   if (m.includes('invalid_current_password')) return 'Your current password is incorrect.';
@@ -58,9 +56,10 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   // that "Save changes" would silently copy into display_name.
   const [displayName, setDisplayName] = useState(user?.display_name ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
+  // The avatar is the user's initial on a colour they choose; there is no image upload
+  // (D206). '' is "Default" — the theme's primary colour.
+  const [avatarColor, setAvatarColor] = useState(isAvatarColor(user?.avatar_color) ? user.avatar_color : '');
   const [savingProfile, setSavingProfile] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const [oldPw, setOldPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -70,7 +69,8 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   useEffect(() => {
     setDisplayName(user?.display_name ?? '');
     setPhone(user?.phone ?? '');
-  }, [user?.id, user?.display_name, user?.phone]);
+    setAvatarColor(isAvatarColor(user?.avatar_color) ? user.avatar_color : '');
+  }, [user?.id, user?.display_name, user?.phone, user?.avatar_color]);
 
   useEffect(() => {
     if (locked) setTab('password');
@@ -78,11 +78,11 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
 
   const onSaveProfile = async () => {
     setSavingProfile(true);
-    // A blank string CLEARS the field; NULL would leave it unchanged (D205).
+    // A blank string CLEARS the field; NULL would leave it unchanged (D206).
     const { error } = await supabase.rpc('update_own_profile', {
       p_display_name: displayName.trim(),
       p_phone: phone.trim(),
-      p_avatar_url: null,
+      p_avatar_color: avatarColor,
       p_user_id: user?.id,
     });
     setSavingProfile(false);
@@ -92,45 +92,6 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
     }
     await refreshProfile();
     toast({ title: 'Profile updated' });
-  };
-
-  const onAvatarPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user?.id) return;
-    if (!AVATAR_TYPES.includes(file.type)) {
-      toast({ title: 'Unsupported file', description: 'Use a PNG or JPG image.', variant: 'destructive' });
-      if (fileRef.current) fileRef.current.value = '';
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ title: 'File too large', description: 'Max 2 MB.', variant: 'destructive' });
-      return;
-    }
-    setUploading(true);
-    try {
-      const ext = file.type === 'image/png' ? 'png' : 'jpg';
-      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from('avatars')
-        .upload(path, file, { upsert: true, contentType: file.type });
-      if (upErr) throw upErr;
-      const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-      const publicUrl = data.publicUrl;
-      const { error: rpcErr } = await supabase.rpc('update_own_profile', {
-        p_display_name: null,
-        p_phone: null,
-        p_avatar_url: publicUrl,
-        p_user_id: user.id,
-      });
-      if (rpcErr) throw rpcErr;
-      await refreshProfile();
-      toast({ title: 'Avatar updated' });
-    } catch (err: any) {
-      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
   };
 
   const onChangePassword = async () => {
@@ -210,17 +171,33 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16">
-                  {user?.avatar_url ? <AvatarImage src={user.avatar_url} alt="Avatar" /> : null}
-                  <AvatarFallback className="bg-primary text-primary-foreground text-lg">{initial}</AvatarFallback>
+                <Avatar className="h-16 w-16 shrink-0">
+                  <AvatarFallback className={`${avatarClass(avatarColor)} text-lg`}>{initial}</AvatarFallback>
                 </Avatar>
-                <div>
-                  <input ref={fileRef} type="file" accept={AVATAR_TYPES.join(',')} hidden onChange={onAvatarPick} />
-                  <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                    {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                    {uploading ? 'Uploading…' : 'Upload avatar'}
-                  </Button>
-                  <p className="text-xs text-muted-foreground mt-1">PNG or JPG, up to 2 MB.</p>
+                <div className="space-y-2">
+                  <Label id="avatar-color-label">Avatar colour</Label>
+                  <div role="radiogroup" aria-labelledby="avatar-color-label" className="flex flex-wrap gap-1.5">
+                    {[['', 'Default', DEFAULT_AVATAR_CLASS] as const,
+                      ...Object.entries(AVATAR_COLORS).map(([k, v]) => [k, v.label, v.className] as const),
+                    ].map(([value, label, fill]) => {
+                      const selected = avatarColor === value;
+                      return (
+                        <button
+                          key={value || 'default'}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          aria-label={label}
+                          title={label}
+                          onClick={() => setAvatarColor(value)}
+                          className={`h-11 w-11 md:h-7 md:w-7 rounded-full ${fill} outline-none ring-offset-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-ring ${selected ? 'ring-2 ring-foreground' : ''}`}
+                        >
+                          {selected && <Check className="mx-auto h-3.5 w-3.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Saved with “Save changes”.</p>
                 </div>
               </div>
 

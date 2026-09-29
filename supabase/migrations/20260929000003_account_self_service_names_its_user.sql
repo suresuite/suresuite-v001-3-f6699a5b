@@ -1,4 +1,4 @@
--- Account / §4 D205 — /profile's three RPCs name the user they act for, and the
+-- Account / §4 D206 — /profile's three RPCs name the user they act for, and the
 -- password policy is stated once.
 --
 -- ── THE DEFECT ──────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@
 -- quietly acting for either. The parameter is trailing and DEFAULT NULL, and each
 -- old signature is DROPPED first so no overload is left behind (the PostgREST
 -- ambiguity recorded in §16 · WP 6.2 slice 12). DROP takes the grants with it, so
--- they are re-granted explicitly below and `rehearsal/400` reads them from `proacl`.
+-- they are re-granted explicitly below and `rehearsal/410` reads them from `proacl`.
 --
 -- ── THE POLICY, ONCE ────────────────────────────────────────────────────────
 --
@@ -48,6 +48,19 @@
 -- `force_password_change`, so that date is never the one that expires a password.
 -- `get_my_profile` also returns `password_expired`, computed on the SERVER clock, so a
 -- browser with a wrong clock cannot read an expired password as valid at sign-in.
+--
+-- ── THE AVATAR IS A COLOUR, NOT AN UPLOAD ───────────────────────────────────
+--
+-- The avatar upload wrote to storage under policies that resolve the uploader through
+-- the same `get_current_user_id()`, so it was refused for every `anon` caller too.
+-- Fixing it needs a signed-upload path this change does not own; the owner chose to
+-- retire the image instead and let a user pick the colour of their initial. So
+-- `avatar_color` is a token from a fixed palette (CHECK below; `src/lib/avatarColors.ts`
+-- maps each token to its classes and `avatarColors.test.ts` fails if the two lists
+-- differ), NULL meaning the theme's primary colour. `update_own_profile` takes the
+-- colour where it took the URL, and neither RPC reads or writes `avatar_url` any more:
+-- the column and the `avatars` bucket are left where they are rather than dropped,
+-- because a drop destroys whatever a pre-D155 session may have uploaded.
 --
 -- A new password equal to the current one is refused (`password_unchanged`): a forced
 -- or expired change that accepts the same password resets the clock and changes
@@ -61,7 +74,7 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE
 AS $$ SELECT interval '90 days' $$;
 
 COMMENT ON FUNCTION public.password_max_age() IS
-  'D205 — how long a password is valid after it is set. The one statement of the '
+  'D206 — how long a password is valid after it is set. The one statement of the '
   'password-expiry policy: the approved_users.password_expires_at default and '
   'change_own_password read it, and get_my_profile returns it to the account page.';
 
@@ -70,6 +83,20 @@ GRANT EXECUTE ON FUNCTION public.password_max_age() TO anon, authenticated;
 
 ALTER TABLE public.approved_users
   ALTER COLUMN password_expires_at SET DEFAULT (now() + public.password_max_age());
+
+-- ── 1b · the avatar colour ───────────────────────────────────────────────────
+ALTER TABLE public.approved_users
+  ADD COLUMN IF NOT EXISTS avatar_color text;
+ALTER TABLE public.approved_users
+  DROP CONSTRAINT IF EXISTS approved_users_avatar_color_check;
+ALTER TABLE public.approved_users
+  ADD CONSTRAINT approved_users_avatar_color_check CHECK (
+    avatar_color IS NULL OR avatar_color IN (
+      'slate', 'red', 'orange', 'amber', 'green', 'teal', 'blue', 'indigo', 'violet', 'pink'));
+
+COMMENT ON COLUMN public.approved_users.avatar_color IS
+  'D206 — the colour of the user''s initial on their avatar, one token of a fixed '
+  'palette; NULL is the theme''s primary colour. Replaces the retired avatar upload.';
 
 -- ── 2 · who the caller is ────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.account_self_resolve(p_user_id uuid)
@@ -100,7 +127,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.account_self_resolve(uuid) IS
-  'D205 — the user an account self-service RPC acts for: the named user, or the '
+  'D206 — the user an account self-service RPC acts for: the named user, or the '
   'session''s when none is named; refuses a name that contradicts the session and an '
   'unknown user. Sets app.current_user_id LOCAL. Internal: no role may call it directly.';
 
@@ -116,7 +143,7 @@ RETURNS TABLE(
   name text,
   display_name text,
   phone text,
-  avatar_url text,
+  avatar_color text,
   role text,
   organization text,
   is_active boolean,
@@ -134,7 +161,7 @@ DECLARE
   v_uid uuid := public.account_self_resolve(p_user_id);
 BEGIN
   RETURN QUERY
-  SELECT au.id, au.email, au.name, au.display_name, au.phone, au.avatar_url,
+  SELECT au.id, au.email, au.name, au.display_name, au.phone, au.avatar_color,
          au.role::text, au.organization, au.is_active, au.force_password_change,
          au.password_changed_at, au.password_expires_at,
          (au.password_expires_at <= now()),
@@ -145,7 +172,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.get_my_profile(uuid) IS
-  'D205 — the signed-in user''s own account row, with password_expired computed on the '
+  'D206 — the signed-in user''s own account row, with password_expired computed on the '
   'server clock and the policy''s max age in days. The user is a parameter because the '
   'browser calls as anon (D155); a contradicting session is refused.';
 
@@ -157,7 +184,7 @@ DROP FUNCTION IF EXISTS public.update_own_profile(text, text, text);
 CREATE FUNCTION public.update_own_profile(
   p_display_name text DEFAULT NULL,
   p_phone        text DEFAULT NULL,
-  p_avatar_url   text DEFAULT NULL,
+  p_avatar_color text DEFAULT NULL,
   p_user_id      uuid DEFAULT NULL
 )
 RETURNS void
@@ -177,15 +204,15 @@ BEGIN
                              ELSE NULLIF(btrim(p_display_name), '') END,
          phone        = CASE WHEN p_phone IS NULL THEN phone
                              ELSE NULLIF(btrim(p_phone), '') END,
-         avatar_url   = CASE WHEN p_avatar_url IS NULL THEN avatar_url
-                             ELSE NULLIF(btrim(p_avatar_url), '') END,
+         avatar_color = CASE WHEN p_avatar_color IS NULL THEN avatar_color
+                             ELSE NULLIF(btrim(p_avatar_color), '') END,
          updated_at   = now()
    WHERE id = v_uid;
 END;
 $$;
 
 COMMENT ON FUNCTION public.update_own_profile(text, text, text, uuid) IS
-  'D205 — the signed-in user edits their own display name, phone and avatar. NULL '
+  'D206 — the signed-in user edits their own display name, phone and avatar colour. NULL '
   'leaves a field unchanged, a blank string clears it. Refuses an inactive account.';
 
 -- ── 5 · password write ───────────────────────────────────────────────────────
@@ -246,7 +273,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.change_own_password(text, text, uuid) IS
-  'D205 — the signed-in user sets a new password. Requires the current one (checked '
+  'D206 — the signed-in user sets a new password. Requires the current one (checked '
   'here, so an asserted id alone cannot change a password), refuses a new password '
   'equal to it, clears force_password_change and returns the new expiry, '
   'now() + password_max_age().';

@@ -1,5 +1,5 @@
 /**
- * D205 — the password-expiry state every account surface reads. The day count is a
+ * D206 — the password-expiry state every account surface reads. The day count is a
  * CALENDAR count so it agrees with the date printed beside it; the expiry itself is an
  * instant, and the server's `password_expired` wins over a browser clock that is behind.
  */
@@ -109,7 +109,7 @@ describe('describeExpiry', () => {
   it('says how long ago an expired password expired', () => {
     expect(say(at(2026, 9, 29, 9, 0))).toBe('Your password expired today (2026-9-29).');
     expect(say(at(2026, 9, 28, 23, 0))).toBe('Your password expired on 2026-9-28 (1 day ago).');
-    // 2026-05-27 + 90 days — the date every never-changed password reads (see D205).
+    // 2026-05-27 + 90 days — the date every never-changed password reads (see D206).
     expect(say(at(2026, 8, 25, 12, 0))).toBe('Your password expired on 2026-8-25 (35 days ago).');
   });
 });

@@ -10,15 +10,16 @@ interface User {
   role: string;
   organization: string;
   display_name?: string | null;
-  avatar_url?: string | null;
+  /** A token of `AVATAR_COLORS`; the image upload is retired (D206). */
+  avatar_color?: string | null;
   phone?: string | null;
   is_active?: boolean;
   force_password_change?: boolean;
   password_expires_at?: string | null;
   password_changed_at?: string | null;
-  /** Computed on the database clock when the row was read (D205). */
+  /** Computed on the database clock when the row was read (D206). */
   password_expired?: boolean;
-  /** The policy, `password_max_age()`, in days (D205). */
+  /** The policy, `password_max_age()`, in days (D206). */
   password_max_age_days?: number | null;
 }
 
@@ -27,7 +28,7 @@ interface User {
  * browser calls as `anon`, and the GUC `set_current_user_context` sets is LOCAL to its
  * own request, so a call that named nobody resolved nobody and raised
  * `not_authenticated` for everyone — which is how forced and expired password changes
- * went unenforced (PLAN.md §4 D205).
+ * went unenforced (PLAN.md §4 D206).
  */
 async function readProfile(userId: string) {
   const { data, error } = await supabase.rpc('get_my_profile', { p_user_id: userId });
@@ -40,7 +41,7 @@ async function readProfile(userId: string) {
       role: p.role as string | null,
       organization: p.organization as string | null,
       display_name: p.display_name as string | null,
-      avatar_url: p.avatar_url as string | null,
+      avatar_color: p.avatar_color as string | null,
       phone: p.phone as string | null,
       is_active: p.is_active as boolean,
       force_password_change: p.force_password_change as boolean,
@@ -137,7 +138,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // The account row: deactivation, forced change and password expiry. FAIL CLOSED —
       // an unreadable row used to be skipped silently, which is exactly how none of the
-      // three was ever enforced (D205).
+      // three was ever enforced (D206).
       const { profile, error: profileError } = await readProfile(userData.user_id);
       if (!profile) {
         console.error('[AUTH] Account status could not be read:', profileError);

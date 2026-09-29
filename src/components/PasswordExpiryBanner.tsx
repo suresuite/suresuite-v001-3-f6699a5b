@@ -7,7 +7,7 @@ import { EXPIRY_WARNING_DAYS, describeExpiry, passwordStatus, shouldWarn } from 
 /**
  * Warns when the password expires within `EXPIRY_WARNING_DAYS` calendar days. Once a
  * change is REQUIRED it stays silent: `RoleGuard` has already sent the user to
- * /profile, and that page says so itself (PLAN.md §4 D205).
+ * /profile, and that page says so itself (PLAN.md §4 D206).
  */
 const PasswordExpiryBanner = () => {
   const { user } = useAuth();

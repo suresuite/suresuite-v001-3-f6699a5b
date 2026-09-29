@@ -3,7 +3,7 @@
  * that shows or enforces it — `RoleGuard`, `PasswordExpiryBanner` and /profile.
  *
  * The POLICY (how many days a password lives) is the database's: `password_max_age()`,
- * returned by `get_my_profile` as `password_max_age_days` (PLAN.md §4 D205). This module
+ * returned by `get_my_profile` as `password_max_age_days` (PLAN.md §4 D206). This module
  * only reads what the account row says and counts days against it.
  *
  * Two different questions, answered two different ways on purpose:
