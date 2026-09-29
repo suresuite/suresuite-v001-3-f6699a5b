@@ -114,6 +114,17 @@ export const KEY_COLUMNS: Record<GridStage, Array<{ label: string; check: Column
       },
     },
     {
+      label: "Qty / assy (flat view, single-level BOM)",
+      check: {
+        shows:
+          "bom_single_level.consumption_rate for each product that uses the material — one value, or the range and product count; every product is listed in the tooltip",
+        savedTo: "— (read-only; change it in the BOM file)",
+        engine: "the same rate (BomArc.consumption_rate); blank or 0 → 1.0",
+        verdict: "info",
+        note: "A blank or 0 rate shows the engine's 1, marked 'def'. A material outside the BOM shows '—'. Hidden when the project has no single-level BOM rows.",
+      },
+    },
+    {
       label: "Supplier",
       check: { shows: "supplier id of the lane (inbound_logistics.supplier_id)", savedTo: "—", engine: "arc supplier_id", verdict: "info" },
     },
