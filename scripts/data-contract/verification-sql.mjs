@@ -2438,6 +2438,705 @@ async function d175MaterialVisibility() {
   });
 }
 
+// ── AUDIT 2026-09-29 — the data mapping, end to end: ONE FACT, EVERY HOP ───────
+//
+// The single-source audit (PLAN.md §4.2's lineage matrix, §16 · *Audit 2026-09-29*)
+// asks one question of every business fact: when two hops answer it, do they
+// agree? Every probe below computes the SAME fact twice — once as the stored,
+// derived row a page reads, once from the tier-2 rows by the rule the repository
+// says is current — and counts the disagreement PER PROJECT, never for one (§4 D42).
+// The recomputations call the database's own `rate_to_weekly`, so a disagreement
+// is between the stored row and the current rule, not between two copies of a rule.
+//
+// Read-only: every statement is a SELECT, and the functions called are the
+// IMMUTABLE unit functions and the STABLE classifiers.
+async function mappingAudit() {
+  section("Audit 2026-09-29 · A — which WRITER produced the graph every page reads");
+  // A1 — the current writer (`20260924000001`) writes `level` = `bom_depth` on
+  // every multi-tier row, NULLs included; no retired writer ever set `bom_depth`.
+  // So `level IS DISTINCT FROM bom_depth` is a row the current writer did not write.
+  const a1 = await tryQ(`
+    select p.name as project, p.bom_level,
+           (select count(*) from public.supply_chain_data s where s.project_id = p.id)::int as scd_rows,
+           (select count(*) from public.supply_chain_data_multi_tier t where t.project_id = p.id)::int as mt_rows,
+           (select count(*) from public.supply_chain_data_multi_tier t
+             where t.project_id = p.id and t.level is distinct from t.bom_depth)::int as mt_rows_not_current_writer,
+           (select left(max(s.created_at)::text, 16) from public.supply_chain_data s where s.project_id = p.id) as graph_written,
+           left(greatest(
+              (select max(greatest(x.created_at, x.updated_at)) from public.inbound_logistics x where x.project_id = p.id),
+              (select max(greatest(x.created_at, x.updated_at)) from public.outbound_logistics x where x.project_id = p.id),
+              (select max(greatest(x.created_at, x.updated_at)) from public.bom_single_level x where x.project_id = p.id),
+              (select max(greatest(x.created_at, x.updated_at)) from public.bom_multi_level x where x.project_id = p.id))::text,
+              16) as sources_last_touched,
+           (select count(*) from public.supply_chain_data s where s.project_id = p.id and s.computed_from_hash is not null)::int as scd_hashed
+      from public.projects p order by p.name`);
+  report("A1 — writer fingerprint per project", a1, (rows) => {
+    out("", "**(A1) the stored graph, per project, and whether the CURRENT writer produced it** — `mt_rows_not_current_writer` counts multi-tier rows whose `level` differs from `bom_depth`, which `rebuild_supply_chain_lanes` (`20260924000001`) cannot produce:");
+    out(...table(rows));
+    const stale = rows.filter((r) => Number(r.mt_rows_not_current_writer) > 0);
+    const withGraph = rows.filter((r) => Number(r.scd_rows) > 0);
+    out("", `- **${stale.length} of ${withGraph.length} project(s) with a graph hold multi-tier rows the current writer did not write.**`);
+  });
+
+  section("Audit 2026-09-29 · B — lane share and primary supplier: stored row vs tier-2 recomputed");
+  // B1 — `supply_chain_data.sourcing_ratio` on the inbound lane is the supplier's
+  // share of its material, by the current rule `rate_to_weekly(volume, time_unit)`.
+  // `share_raw` is the RETIRED rule (D150: raw volume, no unit). A stored ratio that
+  // matches only `share_raw` was written by the retired writer.
+  const b1 = await tryQ(`
+    with inb as (
+      select project_id, plant_name, btrim(supplier_id) as s, btrim(material_id) as m,
+             public.rate_to_weekly(coalesce(volume, 0), time_unit) as wk,
+             coalesce(volume, 0)::numeric as raw
+        from public.inbound_logistics
+       where coalesce(btrim(supplier_id), '') <> '' and coalesce(btrim(material_id), '') <> ''),
+    ex as (select project_id, plant_name, s, m, sum(wk) as wk, sum(raw) as raw from inb group by 1,2,3,4),
+    tot as (select project_id, plant_name, m, sum(wk) as twk, sum(raw) as traw from ex group by 1,2,3),
+    e as (
+      select ex.project_id, ex.plant_name, ex.s, ex.m,
+             case when t.twk  > 0 then ex.wk  / t.twk  else 1.0 end as share_wk,
+             case when t.traw > 0 then ex.raw / t.traw else 1.0 end as share_raw
+        from ex join tot t using (project_id, plant_name, m)),
+    st as (
+      select project_id, plant_name, from_location as s, to_location as m,
+             count(*)::int as copies, max(sourcing_ratio)::numeric as r
+        from public.supply_chain_data where data_source = 'inbound'
+       group by 1,2,3,4),
+    j as (
+      select coalesce(e.project_id, st.project_id) as project_id,
+             e.s is not null as in_src, st.s is not null as in_graph,
+             st.copies, st.r, e.share_wk, e.share_raw
+        from e full join st using (project_id, plant_name, s, m))
+    select p.name as project,
+           count(*) filter (where in_src)::int as src_lanes,
+           count(*) filter (where in_graph)::int as graph_lanes,
+           count(*) filter (where in_src and not in_graph)::int as src_not_in_graph,
+           count(*) filter (where in_graph and not in_src)::int as graph_not_in_src,
+           count(*) filter (where copies > 1)::int as duplicated_in_graph,
+           count(*) filter (where in_src and in_graph and abs(r - share_wk) > 1e-6)::int as share_disagrees,
+           count(*) filter (where in_src and in_graph and abs(r - share_wk) > 1e-6
+                              and abs(r - share_raw) <= 1e-6)::int as share_is_retired_rule
+      from j join public.projects p on p.id = j.project_id
+     group by p.name order by p.name`);
+  report("B1 — inbound lane set and share", b1, (rows) => {
+    out("", "**(B1) the inbound lane: the graph's rows against `inbound_logistics`, and the stored share against the share recomputed now:**");
+    out(...table(rows));
+  });
+
+  // B2 — the PRIMARY supplier of a material: argmax share. Stored graph's argmax
+  // (what the Supplier grid ranks by when a lane carries no daily volume) against
+  // the argmax of the current rule. Ties broken by supplier id, identically.
+  const b2 = await tryQ(`
+    with inb as (
+      select project_id, plant_name, btrim(supplier_id) as s, btrim(material_id) as m,
+             sum(public.rate_to_weekly(coalesce(volume, 0), time_unit)) as wk
+        from public.inbound_logistics
+       where coalesce(btrim(supplier_id), '') <> '' and coalesce(btrim(material_id), '') <> ''
+       group by 1,2,3,4),
+    ep as (select distinct on (project_id, plant_name, m) project_id, plant_name, m, s as primary_src
+             from inb order by project_id, plant_name, m, wk desc, s),
+    sp as (select distinct on (project_id, plant_name, to_location) project_id, plant_name, to_location as m,
+                  from_location as primary_graph
+             from public.supply_chain_data where data_source = 'inbound'
+            order by project_id, plant_name, to_location, sourcing_ratio desc nulls last, from_location),
+    multi as (select project_id, plant_name, m from inb group by 1,2,3 having count(*) > 1)
+    select p.name as project,
+           count(*)::int as multi_sourced_materials,
+           count(*) filter (where sp.primary_graph is null)::int as not_in_graph,
+           count(*) filter (where sp.primary_graph is not null and sp.primary_graph <> ep.primary_src)::int as primary_disagrees
+      from multi mu
+      join ep using (project_id, plant_name, m)
+      left join sp using (project_id, plant_name, m)
+      join public.projects p on p.id = mu.project_id
+     group by p.name order by p.name`);
+  report("B2 — primary supplier", b2, (rows) => {
+    out("", "**(B2) the primary supplier of every multi-sourced material — the stored graph's highest-share lane against the current rule's:**");
+    out(...table(rows));
+  });
+
+  // B3 — the outbound lane, the same comparison.
+  const b3 = await tryQ(`
+    with o as (
+      select project_id, plant_name, btrim(product_id) as pr, btrim(customer_id) as c,
+             sum(public.rate_to_weekly(coalesce(volume, 0), time_unit)) as wk
+        from public.outbound_logistics
+       where coalesce(btrim(product_id), '') <> '' and coalesce(btrim(customer_id), '') <> ''
+       group by 1,2,3,4),
+    d as (select project_id, plant_name, pr, sum(wk) as dwk from o group by 1,2,3),
+    e as (select o.project_id, o.plant_name, o.pr, o.c,
+                 case when d.dwk > 0 then o.wk / d.dwk else 1.0 end as share, o.wk
+            from o join d using (project_id, plant_name, pr)),
+    st as (select project_id, plant_name, from_location as pr, to_location as c,
+                  count(*)::int as copies, max(sourcing_ratio)::numeric as r, max(weighted)::numeric as w
+             from public.supply_chain_data where data_source = 'outbound' group by 1,2,3,4),
+    j as (select coalesce(e.project_id, st.project_id) as project_id, e.pr is not null as in_src,
+                 st.pr is not null as in_graph, st.r, st.w, e.share, e.wk
+            from e full join st using (project_id, plant_name, pr, c))
+    select p.name as project,
+           count(*) filter (where in_src)::int as src_lanes,
+           count(*) filter (where in_graph)::int as graph_lanes,
+           count(*) filter (where in_src and not in_graph)::int as src_not_in_graph,
+           count(*) filter (where in_graph and not in_src)::int as graph_not_in_src,
+           count(*) filter (where in_src and in_graph and abs(r - share) > 1e-6)::int as share_disagrees,
+           count(*) filter (where in_src and in_graph and abs(w - wk) > 1e-6)::int as weekly_volume_disagrees
+      from j join public.projects p on p.id = j.project_id
+     group by p.name order by p.name`);
+  report("B3 — outbound lane", b3, (rows) => {
+    out("", "**(B3) the outbound lane: the stored `sourcing_ratio`/`weighted` against the current rule (weekly volume, share of product demand):**");
+    out(...table(rows));
+  });
+
+  section("Audit 2026-09-29 · C — labels against the rows they describe");
+  // C1 — `projects.bom_level` against which BOM table holds rows.
+  const c1 = await tryQ(`
+    select p.name as project, p.bom_level,
+           (select count(*) from public.bom_single_level b where b.project_id = p.id)::int as single_rows,
+           (select count(*) from public.bom_multi_level b where b.project_id = p.id)::int as multi_rows,
+           case
+             when p.bom_level is null then 'label missing'
+             when p.bom_level not in ('single', 'multi') then 'label not a known value'
+             when p.bom_level = 'single' and exists(select 1 from public.bom_multi_level b where b.project_id = p.id)
+                  and not exists(select 1 from public.bom_single_level b where b.project_id = p.id) then 'MISMATCH: says single, rows are multi'
+             when p.bom_level = 'multi' and exists(select 1 from public.bom_single_level b where b.project_id = p.id)
+                  and not exists(select 1 from public.bom_multi_level b where b.project_id = p.id) then 'MISMATCH: says multi, rows are single'
+             when exists(select 1 from public.bom_single_level b where b.project_id = p.id)
+                  and exists(select 1 from public.bom_multi_level b where b.project_id = p.id) then 'BOTH tables hold rows'
+             else 'agrees (or no BOM)' end as verdict
+      from public.projects p order by p.name`);
+  report("C1 — bom_level vs rows", c1, (rows) => {
+    out("", "**(C1) `projects.bom_level` against the BOM rows** — every reader that branches on the label (`get_project_datasets`, `datamap.py`, the Supplier stage before D178) reads the table the label names:");
+    out(...table(rows));
+  });
+
+  // C2 — node_list's stored echelon / bom_depth against the classifier NOW.
+  const c2 = await tryQ(`
+    select p.name as project, count(*)::int as node_list_rows,
+           count(*) filter (where n.echelon is distinct from public.classify_node_echelon(n.project_id, n.node_id))::int as echelon_stale,
+           count(*) filter (where n.bom_depth is distinct from public.node_bom_depth(n.project_id, n.node_id))::int as bom_depth_stale,
+           count(*) filter (where n.node_type is distinct from public.classify_node_type(n.project_id, n.node_id))::int as node_type_stale
+      from public.node_list n join public.projects p on p.id = n.project_id
+     group by p.name order by p.name`);
+  report("C2 — node_list vs its classifier", c2, (rows) => {
+    out("", "**(C2) `node_list`'s stored `echelon`/`bom_depth`/`node_type` against `classify_node_echelon`/`node_bom_depth`/`classify_node_type` evaluated now over the stored graph:**");
+    out(...table(rows));
+  });
+
+  // C3 — graph nodes with no node_list row, and node_list rows with no graph node.
+  const c3 = await tryQ(`
+    with g as (
+      select project_id, from_location as id from public.supply_chain_data
+      union select project_id, to_location from public.supply_chain_data
+      union select project_id, from_location from public.supply_chain_data_multi_tier
+      union select project_id, to_location from public.supply_chain_data_multi_tier)
+    select p.name as project,
+           (select count(*) from g where g.project_id = p.id)::int as graph_nodes,
+           (select count(*) from public.node_list n where n.project_id = p.id)::int as node_list_rows,
+           (select count(*) from g where g.project_id = p.id
+               and not exists (select 1 from public.node_list n where n.project_id = g.project_id and n.node_id = g.id))::int as graph_not_in_node_list,
+           (select count(*) from public.node_list n where n.project_id = p.id
+               and not exists (select 1 from g where g.project_id = n.project_id and g.id = n.node_id))::int as node_list_not_in_graph
+      from public.projects p order by p.name`);
+  report("C3 — node_list coverage", c3, (rows) => {
+    out("", "**(C3) `node_list` against the node set of both edge tables:**");
+    out(...table(rows));
+  });
+
+  section("Audit 2026-09-29 · D — reads that can silently truncate: per-project rows against PostgREST's cap");
+  // D1 — PostgREST answers a `.from()` read with at most `max_rows` rows and says
+  // nothing about the rest. A client read without `.range()` paging is therefore
+  // complete only while the project is below the cap.
+  const cfg = await apiGet("/postgrest");
+  const maxRows = cfg.rows?.max_rows ?? null;
+  out(cfg.error ? `- PostgREST config unreadable: \`${cfg.error}\`` : `- PostgREST \`max_rows\` = **${maxRows}**`);
+  const d1 = await tryQ(`
+    select p.name as project,
+           (select count(*) from public.supply_chain_data x where x.project_id = p.id)::int as supply_chain_data,
+           (select count(*) from public.supply_chain_data_multi_tier x where x.project_id = p.id)::int as multi_tier,
+           (select count(*) from public.node_list x where x.project_id = p.id)::int as node_list,
+           (select count(*) from public.bom_single_level x where x.project_id = p.id)::int as bom_single_level,
+           (select count(*) from public.bom_multi_level x where x.project_id = p.id)::int as bom_multi_level,
+           (select count(*) from public.inbound_logistics x where x.project_id = p.id)::int as inbound_logistics,
+           (select count(*) from public.materials x where x.project_id = p.id)::int as materials,
+           (select count(*) from public.network_nodes x where x.project_id = p.id)::int as network_nodes,
+           (select count(*) from public.network_edges x where x.project_id = p.id)::int as network_edges
+      from public.projects p order by p.name`);
+  report("D1 — per-project row counts", d1, (rows) => {
+    out(...table(rows));
+    if (maxRows != null) {
+      const over = [];
+      for (const r of rows) for (const [k, v] of Object.entries(r)) if (k !== "project" && Number(v) > Number(maxRows)) over.push(`${r.project}.${k} = ${v}`);
+      out("", `- **${over.length} (project, table) pair(s) exceed \`max_rows\`**: ${over.join(" · ") || "none"}`);
+    }
+  });
+
+  section("Audit 2026-09-29 · E — repository vs production: migrations and edge functions");
+  // E1 — set equality of migration VERSIONS, not max+count (a gap and an extra
+  // cancel in a count).
+  let repoVersions = [];
+  try {
+    const { readdirSync } = await import("node:fs");
+    repoVersions = readdirSync(new URL("../../supabase/migrations/", import.meta.url))
+      .filter((f) => f.endsWith(".sql")).map((f) => f.split("_")[0]);
+  } catch (e) { out(`- could not list supabase/migrations: ${e.message}`); }
+  const led = await tryQ(`select version from supabase_migrations.schema_migrations order by version`);
+  report("E1 — migration ledger vs repository", led, (rows) => {
+    const prod = new Set(rows.map((r) => String(r.version)));
+    const repo = new Set(repoVersions);
+    const notApplied = [...repo].filter((v) => !prod.has(v)).sort();
+    const notInRepo = [...prod].filter((v) => !repo.has(v)).sort();
+    out(`- repository: **${repo.size}** versions · production ledger: **${prod.size}**`,
+        `- in the repository, NOT applied: **${notApplied.length}** ${sample(notApplied).join(", ")}`,
+        `- applied, NOT in the repository: **${notInRepo.length}** ${sample(notInRepo).join(", ")}`);
+  });
+
+  // E2 — each edge function's live build date against the last commit that touched
+  // its source (or `_shared`). A live build older than its source is running code
+  // the repository no longer holds.
+  const fns = await apiGet("/functions");
+  if (fns.error) { out(`- function list unreadable: \`${fns.error}\``); }
+  else {
+    const { execSync } = await import("node:child_process");
+    const { existsSync } = await import("node:fs");
+    const lastCommit = (p) => {
+      try { const d = execSync(`git log -1 --format=%cI -- ${p}`, { encoding: "utf8" }).trim(); return d ? new Date(d).toISOString() : null; }
+      catch { return null; }
+    };
+    const shared = lastCommit("supabase/functions/_shared");
+    const rows = (fns.rows ?? []).map((f) => {
+      const dir = `supabase/functions/${f.slug}`;
+      const inRepo = existsSync(new URL(`../../${dir}`, import.meta.url));
+      const src = inRepo ? lastCommit(dir) : null;
+      const live = f.updated_at ? new Date(f.updated_at).toISOString() : null;
+      const verdict = !inRepo ? "LIVE, NO SOURCE" :
+        !src ? "source date unknown (shallow clone?)" :
+        live && live < src ? "LIVE BUILD OLDER THAN ITS SOURCE" : "current";
+      return { slug: f.slug, live_build: live?.slice(0, 16) ?? "", source_commit: src?.slice(0, 16) ?? "", verdict };
+    });
+    out(`- \`_shared\` last changed: ${shared ?? "unknown"}`);
+    out(...table(rows.sort((a, b) => a.verdict.localeCompare(b.verdict) || a.slug.localeCompare(b.slug))));
+  }
+
+  // D2 — did a RUN see the whole project? The worker reads every tier-2 table as
+  // one PostgREST GET with no paging (`datamap.py::rows`), so a project over
+  // `max_rows` is simulated on whatever slice came back. `run_item_series` holds
+  // one row per simulated material/product, which is the engine's own count.
+  const d2 = await tryQ(`
+    with last_run as (
+      select distinct on (r.project_id) r.project_id, r.id, r.code_version, r.created_at
+        from public.simulation_runs r where r.status = 'done'
+       order by r.project_id, r.created_at desc)
+    select p.name as project, lr.code_version, to_char(lr.created_at, 'YYYY-MM-DD') as run_date,
+           (select count(*) from public.run_item_series s where s.run_id = lr.id and s.kind = 'material')::int as run_materials,
+           (select count(*) from public.run_item_series s where s.run_id = lr.id and s.kind = 'product')::int as run_products,
+           (select count(distinct m) from (
+               select material_id as m from public.bom_single_level b where b.project_id = p.id
+               union select material_id from public.bom_multi_level b where b.project_id = p.id) u)::int as bom_materials_now,
+           (select count(distinct product_id) from public.bom_single_level b where b.project_id = p.id)::int as bom_single_products_now,
+           (select count(*) from public.bom_single_level b where b.project_id = p.id)::int as bom_single_rows_now,
+           (select count(*) from public.inbound_logistics i where i.project_id = p.id)::int as inbound_rows_now
+      from last_run lr join public.projects p on p.id = lr.project_id
+     order by p.name`);
+  report("D2 — what the last run simulated vs the project now", d2, (rows) => {
+    out("", "**(D2) each project's latest completed run: materials/products the engine simulated (`run_item_series`) against the project's BOM now** — series exist only for a 1-replication `full_debug` run (`scsim_bridge.py`), so a 0 here says nothing about coverage:");
+    out(...table(rows));
+  });
+
+  section("Audit 2026-09-29 · F — one tier-2 value, several rules: where the rows make the rules disagree");
+  // F1 — a blank or zero BOM consumption rate. The contract declares 1.0
+  // (`missing_default`), the engine reads `or 1.0`, the Supplier grid `rate > 0 ?
+  // rate : 1`, and the lane writer `COALESCE(consumption_rate, 0)` — which drops the
+  // row from the product graph. Every such row is a material the graph and the run
+  // disagree about.
+  const f1 = await tryQ(`
+    select p.name as project, t.tbl, t.rows, t.rate_null, t.rate_zero_or_negative
+      from (
+        select project_id, 'bom_single_level' as tbl, count(*)::int as rows,
+               count(*) filter (where consumption_rate is null)::int as rate_null,
+               count(*) filter (where consumption_rate <= 0)::int as rate_zero_or_negative
+          from public.bom_single_level group by project_id
+        union all
+        select project_id, 'bom_multi_level', count(*)::int,
+               count(*) filter (where consumption_rate is null)::int,
+               count(*) filter (where consumption_rate <= 0)::int
+          from public.bom_multi_level group by project_id) t
+      join public.projects p on p.id = t.project_id
+     order by p.name, t.tbl`);
+  report("F1 — BOM rate null/zero", f1, (rows) => {
+    out("", "**(F1) BOM rows whose consumption rate is NULL or ≤ 0** — lane writer reads 0, engine and grid read 1.0:");
+    out(...table(rows));
+  });
+
+  // F2 — lanes with NULL economics (the `assign_*` / grid-fallback signature) and
+  // lead-time units the grid ignores. The grid multiplies `lead_time` by 7
+  // unconditionally; the engine converts by `lead_time_unit`.
+  const f2 = await tryQ(`
+    select p.name as project, count(*)::int as inbound_rows,
+           count(*) filter (where volume is null and lead_time is null and unit_price is null)::int as all_three_null,
+           count(*) filter (where lead_time is null)::int as lead_time_null,
+           count(*) filter (where unit_price is null)::int as price_null,
+           count(*) filter (where lead_time_unit is null)::int as lt_unit_null,
+           count(*) filter (where lower(btrim(lead_time_unit)) in ('week','weeks','wk','w','weekly'))::int as lt_unit_week,
+           count(*) filter (where lead_time_unit is not null
+                             and lower(btrim(lead_time_unit)) not in ('week','weeks','wk','w','weekly'))::int as lt_unit_not_week,
+           string_agg(distinct lead_time_unit, ',') as lt_units,
+           count(*) filter (where supplier_id <> btrim(supplier_id) or material_id <> btrim(material_id))::int as untrimmed_ids
+      from public.inbound_logistics i join public.projects p on p.id = i.project_id
+     group by p.name order by p.name`);
+  report("F2 — inbound economics and lead-time unit", f2, (rows) => {
+    out("", "**(F2) inbound lanes: NULL economics, and `lead_time_unit` values the Supplier grid ignores** (`lt_unit_not_week` rows render 7× wrong or better on the grid, correctly in the engine):");
+    out(...table(rows));
+  });
+
+  // F3 — DEMAND: authored twice. `products.demand_mean` (weekly) is what the
+  // engine prefers; the lane writer and the grid's placeholder use the outbound
+  // volume (sum, and the grid an AVERAGE per product row). Count products where
+  // both exist and differ.
+  const f3 = await tryQ(`
+    with o as (
+      select project_id, btrim(product_id) as pr,
+             sum(public.rate_to_weekly(coalesce(volume, 0), time_unit)) as wk_sum,
+             avg(public.rate_to_weekly(coalesce(volume, 0), time_unit)) as wk_avg,
+             count(*)::int as rows
+        from public.outbound_logistics group by 1,2)
+    select p.name as project,
+           count(*)::int as products_with_outbound,
+           count(*) filter (where pm.demand_mean is not null)::int as with_demand_mean,
+           count(*) filter (where pm.demand_mean is not null and abs(pm.demand_mean - o.wk_sum) > 1e-6)::int as demand_mean_ne_outbound_sum,
+           count(*) filter (where o.rows > 1)::int as products_with_several_customers,
+           count(*) filter (where abs(o.wk_sum - o.wk_avg) > 1e-6)::int as grid_avg_ne_sum
+      from o
+      join public.projects p on p.id = o.project_id
+      left join public.products pm on pm.project_id = o.project_id and pm.product_id = o.pr
+     group by p.name order by p.name`);
+  report("F3 — demand", f3, (rows) => {
+    out("", "**(F3) weekly demand per product: `products.demand_mean` against the outbound sum (engine vs lane writer), and the outbound sum against the per-row average (the grid's placeholder basis):**");
+    out(...table(rows));
+  });
+
+  // F4 — plant identity. The natural key includes `plant_name`, some writers stamp
+  // `projects.plant_name` and some take the payload's.
+  const f4 = await tryQ(`
+    with pl as (
+      select project_id, 'inbound' as t, plant_name from public.inbound_logistics
+      union all select project_id, 'outbound', plant_name from public.outbound_logistics
+      union all select project_id, 'bom_single', plant_name from public.bom_single_level
+      union all select project_id, 'bom_multi', plant_name from public.bom_multi_level
+      union all select project_id, 'node_list', plant_name from public.node_list)
+    select p.name as project, p.plant_name as project_plant,
+           count(distinct pl.plant_name)::int as distinct_plants_in_rows,
+           count(*) filter (where pl.plant_name is distinct from p.plant_name)::int as rows_not_on_project_plant,
+           string_agg(distinct pl.t, ',') filter (where pl.plant_name is distinct from p.plant_name) as in_tables
+      from pl join public.projects p on p.id = pl.project_id
+     group by p.name, p.plant_name order by p.name`);
+  report("F4 — plant name", f4, (rows) => {
+    out("", "**(F4) `plant_name` on tier-2 rows against `projects.plant_name`** — every ETL join is on plant, so a row on another plant is a separate graph:");
+    out(...table(rows));
+  });
+
+  // F5 — masters the side-effect writer never creates.
+  const f5 = await tryQ(`
+    select p.name as project,
+           (select count(distinct b.material_id) from public.bom_multi_level b where b.project_id = p.id
+               and not exists (select 1 from public.materials m where m.project_id = p.id and m.material_id = b.material_id)
+               and not exists (select 1 from public.products x where x.project_id = p.id and x.product_id = b.material_id))::int as bom_multi_ids_no_master,
+           (select count(distinct o.customer_id) from public.outbound_logistics o where o.project_id = p.id
+               and not exists (select 1 from public.customers c where c.project_id = p.id and c.customer_id = o.customer_id))::int as customers_no_master,
+           (select count(distinct i.supplier_id) from public.inbound_logistics i where i.project_id = p.id
+               and not exists (select 1 from public.suppliers s where s.project_id = p.id and s.supplier_id = i.supplier_id))::int as suppliers_no_master
+      from public.projects p order by p.name`);
+  report("F5 — masters", f5, (rows) => {
+    out("", "**(F5) ids used by a lane or BOM with no master row** — `ensure_item_masters` reads inbound, `bom_single_level` and outbound, never `bom_multi_level`, and never writes `customers`:");
+    out(...table(rows));
+  });
+
+  // F6 — derived analysis state that the lane rebuild erases.
+  const f6 = await tryQ(`
+    select p.name as project,
+           (select count(*) from public.supply_chain_data s where s.project_id = p.id and s.is_critical_node)::int as scd_critical_rows,
+           (select count(*) from public.supply_chain_data s where s.project_id = p.id and s.critical_node_score is not null)::int as scd_scored_rows,
+           (select count(*) from public.analysis_runs r where r.project_id = p.id)::int as analysis_runs,
+           (select count(*) from public.node_list n where n.project_id = p.id and n.is_critical_node)::int as node_list_critical
+      from public.projects p order by p.name`);
+  report("F6 — critical-node state", f6, (rows) => {
+    out("", "**(F6) critical-node state on the lane rows (erased by every rebuild) against the analysis store and `node_list`:**");
+    out(...table(rows));
+  });
+
+  // F7 — network_edges duplicates (plain INSERT, no natural key).
+  const f7 = await tryQ(`
+    select p.name as project, count(*)::int as edges,
+           (count(*) - count(distinct (e.src_uid, e.dst_uid, e.relation_type)))::int as duplicate_edges
+      from public.network_edges e join public.projects p on p.id = e.project_id
+     group by p.name order by p.name`);
+  report("F7 — network_edges duplicates", f7, (rows) => {
+    out("", "**(F7) `network_edges` rows that repeat a (source, target) pair** — each inflates degree and weighted centrality:");
+    out(...table(rows));
+  });
+
+  // F8 — triggers on `projects` and the lane tables, as production holds them.
+  const f8 = await tryQ(`
+    select c.relname as tbl, t.tgname, p.proname as fn,
+           case when t.tgenabled = 'D' then 'disabled' else 'enabled' end as state
+      from pg_trigger t join pg_class c on c.oid = t.tgrelid
+      join pg_namespace n on n.oid = c.relnamespace join pg_proc p on p.oid = t.tgfoid
+     where n.nspname = 'public' and not t.tgisinternal
+       and c.relname in ('projects', 'supply_chain_data', 'supply_chain_data_multi_tier',
+                         'inbound_logistics', 'outbound_logistics', 'bom_single_level', 'bom_multi_level')
+     order by 1, 2`);
+  report("F8 — triggers", f8, (rows) => {
+    out("", "**(F8) every non-internal trigger on `projects` and the lane tables** — is `auto_combine_on_completion` attached to anything?");
+    out(...table(rows));
+  });
+
+  // F9 — `projects.bom_level` values actually held.
+  const f9 = await tryQ(`select coalesce(bom_level, '<null>') as bom_level, count(*)::int as projects from public.projects group by 1 order by 1`);
+  report("F9 — bom_level values", f9, (rows) => {
+    out("", "**(F9) `projects.bom_level` values** — DataManager writes `multi`, the admin editor writes and tests for `multi_level`, and there is no CHECK:");
+    out(...table(rows));
+  });
+
+  section("Audit 2026-09-29 · G — 'primary supplier' and 'demand model', each answered by three authors");
+  // G1 — the primary supplier of a multi-sourced material, three ways:
+  //   engine  (`context.py` primary_link): min (cost, rounded lead-time weeks, supplier)
+  //           with cost = unit_price, ≤0/NULL → 1.0; lead time via lead_time_unit, NULL/0 → 2
+  //   grid    (`useStageRows` matMeta):     max weekly volume, then min price, then min lead time
+  //   stress  (`stressTargets.resolvePrimarySupplier`): ONE supplier per project — the largest
+  //           total weekly volume across every material
+  const g1 = await tryQ(`
+    with inb as (
+      select project_id, btrim(supplier_id) as s, btrim(material_id) as m,
+             public.rate_to_weekly(coalesce(volume, 0), time_unit) as wk,
+             case when coalesce(unit_price, 0) <= 0 then 1.0 else unit_price end as cost,
+             least(51, greatest(1, round(case when coalesce(lead_time, 0) = 0 then 2.0
+                   else public.duration_to_weeks(lead_time, lead_time_unit) end))) as ltw,
+             unit_price, lead_time
+        from public.inbound_logistics
+       where coalesce(btrim(supplier_id), '') <> '' and coalesce(btrim(material_id), '') <> ''),
+    multi as (select project_id, m from inb group by 1,2 having count(distinct s) > 1),
+    eng as (select distinct on (project_id, m) project_id, m, s as engine_primary
+              from inb order by project_id, m, cost, ltw, s),
+    grid as (select distinct on (project_id, m) project_id, m, s as grid_primary
+               from inb order by project_id, m, wk desc, unit_price asc nulls last, lead_time asc nulls last, s),
+    stress as (select distinct on (project_id) project_id, s as stress_primary
+                 from (select project_id, s, sum(wk) as wk from inb group by 1,2) x
+                order by project_id, wk desc, s)
+    select p.name as project,
+           count(*)::int as multi_sourced_materials,
+           count(*) filter (where e.engine_primary <> g.grid_primary)::int as engine_ne_grid,
+           st.stress_primary,
+           (select count(*) from eng e2 where e2.project_id = mu.project_id and e2.engine_primary = st.stress_primary)::int as materials_engine_orders_from_stress_primary,
+           (select count(distinct m) from inb i2 where i2.project_id = mu.project_id and i2.s = st.stress_primary)::int as materials_stress_primary_supplies
+      from multi mu
+      join eng e using (project_id, m) join grid g using (project_id, m)
+      join stress st using (project_id)
+      join public.projects p on p.id = mu.project_id
+     group by p.name, mu.project_id, st.stress_primary order by p.name`);
+  report("G1 — primary supplier, three authors", g1, (rows) => {
+    out("", "**(G1) multi-sourced materials whose ENGINE primary (cheapest link) differs from the GRID's suggested primary (highest volume); and the ONE supplier the `supplier:primary` stress preset disrupts, against how many materials the engine actually orders from it:**");
+    out(...table(rows));
+  });
+
+  // G2 — demand model. `_resolve_demand_kind`: product `demand_distribution`, else
+  // the SCENARIO's `demand_model.kind`, else triangular. The Data Map states the
+  // default as "triangular, cv 0.30". App-created scenarios default to poisson.
+  const g2 = await tryQ(`
+    select p.name as project,
+           (select count(*) from public.products x where x.project_id = p.id)::int as products,
+           (select count(*) from public.products x where x.project_id = p.id and x.demand_distribution is null)::int as products_no_distribution,
+           (select string_agg(distinct coalesce(s.demand_model->>'kind', '<none>'), ',') from public.scenarios s where s.project_id = p.id) as scenario_kinds,
+           (select count(*) from public.simulation_runs r join public.scenarios s on s.id = r.scenario_id
+             where r.project_id = p.id and r.status = 'done' and s.demand_model->>'kind' = 'poisson')::int as done_runs_on_poisson_scenario,
+           (select count(*) from public.simulation_runs r where r.project_id = p.id and r.status = 'done')::int as done_runs
+      from public.projects p order by p.name`);
+  report("G2 — demand model", g2, (rows) => {
+    out("", "**(G2) products with no `demand_distribution` (the engine takes the SCENARIO's kind for them, the Data Map says triangular) and the scenario kinds each project holds:**");
+    out(...table(rows));
+  });
+
+  section("Audit 2026-09-29 · H — what `anon` can read: the browser's direct `.from()` reads against production's policies");
+  // H1 — every request the app sends goes out as `anon` (D155, D169). A table whose
+  // SELECT policies name no `anon`/PUBLIC role, or whose only policy tests the
+  // `app.*` GUC org context no PostgREST request sets, answers the browser with ZERO
+  // rows and no error — and a page that renders "none" from that is D169's shape.
+  const h1 = await tryQ(`
+    select c.relname as tbl,
+           coalesce(string_agg(distinct pol.polname || ' → ' ||
+             case when pol.polroles = '{0}' then 'PUBLIC'
+                  else (select string_agg(r.rolname, '+') from pg_roles r where r.oid = any(pol.polroles)) end, ' · '), '(none)') as select_policies,
+           bool_or(pol.polroles = '{0}' or exists (select 1 from pg_roles r where r.oid = any(pol.polroles) and r.rolname = 'anon')) as anon_has_a_policy,
+           has_table_privilege('anon', c.oid, 'SELECT') as anon_grant
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+      left join pg_policy pol on pol.polrelid = c.oid and pol.polcmd in ('r', '*')
+     where c.relname in ('ingest_runs','ingest_files','ingest_staged_rows','analysis_runs','supply_chain_data',
+                         'supply_chain_data_multi_tier','node_list','network_nodes','network_edges','projects',
+                         'bom_multi_level','bom_single_level','inbound_logistics','outbound_logistics','materials',
+                         'products','suppliers','customers','run_item_series','experiments','recovery_playbooks',
+                         'scenario_templates')
+     group by c.relname, c.oid order by c.relname`);
+  report("H1 — anon read surface", h1, (rows) => {
+    out("", "**(H1) SELECT policies on every table the browser reads by `.from()`, as production holds them:**");
+    out(...table(rows));
+  });
+
+  // I1 — the run-results workbook's `run_meta` sheet reads the LIVE scenario's seed
+  // and schedule; the reproducibility sheet reads the run's stamped copy (audit WP 8).
+  // Where the scenario moved after the run, one workbook carries two answers. A
+  // seed of 0 also runs as 42 (`datamap.py`: `or 42`).
+  const i1 = await tryQ(`
+    select count(*)::int as done_runs,
+           count(*) filter (where r.seed is not null)::int as runs_with_stamped_seed,
+           count(*) filter (where r.seed is not null and r.seed is distinct from s.seed)::int as live_seed_differs,
+           count(*) filter (where r.disruption_schedule is not null
+                              and r.disruption_schedule::jsonb is distinct from coalesce(s.disruption_schedule::jsonb, '[]'::jsonb))::int as live_schedule_differs,
+           count(*) filter (where coalesce(r.seed, s.seed) = 0)::int as seed_zero_runs_as_42
+      from public.simulation_runs r left join public.scenarios s on s.id = r.scenario_id
+     where r.status = 'done'`);
+  report("I1 — run_meta vs the run's own binding", i1, (rows) => {
+    out("", "**(I1) completed runs whose scenario has since changed seed or schedule** — the workbook's `run_meta` sheet then contradicts its `reproducibility` sheet:");
+    out(...table(rows));
+  });
+
+  // J1 — the critical-node analyser reads `supply_chain_data` in ONE unpaged
+  // PostgREST read (`predict-critical-nodes`). A project whose scored-row count
+  // sits exactly on a round cap was scored on a slice.
+  const j1 = await tryQ(`
+    select p.name as project,
+           count(*)::int as lane_rows,
+           count(*) filter (where s.critical_node_score is not null)::int as scored,
+           left(min(s.prediction_timestamp)::text, 16) as first_scored,
+           left(max(s.prediction_timestamp)::text, 16) as last_scored,
+           left(max(s.created_at)::text, 16) as lanes_written
+      from public.supply_chain_data s join public.projects p on p.id = s.project_id
+     group by p.name having count(*) filter (where s.critical_node_score is not null) > 0
+     order by p.name`);
+  report("J1 — critical-node scoring coverage", j1, (rows) => {
+    out("", "**(J1) lanes the critical-node analyser scored, per project:**");
+    out(...table(rows));
+  });
+
+  // F4b — the project whose rows sit on two plants: which plant, which table.
+  const f4b = await tryQ(`
+    with pl as (
+      select project_id, 'inbound' as t, plant_name from public.inbound_logistics
+      union all select project_id, 'outbound', plant_name from public.outbound_logistics
+      union all select project_id, 'bom_multi', plant_name from public.bom_multi_level
+      union all select project_id, 'bom_single', plant_name from public.bom_single_level
+      union all select project_id, 'node_list', plant_name from public.node_list
+      union all select project_id, 'supply_chain_data', plant_name from public.supply_chain_data
+      union all select project_id, 'multi_tier', plant_name from public.supply_chain_data_multi_tier
+      union all select project_id, 'network_nodes', plant_name from public.network_nodes)
+    select p.name as project, p.plant_name as project_plant, pl.t, pl.plant_name as row_plant, count(*)::int as rows
+      from pl join public.projects p on p.id = pl.project_id
+     where exists (select 1 from pl x where x.project_id = p.id and x.plant_name is distinct from p.plant_name)
+     group by 1,2,3,4 order by 1,3,4`);
+  report("F4b — plants per table", f4b, (rows) => {
+    out("", "**(F4b) for every project with a row off its own plant: each table's plant values:**");
+    out(...table(rows));
+  });
+
+  // K1 — the default fulfillment mode, authored twice. The worker reads
+  // `projects.supply_chain_model` (`worker.py::_fetch_project_model`); the browser
+  // engine passes the POLICY's `fulfillment_strategy` (`RunValidateStage` →
+  // `projectModel`). Neither is in `graph_hash`. Where they disagree, the two
+  // engines simulate a product with no `fulfillment_mode` differently under one hash.
+  const k1 = await tryQ(`
+    select p.name as project, p.supply_chain_model as project_model,
+           pd.fulfillment_strategy as policy_strategy,
+           (select count(*) from public.products x where x.project_id = p.id and x.fulfillment_mode is null)::int as products_without_mode,
+           (select count(*) from public.simulation_runs r where r.project_id = p.id and r.status = 'done'
+               and r.aggregate_kpis->'_meta'->>'engine' = 'pyodide')::int as browser_runs,
+           (select count(*) from public.simulation_runs r where r.project_id = p.id and r.status = 'done'
+               and coalesce(r.aggregate_kpis->'_meta'->>'engine', '') <> 'pyodide')::int as worker_runs
+      from public.projects p left join public.policy_defaults pd on pd.project_id = p.id
+     order by p.name`);
+  report("K1 — fulfillment default", k1, (rows) => {
+    out("", "**(K1) the default fulfillment mode as the worker reads it (`projects.supply_chain_model`) and as the browser engine reads it (`policy_defaults.fulfillment_strategy`):**");
+    out(...table(rows));
+  });
+
+  // K2 — firm prominence: stored, or invented client-side. `FirmLevelNetwork`
+  // computes its own composite for a node with no stored `prominence`.
+  const k2 = await tryQ(`
+    select p.name as project, count(*)::int as network_nodes,
+           count(*) filter (where n.prominence is null)::int as prominence_null
+      from public.network_nodes n join public.projects p on p.id = n.project_id
+     group by p.name order by p.name`);
+  report("K2 — network_nodes prominence", k2, (rows) => {
+    out("", "**(K2) `network_nodes.prominence` NULL — the nodes whose Firm-level size and stats come from the page's own composite:**");
+    out(...table(rows));
+  });
+
+  section("Audit 2026-09-29 · L — the policy grid and the defaults cards: what is STORED, what the engine is SENT");
+  // L1 — `policy_defaults` is seeded as `{}` per family (`create_default_policy_defaults`)
+  // and the page shows each family through the Zod bundle, which fills every missing
+  // key with the UI's default (`parseFamily`). The run's snapshot copies the stored
+  // JSON raw (`_build_policy_snapshot`) and `project_map.py::_map_policies` reads a
+  // missing key with ITS OWN default — `backorder_allowed` False (UI true),
+  // `backorder_cost_per_day` 0 (UI 2), `allocation` '' (UI priority), `coverage_weeks`
+  // absent → the 8/10/12 strip (UI 8). So a family never saved shows one policy and
+  // runs another.
+  const l1 = await tryQ(`
+    select p.name as project,
+           (select count(*) from jsonb_object_keys(coalesce(d.fulfillment, '{}'::jsonb)))::int as fulfil_keys,
+           d.fulfillment->>'backorder_allowed' as backorder_allowed,
+           d.fulfillment->>'backorder_cost_per_day' as bo_cost,
+           d.fulfillment->>'allocation' as allocation,
+           (select count(*) from jsonb_object_keys(coalesce(d.inventory, '{}'::jsonb)))::int as inv_keys,
+           d.inventory->>'type' as inv_type,
+           d.inventory->>'safety_stock_method' as ss_method,
+           d.inventory->>'safety_stock_days' as ss_days,
+           d.inventory->>'coverage_weeks' as kappa,
+           d.inventory->>'holding_cost_pct' as hold_pct,
+           (select count(*) from jsonb_object_keys(coalesce(d.sourcing, '{}'::jsonb)))::int as src_keys,
+           d.sourcing->>'strategy' as src_strategy,
+           (select count(*) from jsonb_object_keys(coalesce(d.recovery, '{}'::jsonb)))::int as rec_keys,
+           d.recovery->>'response' as rec_response,
+           (select count(*) from jsonb_object_keys(coalesce(d.production, '{}'::jsonb)))::int as prod_keys,
+           d.fulfillment_strategy
+      from public.projects p left join public.policy_defaults d on d.project_id = p.id
+     order by p.name`);
+  report("L1 — stored defaults", l1, (rows) => {
+    out("", "**(L1) the project defaults AS STORED — an empty cell is a key the page fills with the UI default and the engine reads with its own:**");
+    out(...table(rows));
+  });
+
+  // L2 — every override the grid has written, by scope, family and key: the
+  // engine applies some per row and drops others (`_map_policies`).
+  const l2 = await tryQ(`
+    select o.scope, o.family, k.key,
+           case when o.target_key like '%::%' then 'a::b' else 'single' end as key_shape,
+           count(*)::int as overrides, count(distinct o.project_id)::int as projects
+      from public.policy_overrides o
+      cross join lateral jsonb_object_keys(coalesce(o.patch, '{}'::jsonb)) as k(key)
+     group by 1,2,3,4 order by 1,2,3,4`);
+  report("L2 — overrides by key", l2, (rows) => {
+    out("", "**(L2) every stored override, by scope / family / key:**");
+    out(...table(rows));
+  });
+
+  // L3 — what the last completed run's policy snapshot actually carried.
+  const l3 = await tryQ(`
+    with last_run as (
+      select distinct on (r.project_id) r.project_id, r.policy_version_id, r.created_at
+        from public.simulation_runs r where r.status = 'done'
+       order by r.project_id, r.created_at desc)
+    select p.name as project, to_char(lr.created_at, 'YYYY-MM-DD') as run_date,
+           lr.policy_version_id is not null as has_version,
+           v.snapshot->'defaults'->'fulfillment'->>'backorder_allowed' as snap_backorder,
+           (select count(*) from jsonb_object_keys(coalesce(v.snapshot->'defaults'->'fulfillment', '{}'::jsonb)))::int as snap_fulfil_keys,
+           (select count(*) from jsonb_object_keys(coalesce(v.snapshot->'defaults'->'inventory', '{}'::jsonb)))::int as snap_inv_keys,
+           jsonb_array_length(coalesce(v.snapshot->'overrides', '[]'::jsonb))::int as snap_overrides
+      from last_run lr join public.projects p on p.id = lr.project_id
+      left join public.policy_versions v on v.id = lr.policy_version_id
+     order by p.name`);
+  report("L3 — last run's policy snapshot", l3, (rows) => {
+    out("", "**(L3) the policy snapshot each project's last completed run was SENT:**");
+    out(...table(rows));
+  });
+}
+
+
 /**
  * §15 · BOM usability, Phase 1 — WHAT SHAPE ARE THE MULTI-LEVEL BOMS WE HAVE?
  *
@@ -4342,6 +5041,7 @@ async function main() {
   await d175MaterialVisibility();
   await bomShapeProbe();
   await bomDerivedLaneDetail();
+  await mappingAudit();
   await allProjectsSweep();
   await migrationFenceClose();
 

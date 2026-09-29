@@ -31,6 +31,7 @@ import { FocusedStage } from "@/components/policies/FocusedStage";
 import { GuidePanel } from "@/components/policies/GuidePanel";
 import { VerifiableExportsSection } from "@/components/policies/VerifiableExportsSection";
 import { DataMapGrid } from "@/components/policies/DataMapGrid";
+import { PolicyColumnCheck } from "@/components/policies/PolicyColumnCheck";
 import { PolicySetupBar, type PlanningUnit } from "@/components/policies/PolicySetupBar";
 import {
   formatVersionWhen,
@@ -394,7 +395,13 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
               </MobilePanel>
             )}
             {tab === "datamap" ? (
-              <DataMapGrid projectId={projectId} />
+              <div className="flex flex-col gap-6">
+                {/* The page's own columns first: what each one shows and whether
+                    an edit reaches the run. Then the uploaded columns → engine. */}
+                <PolicyColumnCheck />
+                <h2 className="text-sm font-semibold">Uploaded datasets → engine</h2>
+                <DataMapGrid projectId={projectId} />
+              </div>
             ) : tab === "guide" ? (
               <GuidePanel
                 onJumpToStage={(s) => {

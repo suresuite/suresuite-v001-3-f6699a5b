@@ -52,6 +52,10 @@ jobs:
       contents: write   # publish the report to the verification-results branch
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Audit 2026-09-29 probe E2 dates each edge function's source by its
+          # last commit, which a depth-1 clone cannot answer.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
