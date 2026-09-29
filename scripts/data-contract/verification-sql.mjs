@@ -2439,6 +2439,413 @@ async function d175MaterialVisibility() {
 }
 
 /**
+ * §15 · BOM usability, Phase 1 — WHAT SHAPE ARE THE MULTI-LEVEL BOMS WE HAVE?
+ *
+ * Before the Supplier stage's BOM tree (§4 D177) is redesigned, the design has
+ * to be sized against the real uploads, not the fixtures: how deep, how wide,
+ * how many materials sit under several parents, which sub-assemblies carry
+ * their own inbound lanes, how many rows are orphans or root rows, and whether
+ * the numbers the tree shows (the derived deep lane) agree with the numbers the
+ * engine actually runs (`datamap._flatten_multi_level_bom`). D178 and D179 were
+ * both lost by trusting a count, so this prints SHAPES and bounded samples per
+ * project, and cross-checks the two sources of "how much M does one P need".
+ *
+ * EVERY project holding `bom_multi_level` rows is measured (§4 D42). Read-only.
+ * Vocabulary, from the upload only (no second classifier — D127):
+ *   edge         a row with a non-blank `higher_level_component_id`
+ *   top parent   a parent that is nobody's child — the ENGINE's roots
+ *   demanded     a product with outbound volume — the DERIVATION's roots
+ *   leaf         a child that is nobody's parent — the engine's purchased set
+ *   intermediate a child that is also a parent — a sub-assembly
+ */
+const BOM_CTE = `
+  b AS (
+    SELECT project_id, plant_name,
+           btrim(material_id) AS child,
+           NULLIF(btrim(higher_level_component_id), '') AS parent,
+           level, consumption_rate AS rate
+      FROM public.bom_multi_level
+     WHERE COALESCE(btrim(material_id), '') <> ''
+  ),
+  bproj AS (SELECT DISTINCT project_id FROM b),
+  e   AS (SELECT DISTINCT project_id, child, parent FROM b WHERE parent IS NOT NULL AND parent <> child),
+  par AS (SELECT DISTINCT project_id, parent AS id FROM e),
+  chi AS (SELECT DISTINCT project_id, child AS id FROM e),
+  top AS (SELECT * FROM par p WHERE NOT EXISTS (SELECT 1 FROM chi c WHERE c.project_id = p.project_id AND c.id = p.id)),
+  leaf AS (SELECT * FROM chi c WHERE NOT EXISTS (SELECT 1 FROM par p WHERE p.project_id = c.project_id AND p.id = c.id)),
+  mid AS (SELECT * FROM chi c WHERE EXISTS (SELECT 1 FROM par p WHERE p.project_id = c.project_id AND p.id = c.id)),
+  dem AS (
+    SELECT project_id, btrim(product_id) AS id,
+           SUM(public.rate_to_weekly(COALESCE(volume, 0), time_unit)) AS wk
+      FROM public.outbound_logistics
+     WHERE COALESCE(btrim(product_id), '') <> ''
+       AND project_id IN (SELECT project_id FROM bproj)
+     GROUP BY 1, 2
+  ),
+  prod AS (
+    SELECT DISTINCT project_id, btrim(product_id) AS id FROM public.products
+     WHERE COALESCE(btrim(product_id), '') <> '' AND project_id IN (SELECT project_id FROM bproj)
+  ),
+  lane AS (
+    SELECT project_id, btrim(material_id) AS id,
+           COUNT(DISTINCT btrim(supplier_id))::int AS sups,
+           MIN(lead_time) AS lt_min, MAX(lead_time) AS lt_max,
+           COUNT(*) FILTER (WHERE lead_time IS NULL)::int AS lt_null
+      FROM public.inbound_logistics
+     WHERE COALESCE(btrim(material_id), '') <> '' AND COALESCE(btrim(supplier_id), '') <> ''
+       AND project_id IN (SELECT project_id FROM bproj)
+     GROUP BY 1, 2
+  )`;
+
+// The derivation's edge set, as rebuild_supply_chain_lanes' deep-lane CTE builds
+// it (20260924000001): uploaded edges, plus a blank-parent row hung under every
+// demanded product UNLESS its child is itself a product (D129 + D171).
+const DERIVED_EDGES_CTE = `
+  ex AS (
+    SELECT project_id, parent, child FROM e
+    UNION
+    SELECT r.project_id, d.id, r.child
+      FROM b r JOIN dem d ON d.project_id = r.project_id
+     WHERE r.parent IS NULL
+       AND NOT EXISTS (SELECT 1 FROM prod x WHERE x.project_id = r.project_id AND x.id = r.child)
+       AND NOT EXISTS (SELECT 1 FROM dem x WHERE x.project_id = r.project_id AND x.id = r.child)
+       AND d.id <> r.child
+  ),
+  walk AS (
+    SELECT d.project_id, d.id AS root, d.id AS node, ARRAY[d.id] AS path
+      FROM dem d
+    UNION ALL
+    SELECT w.project_id, w.root, x.child, w.path || x.child
+      FROM walk w JOIN ex x ON x.project_id = w.project_id AND x.parent = w.node
+     WHERE x.child <> ALL (w.path) AND array_length(w.path, 1) < 64
+  )`;
+
+async function bomShapeProbe() {
+  section("§15 · BOM usability Phase 1 — the multi-level BOMs production actually holds");
+  out("Every project with `bom_multi_level` rows. Vocabulary: **top parent** = a parent that is nobody's child (the engine's roots); **demanded** = a product with outbound volume (the derivation's and the tree's roots); **leaf** = a child that is nobody's parent (what the engine buys); **intermediate** = a child that is also a parent (a sub-assembly).");
+
+  report("(B1) shape per project", await tryQ(`
+    WITH ${BOM_CTE}
+    SELECT p.name AS project,
+      (SELECT COUNT(*) FROM b WHERE b.project_id = p.id)::int AS bom_rows,
+      (SELECT COUNT(DISTINCT plant_name) FROM b WHERE b.project_id = p.id)::int AS plants,
+      (SELECT COUNT(*) FROM b WHERE b.project_id = p.id AND b.parent IS NULL)::int AS blank_parent_rows,
+      (SELECT COUNT(*) FROM b WHERE b.project_id = p.id AND b.parent IS NULL
+          AND (EXISTS (SELECT 1 FROM prod x WHERE x.project_id = b.project_id AND x.id = b.child)
+               OR EXISTS (SELECT 1 FROM dem x WHERE x.project_id = b.project_id AND x.id = b.child)))::int AS root_rows_naming_a_product,
+      (SELECT COUNT(*) FROM b WHERE b.project_id = p.id AND b.parent = b.child)::int AS self_rows,
+      (SELECT COUNT(*) FROM (SELECT 1 FROM b WHERE b.project_id = p.id AND parent IS NOT NULL
+          GROUP BY child, parent HAVING COUNT(*) > 1) x)::int AS pairs_on_2plus_rows,
+      (SELECT COUNT(*) FROM e WHERE e.project_id = p.id)::int AS edges,
+      (SELECT COUNT(*) FROM (SELECT child FROM b WHERE b.project_id = p.id UNION SELECT parent FROM b WHERE b.project_id = p.id AND parent IS NOT NULL) n)::int AS nodes,
+      (SELECT COUNT(*) FROM top WHERE top.project_id = p.id)::int AS top_parents,
+      (SELECT COUNT(*) FROM top t WHERE t.project_id = p.id AND EXISTS (SELECT 1 FROM dem d WHERE d.project_id = t.project_id AND d.id = t.id))::int AS top_demanded,
+      (SELECT COUNT(*) FROM dem d WHERE d.project_id = p.id)::int AS demanded,
+      (SELECT COUNT(*) FROM dem d WHERE d.project_id = p.id AND NOT EXISTS (SELECT 1 FROM par x WHERE x.project_id = d.project_id AND x.id = d.id))::int AS demanded_not_a_bom_parent,
+      (SELECT COUNT(*) FROM dem d WHERE d.project_id = p.id AND EXISTS (SELECT 1 FROM chi x WHERE x.project_id = d.project_id AND x.id = d.id))::int AS demanded_and_consumed,
+      (SELECT COUNT(*) FROM mid WHERE mid.project_id = p.id)::int AS intermediates,
+      (SELECT COUNT(*) FROM mid m WHERE m.project_id = p.id AND EXISTS (SELECT 1 FROM prod x WHERE x.project_id = m.project_id AND x.id = m.id))::int AS intermediates_in_product_master,
+      (SELECT COUNT(*) FROM leaf WHERE leaf.project_id = p.id)::int AS leaves,
+      (SELECT MAX(updated_at) FROM public.bom_multi_level x WHERE x.project_id = p.id)::text AS bom_updated
+    FROM public.projects p WHERE p.id IN (SELECT project_id FROM bproj) ORDER BY p.name`), (rows) => {
+    out("", "**(B1) shape per project** — `pairs_on_2plus_rows`: the same child→parent pair on several rows (different `level`), which BOTH the engine and the derivation count once per row:");
+    out(...table(rows));
+  });
+
+  report("(B2) levels", await tryQ(`
+    WITH ${BOM_CTE}
+    SELECT p.name AS project, b.level,
+           COUNT(*)::int AS rows,
+           COUNT(DISTINCT b.child)::int AS children,
+           COUNT(DISTINCT b.parent)::int AS parents,
+           COUNT(*) FILTER (WHERE b.parent IS NULL)::int AS blank_parent,
+           COUNT(*) FILTER (WHERE b.rate IS NULL)::int AS rate_null,
+           COUNT(*) FILTER (WHERE b.rate = 0)::int AS rate_zero,
+           COUNT(*) FILTER (WHERE b.rate <> 1)::int AS rate_not_1,
+           MIN(b.rate)::text AS rate_min, MAX(b.rate)::text AS rate_max
+      FROM b JOIN public.projects p ON p.id = b.project_id
+     GROUP BY p.name, b.level ORDER BY p.name, b.level`), (rows) => {
+    out("", "**(B2) rows per uploaded `level`** — a NULL or zero rate is read as 1.0 by the engine (`_num(rate) or 1.0`) and as 0 by the derivation (`COALESCE(rate, 0)`):");
+    out(...table(rows));
+  });
+
+  report("(B3) level consistency", await tryQ(`
+    WITH ${BOM_CTE},
+    plevel AS (SELECT project_id, child AS id, MIN(level) AS lmin, MAX(level) AS lmax FROM b GROUP BY 1, 2)
+    SELECT p.name AS project,
+      COUNT(*) FILTER (WHERE b.parent IS NOT NULL AND pl.id IS NULL)::int AS edge_rows_parent_has_no_row,
+      COUNT(*) FILTER (WHERE pl.id IS NOT NULL AND b.level IS DISTINCT FROM pl.lmax + 1 AND b.level IS DISTINCT FROM pl.lmin + 1)::int AS edge_rows_level_not_parent_plus_1,
+      (SELECT COUNT(*) FROM plevel x WHERE x.project_id = p.id AND x.lmin <> x.lmax)::int AS children_on_2plus_levels,
+      (SELECT MIN(level) FROM b y WHERE y.project_id = p.id AND y.parent IN (SELECT id FROM top t WHERE t.project_id = p.id))::int AS min_level_under_top,
+      (SELECT MAX(level) FROM b y WHERE y.project_id = p.id AND y.parent IN (SELECT id FROM top t WHERE t.project_id = p.id))::int AS max_level_under_top
+    FROM b JOIN public.projects p ON p.id = b.project_id
+    LEFT JOIN plevel pl ON pl.project_id = b.project_id AND pl.id = b.parent
+    GROUP BY p.id, p.name ORDER BY p.name`), (rows) => {
+    out("", "**(B3) does the uploaded `level` agree with the edges?** — a tree can indent by path depth or by `level`; this says whether the two ever differ:");
+    out(...table(rows));
+  });
+
+  report("(B4) fan-out", await tryQ(`
+    WITH ${BOM_CTE},
+    fo AS (SELECT e.project_id, e.parent, COUNT(*)::int AS n,
+                  EXISTS (SELECT 1 FROM top t WHERE t.project_id = e.project_id AND t.id = e.parent) AS is_top
+             FROM e GROUP BY 1, 2)
+    SELECT p.name AS project, CASE WHEN fo.is_top THEN 'top parent' ELSE 'intermediate' END AS parent_kind,
+           COUNT(*)::int AS parents, MIN(n) AS min_children,
+           percentile_disc(0.5) WITHIN GROUP (ORDER BY n) AS median,
+           percentile_disc(0.9) WITHIN GROUP (ORDER BY n) AS p90, MAX(n) AS max_children
+      FROM fo JOIN public.projects p ON p.id = fo.project_id
+     GROUP BY p.name, fo.is_top ORDER BY p.name, parent_kind DESC`), (rows) => {
+    out("", "**(B4) fan-out — distinct children per parent:**");
+    out(...table(rows));
+  });
+
+  report("(B5) where-used", await tryQ(`
+    WITH ${BOM_CTE},
+    pc AS (SELECT e.project_id, e.child, COUNT(*)::int AS n,
+                  EXISTS (SELECT 1 FROM par x WHERE x.project_id = e.project_id AND x.id = e.child) AS is_mid
+             FROM e GROUP BY 1, 2)
+    SELECT p.name AS project, CASE WHEN pc.is_mid THEN 'intermediate' ELSE 'leaf' END AS child_kind,
+           COUNT(*)::int AS children,
+           COUNT(*) FILTER (WHERE n = 1)::int AS one_parent,
+           COUNT(*) FILTER (WHERE n = 2)::int AS two,
+           COUNT(*) FILTER (WHERE n BETWEEN 3 AND 5)::int AS three_to_five,
+           COUNT(*) FILTER (WHERE n > 5)::int AS six_plus,
+           MAX(n) AS max_parents
+      FROM pc JOIN public.projects p ON p.id = pc.project_id
+     GROUP BY p.name, pc.is_mid ORDER BY p.name, child_kind`), (rows) => {
+    out("", "**(B5) where-used — distinct parents per child.** An intermediate under 2+ parents repeats its WHOLE subtree in a path-expanded tree:");
+    out(...table(rows));
+  });
+
+  report("(B6) sourcing", await tryQ(`
+    WITH ${BOM_CTE},
+    bomids AS (SELECT project_id, child AS id FROM b UNION SELECT project_id, parent FROM b WHERE parent IS NOT NULL),
+    scd AS (SELECT DISTINCT project_id, btrim(from_location) AS sup, btrim(to_location) AS mat
+              FROM public.supply_chain_data WHERE data_source = 'inbound' AND project_id IN (SELECT project_id FROM bproj)),
+    paired AS (SELECT DISTINCT project_id, mat AS id FROM scd),
+    rowchild AS (SELECT DISTINCT project_id, child AS id FROM b)
+    SELECT p.name AS project,
+      (SELECT COUNT(*) FROM leaf l WHERE l.project_id = p.id AND EXISTS (SELECT 1 FROM lane x WHERE x.project_id = l.project_id AND x.id = l.id))::int AS leaves_with_lane,
+      (SELECT COUNT(*) FROM leaf l WHERE l.project_id = p.id AND NOT EXISTS (SELECT 1 FROM lane x WHERE x.project_id = l.project_id AND x.id = l.id))::int AS leaves_no_lane,
+      (SELECT COUNT(*) FROM mid m WHERE m.project_id = p.id AND EXISTS (SELECT 1 FROM lane x WHERE x.project_id = m.project_id AND x.id = m.id))::int AS intermediates_with_lane,
+      (SELECT COUNT(*) FROM top t WHERE t.project_id = p.id AND EXISTS (SELECT 1 FROM lane x WHERE x.project_id = t.project_id AND x.id = t.id))::int AS top_with_lane,
+      (SELECT COUNT(*) FROM lane l WHERE l.project_id = p.id AND NOT EXISTS (SELECT 1 FROM bomids x WHERE x.project_id = l.project_id AND x.id = l.id))::int AS lane_materials_not_in_bom,
+      (SELECT COUNT(*) FROM leaf l JOIN lane x ON x.project_id = l.project_id AND x.id = l.id WHERE l.project_id = p.id AND x.sups = 1)::int AS leaf_1_sup,
+      (SELECT COUNT(*) FROM leaf l JOIN lane x ON x.project_id = l.project_id AND x.id = l.id WHERE l.project_id = p.id AND x.sups = 2)::int AS leaf_2_sup,
+      (SELECT COUNT(*) FROM leaf l JOIN lane x ON x.project_id = l.project_id AND x.id = l.id WHERE l.project_id = p.id AND x.sups >= 3)::int AS leaf_3plus_sup,
+      (SELECT COALESCE(MAX(x.sups), 0) FROM lane x WHERE x.project_id = p.id)::int AS max_sups,
+      (SELECT COUNT(*) FROM scd WHERE scd.project_id = p.id)::int AS grid_lane_lines,
+      (SELECT COUNT(*) FROM rowchild r WHERE r.project_id = p.id
+          AND NOT EXISTS (SELECT 1 FROM par x WHERE x.project_id = r.project_id AND x.id = r.id)
+          AND NOT EXISTS (SELECT 1 FROM paired x WHERE x.project_id = r.project_id AND x.id = r.id))::int AS grid_unassigned_lines,
+      (SELECT COUNT(*) FROM rowchild r WHERE r.project_id = p.id
+          AND EXISTS (SELECT 1 FROM par x WHERE x.project_id = r.project_id AND x.id = r.id)
+          AND NOT EXISTS (SELECT 1 FROM dem x WHERE x.project_id = r.project_id AND x.id = r.id)
+          AND NOT EXISTS (SELECT 1 FROM paired x WHERE x.project_id = r.project_id AND x.id = r.id))::int AS grid_in_house_lines,
+      (SELECT COUNT(DISTINCT btrim(m.material_id)) FROM public.materials m WHERE m.project_id = p.id
+          AND NOT EXISTS (SELECT 1 FROM paired x WHERE x.project_id = m.project_id AND x.id = btrim(m.material_id))
+          AND NOT EXISTS (SELECT 1 FROM rowchild x WHERE x.project_id = m.project_id AND x.id = btrim(m.material_id)))::int AS grid_not_in_bom_lines
+    FROM public.projects p WHERE p.id IN (SELECT project_id FROM bproj) ORDER BY p.name`), (rows) => {
+    out("", "**(B6) sourcing.** `leaves_no_lane` is what the engine refuses a run over (`materials with no supplier link`); `intermediates_with_lane` are BOUGHT sub-assemblies whose lanes the engine's flatten walks straight past. The four `grid_*` columns re-derive the Supplier grid's line classes from `useStageRows` rules (lanes · unassigned · made in-house · not in BOM) as a cross-check on the `N/N lines` the page prints:");
+    out(...table(rows));
+  });
+
+  report("(B7) path-expanded size", await tryQ(`
+    WITH RECURSIVE ${BOM_CTE}, ${DERIVED_EDGES_CTE},
+    per_root AS (SELECT project_id, root, COUNT(*) - 1 AS occ, COUNT(DISTINCT node) - 1 AS nodes, MAX(array_length(path, 1)) - 1 AS depth
+                   FROM walk GROUP BY 1, 2)
+    SELECT p.name AS project,
+      COUNT(*)::int AS demanded_roots,
+      COUNT(*) FILTER (WHERE occ = 0)::int AS roots_with_no_bom,
+      SUM(occ)::int AS node_rows_fully_expanded,
+      MIN(occ) AS min_per_root, percentile_disc(0.5) WITHIN GROUP (ORDER BY occ) AS median_per_root, MAX(occ) AS max_per_root,
+      MAX(nodes) AS max_distinct_under_one_root, MAX(depth) AS max_depth,
+      (SELECT COUNT(DISTINCT n.id) FROM (SELECT child AS id FROM b WHERE b.project_id = p.id UNION SELECT parent FROM b WHERE b.project_id = p.id AND parent IS NOT NULL) n
+        WHERE NOT EXISTS (SELECT 1 FROM walk w WHERE w.project_id = p.id AND w.node = n.id))::int AS bom_nodes_no_demanded_root_reaches,
+      (SELECT COUNT(*) FROM walk w JOIN ex x ON x.project_id = w.project_id AND x.parent = w.node
+        WHERE w.project_id = p.id AND x.child = ANY (w.path))::int AS cycle_hits
+    FROM per_root r JOIN public.projects p ON p.id = r.project_id
+    GROUP BY p.id, p.name ORDER BY p.name`), (rows) => {
+    out("", "**(B7) the tree as the Supplier stage builds it** (demanded roots, D129/D171 edge rules). `node_rows_fully_expanded` is how many structural rows a user scrolls through with everything open, before any supplier line — the number a redesign has to beat:");
+    out(...table(rows));
+  });
+
+  report("(B8) engine vs derivation", await tryQ(`
+    WITH RECURSIVE ${BOM_CTE},
+    ew AS (
+      SELECT t.project_id, t.id AS root, t.id AS node, 1.0::numeric AS eff, ARRAY[t.id] AS path FROM top t
+      UNION ALL
+      SELECT w.project_id, w.root, r.child, w.eff * COALESCE(NULLIF(r.rate, 0), 1), w.path || r.child
+        FROM ew w JOIN b r ON r.project_id = w.project_id AND r.parent = w.node
+       WHERE r.child <> ALL (w.path) AND array_length(w.path, 1) < 64
+    ),
+    eng AS (SELECT w.project_id, w.root, w.node AS leaf, SUM(w.eff) AS qty
+              FROM ew w JOIN leaf l ON l.project_id = w.project_id AND l.id = w.node GROUP BY 1, 2, 3),
+    mt AS (SELECT project_id, data_source, btrim(from_location) AS f, btrim(path_root) AS root, weighted
+             FROM public.supply_chain_data_multi_tier WHERE project_id IN (SELECT project_id FROM bproj)),
+    rd AS (SELECT project_id, f AS root, SUM(weighted) AS wk FROM mt WHERE data_source = 'outbound' GROUP BY 1, 2),
+    der AS (SELECT m.project_id, m.root, m.f AS leaf, SUM(m.weighted) / NULLIF(MAX(rd.wk), 0) AS qty
+              FROM mt m JOIN rd ON rd.project_id = m.project_id AND rd.root = m.root
+             WHERE m.data_source = 'bom' GROUP BY 1, 2, 3),
+    cmp AS (SELECT eng.project_id, eng.root, eng.leaf, eng.qty AS engine_qty, der.qty AS derived_qty
+              FROM eng JOIN dem d ON d.project_id = eng.project_id AND d.id = eng.root AND d.wk > 0
+              LEFT JOIN der ON der.project_id = eng.project_id AND der.root = eng.root AND der.leaf = eng.leaf)
+    SELECT p.name AS project, COUNT(*)::int AS root_leaf_pairs,
+      COUNT(*) FILTER (WHERE derived_qty IS NOT NULL AND abs(engine_qty - derived_qty) <= 1e-6 * GREATEST(1, abs(engine_qty)))::int AS agree,
+      COUNT(*) FILTER (WHERE derived_qty IS NULL)::int AS no_derived_row,
+      COUNT(*) FILTER (WHERE derived_qty IS NOT NULL AND abs(engine_qty - derived_qty) > 1e-6 * GREATEST(1, abs(engine_qty)))::int AS disagree,
+      MAX(abs(engine_qty - derived_qty))::text AS max_abs_diff,
+      COUNT(*) FILTER (WHERE engine_qty <> 1)::int AS qty_not_1,
+      MAX(engine_qty)::text AS max_qty_per_unit
+    FROM cmp JOIN public.projects p ON p.id = cmp.project_id
+    GROUP BY p.name ORDER BY p.name`), (rows) => {
+    out("", "**(B8) \"how much M does one P need?\" — the engine's flatten (Σ over paths of Π rate, NULL/0 rate → 1) against the derived deep lane (Σ `weighted` of M's edges under root P ÷ P's demand)**, for every (demanded top parent, leaf) pair. The tree shows the second; the simulation runs the first:");
+    out(...table(rows));
+  });
+
+  report("(B9) derived lane health", await tryQ(`
+    WITH ${BOM_CTE},
+    mt AS (SELECT * FROM public.supply_chain_data_multi_tier WHERE project_id IN (SELECT project_id FROM bproj))
+    SELECT p.name AS project,
+      (SELECT COUNT(*) FROM mt WHERE mt.project_id = p.id AND data_source = 'bom')::int AS bom_rows,
+      (SELECT COUNT(*) FROM mt WHERE mt.project_id = p.id AND data_source = 'bom' AND COALESCE(btrim(path_root), '') = '')::int AS no_path_root,
+      (SELECT COUNT(*) FROM mt WHERE mt.project_id = p.id AND data_source = 'outbound')::int AS outbound_rows,
+      (SELECT COUNT(*) FROM mt WHERE mt.project_id = p.id AND data_source = 'inbound')::int AS inbound_rows,
+      (SELECT COUNT(*) FROM e WHERE e.project_id = p.id AND NOT EXISTS (SELECT 1 FROM mt WHERE mt.project_id = e.project_id AND mt.data_source = 'bom'
+          AND btrim(mt.from_location) = e.child AND btrim(mt.to_location) = e.parent))::int AS uploaded_edges_not_derived,
+      (SELECT COUNT(*) FROM (SELECT DISTINCT btrim(from_location) f, btrim(to_location) t FROM mt WHERE mt.project_id = p.id AND data_source = 'bom') d
+        WHERE NOT EXISTS (SELECT 1 FROM e WHERE e.project_id = p.id AND e.child = d.f AND e.parent = d.t))::int AS derived_edges_not_uploaded,
+      (SELECT MAX(bom_depth) FROM mt WHERE mt.project_id = p.id)::int AS max_bom_depth,
+      (SELECT COUNT(*) FROM dem d WHERE d.project_id = p.id AND COALESCE(d.wk, 0) = 0)::int AS demanded_rows_zero_volume,
+      (SELECT MAX(created_at) FROM mt WHERE mt.project_id = p.id)::text AS derived_at,
+      (SELECT MAX(updated_at) FROM public.bom_multi_level x WHERE x.project_id = p.id)::text AS bom_updated
+    FROM public.projects p WHERE p.id IN (SELECT project_id FROM bproj) ORDER BY p.name`), (rows) => {
+    out("", "**(B9) derived deep lane vs the upload** — `derived_edges_not_uploaded` should be only the D129 blank-parent hangs; `derived_at` older than `bom_updated` means the tree's numbers describe an older BOM:");
+    out(...table(rows));
+  });
+
+  report("(B10) node_list echelon vs the upload's shape", await tryQ(`
+    WITH ${BOM_CTE},
+    shape AS (
+      SELECT project_id, id, 'top' AS kind FROM top
+      UNION ALL SELECT project_id, id, 'intermediate' FROM mid
+      UNION ALL SELECT project_id, id, 'leaf' FROM leaf
+    )
+    SELECT p.name AS project, s.kind AS upload_shape, COALESCE(n.echelon, '(no node_list row)') AS echelon, COUNT(*)::int AS ids
+      FROM shape s JOIN public.projects p ON p.id = s.project_id
+      LEFT JOIN LATERAL (SELECT echelon FROM public.node_list nl WHERE nl.project_id = s.project_id AND btrim(nl.node_id) = s.id LIMIT 1) n ON true
+     GROUP BY p.name, s.kind, n.echelon ORDER BY p.name, s.kind, 3`), (rows) => {
+    out("", "**(B10) the one classifier (`node_list.echelon`, D127) against the upload's own shape** — any cell off the diagonal (top→product, intermediate→subassembly, leaf→material) is a node a tree would label differently from every other page:");
+    out(...table(rows));
+  });
+
+  report("(B11) lead time", await tryQ(`
+    WITH ${BOM_CTE}
+    SELECT p.name AS project,
+      (SELECT COUNT(*) FROM public.inbound_logistics i WHERE i.project_id = p.id)::int AS lanes,
+      (SELECT COUNT(*) FROM public.inbound_logistics i WHERE i.project_id = p.id AND i.lead_time IS NULL)::int AS lead_time_null,
+      (SELECT MIN(lead_time) FROM public.inbound_logistics i WHERE i.project_id = p.id)::text AS lt_min,
+      (SELECT MAX(lead_time) FROM public.inbound_logistics i WHERE i.project_id = p.id)::text AS lt_max,
+      (SELECT string_agg(DISTINCT COALESCE(lead_time_unit, '(null)'), ', ') FROM public.inbound_logistics i WHERE i.project_id = p.id) AS lead_time_units,
+      (SELECT COUNT(*) FROM public.products x WHERE x.project_id = p.id)::int AS product_master_rows,
+      (SELECT COUNT(*) FROM public.materials x WHERE x.project_id = p.id)::int AS material_master_rows,
+      (SELECT COUNT(*) FROM public.materials x WHERE x.project_id = p.id AND COALESCE(btrim(x.name), '') NOT IN ('', btrim(x.material_id)))::int AS materials_with_a_name
+    FROM public.projects p WHERE p.id IN (SELECT project_id FROM bproj) ORDER BY p.name`), (rows) => {
+    out("", "**(B11) lead times and names** — what a \"longest lead-time path\" or a human-readable label could be built from (the BOM carries no assembly lead time for an intermediate):");
+    out(...table(rows));
+  });
+
+  // ── bounded samples, per project, for designing against real ids ─────────
+  report("(B12) demanded roots", await tryQ(`
+    WITH RECURSIVE ${BOM_CTE}, ${DERIVED_EDGES_CTE},
+    per_root AS (SELECT project_id, root, COUNT(*) - 1 AS occ, COUNT(DISTINCT node) - 1 AS nodes, MAX(array_length(path, 1)) - 1 AS depth FROM walk GROUP BY 1, 2),
+    ranked AS (SELECT r.*, d.wk, ROW_NUMBER() OVER (PARTITION BY r.project_id ORDER BY d.wk DESC NULLS LAST, r.root) AS rn
+                 FROM per_root r JOIN dem d ON d.project_id = r.project_id AND d.id = r.root)
+    SELECT p.name AS project, root, round(wk, 2)::text AS demand_wk, occ AS node_rows, nodes AS distinct_nodes, depth
+      FROM ranked JOIN public.projects p ON p.id = ranked.project_id
+     WHERE rn <= 10 ORDER BY p.name, rn`), (rows) => {
+    out("", "**(B12) the 10 largest-demand roots per project** (sample):");
+    out(...table(rows));
+  });
+
+  report("(B13) multi-parent materials", await tryQ(`
+    WITH ${BOM_CTE},
+    pc AS (SELECT e.project_id, e.child, COUNT(*)::int AS n,
+                  string_agg(e.parent, ', ' ORDER BY e.parent) AS parents,
+                  EXISTS (SELECT 1 FROM par x WHERE x.project_id = e.project_id AND x.id = e.child) AS is_mid
+             FROM e GROUP BY 1, 2),
+    ranked AS (SELECT pc.*, ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY n DESC, child) AS rn FROM pc WHERE n > 1)
+    SELECT p.name AS project, child, CASE WHEN is_mid THEN 'intermediate' ELSE 'leaf' END AS kind, n AS parents_n,
+           left(parents, 120) AS parents,
+           COALESCE((SELECT sups FROM lane l WHERE l.project_id = ranked.project_id AND l.id = ranked.child), 0) AS suppliers
+      FROM ranked JOIN public.projects p ON p.id = ranked.project_id
+     WHERE rn <= 10 ORDER BY p.name, rn`), (rows) => {
+    out("", "**(B13) the most-shared children per project** (sample) — the \"where used\" cases:");
+    out(...table(rows));
+  });
+
+  report("(B14) widest parents", await tryQ(`
+    WITH ${BOM_CTE},
+    fo AS (SELECT e.project_id, e.parent, COUNT(*)::int AS n FROM e GROUP BY 1, 2),
+    ranked AS (SELECT fo.*, ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY n DESC, parent) AS rn FROM fo)
+    SELECT p.name AS project, parent,
+           CASE WHEN EXISTS (SELECT 1 FROM top t WHERE t.project_id = ranked.project_id AND t.id = ranked.parent) THEN 'top' ELSE 'intermediate' END AS kind,
+           n AS children,
+           (SELECT MIN(level) FROM b WHERE b.project_id = ranked.project_id AND b.parent = ranked.parent)::int AS child_level
+      FROM ranked JOIN public.projects p ON p.id = ranked.project_id
+     WHERE rn <= 8 ORDER BY p.name, rn`), (rows) => {
+    out("", "**(B14) the widest parents per project** (sample):");
+    out(...table(rows));
+  });
+
+  report("(B15) attention samples", await tryQ(`
+    WITH ${BOM_CTE},
+    cls AS (
+      SELECT l.project_id, 'leaf, no inbound lane' AS what, l.id FROM leaf l
+       WHERE NOT EXISTS (SELECT 1 FROM lane x WHERE x.project_id = l.project_id AND x.id = l.id)
+      UNION ALL
+      SELECT m.project_id, 'intermediate WITH a lane (' || x.sups || ' sup)', m.id FROM mid m
+        JOIN lane x ON x.project_id = m.project_id AND x.id = m.id
+      UNION ALL
+      SELECT t.project_id, 'top parent, not demanded', t.id FROM top t
+       WHERE NOT EXISTS (SELECT 1 FROM dem d WHERE d.project_id = t.project_id AND d.id = t.id)
+      UNION ALL
+      SELECT d.project_id, 'demanded, no BOM below', d.id FROM dem d
+       WHERE NOT EXISTS (SELECT 1 FROM par x WHERE x.project_id = d.project_id AND x.id = d.id)
+         AND NOT EXISTS (SELECT 1 FROM b WHERE b.project_id = d.project_id AND b.parent IS NULL
+                           AND NOT EXISTS (SELECT 1 FROM prod x WHERE x.project_id = b.project_id AND x.id = b.child))
+      UNION ALL
+      SELECT r.project_id, 'blank-parent row', r.child || ' @L' || COALESCE(r.level::text, '?') FROM b r WHERE r.parent IS NULL
+    ),
+    ranked AS (SELECT cls.*, COUNT(*) OVER (PARTITION BY project_id, what) AS total,
+                      ROW_NUMBER() OVER (PARTITION BY project_id, what ORDER BY id) AS rn FROM cls)
+    SELECT p.name AS project, ranked.what, ranked.total::int AS total, string_agg(ranked.id, ', ' ORDER BY ranked.id) AS first_ids
+      FROM ranked JOIN public.projects p ON p.id = ranked.project_id
+     WHERE ranked.rn <= 8 GROUP BY p.name, ranked.what, ranked.total ORDER BY p.name, ranked.what`), (rows) => {
+    out("", "**(B15) lines that need a user's attention, per class** (first 8 ids each):");
+    out(...table(rows));
+  });
+
+  report("(B16) one real branch", await tryQ(`
+    WITH RECURSIVE ${BOM_CTE}, ${DERIVED_EDGES_CTE},
+    pick AS (SELECT DISTINCT ON (project_id) project_id, id FROM dem d
+              WHERE EXISTS (SELECT 1 FROM par x WHERE x.project_id = d.project_id AND x.id = d.id)
+              ORDER BY project_id, wk DESC NULLS LAST, id),
+    br AS (SELECT w.*, ROW_NUMBER() OVER (PARTITION BY w.project_id ORDER BY array_to_string(w.path, '/')) AS rn
+             FROM walk w JOIN pick k ON k.project_id = w.project_id AND k.id = w.root)
+    SELECT p.name AS project, array_length(path, 1) - 1 AS depth, node,
+           (SELECT MIN(r.rate) FROM b r WHERE r.project_id = br.project_id AND r.child = br.node AND r.parent = path[array_length(path, 1) - 1])::text AS rate,
+           COALESCE((SELECT sups FROM lane l WHERE l.project_id = br.project_id AND l.id = br.node), 0) AS suppliers,
+           array_to_string(path, ' > ') AS path
+      FROM br JOIN public.projects p ON p.id = br.project_id
+     WHERE rn <= 45 ORDER BY p.name, rn`), (rows) => {
+    out("", "**(B16) the first 45 path-ordered rows under each project's largest-demand root** — the real subtree a mockup is drawn from:");
+    out(...table(rows));
+  });
+}
+
+/**
  * §15 measures ONE project. Phase 3's scope depends on how much D5/D7/D8 damage
  * exists AT ALL, and a single clean project is not that answer — least of all if
  * it is the seeded one. This sweep runs the three counting defects across every
@@ -3823,6 +4230,7 @@ async function main() {
   }
 
   await d175MaterialVisibility();
+  await bomShapeProbe();
   await allProjectsSweep();
   await migrationFenceClose();
 
