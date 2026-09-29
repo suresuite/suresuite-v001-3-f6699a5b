@@ -117,7 +117,7 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "materials", field: "cost", engineField: "Material.cost (c_m)", chain: "master → volume-weighted inbound unit_price (info) → cheapest inbound (info) → 1.0 (warn)", statusKey: "material_cost" },
   { dataset: "materials", field: "holding_cost_pct", engineField: "Material.holding_cost_rate", chain: "master → policy inventory.holding_cost_pct → 20% · ×100, clamp [5,50]", statusKey: "material_holding" },
   { dataset: "materials", field: "moq", engineField: "SupplierLink.moq", chain: "master → 0", statusKey: "material_moq" },
-  { dataset: "materials", field: "initial_on_hand", engineField: "Material.initial_on_hand", chain: "master → engine warm-starts at S_m", statusKey: "material_initial_on_hand" },
+  { dataset: "materials", field: "initial_on_hand", engineField: "Material.initial_on_hand", chain: "master → engine warm-starts at E[D]·κ + safety stock", statusKey: "material_initial_on_hand" },
   { dataset: "materials", field: "lead_time_dist / lead_time_cv", engineField: "SupplierLink.lead_time_dist/cv", chain: "master → deterministic, cv 0", statusKey: "material_lead_time_dist" },
   // ── products master ────────────────────────────────────────────────────
   { dataset: "products", field: "name", engineField: "Product.name", chain: "display only → id", statusKey: "name" },

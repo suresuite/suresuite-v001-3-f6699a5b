@@ -478,7 +478,7 @@
             }
           ],
           "default": null,
-          "notes": "None \u2192 initialized to the order-up-to level S_m at t=0 (warm start).",
+          "notes": "None \u2192 warm start at t=0: on hand = S_m \u2212 E[D_m]\u00b7T_s = E[D_m]\u00b7\u03ba + safety stock, pipeline primed so position = S_m.",
           "scope": "M",
           "title": "Initial On Hand",
           "unit": "units"
