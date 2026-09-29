@@ -17689,7 +17689,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc assign_material_supplier",
-        "evidence": "src/components/policies/StagePolicyTable.tsx:328"
+        "evidence": "src/components/policies/StagePolicyTable.tsx:346"
       },
       {
         "page": "SimulationLab.tsx",

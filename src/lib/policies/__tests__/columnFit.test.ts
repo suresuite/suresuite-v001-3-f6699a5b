@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitColumns, foldNote, type FitCol } from "../columnFit";
+import { COL_W_MAX, COL_W_MIN, fitColumns, foldNote, type FitCol } from "../columnFit";
 
 const col = (key: string, w: number, extra: Partial<FitCol> = {}): FitCol => ({
   key,
@@ -115,6 +115,45 @@ describe("fitColumns", () => {
     expect(r.visible).toHaveLength(14);
     expect(r.folded).toHaveLength(0);
     expect(r.fills).toBe(false);
+  });
+});
+
+describe("fitColumns · user-dragged widths", () => {
+  it("renders a dragged width and marks the column user-sized", () => {
+    const r = fit(2000, { widths: { material_cost: 150 } });
+    const c = r.visible.find((v) => v.key === "material_cost");
+    expect(c?.w).toBe(150);
+    expect(c?.userSized).toBe(true);
+    expect(r.valueWidth).toBe(SUPPLIER.reduce((s, v) => s + v.w, 0) - 96 + 150);
+  });
+
+  it("clamps a dragged width to the allowed range", () => {
+    const r = fit(4000, { widths: { material_cost: 1, material_moq: 99999 } });
+    expect(r.visible.find((v) => v.key === "material_cost")?.w).toBe(COL_W_MIN);
+    expect(r.visible.find((v) => v.key === "material_moq")?.w).toBe(COL_W_MAX);
+  });
+
+  it("folds with the dragged width, and never folds the dragged column first", () => {
+    const wide = fit(1100, { widths: { cost_per_km: 300 } });
+    const plain = fit(1100);
+    expect(wide.folded.length).toBeGreaterThan(plain.folded.length);
+    expect(wide.visible.some((c) => c.key === "cost_per_km")).toBe(true);
+  });
+
+  it("never compacts a column the user sized", () => {
+    const r = fit(700, { widths: { type: 200 } });
+    const type = r.visible.find((c) => c.key === "type");
+    expect(type?.compact).toBeUndefined();
+    expect(type?.w).toBe(200);
+    // an unsized control on the same tight box still compacts
+    expect(r.visible.find((c) => c.key === "__inv_params")?.w).toBe(148);
+  });
+
+  it("a user-sized non-decision column folding last does not claim a decision field folded", () => {
+    const r = fit(200, { widths: { cost_per_km: 400 } });
+    const dropped = r.folded.find((c) => c.key === "cost_per_km");
+    expect(dropped).toBeDefined();
+    expect(dropped?.wasKeep).toBeUndefined();
   });
 });
 

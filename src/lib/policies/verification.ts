@@ -75,7 +75,7 @@ export function verifyProjectPolicies(input: VerifyInput): VerifyResult {
       severity: "block",
       stage: "run_validate",
       message: "Planning time unit is not set.",
-      hint: "Pick day / week / month at the top of the policies page.",
+      hint: "The planning unit is fixed to weeks; reload the policies page.",
     });
   }
 

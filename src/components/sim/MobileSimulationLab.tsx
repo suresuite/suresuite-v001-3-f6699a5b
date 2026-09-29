@@ -379,7 +379,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
         {
           label: "Scenario",
           hint: selected.description || "no description",
-          value: UNIT_LABEL_PLURAL[unit ?? "day"],
+          value: UNIT_LABEL_PLURAL[unit],
           sheet: "scenario",
         },
         { label: "Horizon", hint: "simulated period", value: `${selected.horizon_days} d`, sheet: "runWindow" },

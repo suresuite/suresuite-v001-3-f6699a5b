@@ -18,7 +18,9 @@ import { DEFAULT_BUNDLE } from "@/lib/policies/schemas";
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1", email: "u@x" } }) }));
 vi.mock("@/hooks/useGlobalProject", () => ({ useGlobalProject: () => ({ selectedProject: null }) }));
-vi.mock("@/hooks/useTimeUnit", () => ({ useTimeUnit: () => ({ adaptLabel: (s: string) => s }) }));
+vi.mock("@/hooks/useTimeUnit", () => ({
+  useTimeUnit: () => ({ adaptLabel: (s: string) => s, isDayField: () => false, fromDays: (n: number) => n }),
+}));
 vi.mock("@/hooks/useDatasetVersion", () => ({ useDatasetVersion: () => ({ snapshot: async () => null }) }));
 vi.mock("@/hooks/useItemMasters", () => ({
   useItemMasters: () => ({

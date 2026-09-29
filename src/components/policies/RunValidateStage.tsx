@@ -691,7 +691,7 @@ export function RunValidateStage({
       supplierRows,
       plantRows,
       customerRows,
-      timeUnit: timeUnit ?? null,
+      timeUnit,
       materials: itemMasters.materials,
       products: itemMasters.products,
       suppliers: itemMasters.suppliers,

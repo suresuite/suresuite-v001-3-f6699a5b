@@ -63,7 +63,7 @@ function DisruptionNumberInput({
 
 export function DisruptionScheduleEditor({ value, onChange, projectId, warmup }: Props) {
   const { unit, fromDays, toDays } = useTimeUnit(projectId);
-  const unitPlural = UNIT_LABEL_PLURAL[unit ?? "day"];
+  const unitPlural = UNIT_LABEL_PLURAL[unit];
 
   const [local, setLocal] = useState(value);
   useEffect(() => setLocal(value), [value]);
