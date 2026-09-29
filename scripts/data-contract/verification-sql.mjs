@@ -2462,7 +2462,7 @@ async function mappingAudit() {
            (select count(*) from public.supply_chain_data_multi_tier t
              where t.project_id = p.id and t.level is distinct from t.bom_depth)::int as mt_rows_not_current_writer,
            (select left(max(s.created_at)::text, 16) from public.supply_chain_data s where s.project_id = p.id) as graph_written,
-           (select left(greatest(
+           left(greatest(
               (select max(greatest(x.created_at, x.updated_at)) from public.inbound_logistics x where x.project_id = p.id),
               (select max(greatest(x.created_at, x.updated_at)) from public.outbound_logistics x where x.project_id = p.id),
               (select max(greatest(x.created_at, x.updated_at)) from public.bom_single_level x where x.project_id = p.id),
@@ -3032,6 +3032,38 @@ async function mappingAudit() {
      group by 1,2,3,4 order by 1,3,4`);
   report("F4b — plants per table", f4b, (rows) => {
     out("", "**(F4b) for every project with a row off its own plant: each table's plant values:**");
+    out(...table(rows));
+  });
+
+  // K1 — the default fulfillment mode, authored twice. The worker reads
+  // `projects.supply_chain_model` (`worker.py::_fetch_project_model`); the browser
+  // engine passes the POLICY's `fulfillment_strategy` (`RunValidateStage` →
+  // `projectModel`). Neither is in `graph_hash`. Where they disagree, the two
+  // engines simulate a product with no `fulfillment_mode` differently under one hash.
+  const k1 = await tryQ(`
+    select p.name as project, p.supply_chain_model as project_model,
+           pd.fulfillment_strategy as policy_strategy,
+           (select count(*) from public.products x where x.project_id = p.id and x.fulfillment_mode is null)::int as products_without_mode,
+           (select count(*) from public.simulation_runs r where r.project_id = p.id and r.status = 'done'
+               and r.aggregate_kpis->'_meta'->>'engine' = 'pyodide')::int as browser_runs,
+           (select count(*) from public.simulation_runs r where r.project_id = p.id and r.status = 'done'
+               and coalesce(r.aggregate_kpis->'_meta'->>'engine', '') <> 'pyodide')::int as worker_runs
+      from public.projects p left join public.policy_defaults pd on pd.project_id = p.id
+     order by p.name`);
+  report("K1 — fulfillment default", k1, (rows) => {
+    out("", "**(K1) the default fulfillment mode as the worker reads it (`projects.supply_chain_model`) and as the browser engine reads it (`policy_defaults.fulfillment_strategy`):**");
+    out(...table(rows));
+  });
+
+  // K2 — firm prominence: stored, or invented client-side. `FirmLevelNetwork`
+  // computes its own composite for a node with no stored `prominence`.
+  const k2 = await tryQ(`
+    select p.name as project, count(*)::int as network_nodes,
+           count(*) filter (where n.prominence is null)::int as prominence_null
+      from public.network_nodes n join public.projects p on p.id = n.project_id
+     group by p.name order by p.name`);
+  report("K2 — network_nodes prominence", k2, (rows) => {
+    out("", "**(K2) `network_nodes.prominence` NULL — the nodes whose Firm-level size and stats come from the page's own composite:**");
     out(...table(rows));
   });
 }
