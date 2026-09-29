@@ -53,7 +53,9 @@ describe("StagePolicyTable can never render a blank body (D178)", () => {
   const src = read(TABLE);
 
   it("the tree build is guarded — no error boundary protects this render path", () => {
-    expect(src).toMatch(/try \{[\s\S]{0,400}buildBomTreeView\(/);
+    // §4 D180 — the build is now `buildBomTreeModel`, which runs the one walk
+    // (`buildBomTreeView`) inside it; the guard is on the call the table makes.
+    expect(src).toMatch(/try \{[\s\S]{0,400}buildBomTreeModel\(/);
   });
 
   it("the tree renders only when treeFallbackReason allows it, and the reason is shown", () => {
@@ -102,8 +104,12 @@ describe("the Material column names every material (D179)", () => {
     expect(src).toMatch(/\.\.\.memberDisplay\(group\.members\.length, mi\)/);
   });
 
-  it("the tree pass takes each lane's continuation from the tree builder, not a constant", () => {
-    expect(src).toMatch(/isContinuation: e\.continuation/);
+  it("the tree pass takes each lane's continuation from the tree model, not a constant", () => {
+    // §4 D180 — the lane's material cell is `laneMaterialText(row, continuation,
+    // flags)`, fed from the model's VisRow; a literal `true` there is D177's
+    // nameless-tail defect back.
+    expect(src).toMatch(/laneMaterialText\(v\.row as Record<string, unknown>, v\.continuation, flags\)/);
+    expect(/laneMaterialText\([^)]*,\s*true\s*,/.test(src)).toBe(false);
     expect(/isContinuation: true,\s*groupId: `tree::/.test(src)).toBe(false);
   });
 });

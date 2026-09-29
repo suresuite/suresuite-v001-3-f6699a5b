@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "fd36cb9e7ac3";
+export const CONTRACT_VERSION = "7be43dae7f5a";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20260924000001_bom_root_rows_are_not_edges.sql";
+export const LAST_MIGRATION = "20260929000001_audit_log_read_and_chain.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
   "tablesDescribed": 55,
-  "columnsDescribed": 684,
+  "columnsDescribed": 687,
   "tablesUndescribed": 26
 } as const;
 
@@ -327,7 +327,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "audit_logs",
         "grain": "One recorded action, on one plane. `admin` is what a super admin did, `data` is a tier transition — a write to tier 2, 3 or 4 — and `access` is a governed decision such as an export being allowed or refused.",
-        "columns": 11,
+        "columns": 14,
         "owner": "platform"
       },
       {

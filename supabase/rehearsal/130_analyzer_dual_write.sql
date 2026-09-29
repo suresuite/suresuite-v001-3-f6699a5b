@@ -397,7 +397,11 @@ BEGIN
   -- draft of this section passed that mutation, which is §16 · WP 4.1 · E
   -- happening again to the package that quoted it.
   PERFORM set_config('app.current_user_id', v_analyst::text, true);  -- POISON
+  -- audit_logs is append-only (D186); clearing it is allowed only here, inside
+  -- this file's rolled-back transaction, by lifting the guard around the DELETE.
+  ALTER TABLE public.audit_logs DISABLE TRIGGER audit_logs_guard_change;
   DELETE FROM public.audit_logs WHERE plane = 'data' AND target_type = 'network_nodes';
+  ALTER TABLE public.audit_logs ENABLE TRIGGER audit_logs_guard_change;
 
   PERFORM public.analysis_apply_node_metrics(
     (v_r2 ->> 'run_id')::uuid, '[{"uid":"N3","prominence":0.33}]'::jsonb, v_editor);
@@ -501,7 +505,11 @@ BEGIN
   -- assertion's subject; it is D66's, and WP 6.2 owns making `min_project_role`
   -- the one answer to who may write.
 
+  -- audit_logs is append-only (D186); clearing it is allowed only here, inside
+  -- this file's rolled-back transaction, by lifting the guard around the DELETE.
+  ALTER TABLE public.audit_logs DISABLE TRIGGER audit_logs_guard_change;
   DELETE FROM public.audit_logs WHERE plane = 'data' AND target_type = 'network_nodes';
+  ALTER TABLE public.audit_logs ENABLE TRIGGER audit_logs_guard_change;
   PERFORM set_config('app.current_user_id', v_analyst::text, true);  -- POISON
 
   PERFORM public.bulk_insert_network_nodes(

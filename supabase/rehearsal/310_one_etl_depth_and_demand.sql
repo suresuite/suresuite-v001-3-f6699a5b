@@ -518,7 +518,11 @@ BEGIN
   -- statement, so when that statement named nobody the derivation falls back to
   -- the project's modeler — a tier-3 write must name somebody, and `unknown` is
   -- not an option `audit-actor` allows.
+  -- audit_logs is append-only (D186); clearing it is allowed only here, inside
+  -- this file's rolled-back transaction, by lifting the guard around the DELETE.
+  ALTER TABLE public.audit_logs DISABLE TRIGGER audit_logs_guard_change;
   DELETE FROM public.audit_logs WHERE plane = 'data';
+  ALTER TABLE public.audit_logs ENABLE TRIGGER audit_logs_guard_change;
   PERFORM set_config('app.current_user_id', '', true);
   INSERT INTO public.inbound_logistics
     (project_id, plant_name, supplier_id, material_id, volume, time_unit)

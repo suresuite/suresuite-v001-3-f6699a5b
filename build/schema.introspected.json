@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 349,
-  "migrations_applied": 341,
+  "migrations_found": 350,
+  "migrations_applied": 342,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260924000001_bom_root_rows_are_not_edges.sql",
+  "last_migration": "20260929000001_audit_log_read_and_chain.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 284,
+    "functions": 290,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -2991,14 +2991,7 @@
           "default": null,
           "primary_key": false,
           "unique": false,
-          "references": {
-            "schema": "public",
-            "table": "approved_users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": "SET NULL"
-          },
+          "references": null,
           "added_by": "20260709000002_super_admin_phase1.sql"
         },
         {
@@ -3108,6 +3101,42 @@
           "unique": false,
           "references": null,
           "added_by": "20260916000001_data_plane_audit.sql"
+        },
+        {
+          "name": "seq",
+          "quoted": false,
+          "type": "bigint",
+          "type_raw": "bigint",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000001_audit_log_read_and_chain.sql"
+        },
+        {
+          "name": "prev_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000001_audit_log_read_and_chain.sql"
+        },
+        {
+          "name": "row_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000001_audit_log_read_and_chain.sql"
         }
       ],
       "constraints": [
@@ -3163,6 +3192,29 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260916000001_data_plane_audit.sql"
+        },
+        {
+          "name": "audit_logs_seq_key",
+          "unique": true,
+          "columns": [
+            "seq"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260929000001_audit_log_read_and_chain.sql"
+        },
+        {
+          "name": "audit_logs_unsealed_idx",
+          "unique": false,
+          "columns": [
+            "created_at",
+            "id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "seq IS NULL",
+          "partial": true,
+          "added_by": "20260929000001_audit_log_read_and_chain.sql"
         }
       ],
       "rls": {
@@ -3197,6 +3249,13 @@
             "id"
           ],
           "name": "admin_audit_logs_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "seq"
+          ],
+          "name": "audit_logs_seq_key"
         }
       ]
     },
@@ -21086,6 +21145,35 @@
       "defined_by": "20260710000001_model_validations.sql"
     },
     {
+      "name": "admin_audit_log_read",
+      "signature": "admin_audit_log_read(uuid, text, timestamptz, text, integer)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_since timestamptz",
+        "p_plane text DEFAULT NULL",
+        "p_limit integer DEFAULT 1000"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": "D185 — /admin/audit's read. The reader is a parameter and must be a super admin, ",
+      "defined_by": "20260929000001_audit_log_read_and_chain.sql"
+    },
+    {
+      "name": "admin_audit_log_verify",
+      "signature": "admin_audit_log_verify(uuid, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": "D186 — walks the audit_logs hash chain and names the first gap, broken link or edited ",
+      "defined_by": "20260929000001_audit_log_read_and_chain.sql"
+    },
+    {
       "name": "admin_copy_project",
       "signature": "admin_copy_project(uuid, text, uuid, text, uuid, uuid)",
       "args": [
@@ -21713,6 +21801,50 @@
       "defined_by": "20260918000002_actor_on_three_definer_writers.sql"
     },
     {
+      "name": "audit_log_digest",
+      "signature": "audit_log_digest(public.audit_logs)",
+      "args": [
+        "r public.audit_logs"
+      ],
+      "returns": "text LANGUAGE sql STABLE SET search_path",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": "D186 — sha256 over the previous row's hash, the row's position and every content ",
+      "defined_by": "20260929000001_audit_log_read_and_chain.sql"
+    },
+    {
+      "name": "audit_log_seal",
+      "signature": "audit_log_seal(boolean)",
+      "args": [
+        "_wait boolean DEFAULT false"
+      ],
+      "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D186 — chains every committed, unsealed audit_logs row onto the head. Runs ",
+      "defined_by": "20260929000001_audit_log_read_and_chain.sql"
+    },
+    {
+      "name": "audit_logs_guard",
+      "signature": "audit_logs_guard()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260929000001_audit_log_read_and_chain.sql"
+    },
+    {
+      "name": "audit_logs_seal_after_insert",
+      "signature": "audit_logs_seal_after_insert()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260929000001_audit_log_read_and_chain.sql"
+    },
+    {
       "name": "audit_tier_write",
       "signature": "audit_tier_write()",
       "args": [],
@@ -21720,7 +21852,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "Statement-level audit for every tier 2/3/4 write. One row per STATEMENT with a ",
-      "defined_by": "20260916000001_data_plane_audit.sql"
+      "defined_by": "20260929000001_audit_log_read_and_chain.sql"
     },
     {
       "name": "authenticate_approved_user",
@@ -21733,7 +21865,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20250820152955_871d761b-f2b9-44cb-9a68-9ca70b6016d4.sql"
+      "defined_by": "20260929000001_audit_log_read_and_chain.sql"
     },
     {
       "name": "authenticate_user",

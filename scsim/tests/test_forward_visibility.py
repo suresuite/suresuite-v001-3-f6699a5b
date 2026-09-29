@@ -1,3 +1,8 @@
+# SCSIM — supply chain simulation library and stress-test framework.
+# Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
+# release; see scsim/NOTICE.md for licensing, funding and citation.
+# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+
 """P-C.6 forward_visibility + P-P.1 forward_visible basis (§II.4 / §III-D.6).
 
 Golden #6: the WSC-2026 MTO coverage formula. Min-max levels must equal the

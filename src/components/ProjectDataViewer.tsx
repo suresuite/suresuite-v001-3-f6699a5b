@@ -291,7 +291,7 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
       <TableShell>
         <Table className={SMALL_TXT}>
           {/* ultra-compact table header */}
-          <TableHeader className="sticky top-0 bg-background z-10">
+          <TableHeader className="sticky top-0 z-10">
             <TableRow className="h-7">
               {cols.map((c) => (
                 <TableHead key={c} className={`${HEAD_CELL_PAD} ${SMALL_TXT}`}>{c}</TableHead>

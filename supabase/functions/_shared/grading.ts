@@ -790,9 +790,15 @@ export function gradeManifest(
   // reaches it — the block above only swept the BOM's materials, so an
   // unconnected master row (upload materials, forget its inbound lane) was
   // invisible until the engine raised.
+  //
+  // §4 D183 — ONLY the master rows that block does not already name. A material
+  // in the BOM AND the master with no lane was reported twice — the same field,
+  // the same material, two blocks — which is what turned `grading_test.ts` red
+  // on `main` from this sweep's first commit: one defect, counted as two.
+  const bomReported = new Set(unsourced);
   const masterUnsourced = dataset.materials
     .map((m) => String(m.material_id ?? "").trim())
-    .filter((m) => m && !arcMaterials.has(m))
+    .filter((m) => m && !arcMaterials.has(m) && !bomReported.has(m))
     .sort();
   if (masterUnsourced.length > 0) {
     out.push({

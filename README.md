@@ -84,3 +84,12 @@ The frontend builds with `vite build`; Vite loads `.env.production` for every
 production build, so the committed `VITE_*` flags there are the effective
 settings unless overridden by a Vercel dashboard environment variable of the
 same name.
+
+## Copyright and licensing
+
+Copyright © 2023–2026 Phu Nguyen. SuReSuite is part of the PhD thesis of Phu Nguyen
+(HWR Berlin) and all rights are reserved. The simulation library and stress-test
+framework in [`scsim/`](scsim/NOTICE.md) are results of the Horizon Europe project
+ACCURATE (GA 101138269) and are being prepared for open-access release — see
+[`COPYRIGHT.md`](COPYRIGHT.md) and the
+[release plan](docs/design/open-access-release-plan.md).

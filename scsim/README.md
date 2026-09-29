@@ -70,3 +70,9 @@ adding policy #22 cannot perturb policies #1–21 or the world (tested:
 G-RNG). Golden traces #1–#5 freeze the engine semantics; the pipeline
 schema snapshot (`scsim/pipeline_schema.json`) fails the build on
 accidental contract drift.
+
+## Copyright, licence and funding
+
+Copyright © 2023–2026 Phu Nguyen. SCSIM is being prepared for open-access release as a
+result of the Horizon Europe project ACCURATE (GA 101138269); until a `LICENSE` file is
+added here, all rights are reserved. See [`NOTICE.md`](NOTICE.md).

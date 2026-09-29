@@ -5,7 +5,7 @@ import { resolvePrimarySupplier } from "@/lib/sim/stressTargets";
 
 /**
  * Audit 2026-09-29 — the single-source audit's findings, PROVED rather than
- * described (PLAN.md §4 D180–D196, §16 · *Audit 2026-09-29*).
+ * described (PLAN.md §4 D187–D203, §16 · *Audit 2026-09-29*).
  *
  * Every `it.fails` below asserts the RULE — one fact, one author — and fails
  * today because the rule is broken. `it.fails` passes while its body fails, so
@@ -37,7 +37,7 @@ function latestFunctionBody(fn: string): string {
   throw new Error(`no migration defines public.${fn}`);
 }
 
-describe("D191 · a blank BOM consumption rate means 1.0 to the contract and the engine, 0 to the graph", () => {
+describe("D198 · a blank BOM consumption rate means 1.0 to the contract and the engine, 0 to the graph", () => {
   it("the contract declares 1.0 (the premise)", () => {
     expect(read("supabase/contract/bom_multi_level.contract.yaml")).toMatch(/missing_default: "1\.0"/);
     expect(read("sim-worker/sim_worker/datamap.py")).toMatch(/or 1\.0/);
@@ -47,7 +47,7 @@ describe("D191 · a blank BOM consumption rate means 1.0 to the contract and the
   });
 });
 
-describe("D181 · 'primary supplier' has three authors", () => {
+describe("D188 · 'primary supplier' has three authors", () => {
   // M1 is bought from A (100/wk at 10) and B (10/wk at 5). The engine's primary
   // link is the CHEAPEST (`scsim/scsim/core/context.py`: sorted by cost, lead
   // time, id) — B. M2 is bought only from B. So the engine orders M1 and M2 from
@@ -68,7 +68,7 @@ describe("D181 · 'primary supplier' has three authors", () => {
   });
 });
 
-describe("D182 · the Supplier grid's demand placeholder is not the engine's demand", () => {
+describe("D189 · the Supplier grid's demand placeholder is not the engine's demand", () => {
   it.fails("it sums a product's outbound lanes (the engine sums; the grid averages)", () => {
     expect(read("src/hooks/useStageRows.tsx")).not.toMatch(/const dPerDay = avg\(outVolByProduct\.get\(parent\)/);
   });
@@ -79,7 +79,7 @@ describe("D182 · the Supplier grid's demand placeholder is not the engine's dem
   });
 });
 
-describe("D183 · the Data Map names a demand-distribution default the engine does not use", () => {
+describe("D190 · the Data Map names a demand-distribution default the engine does not use", () => {
   it("the engine takes the SCENARIO's kind before triangular (the premise)", () => {
     expect(read("scsim/scsim/io/project_map.py")).toMatch(
       /if product_dist:[\s\S]{0,120}if scenario_model and scenario_model\.get\("kind"\):[\s\S]{0,120}return "triangular"/,
@@ -93,7 +93,7 @@ describe("D183 · the Data Map names a demand-distribution default the engine do
   });
 });
 
-describe("D184 · which BOM table a project uses has five authors", () => {
+describe("D191 · which BOM table a project uses has five authors", () => {
   it("the engine and the lane fallback pick by ROW PRESENCE (the premise)", () => {
     expect(read("sim-worker/sim_worker/datamap.py")).toMatch(/if not bom:\s*\n\s*bom = await rows\("bom_single_level"/);
     expect(read("src/lib/policies/projectLanes.ts")).toMatch(/multi\.length > 0 \? "bom_multi_level" : "bom_single_level"/);
@@ -110,7 +110,7 @@ describe("D184 · which BOM table a project uses has five authors", () => {
   });
 });
 
-describe("D185 · `projects.bom_level` has two spellings of 'multi'", () => {
+describe("D192 · `projects.bom_level` has two spellings of 'multi'", () => {
   it.fails("the admin page recognises the value the project page writes", () => {
     expect(read("src/pages/DataManager.tsx")).toMatch(/<RadioGroupItem value="multi"/);
     // AdminProjects labels anything but 'multi_level' as "single BOM".
@@ -118,7 +118,7 @@ describe("D185 · `projects.bom_level` has two spellings of 'multi'", () => {
   });
 });
 
-describe("D186 · /network/interactive-space tests a HEAD count through `data`, which postgrest-js leaves null", () => {
+describe("D193 · /network/interactive-space tests a HEAD count through `data`, which postgrest-js leaves null", () => {
   it("postgrest-js never sets `data` on a HEAD request (the premise)", () => {
     const lib = read("node_modules/@supabase/postgrest-js/dist/cjs/PostgrestBuilder.js");
     expect(lib).toMatch(/let data = null;[\s\S]{0,400}if \(this\.method !== 'HEAD'\)/);

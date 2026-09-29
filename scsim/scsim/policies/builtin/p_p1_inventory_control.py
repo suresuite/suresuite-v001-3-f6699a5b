@@ -1,3 +1,8 @@
+# SCSIM — supply chain simulation library and stress-test framework.
+# Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
+# release; see scsim/NOTICE.md for licensing, funding and citation.
+# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+
 """P-P.1 inventory_control — BUILT_IN buffer (Part IV §4.1). ✅ min_max.
 
 Context: the everyday replenishment rule — the baseline shock absorber every
@@ -14,6 +19,8 @@ max(S_m − position, MOQ) when position < s_m, on the material's primary
 from __future__ import annotations
 
 from typing import ClassVar, Literal, Optional
+
+import logging
 
 import numpy as np
 from pydantic import Field, field_validator, model_validator
@@ -48,6 +55,8 @@ from scsim.policies.base import (
     PolicyPlugin,
 )
 from scsim.policies.registry import register_plugin
+
+_log = logging.getLogger(__name__)
 
 
 def _primary_link_lts(net: Network) -> dict[str, int]:
@@ -292,6 +301,14 @@ class InventoryControl(PolicyPlugin):
         kappa = self._kappa(ctx)
         _types, _q, k_ov, s_abs, S_abs = self._override_arrays(m)
         kappa_vec = np.where(np.isnan(k_ov), float(kappa), k_ov)
+
+        # κ diagnostics (9bf05df). DEBUG-level, not print(): PH70 runs every
+        # simulated week of every replication, in the worker and the browser.
+        if _log.isEnabledFor(logging.DEBUG):
+            _log.debug("kappa (strip value): %s", kappa)
+            _log.debug("k_ov (per-mat override): %s", k_ov)
+            _log.debug("kappa_vec (effective): %s", kappa_vec)
+
         if self.params.basis == "forward_visible":
             # §II.4 Forward-visible schedule (WSC-2026 MTO), inclusive windows:
             # s_m[t] = Σ_{τ=t}^{t+T_s} D̂_m[τ]; S_m[t] = Σ_{τ=t}^{t+T_s+κ} D̂_m[τ].

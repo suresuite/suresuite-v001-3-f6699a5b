@@ -1,3 +1,8 @@
+# SCSIM — supply chain simulation library and stress-test framework.
+# Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
+# release; see scsim/NOTICE.md for licensing, funding and citation.
+# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+
 """P-S.2 proactive_multi_sourcing: splitting, slice-wise exposure, premiums,
 rebalancing — and the M5 exit criterion ({P-P.3, P-P.5} synergy positive)."""
 from __future__ import annotations
