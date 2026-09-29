@@ -13,16 +13,14 @@ import { StagePolicyTable } from "./StagePolicyTable";
 import { MobileStagePolicyList } from "./MobileStagePolicyList";
 import { MobileGroup, MobileNote, MobilePanel, MobileRow } from "@/components/mobile";
 import { PolicyDefaultsCard } from "./PolicyDefaultsCard";
-import { ApplyPresetDialog } from "./ApplyPresetDialog";
 import { PresetDiffBanner } from "./PresetDiffBanner";
 import { LaneTruncationNotice } from "@/components/policies/LaneTruncationNotice";
 import { RunValidateStage } from "./RunValidateStage";
 import { getStage, type StageKey } from "@/lib/policies/stages";
 import type { StageRowsQuery } from "@/hooks/useStageGuards";
-import { getStagePresets } from "@/lib/policies/presets/stagePresets";
 import type { OverrideRow } from "@/lib/policies/resolve";
 import type { FulfillmentStrategy, PolicyBundle, PolicyFamily } from "@/lib/policies/schemas";
-import type { PresetDefinition, ProjectContext, ResolvedPreset } from "@/lib/policies/resolvePreset";
+import type { ProjectContext } from "@/lib/policies/resolvePreset";
 import { FIELD_LABELS, visibleFieldGroups } from "@/lib/policies/schemas";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import {
@@ -44,7 +42,6 @@ interface Props {
   saveDefault: <F extends PolicyFamily>(family: F, value: PolicyBundle[F]) => Promise<void>;
   bulkUpsertOverrides: (rows: OverrideRow[]) => Promise<void>;
   deleteOverride?: (scope: "node" | "edge", targetKey: string, family: PolicyFamily) => Promise<void>;
-  applyResolvedPreset: (slug: string, families: PolicyFamily[], bundle: PolicyBundle) => Promise<void>;
   clearActivePreset: () => Promise<void>;
   saveSnapshot: (label?: string) => Promise<string | null>;
   /** Policy-version context for the Run & Validate credibility card (§9.5). */
@@ -68,7 +65,6 @@ export function FocusedStage({
   saveDefault,
   bulkUpsertOverrides,
   deleteOverride,
-  applyResolvedPreset,
   clearActivePreset,
   saveSnapshot,
   selectedVersionId,
@@ -77,8 +73,6 @@ export function FocusedStage({
 }: Props) {
   const stage = getStage(stageKey);
   const isMobile = useIsMobile();
-  const presets = useMemo(() => getStagePresets(stageKey), [stageKey]);
-  const [presetDraft, setPresetDraft] = useState<PresetDefinition | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -91,17 +85,6 @@ export function FocusedStage({
     activePreset != null &&
     !bannerDismissed &&
     activePreset.startsWith(`${stageKey}:`);
-
-  const onApplyPreset = async (resolved: ResolvedPreset, families: PolicyFamily[]) => {
-    const scoped = families.filter((f) => stage.families.includes(f));
-    if (scoped.length === 0) {
-      toast.warning("No changes for this stage.");
-      return;
-    }
-    await applyResolvedPreset(resolved.slug, scoped, resolved.bundle);
-    setBannerDismissed(false);
-    toast.success(`Applied "${resolved.name}" to ${stage.title}`);
-  };
 
   const handleExport = () => {
     const wb = exportStageWorkbook(stage.title, stage.families, defaults, stageOverrides);
@@ -185,27 +168,6 @@ export function FocusedStage({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button size="sm" variant="outline" className="h-[26px] px-2.5 text-[11.5px]">
-            Apply preset ▾
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[min(340px,calc(100vw-1.5rem))]">
-          {presets.map((p) => (
-            <DropdownMenuItem
-              key={p.slug}
-              onClick={() => setPresetDraft(p)}
-              className="flex flex-col items-start gap-0.5 py-1.5"
-            >
-              <span className="text-[12px] font-medium">{p.name}</span>
-              <span className="font-mono text-[10.5px] text-muted-foreground line-clamp-2">
-                {p.description}
-              </span>
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
     </>
   );
 
@@ -229,8 +191,8 @@ export function FocusedStage({
   );
 
   // Mobile: check/verify, not configure (spec — see MobileStagePolicyList's own
-  // header comment). No filter/sort/bulk-edit toolbar, no "apply a preset"
-  // dropdown, no preset-applied banner (the banner exists to explain a bulk
+  // header comment). No filter/sort/bulk-edit toolbar, no preset-applied
+  // banner (the banner exists to explain a bulk
   // change that can't happen from here), and the fulfillment defaults render
   // as a plain read-only summary instead of PolicyDefaultsCard's form.
   if (isMobile) {
@@ -317,14 +279,6 @@ export function FocusedStage({
         />
       )}
 
-      <ApplyPresetDialog
-        open={presetDraft != null}
-        onOpenChange={(o) => !o && setPresetDraft(null)}
-        preset={presetDraft}
-        ctx={ctx}
-        currentBundle={defaults}
-        onApply={onApplyPreset}
-      />
     </div>
   );
 }

@@ -152,7 +152,6 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
     setSelectedVersionId,
     restoreVersion,
     saveDefault,
-    applyResolvedPreset,
     clearActivePreset,
     bulkUpsertOverrides,
     deleteOverride,
@@ -443,7 +442,6 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
               saveDefault={saveDefault}
               bulkUpsertOverrides={bulkUpsertOverrides}
               deleteOverride={deleteOverride}
-              applyResolvedPreset={applyResolvedPreset}
               clearActivePreset={clearActivePreset}
               saveSnapshot={saveSnapshot}
               selectedVersionId={selectedVersionId}
