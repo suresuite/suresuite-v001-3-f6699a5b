@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 352,
-  "migrations_applied": 344,
+  "migrations_found": 353,
+  "migrations_applied": 345,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260929000003_account_self_service_names_its_user.sql",
+  "last_migration": "20260930000002_admin_delete_organization.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 299,
+    "functions": 301,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -21138,6 +21138,20 @@
       "defined_by": "20260917000002_graph_hash_v2.sql"
     },
     {
+      "name": "_delete_project_rows",
+      "signature": "_delete_project_rows(uuid, uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_user_id uuid",
+        "p_user_email text"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D170/D208 — THE project sweep: removes one project and everything scoped to it, ",
+      "defined_by": "20260930000002_admin_delete_organization.sql"
+    },
+    {
       "name": "_delete_workspace_objects",
       "signature": "_delete_workspace_objects(text[])",
       "args": [
@@ -21273,6 +21287,21 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260711000003_admin_management_rpcs.sql"
+    },
+    {
+      "name": "admin_delete_organization",
+      "signature": "admin_delete_organization(uuid, text, uuid, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_org_id uuid",
+        "p_confirm_slug text"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D208 — PERMANENTLY deletes an organization, its projects (each through ",
+      "defined_by": "20260930000002_admin_delete_organization.sql"
     },
     {
       "name": "admin_delete_project",
@@ -22857,7 +22886,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "D170 — deletes ONE project and everything scoped to it in a single transaction: ",
-      "defined_by": "20260922000009_delete_project_row_first.sql"
+      "defined_by": "20260930000002_admin_delete_organization.sql"
     },
     {
       "name": "delete_simulation_result",

@@ -11451,7 +11451,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": "one of active / suspended",
-        "meaning": "Whether the tenant is live — `active` or `suspended`, CHECK-constrained to those two. Set through `admin_set_org_status`.",
+        "meaning": "Whether the tenant is live — `active` or `suspended`, CHECK-constrained to those two. Set through `admin_set_org_status`. Suspension is the REVERSIBLE verb; removing a tenant is `admin_delete_organization` (§4 D208), which deletes the row rather than setting a status.",
         "primaryKey": false,
         "unique": false,
         "references": null,

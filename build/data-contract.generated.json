@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 352,
-      "migrations_applied": 344,
-      "last_migration": "20260929000003_account_self_service_names_its_user.sql"
+      "migrations_found": 353,
+      "migrations_applied": 345,
+      "last_migration": "20260930000002_admin_delete_organization.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -17569,7 +17569,7 @@
         "min_project_role": "viewer",
         "audited": true,
         "rls_enabled": true,
-        "note": "`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first."
+        "note": "`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status` / `admin_delete_organization`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that takes the organization's projects and accounts with it, and is a different verb from suspension. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first."
       },
       "rls": {
         "enabled": true,
@@ -17776,7 +17776,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "Whether the tenant is live — `active` or `suspended`, CHECK-constrained to those two. Set through `admin_set_org_status`.",
+          "meaning": "Whether the tenant is live — `active` or `suspended`, CHECK-constrained to those two. Set through `admin_set_org_status`. Suspension is the REVERSIBLE verb; removing a tenant is `admin_delete_organization` (§4 D208), which deletes the row rather than setting a status.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -31025,5 +31025,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "ff8dd81afee0"
+  "contract_version": "6cd1e7f89e68"
 }

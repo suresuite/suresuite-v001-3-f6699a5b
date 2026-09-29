@@ -40,7 +40,7 @@ partially or get corrected — the write fails.
 | Row-level security | enabled |
 | Policies on the table | 2 — all carry a predicate |
 
-`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first.
+`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status` / `admin_delete_organization`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that takes the organization's projects and accounts with it, and is a different verb from suspension. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first.
 
 <details><summary>2 RLS policies</summary>
 
@@ -74,7 +74,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `name` | — | `text` | — | — | The organization's display name, as an administrator typed it. EDITABLE and NOT UNIQUE — two organizations may legitimately share one. It is a label for humans and it is never an identity. |
 | `slug` | — | `text` | — | — | A URL-safe form of the name, `lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'))` at the moment the row was seeded. UNIQUE, and deliberately NOT recomputed on rename — so after a rename it is a record of what the organization used to be called, which is what makes it usable to match rows written before it. |
 | `owner_user_id` | — | `uuid` | — | — | The approved user who owns the tenant. Advisory today — nothing in RLS or any RPC reads it; ownership is expressed through `organization_members.org_role = 'owner'`. Two places holding the same fact is an I1 violation waiting to diverge; WP 2.2 owns the resolution. |
-| `status` | — | `text` | — | — | Whether the tenant is live — `active` or `suspended`, CHECK-constrained to those two. Set through `admin_set_org_status`. |
+| `status` | — | `text` | — | — | Whether the tenant is live — `active` or `suspended`, CHECK-constrained to those two. Set through `admin_set_org_status`. Suspension is the REVERSIBLE verb; removing a tenant is `admin_delete_organization` (§4 D208), which deletes the row rather than setting a status. |
 | `settings` | — | `jsonb` | — | — | Per-tenant configuration, free-form. No key of it is read by any migration, edge function or page today; it is a forward-declared extension point. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the organization was created. Server-stamped. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the row was last modified. Server-stamped by DEFAULT only — no trigger maintains it, and `admin_update_organization` does not set it, so a renamed organization still shows its creation time here. |
@@ -142,7 +142,7 @@ The approved user who owns the tenant. Advisory today — nothing in RLS or any 
 
 ### `status`
 
-Whether the tenant is live — `active` or `suspended`, CHECK-constrained to those two. Set through `admin_set_org_status`.
+Whether the tenant is live — `active` or `suspended`, CHECK-constrained to those two. Set through `admin_set_org_status`. Suspension is the REVERSIBLE verb; removing a tenant is `admin_delete_organization` (§4 D208), which deletes the row rather than setting a status.
 
 | | |
 |---|---|
@@ -200,6 +200,6 @@ When the row was last modified. Server-stamped by DEFAULT only — no trigger ma
 
 ---
 
-*Generated from data contract `ff8dd81afee0`, engine `0.2.8`,
+*Generated from data contract `6cd1e7f89e68`, engine `0.2.8`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
