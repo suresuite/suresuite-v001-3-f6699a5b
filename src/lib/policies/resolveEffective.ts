@@ -3,6 +3,7 @@ import type { PolicyBundle, PolicyFamily } from "./schemas";
 import type { ColSpec } from "./columnSpecs";
 import { reducerLabel, type DerivedValue } from "./effectiveEconomics";
 import { shadowedBy } from "./registryAccess";
+import { engineChainFor } from "./dataMap";
 import type { Provenance } from "@/components/policies/policyGridUi";
 
 /**
@@ -45,12 +46,20 @@ export function masterValueFor(
   col: ColSpec,
   row: Record<string, unknown>,
   masterRowById: MasterRowMaps,
-): number | undefined {
+): number | string | undefined {
   if (!col.master) return undefined;
   const id = String(row[col.master.idFrom] ?? "");
   const v = masterRowById[col.master.table].get(id)?.[col.master.field];
+  if (v == null) return undefined;
+  // A text or enum master column is read as the string it is. Through
+  // `Number(...)` a lead-time distribution became NaN and then "unset", so the
+  // grid could never show one (see `ColSpec.master.valueKind`).
+  if (col.master.valueKind === "text" || col.master.valueKind === "enum") {
+    const s = String(v).trim();
+    return s === "" ? undefined : s;
+  }
   const n = Number(v);
-  return v == null || !Number.isFinite(n) ? undefined : n;
+  return Number.isFinite(n) ? n : undefined;
 }
 
 export function derivedValueFor(
@@ -235,9 +244,11 @@ export interface ResolvedCell {
   derivedVia?: DerivedValue;
   /**
    * This cell is EDITABLE and the engine will not read it, because another
-   * field outranks it (§4 D167). Today the only case is the plant grid's
+   * field outranks it (§4 D167). Two cases today: the plant grid's
    * `capacity_units_per_day` / `utilization_cap_pct` under a product that
-   * carries a master `products.production_capacity`.
+   * carries a master `products.production_capacity`, and the supplier grid's
+   * `holding_cost_pct` under a material that carries a master
+   * `materials.holding_cost_pct`.
    *
    * Not a provenance state: the cell's own value still comes from wherever the
    * dot says it does. What is false is the IMPLICATION that typing here
@@ -255,9 +266,9 @@ export interface ResolvedCell {
 export function supersededNote(shadowingField: string, label: string): string {
   return (
     `Not applied on this row. ${shadowingField} has a value, and the engine ` +
-    `reads the item master before the plant grid — so the run uses that ` +
-    `number and this ${label} is stored but ignored. Clear the master value ` +
-    `to make this cell decide the capacity again.`
+    `reads the item master first — so the run uses that number and this ` +
+    `${label} is stored but ignored. Clear the ${shadowingField} value to make ` +
+    `this cell apply again.`
   );
 }
 
@@ -314,7 +325,8 @@ export function resolveCell(args: {
    *
    * Asked of the registry, per row. `shadowedBy` returns the `dataset.column`
    * that outranks this bundle key — `products.production_capacity` for the
-   * plant grid's two capacity cells — and the row is shadowed when the master
+   * plant grid's two capacity cells, `materials.holding_cost_pct` for the
+   * holding cost — and the row is shadowed when the master
    * column named there carries a value. The master COLUMN is found through
    * `masterColByField`, which already knows which row field holds the id, so
    * this needs no second convention for resolving `dataset.column` against a
@@ -323,8 +335,14 @@ export function resolveCell(args: {
   const shadowField = col.master ? undefined : shadowedBy(col.field);
   let supersededBy: ResolvedCell["supersededBy"];
   if (shadowField) {
-    const [, shadowCol] = shadowField.split(".");
-    const spec = shadowCol ? masterColByField.get(shadowCol) : undefined;
+    // Matched on the master POINTER, not the grid's field id: the two agree for
+    // `production_capacity` and differ on purpose for `holding_cost_pct`, whose
+    // master column renders as `material_holding_cost_pct` beside the policy
+    // column of the same name.
+    const [shadowTable, shadowCol] = shadowField.split(".");
+    const spec = [...masterColByField.values()].find(
+      (c) => c.master?.table === shadowTable && c.master?.field === shadowCol,
+    );
     if (spec && masterValueFor(spec, row, masterRowById) !== undefined) {
       supersededBy = {
         field: shadowField,
@@ -353,8 +371,10 @@ export function resolveCell(args: {
    * of inventing a number.
    */
   const nullMeans = col.master?.nullMeans;
+  // A master column that declares its `valueKind` is never given the `0`: its
+  // empty state is resolved by the engine, and the tooltip below says how.
   const liveDefault = col.master
-    ? derivedVal ?? (nullMeans ? undefined : 0)
+    ? derivedVal ?? (nullMeans || col.master.valueKind ? undefined : 0)
     : bundleVal !== undefined
       ? bundleVal
       : col.defaultWhenMissing !== undefined
@@ -385,6 +405,15 @@ export function resolveCell(args: {
   // because for a master column there is nothing else left.
   const declaredEmpty =
     !edited && !!nullMeans && !masterSet && derivedVal === undefined && cellValue === undefined;
+  // Empty, nothing derived, no declared meaning — and the column opted out of
+  // the `0`. What the engine does instead is the Data Map's chain for this
+  // column, shown where the blank is (T2) rather than only on the Data Map.
+  const engineResolvesEmpty =
+    !edited && !!col.master?.valueKind && !masterSet && derivedVal === undefined && !nullMeans &&
+    cellValue === undefined;
+  const emptyChain = engineResolvesEmpty
+    ? engineChainFor(col.master!.table, col.master!.field)
+    : undefined;
   const fromOverride =
     !edited &&
     !imputed &&
@@ -424,7 +453,11 @@ export function resolveCell(args: {
     liveDefault,
     edited,
     placeholder: declaredEmpty ? nullMeans!.token : undefined,
-    placeholderTitle: declaredEmpty ? nullMeans!.title : undefined,
+    placeholderTitle: declaredEmpty
+      ? nullMeans!.title
+      : emptyChain
+        ? `Not set. The engine resolves an empty value as: ${emptyChain}.`
+        : undefined,
     derivedVia: derivedFallback ? derivedVia : undefined,
     supersededBy,
   };

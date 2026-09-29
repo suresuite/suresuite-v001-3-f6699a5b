@@ -54,6 +54,25 @@ export interface ColSpec {
      * reader looks to find out what this column is (`single-source`, I1).
      */
     nullMeans?: { token: string; title: string };
+    /**
+     * What KIND of value the master column holds.
+     *
+     * ABSENT means numeric, and absent keeps the behaviour every master column
+     * had before the item-master editor was retired: an empty cell with no
+     * derived fallback shows `0`. Every column that DECLARES a kind renders its
+     * empty state as empty instead — blank, with the engine's own fallback
+     * chain in the tooltip (`dataMap.ts`) — because for these fields empty is a
+     * choice the engine resolves (the scenario's CV, a symmetric triangle, a
+     * deterministic lead time), and a `0` would state a value nobody entered
+     * (§4 D17's class).
+     *
+     * `text` and `enum` exist because the grid used to read a master value
+     * through `Number(...)`, which turned every lead-time distribution and
+     * fulfillment mode into `NaN` and then into "no value".
+     */
+    valueKind?: "number" | "text" | "enum";
+    /** The choices for an `enum` master column — only values the engine runs. */
+    options?: readonly { value: string; label: string }[];
   };
   /**
    * Type-specific inventory level/lot params (reorder point, order-up-to, lot Q,
@@ -115,6 +134,28 @@ const pendingCol = (field: string, family: PolicyFamily): ColSpec => {
     engineStatus: st.state === "pending" ? st : undefined,
   };
 };
+
+// ---------- item-master enums ----------
+// The values `scsim/scsim/io/project_map.py` actually RUNS, moved here from the
+// retired item-master editor with its reasoning intact: `ato` parses but
+// hard-errors at compile, `empirical` lead times and `bootstrap` demand are not
+// runnable yet — none of them is offered, and the write RPCs reject them as a
+// second line.
+const LEAD_TIME_DIST_OPTIONS = [
+  { value: "deterministic", label: "Deterministic" },
+  { value: "lognormal", label: "Lognormal" },
+  { value: "gamma", label: "Gamma" },
+] as const;
+const FULFILLMENT_MODE_OPTIONS = [
+  { value: "mto", label: "Make-to-order" },
+  { value: "mts", label: "Make-to-stock" },
+] as const;
+const DEMAND_DISTRIBUTION_OPTIONS = [
+  { value: "triangular", label: "Triangular" },
+  { value: "deterministic", label: "Deterministic" },
+  { value: "poisson", label: "Poisson" },
+  { value: "negbin", label: "Negative binomial" },
+] as const;
 
 // ---------- gating helpers ----------
 const plantNeedsInventory: ColSpec["visibleWhen"] = ({ fulfillmentStrategy }) =>
@@ -222,6 +263,29 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("reliability_score", "sourcing", {
         master: { table: "suppliers", field: "reliability_score", idFrom: "supplier_id" },
       }),
+      // THE ITEM-MASTER EDITOR'S OTHER COLUMNS, NOW HERE. /policies is the one
+      // place item-master economics are edited; the editor on /project-manager
+      // was retired once every field it wrote had a column on this grid. The CSV
+      // item-master upload stays the bulk path.
+      //
+      // The engine applies a material's lead-time distribution to EVERY
+      // supplier link of that material, so the value is per material and shows
+      // the same on each of its supplier rows.
+      col("material_lead_time_dist", "sourcing", {
+        master: {
+          table: "materials", field: "lead_time_dist", idFrom: "material_id",
+          valueKind: "enum", options: LEAD_TIME_DIST_OPTIONS,
+        },
+      }),
+      col("material_lead_time_cv", "sourcing", {
+        master: { table: "materials", field: "lead_time_cv", idFrom: "material_id", valueKind: "number" },
+      }),
+      col("material_name", "sourcing", {
+        master: { table: "materials", field: "name", idFrom: "material_id", valueKind: "text" },
+      }),
+      col("supplier_name", "sourcing", {
+        master: { table: "suppliers", field: "name", idFrom: "supplier_id", valueKind: "text" },
+      }),
 
       // Policy Type → dynamic parameters (§II.1–II.3). The type drives which
       // level/lot params below are editable; the params' schemas come from the
@@ -257,6 +321,12 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // waiting to happen — the three copies must read the same number.
       col("safety_stock_days", "inventory", { defaultWhenMissing: 7 }),
       col("holding_cost_pct", "inventory", { defaultWhenMissing: 0.2 }),
+      // The material's OWN holding rate. The engine reads it BEFORE the policy
+      // column beside it, so when it is set the policy value is not applied —
+      // the registry declares that (`shadowed_by`) and the policy cell says so.
+      col("material_holding_cost_pct", "inventory", {
+        master: { table: "materials", field: "holding_cost_pct", idFrom: "material_id", valueKind: "number" },
+      }),
 
       // Transport family: stored + versioned today, consumed when the P-T.x
       // catalog policies land — visible-disabled with the milestone badge.
@@ -286,6 +356,34 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       }),
       col("demand_mean", "production", {
         master: { table: "products", field: "demand_mean", idFrom: "product_id" },
+      }),
+      // The rest of the product's demand and fulfillment economics — the
+      // item-master editor's columns, now here (see the supplier stage).
+      // `demand_min` / `demand_max` bound a TRIANGULAR demand only; the engine
+      // ignores them for the other distributions.
+      col("product_fulfillment_mode", "production", {
+        master: {
+          table: "products", field: "fulfillment_mode", idFrom: "product_id",
+          valueKind: "enum", options: FULFILLMENT_MODE_OPTIONS,
+        },
+      }),
+      col("product_demand_distribution", "production", {
+        master: {
+          table: "products", field: "demand_distribution", idFrom: "product_id",
+          valueKind: "enum", options: DEMAND_DISTRIBUTION_OPTIONS,
+        },
+      }),
+      col("product_demand_cv", "production", {
+        master: { table: "products", field: "demand_cv", idFrom: "product_id", valueKind: "number" },
+      }),
+      col("product_demand_min", "production", {
+        master: { table: "products", field: "demand_min", idFrom: "product_id", valueKind: "number" },
+      }),
+      col("product_demand_max", "production", {
+        master: { table: "products", field: "demand_max", idFrom: "product_id", valueKind: "number" },
+      }),
+      col("product_name", "production", {
+        master: { table: "products", field: "name", idFrom: "product_id", valueKind: "text" },
       }),
       col("capacity_units_per_day", "production", { defaultWhenMissing: 1000 }),
       // THE OTHER HALF OF THE ARITHMETIC, AND IT HAD NO COLUMN (§4 D167). The
@@ -460,12 +558,17 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   material_moq: { sub: "units · master", w: 84, kind: "int", prio: 5 },
   capacity_per_week: { sub: "units / wk · master", w: 96, kind: "int", prio: 4 },
   reliability_score: { sub: "0–1 · master", w: 84, kind: "num", dec: 2, prio: 3 },
+  material_lead_time_dist: { sub: "lead time · master", w: 112, kind: "text", align: "left", prio: 2 },
+  material_lead_time_cv: { sub: "0–1 · master", w: 84, kind: "num", dec: 2, prio: 2 },
+  material_name: { sub: "master", w: 120, kind: "text", align: "left", prio: 1 },
+  supplier_name: { sub: "master", w: 120, kind: "text", align: "left", prio: 1 },
   // ---- inventory (shared by supplier + plant)
   type: { sub: "s,S · S · R,Q · T,S", w: 152, kind: "type", keep: true, filterable: false, align: "left" },
   __inv_params: { sub: "levels & lot sizes", w: 184, kind: "vector", keep: true, filterable: false, align: "left" },
   initial_on_hand: { sub: "units", w: 88, kind: "int", prio: 6 },
   safety_stock_days: { sub: "days · 0–84", w: 76, kind: "int", unit: "d", keep: true },
   holding_cost_pct: { sub: "frac / yr", w: 72, kind: "num", dec: 2, prio: 7 },
+  material_holding_cost_pct: { sub: "frac / yr · master", w: 96, kind: "num", dec: 2, prio: 6 },
   service_level_target: { sub: "0–1", w: 84, kind: "num", dec: 2, prio: 7 },
   // ---- supplier · transport (engine-pending)
   mode: { sub: "pending", w: 76, kind: "text", quiet: true, prio: 2 },
@@ -474,6 +577,12 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   sell_price: { sub: "€ / unit · master", w: 92, kind: "num", dec: 2, unit: "€", keep: true },
   production_capacity: { sub: "units / wk · master", w: 100, kind: "int", prio: 5 },
   demand_mean: { sub: "units / wk · master", w: 100, kind: "int", prio: 4 },
+  product_fulfillment_mode: { sub: "MTO · MTS · master", w: 120, kind: "text", align: "left", prio: 3 },
+  product_demand_distribution: { sub: "demand · master", w: 120, kind: "text", align: "left", prio: 3 },
+  product_demand_cv: { sub: "≥ 0 · master", w: 84, kind: "num", dec: 2, prio: 3 },
+  product_demand_min: { sub: "units / wk · master", w: 100, kind: "int", prio: 2 },
+  product_demand_max: { sub: "units / wk · master", w: 100, kind: "int", prio: 2 },
+  product_name: { sub: "master", w: 120, kind: "text", align: "left", prio: 1 },
   capacity_units_per_day: { sub: "units / day", w: 96, kind: "int", keep: true },
   utilization_cap_pct: { sub: "% of line capacity", w: 84, kind: "int", unit: "%", prio: 6 },
   allocation_priority_weight: { sub: "weight", w: 76, kind: "num", dec: 2, prio: 9 },
@@ -502,6 +611,17 @@ export const SHORT_LABEL: Record<string, string> = {
   material_moq: "MOQ",
   capacity_per_week: "Capacity",
   reliability_score: "Reliability",
+  material_lead_time_dist: "Lead-time dist.",
+  material_lead_time_cv: "Lead-time CV",
+  material_name: "Material name",
+  supplier_name: "Supplier name",
+  material_holding_cost_pct: "Holding (material)",
+  product_fulfillment_mode: "Fulfillment",
+  product_demand_distribution: "Demand dist.",
+  product_demand_cv: "Demand CV",
+  product_demand_min: "Demand min",
+  product_demand_max: "Demand max",
+  product_name: "Product name",
   type: "Policy type",
   __inv_params: "Replenishment",
   initial_on_hand: "Initial stock",

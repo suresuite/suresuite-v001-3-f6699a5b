@@ -130,7 +130,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: []
       hybrid: null
       on_conflict: assertion_wins
@@ -169,7 +169,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: []
       hybrid: null
       on_conflict: assertion_wins
@@ -211,7 +211,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form, policy_grid]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: []
       hybrid: null
       on_conflict: assertion_wins
@@ -246,7 +246,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: []
       hybrid: null
       on_conflict: assertion_wins
@@ -281,7 +281,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: [observations.stock_counts (Phase 7+)]
       hybrid: null
       on_conflict: assertion_wins
@@ -316,7 +316,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: [observations.receipts (Phase 7+)]
       hybrid: null
       on_conflict: assertion_wins
@@ -354,7 +354,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: [observations.receipts (Phase 7+)]
       hybrid: null
       on_conflict: assertion_wins

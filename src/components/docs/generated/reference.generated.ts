@@ -1544,7 +1544,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:418"
       },
       {
         "page": "InteractiveNetworkSpace.tsx",
@@ -1907,7 +1907,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:418"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -5045,7 +5045,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:418"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -8480,7 +8480,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc delete_project_dataset",
-        "evidence": "src/pages/DataManager.tsx:697"
+        "evidence": "src/pages/DataManager.tsx:702"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -8748,7 +8748,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:418"
       },
       {
         "page": "ProductLevelNetwork.tsx",
@@ -9153,7 +9153,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:418"
       },
       {
         "page": "ProductLevelNetwork.tsx",
@@ -10289,7 +10289,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_node_list",
-        "evidence": "src/pages/DataManager.tsx:425"
+        "evidence": "src/pages/DataManager.tsx:430"
       },
       {
         "page": "FirmLevelNetwork.tsx",
@@ -11471,7 +11471,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:418"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -14611,7 +14611,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/DataManager.tsx:200"
+        "evidence": "src/pages/DataManager.tsx:205"
       },
       {
         "page": "DeveloperApi.tsx",
@@ -17603,7 +17603,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc combine_project_into_supply_chain",
-        "evidence": "src/pages/DataManager.tsx:640"
+        "evidence": "src/pages/DataManager.tsx:645"
       },
       {
         "page": "FirmLevelNetwork.tsx",
@@ -17623,7 +17623,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc assign_material_supplier",
-        "evidence": "src/components/policies/StagePolicyTable.tsx:258"
+        "evidence": "src/components/policies/StagePolicyTable.tsx:262"
       },
       {
         "page": "SimulationLab.tsx",
@@ -18174,7 +18174,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc combine_project_into_supply_chain",
-        "evidence": "src/pages/DataManager.tsx:640"
+        "evidence": "src/pages/DataManager.tsx:645"
       },
       {
         "page": "InteractiveNetworkSpace.tsx",

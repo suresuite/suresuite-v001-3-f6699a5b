@@ -207,8 +207,9 @@ On the right edge of the card is a **toolbar** (only fully shown to the owner/ad
 - **View data** (eye) — expands an inline `ProjectDataViewer` below the card to inspect
   uploaded rows.
 - **Upload data** (upload icon) — expands the **Upload Wizard** inline (Scene 4a).
-- **Edit item master** (coin icon) — expands an `ItemMasterEditor` for per-item costs &
-  capacities.
+- **Edit item economics** (coin icon) — opens the /policies grid on the Supplier stage, where
+  per-item costs, prices, capacities and demand parameters are edited as master-backed columns.
+  (It used to expand a separate item-master editor on the card; that editor is retired.)
 - **Combine datasets** (workflow icon) — appears once some data exists and no combine is
   running; runs the combine pipeline (Scene 4b).
 - **Edit project** (pencil) — flips the card into an inline edit form (same fields as create).
@@ -398,7 +399,7 @@ Above the table, two power tools:
   posture). It opens an `ApplyPresetDialog` that resolves the preset against my project context
   and shows what will change; after applying, a **PresetDiffBanner** sits atop the table showing
   *"preset X applied, N changes"* with **Revert**. Presets carry **provenance** (a
-  `ProvenanceBadge`) so I can see a value came from a preset vs. my own edit.
+  provenance dot) so I can see a value came from a preset vs. my own edit.
 
 If the project has no combined data, a yellow banner tells me to *"upload and combine datasets
 in Data Manager"* first.

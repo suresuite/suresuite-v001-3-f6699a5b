@@ -3317,6 +3317,14 @@
       "transform": "percent / 100, multiplied into the weekly capacity above; the mapper substitutes 85 when the production policy sets none and says so. Read ONLY on the branch that derives capacity from the grid \u2014 a master production_capacity shadows this too"
     },
     {
+      "catalog_ref": null,
+      "family": "inventory",
+      "key": "holding_cost_pct",
+      "shadowed_by": "materials.holding_cost_pct",
+      "target": "Material.holding_cost_rate",
+      "transform": "fraction x 100 -> %/yr, clamped 5-50, per material; 20 when nothing sets it. Read from the project default and from a `node:<material>` override only \u2014 a supplier-grid row key `<supplier>::<material>` and a plant-grid row are NOT read for it. The MASTER `materials.holding_cost_pct` shadows it entirely when present"
+    },
+    {
       "catalog_ref": "P-P.4",
       "family": "inventory",
       "key": "fg_safety_stock",

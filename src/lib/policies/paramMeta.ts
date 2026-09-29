@@ -346,6 +346,88 @@ export const PARAM_META: Record<string, ParamMeta> = {
     meaning: "Mean weekly demand for the product (item master) — sizes MTS targets and default capacity.",
     specRef: "§III-D",
   },
+  // The item-master editor's remaining columns, which /policies took over when
+  // it was retired. The fallbacks named here are the engine's own
+  // (`project_map.py`), the same chains the Data Map states.
+  material_lead_time_dist: {
+    unit: "enum",
+    meaning:
+      "How the material's supplier lead time varies (item master). Applied to every supplier link of the material. Empty = deterministic: the uploaded lead time exactly, every order.",
+    options: [
+      { value: "deterministic", meaning: "Every order arrives after exactly the uploaded lead time." },
+      { value: "lognormal", meaning: "Lead times drawn from a lognormal around the uploaded mean, spread set by the lead-time CV." },
+      { value: "gamma", meaning: "Lead times drawn from a gamma around the uploaded mean, spread set by the lead-time CV." },
+    ],
+    specRef: "docs/data-simulation-mapping §4",
+  },
+  material_lead_time_cv: {
+    unit: "–",
+    range: "0–1",
+    meaning:
+      "Coefficient of variation of the material's lead time (item master). Read only for a lognormal or gamma lead-time distribution. Empty = 0.",
+    specRef: "docs/data-simulation-mapping §4",
+  },
+  material_holding_cost_pct: {
+    unit: "fraction / year",
+    range: "0.05–0.50 (clamped)",
+    meaning:
+      "This material's own annual holding-cost rate (item master). When set, the engine uses it INSTEAD of the Holding policy value on the same row. Empty = the Holding policy value, then 20%.",
+    specRef: "docs/data-simulation-mapping §4",
+  },
+  material_name: {
+    meaning: "Display name of the material (item master). Display only — empty shows the material id.",
+  },
+  supplier_name: {
+    meaning: "Display name of the supplier (item master). Display only — empty shows the supplier id.",
+  },
+  product_fulfillment_mode: {
+    unit: "enum",
+    meaning:
+      "Whether the product is made to order or made to stock (item master). Empty = the project's supply-chain model, then make-to-order.",
+    options: [
+      { value: "mto", meaning: "Produced against customer orders; no finished-goods stock is held." },
+      { value: "mts", meaning: "Produced to a finished-goods stock target; orders are served from stock." },
+    ],
+    specRef: "docs/data-simulation-mapping §5",
+  },
+  product_demand_distribution: {
+    unit: "enum",
+    meaning:
+      "The distribution weekly demand is drawn from (item master). Empty = the scenario's demand model, then triangular.",
+    options: [
+      { value: "triangular", meaning: "Triangular around the demand mean; bounds from demand min/max, else mean·(1±CV)." },
+      { value: "deterministic", meaning: "Exactly the demand mean every week." },
+      { value: "poisson", meaning: "Poisson with the demand mean." },
+      { value: "negbin", meaning: "Negative binomial with the demand mean; dispersion from the demand CV." },
+    ],
+    specRef: "docs/data-simulation-mapping §5",
+  },
+  product_demand_cv: {
+    unit: "–",
+    range: "≥ 0",
+    meaning:
+      "Coefficient of variation of weekly demand (item master). Empty = the scenario's demand CV, then 0.30.",
+    specRef: "docs/data-simulation-mapping §5",
+  },
+  product_demand_min: {
+    symbol: "a_p",
+    unit: "units / week",
+    range: "≥ 0",
+    meaning:
+      "Explicit lower bound of a triangular demand (item master). Ignored for other distributions. Empty = demand mean·(1−CV).",
+    specRef: "docs/data-simulation-mapping §5",
+  },
+  product_demand_max: {
+    symbol: "c_p",
+    unit: "units / week",
+    range: "≥ 0",
+    meaning:
+      "Explicit upper bound of a triangular demand, e.g. a historical maximum (item master). Ignored for other distributions. Empty = demand mean·(1+CV).",
+    specRef: "docs/data-simulation-mapping §5",
+  },
+  product_name: {
+    meaning: "Display name of the product (item master). Display only — empty shows the product id.",
+  },
   lead_time_mean_days: {
     symbol: "L",
     unit: "days",

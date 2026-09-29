@@ -118,10 +118,13 @@ fields:
     substitutions: []
     ingest: {csv_header: null, required: true, validate: null}
     surfaces:
-      - page: "DataManager.tsx"
-        via: "table read"
+      # Was `RowProvenance` on the item-master editor's "Source" column. The
+      # editor is retired; the same file-and-line trace is the value-chain
+      # popover on every master-backed /policies cell.
+      - page: "ProjectPolicies.tsx"
+        via: "rpc ingest_value_chain"
         grain: column
-        evidence: "src/components/ingest/RowProvenance.tsx:65"
+        evidence: "src/components/policies/ValueChainPopover.tsx:102"
         confirmed: true
     resolution: null
   storage_bucket:
@@ -193,10 +196,13 @@ fields:
     substitutions: []
     ingest: {csv_header: null, required: true, validate: null}
     surfaces:
-      - page: "DataManager.tsx"
-        via: "table read"
+      # Was `RowProvenance` on the item-master editor's "Source" column. The
+      # editor is retired; the same file-and-line trace is the value-chain
+      # popover on every master-backed /policies cell.
+      - page: "ProjectPolicies.tsx"
+        via: "rpc ingest_value_chain"
         grain: column
-        evidence: "src/components/ingest/RowProvenance.tsx:65"
+        evidence: "src/components/policies/ValueChainPopover.tsx:102"
         confirmed: true
     resolution: null
     note: >-

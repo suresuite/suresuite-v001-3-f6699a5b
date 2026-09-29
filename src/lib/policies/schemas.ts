@@ -604,6 +604,17 @@ export const FIELD_LABELS: Record<string, string> = {
   capacity_per_week: "Supplier capacity (units/wk)",
   reliability_score: "Reliability (0–1)",
   material_moq: "MOQ (master)",
+  material_lead_time_dist: "Lead-time distribution (master)",
+  material_lead_time_cv: "Lead-time CV (master)",
+  material_name: "Material name (master)",
+  supplier_name: "Supplier name (master)",
+  material_holding_cost_pct: "Holding cost, this material (master)",
+  product_fulfillment_mode: "Fulfillment mode (master)",
+  product_demand_distribution: "Demand distribution (master)",
+  product_demand_cv: "Demand CV (master)",
+  product_demand_min: "Demand min (units/wk, master)",
+  product_demand_max: "Demand max (units/wk, master)",
+  product_name: "Product name (master)",
   // inventory extensions
   moq: "MOQ",
   // production extensions

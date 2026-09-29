@@ -150,7 +150,7 @@ The file's name as the user's machine gave it, verbatim. For display and for the
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `DataManager.tsx` (`src/components/ingest/RowProvenance.tsx:65`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/components/policies/ValueChainPopover.tsx:102`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -224,7 +224,7 @@ SHA-256 of the bytes AS RECEIVED, lowercase hex, computed before any parse. The 
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `DataManager.tsx` (`src/components/ingest/RowProvenance.tsx:65`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/components/policies/ValueChainPopover.tsx:102`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -268,6 +268,6 @@ When the bytes were received. Server-stamped, never the client's clock.
 
 ---
 
-*Generated from data contract `fd36cb9e7ac3`, engine `0.2.8`,
+*Generated from data contract `515bbeaec1e8`, engine `0.2.8`,
 sidecar `supabase/contract/ingest_files.contract.yaml`, table created by `20260916000013_ingest_files_tier0.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -2457,7 +2457,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:413",
+          "evidence": "src/pages/DataManager.tsx:418",
           "confirmed": true
         },
         {
@@ -3086,7 +3086,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:413",
+          "evidence": "src/pages/DataManager.tsx:418",
           "confirmed": true
         },
         {
@@ -7966,7 +7966,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:413",
+          "evidence": "src/pages/DataManager.tsx:418",
           "confirmed": true
         },
         {
@@ -8983,10 +8983,10 @@
           },
           "surfaces": [
             {
-              "page": "DataManager.tsx",
-              "via": "table read",
+              "page": "ProjectPolicies.tsx",
+              "via": "rpc ingest_value_chain",
               "grain": "column",
-              "evidence": "src/components/ingest/RowProvenance.tsx:65",
+              "evidence": "src/components/policies/ValueChainPopover.tsx:102",
               "confirmed": true
             }
           ],
@@ -9151,10 +9151,10 @@
           },
           "surfaces": [
             {
-              "page": "DataManager.tsx",
-              "via": "table read",
+              "page": "ProjectPolicies.tsx",
+              "via": "rpc ingest_value_chain",
               "grain": "column",
-              "evidence": "src/components/ingest/RowProvenance.tsx:65",
+              "evidence": "src/components/policies/ValueChainPopover.tsx:102",
               "confirmed": true
             }
           ],
@@ -12142,10 +12142,10 @@
           },
           "surfaces": [
             {
-              "page": "DataManager.tsx",
-              "via": "table read",
+              "page": "ProjectPolicies.tsx",
+              "via": "rpc ingest_value_chain",
               "grain": "column",
-              "evidence": "src/components/ingest/RowProvenance.tsx:51",
+              "evidence": "src/components/policies/ValueChainPopover.tsx:102",
               "confirmed": true
             }
           ],
@@ -12278,10 +12278,10 @@
           },
           "surfaces": [
             {
-              "page": "DataManager.tsx",
-              "via": "table read",
+              "page": "ProjectPolicies.tsx",
+              "via": "rpc ingest_value_chain",
               "grain": "column",
-              "evidence": "src/components/ingest/RowProvenance.tsx:51",
+              "evidence": "src/components/policies/ValueChainPopover.tsx:102",
               "confirmed": true
             }
           ],
@@ -12651,7 +12651,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [],
             "hybrid": null,
@@ -12712,7 +12712,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [],
             "hybrid": null,
@@ -12773,7 +12773,6 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form",
               "policy_grid"
             ],
             "estimable_from": [],
@@ -12829,7 +12828,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [],
             "hybrid": null,
@@ -12877,7 +12876,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [
               "observations.stock_counts (Phase 7+)"
@@ -12938,7 +12937,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [
               "observations.receipts (Phase 7+)"
@@ -12995,7 +12994,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [
               "observations.receipts (Phase 7+)"
@@ -13283,7 +13282,7 @@
           "page": "DataManager.tsx",
           "via": "rpc delete_project_dataset",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:697",
+          "evidence": "src/pages/DataManager.tsx:702",
           "confirmed": true
         },
         {
@@ -13707,7 +13706,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:413",
+          "evidence": "src/pages/DataManager.tsx:418",
           "confirmed": true
         },
         {
@@ -14311,7 +14310,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:413",
+          "evidence": "src/pages/DataManager.tsx:418",
           "confirmed": true
         },
         {
@@ -15969,7 +15968,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_node_list",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:425",
+          "evidence": "src/pages/DataManager.tsx:430",
           "confirmed": true
         },
         {
@@ -17777,7 +17776,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:413",
+          "evidence": "src/pages/DataManager.tsx:418",
           "confirmed": true
         },
         {
@@ -20732,7 +20731,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [],
             "hybrid": null,
@@ -20787,7 +20786,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [],
             "hybrid": null,
@@ -20847,7 +20846,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [],
             "hybrid": null,
@@ -20910,7 +20909,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [],
             "hybrid": null,
@@ -20970,7 +20969,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [],
             "hybrid": null,
@@ -21025,7 +21024,7 @@
             "default_mode": "hybrid",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [
               "outbound_logistics.volume (weekly-normalized)"
@@ -21090,7 +21089,6 @@
             "default_mode": "hybrid",
             "assertable_by": [
               "csv_upload",
-              "item_master_form",
               "policy_grid"
             ],
             "estimable_from": [
@@ -21218,7 +21216,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [
               "derived from demand_mean and demand_cv"
@@ -21281,7 +21279,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [
               "derived from demand_mean and demand_cv"
@@ -22727,7 +22725,7 @@
           "page": "DataManager.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:200",
+          "evidence": "src/pages/DataManager.tsx:205",
           "confirmed": true
         },
         {
@@ -26891,7 +26889,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [],
             "hybrid": null,
@@ -26946,7 +26944,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [],
             "hybrid": null,
@@ -27007,7 +27005,7 @@
             "default_mode": "asserted",
             "assertable_by": [
               "csv_upload",
-              "item_master_form"
+              "policy_grid"
             ],
             "estimable_from": [
               "observations.receipts (Phase 7+)"
@@ -27280,7 +27278,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:640",
+          "evidence": "src/pages/DataManager.tsx:645",
           "confirmed": true
         },
         {
@@ -27308,7 +27306,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "rpc assign_material_supplier",
           "grain": "table",
-          "evidence": "src/components/policies/StagePolicyTable.tsx:258",
+          "evidence": "src/components/policies/StagePolicyTable.tsx:262",
           "confirmed": true
         },
         {
@@ -28235,7 +28233,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:640",
+          "evidence": "src/pages/DataManager.tsx:645",
           "confirmed": true
         },
         {
@@ -30860,5 +30858,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "fd36cb9e7ac3"
+  "contract_version": "515bbeaec1e8"
 }

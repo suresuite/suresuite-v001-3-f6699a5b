@@ -119,7 +119,7 @@ The run these rows were staged in. NOT NULL, ON DELETE CASCADE: the run is the o
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `DataManager.tsx` (`src/components/ingest/RowProvenance.tsx:51`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/components/policies/ValueChainPopover.tsx:102`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -183,7 +183,7 @@ The physical line in the file, 1-based, counting the header as line 1 — so the
 | Validated at ingest | integer > 1 |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `DataManager.tsx` (`src/components/ingest/RowProvenance.tsx:51`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/components/policies/ValueChainPopover.tsx:102`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -276,6 +276,6 @@ When the row was staged. Server-stamped, never the client's clock.
 
 ---
 
-*Generated from data contract `fd36cb9e7ac3`, engine `0.2.8`,
+*Generated from data contract `515bbeaec1e8`, engine `0.2.8`,
 sidecar `supabase/contract/ingest_staged_rows.contract.yaml`, table created by `20260916000014_ingest_staged_rows.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -172,7 +172,7 @@ const cell = (bag: Record<string, unknown> | null, key: string): { text: string 
 /** What the reader can DO about this value — per provenance state, never generic. */
 const REMEDY: Record<Provenance, string> = {
   data: "Re-upload this dataset to change it.",
-  master: "Edit the item master, or upload a new master file.",
+  master: "Edit it in this cell, or upload a new item-master file.",
   contract: "Fill this cell in an upload — while it is empty the schema's declared meaning applies.",
   imputed: "Upload a value for this line; the average stops being used the moment one exists.",
   derived: "Upload the inbound/outbound rows this is computed from.",

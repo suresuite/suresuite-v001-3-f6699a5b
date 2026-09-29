@@ -99,7 +99,9 @@ interface ProjectCardProps {
   onGenerateNodeList: (project: Project) => void;
   onViewData: (project: Project) => void;
   onUploadData: (project: Project) => void;
-  onEditItemMaster: (project: Project) => void;
+  /** Opens the /policies grid, where item-master economics are edited (the
+   *  item-master editor this used to expand on the card is retired). */
+  onOpenItemEconomics: (project: Project) => void;
   onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
   onCombine: (project: Project) => void;
@@ -138,7 +140,7 @@ export function ProjectCard({
   onGenerateNodeList,
   onViewData,
   onUploadData,
-  onEditItemMaster,
+  onOpenItemEconomics,
   onEdit,
   onDelete,
   onCombine,
@@ -426,7 +428,7 @@ export function ProjectCard({
 
           <MobileRow
             label="Project actions"
-            sub={owns ? 'data, item master, combine, edit, delete' : 'view data'}
+            sub={owns ? 'data, item economics, combine, edit, delete' : 'view data'}
             value={owns ? '6' : '1'}
             onClick={() => setSheet(true)}
           />
@@ -467,14 +469,14 @@ export function ProjectCard({
               'Only the project’s modeller or an admin can upload.',
             )}
             {action(
-              'Edit item master',
+              'Edit item economics',
               () => {
-                onEditItemMaster(project);
+                onOpenItemEconomics(project);
                 setSheet(false);
               },
-              'materials, products and suppliers',
+              'costs, prices and demand — on the Policies page',
               !owns,
-              'Only the project’s modeller or an admin can edit the item master.',
+              'Only the project’s modeller or an admin can edit item economics.',
             )}
             {action(
               completion.nodeList && hasBasicData ? 'Download node list' : 'Generate node list',
@@ -773,8 +775,8 @@ export function ProjectCard({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuItem onClick={() => onEditItemMaster(project)}>
-                        <Coins className="mr-2 h-4 w-4" /> Edit item master
+                      <DropdownMenuItem onClick={() => onOpenItemEconomics(project)}>
+                        <Coins className="mr-2 h-4 w-4" /> Edit item economics
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         disabled={project.combine_status === 'running'}

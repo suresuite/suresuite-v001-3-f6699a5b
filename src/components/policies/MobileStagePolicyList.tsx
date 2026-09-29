@@ -82,7 +82,8 @@ function formatValue(col: ColSpec, value: unknown, placeholder?: string): string
   if (value === undefined || value === null || value === "") return placeholder ?? "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number") return col.format ? col.format(value) : String(value);
-  return String(value);
+  // An enum item-master value reads as its label, the words the desktop select shows.
+  return col.master?.options?.find((o) => o.value === value)?.label ?? String(value);
 }
 
 export function MobileStagePolicyList({

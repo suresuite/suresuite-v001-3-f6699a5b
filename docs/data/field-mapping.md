@@ -241,9 +241,11 @@ economics that already exist in the uploaded logistics:
   demand-weighted outbound `unit_price` for product price; Σ weekly outbound volume for demand).
   It reads the chain's ORDER from the registry snapshot rather than restating it. It must change in lockstep with `from_project_data` — it ports
   `_UNIT_DAYS` (including the rate-word synonyms) and the weight semantics verbatim.
-- **Item Master editor** shows the derived value as a `≈` placeholder with a provenance badge
-  ("from inbound data" / "from outbound data") when the master field is NULL; typing a value is
-  the master override. The DB stays NULL for derived fields, so re-uploads refresh them.
+- **The master-backed columns on /policies** (Supplier and Plant stages — the standalone
+  item-master editor is retired) show the derived value with a `derived` provenance dot when the
+  master field is NULL; typing a value is the master override. The DB stays NULL for derived
+  fields, so re-uploads refresh them. A column with no derived value shows a blank cell whose
+  tooltip names the engine's fallback, never an invented `0`.
 - **Stage grids on /policies** render the uploaded lane data (prices, weekly-normalized
   volumes, lead times in weeks) and the master-backed economics columns
   (`materials.cost`, `products.sell_price` / `production_capacity` / `demand_mean`) directly;

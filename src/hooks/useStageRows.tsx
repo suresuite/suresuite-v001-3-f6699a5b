@@ -540,8 +540,8 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             }
           }
           try {
-            // Same direct read the Item Master editor uses (its RLS admits it;
-            // the lane tables' does not — see projectLanes.ts).
+            // A direct read of the item master (its RLS admits it; the lane
+            // tables' does not — see projectLanes.ts).
             const { data: masterRows, error: masterErr } = await sb
               .from("materials")
               .select("material_id")
@@ -690,6 +690,43 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               __imputed: prov.__imputed,
               __decided: {} as Record<string, true>,
             });
+          }
+
+          // EVERY PRODUCT THE ENGINE SIMULATES HAS A LINE. The set above is the
+          // products the network BUILDS AND SHIPS; `project_map.py` simulates
+          // every row of the `products` master. Until the item-master editor was
+          // retired, a product outside that set could still have its price and
+          // demand edited there — now this grid is the only surface, so a
+          // master-only product gets a line here, the same way the supplier
+          // stage lists a master-only material (§4 D175).
+          try {
+            const { data: masterRows, error: masterErr } = await sb
+              .from("products")
+              .select("product_id")
+              .eq("project_id", projectId)
+              .limit(50_000);
+            if (masterErr) throw masterErr;
+            for (const m of (masterRows ?? []) as Record<string, unknown>[]) {
+              const prod = String(m.product_id ?? "").trim();
+              if (!prod || products.has(prod)) continue;
+              const key = `${focal}::${prod}`;
+              if (seen.has(key)) continue;
+              seen.set(key, {
+                key,
+                item_id: focal,
+                product_id: prod,
+                __master_only: true,
+                __components_count: componentsByProduct.get(prod) ?? 0,
+                __demand_per_day: outboundDemandByProduct.get(prod),
+                __from_data: {} as Record<string, true>,
+                __imputed: {} as Record<string, true>,
+                __decided: {} as Record<string, true>,
+              });
+            }
+          } catch (masterReadErr) {
+            // The lines above are still complete for the built-and-shipped
+            // products; only master-only products are unknown. Say so.
+            console.warn("[useStageRows] products master read failed — master-only products are not listed", masterReadErr);
           }
 
           if (!cancelled)

@@ -143,6 +143,10 @@ const POLICY_TYPE_SHORT: Record<string, string> = Object.fromEntries(
 
 type CellKind = "readonly" | "segmented" | "select" | "toggle" | "number" | "text";
 
+/** The select value that stands for "no value" in an enum item-master cell.
+ *  Radix refuses an empty-string item value, so empty needs a name. */
+const MASTER_UNSET = "__unset__";
+
 /** Supabase errors are plain objects, not Error instances — extract either. */
 function errMsg(e: unknown, fallback: string): string {
   const m = (e as { message?: unknown })?.message;
@@ -233,7 +237,7 @@ export function StagePolicyTable({
   // lib/policies/resolveEffective.ts — the single source of truth also used
   // by MobileStagePolicyList, so the two surfaces cannot disagree about a
   // line's own resolved value.
-  const masterValueFor = (col: ColSpec, r: Record<string, unknown>): number | undefined =>
+  const masterValueFor = (col: ColSpec, r: Record<string, unknown>): number | string | undefined =>
     masterValueForShared(col, r, masterRowById);
   // Suppliers the user can assign to an "(unassigned supplier)" material:
   // the suppliers master plus every supplier already sourcing in this stage.
@@ -547,6 +551,16 @@ export function StagePolicyTable({
   const enumOptionsFor = (
     col: ColSpec,
   ): Array<{ value: string; label: string; title?: string }> | null => {
+    // An enum item-master column carries its own choices, and one more: the
+    // engine's fallback. Every item-master field can be left empty, and a
+    // select with no way back to empty would make that fallback unreachable
+    // from the grid once a value had been picked.
+    if (col.master?.options) {
+      return [
+        { value: MASTER_UNSET, label: "— default" },
+        ...col.master.options.map((o) => ({ value: o.value, label: o.label })),
+      ];
+    }
     const opts = SCSIM_ENUM_OPTIONS[col.field] ?? ENUM_OPTIONS[col.field];
     if (!opts) return null;
     if (col.field === "type" && col.family === "inventory") {
@@ -798,6 +812,10 @@ export function StagePolicyTable({
       products: new Map(),
       suppliers: new Map(),
     };
+    // An item-master number is a cost, a price, a quantity or a coefficient,
+    // and none of those is negative. The retired item-master editor refused
+    // one before saving; this is the same check on the surface that replaced it.
+    const invalidMaster: string[] = [];
     for (const rowKey of dirtyKeys) {
       const draft = drafts[rowKey];
       const dataRow = dataRows.find((row) => row.key === rowKey) as
@@ -814,6 +832,14 @@ export function StagePolicyTable({
         if (mcol && dataRow) {
           const id = String(dataRow[mcol.idFrom] ?? "");
           if (!id) continue;
+          // An emptied text cell is an unset value, not an empty string: the
+          // engine's fallback reads NULL, and `""` would reach it as a name or
+          // a distribution called nothing.
+          const mv = typeof v === "string" && v.trim() === "" ? null : v;
+          if (typeof mv === "number" && (!Number.isFinite(mv) || mv < 0)) {
+            invalidMaster.push(`${col.label} (${id})`);
+            continue;
+          }
           // Merge onto the loaded master row when one exists (the upsert RPCs
           // overwrite every column); when the master table has no row yet,
           // send a minimal row — the RPC inserts it.
@@ -821,8 +847,8 @@ export function StagePolicyTable({
             masterMerged[mcol.table].get(id) ??
             masterRowById[mcol.table].get(id) ??
             ({ [mcol.idFrom]: id } as Record<string, unknown>);
-          if (isEqual(v ?? null, (base as Record<string, unknown>)[mcol.field] ?? null)) continue;
-          masterMerged[mcol.table].set(id, { ...base, [mcol.field]: v ?? null });
+          if (isEqual(mv ?? null, (base as Record<string, unknown>)[mcol.field] ?? null)) continue;
+          masterMerged[mcol.table].set(id, { ...base, [mcol.field]: mv ?? null });
           continue;
         }
         if (v === undefined) continue;
@@ -858,6 +884,10 @@ export function StagePolicyTable({
         if (Object.keys(patch).length === 0) continue;
         toUpsert.push({ scope: spec.scope, target_key: rowKey, family, patch });
       }
+    }
+    if (invalidMaster.length > 0) {
+      toast.error(`Item-master values must be non-negative numbers: ${invalidMaster.join(", ")}.`, TOAST);
+      return;
     }
     const masterRowCount =
       masterMerged.materials.size + masterMerged.products.size + masterMerged.suppliers.size;
@@ -1143,6 +1173,12 @@ export function StagePolicyTable({
     liveDefault: unknown,
   ): CellKind => {
     if (col.readOnly) return "readonly";
+    // A master column that declares its kind is rendered as that kind — its
+    // empty value carries no type for the probes below to read. Enums are
+    // always a select, because a segmented control has no "empty" position.
+    if (col.master?.valueKind === "enum") return "select";
+    if (col.master?.valueKind === "text") return "text";
+    if (col.master?.valueKind === "number") return "number";
     if (col.field === "sourcing_firm" && firms && firms.length > 0)
       return firms.length <= 4 ? "segmented" : "select";
     if (opts) return opts.length <= 4 ? "segmented" : "select";
@@ -1305,6 +1341,11 @@ export function StagePolicyTable({
               {i === 0 && r.__in_house && (
                 <RowFlag title="Consumed by another BOM item and produced from its own components — modeled through the BOM. There is no supplier to configure; sourcing does not apply to this line.">
                   made in-house
+                </RowFlag>
+              )}
+              {i === 0 && r.__master_only && (
+                <RowFlag title="In the products item master, but not both built from the BOM and shipped to a customer. The engine still simulates every master product, so its economics are edited here.">
+                  master only
                 </RowFlag>
               )}
               {i === 0 && r.__not_in_bom && (
@@ -1474,7 +1515,14 @@ export function StagePolicyTable({
               )}
 
               {kind === "select" && (
-                <Select value={String(cellValue ?? liveDefault ?? "")} onValueChange={commit}>
+                <Select
+                  value={
+                    col.master?.options
+                      ? String(cellValue ?? MASTER_UNSET)
+                      : String(cellValue ?? liveDefault ?? "")
+                  }
+                  onValueChange={(v) => commit(col.master?.options && v === MASTER_UNSET ? null : v)}
+                >
                   <SelectTrigger className="h-5 border-transparent bg-transparent px-1.5 font-mono text-[10.5px] hover:bg-[#fafafa]">
                     <SelectValue placeholder="—" />
                   </SelectTrigger>

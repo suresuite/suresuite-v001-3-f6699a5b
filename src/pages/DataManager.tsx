@@ -1,6 +1,6 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -40,7 +40,7 @@ import {
 // import { cn } from '@/lib/utils';
 import { Toggle } from '@/components/ui/toggle';
 import ProjectDataViewer from '@/components/ProjectDataViewer';
-import ItemMasterEditor from '@/components/ItemMasterEditor';
+import { itemMasterRoute } from '@/lib/policies/dataMap';
 import { getDefaultSimulationDateRange, formatDateForDatabase } from '@/utils/dateHelpers';
 import UploadWizard from '@/components/UploadWizard';
 import { ProjectCard } from '@/components/ProjectCard';
@@ -133,14 +133,16 @@ function projectStatus(project, completion) {
 
 const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   // Walk-to deep link (§8.2 findings → data): ?project=<id> expands the
-  // project's data card; &item_master=<materials|products|suppliers> also
-  // opens the Item Master editor on that tab (see fieldWalkToRoute).
+  // project's data card. &item_master=<materials|products|suppliers> used to
+  // open the item-master editor here; that editor is retired and /policies is
+  // the one surface for item economics, so such a link — a bookmark, an old
+  // chat answer — is forwarded to the stage that edits that table.
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [uploadingProject, setUploadingProject] = useState<Project | null>(null);
-  const [itemMasterProjectId, setItemMasterProjectId] = useState<string | null>(null);
   // Mobile list redesign (v3 §2.1): which project's full detail — the
   // existing <ProjectCard/> content, previously shown for every project at
   // once — is open below its compact row. Desktop is untouched; ProjectCard
@@ -151,13 +153,16 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   const [projectQuery, setProjectQuery] = useState('');
   const [activeSheetOpen, setActiveSheetOpen] = useState(false);
   const [sharedSheetOpen, setSharedSheetOpen] = useState(false);
-  const walkToTable = searchParams.get('item_master');
   useEffect(() => {
     const walkToProject = searchParams.get('project');
     if (!walkToProject) return;
+    const walkToTable = searchParams.get('item_master');
+    if (walkToTable === 'materials' || walkToTable === 'products' || walkToTable === 'suppliers') {
+      navigate(itemMasterRoute(walkToTable, walkToProject), { replace: true });
+      return;
+    }
     setExpandedProjectId(walkToProject);
     setOpenProjectId(walkToProject);
-    if (walkToTable) setItemMasterProjectId(walkToProject);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
   const { globalSelectedProjectId, setGlobalSelectedProjectId, selectedProject, setSelectedProject } = useGlobalProject();
@@ -935,11 +940,9 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                       current?.id === project.id ? null : project
                     );
                   }}
-                  onEditItemMaster={(project) => {
+                  onOpenItemEconomics={(project) => {
                     setSelectedProject(project);
-                    setItemMasterProjectId((current) =>
-                      current === project.id ? null : project.id
-                    );
+                    navigate(itemMasterRoute('materials', project.id));
                   }}
                   onEdit={(project) => {
                     setSelectedProject(project);
@@ -986,22 +989,6 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                      {/* Complementary to the Upload Wizard above, never a replacement —
                          docs/design/erp-mrp-integration-plan.md §2.0, §6c. */}
                      <ErpConnectionsPanel projectId={project.id} />
-                  </div>
-                )}
-                {itemMasterProjectId === project.id && (
-                  <div className={cn(
-                      'mt-4',
-                      isMobile ? 'border-l-2 border-[#d4d4d4] pl-2.5' : 'ml-4 border-l-2 border-border pl-4',
-                    )}>
-                    <ItemMasterEditor
-                      projectId={project.id}
-                      initialTab={
-                        walkToTable === 'materials' || walkToTable === 'products' || walkToTable === 'suppliers'
-                          ? walkToTable
-                          : undefined
-                      }
-                      onClose={() => setItemMasterProjectId(null)}
-                    />
                   </div>
                 )}
                 {uploadingProject?.id === project.id && (

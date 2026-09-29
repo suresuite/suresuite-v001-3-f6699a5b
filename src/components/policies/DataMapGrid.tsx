@@ -54,8 +54,8 @@ export function DataMapGrid({ projectId }: { projectId: string }) {
           How every uploaded column reaches the simulation engine. <b>used</b> = read directly;{" "}
           <b>fallback active</b> = the master field is empty, so the engine resolves it from your
           inbound/outbound data; <b>default applied</b> = no data source, an engine default fills
-          in; <b>unused</b> = the engine ignores this column. Fix gaps in the Item Master editor
-          (Project Manager) or by re-uploading the dataset.
+          in; <b>unused</b> = the engine ignores this column. Fix item-master gaps in the Supplier and
+          Plant stages on this page, or by re-uploading the dataset.
         </p>
       </div>
 

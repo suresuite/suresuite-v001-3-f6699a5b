@@ -18,7 +18,7 @@ export const LANE_ROW_CEILING = 50_000;
 
 /** The sentence a surface shows when a lane read was cut short. One wording,
  *  because the same partial read is rendered by the policy grid, the data map
- *  and the item-master editor, and three paraphrases of one fact is exactly
+ *  and the Run & Validate stage, and three paraphrases of one fact is exactly
  *  what `single-source` (I1) forbids. */
 export function laneTruncationNotice(lanes: { truncated: string[] }): string | null {
   if (!lanes.truncated.length) return null;

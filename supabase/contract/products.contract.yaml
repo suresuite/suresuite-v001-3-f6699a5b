@@ -129,7 +129,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: []
       hybrid: null
       on_conflict: assertion_wins
@@ -162,7 +162,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: []
       hybrid: null
       on_conflict: assertion_wins
@@ -210,7 +210,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: []
       hybrid: null
       on_conflict: assertion_wins
@@ -251,7 +251,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: []
       hybrid: null
       on_conflict: assertion_wins
@@ -285,7 +285,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: []
       hybrid: null
       on_conflict: assertion_wins
@@ -323,7 +323,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: hybrid
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: [outbound_logistics.volume (weekly-normalized)]
       hybrid:
         centre: "products.demand_mean"
@@ -366,7 +366,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: hybrid
-      assertable_by: [csv_upload, item_master_form, policy_grid]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: [outbound_logistics.volume (weekly-normalized)]
       hybrid: null
       on_conflict: assertion_wins
@@ -441,7 +441,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: [derived from demand_mean and demand_cv]
       hybrid: null
       on_conflict: assertion_wins
@@ -481,7 +481,7 @@ fields:
     surfaces: []
     resolution:
       default_mode: asserted
-      assertable_by: [csv_upload, item_master_form]
+      assertable_by: [csv_upload, policy_grid]
       estimable_from: [derived from demand_mean and demand_cv]
       hybrid: null
       on_conflict: assertion_wins

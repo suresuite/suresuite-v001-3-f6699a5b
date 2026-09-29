@@ -343,7 +343,7 @@ def test_policy_bundle_keys_match_what_the_mapper_reads():
         "max_backorder_days", "backorder_cost_per_day", "allocation",
         "tier_overrides", "fulfillment_strategy",
         "min_share_pct", "review_period_days",
-        "primary_source", "material_price", "initial_on_hand", "holding_cost_pct",
+        "primary_source", "material_price", "initial_on_hand",
         "sourcing_firm", "moq", "lead_time_distribution", "ordering_cost",
         "supplier_capacity_per_day", "capacity_machine_per_day",
         "capacity_labor_per_day", "production_cost_per_unit", "mode",
@@ -375,19 +375,30 @@ def test_registry_publishes_the_policy_bundle_keys():
     # have been the wrong fix.
     entity = [k for k in keys if k["catalog_ref"] is None]
     assert [k["key"] for k in entity] == [
-        "capacity_units_per_day", "utilization_cap_pct"], entity
-    # Both of them are also SHADOWED, and by the same master column — the plant
-    # grid's two capacity cells are unreachable together or not at all (§4 D167).
+        "capacity_units_per_day", "utilization_cap_pct", "holding_cost_pct"], entity
+    # All three are also SHADOWED by an item-master column. The plant grid's two
+    # capacity cells are unreachable together or not at all (§4 D167); the
+    # holding cost is unreachable for a material whose master row sets its own.
     assert {k["key"]: k.get("shadowed_by") for k in entity} == {
         "capacity_units_per_day": "products.production_capacity",
         "utilization_cap_pct": "products.production_capacity",
+        "holding_cost_pct": "materials.holding_cost_pct",
     }
     # A `shadowed_by` that names nothing the engine reads is fiction, so it must
-    # resolve to a declared base data requirement.
-    fields = {r["field"] for r in reg["base_data_requirements"]}
+    # resolve to a declared base data requirement OR to a field of the item-master
+    # row the mapper reads. The second door is for a column the engine reads with
+    # no requirement level of its own: `materials.holding_cost_pct` is optional,
+    # and declaring it a requirement would add a validation note to every
+    # project that leaves it blank.
+    from dataclasses import fields as dc_fields
+    from scsim.io.project_map import MaterialRow, ProductRow, SupplierRow
+    readable = {r["field"] for r in reg["base_data_requirements"]}
+    for table, row in (("materials", MaterialRow), ("products", ProductRow),
+                       ("suppliers", SupplierRow)):
+        readable |= {f"{table}.{f.name}" for f in dc_fields(row)}
     for k in keys:
         if k.get("shadowed_by"):
-            assert k["shadowed_by"] in fields, k
+            assert k["shadowed_by"] in readable, k
 
 
 # --------------------------------------------- what an EMPTY column means (D167)

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { HDR_PROJECT_SELECT, HDR_SEGMENTED } from "@/components/shared/headerControls";
@@ -175,6 +176,27 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
 
   const [tab, setTab] = useState<"stages" | "guide" | "datamap">("stages");
   const [activeStage, setActiveStage] = useState<StageKey>("supplier");
+  // Walk-to links (`fieldWalkToRoute`, `itemMasterRoute`) land here with the
+  // project and the stage that edits the field — the item-master fields that
+  // used to open an editor on /project-manager open their /policies stage.
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const walkToProject = searchParams.get("project");
+    if (walkToProject && walkToProject !== globalSelectedProjectId) {
+      setGlobalSelectedProjectId(walkToProject);
+    }
+    const walkToStage = searchParams.get("stage");
+    if (
+      walkToStage === "supplier" ||
+      walkToStage === "plant" ||
+      walkToStage === "customer" ||
+      walkToStage === "run_validate"
+    ) {
+      setActiveStage(walkToStage);
+      setTab("stages");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   // v3 §3.1 (gap-close T6): search the network, not the catalog.

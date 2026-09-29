@@ -62,8 +62,10 @@ export interface DataMapContractRow {
 
 /**
  * Walk-to link for a `dataset.column` manifest field (§6.3 rule 3 / §8.2):
- * the /project-manager route that opens the editor closest to the gap.
- * Item-master datasets deep-open the Item Master editor on the right tab;
+ * the route that opens the editor closest to the gap.
+ * Item-master datasets open the /policies stage that renders the column —
+ * materials and suppliers on the Supplier stage, products on the Plant stage
+ * (the item-master editor that used to live on /project-manager is retired);
  * lane/BOM datasets (fixed by re-upload or the supplier-assignment RPC)
  * expand the project's data card. `materials.supplier_link` is the synthetic
  * unsourced-BOM field — its fix lives on the inbound lanes, not the master.
@@ -80,7 +82,7 @@ export function fieldWalkToRoute(
     (dataset === "materials" || dataset === "products" || dataset === "suppliers") &&
     column !== "supplier_link"
   ) {
-    return `${base}&item_master=${dataset}`;
+    return itemMasterRoute(dataset, projectId);
   }
   if (
     dataset === "inbound_logistics" ||
@@ -91,6 +93,29 @@ export function fieldWalkToRoute(
     return base;
   }
   return base;
+}
+
+/** The /policies stage that edits an item-master table's columns. */
+export function itemMasterRoute(
+  table: "materials" | "products" | "suppliers",
+  projectId: string,
+): string {
+  const stage = table === "products" ? "plant" : "supplier";
+  return `/policies?project=${encodeURIComponent(projectId)}&stage=${stage}`;
+}
+
+/**
+ * The engine's resolution chain for one item-master column, as the Data Map
+ * states it — or undefined when the map has no row for it. One row may name two
+ * columns (`lead_time_dist / lead_time_cv`), so the field list is split.
+ *
+ * Read by the policy grid to explain an EMPTY master cell at the point of
+ * display, so that sentence has one author: this table.
+ */
+export function engineChainFor(dataset: string, column: string): string | undefined {
+  return DATA_MAP_CONTRACT.find(
+    (r) => r.dataset === dataset && r.field.split(" / ").includes(column),
+  )?.chain;
 }
 
 export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
@@ -125,7 +150,7 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "products", field: "demand_mean", engineField: "Product.demand_mode (b_p)", chain: "master → Σ weekly outbound volume → 0 (warn: never ordered)", statusKey: "product_demand_mean" },
   { dataset: "products", field: "production_capacity", engineField: "Product.production_capacity (O_p)", chain: "master → policy capacity×7×util → max(2·demand, 1000) (warn: never binds)", statusKey: "product_capacity" },
   { dataset: "products", field: "fulfillment_mode", engineField: "Product.fulfillment_mode", chain: "master → projects.supply_chain_model → mto", statusKey: "product_fulfillment_mode" },
-  { dataset: "products", field: "demand_distribution", engineField: "Product.demand_model", chain: "scenario demand_model.kind → master → triangular", statusKey: "product_demand_distribution" },
+  { dataset: "products", field: "demand_distribution", engineField: "Product.demand_model", chain: "master → scenario demand_model.kind → triangular", statusKey: "product_demand_distribution" },
   { dataset: "products", field: "demand_cv", engineField: "demand variability", chain: "master → scenario demand_model.cv → 0.30", statusKey: "product_demand_cv" },
   { dataset: "products", field: "demand_min", engineField: "Product.demand_min (a_p)", chain: "master (explicit bound) → demand_mean·(1−cv)", statusKey: "product_demand_min" },
   { dataset: "products", field: "demand_max", engineField: "Product.demand_max (c_p)", chain: "master (explicit bound, e.g. historical max) → demand_mean·(1+cv)", statusKey: "product_demand_max" },

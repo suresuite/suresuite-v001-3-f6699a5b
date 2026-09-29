@@ -315,7 +315,7 @@ class MappingResult:
 # READ by this module, and every bundle key this module reads must be here —
 # `scsim/tests/test_registry_io.py` asserts both directions against the source.
 #
-# FOURTEEN KEYS: `type` and `safety_stock_days` are rendered by both
+# FIFTEEN KEYS: `type`, `safety_stock_days` and `holding_cost_pct` are rendered by both
 # the supplier and the plant stage, so the grid has more cells than keys; the
 # four replenishment cells (Q, κ, s, S) joined when supplier-row overrides
 # started reaching the engine as `inventory_control.material_overrides`.
@@ -324,8 +324,9 @@ class MappingResult:
 # it performs is half of what the plant stage exists to show.)
 #
 # `shadowed_by` is OPTIONAL and names the entity field that, when present,
-# makes this key's value unreachable. Two keys carry it and both name
-# `products.production_capacity` (§4 D167).
+# makes this key's value unreachable. Three keys carry it: two name
+# `products.production_capacity` (§4 D167) and `holding_cost_pct` names
+# `materials.holding_cost_pct`.
 POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     {
         "key": "supply_share",
@@ -393,6 +394,25 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
                      "says so. Read ONLY on the branch that derives capacity from the "
                      "grid — a master production_capacity shadows this too",
         "shadowed_by": "products.production_capacity",
+    },
+    {
+        # Declared when the item-master editor was retired and /policies became
+        # the one surface for item-master economics: the supplier grid renders
+        # the material's master holding rate BESIDE this policy column, and the
+        # mapper reads the master first. Before this entry the key sat on the
+        # parity test's `not_rendered` list while being rendered on two stages,
+        # so nothing could tell a planner the master value outranks it.
+        "key": "holding_cost_pct",
+        "family": "inventory",
+        "target": "Material.holding_cost_rate",
+        "catalog_ref": None,
+        "transform": "fraction x 100 -> %/yr, clamped 5-50, per material; 20 when "
+                     "nothing sets it. Read from the project default and from a "
+                     "`node:<material>` override only — a supplier-grid row key "
+                     "`<supplier>::<material>` and a plant-grid row are NOT read for "
+                     "it. The MASTER `materials.holding_cost_pct` shadows it entirely "
+                     "when present",
+        "shadowed_by": "materials.holding_cost_pct",
     },
     {
         "key": "fg_safety_stock",

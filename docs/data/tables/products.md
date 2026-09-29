@@ -151,7 +151,7 @@ for one you did.
 | | |
 |---|---|
 | Default mode | `asserted` |
-| Assertable by | `csv_upload`, `item_master_form` |
+| Assertable by | `csv_upload`, `policy_grid` |
 | Estimable from | **never** — this value may not be estimated |
 | Hybrid (centre / spread) | **none** — the engine has no variability field for this quantity |
 | On conflict | `assertion_wins` |
@@ -190,7 +190,7 @@ for one you did.
 | | |
 |---|---|
 | Default mode | `asserted` |
-| Assertable by | `csv_upload`, `item_master_form` |
+| Assertable by | `csv_upload`, `policy_grid` |
 | Estimable from | **never** — this value may not be estimated |
 | Hybrid (centre / spread) | **none** — the engine has no variability field for this quantity |
 | On conflict | `assertion_wins` |
@@ -231,7 +231,7 @@ for one you did.
 | | |
 |---|---|
 | Default mode | `asserted` |
-| Assertable by | `csv_upload`, `item_master_form` |
+| Assertable by | `csv_upload`, `policy_grid` |
 | Estimable from | **never** — this value may not be estimated |
 | Hybrid (centre / spread) | **none** — the engine has no variability field for this quantity |
 | On conflict | `assertion_wins` |
@@ -266,7 +266,7 @@ for one you did.
 | | |
 |---|---|
 | Default mode | `asserted` |
-| Assertable by | `csv_upload`, `item_master_form` |
+| Assertable by | `csv_upload`, `policy_grid` |
 | Estimable from | **never** — this value may not be estimated |
 | Hybrid (centre / spread) | **none** — the engine has no variability field for this quantity |
 | On conflict | `assertion_wins` |
@@ -301,7 +301,7 @@ for one you did.
 | | |
 |---|---|
 | Default mode | `asserted` |
-| Assertable by | `csv_upload`, `item_master_form` |
+| Assertable by | `csv_upload`, `policy_grid` |
 | Estimable from | **never** — this value may not be estimated |
 | Hybrid (centre / spread) | **none** — the engine has no variability field for this quantity |
 | On conflict | `assertion_wins` |
@@ -342,7 +342,7 @@ for one you did.
 | | |
 |---|---|
 | Default mode | `hybrid` |
-| Assertable by | `csv_upload`, `item_master_form` |
+| Assertable by | `csv_upload`, `policy_grid` |
 | Estimable from | `outbound_logistics.volume (weekly-normalized)` |
 | Hybrid (centre / spread) | `products.demand_mean` / `products.demand_cv + products.demand_min/demand_max` |
 | On conflict | `assertion_wins` |
@@ -379,7 +379,7 @@ for one you did.
 | | |
 |---|---|
 | Default mode | `hybrid` |
-| Assertable by | `csv_upload`, `item_master_form`, `policy_grid` |
+| Assertable by | `csv_upload`, `policy_grid` |
 | Estimable from | `outbound_logistics.volume (weekly-normalized)` |
 | Hybrid (centre / spread) | **none** — the engine has no variability field for this quantity |
 | On conflict | `assertion_wins` |
@@ -443,7 +443,7 @@ for one you did.
 | | |
 |---|---|
 | Default mode | `asserted` |
-| Assertable by | `csv_upload`, `item_master_form` |
+| Assertable by | `csv_upload`, `policy_grid` |
 | Estimable from | `derived from demand_mean and demand_cv` |
 | Hybrid (centre / spread) | **none** — the engine has no variability field for this quantity |
 | On conflict | `assertion_wins` |
@@ -479,7 +479,7 @@ for one you did.
 | | |
 |---|---|
 | Default mode | `asserted` |
-| Assertable by | `csv_upload`, `item_master_form` |
+| Assertable by | `csv_upload`, `policy_grid` |
 | Estimable from | `derived from demand_mean and demand_cv` |
 | Hybrid (centre / spread) | **none** — the engine has no variability field for this quantity |
 | On conflict | `assertion_wins` |
@@ -565,6 +565,6 @@ The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_numb
 
 ---
 
-*Generated from data contract `fd36cb9e7ac3`, engine `0.2.8`,
+*Generated from data contract `515bbeaec1e8`, engine `0.2.8`,
 sidecar `supabase/contract/products.contract.yaml`, table created by `20260614000001_item_master.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
