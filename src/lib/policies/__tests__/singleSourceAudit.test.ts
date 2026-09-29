@@ -86,7 +86,9 @@ describe("D190 · the Data Map names a demand-distribution default the engine do
     );
     expect(read("src/hooks/useScenarios.tsx")).toMatch(/kind: "poisson"/);
   });
-  it.fails("the Data Map's stated default is the scenario's model, not a bare 'triangular'", () => {
+  // CLOSED 2026-09-29 (the Data map reconciliation): `.fails` removed in the
+  // same commit that made this pass, as the file header requires.
+  it("the Data Map's stated default is the scenario's model, not a bare 'triangular'", () => {
     expect(read("src/hooks/useDataMap.tsx")).not.toMatch(
       /product_demand_distribution: masterField\(prods, "demand_distribution", \{ status: "default", detail: "triangular" \}\)/,
     );
