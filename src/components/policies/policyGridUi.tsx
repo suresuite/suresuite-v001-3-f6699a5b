@@ -9,6 +9,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { LAYER, tint } from "@/components/intelligence/piUi";
+import { numCellCommit } from "@/lib/policies/numCellCommit";
 
 /* ── provenance ──────────────────────────────────────────────────────── */
 
@@ -231,6 +232,7 @@ export function FamilyChip({
 
 /* ── column header ───────────────────────────────────────────────────── */
 
+
 /**
  * Sort arrow renders ONLY on the active column — an always-present idle glyph
  * reserved ~11px in every header and collided with the info button.
@@ -403,8 +405,9 @@ export function NumCell({
           title={title ?? PROVENANCE[provenance].title}
           size={1}
           onBlur={(e) => {
-            const raw = e.target.value.replace("≈", "").trim();
-            onCommit(raw === "" ? undefined : parseFloat(raw.replace(",", ".")));
+            const next = numCellCommit(e.target.value, text, !!integer);
+            if (next.commit) onCommit(next.value);
+            else e.target.value = text;
           }}
           style={{
             boxSizing: "border-box",

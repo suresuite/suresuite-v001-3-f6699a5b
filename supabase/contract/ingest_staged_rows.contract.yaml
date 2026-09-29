@@ -73,7 +73,7 @@ fields:
     surfaces:
       # Was `RowProvenance` on the item-master editor's "Source" column. The
       # editor is retired; the same file-and-line trace is the value-chain
-      # popover on every master-backed /policies cell.
+      # popover on every master-backed /policies number cell.
       - page: "ProjectPolicies.tsx"
         via: "rpc ingest_value_chain"
         grain: column
@@ -148,7 +148,7 @@ fields:
     surfaces:
       # Was `RowProvenance` on the item-master editor's "Source" column. The
       # editor is retired; the same file-and-line trace is the value-chain
-      # popover on every master-backed /policies cell.
+      # popover on every master-backed /policies number cell.
       - page: "ProjectPolicies.tsx"
         via: "rpc ingest_value_chain"
         grain: column

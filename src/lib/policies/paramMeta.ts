@@ -371,7 +371,7 @@ export const PARAM_META: Record<string, ParamMeta> = {
     unit: "fraction / year",
     range: "0.05–0.50 (clamped)",
     meaning:
-      "This material's own annual holding-cost rate (item master). When set, the engine uses it INSTEAD of the Holding policy value on the same row. Empty = the Holding policy value, then 20%.",
+      "This material's own annual holding-cost rate (item master). When set, the engine uses it instead of any Holding policy value. Empty = the project's DEFAULT Holding policy value, then 20% — a Holding value typed on a single grid row is not read by the engine.",
     specRef: "docs/data-simulation-mapping §4",
   },
   material_name: {

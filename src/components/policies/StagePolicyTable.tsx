@@ -831,7 +831,8 @@ export function StagePolicyTable({
         const mcol = col.master;
         if (mcol && dataRow) {
           const id = String(dataRow[mcol.idFrom] ?? "");
-          if (!id) continue;
+          // A "(…)" id is a placeholder line, never an entity (see the render).
+          if (!id || id.startsWith("(")) continue;
           // An emptied text cell is an unset value, not an empty string: the
           // engine's fallback reads NULL, and `""` would reach it as a name or
           // a distribution called nothing.
@@ -1344,8 +1345,13 @@ export function StagePolicyTable({
                 </RowFlag>
               )}
               {i === 0 && r.__master_only && (
-                <RowFlag title="In the products item master, but not both built from the BOM and shipped to a customer. The engine still simulates every master product, so its economics are edited here.">
+                <RowFlag title="In the products item master, but not both built from the BOM and shipped to a customer. The engine still simulates it as a finished product, so its economics are edited here.">
                   master only
+                </RowFlag>
+              )}
+              {i === 0 && r.__supplier_only && (
+                <RowFlag title="In the suppliers item master with no inbound lane. The engine still loads it (a disruption can target it), so its name, capacity and reliability are edited here. Nothing else applies without a lane.">
+                  no lane
                 </RowFlag>
               )}
               {i === 0 && r.__not_in_bom && (
@@ -1433,7 +1439,7 @@ export function StagePolicyTable({
                 className="border-b p-0 align-middle group-hover:bg-[#fafafa]"
                 style={{ width, minWidth: width, ...cellDivider(isLastCol) }}
               >
-                {renderInvParamsCell(rowKey, r, fc.paramW)}
+                {r.__supplier_only ? null : renderInvParamsCell(rowKey, r, fc.paramW)}
               </td>
             );
           }
@@ -1470,7 +1476,24 @@ export function StagePolicyTable({
 
           const firms = r.__firms_available as string[] | undefined;
           const opts = enumOptionsFor(col);
-          const kind = kindOf(col, opts, firms, cellValue, liveDefault);
+          // A "(…)" id is a PLACEHOLDER line — "(unassigned supplier)", "(made
+          // in-house)", "(no material)" — not an entity. A master cell keyed by
+          // one would save a row for it: `bulk_upsert_suppliers` would insert a
+          // supplier called "(unassigned supplier)", the engine would simulate
+          // it and the assign flow would offer it. The assign flow already
+          // refuses such ids; the master cells now do too. A lane-less supplier's
+          // line edits that supplier and nothing else — it has no material and
+          // no lane for a policy to apply to.
+          const placeholderMaster =
+            !!col.master && String(r[col.master.idFrom] ?? "").startsWith("(");
+          const supplierOnlyLocked = !!r.__supplier_only && col.master?.table !== "suppliers";
+          const kind: CellKind =
+            placeholderMaster || supplierOnlyLocked
+              ? "readonly"
+              : kindOf(col, opts, firms, cellValue, liveDefault);
+          // The hover a number cell carries — the substitution, or what an empty
+          // value means — for every other kind of cell too (T2).
+          const cellTitle = substitution ?? placeholderTitle;
           const commit = (v: unknown) => onCellChange(rowKey, col.field, v);
 
           return (
@@ -1492,6 +1515,9 @@ export function StagePolicyTable({
                   className="block w-full px-[5px] text-right font-mono text-[11px] tabular-nums text-[#c4c4c4]"
                 >
                   {(() => {
+                    // No lane, no policy; no entity, no master value. A default
+                    // here would read as a value that applies.
+                    if (supplierOnlyLocked || placeholderMaster) return "—";
                     const raw = cellValue ?? liveDefault;
                     const n = typeof raw === "number" ? raw : null;
                     if (n != null && Number.isFinite(n)) return col.format ? col.format(n) : String(n);
@@ -1523,7 +1549,10 @@ export function StagePolicyTable({
                   }
                   onValueChange={(v) => commit(col.master?.options && v === MASTER_UNSET ? null : v)}
                 >
-                  <SelectTrigger className="h-5 border-transparent bg-transparent px-1.5 font-mono text-[10.5px] hover:bg-[#fafafa]">
+                  <SelectTrigger
+                    title={cellTitle}
+                    className="h-5 border-transparent bg-transparent px-1.5 font-mono text-[10.5px] hover:bg-[#fafafa]"
+                  >
                     <SelectValue placeholder="—" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1605,6 +1634,7 @@ export function StagePolicyTable({
               {kind === "text" && (
                 <input
                   value={String(cellValue ?? liveDefault ?? "")}
+                  title={cellTitle}
                   onChange={(e) => commit(e.target.value)}
                   className="h-5 w-full min-w-0 rounded-sm border border-transparent bg-transparent px-[5px] font-mono text-[11.5px] outline-none hover:bg-[#fafafa] focus:border-[--zinc-border] focus:bg-background"
                   style={{ boxSizing: "border-box" }}

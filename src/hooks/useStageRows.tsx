@@ -571,6 +571,41 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             console.warn("[useStageRows] materials master read failed — master-only materials are not listed", masterReadErr);
           }
 
+          // EVERY SUPPLIER THE ENGINE LOADS HAS A LINE. `project_map.py` takes
+          // its supplier set from the `suppliers` master, so a supplier with no
+          // inbound lane is still in the run (a disruption can target it) and its
+          // name, capacity and reliability are still engine inputs. The retired
+          // item-master editor listed it; with this grid the only surface left, a
+          // lane-less supplier gets a line keyed to no material. Only its SUPPLIER
+          // columns are editable there — the grid treats every "(…)" id as a
+          // placeholder, so no material row is ever written for it.
+          try {
+            const { data: supRows, error: supErr } = await sb
+              .from("suppliers")
+              .select("supplier_id")
+              .eq("project_id", projectId)
+              .limit(50_000);
+            if (supErr) throw supErr;
+            const listed = new Set([...seen.values()].map((r) => String(r.supplier_id ?? "")));
+            for (const m of (supRows ?? []) as Record<string, unknown>[]) {
+              const sid = String(m.supplier_id ?? "").trim();
+              if (!sid || listed.has(sid)) continue;
+              const key = `${sid}::(no material)`;
+              if (seen.has(key)) continue;
+              seen.set(key, {
+                key,
+                supplier_id: sid,
+                material_id: "(no material)",
+                __supplier_only: true,
+                __supplier_count: 0,
+                __lane_count: 0,
+              });
+              listed.add(sid);
+            }
+          } catch (supReadErr) {
+            console.warn("[useStageRows] suppliers master read failed — lane-less suppliers are not listed", supReadErr);
+          }
+
           if (!cancelled)
             setRows(
               [...seen.values()].sort(
@@ -699,6 +734,13 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
           // demand edited there — now this grid is the only surface, so a
           // master-only product gets a line here, the same way the supplier
           // stage lists a master-only material (§4 D175).
+          // A master product CONSUMED by another product is a sub-assembly: the
+          // engine drops it as a product and models it through the BOM (§4 D174),
+          // so a line for it here would be a set of cells no run reads. Both BOM
+          // shapes count — `bom` is empty on a single-level project.
+          const bomComponents = new Set(
+            [...bom, ...lanes.bom].map((r) => String(r.material_id ?? "").trim()).filter(Boolean),
+          );
           try {
             const { data: masterRows, error: masterErr } = await sb
               .from("products")
@@ -708,7 +750,7 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             if (masterErr) throw masterErr;
             for (const m of (masterRows ?? []) as Record<string, unknown>[]) {
               const prod = String(m.product_id ?? "").trim();
-              if (!prod || products.has(prod)) continue;
+              if (!prod || products.has(prod) || bomComponents.has(prod)) continue;
               const key = `${focal}::${prod}`;
               if (seen.has(key)) continue;
               seen.set(key, {

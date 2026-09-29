@@ -469,12 +469,14 @@ export function ProjectCard({
               'Only the project’s modeller or an admin can upload.',
             )}
             {action(
-              'Edit item economics',
+              'Item economics',
               () => {
                 onOpenItemEconomics(project);
                 setSheet(false);
               },
-              'costs, prices and demand — on the Policies page',
+              // The Policies page is read-only on a phone ("edit on desktop"),
+              // so this sheet — the phone's — says so rather than promising an edit.
+              'costs, prices and demand on the Policies page — edit on desktop',
               !owns,
               'Only the project’s modeller or an admin can edit item economics.',
             )}
