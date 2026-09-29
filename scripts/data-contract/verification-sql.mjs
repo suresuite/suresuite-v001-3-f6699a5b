@@ -2461,13 +2461,13 @@ async function mappingAudit() {
            (select count(*) from public.supply_chain_data_multi_tier t where t.project_id = p.id)::int as mt_rows,
            (select count(*) from public.supply_chain_data_multi_tier t
              where t.project_id = p.id and t.level is distinct from t.bom_depth)::int as mt_rows_not_current_writer,
-           (select to_char(max(s.created_at), 'YYYY-MM-DD HH24:MI') from public.supply_chain_data s where s.project_id = p.id) as graph_written,
-           (select to_char(greatest(
+           (select left(max(s.created_at)::text, 16) from public.supply_chain_data s where s.project_id = p.id) as graph_written,
+           (select left(greatest(
               (select max(greatest(x.created_at, x.updated_at)) from public.inbound_logistics x where x.project_id = p.id),
               (select max(greatest(x.created_at, x.updated_at)) from public.outbound_logistics x where x.project_id = p.id),
               (select max(greatest(x.created_at, x.updated_at)) from public.bom_single_level x where x.project_id = p.id),
-              (select max(greatest(x.created_at, x.updated_at)) from public.bom_multi_level x where x.project_id = p.id)),
-              'YYYY-MM-DD HH24:MI') as sources_last_touched,
+              (select max(greatest(x.created_at, x.updated_at)) from public.bom_multi_level x where x.project_id = p.id))::text,
+              16) as sources_last_touched,
            (select count(*) from public.supply_chain_data s where s.project_id = p.id and s.computed_from_hash is not null)::int as scd_hashed
       from public.projects p order by p.name`);
   report("A1 — writer fingerprint per project", a1, (rows) => {
@@ -2737,7 +2737,7 @@ async function mappingAudit() {
       from last_run lr join public.projects p on p.id = lr.project_id
      order by p.name`);
   report("D2 — what the last run simulated vs the project now", d2, (rows) => {
-    out("", "**(D2) each project's latest completed run: materials/products the engine simulated (`run_item_series`) against the project's BOM now** — a run's series count below the BOM's is a run on a subset:");
+    out("", "**(D2) each project's latest completed run: materials/products the engine simulated (`run_item_series`) against the project's BOM now** — series exist only for a 1-replication `full_debug` run (`scsim_bridge.py`), so a 0 here says nothing about coverage:");
     out(...table(rows));
   });
 
@@ -2892,6 +2892,146 @@ async function mappingAudit() {
   const f9 = await tryQ(`select coalesce(bom_level, '<null>') as bom_level, count(*)::int as projects from public.projects group by 1 order by 1`);
   report("F9 — bom_level values", f9, (rows) => {
     out("", "**(F9) `projects.bom_level` values** — DataManager writes `multi`, the admin editor writes and tests for `multi_level`, and there is no CHECK:");
+    out(...table(rows));
+  });
+
+  section("Audit 2026-09-29 · G — 'primary supplier' and 'demand model', each answered by three authors");
+  // G1 — the primary supplier of a multi-sourced material, three ways:
+  //   engine  (`context.py` primary_link): min (cost, rounded lead-time weeks, supplier)
+  //           with cost = unit_price, ≤0/NULL → 1.0; lead time via lead_time_unit, NULL/0 → 2
+  //   grid    (`useStageRows` matMeta):     max weekly volume, then min price, then min lead time
+  //   stress  (`stressTargets.resolvePrimarySupplier`): ONE supplier per project — the largest
+  //           total weekly volume across every material
+  const g1 = await tryQ(`
+    with inb as (
+      select project_id, btrim(supplier_id) as s, btrim(material_id) as m,
+             public.rate_to_weekly(coalesce(volume, 0), time_unit) as wk,
+             case when coalesce(unit_price, 0) <= 0 then 1.0 else unit_price end as cost,
+             least(51, greatest(1, round(case when coalesce(lead_time, 0) = 0 then 2.0
+                   else public.duration_to_weeks(lead_time, lead_time_unit) end))) as ltw,
+             unit_price, lead_time
+        from public.inbound_logistics
+       where coalesce(btrim(supplier_id), '') <> '' and coalesce(btrim(material_id), '') <> ''),
+    multi as (select project_id, m from inb group by 1,2 having count(distinct s) > 1),
+    eng as (select distinct on (project_id, m) project_id, m, s as engine_primary
+              from inb order by project_id, m, cost, ltw, s),
+    grid as (select distinct on (project_id, m) project_id, m, s as grid_primary
+               from inb order by project_id, m, wk desc, unit_price asc nulls last, lead_time asc nulls last, s),
+    stress as (select distinct on (project_id) project_id, s as stress_primary
+                 from (select project_id, s, sum(wk) as wk from inb group by 1,2) x
+                order by project_id, wk desc, s)
+    select p.name as project,
+           count(*)::int as multi_sourced_materials,
+           count(*) filter (where e.engine_primary <> g.grid_primary)::int as engine_ne_grid,
+           st.stress_primary,
+           (select count(*) from eng e2 where e2.project_id = mu.project_id and e2.engine_primary = st.stress_primary)::int as materials_engine_orders_from_stress_primary,
+           (select count(distinct m) from inb i2 where i2.project_id = mu.project_id and i2.s = st.stress_primary)::int as materials_stress_primary_supplies
+      from multi mu
+      join eng e using (project_id, m) join grid g using (project_id, m)
+      join stress st using (project_id)
+      join public.projects p on p.id = mu.project_id
+     group by p.name, mu.project_id, st.stress_primary order by p.name`);
+  report("G1 — primary supplier, three authors", g1, (rows) => {
+    out("", "**(G1) multi-sourced materials whose ENGINE primary (cheapest link) differs from the GRID's suggested primary (highest volume); and the ONE supplier the `supplier:primary` stress preset disrupts, against how many materials the engine actually orders from it:**");
+    out(...table(rows));
+  });
+
+  // G2 — demand model. `_resolve_demand_kind`: product `demand_distribution`, else
+  // the SCENARIO's `demand_model.kind`, else triangular. The Data Map states the
+  // default as "triangular, cv 0.30". App-created scenarios default to poisson.
+  const g2 = await tryQ(`
+    select p.name as project,
+           (select count(*) from public.products x where x.project_id = p.id)::int as products,
+           (select count(*) from public.products x where x.project_id = p.id and x.demand_distribution is null)::int as products_no_distribution,
+           (select string_agg(distinct coalesce(s.demand_model->>'kind', '<none>'), ',') from public.scenarios s where s.project_id = p.id) as scenario_kinds,
+           (select count(*) from public.simulation_runs r join public.scenarios s on s.id = r.scenario_id
+             where r.project_id = p.id and r.status = 'done' and s.demand_model->>'kind' = 'poisson')::int as done_runs_on_poisson_scenario,
+           (select count(*) from public.simulation_runs r where r.project_id = p.id and r.status = 'done')::int as done_runs
+      from public.projects p order by p.name`);
+  report("G2 — demand model", g2, (rows) => {
+    out("", "**(G2) products with no `demand_distribution` (the engine takes the SCENARIO's kind for them, the Data Map says triangular) and the scenario kinds each project holds:**");
+    out(...table(rows));
+  });
+
+  section("Audit 2026-09-29 · H — what `anon` can read: the browser's direct `.from()` reads against production's policies");
+  // H1 — every request the app sends goes out as `anon` (D155, D169). A table whose
+  // SELECT policies name no `anon`/PUBLIC role, or whose only policy tests the
+  // `app.*` GUC org context no PostgREST request sets, answers the browser with ZERO
+  // rows and no error — and a page that renders "none" from that is D169's shape.
+  const h1 = await tryQ(`
+    select c.relname as tbl,
+           coalesce(string_agg(distinct pol.polname || ' → ' ||
+             case when pol.polroles = '{0}' then 'PUBLIC'
+                  else (select string_agg(r.rolname, '+') from pg_roles r where r.oid = any(pol.polroles)) end, ' · '), '(none)') as select_policies,
+           bool_or(pol.polroles = '{0}' or exists (select 1 from pg_roles r where r.oid = any(pol.polroles) and r.rolname = 'anon')) as anon_has_a_policy,
+           has_table_privilege('anon', c.oid, 'SELECT') as anon_grant
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+      left join pg_policy pol on pol.polrelid = c.oid and pol.polcmd in ('r', '*')
+     where c.relname in ('ingest_runs','ingest_files','ingest_staged_rows','analysis_runs','supply_chain_data',
+                         'supply_chain_data_multi_tier','node_list','network_nodes','network_edges','projects',
+                         'bom_multi_level','bom_single_level','inbound_logistics','outbound_logistics','materials',
+                         'products','suppliers','customers','run_item_series','experiments','recovery_playbooks',
+                         'scenario_templates')
+     group by c.relname, c.oid order by c.relname`);
+  report("H1 — anon read surface", h1, (rows) => {
+    out("", "**(H1) SELECT policies on every table the browser reads by `.from()`, as production holds them:**");
+    out(...table(rows));
+  });
+
+  // I1 — the run-results workbook's `run_meta` sheet reads the LIVE scenario's seed
+  // and schedule; the reproducibility sheet reads the run's stamped copy (audit WP 8).
+  // Where the scenario moved after the run, one workbook carries two answers. A
+  // seed of 0 also runs as 42 (`datamap.py`: `or 42`).
+  const i1 = await tryQ(`
+    select count(*)::int as done_runs,
+           count(*) filter (where r.seed is not null)::int as runs_with_stamped_seed,
+           count(*) filter (where r.seed is not null and r.seed is distinct from s.seed)::int as live_seed_differs,
+           count(*) filter (where r.disruption_schedule is not null
+                              and r.disruption_schedule::jsonb is distinct from coalesce(s.disruption_schedule::jsonb, '[]'::jsonb))::int as live_schedule_differs,
+           count(*) filter (where coalesce(r.seed, s.seed) = 0)::int as seed_zero_runs_as_42
+      from public.simulation_runs r left join public.scenarios s on s.id = r.scenario_id
+     where r.status = 'done'`);
+  report("I1 — run_meta vs the run's own binding", i1, (rows) => {
+    out("", "**(I1) completed runs whose scenario has since changed seed or schedule** — the workbook's `run_meta` sheet then contradicts its `reproducibility` sheet:");
+    out(...table(rows));
+  });
+
+  // J1 — the critical-node analyser reads `supply_chain_data` in ONE unpaged
+  // PostgREST read (`predict-critical-nodes`). A project whose scored-row count
+  // sits exactly on a round cap was scored on a slice.
+  const j1 = await tryQ(`
+    select p.name as project,
+           count(*)::int as lane_rows,
+           count(*) filter (where s.critical_node_score is not null)::int as scored,
+           left(min(s.prediction_timestamp)::text, 16) as first_scored,
+           left(max(s.prediction_timestamp)::text, 16) as last_scored,
+           left(max(s.created_at)::text, 16) as lanes_written
+      from public.supply_chain_data s join public.projects p on p.id = s.project_id
+     group by p.name having count(*) filter (where s.critical_node_score is not null) > 0
+     order by p.name`);
+  report("J1 — critical-node scoring coverage", j1, (rows) => {
+    out("", "**(J1) lanes the critical-node analyser scored, per project:**");
+    out(...table(rows));
+  });
+
+  // F4b — the project whose rows sit on two plants: which plant, which table.
+  const f4b = await tryQ(`
+    with pl as (
+      select project_id, 'inbound' as t, plant_name from public.inbound_logistics
+      union all select project_id, 'outbound', plant_name from public.outbound_logistics
+      union all select project_id, 'bom_multi', plant_name from public.bom_multi_level
+      union all select project_id, 'bom_single', plant_name from public.bom_single_level
+      union all select project_id, 'node_list', plant_name from public.node_list
+      union all select project_id, 'supply_chain_data', plant_name from public.supply_chain_data
+      union all select project_id, 'multi_tier', plant_name from public.supply_chain_data_multi_tier
+      union all select project_id, 'network_nodes', plant_name from public.network_nodes)
+    select p.name as project, p.plant_name as project_plant, pl.t, pl.plant_name as row_plant, count(*)::int as rows
+      from pl join public.projects p on p.id = pl.project_id
+     where exists (select 1 from pl x where x.project_id = p.id and x.plant_name is distinct from p.plant_name)
+     group by 1,2,3,4 order by 1,3,4`);
+  report("F4b — plants per table", f4b, (rows) => {
+    out("", "**(F4b) for every project with a row off its own plant: each table's plant values:**");
     out(...table(rows));
   });
 }
