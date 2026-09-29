@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 350,
-      "migrations_applied": 342,
-      "last_migration": "20260929000001_audit_log_read_and_chain.sql"
+      "migrations_found": 351,
+      "migrations_applied": 343,
+      "last_migration": "20260929000003_account_self_service_names_its_user.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -18,8 +18,8 @@
   "counts": {
     "tables_in_schema": 81,
     "tables_covered": 55,
-    "columns_covered": 687,
-    "check_constraints": 49,
+    "columns_covered": 688,
+    "check_constraints": 50,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -1080,7 +1080,7 @@
           "page": "Auth.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1088,7 +1088,7 @@
           "page": "DataManager.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1103,7 +1103,7 @@
           "page": "FirmLevelNetwork.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1111,7 +1111,7 @@
           "page": "Forbidden.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1119,7 +1119,7 @@
           "page": "GettingStarted.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1127,7 +1127,7 @@
           "page": "InteractiveNetworkSpace.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1135,7 +1135,7 @@
           "page": "Landing.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1143,7 +1143,7 @@
           "page": "NotFound.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1151,7 +1151,7 @@
           "page": "ProcessLevelNetwork.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1159,7 +1159,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1167,14 +1167,14 @@
           "page": "Profile.tsx",
           "via": "rpc change_own_password",
           "grain": "table",
-          "evidence": "src/pages/Profile.tsx:110",
+          "evidence": "src/pages/Profile.tsx:111",
           "confirmed": true
         },
         {
           "page": "ProjectIntelligence.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1182,7 +1182,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1190,7 +1190,7 @@
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:82",
+          "evidence": "src/hooks/useAuth.tsx:120",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         }
@@ -1249,6 +1249,13 @@
           "definition": "UNIQUE (email)",
           "implicit": true,
           "added_by": "20250815000000_approved_users_base.sql"
+        },
+        {
+          "name": "approved_users_avatar_color_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ( avatar_color IS NULL OR avatar_color IN ( 'slate', 'red', 'orange', 'amber', 'green', 'teal', 'blue', 'indigo', 'violet', 'pink'))",
+          "added_by": "20260929000003_account_self_service_names_its_user.sql"
         }
       ],
       "indexes": [
@@ -1535,7 +1542,7 @@
               "page": "Auth.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1543,7 +1550,7 @@
               "page": "DataManager.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1551,7 +1558,7 @@
               "page": "DeveloperApi.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1559,7 +1566,7 @@
               "page": "FirmLevelNetwork.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1567,7 +1574,7 @@
               "page": "Forbidden.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1575,7 +1582,7 @@
               "page": "GettingStarted.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1583,7 +1590,7 @@
               "page": "InteractiveNetworkSpace.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1591,7 +1598,7 @@
               "page": "Landing.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1599,7 +1606,7 @@
               "page": "NotFound.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1607,7 +1614,7 @@
               "page": "ProcessLevelNetwork.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1615,7 +1622,7 @@
               "page": "ProductLevelNetwork.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1623,7 +1630,7 @@
               "page": "Profile.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1631,7 +1638,7 @@
               "page": "ProjectIntelligence.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1639,7 +1646,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1647,7 +1654,7 @@
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:82",
+              "evidence": "src/hooks/useAuth.tsx:120",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             }
@@ -1701,7 +1708,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "URL of the user's profile image, if they uploaded one.",
+          "meaning": "URL of a profile image uploaded to the `avatars` bucket. RETIRED by §4 D206: the upload was refused for every `anon` caller by its storage policies, and the owner chose an avatar colour instead, so no RPC reads or writes this column any more. Kept rather than dropped so nothing uploaded before is destroyed.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -1788,7 +1795,7 @@
           "name": "password_expires_at",
           "type": "timestamp with time zone",
           "nullable": false,
-          "default": "(now() + interval '90 days')",
+          "default": "(now() + public.password_max_age())",
           "primary_key": false,
           "unique": false,
           "references": null,
@@ -1797,7 +1804,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "When the current password stops being accepted — `now() + 90 days` at the time the row was written.",
+          "meaning": "When the current password expires — `now() + password_max_age()` (90 days) when the password was last set. Expiry does not refuse a sign-in: it sends the user to /profile and closes every other page until the password is changed (`RoleGuard`, reading `get_my_profile`'s server-computed `password_expired`; §4 D206). Rows that predate `20260527011429` were stamped by that migration's column default, not by a real password change.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -1808,7 +1815,7 @@
           "substitutions": [
             {
               "when": "no expiry is supplied",
-              "value": "90 days after the row is written",
+              "value": "password_max_age() (90 days) after the row is written",
               "provenance": "default",
               "visible_as": "the column default; the account pages render the resulting date"
             }
@@ -1836,7 +1843,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "Whether the user must set a new password before continuing. Set when an administrator resets an account.",
+          "meaning": "Whether the user must set a new password before continuing. Set when an administrator creates or resets an account; cleared by `change_own_password`. Enforced by `RoleGuard`, which could not see it until §4 D206.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -1868,7 +1875,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "Whether the account may sign in. Checked at login; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.",
+          "meaning": "Whether the account may sign in. Checked at login through `get_my_profile` (which, until §4 D206, raised for every user and was ignored, so the check never ran) and on every reload; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -1924,6 +1931,45 @@
           "surfaces": [],
           "resolution": null,
           "note": "NULLABLE, and rows are genuinely NULL here. It was added and backfilled once by `20260709000002`; WP 2.1 re-ran the backfill matching on `name` OR `slug` and leaving ambiguous matches alone rather than picking one. A row whose text org matches no organization — `'default_org'`, or a tenant renamed and re-typed — stays NULL and keeps working on the text branch. How many is a §15 question; no work-package session can reach the database.",
+          "engine_requirement": null
+        },
+        {
+          "name": "avatar_color",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000003_account_self_service_names_its_user.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The colour of the user's initial on their avatar — one token of a fixed palette, CHECK-constrained; the page maps each token to its fill (`src/lib/avatarColors.ts`, pinned to the CHECK by `avatarColors.test.ts`). §4 D206.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "the user has not chosen a colour (NULL)",
+              "value": "the theme's primary colour",
+              "provenance": "default",
+              "visible_as": "the \"Default\" swatch, selected, on /profile"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of the palette tokens in the CHECK"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
           "engine_requirement": null
         }
       ],
@@ -30979,5 +31025,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "bbda57e7cc8b"
+  "contract_version": "8de91a48043b"
 }
