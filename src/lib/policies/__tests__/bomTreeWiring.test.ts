@@ -29,8 +29,12 @@ describe("the tree is presentation over the unchanged flat set (D180)", () => {
 
   it("flat mode and every other stage keep KEY_W exactly; only the tree widens Material", () => {
     expect(src).toMatch(
-      /if \(!treeActive\) \{\s*return spec\.keyCols\.map\(\(c, i\) => \(\{ id: c\.id, w: i === 0 \? keyW\.a : keyW\.b, left: i === 0 \? 0 : keyW\.a \}\)\);/,
+      /if \(!treeActive\) \{\s*const flat = spec\.keyCols\.map\(\(c, i\) => \(\{ id: c\.id, w: i === 0 \? keyW\.a : keyW\.b, left: i === 0 \? 0 : keyW\.a \}\)\);\s*if \(!flatQty\) return flat;/,
     );
+    // A single-level BOM adds ONE frozen column, Qty / assy, between Material
+    // and Supplier — at the tree's own width — and changes neither key width.
+    expect(src).toMatch(/return \[flat\[0\], \{ id: "__qty", w: TREE_QTY_W, left: keyW\.a \}, \.\.\.flat\.slice\(1\)\];/);
+    expect(src).toMatch(/const flatQty = stageKey === "supplier" && !treeActive && qtyByMaterial\.size > 0;/);
     // one constant feeds both the <col> and the sticky offset (columnFit.ts §0.2)
     expect(src).toMatch(/\{keyDefs\.map\(\(d\) => \(\s*<col key=\{d\.id\} style=\{\{ width: d\.w \}\} \/>/);
   });

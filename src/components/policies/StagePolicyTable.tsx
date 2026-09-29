@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -81,6 +81,7 @@ import { useDerivedMaps } from "@/hooks/useDerivedMaps";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
 import type { StageRowsQuery } from "@/hooks/useStageGuards";
+import { qtyCellText, qtyPerAssemblyByMaterial } from "@/lib/policies/singleBomQty";
 import type { StageKey } from "@/lib/policies/stages";
 
 interface Props {
@@ -622,9 +623,21 @@ export function StagePolicyTable({
   // cells. Flat (and every other stage) is exactly the two `KEY_W` columns.
   type KeyColDef = { id: string; w: number; left: number | null };
   const treeKeyA = treeKeyWidthFor(winWidth);
+  // Qty per assembly on a SINGLE-level BOM (the tree has its own column):
+  // a frozen key column between Material and Supplier, from the uploaded
+  // bom_single_level rows read by the engine's rule (singleBomQty.ts).
+  const qtyByMaterial = useMemo(
+    () => qtyPerAssemblyByMaterial(stageRows.singleBomRows ?? []),
+    [stageRows.singleBomRows],
+  );
+  const flatQty = stageKey === "supplier" && !treeActive && qtyByMaterial.size > 0;
+  /** Flat key column `i` of `spec.keyCols` → its index in `keyDefs`. */
+  const keyIdx = (i: number) => (flatQty && i > 0 ? i + 1 : i);
   const designKeyDefs: KeyColDef[] = useMemo(() => {
     if (!treeActive) {
-      return spec.keyCols.map((c, i) => ({ id: c.id, w: i === 0 ? keyW.a : keyW.b, left: i === 0 ? 0 : keyW.a }));
+      const flat = spec.keyCols.map((c, i) => ({ id: c.id, w: i === 0 ? keyW.a : keyW.b, left: i === 0 ? 0 : keyW.a }));
+      if (!flatQty) return flat;
+      return [flat[0], { id: "__qty", w: TREE_QTY_W, left: keyW.a }, ...flat.slice(1)];
     }
     const supplierCol = spec.keyCols[1]?.id ?? "supplier_id";
     if (!treePivot) {
@@ -641,7 +654,7 @@ export function StagePolicyTable({
       { id: "__qty", w: TREE_QTY_W, left: null },
       { id: supplierCol, w: keyW.b, left: null },
     ];
-  }, [treeActive, treePivot, treeKeyA, treeLevelCount, keyW.a, keyW.b, spec.keyCols]);
+  }, [treeActive, treePivot, treeKeyA, treeLevelCount, keyW.a, keyW.b, spec.keyCols, flatQty]);
   // User widths replace the design width; the sticky `left` offsets are then
   // re-accumulated from the widths actually rendered (columnFit.ts §0.2).
   const keyDefs: KeyColDef[] = useMemo(() => {
@@ -1491,6 +1504,49 @@ export function StagePolicyTable({
     trStyle?: React.CSSProperties;
   };
 
+  /** Flat, single-level BOM: the "Qty / assy" cell for one material. */
+  const flatQtyTd = (materialId: string, bgClass: string) => {
+    const q = qtyCellText(qtyByMaterial.get(materialId));
+    const d = keyDefs[1];
+    return (
+      <td
+        key="__qty"
+        className={cn(
+          "sticky z-20 border-b border-r border-[--hair-divider] px-2 py-[3px] text-right text-[12px] tabular-nums",
+          bgClass,
+        )}
+        style={{ left: d.left ?? undefined, width: d.w, minWidth: d.w, maxWidth: d.w }}
+        title={q.title}
+      >
+        <span className="block truncate" style={{ color: q.defaulted || q.text === "—" ? "#a1a1aa" : "#18181b" }}>
+          {q.text}
+          {q.defaulted && <span className="ml-0.5 text-[9px]">·def</span>}
+        </span>
+      </td>
+    );
+  };
+  /** Its header: the tree's label, "per product" since the parent is always the product. */
+  const flatQtyTh = () => {
+    const d = keyDefs[1];
+    return (
+      <th
+        key="__qty"
+        className="sticky top-[23px] z-40 bg-[--brand-ink] p-0 align-top"
+        style={{ left: d.left ?? undefined, width: d.w, minWidth: d.w }}
+      >
+        <div
+          className="flex h-full flex-col items-end justify-start gap-px px-1.5 py-1 text-right font-mono text-white"
+          style={{ borderRight: "1px solid rgba(255,255,255,0.22)" }}
+          title="Units of this material per unit of finished product, from the single-level BOM. A blank or 0 rate runs as 1 (engine rule)."
+        >
+          <span className="text-[10px] font-medium uppercase leading-[1.2] tracking-[0.08em]">Qty / assy</span>
+          <span className="text-[9px] leading-[1.2] text-white/55">per product</span>
+        </div>
+        {resizeHandle("__qty", "Qty / assy")}
+      </th>
+    );
+  };
+
   /** One data row (§5.1 — plain or a group's expanded member). */
   const renderRow = (
     r: Record<string, unknown>,
@@ -1510,8 +1566,9 @@ export function StagePolicyTable({
       <tr key={rowKey} className="group" data-occ={tree?.occKey} style={tree?.trStyle}>
         {tree?.cellsBefore({ accent: accent ?? null, flags: materialFlags(r, rowKey, overrode, isDirty) })}
         {spec.keyCols.map((c, i) => tree && i === 0 ? null : (
+          <Fragment key={c.id}>
+          {i === 1 && flatQty && !tree && flatQtyTd(String(r.material_id ?? ""), "bg-background group-hover:bg-[#fafafa]")}
           <td
-            key={c.id}
             className={cn(
               (!supplierDef || supplierDef.left !== null) && "sticky z-20",
               "border-b border-r border-[--hair-divider] bg-background px-2 py-[3px] font-mono text-[11px] group-hover:bg-[#fafafa]",
@@ -1519,10 +1576,10 @@ export function StagePolicyTable({
               tree && r.__in_house && "text-[#71717a]",
             )}
             style={{
-              left: supplierDef ? (supplierDef.left ?? undefined) : keyLeft(i),
-              width: supplierDef ? supplierDef.w : keyWidths[i],
-              minWidth: supplierDef ? supplierDef.w : keyWidths[i],
-              maxWidth: supplierDef ? supplierDef.w : keyWidths[i],
+              left: supplierDef ? (supplierDef.left ?? undefined) : keyLeft(keyIdx(i)),
+              width: supplierDef ? supplierDef.w : keyWidths[keyIdx(i)],
+              minWidth: supplierDef ? supplierDef.w : keyWidths[keyIdx(i)],
+              maxWidth: supplierDef ? supplierDef.w : keyWidths[keyIdx(i)],
               ...(i === 0 && accent ? { borderLeft: `2px solid ${accent}` } : {}),
             }}
           >
@@ -1644,6 +1701,7 @@ export function StagePolicyTable({
                 )}
             </span>
           </td>
+          </Fragment>
         ))}
 
         {visible.map((fc, fi) => {
@@ -2686,13 +2744,14 @@ export function StagePolicyTable({
                 renderTreeHeads()
               ) : (
                 spec.keyCols.map((c, i) => (
+                  <Fragment key={c.id}>
+                  {i === 1 && flatQty && flatQtyTh()}
                   <th
-                    key={c.id}
                     className="sticky top-[23px] z-40 bg-[--brand-ink] p-0 align-top"
                     style={{
-                      left: keyLeft(i),
-                      width: keyWidths[i],
-                      minWidth: keyWidths[i],
+                      left: keyLeft(keyIdx(i)),
+                      width: keyWidths[keyIdx(i)],
+                      minWidth: keyWidths[keyIdx(i)],
                     }}
                   >
                     <SortHeader
@@ -2704,6 +2763,7 @@ export function StagePolicyTable({
                     />
                     {resizeHandle(c.id, c.label)}
                   </th>
+                  </Fragment>
                 ))
               )}
               {visible.map((fc, i) => {
@@ -2870,9 +2930,10 @@ export function StagePolicyTable({
                         )}
                       </span>
                     </td>
+                    {flatQty && flatQtyTd(group.id, "bg-[#f7f7f7]")}
                     <td
                       className="sticky z-20 border-b border-r border-r-[--hair-border] bg-[#f7f7f7] px-2 py-[3px] font-mono text-[11px] text-muted-foreground"
-                      style={{ left: keyLeft(1), width: keyWidths[1], minWidth: keyWidths[1], maxWidth: keyWidths[1] }}
+                      style={{ left: keyLeft(keyIdx(1)), width: keyWidths[keyIdx(1)], minWidth: keyWidths[keyIdx(1)], maxWidth: keyWidths[keyIdx(1)] }}
                     >
                       {keyBLabel}
                     </td>

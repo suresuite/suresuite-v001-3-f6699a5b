@@ -50,7 +50,7 @@ function withPrefs(prefs: Prefs | null) {
 }
 afterEach(() => vi.unstubAllGlobals());
 
-function render(o: { bomLevel: string; rows: Record<string, unknown>[]; bomRows?: unknown[]; deepRows?: unknown[] }) {
+function render(o: { bomLevel: string; rows: Record<string, unknown>[]; bomRows?: unknown[]; deepRows?: unknown[]; singleBomRows?: unknown[] }) {
   return renderToStaticMarkup(
     createElement(StagePolicyTable, {
       projectId: "P",
@@ -68,6 +68,7 @@ function render(o: { bomLevel: string; rows: Record<string, unknown>[]; bomRows?
         reload: () => {},
         bomLevel: o.bomLevel,
         bomRows: (o.bomRows ?? []) as never,
+        singleBomRows: (o.singleBomRows ?? []) as never,
         deepRows: (o.deepRows ?? []) as never,
         loadError: null,
         deepError: null,
@@ -111,7 +112,7 @@ describe("the BOM tree renders at AA-ver3's size (D180)", () => {
 });
 
 describe("a single-level project is untouched (D180)", () => {
-  it("no tree, no Qty / assy, no layout bar — the flat grid names every line", () => {
+  it("no tree, no layout bar — and with no BOM rows, no Qty / assy — the flat grid names every line", () => {
     withPrefs(null);
     const rows = [
       { key: "S1::M001", supplier_id: "S1", material_id: "M001", __lane_count: 2 },
@@ -124,6 +125,34 @@ describe("a single-level project is untouched (D180)", () => {
     expect(html).not.toContain("expand to");
     expect(html).not.toContain("BOM tree ·");
     expect(count(html, "data-occ=")).toBe(0);
+    for (const r of rows) expect(html).toContain(r.supplier_id);
+  });
+});
+
+describe("a single-level BOM shows Qty / assy in the flat grid", () => {
+  const rows = [
+    { key: "S1::M001", supplier_id: "S1", material_id: "M001", __lane_count: 1 },
+    { key: "S3::M002", supplier_id: "S3", material_id: "M002", __lane_count: 1 },
+    { key: "S9::M999", supplier_id: "S9", material_id: "M999", __lane_count: 1 },
+  ];
+  const singleBomRows = [
+    { product_id: "P1", material_id: "M001", consumption_rate: 4 },
+    { product_id: "P1", material_id: "M002", consumption_rate: null },
+  ];
+  const html = render({ bomLevel: "single", rows, singleBomRows });
+  const text = html.replace(/<[^>]+>/g, " ");
+
+  it("the column appears, headed like the tree's, per product", () => {
+    expect(html).toContain("Qty / assy");
+    expect(html).toContain("per product");
+    expect(count(html, "data-occ=")).toBe(0);
+  });
+
+  it("each line shows its material's qty; a blank rate shows the engine's 1, marked; a material outside the BOM shows a dash", () => {
+    expect(html).toContain('title="4 per P1"');
+    expect(html).toContain("the engine uses 1");
+    expect(text).toMatch(/1\s*·def/);
+    expect(html).toContain('title="Not in the bill of materials"');
     for (const r of rows) expect(html).toContain(r.supplier_id);
   });
 });

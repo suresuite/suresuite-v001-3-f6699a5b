@@ -19640,6 +19640,22 @@ from lane volumes" — which its `setup` does not (it splits equally). That text
 engine registry's, generated from scsim, and correcting it is an engine-metadata
 change rather than a Data map one.
 
+#### Addendum · Qty / assy on a single-level BOM · 2026-09-29
+
+Owner-directed: quantity per assembly matters on a single-level BOM too, and the
+Supplier grid only offered it inside the multi-level tree. The flat grid now shows a
+frozen **Qty / assy** column between Material and Supplier whenever the project's BOM
+rows are single-level (the rows' shape decides, as D178 requires, not the label). The
+value is `bom_single_level.consumption_rate` read by the ENGINE's rule —
+`datamap.py` builds `BomArc(consumption_rate=_num(rate) or 1.0)` — so a blank or 0
+rate shows the 1 the run uses, marked `def`, never a blank the run does not have. A
+material used by several products shows the range and the count, with every product
+in the tooltip; a material outside the BOM shows "—". `singleBomQty.ts` holds the rule
+(its test pins the engine line it restates); `bomTreeRender.test.tsx` renders the
+column; `bomTreeWiring.test.ts` now pins that the flat key widths are unchanged and
+exactly one column is added; the Data map's column-by-column tab lists it. Read-only:
+the rate is changed in the BOM upload, like every other uploaded value on this grid.
+
 
 ## 17. Sequencing
 

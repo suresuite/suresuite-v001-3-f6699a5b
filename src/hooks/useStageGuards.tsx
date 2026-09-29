@@ -25,6 +25,10 @@ export interface StageRowsQuery {
    *  `rows` above remains the flat set every guard and verifier reads. */
   bomLevel: string;
   bomRows: Record<string, unknown>[];
+  /** Single-level BOM rows (product ← material) for the flat grid's
+   *  "Qty / assy"; empty on a multi-level project. Optional so a stage that
+   *  never has a BOM need not carry it. */
+  singleBomRows?: Record<string, unknown>[];
   deepRows: Record<string, unknown>[];
   /** §4 D178 — the read that emptied `rows`, named, or null. The grid RENDERS
    *  this in its empty state; "no lines for this project" over a failed read
