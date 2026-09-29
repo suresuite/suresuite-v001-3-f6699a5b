@@ -297,6 +297,11 @@ class InventoryControl(PolicyPlugin):
         kappa = self._kappa(ctx)
         _types, _q, k_ov, s_abs, S_abs = self._override_arrays(m)
         kappa_vec = np.where(np.isnan(k_ov), float(kappa), k_ov)
+
+        print("kappa (strip value):", kappa)         # NEW
+        print("k_ov (per-mat override):", k_ov)       # NEW
+        print("kappa_vec (effective):", kappa_vec)    # NEW
+                
         if self.params.basis == "forward_visible":
             # §II.4 Forward-visible schedule (WSC-2026 MTO), inclusive windows:
             # s_m[t] = Σ_{τ=t}^{t+T_s} D̂_m[τ]; S_m[t] = Σ_{τ=t}^{t+T_s+κ} D̂_m[τ].

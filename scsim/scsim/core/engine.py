@@ -628,6 +628,15 @@ def _initialize_state(compiled: CompiledScenario, ctx: SimContext) -> None:
         fn(ctx)
     init = np.where(model.mat_initial >= 0, model.mat_initial,
                     np.maximum(ctx.level_S - model.exp_demand_m * model.link_lt[model.primary_link], 0.0))
+
+    print("mat_ids:", model.mat_ids)
+    print("material_demand:", ctx.material_demand)
+    print("level_S:", ctx.level_S)
+    print("exp_demand_m:", model.exp_demand_m)
+    print("link_lt[primary]:", model.link_lt[model.primary_link])
+    print("mat_initial:", model.mat_initial)
+    print("computed init:", init)
+    
     ctx.on_hand = init.astype(float)
     if model.mts_mask.any():
         ctx.fg_on_hand = ctx.fg_target.copy()  # MTS starts at its stock target
