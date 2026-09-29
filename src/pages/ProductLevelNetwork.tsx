@@ -18,7 +18,7 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { supabase } from '@/integrations/supabase/client';
-import { buildProductLevelGraph, edgeWidthForFlow, maxFlow, GRAPH_INK, type FlatLaneRow } from '@/lib/graph';
+import { buildProductLevelGraph, edgeWidthForFlow, maxFlow, EDGE_WIDTH, GRAPH_INK, type FlatLaneRow } from '@/lib/graph';
 import { useAuth } from '@/hooks/useAuth';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -668,9 +668,17 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
             },
             type: 'straight',
             // DIRECTION IS VISIBLE. These lanes are directed and the graph read as
-            // undirected because nothing drew an arrowhead.
-            markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: GRAPH_INK.edge },
-            data: { weight: e.flow, lane: e.lane },
+            // undirected because nothing drew an arrowhead. Sized in px rather than
+            // React Flow's default of stroke-width units, so a wide edge does not
+            // grow an arrowhead several times the size of the node it points at.
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 16,
+              height: 16,
+              markerUnits: 'userSpaceOnUse',
+              color: GRAPH_INK.edge,
+            },
+            data: { weight: e.flow, lane: e.lane, width: edgeWidthForFlow(e.flow, maxFlow(productGraph.edges)) },
           };
         }
       }
@@ -906,10 +914,13 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
 
   useEffect(() => {
     const updatedEdges = allEdges.map(edge => {
+      // Keep the flow width through a selection: a flat width here erased the
+      // encoding the moment a node was clicked.
+      const width = typeof edge.data?.width === 'number' ? edge.data.width : EDGE_WIDTH.uniform;
       if (selectedNode && (edge.source === selectedNode.id || edge.target === selectedNode.id)) {
-        return { ...edge, style: { stroke: '#3b82f6', strokeWidth: 1.8, strokeOpacity: 0.8 } };
+        return { ...edge, style: { stroke: GRAPH_INK.edgeHighlight, strokeWidth: width + 0.6, strokeOpacity: 0.8 } };
       } else {
-        return { ...edge, style: { stroke: '#8C8C8C', strokeWidth: 1.2, strokeOpacity: 0.5 } };
+        return { ...edge, style: { stroke: GRAPH_INK.edge, strokeWidth: width, strokeOpacity: 0.5 } };
       }
     });
     setEdges(updatedEdges);

@@ -23,8 +23,13 @@ import type { Echelon, GraphEdge, GraphNode } from './types';
 /** Size in px. Constant when nothing was chosen, so the legend can say "uniform". */
 export const NODE_SIZE = { min: 18, max: 56, uniform: 30 } as const;
 
-/** Edge stroke width in px. */
-export const EDGE_WIDTH = { min: 1, max: 6, uniform: 1.5 } as const;
+/**
+ * Edge stroke width in px. The range is deliberately narrow: at a 6 px ceiling the
+ * product view read as a bundle of bars, and the lane is the thing being shown, not
+ * its volume. The top of the range sits at the width the selection highlight has
+ * always drawn, so the resting graph and a clicked one weigh the same.
+ */
+export const EDGE_WIDTH = { min: 0.75, max: 1.5, uniform: 1.2 } as const;
 
 /**
  * Node diameter from a metric, scaled across the values actually present.

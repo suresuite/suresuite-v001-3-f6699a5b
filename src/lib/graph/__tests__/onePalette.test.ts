@@ -24,7 +24,7 @@ const BASELINE: Record<string, number> = {
   // 11 → 10: WP 8.4 took the edge stroke from `GRAPH_INK` instead of a literal. The
   // remaining ten are `GROUP_COLORS` and the selection highlight, which go when the
   // page's A/B/C/D columns become echelons outright.
-  'src/pages/ProductLevelNetwork.tsx': 10,
+  'src/pages/ProductLevelNetwork.tsx': 8,
   // UNCHANGED at 32 by WP 8.3, and that is the honest number: the two classifiers it
   // deleted held no colours. `getNodeColor` still holds all 32, because replacing it
   // is the same change as migrating the level tiles and the flow list — WP 8.4's.
