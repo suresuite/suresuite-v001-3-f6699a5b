@@ -60,8 +60,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (!data || data.length === 0) {
+        // The server returns no row for a wrong password AND for a suspended account
+        // (PLAN.md §4 D205) and does not say which, so the message may not either.
         console.log('[AUTH] No user data returned from authentication');
-        return { success: false, error: 'Invalid email or password' };
+        return { success: false, error: 'Invalid email or password, or the account is suspended. Contact your administrator if this persists.' };
       }
 
       const userData = data[0];

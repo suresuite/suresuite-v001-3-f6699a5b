@@ -281,6 +281,6 @@ Free text a person wrote about why. The only column here that carries a REASON r
 
 ---
 
-*Generated from data contract `7be43dae7f5a`, engine `0.2.8`,
+*Generated from data contract `c1b8c906bac6`, engine `0.2.8`,
 sidecar `supabase/contract/policy_versions.contract.yaml`, table created by `20260609000002_policy_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

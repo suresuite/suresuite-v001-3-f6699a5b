@@ -68,19 +68,19 @@ unnoticed.
 
 <details><summary>13 app-shell read(s) — not lineage</summary>
 
-* `Auth.tsx` — `src/hooks/useAuth.tsx:82`
-* `DataManager.tsx` — `src/hooks/useAuth.tsx:82`
-* `FirmLevelNetwork.tsx` — `src/hooks/useAuth.tsx:82`
-* `Forbidden.tsx` — `src/hooks/useAuth.tsx:82`
-* `GettingStarted.tsx` — `src/hooks/useAuth.tsx:82`
-* `InteractiveNetworkSpace.tsx` — `src/hooks/useAuth.tsx:82`
-* `Landing.tsx` — `src/hooks/useAuth.tsx:82`
-* `NotFound.tsx` — `src/hooks/useAuth.tsx:82`
-* `ProcessLevelNetwork.tsx` — `src/hooks/useAuth.tsx:82`
-* `ProductLevelNetwork.tsx` — `src/hooks/useAuth.tsx:82`
-* `ProjectIntelligence.tsx` — `src/hooks/useAuth.tsx:82`
-* `ProjectPolicies.tsx` — `src/hooks/useAuth.tsx:82`
-* `SimulationLab.tsx` — `src/hooks/useAuth.tsx:82`
+* `Auth.tsx` — `src/hooks/useAuth.tsx:84`
+* `DataManager.tsx` — `src/hooks/useAuth.tsx:84`
+* `FirmLevelNetwork.tsx` — `src/hooks/useAuth.tsx:84`
+* `Forbidden.tsx` — `src/hooks/useAuth.tsx:84`
+* `GettingStarted.tsx` — `src/hooks/useAuth.tsx:84`
+* `InteractiveNetworkSpace.tsx` — `src/hooks/useAuth.tsx:84`
+* `Landing.tsx` — `src/hooks/useAuth.tsx:84`
+* `NotFound.tsx` — `src/hooks/useAuth.tsx:84`
+* `ProcessLevelNetwork.tsx` — `src/hooks/useAuth.tsx:84`
+* `ProductLevelNetwork.tsx` — `src/hooks/useAuth.tsx:84`
+* `ProjectIntelligence.tsx` — `src/hooks/useAuth.tsx:84`
+* `ProjectPolicies.tsx` — `src/hooks/useAuth.tsx:84`
+* `SimulationLab.tsx` — `src/hooks/useAuth.tsx:84`
 
 These reach the table only through modules the shell mounts on every page.
 Listing them as surfaces would be true about the imports and false about
@@ -109,8 +109,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `password_changed_at` | — | `timestamp with time zone` | — | — | When the password was last set. Server-stamped. |
 | `password_expires_at` | — | `timestamp with time zone` | — | — | When the current password stops being accepted — `now() + 90 days` at the time the row was written. |
 | `force_password_change` | — | `boolean` | — | — | Whether the user must set a new password before continuing. Set when an administrator resets an account. |
-| `is_active` | — | `boolean` | — | — | Whether the account may sign in. Checked at login; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`. |
-| `organization_id` | — | `uuid` | — | — | The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. |
+| `is_active` | — | `boolean` | — | — | Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. Before that the only check was the browser's, through a call that fails for anon, so the column was set and never read. It is not consulted by any RLS policy, so suspending a user does not end a browser session that is already signed in (D28's client-asserted identity). |
+| `organization_id` | — | `uuid` | — | — | The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it. |
 
 ## Each column in full
 
@@ -335,7 +335,7 @@ Whether the user must set a new password before continuing. Set when an administ
 
 ### `is_active`
 
-Whether the account may sign in. Checked at login; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.
+Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. Before that the only check was the browser's, through a call that fails for anon, so the column was set and never read. It is not consulted by any RLS policy, so suspending a user does not end a browser session that is already signed in (D28's client-asserted identity).
 
 | | |
 |---|---|
@@ -349,7 +349,7 @@ Whether the account may sign in. Checked at login; it is not consulted by any RL
 
 ### `organization_id`
 
-The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns.
+The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it.
 
 | | |
 |---|---|
@@ -372,6 +372,6 @@ The user's tenant, by uuid — the same organization `organization` names, and t
 
 ---
 
-*Generated from data contract `7be43dae7f5a`, engine `0.2.8`,
+*Generated from data contract `c1b8c906bac6`, engine `0.2.8`,
 sidecar `supabase/contract/approved_users.contract.yaml`, table created by `20250815000000_approved_users_base.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 350,
-  "migrations_applied": 342,
+  "migrations_found": 351,
+  "migrations_applied": 343,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260929000001_audit_log_read_and_chain.sql",
+  "last_migration": "20260929000002_admin_users_read.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 290,
+    "functions": 297,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -20972,6 +20972,16 @@
   },
   "functions": [
     {
+      "name": "_active_super_admin_count",
+      "signature": "_active_super_admin_count()",
+      "args": [],
+      "returns": "integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20260929000002_admin_users_read.sql"
+    },
+    {
       "name": "_api_key_audit",
       "signature": "_api_key_audit(uuid, text, uuid, jsonb, jsonb)",
       "args": [
@@ -21011,7 +21021,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000003_admin_management_rpcs.sql"
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "_build_dataset_snapshot_v2",
@@ -21119,6 +21129,16 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
+    },
+    {
+      "name": "_lock_active_super_admins",
+      "signature": "_lock_active_super_admins()",
+      "args": [],
+      "returns": "void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": null,
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "_proposals_touch",
@@ -21248,7 +21268,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260712000002_admin_project_management.sql"
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "admin_list_projects",
@@ -21275,6 +21295,32 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260712000002_admin_project_management.sql"
+    },
+    {
+      "name": "admin_list_users",
+      "signature": "admin_list_users(uuid, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text"
+      ],
+      "returns": "TABLE ( user_id uuid, name text, email text, role text, is_active boolean, organization_id uuid, organization text, organization_status text, org_role text, mtd_requests bigint, mtd_tokens bigint, mtd_cost_usd numeric, monthly_budget_usd numeric, created_at timestamptz)",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": "D205 — /admin/users's read. The reader is a parameter and must be an active super ",
+      "defined_by": "20260929000002_admin_users_read.sql"
+    },
+    {
+      "name": "admin_platform_overview",
+      "signature": "admin_platform_overview(uuid, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": "D205 — /admin's figures. Reader is a parameter and must be an active super admin; ",
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "admin_rename_project",
@@ -21351,7 +21397,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000003_admin_management_rpcs.sql"
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "admin_set_user_budget",
@@ -21402,7 +21448,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000003_admin_management_rpcs.sql"
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "admin_transfer_project",
@@ -21471,6 +21517,20 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260711000003_admin_management_rpcs.sql"
+    },
+    {
+      "name": "admin_usage_log_read",
+      "signature": "admin_usage_log_read(uuid, text, integer)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_limit integer DEFAULT 500"
+      ],
+      "returns": "TABLE ( id uuid, user_id uuid, user_name text, model_code text, provider_code text, prompt_tokens integer, completion_tokens integer, total_tokens integer, cost_usd numeric, latency_ms integer, status text, created_at timestamptz)",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": "D205 — /admin/usage's read. Reader is a parameter and must be an active super admin.",
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "advance_chat_plan_step",
@@ -21726,6 +21786,16 @@
       "defined_by": "20260918000001_org_row_uuid_only.sql"
     },
     {
+      "name": "approved_users_sync_org_membership",
+      "signature": "approved_users_sync_org_membership()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260929000002_admin_users_read.sql"
+    },
+    {
       "name": "archive_project_memory",
       "signature": "archive_project_memory(uuid)",
       "args": [
@@ -21865,7 +21935,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260929000001_audit_log_read_and_chain.sql"
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "authenticate_user",
@@ -24040,6 +24110,16 @@
       "volatility": "STABLE",
       "comment": "Is this organization the caller's? UUID only, since Phase 3 / WP 3.0 (D29): ",
       "defined_by": "20260916000011_org_identity_uuid_only.sql"
+    },
+    {
+      "name": "organization_members_match_account",
+      "signature": "organization_members_match_account()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "project_freshness",
