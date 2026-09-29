@@ -1,3 +1,8 @@
+# SCSIM — supply chain simulation library and stress-test framework.
+# Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
+# release; see scsim/NOTICE.md for licensing, funding and citation.
+# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+
 """P-P.5 short_term_capacity (overtime) — ANTICIPATION (Part IV §4.3). ✅
 
 Context: overtime bites only when capacity binds (~2% of weeks in the

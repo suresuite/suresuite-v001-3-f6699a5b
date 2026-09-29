@@ -1,3 +1,8 @@
+# SCSIM — supply chain simulation library and stress-test framework.
+# Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
+# release; see scsim/NOTICE.md for licensing, funding and citation.
+# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+
 """P-P.1 inventory_control — BUILT_IN buffer (Part IV §4.1). ✅ min_max.
 
 Context: the everyday replenishment rule — the baseline shock absorber every

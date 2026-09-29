@@ -1,3 +1,8 @@
+# SCSIM — supply chain simulation library and stress-test framework.
+# Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
+# release; see scsim/NOTICE.md for licensing, funding and citation.
+# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+
 """Every clamp at the UI→engine boundary says so (audit 2026-09-22, F-21).
 
 `project_map._clamp` used to return silently, and a dozen values a user typed
