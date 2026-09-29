@@ -2846,6 +2846,116 @@ async function bomShapeProbe() {
 }
 
 /**
+ * §15 · BOM usability Phase 1, second read — WHAT DOES A TREE CELL ACTUALLY READ?
+ *
+ * The first read (B1–B16, run `36555596249`) found both multi-level projects'
+ * derived deep lanes PREDATE WP 8.2 (`bom_depth` NULL on every row; derived
+ * 2025-10-10 and 2026-07-05), and on `Project AA - ver3` not one of 195
+ * (product, leaf) pairs joined to a derived row by `path_root`. The Supplier
+ * tree (D177) keys every number on (child, parent, path_root) and every root on
+ * the outbound rows' `from_location`, so this reads exactly those keys — the
+ * values a cell renders, not a count of them.
+ */
+async function bomDerivedLaneDetail() {
+  section("§15 · BOM usability Phase 1 — what the Supplier tree's cells read from the derived lane");
+  const MT = `
+    bp AS (SELECT DISTINCT project_id FROM public.bom_multi_level),
+    mt AS (SELECT m.* FROM public.supply_chain_data_multi_tier m WHERE m.project_id IN (SELECT project_id FROM bp))`;
+
+  report("(B17) path_root per data_source", await tryQ(`
+    WITH ${MT}
+    SELECT p.name AS project, mt.data_source,
+           COALESCE(NULLIF(btrim(mt.path_root), ''), '(blank)') AS path_root,
+           COUNT(*)::int AS rows,
+           COUNT(*) FILTER (WHERE mt.bom_depth IS NULL)::int AS bom_depth_null,
+           string_agg(DISTINCT COALESCE(mt.level::text, 'null'), ',') AS level_values,
+           round(SUM(mt.weighted), 4)::text AS sum_weighted,
+           COUNT(*) FILTER (WHERE COALESCE(mt.weighted, 0) = 0)::int AS weighted_zero_or_null,
+           MIN(mt.created_at)::text AS first_created, MAX(mt.created_at)::text AS last_created
+      FROM mt JOIN public.projects p ON p.id = mt.project_id
+     GROUP BY p.name, mt.data_source, 3
+     ORDER BY p.name, mt.data_source, rows DESC
+     LIMIT 60`), (rows) => {
+    out("", "**(B17) derived-lane rows per `data_source` × `path_root`** — the tree reads a bom row's numbers only when its `path_root` equals an outbound row's `from_location`:");
+    out(...table(rows));
+  });
+
+  report("(B18) outbound rows", await tryQ(`
+    WITH ${MT}
+    SELECT p.name AS project, mt.from_location, mt.to_location, mt.path_root, mt.weighted::text, mt.level, mt.bom_depth
+      FROM mt JOIN public.projects p ON p.id = mt.project_id
+     WHERE mt.data_source = 'outbound' ORDER BY p.name LIMIT 20`), (rows) => {
+    out("", "**(B18) the derived lane's outbound rows** — the tree's roots and their demand:");
+    out(...table(rows));
+  });
+
+  report("(B19) key match", await tryQ(`
+    WITH ${MT},
+    roots AS (SELECT project_id, btrim(from_location) AS r FROM mt WHERE data_source = 'outbound'),
+    e AS (SELECT DISTINCT project_id, btrim(material_id) AS c, btrim(higher_level_component_id) AS pa
+            FROM public.bom_multi_level WHERE COALESCE(btrim(higher_level_component_id), '') <> '')
+    SELECT p.name AS project,
+      (SELECT COUNT(*) FROM e WHERE e.project_id = p.id)::int AS uploaded_edges,
+      (SELECT COUNT(*) FROM e WHERE e.project_id = p.id AND EXISTS (
+          SELECT 1 FROM mt JOIN roots ON roots.project_id = mt.project_id AND roots.r = btrim(mt.path_root)
+           WHERE mt.project_id = e.project_id AND mt.data_source = 'bom'
+             AND btrim(mt.from_location) = e.c AND btrim(mt.to_location) = e.pa))::int AS edges_a_tree_cell_can_read,
+      (SELECT COUNT(*) FROM (SELECT 1 FROM mt WHERE mt.project_id = p.id AND data_source = 'bom'
+          GROUP BY btrim(from_location), btrim(to_location), btrim(path_root) HAVING COUNT(*) > 1) d)::int AS bom_keys_on_2plus_rows,
+      (SELECT COUNT(*) FROM (SELECT 1 FROM mt WHERE mt.project_id = p.id AND data_source = 'inbound'
+          GROUP BY btrim(from_location), btrim(to_location) HAVING COUNT(*) > 1) d)::int AS inbound_pairs_on_2plus_rows,
+      (SELECT COUNT(*) FROM mt WHERE mt.project_id = p.id AND data_source NOT IN ('bom', 'inbound', 'outbound'))::int AS other_source_rows
+    FROM public.projects p WHERE p.id IN (SELECT project_id FROM bp) ORDER BY p.name`), (rows) => {
+    out("", "**(B19) how many uploaded BOM edges would show a NUMBER in the tree** (a derived row keyed (child, parent, a root the tree knows)); the rest render `not derived — run Combine`:");
+    out(...table(rows));
+  });
+
+  report("(B20) bom-row sample", await tryQ(`
+    WITH ${MT},
+    s AS (SELECT mt.*, ROW_NUMBER() OVER (PARTITION BY mt.project_id ORDER BY mt.from_location, mt.to_location) AS rn
+            FROM mt WHERE data_source = 'bom'
+             AND btrim(from_location) IN ('WP1', 'DSC71N', 'E539.15112.000.00', 'ASNA2050DCJ3208', 'E539.14519.000.00'))
+    SELECT p.name AS project, s.from_location, s.to_location, s.path_root, s.level, s.bom_depth,
+           s.material_consumption_rate::text AS rate, s.weighted::text
+      FROM s JOIN public.projects p ON p.id = s.project_id WHERE rn <= 30 ORDER BY p.name, rn`), (rows) => {
+    out("", "**(B20) the derived rows behind the first branch of B16** (`DB366 (S14A) > WP1 > DSC71N > … > ASNA2050DCJ3208`) — exactly what those tree cells print:");
+    out(...table(rows));
+  });
+
+  report("(B21) engine/derivation disagreements", await tryQ(`
+    WITH RECURSIVE
+    b AS (SELECT project_id, btrim(material_id) AS child, NULLIF(btrim(higher_level_component_id), '') AS parent, consumption_rate AS rate
+            FROM public.bom_multi_level WHERE COALESCE(btrim(material_id), '') <> ''),
+    par AS (SELECT DISTINCT project_id, parent AS id FROM b WHERE parent IS NOT NULL),
+    chi AS (SELECT DISTINCT project_id, child AS id FROM b WHERE parent IS NOT NULL),
+    top AS (SELECT * FROM par p WHERE NOT EXISTS (SELECT 1 FROM chi c WHERE c.project_id = p.project_id AND c.id = p.id)),
+    ew AS (
+      SELECT t.project_id, t.id AS root, t.id AS node, 1.0::numeric AS eff, ARRAY[t.id] AS path FROM top t
+      UNION ALL
+      SELECT w.project_id, w.root, r.child, w.eff * COALESCE(NULLIF(r.rate, 0), 1), w.path || r.child
+        FROM ew w JOIN b r ON r.project_id = w.project_id AND r.parent = w.node
+       WHERE r.child <> ALL (w.path) AND array_length(w.path, 1) < 64),
+    eng AS (SELECT w.project_id, w.root, w.node AS leaf, SUM(w.eff) AS qty, COUNT(*)::int AS paths
+              FROM ew w WHERE NOT EXISTS (SELECT 1 FROM par x WHERE x.project_id = w.project_id AND x.id = w.node) AND w.node <> w.root
+             GROUP BY 1, 2, 3),
+    mt AS (SELECT project_id, data_source, btrim(from_location) AS f, btrim(to_location) AS t, btrim(path_root) AS root, weighted
+             FROM public.supply_chain_data_multi_tier WHERE project_id IN (SELECT project_id FROM top)),
+    rd AS (SELECT project_id, f AS root, SUM(weighted) AS wk FROM mt WHERE data_source = 'outbound' GROUP BY 1, 2),
+    der AS (SELECT m.project_id, m.root, m.f AS leaf, SUM(m.weighted) AS w, COUNT(*)::int AS rows
+              FROM mt m WHERE m.data_source = 'bom' GROUP BY 1, 2, 3),
+    ranked AS (SELECT eng.*, der.w, der.rows, rd.wk, der.w / NULLIF(rd.wk, 0) AS derived_qty,
+                      ROW_NUMBER() OVER (PARTITION BY eng.project_id ORDER BY abs(eng.qty - COALESCE(der.w / NULLIF(rd.wk, 0), 0)) DESC, eng.leaf) AS rn
+                 FROM eng
+                 LEFT JOIN rd ON rd.project_id = eng.project_id AND rd.root = eng.root
+                 LEFT JOIN der ON der.project_id = eng.project_id AND der.root = eng.root AND der.leaf = eng.leaf)
+    SELECT p.name AS project, root, leaf, paths, qty::text AS engine_qty, derived_qty::text, rows AS derived_rows, w::text AS sum_weighted, wk::text AS root_demand
+      FROM ranked JOIN public.projects p ON p.id = ranked.project_id WHERE rn <= 5 ORDER BY p.name, rn`), (rows) => {
+    out("", "**(B21) the five largest engine-vs-derived gaps per project** (engine = Σ paths Π rate; derived = Σ `weighted` over the leaf's rows under that root ÷ root demand):");
+    out(...table(rows));
+  });
+}
+
+/**
  * §15 measures ONE project. Phase 3's scope depends on how much D5/D7/D8 damage
  * exists AT ALL, and a single clean project is not that answer — least of all if
  * it is the seeded one. This sweep runs the three counting defects across every
@@ -4231,6 +4341,7 @@ async function main() {
 
   await d175MaterialVisibility();
   await bomShapeProbe();
+  await bomDerivedLaneDetail();
   await allProjectsSweep();
   await migrationFenceClose();
 
