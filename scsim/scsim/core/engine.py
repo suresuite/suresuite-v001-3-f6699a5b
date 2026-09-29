@@ -21,6 +21,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
+import logging
+
 import numpy as np
 
 from scsim import ENGINE_VERSION
@@ -75,6 +77,8 @@ from scsim.policies.registry import check_portfolio, instantiate
 from scsim.stats.bootstrap import aggregate_mean_ci, t_halfwidth
 from scsim.stats.seeds import replication_grid, world_streams
 from scsim.stats.warmup import detect_warmup
+
+_log = logging.getLogger(__name__)
 
 
 class CompileError(ValueError):
@@ -629,14 +633,17 @@ def _initialize_state(compiled: CompiledScenario, ctx: SimContext) -> None:
     init = np.where(model.mat_initial >= 0, model.mat_initial,
                     np.maximum(ctx.level_S - model.exp_demand_m * model.link_lt[model.primary_link], 0.0))
 
-    print("mat_ids:", model.mat_ids)
-    print("material_demand:", ctx.material_demand)
-    print("level_S:", ctx.level_S)
-    print("exp_demand_m:", model.exp_demand_m)
-    print("link_lt[primary]:", model.link_lt[model.primary_link])
-    print("mat_initial:", model.mat_initial)
-    print("computed init:", init)
-    
+    # Initial-inventory diagnostics (9bf05df). DEBUG-level, not print(): this runs
+    # once per replication in the worker AND in the browser engine, and stdout
+    # there is a user's console. `scsim/debug_init.py` turns it on.
+    if _log.isEnabledFor(logging.DEBUG):
+        _log.debug("mat_ids: %s", model.mat_ids)
+        _log.debug("material_demand: %s", ctx.material_demand)
+        _log.debug("level_S: %s", ctx.level_S)
+        _log.debug("exp_demand_m: %s", model.exp_demand_m)
+        _log.debug("link_lt[primary]: %s", model.link_lt[model.primary_link])
+        _log.debug("mat_initial: %s", model.mat_initial)
+        _log.debug("computed init: %s", init)
     ctx.on_hand = init.astype(float)
     if model.mts_mask.any():
         ctx.fg_on_hand = ctx.fg_target.copy()  # MTS starts at its stock target

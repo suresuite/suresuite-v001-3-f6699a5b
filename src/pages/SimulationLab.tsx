@@ -117,13 +117,13 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
         suppliers: itemMasters.suppliers as unknown as Record<string, unknown>[],
         inbound: itemMasters.lanes.inbound,
         outbound: itemMasters.lanes.outbound,
-        // Multi-level BOM lanes carry higher_level_component_id — grade them
-        // through the single-level shape exactly as the edge gate does.
-        bom: itemMasters.lanes.bom.map((r) =>
-          r.product_id == null && r.higher_level_component_id != null
-            ? { ...r, product_id: r.higher_level_component_id }
-            : r,
-        ),
+        // RAW rows, single- or multi-level: the shared grader flattens a
+        // multi-level BOM to root → leaf exactly as the engine does
+        // (`normalizeBomRows`). Rewriting each parent as a `product_id` here
+        // skipped that flatten, so a sub-assembly under the product was
+        // reported unsourced and the real purchased materials below it were
+        // never checked (§4 D182). Same rows RunValidateStage passes.
+        bom: itemMasters.lanes.bom,
       },
       (selected?.disruption_schedule as unknown as Record<string, unknown>[]) ?? [],
     );

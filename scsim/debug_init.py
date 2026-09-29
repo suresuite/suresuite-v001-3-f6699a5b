@@ -1,4 +1,10 @@
 # debug_init.py
+import logging
+
+# The init / κ diagnostics are DEBUG log lines in the engine (not print), so a
+# run in the worker or the browser stays quiet; this script turns them on.
+logging.basicConfig(level=logging.DEBUG, format="%(message)s")
+
 from scsim import Scenario, Network, SimulationSettings, Material, Product, Supplier, SupplierLink, BomLine
 from scsim.entities.enums import FulfillmentMode
 from scsim.core.engine import run_scenario
