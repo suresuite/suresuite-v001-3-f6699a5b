@@ -40,6 +40,8 @@ export function useDataMap(projectId: string | null | undefined) {
   const [outbound, setOutbound] = useState<LaneRow[]>([]);
   const [bomCount, setBomCount] = useState(0);
   const [bomBlankRates, setBomBlankRates] = useState(0);
+  // Product ids a BOM row consumes — the engine's sub-assembly rule (D174).
+  const [bomConsumed, setBomConsumed] = useState<Set<string>>(new Set());
   const [bomTable, setBomTable] = useState<"bom_multi_level" | "bom_single_level">("bom_single_level");
   // customers: null = could not read (said so on screen), [] = none uploaded.
   const [customers, setCustomers] = useState<Array<Record<string, unknown>> | null>([]);
@@ -54,6 +56,7 @@ export function useDataMap(projectId: string | null | undefined) {
       setOutbound([]);
       setBomCount(0);
       setBomBlankRates(0);
+      setBomConsumed(new Set());
       setCustomers([]);
       setTruncated([]);
       return;
@@ -69,6 +72,17 @@ export function useDataMap(projectId: string | null | undefined) {
       setOutbound(lanes.outbound as unknown as LaneRow[]);
       setBomCount(lanes.bom.length);
       setBomBlankRates(lanes.bom.filter((r) => !(num((r as Record<string, unknown>).consumption_rate) > 0)).length);
+      // datamap.py's rule: a single-level row's material, or a multi-level
+      // row's material under a real parent, is consumed.
+      setBomConsumed(new Set(
+        lanes.bom
+          .filter((r) => {
+            const x = r as Record<string, unknown>;
+            return x.product_id != null || String(x.higher_level_component_id ?? "").trim() !== "";
+          })
+          .map((r) => String((r as Record<string, unknown>).material_id ?? "").trim())
+          .filter(Boolean),
+      ));
       // The engine's rule, not the label: multi-level rows win whenever they
       // exist — projectLanes decides the same way on its direct path.
       setBomTable(lanes.bom.some((r) => (r as Record<string, unknown>).higher_level_component_id != null) ? "bom_multi_level" : "bom_single_level");
@@ -177,14 +191,14 @@ export function useDataMap(projectId: string | null | undefined) {
           : bomBlankRates > 0
             ? { status: "default", detail: `${bomBlankRates}/${bomCount} lines blank or 0 — run at 1.0 (the network pages read them as 0)` }
             : { status: "ok", detail: `${bomCount} lines of ${bomTable}, the table the engine reads` },
-      bom_level_column: { status: "unused", detail: "not read — structure comes from the parent links" },
+      bom_level_column: { status: "unused", detail: "fetched but not used — structure comes from the parent links" },
       material_cost: withFallback(
         mats, "material_id", "cost",
         (id) => derived.materialCost.has(id),
         "resolve from volume-weighted inbound unit_price",
         "engine would default cost to 1.0",
       ),
-      material_holding: masterField(mats, "holding_cost_pct", { status: "default", detail: "policy holding_cost_pct → 20%" }),
+      material_holding: masterField(mats, "holding_cost_pct", { status: "default", detail: "the project-default policy's holding_cost_pct, else 20 %/yr" }),
       material_moq: masterField(mats, "moq", { status: "default", detail: "0 (no MOQ)" }),
       material_initial_on_hand: masterField(mats, "initial_on_hand", { status: "default", detail: "engine warm-starts at base stock" }),
       material_lead_time_dist: masterField(mats, "lead_time_dist", { status: "default", detail: "deterministic, cv 0" }),
@@ -200,8 +214,20 @@ export function useDataMap(projectId: string | null | undefined) {
         "resolve from Σ weekly outbound volume",
         "zero demand — product never ordered",
       ),
-      product_capacity: masterField(prods, "production_capacity", { status: "default", detail: "max(2·demand, 1000) — capacity never binds" }),
-      product_fulfillment_mode: masterField(prods, "fulfillment_mode", { status: "default", detail: "project supply-chain model (MTS/MTO)" }),
+      // Like the engine: a 0 or negative capacity counts as blank.
+      product_capacity: masterField(
+        prods.map((p) => ({ ...p, production_capacity: num(p.production_capacity) > 0 ? p.production_capacity : null })),
+        "production_capacity",
+        { status: "default", detail: "the Plant grid's line capacity if set, else max(2·demand, 1000) — capacity never binds" },
+      ),
+      product_fulfillment_mode: masterField(prods, "fulfillment_mode", { status: "default", detail: "projects.supply_chain_model, else MTO" }),
+      product_identity: (() => {
+        if (prods.length === 0) return { status: "missing" as const, detail: "no product rows" };
+        const sub = prods.filter((p) => bomConsumed.has(String(p.product_id ?? "").trim())).length;
+        return sub > 0
+          ? { status: "ok" as const, detail: `${prods.length} products — ${sub} are sub-assemblies, modelled through their components` }
+          : { status: "ok" as const, detail: `${prods.length} finished products` };
+      })(),
       product_demand_distribution: masterField(prods, "demand_distribution", {
         status: "default",
         detail: scenarioKinds.length
@@ -210,7 +236,7 @@ export function useDataMap(projectId: string | null | undefined) {
       }),
       product_demand_cv: masterField(prods, "demand_cv", {
         status: "default",
-        detail: "the scenario's cv, else 0.30 (no effect under Poisson)",
+        detail: "the scenario's cv, else 0.30 (no effect under poisson or deterministic)",
       }),
       product_demand_min: masterField(prods, "demand_min", { status: "default", detail: "demand_mean·(1−cv)" }),
       product_demand_max: masterField(prods, "demand_max", { status: "default", detail: "demand_mean·(1+cv)" }),
@@ -225,9 +251,10 @@ export function useDataMap(projectId: string | null | undefined) {
       customer_segment: customerField("segment", "every customer in segment 'default'"),
       customer_priority: customerField("priority_weight", "priority 1.0"),
       customer_sla_floor: { status: "unused", detail: "engine does not read it" },
+      plant_ignored: { status: "unused", detail: "not read by the engine" },
       name: { status: "ok", detail: "display only" },
     };
-  }, [inbound, outbound, bomCount, bomBlankRates, bomTable, customers, scenarios, materials, products, suppliers, derived]);
+  }, [inbound, outbound, bomCount, bomBlankRates, bomConsumed, bomTable, customers, scenarios, materials, products, suppliers, derived]);
 
   return { statuses, truncated, bomTable, loading: loading || mastersLoading };
 }

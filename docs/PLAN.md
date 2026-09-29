@@ -19656,6 +19656,31 @@ column; `bomTreeWiring.test.ts` now pins that the flat key widths are unchanged 
 exactly one column is added; the Data map's column-by-column tab lists it. Read-only:
 the rate is changed in the BOM upload, like every other uploaded value on this grid.
 
+#### Addendum · the "Uploaded data → engine" tab, re-checked line by line · 2026-09-29
+
+Re-checked against `main` at `afc46fa3` — every row against `datamap.py::build_project_data`
+and `project_map.py`. Nine corrections, each read from the engine rather than inferred:
+`plant_name` is not read by the engine on any lane or BOM table (it merges plants; the
+graph does not — D202), now a row on all four; the masters gained identity rows, and
+`products.product_id` states the sub-assembly rule (D174) with a live count; an inbound
+link is dropped only when its material is in NEITHER the master nor the BOM (the old
+text said "nothing consumes"); outbound `volume` also splits each product's demand
+across its customers (`CustomerLink.share`) — its second, unlisted use; the engine
+models triangular / poisson / negbin / deterministic, and `demand_cv` sets triangular's
+spread AND negbin's dispersion (the old text said only "no effect under Poisson");
+cost, sell price, demand mean and production capacity count a 0 as blank (`> 0`
+tests at `project_map.py` 908/957/968/978), and the capacity status now does too;
+supplier capacity must be > 0 — the upload refuses 0 and the engine rejects it;
+`bom_multi_level.level` is FETCHED by the worker and never used (the old row said "not
+read", and the new test caught it). `dataMapContract.test.ts` gains two assertions: a
+column the map calls not read may not be selected by the worker, and the sub-assembly
+rule is the worker's.
+
+Also repaired on the way: `main` was red on `contract:check` R12 — PR #294 moved three
+reads in `usePolicies.tsx` by four lines and the `policy_defaults`, `policy_overrides`
+and `policy_versions` lineage citations did not follow (D86's shape). Re-anchored to
+the reads (145, 146, 462) and regenerated.
+
 
 ## 17. Sequencing
 

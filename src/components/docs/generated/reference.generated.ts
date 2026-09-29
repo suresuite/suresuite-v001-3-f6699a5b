@@ -11937,17 +11937,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectIntelligence.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:141"
+        "evidence": "src/hooks/usePolicies.tsx:145"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:141"
+        "evidence": "src/hooks/usePolicies.tsx:145"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:141"
+        "evidence": "src/hooks/usePolicies.tsx:145"
       }
     ],
     "governance": {
@@ -12360,17 +12360,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectIntelligence.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:142"
+        "evidence": "src/hooks/usePolicies.tsx:146"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:142"
+        "evidence": "src/hooks/usePolicies.tsx:146"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:142"
+        "evidence": "src/hooks/usePolicies.tsx:146"
       }
     ],
     "governance": {
@@ -12899,7 +12899,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:458"
+        "evidence": "src/hooks/usePolicies.tsx:462"
       }
     ],
     "governance": {
