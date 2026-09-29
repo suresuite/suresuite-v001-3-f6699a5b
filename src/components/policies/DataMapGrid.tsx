@@ -1,7 +1,8 @@
-// Read-only "Data map" grid: every uploaded column of the six datasets the
+// Read-only "Uploaded data → engine" grid: every column of every dataset the
 // sim worker reads, its engine destination, the resolution chain, and the
 // project's live status — so no uploaded field is ever silently unused.
-// Contract: src/lib/policies/dataMap.ts ↔ docs/data-simulation-mapping.md §4.
+// Contract: src/lib/policies/dataMap.ts (pinned to the worker's reads by
+// dataMapContract.test.ts).
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle2, CircleOff, Database, TriangleAlert } from "lucide-react";
@@ -33,14 +34,16 @@ const STATUS_META: Record<DataMapStatus, { label: string; className: string }> =
 const DATASET_ORDER: DataMapDataset[] = [
   "inbound_logistics",
   "outbound_logistics",
+  "bom_multi_level",
   "bom_single_level",
   "materials",
   "products",
   "suppliers",
+  "customers",
 ];
 
 export function DataMapGrid({ projectId }: { projectId: string }) {
-  const { statuses, truncated, loading } = useDataMap(projectId);
+  const { statuses, truncated, bomTable, loading } = useDataMap(projectId);
 
   return (
     <div className="flex flex-col gap-4">
@@ -63,8 +66,13 @@ export function DataMapGrid({ projectId }: { projectId: string }) {
         const rows = DATA_MAP_CONTRACT.filter((r) => r.dataset === dataset);
         return (
           <div key={dataset} className="rounded-md border overflow-hidden">
-            <div className="bg-muted/40 px-3 py-2 text-xs font-semibold">
+            <div className="flex flex-wrap items-center gap-2 bg-muted/40 px-3 py-2 text-xs font-semibold">
               {DATASET_LABEL[dataset]}
+              {(dataset === "bom_multi_level" || dataset === "bom_single_level") && !loading && (
+                <Badge variant="outline" className="h-5 text-[10px] font-normal">
+                  {dataset === bomTable ? "this project's engine reads this table" : "not read for this project"}
+                </Badge>
+              )}
             </div>
             <div className="overflow-x-auto">
               <Table>

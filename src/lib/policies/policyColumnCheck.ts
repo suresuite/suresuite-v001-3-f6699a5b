@@ -532,7 +532,7 @@ export const RUN_VALIDATE_CHECK: Array<{ label: string; check: ColumnCheck }> = 
       savedTo: "the validation scenario is created with Poisson (λ 50, never read)",
       engine: "a product with no demand_distribution runs the SCENARIO's kind — Poisson",
       verdict: "differs",
-      note: "16 completed runs simulated Poisson while the Data map below says 'triangular'.",
+      note: "16 completed runs simulated Poisson, and nothing on the run form says which model the run used.",
       refs: ["D190"],
     },
   },
@@ -543,10 +543,10 @@ export const NO_COLUMN_CHECK: Array<{ label: string; check: ColumnCheck }> = [
   {
     label: "Demand distribution, CV, min, max (products)",
     check: {
-      shows: "no column; the Data map below states the default as 'triangular / 0.30'",
+      shows: "no column here — their status per project is on the 'Uploaded data → engine' tab",
       savedTo: "item-master editor or products upload",
-      engine: "products.* → the scenario's demand model (Poisson) → triangular / 0.30",
-      verdict: "differs",
+      engine: "products.* → the scenario's demand model (Poisson for scenarios created in the app) → triangular / 0.30",
+      verdict: "info",
       shouldBe: "Plant-stage columns backed by the products master",
       refs: ["D190"],
     },

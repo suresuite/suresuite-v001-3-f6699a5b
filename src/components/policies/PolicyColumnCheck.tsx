@@ -119,14 +119,9 @@ export function PolicyColumnCheck() {
         <ListChecks className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <div className="flex flex-col gap-1">
           <p>
-            <b>The Policies page, column by column.</b> For every column: what the cell shows and where that
-            value comes from, where an edit is saved, what the simulation engine actually uses (and its default
-            when the value is blank), and whether an edit changes a run. The column list is read from the grid's
-            own specification, so a new column cannot appear here without its entry.
-          </p>
-          <p>
-            Counts are measured in production on {MEASURED.date} (verification run {MEASURED.run}, {MEASURED.scope})
-            and describe all projects, not only the one selected.
+            The column list is read from the grid's own specification, so a new column cannot appear on the
+            Policies page without an entry here. Counts are measured in production on {MEASURED.date} (verification
+            run {MEASURED.run}, {MEASURED.scope}) and describe all projects, not only the one selected.
           </p>
           <div className="flex flex-wrap items-start gap-1.5 pt-0.5">
             {(Object.keys(VERDICT_META) as Verdict[]).map((v) => (
