@@ -77,19 +77,19 @@ unnoticed.
 
 <details><summary>13 app-shell read(s) — not lineage</summary>
 
-* `Auth.tsx` — `src/hooks/useAuth.tsx:120`
-* `DataManager.tsx` — `src/hooks/useAuth.tsx:120`
-* `FirmLevelNetwork.tsx` — `src/hooks/useAuth.tsx:120`
-* `Forbidden.tsx` — `src/hooks/useAuth.tsx:120`
-* `GettingStarted.tsx` — `src/hooks/useAuth.tsx:120`
-* `InteractiveNetworkSpace.tsx` — `src/hooks/useAuth.tsx:120`
-* `Landing.tsx` — `src/hooks/useAuth.tsx:120`
-* `NotFound.tsx` — `src/hooks/useAuth.tsx:120`
-* `ProcessLevelNetwork.tsx` — `src/hooks/useAuth.tsx:120`
-* `ProductLevelNetwork.tsx` — `src/hooks/useAuth.tsx:120`
-* `ProjectIntelligence.tsx` — `src/hooks/useAuth.tsx:120`
-* `ProjectPolicies.tsx` — `src/hooks/useAuth.tsx:120`
-* `SimulationLab.tsx` — `src/hooks/useAuth.tsx:120`
+* `Auth.tsx` — `src/hooks/useAuth.tsx:122`
+* `DataManager.tsx` — `src/hooks/useAuth.tsx:122`
+* `FirmLevelNetwork.tsx` — `src/hooks/useAuth.tsx:122`
+* `Forbidden.tsx` — `src/hooks/useAuth.tsx:122`
+* `GettingStarted.tsx` — `src/hooks/useAuth.tsx:122`
+* `InteractiveNetworkSpace.tsx` — `src/hooks/useAuth.tsx:122`
+* `Landing.tsx` — `src/hooks/useAuth.tsx:122`
+* `NotFound.tsx` — `src/hooks/useAuth.tsx:122`
+* `ProcessLevelNetwork.tsx` — `src/hooks/useAuth.tsx:122`
+* `ProductLevelNetwork.tsx` — `src/hooks/useAuth.tsx:122`
+* `ProjectIntelligence.tsx` — `src/hooks/useAuth.tsx:122`
+* `ProjectPolicies.tsx` — `src/hooks/useAuth.tsx:122`
+* `SimulationLab.tsx` — `src/hooks/useAuth.tsx:122`
 
 These reach the table only through modules the shell mounts on every page.
 Listing them as surfaces would be true about the imports and false about
@@ -118,8 +118,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `password_changed_at` | — | `timestamp with time zone` | — | — | When the password was last set. Server-stamped. |
 | `password_expires_at` | — | `timestamp with time zone` | — | — | When the current password expires — `now() + password_max_age()` (90 days) when the password was last set. Expiry does not refuse a sign-in: it sends the user to /profile and closes every other page until the password is changed (`RoleGuard`, reading `get_my_profile`'s server-computed `password_expired`; §4 D206). Rows that predate `20260527011429` were stamped by that migration's column default, not by a real password change. |
 | `force_password_change` | — | `boolean` | — | — | Whether the user must set a new password before continuing. Set when an administrator creates or resets an account; cleared by `change_own_password`. Enforced by `RoleGuard`, which could not see it until §4 D206. |
-| `is_active` | — | `boolean` | — | — | Whether the account may sign in. Checked at login through `get_my_profile` (which, until §4 D206, raised for every user and was ignored, so the check never ran) and on every reload; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`. |
-| `organization_id` | — | `uuid` | — | — | The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. |
+| `is_active` | — | `boolean` | — | — | Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. The browser also checks it through `get_my_profile` at login and on every reload — a check that, until §4 D206, raised for every user and was ignored, so before these two changes the column was set and never read. It is not consulted by any RLS policy, so between reloads a suspended user's open session is not revoked (D28's client-asserted identity). |
+| `organization_id` | — | `uuid` | — | — | The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it. |
 | `avatar_color` | — | `text` | — | — | The colour of the user's initial on their avatar — one token of a fixed palette, CHECK-constrained; the page maps each token to its fill (`src/lib/avatarColors.ts`, pinned to the CHECK by `avatarColors.test.ts`). §4 D206. |
 
 ## Each column in full
@@ -345,7 +345,7 @@ Whether the user must set a new password before continuing. Set when an administ
 
 ### `is_active`
 
-Whether the account may sign in. Checked at login through `get_my_profile` (which, until §4 D206, raised for every user and was ignored, so the check never ran) and on every reload; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.
+Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. The browser also checks it through `get_my_profile` at login and on every reload — a check that, until §4 D206, raised for every user and was ignored, so before these two changes the column was set and never read. It is not consulted by any RLS policy, so between reloads a suspended user's open session is not revoked (D28's client-asserted identity).
 
 | | |
 |---|---|
@@ -359,7 +359,7 @@ Whether the account may sign in. Checked at login through `get_my_profile` (whic
 
 ### `organization_id`
 
-The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns.
+The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it.
 
 | | |
 |---|---|
@@ -403,6 +403,6 @@ for one you did.
 
 ---
 
-*Generated from data contract `8de91a48043b`, engine `0.2.8`,
+*Generated from data contract `ff8dd81afee0`, engine `0.2.8`,
 sidecar `supabase/contract/approved_users.contract.yaml`, table created by `20250815000000_approved_users_base.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
