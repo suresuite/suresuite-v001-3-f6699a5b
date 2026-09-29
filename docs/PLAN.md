@@ -19681,6 +19681,23 @@ reads in `usePolicies.tsx` by four lines and the `policy_defaults`, `policy_over
 and `policy_versions` lineage citations did not follow (D86's shape). Re-anchored to
 the reads (145, 146, 462) and regenerated.
 
+#### Addendum · each Data map tool states its version and last update · 2026-09-29
+
+Owner-directed: a reader of either Data map tab could not tell WHICH statement of the
+mapping they were reading, or when it was last checked against the engine. Both tabs
+now open with a version line — "Mapping v1.2 · updated 2026-09-29 · checked against
+engine 0.2.8 · this build runs engine 0.2.8" — and a **Version history** toggle that
+lists every version newest first with its date, engine, commit and changes. The record
+is authored once, in `src/lib/policies/mappingVersions.ts` (column-by-column 1.0–1.2;
+uploaded data → engine 1.0–2.1, the three earlier versions dated from their commits in
+`git log`). A version is not a label someone remembers to bump: `mappingVersions.test.ts`
+fingerprints each tool's content (sha256 of the exported mapping) and fails when the
+content changes without a new version entry, printing the fingerprint to record; it
+also fails when `registry.generated.json :: engine_version` moves past the engine the
+latest entry was checked against, and the page shows an amber warning in the same
+case. The user manual (*How policies work → The Data map*) explains both tabs, the
+version line and the rule.
+
 
 ## 17. Sequencing
 

@@ -10,6 +10,7 @@ import { useState } from "react";
 import { Segmented } from "@/components/intelligence/piUi";
 import { PolicyColumnCheck } from "@/components/policies/PolicyColumnCheck";
 import { DataMapGrid } from "@/components/policies/DataMapGrid";
+import { MappingVersionBar } from "@/components/policies/MappingVersionBar";
 
 type DataMapTab = "columns" | "uploads";
 
@@ -33,6 +34,7 @@ export function DataMapView({ projectId }: { projectId: string }) {
             ? "Every column of the Policies page: what the cell shows, where an edit is saved, what the simulation engine uses, and whether an edit changes a run. The same for every project."
             : "Every column of every dataset the simulation reads: where it goes in the engine, what fills it when it is blank, and this project's status."}
         </p>
+        <MappingVersionBar tool={tab === "columns" ? "columns" : "uploads"} />
       </div>
       {tab === "columns" ? <PolicyColumnCheck /> : <DataMapGrid projectId={projectId} />}
     </div>

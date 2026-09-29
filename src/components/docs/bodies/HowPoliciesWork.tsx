@@ -6,6 +6,7 @@ import { PageTitle, Section, P, Key, Callout, Prose, Term, DocLink, AppLink, Pro
 import { DocFigure } from "@/components/docs/DocFigure";
 import { RESOLUTION_ORDER, RESOLUTION_ORDER_SOURCE, CHAIN_COUNT, BROKEN_COUNT } from "@/components/docs/generated/policy.generated";
 import { STAGES } from "@/lib/policies/stages";
+import { ENGINE_VERSION, MAPPING_TITLE, latestVersion } from "@/lib/policies/mappingVersions";
 
 export default function HowPoliciesWork() {
   const stages = STAGES.filter((s) => s.key !== "run_validate");
@@ -124,6 +125,33 @@ export default function HowPoliciesWork() {
           engine, recomputed by the engine and ignored, an application routing hint, or read by
           nothing at all. We would rather tell you than have you find out by changing one.
         </P>
+      </Section>
+
+      <Section id="data-map" title="The Data map, and which version of it you are reading">
+        <P>
+          The <b>Data map</b> view of the Policies page answers two questions, one tab each.{" "}
+          <b>{MAPPING_TITLE.columns}</b> lists every column of the page: what the cell shows, where an
+          edit is saved, what the simulation uses, and whether an edit changes a run.{" "}
+          <b>{MAPPING_TITLE.uploads}</b> lists every column of every dataset the simulation reads:
+          where it goes in the engine, what fills it when it is blank, and your project&apos;s status.
+        </P>
+        <P>
+          Both are written by hand about what the engine does, so each carries a version. Under the
+          tab you see the mapping&apos;s version, the date it was last changed or re-checked, the
+          engine version it was checked against and the engine this build runs; <b>Version
+          history</b> opens the list of every version and what changed. Today:{" "}
+          {MAPPING_TITLE.columns} v{latestVersion("columns").version} ({latestVersion("columns").updated})
+          and {MAPPING_TITLE.uploads} v{latestVersion("uploads").version} (
+          {latestVersion("uploads").updated}), both checked against engine {ENGINE_VERSION}.
+        </P>
+        <Callout>
+          <p>
+            A version is not a label someone remembers to bump. A mapping whose content changes
+            without a new version fails the build, and so does an engine release the mapping has not
+            been re-checked against. If you ever see the page warn that the mapping was checked
+            against an older engine, treat its statements as unverified for this release.
+          </p>
+        </Callout>
       </Section>
 
       <Section id="related" title="Related">
