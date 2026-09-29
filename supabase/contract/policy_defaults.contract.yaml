@@ -20,17 +20,17 @@ surfaces:
   - page: "ProjectIntelligence.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/usePolicies.tsx:141"
+    evidence: "src/hooks/usePolicies.tsx:145"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/usePolicies.tsx:141"
+    evidence: "src/hooks/usePolicies.tsx:145"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/usePolicies.tsx:141"
+    evidence: "src/hooks/usePolicies.tsx:145"
     confirmed: true
 
 governance:

@@ -57,6 +57,23 @@ describe("Data map contract ↔ what the worker reads", () => {
     for (const f of fields) expect(contractFields.has(f), f).toBe(true);
   });
 
+  it("a column the Data map calls NOT READ is not selected by the worker", () => {
+    // The reverse of the rows test: if the engine starts reading plant_name,
+    // expected_lead_time or level, the Data map must stop saying it does not.
+    const selected = new Map<string, Set<string>>();
+    for (const { table, cols } of workerReads()) if (cols.length) selected.set(table, new Set(cols));
+    for (const r of DATA_MAP_CONTRACT) {
+      if (r.engineField !== null) continue;
+      const cols = selected.get(r.dataset);
+      if (!cols) continue; // a `select *` table: the mapper's own fields decide (checked by the row chains)
+      expect(cols.has(r.field), `${r.dataset}.${r.field} is marked not read but the worker selects it`).toBe(false);
+    }
+  });
+
+  it("the sub-assembly rule the products row states is the worker's", () => {
+    expect(datamapPy).toMatch(/subassemblies=sorted\(\{/);
+  });
+
   it("the demand-distribution chain puts the product master FIRST, as the engine does", () => {
     const row = DATA_MAP_CONTRACT.find((r) => r.dataset === "products" && r.field === "demand_distribution")!;
     expect(row.chain.indexOf("master")).toBeLessThan(row.chain.indexOf("SCENARIO"));

@@ -292,6 +292,6 @@ sha256, hex, over `prev_hash`, `seq` and every content column (`audit_log_digest
 
 ---
 
-*Generated from data contract `7be43dae7f5a`, engine `0.2.8`,
+*Generated from data contract `bbda57e7cc8b`, engine `0.2.8`,
 sidecar `supabase/contract/audit_logs.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
