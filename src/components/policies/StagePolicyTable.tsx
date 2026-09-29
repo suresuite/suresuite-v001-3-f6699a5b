@@ -40,7 +40,18 @@ import {
   type ColSpecCtx,
 } from "@/lib/policies/columnSpecs";
 import { fitColumns, foldNote, type FitCol } from "@/lib/policies/columnFit";
-import { buildBomTreeView, type TreeEntry } from "@/lib/policies/bomTreeView";
+import {
+  buildBomTreeModel,
+  expandToLevel,
+  occKey,
+  revealForFilter,
+  revealKeys,
+  visibleTreeRows,
+  type BomOcc,
+  type BomTreeModel,
+  type TreeLayout,
+  type VisRow,
+} from "@/lib/policies/bomTreeView";
 import { stageEmptyMessage, treeFallbackReason } from "@/lib/policies/stageGridState";
 import { groupByKeyA, memberDisplay, summarise } from "@/lib/policies/groupRows";
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
@@ -134,6 +145,64 @@ function keyWidthsFor(winWidth: number): { a: number; b: number } {
   if (winWidth >= 1024) return KEY_W.mid;
   return KEY_W.narrow;
 }
+
+/**
+ * §4 D180 — the Supplier stage's BOM tree widens ONLY the Material key column,
+ * and only while the tree is on screen: flat mode, single-level projects and
+ * the other stages keep `KEY_W` exactly. One constant feeds both the `<col>`
+ * and the sticky `left` (columnFit.ts §0.2); never below `KEY_W.*.a`.
+ */
+const TREE_KEY_W = {
+  wide: 320, // ≥1280
+  mid: 280, // ≥1024
+  narrow: 240, // <1024
+} as const;
+/** The frozen "Qty / assy" column the tree adds right of Material. */
+const TREE_QTY_W = 72;
+/** Outline / Tabular: one column per level (Product, L0, L1, …). */
+const TREE_LEVEL_W = [120, 100, 110, 170, 150, 220] as const;
+const TREE_LEVEL_W_EXTRA = 150;
+const treeLevelWidth = (i: number): number => TREE_LEVEL_W[i] ?? TREE_LEVEL_W_EXTRA;
+
+function treeKeyWidthFor(winWidth: number): number {
+  if (winWidth >= 1280) return TREE_KEY_W.wide;
+  if (winWidth >= 1024) return TREE_KEY_W.mid;
+  return TREE_KEY_W.narrow;
+}
+
+/** Per-project tree presentation prefs, beside `policy.table.collapsed.<stage>`. */
+const TREE_PREFS_KEY = "policy.table.bomTree.supplier";
+type TreePrefs = { layout: TreeLayout; repeat: boolean; level: number | "all" };
+const TREE_PREFS_DEFAULT: TreePrefs = { layout: "compact", repeat: false, level: 2 };
+function readTreePrefs(projectId: string | null | undefined): TreePrefs {
+  if (!projectId || typeof window === "undefined") return TREE_PREFS_DEFAULT;
+  try {
+    const all = JSON.parse(localStorage.getItem(TREE_PREFS_KEY) ?? "{}") as Record<string, Partial<TreePrefs>>;
+    const p = all[projectId] ?? {};
+    return {
+      layout: p.layout === "outline" || p.layout === "tabular" ? p.layout : "compact",
+      repeat: p.repeat === true,
+      level: p.level === "all" || (typeof p.level === "number" && p.level >= 0) ? p.level : 2,
+    };
+  } catch {
+    return TREE_PREFS_DEFAULT;
+  }
+}
+function writeTreePrefs(projectId: string | null | undefined, prefs: TreePrefs): void {
+  if (!projectId || typeof window === "undefined") return;
+  try {
+    const all = JSON.parse(localStorage.getItem(TREE_PREFS_KEY) ?? "{}") as Record<string, TreePrefs>;
+    all[projectId] = prefs;
+    localStorage.setItem(TREE_PREFS_KEY, JSON.stringify(all));
+  } catch {
+    /* noop — a preference, never state that must persist */
+  }
+}
+
+const fmtQty = (n: number | null | undefined): string =>
+  n == null || !Number.isFinite(n) ? "—" : Number.isInteger(n) ? String(n) : n.toFixed(2);
+const fmtFlow = (n: number | null | undefined): string =>
+  n == null || !Number.isFinite(n) ? "—" : n.toFixed(2);
 
 /** Short segmented labels for the inventory Policy Type (titles stay the
  *  registry library's own labels — "Min-max (s, S)", "(R, Q)", …). */
@@ -451,7 +520,87 @@ export function StagePolicyTable({
     return () => ro.disconnect();
   }, []);
 
-  const avail = Math.max(0, containerW - 2 - 24 - keyW.a - keyW.b);
+  // §4 D177 / D180 — the Supplier stage's BOM tree (multi-level projects
+  // only). Presentation only: the flat rows every guard, prefill, verifier and
+  // export reads pass through `buildBomTreeModel` untouched (each exactly
+  // once) — the model orders them, interleaves read-only structural rows built
+  // from the upload's shape and the derived lane's numbers, and decides which
+  // are OPEN. An active column sort shows the flat view (the tree has its own
+  // order). Declared before the column fit because the tree's key block is
+  // wider than the flat one, and the fit must know it.
+  const treeAvailable =
+    stageKey === "supplier" && (stageRows.bomLevel ?? "").includes("multi");
+  const [viewMode, setViewMode] = useState<"tree" | "flat">("tree");
+  const treeWanted = treeAvailable && viewMode === "tree" && sort === null;
+  // §4 D178 — the tree may never blank the grid. The build is guarded (no
+  // error boundary protects this render path), and a tree with no structure
+  // while flat rows exist falls back to the flat lanes WITH the reason.
+  const treeBuild = useMemo<{ model: BomTreeModel | null; error: string | null }>(() => {
+    if (!treeWanted) return { model: null, error: null };
+    try {
+      return {
+        model: buildBomTreeModel({
+          bomRows: stageRows.bomRows ?? [],
+          deepRows: stageRows.deepRows ?? [],
+          supplierRows: dataRows as Array<Record<string, unknown> & { key: string }>,
+        }),
+        error: null,
+      };
+    } catch (err) {
+      return { model: null, error: err instanceof Error ? err.message : String(err) };
+    }
+  }, [treeWanted, stageRows.bomRows, stageRows.deepRows, dataRows]);
+  const treeFallback = treeFallbackReason({
+    wanted: treeWanted,
+    buildError: treeBuild.error,
+    hasStructure: (treeBuild.model?.occs.length ?? 0) > 0,
+    flatRowCount: dataRows.length,
+    deepError: stageRows.deepError ?? null,
+  });
+  const treeActive = treeWanted && treeFallback === null && treeBuild.model !== null;
+  const treeModel = treeActive ? treeBuild.model : null;
+
+  const [treePrefs, setTreePrefsState] = useState<TreePrefs>(() => readTreePrefs(projectId));
+  useEffect(() => {
+    setTreePrefsState(readTreePrefs(projectId));
+  }, [projectId]);
+  const setTreePrefs = (patch: Partial<TreePrefs>) =>
+    setTreePrefsState((cur) => {
+      const next = { ...cur, ...patch };
+      writeTreePrefs(projectId, next);
+      return next;
+    });
+  const treeLayout: TreeLayout = treePrefs.layout;
+  const treePivot = treeActive && treeLayout !== "compact";
+  const treeLevelCount = treeModel ? treeModel.maxDepth + 1 : 0;
+
+  // The key block, one definition for the <col>s, the sticky offsets and the
+  // cells. Flat (and every other stage) is exactly the two `KEY_W` columns.
+  type KeyColDef = { id: string; w: number; left: number | null };
+  const treeKeyA = treeKeyWidthFor(winWidth);
+  const keyDefs: KeyColDef[] = useMemo(() => {
+    if (!treeActive) {
+      return spec.keyCols.map((c, i) => ({ id: c.id, w: i === 0 ? keyW.a : keyW.b, left: i === 0 ? 0 : keyW.a }));
+    }
+    const supplierCol = spec.keyCols[1]?.id ?? "supplier_id";
+    if (!treePivot) {
+      return [
+        { id: "__tree", w: treeKeyA, left: 0 },
+        { id: "__qty", w: TREE_QTY_W, left: treeKeyA },
+        { id: supplierCol, w: keyW.b, left: treeKeyA + TREE_QTY_W },
+      ];
+    }
+    // Outline / Tabular: the level block is ~1 074 px on AA-ver3, too wide to
+    // freeze — it scrolls with the values (handoff §3).
+    return [
+      ...Array.from({ length: treeLevelCount }, (_, i) => ({ id: `__lvl${i}`, w: treeLevelWidth(i), left: null })),
+      { id: "__qty", w: TREE_QTY_W, left: null },
+      { id: supplierCol, w: keyW.b, left: null },
+    ];
+  }, [treeActive, treePivot, treeKeyA, treeLevelCount, keyW.a, keyW.b, spec.keyCols]);
+  const keyBlockW = keyDefs.reduce((a, d) => a + d.w, 0);
+
+  const avail = Math.max(0, containerW - 2 - 24 - (treePivot ? 0 : keyBlockW));
   const fit = useMemo(
     () =>
       fitColumns({
@@ -482,7 +631,7 @@ export function StagePolicyTable({
   // Frozen key columns: cumulative left offsets from the breakpoint widths.
   const keyWidths = [keyW.a, keyW.b];
   const keyLeft = (i: number) => (i === 0 ? 0 : keyW.a);
-  const keyTotal = keyW.a + keyW.b;
+  const keyTotal = keyBlockW;
   const tableMinWidth = keyTotal + fit.valueWidth;
 
   // Reset drafts + filters/sort/group-collapse when stage / project changes.
@@ -660,8 +809,15 @@ export function StagePolicyTable({
   const hasActiveQuery =
     sort !== null || Object.values(colFilters).some((v) => v.trim() !== "");
 
+  // §4 D180 — in the tree the Material filter OPENS the path to every match;
+  // it never removes a row (handoff §5). Every other column's filter keeps
+  // today's behaviour, and so does the Material filter in the flat view.
+  const materialColId = spec.keyCols[0]?.id ?? "";
+  const materialFilter = treeActive ? (colFilters[materialColId] ?? "") : "";
   const filtered = useMemo(() => {
-    const active = Object.entries(colFilters).filter(([, v]) => v.trim() !== "");
+    const active = Object.entries(colFilters).filter(
+      ([colId, v]) => v.trim() !== "" && !(treeActive && colId === materialColId),
+    );
     let out = dataRows;
     if (active.length > 0) {
       out = dataRows.filter((r) =>
@@ -689,7 +845,7 @@ export function StagePolicyTable({
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataRows, colFilters, sort, drafts, overrides, spec.keyCols]);
+  }, [dataRows, colFilters, sort, drafts, overrides, spec.keyCols, treeActive]);
 
   // Row-group collapse (§5): consecutive runs sharing key A — a material's
   // suppliers, a plant's products, a customer's product lanes. An active sort
@@ -700,45 +856,86 @@ export function StagePolicyTable({
     [filtered, spec.keyCols],
   );
 
-  // §4 D177 — the Supplier stage's BOM tree (multi-level projects only).
-  // Presentation only: `filtered` is still the flat row set every guard,
-  // prefill and verifier reads; the tree orders it and interleaves read-only
-  // structural rows built from the upload's shape + the derived lane's
-  // numbers (`bomTreeView.ts`). An active column sort shows the flat view —
-  // the tree has its own order.
-  const treeAvailable =
-    stageKey === "supplier" && (stageRows.bomLevel ?? "").includes("multi");
-  const [viewMode, setViewMode] = useState<"tree" | "flat">("tree");
-  const treeWanted = treeAvailable && viewMode === "tree" && sort === null;
-  // §4 D178 — the tree may never blank the grid. The build is guarded (no
-  // error boundary protects this render path), and a tree with no structure
-  // while flat rows exist falls back to the flat lanes WITH the reason —
-  // rendering it would show the whole stage as one "Not in the BOM" tail, or
-  // nothing at all, while the flat set holds every line.
-  const treeBuild = useMemo<{ entries: TreeEntry[]; error: string | null }>(() => {
-    if (!treeWanted) return { entries: [], error: null };
-    try {
-      return {
-        entries: buildBomTreeView({
-          bomRows: stageRows.bomRows ?? [],
-          deepRows: stageRows.deepRows ?? [],
-          supplierRows: filtered as Array<Record<string, unknown> & { key: string }>,
-        }),
-        error: null,
-      };
-    } catch (err) {
-      return { entries: [], error: err instanceof Error ? err.message : String(err) };
+  // ── §4 D180 — tree presentation state (all of it presentation-only) ──────
+  // `null` = "the expand-to level decides" (the first render of a project
+  // already shows the L2 default, no flash); a user's own expand/collapse
+  // replaces it and is kept across rebuilds (occurrence keys are paths).
+  const [treeOpenState, setTreeOpenState] = useState<Set<string> | null>(null);
+  const [whereOpen, setWhereOpen] = useState<string | null>(null);
+  const [jumpTarget, setJumpTarget] = useState<string | null>(null);
+  useEffect(() => {
+    setTreeOpenState(null);
+    setWhereOpen(null);
+    setJumpTarget(null);
+  }, [projectId]);
+  const treeOpen = useMemo(
+    () => treeOpenState ?? (treeModel ? expandToLevel(treeModel, treePrefs.level) : new Set<string>()),
+    [treeOpenState, treeModel, treePrefs.level],
+  );
+  const setTreeOpen = (f: (cur: Set<string>) => Set<string>) =>
+    setTreeOpenState((cur) => f(cur ?? treeOpen));
+  const expandTreeTo = (level: number | "all") => {
+    setTreePrefs({ level });
+    if (treeModel) setTreeOpenState(expandToLevel(treeModel, level));
+  };
+  const toggleTreeOcc = (key: string) =>
+    setTreeOpen((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const jumpToOcc = (key: string) => {
+    if (!treeModel) return;
+    setTreeOpen((cur) => {
+      const next = new Set(cur);
+      for (const k of revealKeys(treeModel, key)) next.add(k);
+      return next;
+    });
+    setJumpTarget(key);
+  };
+  useEffect(() => {
+    if (!jumpTarget) return;
+    const el = scrollRef.current?.querySelector(`[data-occ="${CSS.escape(jumpTarget)}"]`);
+    if (el && "scrollIntoView" in el) (el as HTMLElement).scrollIntoView({ block: "center" });
+  }, [jumpTarget, treeOpen]);
+
+  const treeReveal = useMemo(
+    () => (treeModel ? revealForFilter(treeModel, materialFilter) : { open: new Set<string>(), matches: new Set<string>() }),
+    [treeModel, materialFilter],
+  );
+  const treeVisible = useMemo(() => {
+    if (!treeModel) return { rows: [] as VisRow[], shownLines: 0 };
+    const open = new Set([...treeOpen, ...treeReveal.open]);
+    const v = visibleTreeRows(treeModel, { open, layout: treeLayout, whereOpen });
+    // Other columns' filters thin supplier lines exactly as in the flat view;
+    // the structure (and each sub-assembly's own line) always stays.
+    if (filtered.length === dataRows.length) return v;
+    const keep = new Set(filtered.map((r) => String(r.key)));
+    const rows = v.rows.filter((r) => r.t !== "lane" || keep.has(String(r.row.key)));
+    return { rows, shownLines: v.shownLines - (v.rows.length - rows.length) };
+  }, [treeModel, treeOpen, treeReveal, treeLayout, whereOpen, filtered, dataRows.length]);
+
+  // Facts per material from the WHOLE flat set (never the filtered view):
+  // how many suppliers, whether any line lacks one, and how many lines carry
+  // an uploaded lead time. Read from the rows `useStageRows` built.
+  const treeMaterialFacts = useMemo(() => {
+    const m = new Map<string, { suppliers: number; unassigned: boolean; lines: number; leadMissing: number }>();
+    if (!treeActive) return m;
+    for (const r of dataRows as Array<Record<string, unknown>>) {
+      const id = String(r.material_id ?? "");
+      const f = m.get(id) ?? { suppliers: 0, unassigned: false, lines: 0, leadMissing: 0 };
+      if (r.__needs_supplier) f.unassigned = true;
+      else if (!r.__in_house) {
+        f.suppliers += 1;
+        f.lines += 1;
+        const fromData = (r.__from_data as Record<string, true> | undefined)?.lead_time_days === true;
+        if (!fromData) f.leadMissing += 1;
+      }
+      m.set(id, f);
     }
-  }, [treeWanted, stageRows.bomRows, stageRows.deepRows, filtered]);
-  const treeFallback = treeFallbackReason({
-    wanted: treeWanted,
-    buildError: treeBuild.error,
-    hasStructure: treeBuild.entries.some((e) => e.kind === "root" || e.kind === "node"),
-    flatRowCount: filtered.length,
-    deepError: stageRows.deepError ?? null,
-  });
-  const treeActive = treeWanted && treeFallback === null;
-  const treeEntries = treeBuild.entries;
+    return m;
+  }, [treeActive, dataRows]);
   const collapsibleGroups = useMemo(() => rowGroups.filter((g) => g.members.length > 1), [rowGroups]);
   const anyGroupExpanded = collapsibleGroups.some((g) => !collapsedGroups.has(`${stageKey}::${g.id}`));
   const toggleAllGroups = () => {
@@ -1158,7 +1355,7 @@ export function StagePolicyTable({
     return "text";
   };
 
-  const colCount = spec.keyCols.length + visible.length;
+  const colCount = keyDefs.length + visible.length;
 
   /** The outermost column carries no right rule (§0.4) — it would otherwise
    *  spring a permanent 2px horizontal scrollbar. */
@@ -1166,10 +1363,74 @@ export function StagePolicyTable({
     borderRight: isLastCol ? "none" : "1px solid var(--hair-divider)",
   });
 
+  /** The material-level flags a line carries in its Material cell — shared by
+   *  the flat cell and the BOM tree's cell (§4 D180), so the two cannot drift. */
+  const materialFlags = (
+    r: Record<string, unknown>,
+    rowKey: string,
+    overrode: boolean,
+    isDirty: boolean,
+  ): React.ReactNode => (
+      <>
+        {/* material-level required actions */}
+        {r.__needs_supplier && (
+          <RowFlag title="This material has no supplier in the project data — assign one in the Supplier column.">
+            needs supplier
+          </RowFlag>
+        )}
+        {/* §4 D175 — the two material classes this stage used to hide. */}
+        {r.__in_house && (
+          <RowFlag title="Consumed by another BOM item and produced from its own components — modeled through the BOM. There is no supplier to configure; sourcing does not apply to this line.">
+            made in-house
+          </RowFlag>
+        )}
+        {r.__not_in_bom && (
+          <RowFlag title="In the item master but in no BOM and no inbound lane. The pre-run check blocks a simulation while such a row exists — assign a supplier lane, add it to the BOM, or remove the master row.">
+            not in BOM
+          </RowFlag>
+        )}
+        {
+          !r.__needs_supplier &&
+          Number(r.__lane_count ?? 0) > 1 &&
+          !groupHasPrimary(r) && (
+            <RowFlag title="Multiple sources — pick exactly one primary.">pick primary</RowFlag>
+          )}
+        {/* Per-row reset (drafts + saved overrides) */}
+        {deleteOverride && (overrode || isDirty) && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              resetRow(rowKey);
+            }}
+            className="shrink-0 font-mono text-[9.5px] text-[#c4c4c4] opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+            title="Revert this line to project data"
+          >
+            ↺
+          </button>
+        )}
+      </>
+  );
+
+  /**
+   * §4 D180 — a tree row reuses this row UNCHANGED from the Supplier column
+   * rightwards; the tree supplies the Material-side cells (the indented tree
+   * cell or the level columns, then Qty / assy). `flags` are this row's own
+   * material-level flags, handed back so the tree cell can carry them.
+   */
+  type TreeRowCtx = {
+    occKey?: string;
+    cellsBefore: (o: { accent: string | null; flags: React.ReactNode }) => React.ReactNode;
+    /** A sub-assembly's line: the engine reads no per-intermediate policy (D18's class). */
+    readOnlyValues?: boolean;
+    trStyle?: React.CSSProperties;
+  };
+
   /** One data row (§5.1 — plain or a group's expanded member). */
   const renderRow = (
     r: Record<string, unknown>,
     groupMeta?: { isFirstOfGroup: boolean; isContinuation: boolean; groupId: string },
+    tree?: TreeRowCtx,
   ) => {
     const rowKey = String(r.key);
     const isDirty = (drafts[rowKey] && Object.keys(drafts[rowKey]).length > 0) ?? false;
@@ -1179,20 +1440,24 @@ export function StagePolicyTable({
     // once a primary is chosen.
     const isMultiSource = Number(r.__lane_count ?? 0) > 1;
     const accent = rowAccent({ edited: isDirty, attention, multiSource: isMultiSource });
+    const supplierDef = tree ? keyDefs[keyDefs.length - 1] : null;
     return (
-      <tr key={rowKey} className="group">
-        {spec.keyCols.map((c, i) => (
+      <tr key={rowKey} className="group" data-occ={tree?.occKey} style={tree?.trStyle}>
+        {tree?.cellsBefore({ accent: accent ?? null, flags: materialFlags(r, rowKey, overrode, isDirty) })}
+        {spec.keyCols.map((c, i) => tree && i === 0 ? null : (
           <td
             key={c.id}
             className={cn(
-              "sticky z-20 border-b border-r border-[--hair-divider] bg-background px-2 py-[3px] font-mono text-[11px] group-hover:bg-[#fafafa]",
+              (!supplierDef || supplierDef.left !== null) && "sticky z-20",
+              "border-b border-r border-[--hair-divider] bg-background px-2 py-[3px] font-mono text-[11px] group-hover:bg-[#fafafa]",
               i === spec.keyCols.length - 1 && "border-r-[--hair-border]",
+              tree && r.__in_house && "text-[#71717a]",
             )}
             style={{
-              left: keyLeft(i),
-              width: keyWidths[i],
-              minWidth: keyWidths[i],
-              maxWidth: keyWidths[i],
+              left: supplierDef ? (supplierDef.left ?? undefined) : keyLeft(i),
+              width: supplierDef ? supplierDef.w : keyWidths[i],
+              minWidth: supplierDef ? supplierDef.w : keyWidths[i],
+              maxWidth: supplierDef ? supplierDef.w : keyWidths[i],
               ...(i === 0 && accent ? { borderLeft: `2px solid ${accent}` } : {}),
             }}
           >
@@ -1295,29 +1560,7 @@ export function StagePolicyTable({
                 </span>
               )}
 
-              {/* material-level required actions */}
-              {i === 0 && r.__needs_supplier && (
-                <RowFlag title="This material has no supplier in the project data — assign one in the Supplier column.">
-                  needs supplier
-                </RowFlag>
-              )}
-              {/* §4 D175 — the two material classes this stage used to hide. */}
-              {i === 0 && r.__in_house && (
-                <RowFlag title="Consumed by another BOM item and produced from its own components — modeled through the BOM. There is no supplier to configure; sourcing does not apply to this line.">
-                  made in-house
-                </RowFlag>
-              )}
-              {i === 0 && r.__not_in_bom && (
-                <RowFlag title="In the item master but in no BOM and no inbound lane. The pre-run check blocks a simulation while such a row exists — assign a supplier lane, add it to the BOM, or remove the master row.">
-                  not in BOM
-                </RowFlag>
-              )}
-              {i === 0 &&
-                !r.__needs_supplier &&
-                Number(r.__lane_count ?? 0) > 1 &&
-                !groupHasPrimary(r) && (
-                  <RowFlag title="Multiple sources — pick exactly one primary.">pick primary</RowFlag>
-                )}
+              {i === 0 && materialFlags(r, rowKey, overrode, isDirty)}
               {c.id === "product_id" && r.__unknown_product && (
                 <span
                   title="Not found in BOM"
@@ -1334,20 +1577,6 @@ export function StagePolicyTable({
                 !getEffective(rowKey, r, "sourcing_firm") && (
                   <RowFlag title="No firms detected for this product — type a sourcing firm">set firm</RowFlag>
                 )}
-              {/* Per-row reset (drafts + saved overrides) */}
-              {i === 0 && deleteOverride && (overrode || isDirty) && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    resetRow(rowKey);
-                  }}
-                  className="shrink-0 font-mono text-[9.5px] text-[#c4c4c4] opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
-                  title="Revert this line to project data"
-                >
-                  ↺
-                </button>
-              )}
             </span>
           </td>
         ))}
@@ -1355,6 +1584,20 @@ export function StagePolicyTable({
         {visible.map((fc, fi) => {
           const isLastCol = fi === visible.length - 1;
           const width = fills && isLastCol ? undefined : fc.w;
+          if (tree?.readOnlyValues) {
+            // §4 D180 — a sub-assembly's line in the tree: nothing to set.
+            // The engine flattens the BOM to product → purchased material and
+            // reads no policy for an intermediate (D18's class), so a value
+            // here would be a control that changes nothing.
+            return (
+              <td
+                key={fc.key}
+                className="border-b bg-[#fafafa]"
+                style={{ width, minWidth: width, ...cellDivider(isLastCol) }}
+                title="Read-only — the engine reads no policy for a sub-assembly; it is modelled through its components"
+              />
+            );
+          }
           if (fc.foldedFamily) {
             return (
               <td
@@ -1570,6 +1813,526 @@ export function StagePolicyTable({
     );
   };
 
+  // ── §4 D180 — the BOM tree render pass ───────────────────────────────────
+  //
+  // Handoff "Supplier stage — BOM tree in the Material column" (Option A,
+  // approved 2026-09-29): only the Material key column changes (+ a frozen
+  // "Qty / assy"); the Supplier column and every value column render through
+  // `renderRow` exactly as in the flat view. Every number shown is the derived
+  // lane's (`bomTreeView.ts`); the only arithmetic is the model's one division.
+  const TREE_ROW_H = 30;
+  const treeFactsFor = (occ: BomOcc, open: boolean): string => {
+    const M = treeModel!;
+    const stale = M.stale ? " · stale" : "";
+    const inside = !open && occ.inside.lines > 0
+      ? ` · ${occ.inside.materials} material${occ.inside.materials === 1 ? "" : "s"} · ${occ.inside.lines} line${occ.inside.lines === 1 ? "" : "s"} inside`
+      : "";
+    if (occ.kind === "root") {
+      return occ.demandPerWeek === null
+        ? `no outbound demand — flows below cannot be derived${inside}`
+        : `demand ${fmtFlow(occ.demandPerWeek)} /wk${stale}${inside}`;
+    }
+    if (!occ.canonical) {
+      const c = M.byKey.get(occ.canonicalKey);
+      return `repeat — its lines live under ${c?.parentId ?? "?"} ↗ (click to go there)`;
+    }
+    if (!occ.derived) return `not derived — run Combine on the Data Manager${inside}`;
+    const qty = M.qtyPerRoot(occ.id)
+      .map((q) => `${fmtQty(q.qty)} / ${q.rootId} · ${fmtFlow(q.flowPerWeek)} /wk`)
+      .join(" ; ") || "qty —";
+    if (occ.kind === "subassembly") return `${qty} · made in-house · read-only${stale}${inside}`;
+    const f = treeMaterialFacts.get(occ.id);
+    const sup = f ? (f.unassigned && f.suppliers === 0 ? "0 suppliers" : `${f.suppliers} supplier${f.suppliers === 1 ? "" : "s"}`) : "";
+    const att = treeAttention(occ);
+    return `${qty} · ${sup}${att ? ` · ${att.text}` : ""}${stale}${inside}`;
+  };
+  const treeAttention = (occ: BomOcc): { text: string; color: string } | null => {
+    if (occ.kind !== "material" || !occ.canonical) return null;
+    const f = treeMaterialFacts.get(occ.id);
+    if (!f) return null;
+    if (f.unassigned) return { text: "no supplier — the engine refuses a run over this material", color: "#bf2330" };
+    if (f.leadMissing > 0) return { text: `lead time missing on ${f.leadMissing} of ${f.lines} line${f.lines === 1 ? "" : "s"}`, color: "#f59e0b" };
+    return null;
+  };
+
+  /** The tree's label content for one occurrence: twisty, id, chips, dot. */
+  const treeLabel = (occ: BomOcc, open: boolean, pivotCell: boolean): React.ReactNode => {
+    const M = treeModel!;
+    const canOpen = occ.childKeys.length > 0 || occ.lanes.length > 0;
+    const match = treeReveal.matches.has(occ.key);
+    const jumped = jumpTarget === occ.key;
+    const repeat = !occ.canonical;
+    const usedIn = occ.kind === "material" && occ.canonical ? M.whereUsed(occ.id).length : 0;
+    const att = treeAttention(occ);
+    const whereIsOpen = whereOpen === occ.key;
+    return (
+      <span className="flex h-full min-w-0 items-center gap-1.5">
+        {canOpen ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleTreeOcc(occ.key);
+            }}
+            aria-label={open ? "Collapse" : "Expand"}
+            title={open ? "Collapse" : "Expand"}
+            className="grid h-[11px] w-[11px] shrink-0 place-items-center rounded-[1px] border border-[#8a8a8a] bg-white font-mono text-[10px] leading-none text-[#18181b]"
+          >
+            {open ? "−" : "+"}
+          </button>
+        ) : (
+          <span className="inline-block w-[11px] shrink-0" />
+        )}
+        <button
+          type="button"
+          onClick={() => (repeat ? jumpToOcc(occ.canonicalKey) : canOpen ? toggleTreeOcc(occ.key) : undefined)}
+          className="min-w-0 flex-auto truncate text-left font-mono text-[11.5px]"
+          style={{
+            color: repeat ? "#71717a" : "#18181b",
+            fontWeight: match || jumped ? 600 : occ.kind === "material" ? 400 : 500,
+          }}
+        >
+          {occ.id}
+        </button>
+        {occ.kind === "root" && !pivotCell && (
+          <span className="shrink-0 rounded-[3px] bg-[#18181b] px-1 font-mono text-[9px] leading-[14px] text-white">product</span>
+        )}
+        {repeat && (
+          <span className="shrink-0 rounded-[3px] border border-[#e0e0e3] bg-white px-1 font-mono text-[9px] leading-[13px] text-[#71717a]">
+            repeat
+          </span>
+        )}
+        {usedIn > 1 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setWhereOpen((cur) => (cur === occ.key ? null : occ.key));
+            }}
+            title={`Where used — ${usedIn} parents`}
+            className="h-[15px] shrink-0 rounded-full border px-1.5 text-[9.5px] leading-[13px]"
+            style={{
+              color: "#7c3aed",
+              borderColor: "rgba(124,58,237,0.3)",
+              background: whereIsOpen ? "rgba(124,58,237,0.16)" : "rgba(124,58,237,0.06)",
+            }}
+          >
+            used in {usedIn}
+          </button>
+        )}
+        {att && (
+          <span
+            className="h-[6px] w-[6px] shrink-0 rounded-full"
+            style={{ background: att.color }}
+            title={att.text}
+          />
+        )}
+      </span>
+    );
+  };
+
+  const treeRowBg = (occ: BomOcc | null): string => {
+    if (!occ) return "#fff";
+    if (jumpTarget === occ.key) return "#f0f0f2";
+    if (treeReveal.matches.has(occ.key)) return "#f7f5ff";
+    return occ.kind === "material" ? "#fff" : "#fafafa";
+  };
+  const treeTip = (occ: BomOcc, open: boolean): string =>
+    `${occ.path.join(" › ")}\n${treeFactsFor(occ, open)}`;
+
+  const keyTdProps = (d: KeyColDef, bg: string, extra?: React.CSSProperties) => ({
+    className: cn(
+      d.left !== null && "sticky z-20",
+      "border-b border-r border-[--hair-divider] px-0 py-0 font-mono text-[11px]",
+    ),
+    style: {
+      ...(d.left !== null ? { left: d.left } : {}),
+      width: d.w,
+      minWidth: d.w,
+      maxWidth: d.w,
+      height: TREE_ROW_H,
+      background: bg,
+      ...extra,
+    } as React.CSSProperties,
+  });
+
+  const qtyTd = (occ: BomOcc | null, bg: string, key = "__qty") => {
+    const d = keyDefs[keyDefs.length - 2];
+    const rate = occ && occ.kind !== "root" ? occ.edgeRate : null;
+    return (
+      <td key={key} {...keyTdProps(d, bg)}>
+        {occ && occ.kind !== "root" && (
+          <span
+            className="block px-2 text-right text-[12px] tabular-nums"
+            style={{ color: !occ.canonical || rate === null ? "#a1a1aa" : "#18181b", fontFamily: "inherit" }}
+            title={rate === null ? (occ.derived ? "rate unknown" : "not derived — run Combine") : `×${rate} per ${occ.parentId} (derived lane)`}
+          >
+            {rate === null ? "—" : fmtQty(rate)}
+          </span>
+        )}
+      </td>
+    );
+  };
+
+  /** Outline / Tabular: the level cells for a row whose label sits at `depth`. */
+  const levelCells = (
+    occ: BomOcc | null,
+    labelDepth: number | null,
+    label: React.ReactNode,
+    bg: string,
+    accent: string | null,
+  ): React.ReactNode[] => {
+    const M = treeModel!;
+    const chain: BomOcc[] = [];
+    if (occ) for (let i = 1; i <= occ.path.length; i++) {
+      const o = M.byKey.get(occKey(occ.path.slice(0, i)));
+      if (o) chain.push(o);
+    }
+    return Array.from({ length: treeLevelCount }, (_, i) => {
+      const d = keyDefs[i];
+      const first = i === 0 && accent ? { borderLeft: `2px solid ${accent}` } : undefined;
+      let content: React.ReactNode = null;
+      if (labelDepth !== null && i === labelDepth) content = label;
+      else if (labelDepth !== null && i < labelDepth && chain[i]) {
+        const anc = chain[i];
+        content = treePrefs.repeat ? (
+          <button
+            type="button"
+            onClick={() => jumpToOcc(anc.key)}
+            className="block w-full truncate text-left font-mono text-[11px] text-[#a1a1aa]"
+            title={anc.id}
+          >
+            {anc.id}
+          </button>
+        ) : null;
+      }
+      return (
+        <td key={d.id} {...keyTdProps(d, bg, first)} title={chain[i]?.id}>
+          <div className="flex h-full min-w-0 items-center px-1.5">{content}</div>
+        </td>
+      );
+    });
+  };
+
+  /** A line's own material cell: "↳ id" under its material, or the id itself. */
+  const laneMaterialText = (row: Record<string, unknown>, continuation: boolean, flags: React.ReactNode) => (
+    <span className="flex h-full min-w-0 items-center gap-1.5" title={String(row.material_id ?? "")}>
+      {continuation && <span className="shrink-0 text-[10px] text-[#c4c4c4]">↳</span>}
+      <span
+        className="min-w-0 truncate font-mono"
+        style={{ fontSize: continuation ? 10 : 11.5, color: continuation ? "#a1a1aa" : "#18181b" }}
+      >
+        {String(row.material_id ?? "")}
+      </span>
+      {flags}
+    </span>
+  );
+
+  const renderTreeRows = (): React.ReactNode[] => {
+    if (!treeModel) return [];
+    const M = treeModel;
+    const valueSpan = Math.max(1, visible.length);
+    const supDef = keyDefs[keyDefs.length - 1];
+    const out: React.ReactNode[] = [];
+    for (const [idx, v] of treeVisible.rows.entries()) {
+      if (v.t === "node") {
+        const occ = v.occ;
+        const bg = treeRowBg(occ);
+        const tip = treeTip(occ, v.open);
+        const label = treeLabel(occ, v.open, treePivot);
+        const materialSide = (accent: string | null): React.ReactNode[] =>
+          treePivot
+            ? [...levelCells(occ, occ.depth, label, bg, accent), qtyTd(occ, bg)]
+            : [
+                <td
+                  key="__tree"
+                  {...keyTdProps(keyDefs[0], bg, accent ? { borderLeft: `2px solid ${accent}` } : undefined)}
+                  title={tip}
+                >
+                  <div className="h-full min-w-0 pr-2" style={{ paddingLeft: 6 + occ.depth * 14 }}>{label}</div>
+                </td>,
+                qtyTd(occ, bg),
+              ];
+        if (occ.ownRow) {
+          // The sub-assembly's line IS this row (handoff §1): Supplier cell
+          // "(made in-house)", value cells read-only.
+          out.push(
+            renderRow(occ.ownRow as Record<string, unknown>, undefined, {
+              occKey: occ.key,
+              readOnlyValues: true,
+              trStyle: { height: TREE_ROW_H },
+              cellsBefore: () => materialSide(null),
+            }),
+          );
+          continue;
+        }
+        out.push(
+          <tr key={`t-node-${occ.key}`} className="group" data-occ={occ.key} style={{ height: TREE_ROW_H }} title={treePivot ? tip : undefined}>
+            {materialSide(null)}
+            <td {...keyTdProps(supDef, bg)}>
+              <span className="block truncate px-2 text-[11px] text-[#71717a]">
+                {v.linesHere > 0 ? `${v.linesHere} line${v.linesHere === 1 ? "" : "s"}` : ""}
+              </span>
+            </td>
+            <td colSpan={valueSpan} className="border-b border-[--hair-divider]" style={{ background: bg }} />
+          </tr>,
+        );
+        continue;
+      }
+      if (v.t === "lane") {
+        const occ = v.occ;
+        const bg = occ && v.carrier ? treeRowBg(occ) : "#fff";
+        out.push(
+          renderRow(v.row as Record<string, unknown>, undefined, {
+            occKey: v.carrier && occ ? occ.key : undefined,
+            trStyle: { height: TREE_ROW_H },
+            cellsBefore: ({ accent, flags }) => {
+              if (treePivot) {
+                const labelDepth = occ ? occ.depth : 0;
+                const label = v.carrier && occ ? (
+                  <span className="flex min-w-0 items-center gap-1.5" title={treeTip(occ, true)}>
+                    {treeLabel(occ, true, true)}
+                    {flags}
+                  </span>
+                ) : (
+                  laneMaterialText(v.row as Record<string, unknown>, v.continuation, flags)
+                );
+                return [
+                  ...levelCells(occ, labelDepth, label, bg, accent),
+                  qtyTd(v.carrier ? occ : null, bg),
+                ];
+              }
+              const pad = occ ? 6 + (occ.depth + 1) * 14 + 4 : 8;
+              return [
+                <td
+                  key="__tree"
+                  {...keyTdProps(keyDefs[0], bg, accent ? { borderLeft: `2px solid ${accent}` } : undefined)}
+                >
+                  <div className="h-full min-w-0 pr-2" style={{ paddingLeft: pad }}>
+                    {laneMaterialText(v.row as Record<string, unknown>, v.continuation, flags)}
+                  </div>
+                </td>,
+                qtyTd(null, bg),
+              ];
+            },
+          }),
+        );
+        continue;
+      }
+      if (v.t === "where") {
+        const occ = v.occ;
+        const w = M.whereUsed(occ.id);
+        const qs = M.qtyPerRoot(occ.id);
+        out.push(
+          <tr key={`t-where-${occ.key}-${idx}`}>
+            <td
+              colSpan={keyDefs.length}
+              className={cn(!treePivot && "sticky left-0 z-20", "border-b border-[--hair-divider] py-1.5")}
+              style={{ background: "#faf8ff", paddingLeft: treePivot ? 12 : 6 + (occ.depth + 1) * 14, width: keyBlockW, maxWidth: keyBlockW }}
+            >
+              <div className="font-mono text-[10px] uppercase tracking-[0.14em]" style={{ color: "#7c3aed" }}>
+                Where used · {w.length} parent{w.length === 1 ? "" : "s"}
+              </div>
+              <div className="mt-1 max-w-[500px]">
+                {w.map((p) => (
+                  <div
+                    key={p.parentId}
+                    className="grid h-[22px] items-center gap-2 border-b font-mono text-[11px]"
+                    style={{ gridTemplateColumns: "minmax(0,1fr) 56px 88px 44px", borderColor: "#efeaff" }}
+                  >
+                    <span className="truncate" title={p.parentId}>{p.parentId}</span>
+                    <span className="text-right tabular-nums">{p.edgeRate === null ? "—" : `×${fmtQty(p.edgeRate)}`}</span>
+                    <span className="text-right tabular-nums" style={{ color: M.stale ? "#a1a1aa" : "#18181b" }}>
+                      {p.flowPerWeek === null ? "—" : `${fmtFlow(p.flowPerWeek)} /wk`}
+                    </span>
+                    {p.occKey ? (
+                      <button type="button" className="text-right underline underline-offset-2" onClick={() => jumpToOcc(p.occKey!)}>
+                        Open
+                      </button>
+                    ) : (
+                      <span className="text-right text-[#a1a1aa]" title="No shipping product reaches this parent">—</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {qs.map((q) => (
+                <div key={q.rootId} className="mt-1 font-mono text-[10.5px] text-[#52525b]">
+                  {q.qty !== null
+                    ? `Σ ${q.edges} edge flow${q.edges === 1 ? "" : "s"} ${fmtFlow(q.flowPerWeek)} ÷ demand ${fmtFlow(q.demandPerWeek)} = ${fmtQty(q.qty)} per ${q.rootId}${M.stale ? " (stale — run Combine)" : ""}`
+                    : `A parent edge under ${q.rootId} is not derived, or it has no demand — qty not shown (run Combine).`}
+                </div>
+              ))}
+            </td>
+            <td colSpan={valueSpan} className="border-b border-[--hair-divider]" style={{ background: "#faf8ff" }} />
+          </tr>,
+        );
+        continue;
+      }
+      // section
+      out.push(
+        <tr key={`t-section-${v.id}`} style={{ height: TREE_ROW_H }}>
+          <td
+            colSpan={keyDefs.length}
+            className={cn(!treePivot && "sticky left-0 z-20", "border-b border-[--hair-divider] px-2 font-mono text-[11px]")}
+            style={{ background: "#fafafa", width: keyBlockW, maxWidth: keyBlockW }}
+          >
+            <span className="font-medium text-foreground">
+              {v.id === "unreachable" ? "Not reaching any shipping product" : "Not in the BOM"}
+            </span>{" "}
+            <span className="text-muted-foreground">
+              {v.id === "unreachable"
+                ? `· ${v.count} derived edge${v.count === 1 ? "" : "s"} with no route to a finished product — check the BOM rows and outbound demand`
+                : `· ${v.count} material${v.count === 1 ? "" : "s"} in no BOM — see each line's flag`}
+            </span>
+          </td>
+          <td colSpan={valueSpan} className="border-b border-[--hair-divider]" style={{ background: "#fafafa" }} />
+        </tr>,
+      );
+    }
+    return out;
+  };
+
+  /** The layout bar, in the band-row cell above the key columns (handoff §3). */
+  const treeLayoutBar = () => {
+    const seg = "px-[6px] leading-[17px] rounded-[4px]";
+    const levels = Array.from({ length: Math.max(0, treeLevelCount - 1) }, (_, i) => i);
+    const repeatDisabled = treeLayout === "compact";
+    return (
+      <div className="flex h-[23px] items-center gap-2 overflow-hidden whitespace-nowrap px-1.5 font-mono text-[9.5px] text-white/70">
+        <span className="inline-flex items-center gap-px rounded-[5px] bg-white/10 p-px">
+          {(
+            [
+              ["compact", "Compact", "One indented column"],
+              ["outline", "Outline", "One column per level; each item on its own row"],
+              ["tabular", "Tabular", "One column per level; a material shares its row with its first supplier line"],
+            ] as const
+          ).map(([v, l, t]) => (
+            <button
+              key={v}
+              type="button"
+              title={t}
+              onClick={() => setTreePrefs({ layout: v })}
+              className={cn(seg, treeLayout === v ? "bg-white text-[#18181b]" : "hover:text-white")}
+            >
+              {l}
+            </button>
+          ))}
+        </span>
+        <button
+          type="button"
+          onClick={() => !repeatDisabled && setTreePrefs({ repeat: !treePrefs.repeat })}
+          title={repeatDisabled ? "Outline and Tabular only — Compact has one label column" : "Repeat parent labels on every row"}
+          aria-disabled={repeatDisabled}
+          className="inline-flex items-center gap-1"
+          style={{ opacity: repeatDisabled ? 0.4 : 1, cursor: repeatDisabled ? "not-allowed" : "pointer" }}
+        >
+          <span
+            className="relative inline-block h-[14px] w-[26px] rounded-full"
+            style={{ background: treePrefs.repeat && !repeatDisabled ? "#fff" : "rgba(255,255,255,0.3)" }}
+          >
+            <span
+              className="absolute top-[2px] h-[10px] w-[10px] rounded-full"
+              style={{
+                left: treePrefs.repeat && !repeatDisabled ? 14 : 2,
+                background: treePrefs.repeat && !repeatDisabled ? "#18181b" : "#fff",
+              }}
+            />
+          </span>
+          repeat labels
+        </button>
+        <span className="inline-flex items-center gap-1">
+          expand to
+          <span className="inline-flex items-center gap-px rounded-[5px] bg-white/10 p-px">
+            {[...levels.map((n) => [n, `L${n}`] as const), ["all", "All"] as const].map(([n, l]) => (
+              <button
+                key={String(n)}
+                type="button"
+                title={n === "all" ? "Expand everything, including supplier lines" : `Expand down to uploaded level ${l}`}
+                onClick={() => expandTreeTo(n)}
+                className={cn(seg, treePrefs.level === n ? "bg-white text-[#18181b]" : "hover:text-white")}
+              >
+                {l}
+              </button>
+            ))}
+          </span>
+        </span>
+      </div>
+    );
+  };
+
+  /** The key heads while the tree is on screen (handoff §2, §3, §6). */
+  const renderTreeHeads = (): React.ReactNode[] => {
+    const matCol = spec.keyCols[0];
+    const supCol = spec.keyCols[1];
+    const supDef = keyDefs[keyDefs.length - 1];
+    const qtyDef = keyDefs[keyDefs.length - 2];
+    const headCls = "sticky top-[23px] z-40 bg-[--brand-ink] p-0 align-top";
+    const pos = (d: KeyColDef): React.CSSProperties => ({
+      ...(d.left !== null ? { left: d.left } : {}),
+      width: d.w,
+      minWidth: d.w,
+    });
+    const filterPlaceholder = "Filter… opens the path to matches";
+    // Outline / Tabular: one head per level column, so a label can never
+    // drift from its cells; the Material filter sits in the band row there.
+    const material = treePivot ? (
+      Array.from({ length: treeLevelCount }, (_, i) => (
+        <th key={`__lvl${i}`} className={headCls} style={pos(keyDefs[i])}>
+          <button
+            type="button"
+            onClick={() => expandTreeTo(i)}
+            title={i === 0 ? "Expand every product" : `Expand every L${i - 1} item`}
+            className="flex h-full w-full flex-col items-start gap-px px-1.5 py-1 text-left font-mono text-white"
+            style={{ borderRight: "1px solid rgba(255,255,255,0.22)" }}
+          >
+            <span className="text-[10px] font-medium uppercase leading-[1.2] tracking-[0.08em]">
+              {i === 0 ? "Product" : `L${i - 1}`}
+            </span>
+            <span className="text-[9px] leading-[1.2] text-white/55">{i === 0 ? "finished product" : "uploaded level"}</span>
+          </button>
+        </th>
+      ))
+    ) : (
+      <th key={matCol.id} className={headCls} style={pos(keyDefs[0])}>
+        <SortHeader
+          label={matCol.label}
+          sub={treeMaterialSub}
+          dir={sort?.col === matCol.id ? sort.dir : null}
+          onSort={() => toggleSort(matCol.id)}
+          filter={colFilters[matCol.id] ?? ""}
+          onFilter={(v) => setColFilter(matCol.id, v)}
+          filterPlaceholder={filterPlaceholder}
+        />
+      </th>
+    );
+    return [
+      material,
+      <th key="__qty" className={headCls} style={pos(qtyDef)}>
+        <div
+          className="flex h-full flex-col items-end justify-start gap-px px-1.5 py-1 text-right font-mono text-white"
+          style={{ borderRight: "1px solid rgba(255,255,255,0.22)" }}
+          title="The edge's own rate from the derived lane: how many of this item one parent assembly consumes"
+        >
+          <span className="text-[10px] font-medium uppercase leading-[1.2] tracking-[0.08em]">Qty / assy</span>
+          <span className="text-[9px] leading-[1.2] text-white/55">per parent</span>
+        </div>
+      </th>,
+      <th key={supCol.id} className={headCls} style={pos(supDef)}>
+        <SortHeader
+          label={supCol.label}
+          dir={sort?.col === supCol.id ? sort.dir : null}
+          onSort={() => toggleSort(supCol.id)}
+          filter={colFilters[supCol.id] ?? ""}
+          onFilter={(v) => setColFilter(supCol.id, v)}
+        />
+      </th>,
+    ];
+  };
+
+  const treeMaterialSub = treeModel
+    ? `${treeModel.stale ? "numbers from an old calculation — run Combine · " : ""}BOM tree · ${treeVisible.shownLines} of ${treeModel.totalLines} lines open`
+    : "";
+
   return (
     <div className="flex flex-col gap-2">
       {mastersError && (
@@ -1771,8 +2534,9 @@ export function StagePolicyTable({
           style={{ width: "100%", minWidth: tableMinWidth, tableLayout: "fixed" }}
         >
           <colgroup>
-            <col style={{ width: keyW.a }} />
-            <col style={{ width: keyW.b }} />
+            {keyDefs.map((d) => (
+              <col key={d.id} style={{ width: d.w }} />
+            ))}
             {visible.map((c, i) => (
               <col
                 key={c.key}
@@ -1785,10 +2549,34 @@ export function StagePolicyTable({
                 measurement — the <colgroup> above is the only source (§0.1). */}
             <tr>
               <th
-                colSpan={spec.keyCols.length}
-                className="sticky left-0 top-0 z-40 h-[23px] border-r border-r-[rgba(255,255,255,0.22)] bg-[--brand-ink] p-0"
-                style={{ width: keyTotal, minWidth: keyTotal }}
-              />
+                colSpan={keyDefs.length}
+                className={
+                  treePivot
+                    ? "sticky top-0 z-40 h-[23px] border-r border-r-[rgba(255,255,255,0.22)] bg-[--brand-ink] p-0"
+                    : "sticky left-0 top-0 z-40 h-[23px] border-r border-r-[rgba(255,255,255,0.22)] bg-[--brand-ink] p-0"
+                }
+                style={{ width: keyTotal, minWidth: keyTotal, ...(treeActive ? { maxWidth: keyTotal } : {}) }}
+              >
+                {treeActive && (
+                  <div className="flex h-[23px] items-center">
+                    {treePivot && (
+                      <>
+                        <input
+                          value={colFilters[materialColId] ?? ""}
+                          onChange={(e) => setColFilter(materialColId, e.target.value)}
+                          placeholder="Filter… opens the path to matches"
+                          aria-label="Filter materials — opens the path to matches"
+                          size={1}
+                          style={{ boxSizing: "border-box", minWidth: 0, width: 240 }}
+                          className="ml-1.5 h-[17px] shrink-0 rounded border border-[--zinc-border] bg-white px-[5px] text-[10px] text-foreground outline-none placeholder:text-[#a3a3a3] focus:border-foreground"
+                        />
+                        <span className="ml-2 min-w-0 truncate font-mono text-[9px] text-white/55">{treeMaterialSub}</span>
+                      </>
+                    )}
+                    {treeLayoutBar()}
+                  </div>
+                )}
+              </th>
               {bandGroups.map((g, gi) => {
                 const isCollapsed = collapsed.has(g.family);
                 const width = g.cols.reduce((a, c) => a + c.w, 0);
@@ -1812,25 +2600,29 @@ export function StagePolicyTable({
             </tr>
             {/* Row 2 — column heads, two lines (label + sub) on one baseline. */}
             <tr>
-              {spec.keyCols.map((c, i) => (
-                <th
-                  key={c.id}
-                  className="sticky top-[23px] z-40 bg-[--brand-ink] p-0 align-top"
-                  style={{
-                    left: keyLeft(i),
-                    width: keyWidths[i],
-                    minWidth: keyWidths[i],
-                  }}
-                >
-                  <SortHeader
-                    label={c.label}
-                    dir={sort?.col === c.id ? sort.dir : null}
-                    onSort={() => toggleSort(c.id)}
-                    filter={colFilters[c.id] ?? ""}
-                    onFilter={(v) => setColFilter(c.id, v)}
-                  />
-                </th>
-              ))}
+              {treeActive ? (
+                renderTreeHeads()
+              ) : (
+                spec.keyCols.map((c, i) => (
+                  <th
+                    key={c.id}
+                    className="sticky top-[23px] z-40 bg-[--brand-ink] p-0 align-top"
+                    style={{
+                      left: keyLeft(i),
+                      width: keyWidths[i],
+                      minWidth: keyWidths[i],
+                    }}
+                  >
+                    <SortHeader
+                      label={c.label}
+                      dir={sort?.col === c.id ? sort.dir : null}
+                      onSort={() => toggleSort(c.id)}
+                      filter={colFilters[c.id] ?? ""}
+                      onFilter={(v) => setColFilter(c.id, v)}
+                    />
+                  </th>
+                ))
+              )}
               {visible.map((fc, i) => {
                 const isLast = i === visible.length - 1;
                 const width = fills && isLast ? undefined : fc.w;
@@ -1904,7 +2696,7 @@ export function StagePolicyTable({
                 </td>
               </tr>
             )}
-            {!loading && filtered.length === 0 && !(treeActive && treeEntries.length > 0) && (
+            {!loading && filtered.length === 0 && !(treeActive && treeVisible.rows.length > 0) && (
               <tr>
                 <td colSpan={colCount} className="py-8 text-center font-mono text-[11px] text-muted-foreground">
                   {/* §4 D178 — the empty body always states WHY (read failed /
@@ -1929,157 +2721,9 @@ export function StagePolicyTable({
                 </td>
               </tr>
             )}
-            {!loading &&
-              treeActive &&
-              (() => {
-                // §4 D177 — the tree render pass. Structural rows are
-                // read-only; lane rows go through renderRow UNCHANGED (the ↳
-                // continuation form, since the material is named by the
-                // structural row above). A collapsed node hides its subtree.
-                const fmt = (n: number | null): string => {
-                  if (n === null) return "—";
-                  const a = Math.abs(n);
-                  return a >= 100 ? n.toFixed(0) : String(Number(n.toFixed(2)));
-                };
-                const isHidden = (path: string[]): boolean => {
-                  for (let d = 1; d < path.length; d++) {
-                    if (collapsedGroups.has(`tree::${path.slice(0, d).join("/")}`)) return true;
-                  }
-                  return false;
-                };
-                const stripSpan = Math.max(1, visible.length);
-                const structuralRow = (
-                  key: string,
-                  depth: number,
-                  colA: React.ReactNode,
-                  colB: string,
-                  strip: React.ReactNode,
-                  tone: "root" | "node" | "section",
-                ) => (
-                  <tr key={key} className="group">
-                    <td
-                      className="sticky z-20 border-b border-r border-[--hair-divider] px-2 py-[3px] font-mono text-[11px]"
-                      style={{
-                        left: keyLeft(0),
-                        width: keyWidths[0],
-                        minWidth: keyWidths[0],
-                        maxWidth: keyWidths[0],
-                        background: tone === "root" ? "#f0f0f0" : tone === "section" ? "#fafafa" : "#f7f7f7",
-                        borderLeft: tone === "root" ? "2px solid #171717" : "2px solid transparent",
-                        paddingLeft: 8 + depth * 12,
-                      }}
-                    >
-                      {colA}
-                    </td>
-                    <td
-                      className="sticky z-20 border-b border-r border-[--hair-divider] px-2 py-[3px] font-mono text-[10px] text-muted-foreground"
-                      style={{
-                        left: keyLeft(1),
-                        width: keyWidths[1],
-                        minWidth: keyWidths[1],
-                        maxWidth: keyWidths[1],
-                        background: tone === "root" ? "#f0f0f0" : tone === "section" ? "#fafafa" : "#f7f7f7",
-                      }}
-                    >
-                      {colB}
-                    </td>
-                    <td
-                      colSpan={stripSpan}
-                      className="border-b border-[--hair-divider] px-2 py-[3px] font-mono text-[10.5px] text-muted-foreground"
-                      style={{ background: tone === "root" ? "#f0f0f0" : tone === "section" ? "#fafafa" : "#f7f7f7" }}
-                    >
-                      {strip}
-                    </td>
-                  </tr>
-                );
-                const chevron = (path: string[]) => {
-                  const id = `tree::${path.join("/")}`;
-                  const closed = collapsedGroups.has(id);
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => toggleGroup(id)}
-                      className="mr-1 grid h-[15px] w-[15px] shrink-0 place-items-center font-mono text-[10px] text-muted-foreground hover:text-foreground"
-                      title={closed ? "Expand this branch" : "Collapse this branch"}
-                    >
-                      {closed ? "▸" : "▾"}
-                    </button>
-                  );
-                };
-                return treeEntries.map((e, idx) => {
-                  if (e.kind === "root") {
-                    return structuralRow(
-                      `t-root-${e.nodeId}`,
-                      0,
-                      <span className="flex items-center">
-                        {chevron(e.path)}
-                        <span className="min-w-0 flex-1 truncate font-medium text-foreground" title={e.nodeId}>{e.nodeId}</span>
-                      </span>,
-                      "finished product",
-                      e.demandPerWeek !== null
-                        ? <>demand <span className="text-foreground">{fmt(e.demandPerWeek)}/wk</span> · from its outbound lanes</>
-                        : <>no outbound demand — flows below cannot be derived</>,
-                      "root",
-                    );
-                  }
-                  if (e.kind === "node") {
-                    if (isHidden(e.path)) return null;
-                    const depth = e.path.length - 1;
-                    return structuralRow(
-                      `t-node-${idx}-${e.path.join("/")}`,
-                      depth,
-                      <span className="flex items-center">
-                        {chevron(e.path)}
-                        <span className="min-w-0 flex-1 truncate" title={e.nodeId}>{e.nodeId}</span>
-                        <span className="ml-1 shrink-0 rounded-sm bg-[#ececec] px-1 text-[9px] uppercase tracking-wide">
-                          {e.echelon === "subassembly" ? "sub" : "mat"}
-                        </span>
-                      </span>,
-                      e.echelon === "subassembly" ? "sub-assembly" : "material",
-                      !e.derived ? (
-                        <span title="The uploaded BOM edge has no row in the derived lane — run Combine on the Data Manager, or the ETL has not seen this upload yet.">
-                          L{e.depth ?? "?"} · not derived — run Combine
-                        </span>
-                      ) : (
-                        <span title={`level ${e.depth ?? "?"} · edge consumption rate ×${fmt(e.edgeRate)} · effective rate from ${e.rootId} ×${fmt(e.effRate)} · inherited weekly flow ${fmt(e.flowPerWeek)}/wk — read from the derived lane (supply_chain_data_multi_tier); eff = flow ÷ root demand`}>
-                          L{e.depth ?? "?"} · rate <span className="text-foreground">×{fmt(e.edgeRate)}</span> · eff{" "}
-                          <span className="text-foreground">×{fmt(e.effRate)}</span> ·{" "}
-                          <span className="text-foreground">{fmt(e.flowPerWeek)}/wk</span>
-                          {!e.carriesLanes && e.canonicalPath && (
-                            <span className="ml-2 text-[10px]">↗ sourced under {e.canonicalPath[Math.max(0, e.canonicalPath.length - 2)]}</span>
-                          )}
-                        </span>
-                      ),
-                      "node",
-                    );
-                  }
-                  if (e.kind === "lane") {
-                    if (isHidden(e.path)) return null;
-                    return renderRow(e.row as Record<string, unknown>, {
-                      isFirstOfGroup: false,
-                      isContinuation: e.continuation,
-                      groupId: `tree::${e.path.join("/")}`,
-                    });
-                  }
-                  // section
-                  return structuralRow(
-                    `t-section-${e.id}`,
-                    0,
-                    <span className="font-medium text-foreground">
-                      {e.id === "unreachable" ? "Not reaching any shipping product" : "Not in the BOM"}
-                    </span>,
-                    e.id === "unreachable" ? `${e.count} edges` : `${e.count} materials`,
-                    e.id === "unreachable" ? (
-                      <span title="Derived lane edges whose walk found no shipping product above them — check the BOM rows and outbound demand.">
-                        derived edges with no route to a finished product
-                      </span>
-                    ) : (
-                      <span>lanes whose material appears in no BOM — see each line's flag</span>
-                    ),
-                    "section",
-                  );
-                });
-              })()}
+            {/* §4 D180 — the BOM tree pass (read-only structural rows; every
+                line through renderRow, its continuation from the model). */}
+            {!loading && treeActive && renderTreeRows()}
             {!loading &&
               !treeActive &&
               rowGroups.flatMap((group) => {

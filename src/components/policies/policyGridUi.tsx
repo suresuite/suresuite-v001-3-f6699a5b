@@ -246,6 +246,7 @@ export function SortHeader({
   filter,
   onFilter,
   last,
+  filterPlaceholder,
 }: {
   label: string;
   /** Second header line: unit, range, provenance note — never part of `label`. */
@@ -260,6 +261,8 @@ export function SortHeader({
   onFilter?: (v: string) => void;
   /** The outermost column carries no right rule — it would spring a scrollbar. */
   last?: boolean;
+  /** Says what the filter does when it is not "thin the rows" (§4 D180). */
+  filterPlaceholder?: string;
 }) {
   return (
     <div
@@ -311,7 +314,7 @@ export function SortHeader({
         <input
           value={filter ?? ""}
           onChange={(e) => onFilter(e.target.value)}
-          placeholder="filter"
+          placeholder={filterPlaceholder ?? "filter"}
           size={1}
           style={{ boxSizing: "border-box", minWidth: 0 }}
           className="h-[18px] w-full rounded border border-[--zinc-border] bg-white px-[5px] text-[10px] text-foreground outline-none placeholder:text-[#a3a3a3] focus:border-foreground"
