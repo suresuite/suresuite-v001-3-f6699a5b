@@ -1,3 +1,8 @@
+# SCSIM — supply chain simulation library and stress-test framework.
+# Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
+# release; see scsim/NOTICE.md for licensing, funding and citation.
+# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+
 """P-P.9 material_allocation — IMPROVISATION, rolling LP (Part IV §4.4). ✅
 
 Context: the weekly war-room — reassign shared materials across products to

@@ -1,3 +1,8 @@
+# SCSIM — supply chain simulation library and stress-test framework.
+# Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
+# release; see scsim/NOTICE.md for licensing, funding and citation.
+# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+
 """Warm-state snapshots — Part X §10.2.4.
 
 The warm-up segment of every replication of a scenario family is identical

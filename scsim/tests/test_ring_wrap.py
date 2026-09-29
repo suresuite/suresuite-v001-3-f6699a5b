@@ -1,3 +1,8 @@
+# SCSIM — supply chain simulation library and stress-test framework.
+# Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
+# release; see scsim/NOTICE.md for licensing, funding and citation.
+# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+
 """A lead-time draw beyond the in-transit ring must not land early (audit F-36).
 
 `ring_width = max(link_lt) + 64`, and `_mech_ship_queue` writes `arrival % W`.

@@ -32,7 +32,7 @@ Section map against the design brief:
 
 Companion descriptive document: `docs/design/platform-architecture-report.md` — the platform described *as built* from technical and supply-chain-management viewpoints, framed as a scientific report skeleton. This blueprint stays normative (what to build and why); the report is descriptive (what exists and how to present it).
 
-Companion documents: `docs/data-simulation-mapping.md` (current field-mapping contract), `docs/simulation-data-lifecycle.md` (current state tiers), `docs/design/ai-agents.md` (authoritative AI-agent design — supersedes the §12 roster sketch), `scsim/docs/architecture.md`, `scsim/docs/roadmap.md`, `scsim/docs/stress-tests.md`, `scsim/docs/synergy.md`, `scsim/docs/adr/0001-mts-fulfillment-mode.md`.
+Companion documents: `docs/data-simulation-mapping.md` (current field-mapping contract), `docs/simulation-data-lifecycle.md` (current state tiers), `docs/design/ai-agents.md` (authoritative AI-agent design — supersedes the §12 roster sketch), `scsim/docs/architecture.md`, `scsim/docs/roadmap.md`, `scsim/docs/stress-tests.md`, `scsim/docs/synergy.md`, `scsim/docs/adr/0001-mts-fulfillment-mode.md`, `docs/design/open-access-release-plan.md` (open-access release of the scsim library and stress-test framework — ACCURATE result).
 
 **Working agreement.** This document governs all platform work: before starting a task, locate it in the gap catalog (§2.3) and roadmap (§13); commits and PRs reference the section, gap, and phase they serve (e.g. `Phase A / G4 / §8.3`). If implementation must deviate from this blueprint, the blueprint is updated **in the same PR** — the document and the code move together and this file is never allowed to go stale. The same rules are stated for tooling sessions in the repository-root `CLAUDE.md`.
 
@@ -1143,6 +1143,7 @@ value; experiment/surrogate endpoints follow their capabilities (Phases C/D).
 3. **Warehouse echelon math:** how does the DC echelon interact with the single-plant Part-III formulation — extension or second model class?
 4. **Surrogate sharing:** are surrogates strictly per-project, or shareable across projects with compatible feature specs (data governance implications)?
 5. **Sub-weekly tick:** is there ever a business case that justifies breaking the weekly fidelity boundary, or do sub-weekly questions belong to a different tool class?
+6. **Open-access release of the engine:** `scsim` (simulation library + stress-test framework) is an ACCURATE result to be published as open access, while the full platform stays part of the PhD thesis and all rights reserved. Governing rule: the public library is cut from `scsim/` and the platform pins the released version — one engine, never a fork (§3). Licence, rights holder and release boundary are open decisions L1–L6 in `docs/design/open-access-release-plan.md`; the surrogate method (§11) follows the same rule once built.
 
 ---
 

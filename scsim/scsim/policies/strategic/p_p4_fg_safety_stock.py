@@ -1,3 +1,8 @@
+# SCSIM — supply chain simulation library and stress-test framework.
+# Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
+# release; see scsim/NOTICE.md for licensing, funding and citation.
+# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+
 """P-P.4 fg_safety_stock — STRATEGIC, MTS only (Part IV §4.2). M7 ✅.
 
 Context: the only buffer DOWNSTREAM of production — keeps serving customers

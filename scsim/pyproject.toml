@@ -8,6 +8,9 @@ version = "0.2.0"
 description = "Resilience-grade 3-echelon supply chain simulator (SCSIM)"
 readme = "README.md"
 requires-python = ">=3.11"
+authors = [{ name = "Phu Nguyen", email = "phu.nguyen@hwr-berlin.de" }]
+# No `license` yet: all rights reserved until the open-access release —
+# see NOTICE.md and docs/design/open-access-release-plan.md (decision L1).
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",

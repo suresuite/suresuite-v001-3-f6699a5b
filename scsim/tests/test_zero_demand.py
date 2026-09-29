@@ -1,3 +1,8 @@
+# SCSIM — supply chain simulation library and stress-test framework.
+# Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
+# release; see scsim/NOTICE.md for licensing, funding and citation.
+# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+
 """A window with no demand has no fill rate (audit 2026-09-22, F-08).
 
 `fulfilled / demand if demand > 0 else 1.0` reported 100% service for a

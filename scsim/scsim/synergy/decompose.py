@@ -1,3 +1,8 @@
+# SCSIM — supply chain simulation library and stress-test framework.
+# Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
+# release; see scsim/NOTICE.md for licensing, funding and citation.
+# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+
 """Synergy decomposition under CRN (Part V, manuscript synergy equations).
 
 synergy_X(AB) = Δ_X(portfolio AB) − Σ_i Δ_X(component i), computed PER
