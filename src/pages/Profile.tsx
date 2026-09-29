@@ -18,6 +18,25 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { PAGE_CAPABILITIES, FEATURE_CAPABILITIES } from '@/lib/capabilities';
 import { AlertCircle, Ban, Check, Loader2, Upload } from 'lucide-react';
+import { describeExpiry, formatDate, passwordStatus, relativeDay } from '@/lib/auth/passwordPolicy';
+
+/** `super_admin` → "Super admin". The stored value is an enum token, not a label. */
+const roleLabel = (role: string | undefined | null) =>
+  role ? role.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : '';
+
+/** What the avatar picker says it takes — "PNG or JPG" — and nothing else. */
+const AVATAR_TYPES = ['image/png', 'image/jpeg'];
+
+/** The RPCs' refusals, in words (see PLAN.md §4 D205 for where each is raised). */
+function accountError(message: string | undefined): string {
+  const m = message ?? '';
+  if (m.includes('invalid_current_password')) return 'Your current password is incorrect.';
+  if (m.includes('password_too_short')) return 'New password must be at least 8 characters.';
+  if (m.includes('password_unchanged')) return 'The new password must be different from your current one.';
+  if (m.includes('account_inactive')) return 'Your account has been deactivated. Contact your administrator.';
+  if (m.includes('not_authenticated')) return 'Your session could not be verified. Please sign out and sign in again.';
+  return m || 'Unknown error.';
+}
 
 interface ProfileProps {
   isCollapsed: boolean;
@@ -28,11 +47,16 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   const { user, refreshProfile } = useAuth();
   const { toast } = useToast();
   const [params, setParams] = useSearchParams();
-  const initialTab = params.get('tab') === 'password' ? 'password' : 'profile';
-  const forced = params.get('forced') === '1';
+  // A required change is read from the ACCOUNT, not from the URL: `?forced=1` is only
+  // where RoleGuard sends you, and editing it away must not unlock the other tabs.
+  const pw = passwordStatus(user);
+  const locked = pw.mustChange;
+  const initialTab = locked || params.get('tab') === 'password' ? 'password' : 'profile';
 
   const [tab, setTab] = useState(initialTab);
-  const [displayName, setDisplayName] = useState(user?.display_name ?? user?.name ?? '');
+  // The stored display name only; the account name is the placeholder, not a value
+  // that "Save changes" would silently copy into display_name.
+  const [displayName, setDisplayName] = useState(user?.display_name ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -44,20 +68,26 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   const [savingPw, setSavingPw] = useState(false);
 
   useEffect(() => {
-    setDisplayName(user?.display_name ?? user?.name ?? '');
+    setDisplayName(user?.display_name ?? '');
     setPhone(user?.phone ?? '');
-  }, [user?.id, user?.display_name, user?.phone, user?.name]);
+  }, [user?.id, user?.display_name, user?.phone]);
+
+  useEffect(() => {
+    if (locked) setTab('password');
+  }, [locked]);
 
   const onSaveProfile = async () => {
     setSavingProfile(true);
+    // A blank string CLEARS the field; NULL would leave it unchanged (D205).
     const { error } = await supabase.rpc('update_own_profile', {
-      p_display_name: displayName || null,
-      p_phone: phone || null,
+      p_display_name: displayName.trim(),
+      p_phone: phone.trim(),
       p_avatar_url: null,
+      p_user_id: user?.id,
     });
     setSavingProfile(false);
     if (error) {
-      toast({ title: 'Could not save', description: error.message, variant: 'destructive' });
+      toast({ title: 'Could not save', description: accountError(error.message), variant: 'destructive' });
       return;
     }
     await refreshProfile();
@@ -67,13 +97,18 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   const onAvatarPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user?.id) return;
+    if (!AVATAR_TYPES.includes(file.type)) {
+      toast({ title: 'Unsupported file', description: 'Use a PNG or JPG image.', variant: 'destructive' });
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
     if (file.size > 2 * 1024 * 1024) {
       toast({ title: 'File too large', description: 'Max 2 MB.', variant: 'destructive' });
       return;
     }
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop() || 'png';
+      const ext = file.type === 'image/png' ? 'png' : 'jpg';
       const path = `${user.id}/avatar-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from('avatars')
@@ -85,6 +120,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
         p_display_name: null,
         p_phone: null,
         p_avatar_url: publicUrl,
+        p_user_id: user.id,
       });
       if (rpcErr) throw rpcErr;
       await refreshProfile();
@@ -106,31 +142,34 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
       toast({ title: 'Passwords do not match', variant: 'destructive' });
       return;
     }
+    if (newPw === oldPw) {
+      toast({ title: 'Choose a new password', description: accountError('password_unchanged'), variant: 'destructive' });
+      return;
+    }
     setSavingPw(true);
-    const { error } = await supabase.rpc('change_own_password', {
+    const { data: newExpiry, error } = await supabase.rpc('change_own_password', {
       p_old_password: oldPw,
       p_new_password: newPw,
+      p_user_id: user?.id,
     });
     setSavingPw(false);
     if (error) {
-      const msg =
-        error.message?.includes('invalid_current_password')
-          ? 'Your current password is incorrect.'
-          : error.message?.includes('password_too_short')
-          ? 'New password must be at least 8 characters.'
-          : error.message;
-      toast({ title: 'Could not change password', description: msg, variant: 'destructive' });
+      toast({ title: 'Could not change password', description: accountError(error.message), variant: 'destructive' });
       return;
     }
     setOldPw('');
     setNewPw('');
     setConfirmPw('');
+    // The account row, not this page, decides whether the other pages open again.
     await refreshProfile();
-    toast({ title: 'Password changed', description: 'Your password is updated and valid for 90 days.' });
-    if (forced) {
-      // Clear the forced flag so guards stop redirecting
-      setParams({}, { replace: true });
-    }
+    const until = newExpiry ? new Date(newExpiry as string) : null;
+    toast({
+      title: 'Password changed',
+      description: until && !Number.isNaN(until.getTime())
+        ? `Your new password is valid until ${formatDate(until)}.`
+        : 'Your password has been updated.',
+    });
+    if (params.get('forced')) setParams({ tab: 'password' }, { replace: true });
   };
 
   const initial = (user?.display_name || user?.name || user?.email || '?').charAt(0).toUpperCase();
@@ -145,19 +184,21 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
         <PageHeader title="My Profile" subtitle="Manage your account, contact info, and password." />
 
 
-      {forced && (
+      {locked && (
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            You must change your password before continuing.
+            {pw.expired
+              ? `${describeExpiry(pw)} You must change it before continuing.`
+              : 'You must set a new password before continuing.'}
           </AlertDescription>
         </Alert>
       )}
 
-      <Tabs value={tab} onValueChange={(v) => { setTab(v); setParams(v === 'password' ? { tab: 'password' } : {}, { replace: true }); }} className="max-w-3xl">
+      <Tabs value={tab} onValueChange={(v) => { if (locked) return; setTab(v); setParams(v === 'password' ? { tab: 'password' } : {}, { replace: true }); }} className="max-w-3xl">
         <TabsList>
-          <TabsTrigger value="profile" disabled={forced}>Profile</TabsTrigger>
-          <TabsTrigger value="access" disabled={forced}>My Access</TabsTrigger>
+          <TabsTrigger value="profile" disabled={locked}>Profile</TabsTrigger>
+          <TabsTrigger value="access" disabled={locked}>My Access</TabsTrigger>
           <TabsTrigger value="password">Change Password</TabsTrigger>
         </TabsList>
 
@@ -174,7 +215,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                   <AvatarFallback className="bg-primary text-primary-foreground text-lg">{initial}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <input ref={fileRef} type="file" accept="image/*" hidden onChange={onAvatarPick} />
+                  <input ref={fileRef} type="file" accept={AVATAR_TYPES.join(',')} hidden onChange={onAvatarPick} />
                   <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
                     {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                     {uploading ? 'Uploading…' : 'Upload avatar'}
@@ -190,7 +231,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                 </div>
                 <div className="space-y-2">
                   <Label>Role</Label>
-                  <Input value={user?.role ?? ''} disabled className="capitalize" />
+                  <Input value={roleLabel(user?.role)} disabled />
                 </div>
                 <div className="space-y-2">
                   <Label>Organization</Label>
@@ -198,7 +239,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="display_name">Display name</Label>
-                  <Input id="display_name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+                  <Input id="display_name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={user?.name ?? ''} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="phone">Phone</Label>
@@ -225,10 +266,32 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
             <CardHeader>
               <CardTitle>Change password</CardTitle>
               <CardDescription>
-                Use at least 8 characters. Passwords expire every 90 days for security.
+                Use at least 8 characters.
+                {pw.maxAgeDays ? ` Passwords expire ${pw.maxAgeDays} days after they are set.` : ''}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-w-md">
+              {(pw.changedAt || pw.expiresAt) && (
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                  {pw.changedAt && (
+                    <>
+                      <dt className="text-muted-foreground">Last changed</dt>
+                      <dd className="tabular-nums">{formatDate(pw.changedAt)}</dd>
+                    </>
+                  )}
+                  {pw.expiresAt && (
+                    <>
+                      <dt className="text-muted-foreground">{pw.expired ? 'Expired' : 'Expires'}</dt>
+                      <dd className={`tabular-nums ${pw.expired ? 'text-destructive' : ''}`}>
+                        {formatDate(pw.expiresAt)}
+                        {relativeDay(pw) && (
+                          <span className="text-muted-foreground"> · {relativeDay(pw)}</span>
+                        )}
+                      </dd>
+                    </>
+                  )}
+                </dl>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="old">Current password</Label>
                 <Input id="old" type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} autoComplete="current-password" />
@@ -241,7 +304,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                 <Label htmlFor="confirm">Confirm new password</Label>
                 <Input id="confirm" type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} autoComplete="new-password" />
               </div>
-              <Button onClick={onChangePassword} disabled={savingPw || !oldPw || !newPw}>
+              <Button onClick={onChangePassword} disabled={savingPw || !oldPw || !newPw || !confirmPw}>
                 {savingPw && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Update password
               </Button>

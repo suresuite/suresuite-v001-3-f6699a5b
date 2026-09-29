@@ -767,7 +767,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "Profile.tsx",
         "via": "rpc change_own_password",
-        "evidence": "src/pages/Profile.tsx:110"
+        "evidence": "src/pages/Profile.tsx:150"
       }
     ],
     "governance": {
@@ -1094,14 +1094,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "When the current password stops being accepted — `now() + 90 days` at the time the row was written.",
+        "meaning": "When the current password expires — `now() + password_max_age()` (90 days) when the password was last set. Expiry does not refuse a sign-in: it sends the user to /profile and closes every other page until the password is changed (`RoleGuard`, reading `get_my_profile`'s server-computed `password_expired`; §4 D205). Rows that predate `20260527011429` were stamped by that migration's column default, not by a real password change.",
         "primaryKey": false,
         "unique": false,
         "references": null,
         "substitutions": [
           {
             "when": "no expiry is supplied",
-            "value": "90 days after the row is written",
+            "value": "password_max_age() (90 days) after the row is written",
             "provenance": "default",
             "visibleAs": "the column default; the account pages render the resulting date"
           }
@@ -1125,7 +1125,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Whether the user must set a new password before continuing. Set when an administrator resets an account.",
+        "meaning": "Whether the user must set a new password before continuing. Set when an administrator creates or resets an account; cleared by `change_own_password`. Enforced by `RoleGuard`, which could not see it until §4 D205.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1149,7 +1149,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Whether the account may sign in. Checked at login; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.",
+        "meaning": "Whether the account may sign in. Checked at login through `get_my_profile` (which, until §4 D205, raised for every user and was ignored, so the check never ran) and on every reload; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.",
         "primaryKey": false,
         "unique": false,
         "references": null,

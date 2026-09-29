@@ -58,7 +58,7 @@ READ THE POLICIES BEFORE TRUSTING THIS ROW. The table carries two policies and t
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DeveloperApi.tsx` | rpc list_api_keys | `src/pages/DeveloperApi.tsx:261` | yes |
-| `Profile.tsx` | rpc change_own_password | `src/pages/Profile.tsx:110` | yes |
+| `Profile.tsx` | rpc change_own_password | `src/pages/Profile.tsx:150` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -68,19 +68,19 @@ unnoticed.
 
 <details><summary>13 app-shell read(s) — not lineage</summary>
 
-* `Auth.tsx` — `src/hooks/useAuth.tsx:82`
-* `DataManager.tsx` — `src/hooks/useAuth.tsx:82`
-* `FirmLevelNetwork.tsx` — `src/hooks/useAuth.tsx:82`
-* `Forbidden.tsx` — `src/hooks/useAuth.tsx:82`
-* `GettingStarted.tsx` — `src/hooks/useAuth.tsx:82`
-* `InteractiveNetworkSpace.tsx` — `src/hooks/useAuth.tsx:82`
-* `Landing.tsx` — `src/hooks/useAuth.tsx:82`
-* `NotFound.tsx` — `src/hooks/useAuth.tsx:82`
-* `ProcessLevelNetwork.tsx` — `src/hooks/useAuth.tsx:82`
-* `ProductLevelNetwork.tsx` — `src/hooks/useAuth.tsx:82`
-* `ProjectIntelligence.tsx` — `src/hooks/useAuth.tsx:82`
-* `ProjectPolicies.tsx` — `src/hooks/useAuth.tsx:82`
-* `SimulationLab.tsx` — `src/hooks/useAuth.tsx:82`
+* `Auth.tsx` — `src/hooks/useAuth.tsx:119`
+* `DataManager.tsx` — `src/hooks/useAuth.tsx:119`
+* `FirmLevelNetwork.tsx` — `src/hooks/useAuth.tsx:119`
+* `Forbidden.tsx` — `src/hooks/useAuth.tsx:119`
+* `GettingStarted.tsx` — `src/hooks/useAuth.tsx:119`
+* `InteractiveNetworkSpace.tsx` — `src/hooks/useAuth.tsx:119`
+* `Landing.tsx` — `src/hooks/useAuth.tsx:119`
+* `NotFound.tsx` — `src/hooks/useAuth.tsx:119`
+* `ProcessLevelNetwork.tsx` — `src/hooks/useAuth.tsx:119`
+* `ProductLevelNetwork.tsx` — `src/hooks/useAuth.tsx:119`
+* `ProjectIntelligence.tsx` — `src/hooks/useAuth.tsx:119`
+* `ProjectPolicies.tsx` — `src/hooks/useAuth.tsx:119`
+* `SimulationLab.tsx` — `src/hooks/useAuth.tsx:119`
 
 These reach the table only through modules the shell mounts on every page.
 Listing them as surfaces would be true about the imports and false about
@@ -107,9 +107,9 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `avatar_url` | — | `text` | — | — | URL of the user's profile image, if they uploaded one. |
 | `phone` | — | `text` | — | — | Contact number. Not used for authentication or for any second factor. |
 | `password_changed_at` | — | `timestamp with time zone` | — | — | When the password was last set. Server-stamped. |
-| `password_expires_at` | — | `timestamp with time zone` | — | — | When the current password stops being accepted — `now() + 90 days` at the time the row was written. |
-| `force_password_change` | — | `boolean` | — | — | Whether the user must set a new password before continuing. Set when an administrator resets an account. |
-| `is_active` | — | `boolean` | — | — | Whether the account may sign in. Checked at login; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`. |
+| `password_expires_at` | — | `timestamp with time zone` | — | — | When the current password expires — `now() + password_max_age()` (90 days) when the password was last set. Expiry does not refuse a sign-in: it sends the user to /profile and closes every other page until the password is changed (`RoleGuard`, reading `get_my_profile`'s server-computed `password_expired`; §4 D205). Rows that predate `20260527011429` were stamped by that migration's column default, not by a real password change. |
+| `force_password_change` | — | `boolean` | — | — | Whether the user must set a new password before continuing. Set when an administrator creates or resets an account; cleared by `change_own_password`. Enforced by `RoleGuard`, which could not see it until §4 D205. |
+| `is_active` | — | `boolean` | — | — | Whether the account may sign in. Checked at login through `get_my_profile` (which, until §4 D205, raised for every user and was ignored, so the check never ran) and on every reload; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`. |
 | `organization_id` | — | `uuid` | — | — | The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. |
 
 ## Each column in full
@@ -300,11 +300,11 @@ When the password was last set. Server-stamped.
 
 ### `password_expires_at`
 
-When the current password stops being accepted — `now() + 90 days` at the time the row was written.
+When the current password expires — `now() + password_max_age()` (90 days) when the password was last set. Expiry does not refuse a sign-in: it sends the user to /profile and closes every other page until the password is changed (`RoleGuard`, reading `get_my_profile`'s server-computed `password_expired`; §4 D205). Rows that predate `20260527011429` were stamped by that migration's column default, not by a real password change.
 
 | | |
 |---|---|
-| Type | `timestamp with time zone`, `NOT NULL`, default `(now() + interval '90 days')` |
+| Type | `timestamp with time zone`, `NOT NULL`, default `(now() + public.password_max_age())` |
 | Grain | `metadata` |
 | Unit | dimensionless |
 | Added by | `20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql` |
@@ -317,11 +317,11 @@ for one you did.
 
 | When | The value used | Shown as | Visible where |
 |---|---|---|---|
-| no expiry is supplied | 90 days after the row is written | `default` | the column default; the account pages render the resulting date |
+| no expiry is supplied | password_max_age() (90 days) after the row is written | `default` | the column default; the account pages render the resulting date |
 
 ### `force_password_change`
 
-Whether the user must set a new password before continuing. Set when an administrator resets an account.
+Whether the user must set a new password before continuing. Set when an administrator creates or resets an account; cleared by `change_own_password`. Enforced by `RoleGuard`, which could not see it until §4 D205.
 
 | | |
 |---|---|
@@ -335,7 +335,7 @@ Whether the user must set a new password before continuing. Set when an administ
 
 ### `is_active`
 
-Whether the account may sign in. Checked at login; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.
+Whether the account may sign in. Checked at login through `get_my_profile` (which, until §4 D205, raised for every user and was ignored, so the check never ran) and on every reload; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.
 
 | | |
 |---|---|
@@ -372,6 +372,6 @@ The user's tenant, by uuid — the same organization `organization` names, and t
 
 ---
 
-*Generated from data contract `bbda57e7cc8b`, engine `0.2.8`,
+*Generated from data contract `d2ce87c5c3d2`, engine `0.2.8`,
 sidecar `supabase/contract/approved_users.contract.yaml`, table created by `20250815000000_approved_users_base.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
