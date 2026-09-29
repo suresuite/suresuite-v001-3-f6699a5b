@@ -3066,6 +3066,74 @@ async function mappingAudit() {
     out("", "**(K2) `network_nodes.prominence` NULL — the nodes whose Firm-level size and stats come from the page's own composite:**");
     out(...table(rows));
   });
+
+  section("Audit 2026-09-29 · L — the policy grid and the defaults cards: what is STORED, what the engine is SENT");
+  // L1 — `policy_defaults` is seeded as `{}` per family (`create_default_policy_defaults`)
+  // and the page shows each family through the Zod bundle, which fills every missing
+  // key with the UI's default (`parseFamily`). The run's snapshot copies the stored
+  // JSON raw (`_build_policy_snapshot`) and `project_map.py::_map_policies` reads a
+  // missing key with ITS OWN default — `backorder_allowed` False (UI true),
+  // `backorder_cost_per_day` 0 (UI 2), `allocation` '' (UI priority), `coverage_weeks`
+  // absent → the 8/10/12 strip (UI 8). So a family never saved shows one policy and
+  // runs another.
+  const l1 = await tryQ(`
+    select p.name as project,
+           (select count(*) from jsonb_object_keys(coalesce(d.fulfillment, '{}'::jsonb)))::int as fulfil_keys,
+           d.fulfillment->>'backorder_allowed' as backorder_allowed,
+           d.fulfillment->>'backorder_cost_per_day' as bo_cost,
+           d.fulfillment->>'allocation' as allocation,
+           (select count(*) from jsonb_object_keys(coalesce(d.inventory, '{}'::jsonb)))::int as inv_keys,
+           d.inventory->>'type' as inv_type,
+           d.inventory->>'safety_stock_method' as ss_method,
+           d.inventory->>'safety_stock_days' as ss_days,
+           d.inventory->>'coverage_weeks' as kappa,
+           d.inventory->>'holding_cost_pct' as hold_pct,
+           (select count(*) from jsonb_object_keys(coalesce(d.sourcing, '{}'::jsonb)))::int as src_keys,
+           d.sourcing->>'strategy' as src_strategy,
+           (select count(*) from jsonb_object_keys(coalesce(d.recovery, '{}'::jsonb)))::int as rec_keys,
+           d.recovery->>'response' as rec_response,
+           (select count(*) from jsonb_object_keys(coalesce(d.production, '{}'::jsonb)))::int as prod_keys,
+           d.fulfillment_strategy
+      from public.projects p left join public.policy_defaults d on d.project_id = p.id
+     order by p.name`);
+  report("L1 — stored defaults", l1, (rows) => {
+    out("", "**(L1) the project defaults AS STORED — an empty cell is a key the page fills with the UI default and the engine reads with its own:**");
+    out(...table(rows));
+  });
+
+  // L2 — every override the grid has written, by scope, family and key: the
+  // engine applies some per row and drops others (`_map_policies`).
+  const l2 = await tryQ(`
+    select o.scope, o.family, k.key,
+           case when o.target_key like '%::%' then 'a::b' else 'single' end as key_shape,
+           count(*)::int as overrides, count(distinct o.project_id)::int as projects
+      from public.policy_overrides o
+      cross join lateral jsonb_object_keys(coalesce(o.patch, '{}'::jsonb)) as k(key)
+     group by 1,2,3,4 order by 1,2,3,4`);
+  report("L2 — overrides by key", l2, (rows) => {
+    out("", "**(L2) every stored override, by scope / family / key:**");
+    out(...table(rows));
+  });
+
+  // L3 — what the last completed run's policy snapshot actually carried.
+  const l3 = await tryQ(`
+    with last_run as (
+      select distinct on (r.project_id) r.project_id, r.policy_version_id, r.created_at
+        from public.simulation_runs r where r.status = 'done'
+       order by r.project_id, r.created_at desc)
+    select p.name as project, to_char(lr.created_at, 'YYYY-MM-DD') as run_date,
+           lr.policy_version_id is not null as has_version,
+           v.snapshot->'defaults'->'fulfillment'->>'backorder_allowed' as snap_backorder,
+           (select count(*) from jsonb_object_keys(coalesce(v.snapshot->'defaults'->'fulfillment', '{}'::jsonb)))::int as snap_fulfil_keys,
+           (select count(*) from jsonb_object_keys(coalesce(v.snapshot->'defaults'->'inventory', '{}'::jsonb)))::int as snap_inv_keys,
+           jsonb_array_length(coalesce(v.snapshot->'overrides', '[]'::jsonb))::int as snap_overrides
+      from last_run lr join public.projects p on p.id = lr.project_id
+      left join public.policy_versions v on v.id = lr.policy_version_id
+     order by p.name`);
+  report("L3 — last run's policy snapshot", l3, (rows) => {
+    out("", "**(L3) the policy snapshot each project's last completed run was SENT:**");
+    out(...table(rows));
+  });
 }
 
 
