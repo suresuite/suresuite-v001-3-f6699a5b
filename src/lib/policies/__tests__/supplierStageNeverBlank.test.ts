@@ -90,6 +90,14 @@ describe("the Material column names every material (D179)", () => {
     ).toBe(false);
   });
 
+  it("a continuation line still WRITES its material id — the ↳ only marks the group", () => {
+    const at = src.indexOf("i === 0 && groupMeta?.isContinuation ? (");
+    const branch = src.slice(at, src.indexOf(") : c.id === \"supplier_id\"", at));
+    expect(branch, "the continuation branch must render r[c.id], not a bare glyph").toMatch(
+      /<span className="truncate">\{String\(r\[c\.id\] \?\? ""\)\}<\/span>/,
+    );
+  });
+
   it("the flat pass takes its member display from memberDisplay (unit-tested)", () => {
     expect(src).toMatch(/\.\.\.memberDisplay\(group\.members\.length, mi\)/);
   });

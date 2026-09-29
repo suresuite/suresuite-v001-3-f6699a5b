@@ -39,8 +39,9 @@ describe("summarise", () => {
  * §4 D179 — every material names itself on screen.
  *
  * The rendered key-A column is modelled exactly as StagePolicyTable draws it:
- * a member shows "↳" when `memberDisplay(...).isContinuation`, its id
- * otherwise. The fixture is Test_Simulation's shape (one material with
+ * EVERY member writes its own id; a continuation (`memberDisplay(...)
+ * .isContinuation`) prefixes it with "↳" to mark the group. Owner-directed:
+ * the material must be readable on every line, not only the group's first. The fixture is Test_Simulation's shape (one material with
  * several suppliers, one with a single supplier) plus the one-line classes
  * D175/D176 add. Under the 2026-09-19 rule every one-line material rendered
  * as a bare "↳", which is the "only M001 is listed" report.
@@ -49,7 +50,7 @@ describe("memberDisplay (D179)", () => {
   const visibleKeyA = (rows: Array<{ material_id: string }>): string[] =>
     groupByKeyA(rows, "material_id").flatMap((g) =>
       g.members.map((_, mi) =>
-        memberDisplay(g.members.length, mi).isContinuation ? "↳" : g.id,
+        memberDisplay(g.members.length, mi).isContinuation ? `↳ ${g.id}` : g.id,
       ),
     );
 
@@ -72,10 +73,10 @@ describe("memberDisplay (D179)", () => {
       { material_id: "M001", supplier_id: "S003" },
       { material_id: "M002", supplier_id: "S004" },
     ];
-    expect(visibleKeyA(rows)).toEqual(["M001", "↳", "↳", "M002"]);
+    expect(visibleKeyA(rows)).toEqual(["M001", "↳ M001", "↳ M001", "M002"]);
   });
 
-  it("every distinct material appears as a visible id — including the one-line classes", () => {
+  it("every LINE names its own material — including the one-line classes", () => {
     const rows = [
       { material_id: "ABS0785D162C" }, { material_id: "ABS0785D162C" },
       { material_id: "INT-1" },          // (made in-house)
@@ -83,8 +84,8 @@ describe("memberDisplay (D179)", () => {
       { material_id: "M-ORPHAN" },       // not in BOM
       { material_id: "M-ONE-SUP" },      // single supplier
     ];
-    const shown = new Set(visibleKeyA(rows).filter((v) => v !== "↳"));
-    expect(shown).toEqual(new Set(rows.map((r) => r.material_id)));
+    const cells = visibleKeyA(rows);
+    rows.forEach((r, i) => expect(cells[i].endsWith(r.material_id)).toBe(true));
   });
 
   it("an active sort that interleaves materials still names every row", () => {
