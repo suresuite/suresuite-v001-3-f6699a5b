@@ -42,7 +42,7 @@ import {
 import { fitColumns, foldNote, type FitCol } from "@/lib/policies/columnFit";
 import { buildBomTreeView, type TreeEntry } from "@/lib/policies/bomTreeView";
 import { stageEmptyMessage, treeFallbackReason } from "@/lib/policies/stageGridState";
-import { groupByKeyA, summarise } from "@/lib/policies/groupRows";
+import { groupByKeyA, memberDisplay, summarise } from "@/lib/policies/groupRows";
 import { ENUM_OPTIONS, SCSIM_ENUM_OPTIONS, type FulfillmentStrategy, type PolicyBundle, type PolicyFamily } from "@/lib/policies/schemas";
 import { effectivePolicy, type OverrideRow } from "@/lib/policies/resolve";
 import {
@@ -1210,9 +1210,11 @@ export function StagePolicyTable({
                   ▾
                 </button>
               )}
-              {i === 0 && groupMeta && !groupMeta.isFirstOfGroup ? (
+              {i === 0 && groupMeta?.isContinuation ? (
                 // Continuation member of an expanded group: key A repeats the
-                // same id as the first member — show ↳ instead of restating it.
+                // same id as the row directly above — show ↳ instead of
+                // restating it. ONLY a continuation: keyed on "not first of a
+                // collapsible group", every one-line material lost its id (§4 D179).
                 <span
                   className="w-[15px] shrink-0 text-center font-mono text-[10px] text-[#c4c4c4]"
                   title={String(r[c.id] ?? "")}
@@ -2053,7 +2055,7 @@ export function StagePolicyTable({
                     if (isHidden(e.path)) return null;
                     return renderRow(e.row as Record<string, unknown>, {
                       isFirstOfGroup: false,
-                      isContinuation: true,
+                      isContinuation: e.continuation,
                       groupId: `tree::${e.path.join("/")}`,
                     });
                   }
@@ -2086,8 +2088,7 @@ export function StagePolicyTable({
                 if (!isGroupCollapsed) {
                   return group.members.map((m, mi) =>
                     renderRow(m.row as Record<string, unknown>, {
-                      isFirstOfGroup: isCollapsible && mi === 0,
-                      isContinuation: isCollapsible && mi > 0,
+                      ...memberDisplay(group.members.length, mi),
                       groupId,
                     }),
                   );

@@ -92,7 +92,19 @@ export type TreeEntry =
       canonicalPath?: string[];
       path: string[];
     }
-  | { kind: "lane"; row: SupplierLaneRow; path: string[] }
+  | {
+      kind: "lane";
+      row: SupplierLaneRow;
+      path: string[];
+      /**
+       * §4 D179 — true only when the entry directly above already names this
+       * lane's material (its own node/root row, or a previous lane of the same
+       * material). The grid draws "↳" for key A exactly then; otherwise the
+       * lane names its material itself. The "Not in the BOM" tail has no node
+       * row, so its first lane per material must carry the id.
+       */
+      continuation: boolean;
+    }
   | {
       kind: "section";
       id: "unreachable" | "not_in_bom";
@@ -244,7 +256,8 @@ export function buildBomTreeView(i: BomTreeInputs): TreeEntry[] {
     for (const row of lanesByMaterial.get(mat) ?? []) {
       if (attached.has(row.key)) continue;
       attached.add(row.key);
-      entries.push({ kind: "lane", row, path });
+      // directly under the node/root row that names `mat`
+      entries.push({ kind: "lane", row, path, continuation: true });
     }
   };
 
@@ -274,9 +287,12 @@ export function buildBomTreeView(i: BomTreeInputs): TreeEntry[] {
   if (leftovers.length > 0) {
     const mats = new Set(leftovers.map((r) => s(r.material_id)));
     entries.push({ kind: "section", id: "not_in_bom", count: mats.size });
+    let prevMat: string | null = null;
     for (const row of leftovers) {
       attached.add(row.key);
-      entries.push({ kind: "lane", row, path: [s(row.material_id)] });
+      const mat = s(row.material_id);
+      entries.push({ kind: "lane", row, path: [mat], continuation: mat === prevMat });
+      prevMat = mat;
     }
   }
 
