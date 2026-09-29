@@ -6,7 +6,7 @@
 > `supabase/contract/`, not these pages.
 
 55 of 81 tables are covered,
-684 columns in all. A table that is not here is listed
+687 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -15,7 +15,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`analysis_results`](analysis_results.md) | 3 | `analysis` | 6 | One entity's metrics from one run. `metrics` is jsonb rather than a column per measure on purpose: the set of measures is the analysis's business and adding one must not be a migration — which is the same argument the open `analysis_kind` enum makes, applied to the output side. |
 | [`analysis_runs`](analysis_runs.md) | 3 | `analysis` | 16 | One execution of one analysis for one project, identified by the world it ran against (`input_hash`), the parameters it ran with (`params_hash`) and the code that ran (`code_version`). Two runs carrying the same five-part key ARE the same run by definition, which is what makes serving a stored answer sound rather than a bet on how recently a timestamp moved. |
 | [`approved_users`](approved_users.md) | G | `platform` | 16 | One person who may sign in. This is the authentication table: the product does not use Supabase Auth for its own users, so a row here IS an account — credential, role, tenant and profile in one. |
-| [`audit_logs`](audit_logs.md) | G | `platform` | 11 | One recorded action, on one plane. `admin` is what a super admin did, `data` is a tier transition — a write to tier 2, 3 or 4 — and `access` is a governed decision such as an export being allowed or refused. |
+| [`audit_logs`](audit_logs.md) | G | `platform` | 14 | One recorded action, on one plane. `admin` is what a super admin did, `data` is a tier transition — a write to tier 2, 3 or 4 — and `access` is a governed decision such as an export being allowed or refused. |
 | [`bom_multi_level`](bom_multi_level.md) | 2 | `data-ingestion` | 11 | One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`), and the index is NULLS NOT DISTINCT because a ROOT line has no parent — without that clause the constraint would hold every line except the roots (D5 closed). |
 | [`bom_single_level`](bom_single_level.md) | 2 | `data-ingestion` | 10 | One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`) — a re-upload updates the line rather than repeating it (D5 closed). |
 | [`capabilities`](capabilities.md) | G | `platform` | 7 | One thing a user may or may not be permitted to do — a page they may open or a feature they may use. The CATALOG: it says what rights exist, never who holds them. The four grant tables answer that. |
@@ -70,4 +70,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `62b2ca3f0fe6`, engine `0.2.8`.*
+*Generated from data contract `db54348e628b`, engine `0.2.8`.*

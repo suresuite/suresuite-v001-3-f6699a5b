@@ -34,7 +34,11 @@ BEGIN
   INSERT INTO public.projects (id, name, modeler_id, plant_name)
   VALUES (v_project, 'Rehearsal', v_actor, 'REHEARSAL');
 
+  -- audit_logs is append-only (D186); clearing it is allowed only here, inside
+  -- this file's rolled-back transaction, by lifting the guard around the DELETE.
+  ALTER TABLE public.audit_logs DISABLE TRIGGER audit_logs_guard_change;
   DELETE FROM public.audit_logs WHERE plane = 'data';
+  ALTER TABLE public.audit_logs ENABLE TRIGGER audit_logs_guard_change;
 
   -- ── one statement, three rows ───────────────────────────────────────────
   -- Three, not one, because the trigger is STATEMENT-level by design: the
@@ -90,7 +94,11 @@ BEGIN
   END IF;
 
   -- ── UPDATE and DELETE are separate triggers and are asserted separately ──
+  -- audit_logs is append-only (D186); clearing it is allowed only here, inside
+  -- this file's rolled-back transaction, by lifting the guard around the DELETE.
+  ALTER TABLE public.audit_logs DISABLE TRIGGER audit_logs_guard_change;
   DELETE FROM public.audit_logs WHERE plane = 'data';
+  ALTER TABLE public.audit_logs ENABLE TRIGGER audit_logs_guard_change;
   UPDATE public.inbound_logistics SET volume = 1 WHERE project_id = v_project;
   SELECT count(*) INTO v_rows FROM public.audit_logs
    WHERE plane = 'data' AND action = 'update' AND target_type = 'inbound_logistics';
@@ -98,7 +106,11 @@ BEGIN
     RAISE EXCEPTION 'D45: a tier-2 UPDATE produced % data-plane audit row(s), expected 1', v_rows;
   END IF;
 
+  -- audit_logs is append-only (D186); clearing it is allowed only here, inside
+  -- this file's rolled-back transaction, by lifting the guard around the DELETE.
+  ALTER TABLE public.audit_logs DISABLE TRIGGER audit_logs_guard_change;
   DELETE FROM public.audit_logs WHERE plane = 'data';
+  ALTER TABLE public.audit_logs ENABLE TRIGGER audit_logs_guard_change;
   DELETE FROM public.inbound_logistics WHERE project_id = v_project;
   SELECT count(*) INTO v_rows FROM public.audit_logs
    WHERE plane = 'data' AND action = 'delete' AND target_type = 'inbound_logistics';
@@ -107,7 +119,11 @@ BEGIN
   END IF;
 
   -- ── a statement that touches nothing is not a tier transition ────────────
+  -- audit_logs is append-only (D186); clearing it is allowed only here, inside
+  -- this file's rolled-back transaction, by lifting the guard around the DELETE.
+  ALTER TABLE public.audit_logs DISABLE TRIGGER audit_logs_guard_change;
   DELETE FROM public.audit_logs WHERE plane = 'data';
+  ALTER TABLE public.audit_logs ENABLE TRIGGER audit_logs_guard_change;
   UPDATE public.inbound_logistics SET volume = 2 WHERE project_id = v_project;  -- matches nothing now
   -- UNSCOPED on purpose, and it still holds: a statement that touches nothing
   -- fires no trigger at all, so neither the tier-2 audit nor WP 8.2's rebuild
