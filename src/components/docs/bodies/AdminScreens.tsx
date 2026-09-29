@@ -34,7 +34,7 @@ const WHAT: Record<string, { what: string; care?: string }> = {
   },
   "/admin/usage": { what: "Spend against budgets, over time." },
   "/admin/audit": {
-    what: "What changed, when, and under whose asserted identity.",
+    what: "Who signed in and what they changed, over the last day, week or month — and whether the log itself is intact.",
     care: "Not every table writes here, and the identity is the one the client presented.",
   },
 };

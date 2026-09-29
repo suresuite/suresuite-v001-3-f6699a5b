@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 684;
+export const REFERENCE_COLUMN_COUNT = 687;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -1205,7 +1205,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "owner": "platform",
     "grain": "One recorded action, on one plane. `admin` is what a super admin did, `data` is a tier transition — a write to tier 2, 3 or 4 — and `access` is a governed decision such as an export being allowed or refused.",
     "naturalKey": [
-      "id"
+      "id",
+      "seq"
     ],
     "naturalKeyIntended": null,
     "checks": [
@@ -1265,14 +1266,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "meaning": "Who did it. NULLABLE, and the null carries meaning: a service-role write with no session context has no attributable actor.",
         "primaryKey": false,
         "unique": false,
-        "references": {
-          "schema": "public",
-          "table": "approved_users",
-          "columns": [
-            "id"
-          ],
-          "onDelete": "SET NULL"
-        },
+        "references": null,
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null,
@@ -1293,7 +1287,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": "non-empty",
-        "meaning": "What happened. Admin-plane rows use the existing dotted vocabulary (`org.update`, `api_key.revoke`); data-plane rows use the SQL operation (`insert`, `update`, `delete`); access-plane rows use `export.allowed` / `export.refused`. Three vocabularies in one column, which is a cost of one table and is recorded here rather than discovered by a reader.",
+        "meaning": "What happened. Admin-plane rows use the existing dotted vocabulary (`org.update`, `api_key.revoke`); data-plane rows use the SQL operation (`insert`, `update`, `delete`); access-plane rows use `export.allowed` / `export.refused`, and since `20260929000001` `auth.sign_in` / `auth.sign_in_failed`, written by `authenticate_approved_user` after the database has checked the password (throttled to one per person per minute; a failed attempt names the ACCOUNT as target and no actor). Three vocabularies in one column, which is a cost of one table and is recorded here rather than discovered by a reader.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1389,7 +1383,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The resulting state, or — on a data-plane row — the shape of the statement: `tier`, `rows_after`, `rows_before` and `actor_known`. On an access-plane row it carries the decision and what was asked for.",
+        "meaning": "The resulting state, or — on a data-plane row — the shape of the statement: `tier`, `rows_after`, `rows_before`, `actor_known` and (since `20260929000001`) `projects`, the distinct `project_id`s it touched, at most 20. On an access-plane row it carries the decision and what was asked for.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1461,7 +1455,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "When it happened. Server-stamped, and the column the plane index orders by.",
+        "meaning": "When it happened. Server-stamped — since `20260929000001` the guard overwrites whatever an INSERT supplies with now(), so a row cannot be back-dated — and the column the plane index orders by.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1497,6 +1491,78 @@ export const REFERENCE_TABLES: RefTable[] = [
             "visibleAs": "the column default, which is also what makes the `admin_audit_logs` compatibility view writable for callers that have not moved yet"
           }
         ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "seq",
+        "type": "bigint",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The row's position in the hash chain (§4 D186), 1-based and gapless. NULL until `audit_log_seal()` chains the row, which it does right after the insert unless another transaction is sealing, in which case the next seal picks it up. Unique, so a fork is an error rather than a second chain.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "prev_hash",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The `row_hash` of the row at `seq - 1` (64 zeros for the first). What makes a deleted or replaced row visible: the next row stops pointing at anything real.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "row_hash",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "sha256, hex, over `prev_hash`, `seq` and every content column (`audit_log_digest`). An edited row no longer matches it. The newest one is the chain HEAD, which is what must be recorded outside the database to detect a rewrite or a cut tail.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
         "engineChain": null,
         "engineLevel": null,
         "blank": null,

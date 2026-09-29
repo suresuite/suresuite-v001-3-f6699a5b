@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 349,
-      "migrations_applied": 341,
-      "last_migration": "20260924000001_bom_root_rows_are_not_edges.sql"
+      "migrations_found": 350,
+      "migrations_applied": 342,
+      "last_migration": "20260929000001_audit_log_read_and_chain.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -18,7 +18,7 @@
   "counts": {
     "tables_in_schema": 81,
     "tables_covered": 55,
-    "columns_covered": 684,
+    "columns_covered": 687,
     "check_constraints": 49,
     "engine_requirements": 7,
     "orphans": 0,
@@ -1946,6 +1946,13 @@
             "id"
           ],
           "name": "admin_audit_logs_pkey"
+        },
+        {
+          "source": "UNIQUE index",
+          "columns": [
+            "seq"
+          ],
+          "name": "audit_logs_seq_key"
         }
       ],
       "natural_key_intended": null,
@@ -1957,7 +1964,7 @@
         "min_project_role": "owner",
         "audited": false,
         "rls_enabled": true,
-        "note": "Two SELECT policies, and they are PERMISSIVE on purpose. A super admin reads every plane; an admin of the SAME ORGANIZATION as the actor reads that org's `data` and `access` rows. They grant DISJOINT slices, so the OR that D28 makes unavoidable is the intended union here rather than an accidental escape hatch — which is worth stating, because the same shape on `approved_users` IS the defect. There is no write policy: rows arrive from SECURITY DEFINER functions and from statement-level triggers, never from a client, so RLS denying writes by default is the enforcement (WP 2.2's pattern). `audited: false` on the audit table is not a joke — nothing records reads of it, and a deletion would leave no trace. Tamper-evidence is a Phase 4 question (hash-chaining a log is the same machinery as `input-hash`), not a WP 2.3 one."
+        "note": "Two SELECT policies, and they are PERMISSIVE on purpose. A super admin reads every plane; an admin of the SAME ORGANIZATION as the actor reads that org's `data` and `access` rows. They grant DISJOINT slices, so the OR that D28 makes unavoidable is the intended union here rather than an accidental escape hatch — which is worth stating, because the same shape on `approved_users` IS the defect. There is no write policy: rows arrive from SECURITY DEFINER functions and from statement-level triggers, never from a client, so RLS denying writes by default is the enforcement (WP 2.2's pattern). `audited: false` on the audit table is not a joke — nothing records reads of it. What changed in `20260929000001` (§4 D185, D186): no reader in this application can satisfy those policies — the browser calls as `anon` and carries no GUC — so `/admin/audit` reads through `admin_audit_log_read`, which names its reader and requires a super admin, as every /admin RPC does. And the table is WRITE-ONCE and HASH-CHAINED: `audit_logs_guard` refuses DELETE, TRUNCATE and every UPDATE but the sealer's, and `admin_audit_log_verify` names the first edited, re-linked or missing row. A deletion now leaves a trace — except by a table owner who disables the guard and rewrites the chain from some row onward or cuts its tail, which only a chain head recorded OUTSIDE the database can reveal. The page shows the head for that reason."
       },
       "rls": {
         "enabled": true,
@@ -2035,6 +2042,29 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260916000001_data_plane_audit.sql"
+        },
+        {
+          "name": "audit_logs_seq_key",
+          "unique": true,
+          "columns": [
+            "seq"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260929000001_audit_log_read_and_chain.sql"
+        },
+        {
+          "name": "audit_logs_unsealed_idx",
+          "unique": false,
+          "columns": [
+            "created_at",
+            "id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "seq IS NULL",
+          "partial": true,
+          "added_by": "20260929000001_audit_log_read_and_chain.sql"
         }
       ],
       "columns": [
@@ -2077,14 +2107,7 @@
           "default": null,
           "primary_key": false,
           "unique": false,
-          "references": {
-            "schema": "public",
-            "table": "approved_users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": "SET NULL"
-          },
+          "references": null,
           "added_by": "20260709000002_super_admin_phase1.sql",
           "unit": null,
           "unit_source": "none",
@@ -2106,7 +2129,7 @@
           },
           "surfaces": [],
           "resolution": null,
-          "note": "THE HONEST LIMIT OF THIS TABLE. `audit_tier_write()` reads `get_current_user_id()`, which resolves only when the caller set `app.current_user_id`. The ingest and ETL edge functions run as the service role and do not, so their rows say WHAT changed and WHEN and record `actor_known: false` in `after` rather than inventing a WHO. That is worth having and it is not attribution; closing it means those functions setting user context, which is their change to make (§16, WP 2.3).",
+          "note": "NO FOREIGN KEY since `20260929000001` (§4 D186). It was `REFERENCES approved_users ON DELETE SET NULL`, which is an UPDATE of a sealed row the moment a person who acted is deleted — so the key is gone, the row keeps the uuid, and the person's name and email leave with their `approved_users` row (the page says \"deleted user\"). THE HONEST LIMIT OF THIS TABLE. `audit_tier_write()` reads `get_current_user_id()`, which resolves only when the caller set `app.current_user_id`. The ingest and ETL edge functions run as the service role and do not, so their rows say WHAT changed and WHEN and record `actor_known: false` in `after` rather than inventing a WHO. That is worth having and it is not attribution; closing it means those functions setting user context, which is their change to make (§16, WP 2.3).",
           "engine_requirement": null
         },
         {
@@ -2122,7 +2145,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "What happened. Admin-plane rows use the existing dotted vocabulary (`org.update`, `api_key.revoke`); data-plane rows use the SQL operation (`insert`, `update`, `delete`); access-plane rows use `export.allowed` / `export.refused`. Three vocabularies in one column, which is a cost of one table and is recorded here rather than discovered by a reader.",
+          "meaning": "What happened. Admin-plane rows use the existing dotted vocabulary (`org.update`, `api_key.revoke`); data-plane rows use the SQL operation (`insert`, `update`, `delete`); access-plane rows use `export.allowed` / `export.refused`, and since `20260929000001` `auth.sign_in` / `auth.sign_in_failed`, written by `authenticate_approved_user` after the database has checked the password (throttled to one per person per minute; a failed attempt names the ACCOUNT as target and no actor). Three vocabularies in one column, which is a cost of one table and is recorded here rather than discovered by a reader.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -2250,7 +2273,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The resulting state, or — on a data-plane row — the shape of the statement: `tier`, `rows_after`, `rows_before` and `actor_known`. On an access-plane row it carries the decision and what was asked for.",
+          "meaning": "The resulting state, or — on a data-plane row — the shape of the statement: `tier`, `rows_after`, `rows_before`, `actor_known` and (since `20260929000001`) `projects`, the distinct `project_id`s it touched, at most 20. On an access-plane row it carries the decision and what was asked for.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -2346,7 +2369,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "When it happened. Server-stamped, and the column the plane index orders by.",
+          "meaning": "When it happened. Server-stamped — since `20260929000001` the guard overwrites whatever an INSERT supplies with now(), so a row cannot be back-dated — and the column the plane index orders by.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -2398,6 +2421,102 @@
             "csv_header": null,
             "required": false,
             "validate": "one of admin / data / access"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "seq",
+          "type": "bigint",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000001_audit_log_read_and_chain.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The row's position in the hash chain (§4 D186), 1-based and gapless. NULL until `audit_log_seal()` chains the row, which it does right after the insert unless another transaction is sealing, in which case the next seal picks it up. Unique, so a fork is an error rather than a second chain.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "prev_hash",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000001_audit_log_read_and_chain.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The `row_hash` of the row at `seq - 1` (64 zeros for the first). What makes a deleted or replaced row visible: the next row stops pointing at anything real.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "row_hash",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000001_audit_log_read_and_chain.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "sha256, hex, over `prev_hash`, `seq` and every content column (`audit_log_digest`). An edited row no longer matches it. The newest one is the chain HEAD, which is what must be recorded outside the database to detect a rewrite or a cut tail.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
           },
           "surfaces": [],
           "resolution": null,
@@ -30860,5 +30979,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "f28e5f095f65"
+  "contract_version": "7be43dae7f5a"
 }
