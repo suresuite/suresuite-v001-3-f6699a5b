@@ -163,10 +163,10 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
   } = usePolicies(projectId);
 
   const { ctx, hasData } = useProjectContext({ projectId, fulfillmentStrategy });
-  const { unit: storedUnit, setUnit } = useTimeUnit(projectId);
-  // Unset behaves exactly like "day" — the engine stores days and adaptLabel
-  // leaves labels alone — so the control always shows the effective unit.
-  const unit: PlanningUnit = storedUnit ?? "day";
+  // Fixed to week for now (useTimeUnit's PLANNING_UNIT): the engine steps in
+  // weeks and lane lead times are canonical in weeks, so the control shows
+  // week and offers nothing else until unit selection is reworked.
+  const { unit, setUnit } = useTimeUnit(projectId);
   const { horizon, unitMap } = useHorizon(
     selectedProject?.simulation_start,
     selectedProject?.simulation_end,

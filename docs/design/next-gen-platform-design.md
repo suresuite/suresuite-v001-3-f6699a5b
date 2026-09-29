@@ -939,7 +939,7 @@ Engineering discipline (unchanged, now enforced through the ai-agents.md mechani
 2. **Complete dataset.** The engine-read entities exist and pass the required-data manifest (§8.1): **bom + inbound + outbound** present and graded from RAW rows, not imputed.
 3. **One primary supplier per material** — persisted, exactly one, every material sourced.
 4. **One primary sourcing firm per customer/product** — persisted, exactly one per `customer::product`.
-5. **Planning time unit set** (`day`/`week`/`month`).
+5. **Planning time unit set** — fixed to **`week`** for now (`PLANNING_UNIT` in `src/hooks/useTimeUnit.ts`): the engine steps in weeks and lane lead times are canonical in weeks, so lead times and time-based calculations are stated in weeks. `day`/`month` are shown disabled until unit selection is reworked; because the unit can no longer be unset, this obligation is satisfied by construction.
 
 Obligations 3–5 are the subtle ones: arcs + graph do **not** imply them. They are persisted **policy selections** — `policy_overrides` written via `bulk_upsert_policy_overrides` — so a project seeded with masters, arcs, and a graph but no selections *loads* yet fails the gate ("Customer/product C1::P1 has no primary sourcing firm"). Seeding that stops before the selections is one step short of run-ready, and under this contract is an **incomplete** create-project proposal.
 
