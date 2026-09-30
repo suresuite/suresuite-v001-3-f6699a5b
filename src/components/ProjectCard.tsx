@@ -453,8 +453,6 @@ export function ProjectCard({
                 setSheet(false);
               },
               'the datasets loaded into this project',
-              !owns,
-              'Only the project’s modeller or an admin can open its data.',
             )}
             {action(
               'Upload data',
@@ -738,22 +736,25 @@ export function ProjectCard({
                 </Tooltip>
               </TooltipProvider>
 
-              {canModify && (project.modeler_id === userId || role === 'admin') && (
+              <Separator orientation="vertical" className="h-4" />
+
+              {/* Reading is open to every role that can reach this page — the
+                  dataset RPCs behind the viewer gate on organization only, and
+                  the viewer has no write action. Everything after it writes. */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 min-h-11 gap-1.5 md:min-h-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewData(project);
+                }}
+              >
+                <Eye className="h-3.5 w-3.5" /> View data
+              </Button>
+
+              {owns && (
                 <>
-                  <Separator orientation="vertical" className="h-4" />
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 min-h-11 gap-1.5 md:min-h-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onViewData(project);
-                    }}
-                  >
-                    <Eye className="h-3.5 w-3.5" /> View data
-                  </Button>
-
                   <Button
                     variant="ghost"
                     size="sm"
