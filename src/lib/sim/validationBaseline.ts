@@ -1,6 +1,6 @@
 /**
  * The validated baseline — the one scenario per project that Run & Validate
- * (/policies) runs its validation into (WP 9.4 slice 4, §4 D225).
+ * (/policies) runs its validation into (WP 9.4 slice 4, §4 D227).
  *
  * It is identified by `scenarios.role`, never by its name: the name is a
  * display string anyone could change, and finding the row by it orphaned the

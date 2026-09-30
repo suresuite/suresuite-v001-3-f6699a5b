@@ -1,5 +1,5 @@
 /**
- * Every new scenario is seeded here (WP 9.4 slice 5, closes §4 D217).
+ * Every new scenario is seeded here (WP 9.4 slice 5, closes §4 D219).
  *
  * A model card certifies a BASELINE WORLD — the fingerprint hashes exactly
  * `horizon_days`, `time_step` and `demand_model` (`_build_scenario_fingerprint`,

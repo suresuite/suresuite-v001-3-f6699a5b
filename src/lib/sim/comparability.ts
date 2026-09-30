@@ -1,5 +1,5 @@
 /**
- * §9.3 comparison semantics, as a pure rule (WP 9.4 slice 5, closes §4 D219).
+ * §9.3 comparison semantics, as a pure rule (WP 9.4 slice 5, closes §4 D221).
  *
  * Two runs are comparable iff they are CRN-paired (same seed spec) and they
  * differ in EXACTLY ONE component. There are three components, not two:

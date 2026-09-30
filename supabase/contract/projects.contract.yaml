@@ -371,7 +371,7 @@ fields:
     note: >-
       As `simulation_start` — the run request is what the engine actually reads. No screen
       reads it since WP 9.4: the network pages' disruption dialog used it to bound a date
-      picker, and the dialog now authors run weeks (§4 D226).
+      picker, and the dialog now authors run weeks (§4 D228).
   completed:
     type: boolean
     unit: null

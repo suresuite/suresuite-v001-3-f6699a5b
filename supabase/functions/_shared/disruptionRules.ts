@@ -75,7 +75,7 @@ export function engineTargetReason(t: EngineTarget): string | null {
  * Every finding a schedule earns before dispatch: events past the cap, targets the
  * engine skips, and partial cuts on a supplier with no finite capacity (moved here
  * from `grading.scenarioCapacityFindings`, and reworded: the engine cuts BY the
- * share, `capacity_factor = (100 − magnitude) / 100` — §4 D221).
+ * share, `capacity_factor = (100 − magnitude) / 100` — §4 D223).
  */
 export function scheduleFindings(
   suppliers: Row[],

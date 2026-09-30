@@ -147,7 +147,7 @@ console.log("── data-plane preflight (anon grants)");
 }
 
 // ── 3. find-or-create the validated baseline scenario (same as the UI) ──────
-// By `scenarios.role` (§4 D225); by name only while the column has not deployed.
+// By `scenarios.role` (§4 D227); by name only while the column has not deployed.
 console.log("── preparing scenario");
 const SCENARIO_NAME = "Policy validation (auto)";
 let scenarioId = null;

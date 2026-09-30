@@ -46,7 +46,7 @@ import { WeeksInput } from "@/components/sim/WeeksInput";
  * gate — so a node picked on a map lands as exactly the event the engine runs, or
  * the dialog says, before anything is written, why it would not. It no longer
  * writes `create_disruption_scenario_v2`'s four tables, which no run reads (§4 D48,
- * D226; a §16 decision).
+ * D228; a §16 decision).
  *
  * A node the engine cannot disrupt (anything but a supplier of this project or the
  * plant) is shown with the reason, and its connected suppliers are offered instead.
@@ -170,7 +170,7 @@ function Body({
             from_network: true,
           }),
         );
-        // Born in the validated world, so it can inherit the validation (§4 D217).
+        // Born in the validated world, so it can inherit the validation (§4 D219).
         if (saved) void cred.applyIfValidated(saved, policyVersionId, { dirty: isDirty });
       } else if (existing) {
         await update(existing.id, { disruption_schedule: [...(existing.disruption_schedule ?? []), ev] });

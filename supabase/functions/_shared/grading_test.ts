@@ -380,6 +380,6 @@ Deno.test("events past the cap, skipped targets and uncapacitated cuts are each 
   assertEquals(f.length, 2, "f.length");
   assertEquals(f[0].field, "scenarios.disruption_schedule", "f[0].field");
   assertEquals(f[1].field, "suppliers.capacity_per_week", "f[1].field");
-  // §4 D221: the engine cuts BY the share — a 30% cut is not "to 30%".
+  // §4 D223: the engine cuts BY the share — a 30% cut is not "to 30%".
   assertEquals(f[1].message.includes("by 30%"), true, f[1].message);
 });

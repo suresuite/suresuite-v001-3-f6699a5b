@@ -17,7 +17,7 @@ import { disruptionWeeks } from "../runWindow";
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
 
-describe("one disruption-event model (WP 9.4 slice 6 · §4 D224)", () => {
+describe("one disruption-event model (WP 9.4 slice 6 · §4 D226)", () => {
   it("reads the mapper's exported rule", () => {
     const d = (registry as unknown as { disruption: typeof DISRUPTION_RULE }).disruption;
     expect(DISRUPTION_RULE).toEqual(d);
@@ -60,7 +60,7 @@ describe("one disruption-event model (WP 9.4 slice 6 · §4 D224)", () => {
     expect(addBlockedReason(five)).toMatch(/at most 5 events/);
   });
 
-  it("the week bounds come from the rule, not a literal (§4 D224)", () => {
+  it("the week bounds come from the rule, not a literal (§4 D226)", () => {
     expect(disruptionWeeks(0, 400 * 7).durationWeeks).toBe(DISRUPTION_RULE.duration_weeks_max);
     const src = readFileSync(join(ROOT, "src/lib/sim/runWindow.ts"), "utf8");
     expect(src).not.toMatch(/clamp\([^)]*,\s*1,\s*52\)/);

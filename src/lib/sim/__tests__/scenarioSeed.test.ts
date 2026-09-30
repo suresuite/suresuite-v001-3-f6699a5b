@@ -12,7 +12,7 @@ const card = {
   demand_model: { kind: "poisson", lambda: 50 },
 };
 
-describe("a new scenario starts in the validated world (§4 D217)", () => {
+describe("a new scenario starts in the validated world (§4 D219)", () => {
   it("copies the card's fingerprint fields exactly", () => {
     const w = worldOf({ horizon_days: 90, time_step: "day", demand_model: { kind: "poisson", lambda: 9 } }, card);
     const seed = buildScenarioSeed({ name: "S", world: w });

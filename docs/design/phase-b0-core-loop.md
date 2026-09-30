@@ -429,7 +429,7 @@ agent later).
 > read-only with its latest run's results, and never dispatches it — the gate reads
 > `baseline` and points to Run & Validate. Inheritance below is unchanged; slice 5 of the
 > same package makes it reachable by seeding every new scenario from the card's
-> fingerprint (§4 D217).
+> fingerprint (§4 D219).
 
 **Inheritance** (blueprint: scenarios under a validated triple inherit
 adopted warm-up + replication count):
@@ -587,7 +587,7 @@ const c = cred.resolve(policyVersionId, selected);       // Credibility (§3.2)
 //   (hand-editing either clears inherited_validation_id → chip disappears)
 
 // Scenario creation — SUPERSEDED by WP 9.4: create("Scenario N") was born at the
-// engine-defaults horizon and could never match a card (PLAN.md §4 D217). Every new
+// engine-defaults horizon and could never match a card (PLAN.md §4 D219). Every new
 // scenario is now seeded from the card's fingerprint (`src/lib/sim/scenarioSeed.ts`)
 // through the New scenario dialog, and then inherits exactly as sketched below.
 onCreate: async () => {

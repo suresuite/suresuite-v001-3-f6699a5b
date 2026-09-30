@@ -1146,7 +1146,7 @@ def _build_settings(sc: ScenarioSettings, w: list[MappingWarning]) -> Simulation
     return SimulationSettings(**kwargs)
 
 
-# ── The disruption-event rule — ONE author, exported (WP 9.4, PLAN.md §4 D224) ──
+# ── The disruption-event rule — ONE author, exported (WP 9.4, PLAN.md §4 D226) ──
 #
 # `_map_events` below is the only place a schedule becomes engine events. The Lab's
 # event editor, the network pages' disruption dialog and the pre-run gate all need

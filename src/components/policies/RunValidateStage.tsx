@@ -111,7 +111,7 @@ const WEEKS_FIELD = "h-6 w-[94px] text-right font-mono text-[11.5px] md:min-h-0"
 
 // Runs launched from the policies stage all reuse this single auto-managed
 // scenario — the project's validated baseline, found by `scenarios.role`
-// rather than by its name (§4 D225). The Lab pins it read-only and reuses its
+// rather than by its name (§4 D227). The Lab pins it read-only and reuses its
 // run; every new Lab scenario is seeded from it.
 
 interface Props {

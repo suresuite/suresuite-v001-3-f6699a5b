@@ -146,7 +146,7 @@ def run_window_rule() -> dict[str, Any]:
 
 
 def disruption_rule() -> dict[str, Any]:
-    """What ``project_map._map_events`` keeps, verbatim (WP 9.4, PLAN.md §4 D224).
+    """What ``project_map._map_events`` keeps, verbatim (WP 9.4, PLAN.md §4 D226).
 
     The Lab's event editor, the network pages' disruption dialog and the pre-run
     gate read this instead of restating the cap, the week bounds or the target

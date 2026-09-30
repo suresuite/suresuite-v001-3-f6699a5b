@@ -1,4 +1,4 @@
--- §4 D225 · THE VALIDATED BASELINE HAS AN IDENTITY (WP 9.4 slice 4).
+-- §4 D227 · THE VALIDATED BASELINE HAS AN IDENTITY (WP 9.4 slice 4).
 --
 -- `scenarios.role` replaces finding Run & Validate's scenario by its display name.
 -- Every claim below is about what the database DOES, which no source-level test of
@@ -15,7 +15,7 @@
 --    has a baseline is left alone; a second call changes nothing.
 -- §4 the function the rule lives in is not callable by the API roles.
 
-DO $role510$
+DO $role530$
 DECLARE
   v_user   uuid := gen_random_uuid();
   v_p1     uuid := gen_random_uuid();
@@ -37,17 +37,17 @@ DECLARE
   v_role   text;
 BEGIN
   INSERT INTO public.approved_users (id, email, name, password_hash)
-    VALUES (v_user, 'r510@example.invalid', 'R510', 'x');
+    VALUES (v_user, 'r510@example.invalid', 'R530', 'x');
   INSERT INTO public.projects (id, name, modeler_id, plant_name) VALUES
-    (v_p1, 'R510 one',   v_user, 'P'),
-    (v_p2, 'R510 two',   v_user, 'P'),
-    (v_p3, 'R510 three', v_user, 'P');
+    (v_p1, 'R530 one',   v_user, 'P'),
+    (v_p2, 'R530 two',   v_user, 'P'),
+    (v_p3, 'R530 three', v_user, 'P');
 
   -- ══ §1 · the default, and the vocabulary ══
   INSERT INTO public.scenarios (id, project_id, name) VALUES (v_s_old, v_p1, 'Policy validation (auto)');
   SELECT role INTO v_role FROM public.scenarios WHERE id = v_s_old;
   IF v_role IS DISTINCT FROM 'experiment' THEN
-    RAISE EXCEPTION 'R510 §1: a new scenario''s role is %, not experiment', v_role;
+    RAISE EXCEPTION 'R530 §1: a new scenario''s role is %, not experiment', v_role;
   END IF;
 
   v_state := NULL;
@@ -56,7 +56,7 @@ BEGIN
   EXCEPTION WHEN check_violation THEN v_state := 'refused';
   END;
   IF v_state IS NULL THEN
-    RAISE EXCEPTION 'R510 §1: role = ''decision'' was accepted; the CHECK is missing';
+    RAISE EXCEPTION 'R530 §1: role = ''decision'' was accepted; the CHECK is missing';
   END IF;
 
   -- ══ §3 · the backfill rule (before §2, which plants baselines by hand) ══
@@ -89,24 +89,24 @@ BEGIN
 
   v_n := public.scenarios_assign_validation_baseline(NULL);
   IF (SELECT role FROM public.scenarios WHERE id = v_s_card) <> 'validation_baseline' THEN
-    RAISE EXCEPTION 'R510 §3: the scenario owning the active card''s evidence run was not chosen';
+    RAISE EXCEPTION 'R530 §3: the scenario owning the active card''s evidence run was not chosen';
   END IF;
   IF EXISTS (SELECT 1 FROM public.scenarios WHERE id IN (v_s_old, v_s_new) AND role <> 'experiment') THEN
-    RAISE EXCEPTION 'R510 §3: a second p1 candidate became a baseline too';
+    RAISE EXCEPTION 'R530 §3: a second p1 candidate became a baseline too';
   END IF;
   IF (SELECT role FROM public.scenarios WHERE id = v_s_b) <> 'validation_baseline'
      OR (SELECT role FROM public.scenarios WHERE id = v_s_a) <> 'experiment' THEN
-    RAISE EXCEPTION 'R510 §3: without a card, the candidate with a run should win over the run-less one';
+    RAISE EXCEPTION 'R530 §3: without a card, the candidate with a run should win over the run-less one';
   END IF;
   IF (SELECT role FROM public.scenarios WHERE id = v_s_dup) <> 'experiment'
      OR (SELECT role FROM public.scenarios WHERE id = v_s_keep) <> 'validation_baseline' THEN
-    RAISE EXCEPTION 'R510 §3: a project that already had a baseline was changed';
+    RAISE EXCEPTION 'R530 §3: a project that already had a baseline was changed';
   END IF;
   IF v_n < 2 THEN
-    RAISE EXCEPTION 'R510 §3: the backfill reported % row(s); p1 and p2 each needed one', v_n;
+    RAISE EXCEPTION 'R530 §3: the backfill reported % row(s); p1 and p2 each needed one', v_n;
   END IF;
   IF public.scenarios_assign_validation_baseline(NULL) <> 0 THEN
-    RAISE EXCEPTION 'R510 §3: a second backfill changed rows — it is not idempotent';
+    RAISE EXCEPTION 'R530 §3: a second backfill changed rows — it is not idempotent';
   END IF;
 
   -- ══ §2 · one baseline per project ══
@@ -116,7 +116,7 @@ BEGIN
   EXCEPTION WHEN unique_violation THEN v_state := 'refused';
   END;
   IF v_state IS NULL THEN
-    RAISE EXCEPTION 'R510 §2: a second validation baseline in one project was accepted';
+    RAISE EXCEPTION 'R530 §2: a second validation baseline in one project was accepted';
   END IF;
   v_state := NULL;
   BEGIN
@@ -124,20 +124,20 @@ BEGIN
   EXCEPTION WHEN unique_violation THEN v_state := 'refused';
   END;
   IF v_state IS NULL THEN
-    RAISE EXCEPTION 'R510 §2: promoting an experiment beside an existing baseline was accepted';
+    RAISE EXCEPTION 'R530 §2: promoting an experiment beside an existing baseline was accepted';
   END IF;
   INSERT INTO public.scenarios (project_id, name) VALUES (v_p1, 'an experiment beside it');
 
   -- ══ §4 · the rule is not an API ══
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
      AND has_function_privilege('anon', 'public.scenarios_assign_validation_baseline(uuid)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'R510 §4: anon may execute the backfill rule';
+    RAISE EXCEPTION 'R530 §4: anon may execute the backfill rule';
   END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated')
      AND has_function_privilege('authenticated', 'public.scenarios_assign_validation_baseline(uuid)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'R510 §4: authenticated may execute the backfill rule';
+    RAISE EXCEPTION 'R530 §4: authenticated may execute the backfill rule';
   END IF;
 
-  RAISE NOTICE 'R510 ok — role default, CHECK, one baseline per project, backfill rule, no API grant';
+  RAISE NOTICE 'R530 ok — role default, CHECK, one baseline per project, backfill rule, no API grant';
 END
-$role510$;
+$role530$;

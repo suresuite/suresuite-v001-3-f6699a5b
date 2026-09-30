@@ -33,7 +33,7 @@ export const UNIT_LABEL_PLURAL: Record<TimeUnit, string> = {
 };
 
 /** Read from the one unit table (`contract:units` gates it), never restated:
- *  a second `month: 30` here disagreed with its 30.4375 (§4 D223). */
+ *  a second `month: 30` here disagreed with its 30.4375 (§4 D225). */
 export const DAYS_PER_UNIT: Record<TimeUnit, number> = {
   day: UNIT_DAYS.day,
   week: UNIT_DAYS.week,

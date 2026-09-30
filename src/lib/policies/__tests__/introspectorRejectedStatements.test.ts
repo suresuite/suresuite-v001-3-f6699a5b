@@ -212,7 +212,7 @@ describe("WP 6.2 · D48 · which overload the caller actually reaches", () => {
     ]);
   });
 
-  it("nothing in src/ calls it any more (WP 9.4 slice 7 · §4 D226)", () => {
+  it("nothing in src/ calls it any more (WP 9.4 slice 7 · §4 D228)", () => {
     // The one call site was the network pages' disruption dialog, which wrote the
     // four legacy tables beside the scenario schedule the engine actually reads.
     // WP 9.4 stopped that write (a §16 decision): the dialog now writes only

@@ -28,7 +28,7 @@ export interface Scenario {
   /** Model-validation card that seeded warm-up/replications (B0 / G13 / §9.5);
    *  null once the user hand-edits either — divergence is explicit. */
   inherited_validation_id?: string | null;
-  /** What the scenario is for (§4 D225). Absent until the column deploys. */
+  /** What the scenario is for (§4 D227). Absent until the column deploys. */
   role?: ScenarioRole;
   /** Created from a network page rather than from the Lab. */
   from_network?: boolean;
@@ -86,7 +86,7 @@ export async function createScenarioRow(row: Partial<Scenario>): Promise<Scenari
   throw first.error;
 }
 
-/** The project's validated baseline, read by role (§4 D225); null when none. */
+/** The project's validated baseline, read by role (§4 D227); null when none. */
 export async function fetchValidationBaseline(projectId: string): Promise<Scenario | null> {
   const { data, error } = await sb
     .from("scenarios")
@@ -159,7 +159,7 @@ export function useScenarios(projectId: string | null | undefined) {
     async (s: Scenario): Promise<Scenario | null> => {
       if (!projectId) return null;
       const { id: _id, created_at: _c, updated_at: _u, ...rest } = s;
-      // A copy is always an experiment — even a copy of the baseline (§4 D225).
+      // A copy is always an experiment — even a copy of the baseline (§4 D227).
       return createScenarioRow({ ...rest, name: `${s.name} (copy)`, ...(s.role ? { role: "experiment" } : {}) });
     },
     [projectId],

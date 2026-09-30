@@ -7,7 +7,7 @@ const side = (o: Partial<ComparableSide["run"]> = {}, sched: unknown[] = []): Co
   run: { policy_version_id: "v1", scenario_hash: "w1", code_version: "0.2.8", seed: 42, disruption_schedule: sched, ...o },
 });
 
-describe("§9.3 comparability knows disruptions are a component (§4 D219)", () => {
+describe("§9.3 comparability knows disruptions are a component (§4 D221)", () => {
   it("baseline vs a stress run of the same model is a valid pair", () => {
     const base = side();
     const stress = side({ disruption_schedule: [ev] }, [ev]);

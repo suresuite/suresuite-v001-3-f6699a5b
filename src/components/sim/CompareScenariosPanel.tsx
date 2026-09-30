@@ -2,7 +2,7 @@
 //
 // Two runs are comparable iff they are CRN-paired (same seed spec) and their
 // RunKeys differ in EXACTLY ONE component: policies, world, or disruptions
-// (the rule lives in lib/sim/comparability.ts — §4 D219). This panel enforces
+// (the rule lives in lib/sim/comparability.ts — §4 D221). This panel enforces
 // that before it shows a single number — a paired experiment, never a chart of
 // two arbitrary runs. Pairs that fail the test get the reason instead of a
 // table.

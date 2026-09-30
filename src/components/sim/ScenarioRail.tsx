@@ -12,7 +12,7 @@ import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/valida
  *      always visible (they used to appear only on the selected row, which is
  *      why nobody could find delete). The validated baseline is pinned first,
  *      cannot be deleted from here, and its copy button starts a new scenario
- *      from it (WP 9.4 slice 4, §4 D225).
+ *      from it (WP 9.4 slice 4, §4 D227).
  *
  * The library is a SOURCE of scenarios, not a scenario — hence a separate
  * surface, a different colour, and a drawer for its detail.

@@ -20,7 +20,7 @@ interface Props {
   projectId: string;
   onClose: () => void;
   onCloned: (scenarioId: string) => void;
-  /** the validated baseline's world — a template runs in it when there is one (§4 D217) */
+  /** the validated baseline's world — a template runs in it when there is one (§4 D219) */
   world?: SeedWorld;
   baseline?: Pick<Scenario, "seed" | "crn"> | null;
 }

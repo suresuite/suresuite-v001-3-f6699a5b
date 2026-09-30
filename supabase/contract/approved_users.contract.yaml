@@ -97,7 +97,7 @@ surfaces:
   - page: "Profile.tsx"
     via: "rpc change_own_password"
     grain: table
-    evidence: "src/pages/Profile.tsx:143"
+    evidence: "src/pages/Profile.tsx:146"
     confirmed: true
   - page: "ProjectIntelligence.tsx"
     via: "table read"

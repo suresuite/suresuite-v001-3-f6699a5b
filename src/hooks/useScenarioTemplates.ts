@@ -47,7 +47,7 @@ export function useScenarioTemplates() {
 
   /**
    * A template's disruption, run in the validated baseline's world when the
-   * project has one (WP 9.4 slice 5, §4 D217) — so the clone can inherit the
+   * project has one (WP 9.4 slice 5, §4 D219) — so the clone can inherit the
    * validation. With no baseline the template's own settings apply, as before.
    * Written through the one scenario insert (`createScenarioRow`).
    */

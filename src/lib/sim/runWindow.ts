@@ -80,7 +80,7 @@ export function runWindowFooter(s: { horizon_days: number; warmup_days: number; 
 }
 
 /** A disruption authored in days, as the engine will run it. The bounds are the
- *  mapper's exported event rule (`registry.disruption`, §4 D224), not literals. */
+ *  mapper's exported event rule (`registry.disruption`, §4 D226), not literals. */
 export function disruptionWeeks(startDay: number, durationDays: number): {
   startWeek: number;
   durationWeeks: number;

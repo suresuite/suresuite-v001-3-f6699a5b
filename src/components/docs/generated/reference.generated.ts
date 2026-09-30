@@ -765,7 +765,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "Profile.tsx",
         "via": "rpc change_own_password",
-        "evidence": "src/pages/Profile.tsx:143"
+        "evidence": "src/pages/Profile.tsx:146"
       }
     ],
     "governance": {
@@ -11363,7 +11363,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour).",
+        "meaning": "This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour). Shown to the account's fellow members by NAME on /profile's My organization tab (§4 D217): `get_my_organization_access` and `project_access_read` return it per person.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -11409,16 +11409,16 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (access_period IN ('week', 'month', 'quarter', 'year'))"
       },
       {
+        "name": "organizations_access_period_start_check",
+        "definition": "CHECK ((access_period IS NULL) = (access_valid_from IS NULL))"
+      },
+      {
         "name": "organizations_project_limit_check",
-        "definition": "CHECK (project_limit IN (1, 2, 3, 5))"
+        "definition": "CHECK (project_limit IN (1, 2, 3, 5, 10, 20, 50, 100))"
       },
       {
         "name": "organizations_user_limit_check",
-        "definition": "CHECK (user_limit IN (1, 2, 3, 5))"
-      },
-      {
-        "name": "organizations_access_period_start_check",
-        "definition": "CHECK ((access_period IS NULL) = (access_valid_from IS NULL))"
+        "definition": "CHECK (user_limit IN (1, 2, 3, 5, 10, 20, 50, 100))"
       }
     ],
     "ingestDataset": null,
@@ -11721,8 +11721,8 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unit": null,
         "csvHeader": null,
         "required": false,
-        "validate": "one of 1 / 2 / 3 / 5, or NULL",
-        "meaning": "The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it.",
+        "validate": "one of 1 / 2 / 3 / 5 / 10 / 20 / 50 / 100, or NULL",
+        "meaning": "The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four added by §4 D218), CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -11745,8 +11745,8 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unit": null,
         "csvHeader": null,
         "required": false,
-        "validate": "one of 1 / 2 / 3 / 5, or NULL",
-        "meaning": "The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it.",
+        "validate": "one of 1 / 2 / 3 / 5 / 10 / 20 / 50 / 100, or NULL",
+        "meaning": "The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four added by §4 D218), CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -17136,7 +17136,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "A step-size label (`day` by default) that NO run reads: the engine steps in weeks (`run_window.days_per_tick`), and no screen offers the control any more (WP 9.4). Retained because the model card's baseline fingerprint (`_build_scenario_fingerprint`, fingerprint v1) hashes it, so dropping or rewriting it would turn every validated scenario stale. A new scenario copies its baseline's value rather than choosing one (§4 D220).",
+        "meaning": "A step-size label (`day` by default) that NO run reads: the engine steps in weeks (`run_window.days_per_tick`), and no screen offers the control any more (WP 9.4). Retained because the model card's baseline fingerprint (`_build_scenario_fingerprint`, fingerprint v1) hashes it, so dropping or rewriting it would turn every validated scenario stale. A new scenario copies its baseline's value rather than choosing one (§4 D222).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -17534,7 +17534,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The model card (`model_validations.id`) whose adopted warm-up and recommended replication count `apply_validation_to_scenario` wrote into this scenario. NULL where nothing was inherited, or where a person hand-edited either value afterwards — divergence from the validated settings is explicit, never silent. A credibility provenance, not a data-readiness grade, which is what this line said until §4 D220.",
+        "meaning": "The model card (`model_validations.id`) whose adopted warm-up and recommended replication count `apply_validation_to_scenario` wrote into this scenario. NULL where nothing was inherited, or where a person hand-edited either value afterwards — divergence from the validated settings is explicit, never silent. A credibility provenance, not a data-readiness grade, which is what this line said until §4 D222.",
         "primaryKey": false,
         "unique": false,
         "references": {
@@ -17565,7 +17565,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "What the scenario is for — `experiment`, a what-if a person set up in the Lab (the default), or `validation_baseline`, the one scenario per project that Run & Validate on /policies runs its validation into (a partial unique index keeps it to one). The Lab pins the baseline, shows it read-only and reuses its run, and every new scenario is seeded from it. It replaced finding that scenario by its display name, which a rename broke (§4 D225). The door a scenario came through is `from_network`, a different fact.",
+        "meaning": "What the scenario is for — `experiment`, a what-if a person set up in the Lab (the default), or `validation_baseline`, the one scenario per project that Run & Validate on /policies runs its validation into (a partial unique index keeps it to one). The Lab pins the baseline, shows it read-only and reuses its run, and every new scenario is seeded from it. It replaced finding that scenario by its display name, which a rename broke (§4 D227). The door a scenario came through is `from_network`, a different fact.",
         "primaryKey": false,
         "unique": false,
         "references": null,

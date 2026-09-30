@@ -9,7 +9,7 @@ import {
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
 
-describe("the validated baseline is found by role, not by name (§4 D225)", () => {
+describe("the validated baseline is found by role, not by name (§4 D227)", () => {
   it("a renamed baseline is still the baseline", () => {
     const rows = [
       { id: "a", name: "Scenario 1", role: "experiment" },

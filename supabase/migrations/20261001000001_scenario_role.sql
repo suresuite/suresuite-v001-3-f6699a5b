@@ -1,4 +1,4 @@
--- WP 9.4 slice 4 · §4 D225 — the validated baseline gets an identity.
+-- WP 9.4 slice 4 · §4 D227 — the validated baseline gets an identity.
 --
 -- Run & Validate (/policies) runs its validation into ONE scenario per project and
 -- found it with `name = 'Policy validation (auto)'`. The Lab listed that row as an
@@ -35,11 +35,11 @@ $role$;
 
 COMMENT ON COLUMN public.scenarios.role IS
   'What the scenario is for: experiment (a Lab what-if) or validation_baseline (the one '
-  'scenario per project that Run & Validate owns). WP 9.4, §4 D225.';
+  'scenario per project that Run & Validate owns). WP 9.4, §4 D227.';
 
 -- Assign the baseline for every project that has none, idempotently. Kept as a
 -- function (SECURITY INVOKER, not granted to the API roles) so the rule is written
--- once and `supabase/rehearsal/510` can execute the same rule the migration did.
+-- once and `supabase/rehearsal/530` can execute the same rule the migration did.
 --
 -- Candidates are the scenarios Run & Validate could have written: the one named
 -- 'Policy validation (auto)', or any scenario that owns an active card's evidence

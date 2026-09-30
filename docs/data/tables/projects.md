@@ -333,7 +333,7 @@ Last day of the horizon the project simulates.
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
-> As `simulation_start` — the run request is what the engine actually reads. No screen reads it since WP 9.4: the network pages' disruption dialog used it to bound a date picker, and the dialog now authors run weeks (§4 D226).
+> As `simulation_start` — the run request is what the engine actually reads. No screen reads it since WP 9.4: the network pages' disruption dialog used it to bound a date picker, and the dialog now authors run weeks (§4 D228).
 
 ### `plant_latitude`
 
@@ -441,6 +441,6 @@ The owning organization by uuid. This is what the public /v1 API authorizes on (
 
 ---
 
-*Generated from data contract `7d86c8ed700e`, engine `0.2.8`,
+*Generated from data contract `75b0effebe46`, engine `0.2.8`,
 sidecar `supabase/contract/projects.contract.yaml`, table created by `20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

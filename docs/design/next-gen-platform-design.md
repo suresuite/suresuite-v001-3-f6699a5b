@@ -697,7 +697,7 @@ Two runs are *comparable* iff they are CRN-paired (same seed spec) and their Run
 > test exists for — the validated baseline against the same model under a disruption — read
 > "nothing to compare". The rule (`src/lib/sim/comparability.ts`) now has three components —
 > policies, world, and the run's stamped disruption schedule — reads the seed from the run rather
-> than the live scenario, and the pane picks the validated baseline as A by default (PLAN.md §4 D219).
+> than the live scenario, and the pane picks the validated baseline as A by default (PLAN.md §4 D221).
 
 ### 9.4 Worker orchestration
 

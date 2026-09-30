@@ -44,7 +44,7 @@ describe("one planning unit (WP 9.4 slice 1)", () => {
   });
 });
 
-describe("the default horizon is a run the engine makes (§4 D218)", () => {
+describe("the default horizon is a run the engine makes (§4 D220)", () => {
   it("equals the engine's floor in days", () => {
     expect(SCENARIO_ENGINE_DEFAULTS.horizon_days).toBe(HORIZON_WEEKS.min * DAYS_PER_WEEK);
   });

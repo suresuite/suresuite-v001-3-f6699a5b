@@ -113,7 +113,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   );
   const { latestRun, reps, runExperiment, cancelRun, addReps } = useSimulationRun(selectedId);
   // The validated baseline is Run & Validate's: the Lab shows it and reuses its
-  // run, and never edits or dispatches it (§4 D225).
+  // run, and never edits or dispatches it (§4 D227).
   const baselineSelected = isValidationBaseline(selected);
   const readOnlyReason = baselineSelected ? BASELINE_READONLY_REASON : null;
 
@@ -310,7 +310,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
   // The scenario mutations the aside owns, lifted so both trees dispatch the
   // identical call. Every new scenario is seeded from the validated baseline's
-  // world (scenarioSeed.ts, §4 D217), so inheritance can match its card.
+  // world (scenarioSeed.ts, §4 D219), so inheritance can match its card.
   const inherit = (s: (typeof scenarios)[number]) => {
     inheritTried.current.add(s.id);
     void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty }).then((cardId) => {
@@ -429,7 +429,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       : `Model ${currentVersionLabel}`;
 
   // What capacity this run will use, and whether it is real (§4 D167) — one
-  // line with details on demand; the same node on desktop and phone (D222).
+  // line with details on demand; the same node on desktop and phone (D224).
   // Beside the gate rather than inside it: a product with no capacity figure is
   // not a finding, but the number it resolves to is max(2·demand, 1000), chosen
   // so capacity never binds, and the run has to say so before it is dispatched.

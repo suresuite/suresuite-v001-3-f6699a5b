@@ -5,7 +5,7 @@
  * `scenarios.disruption_schedule` rows here, and both judge a target by the
  * engine's own rule (`engineTargetOf`, shared with the sim-command gate). The
  * numbers — the cap, the week bounds, the target kinds — are the mapper's,
- * exported as `registry.disruption`; none is restated in `src/` (§4 D224).
+ * exported as `registry.disruption`; none is restated in `src/` (§4 D226).
  *
  * Rows stay in DAYS (`start_day`, `duration_days`): that is the stored shape the
  * engine, the gate and every existing scenario read. What changes is that every

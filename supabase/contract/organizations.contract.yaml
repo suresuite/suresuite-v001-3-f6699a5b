@@ -232,13 +232,14 @@ fields:
     unit_source: none
     meaning: >-
       The most projects the organization may hold, counted by
-      `projects.organization_id` — 1, 2, 3 or 5, CHECK-constrained; NULL is
+      `projects.organization_id` — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four
+      added by §4 D218), CHECK-constrained; NULL is
       unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`.
       Lowering it deletes nothing; no project can be added until under it.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
-    ingest: {csv_header: null, required: false, validate: "one of 1 / 2 / 3 / 5, or NULL"}
+    ingest: {csv_header: null, required: false, validate: "one of 1 / 2 / 3 / 5 / 10 / 20 / 50 / 100, or NULL"}
     surfaces: []
     resolution: null
   user_limit:
@@ -249,7 +250,8 @@ fields:
       The most accounts the organization may have, counted as its
       `organization_members` rows — an account may belong to several organizations
       and takes a seat in each (§4 D210; between D207 and D210 it counted
-      `approved_users.organization_id`) — 1, 2, 3 or 5, CHECK-constrained; NULL is
+      `approved_users.organization_id`) — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the
+      last four added by §4 D218), CHECK-constrained; NULL is
       unlimited. Enforced on every writer by `trg_tenant_allowance` on
       `organization_members`, which every path that adds an account to an
       organization goes through; switching to an organization the account already
@@ -258,7 +260,7 @@ fields:
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
-    ingest: {csv_header: null, required: false, validate: "one of 1 / 2 / 3 / 5, or NULL"}
+    ingest: {csv_header: null, required: false, validate: "one of 1 / 2 / 3 / 5 / 10 / 20 / 50 / 100, or NULL"}
     surfaces: []
     resolution: null
 

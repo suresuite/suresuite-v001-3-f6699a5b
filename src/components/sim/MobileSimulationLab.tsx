@@ -177,9 +177,9 @@ export interface MobileSimulationLabProps {
   runBlockedReason: string | null;
   /** the one gate state the desktop rail and Run card read (runGate.ts) */
   runGate: RunGateState;
-  /** the capacity line the desktop Run pane shows (§4 D167 / D222) */
+  /** the capacity line the desktop Run pane shows (§4 D167 / D224) */
   capacity?: React.ReactNode;
-  /** non-null when the selected scenario is the validated baseline (§4 D225) */
+  /** non-null when the selected scenario is the validated baseline (§4 D227) */
   readOnlyReason?: string | null;
   findingsSource: "pre-run check" | "gate rejection";
   supplierIds: string[];
