@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 357,
-  "migrations_applied": 349,
+  "migrations_found": 358,
+  "migrations_applied": 350,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260930000005_admin_user_memberships.sql",
+  "last_migration": "20260930000006_admin_transfer_project_moves_ownership.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -21504,11 +21504,11 @@
         "p_actor_id uuid",
         "p_actor_email text"
       ],
-      "returns": "TABLE (id uuid, name text, email text, role text, organization_id uuid, is_active boolean)",
+      "returns": "TABLE (id uuid, name text, email text, role text, organization_id uuid, is_active boolean, org_ids uuid[])",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260712000002_admin_project_management.sql"
+      "comment": "Owner pickers on /admin/projects. organization_id is the ACTIVE organization (D210); ",
+      "defined_by": "20260930000006_admin_transfer_project_moves_ownership.sql"
     },
     {
       "name": "admin_list_users",
@@ -21769,11 +21769,11 @@
         "p_org_id uuid",
         "p_new_owner_id uuid DEFAULT NULL"
       ],
-      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260712000002_admin_project_management.sql"
+      "comment": "D212 — move a project to an organization and/or hand it to a new owner. The owner must be ",
+      "defined_by": "20260930000006_admin_transfer_project_moves_ownership.sql"
     },
     {
       "name": "admin_update_organization",

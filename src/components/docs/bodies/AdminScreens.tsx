@@ -27,7 +27,10 @@ const WHAT: Record<string, { what: string; care?: string }> = {
     what: "The tenant boundary and its members.",
     care: "Two organizations can share a display name and are not the same organization.",
   },
-  "/admin/projects": { what: "Every project, across organizations." },
+  "/admin/projects": {
+    what: "Every project, across organizations.",
+    care: "Transferring a project or changing its owner hands the project role over with it: the owner must belong to the target organization, the previous owner's membership and the delegations they granted are removed, and on a move to another organization the members who do not belong to it lose their role on the project. An owner working in another of their organizations sees the project after switching to it.",
+  },
   "/admin/models": {
     what: "Which AI models are configured and available.",
     care: "A model available here can still be unusable because a budget is spent.",
