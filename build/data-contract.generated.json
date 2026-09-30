@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 362,
-      "migrations_applied": 354,
-      "last_migration": "20260930000010_ai_chat_launcher_feature.sql"
+      "migrations_found": 363,
+      "migrations_applied": 355,
+      "last_migration": "20260930000011_my_organization_access.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -1169,7 +1169,7 @@
           "page": "Profile.tsx",
           "via": "rpc change_own_password",
           "grain": "table",
-          "evidence": "src/pages/Profile.tsx:143",
+          "evidence": "src/pages/Profile.tsx:146",
           "confirmed": true
         },
         {
@@ -17636,7 +17636,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour).",
+          "meaning": "This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour). Shown to the account's fellow members by NAME on /profile's My organization tab (§4 D217): `get_my_organization_access` and `project_access_read` return it per person.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -31363,5 +31363,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "1cc84e15372a"
+  "contract_version": "8e55e321d029"
 }

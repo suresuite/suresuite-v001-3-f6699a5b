@@ -765,7 +765,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "Profile.tsx",
         "via": "rpc change_own_password",
-        "evidence": "src/pages/Profile.tsx:143"
+        "evidence": "src/pages/Profile.tsx:146"
       }
     ],
     "governance": {
@@ -11363,7 +11363,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour).",
+        "meaning": "This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour). Shown to the account's fellow members by NAME on /profile's My organization tab (§4 D217): `get_my_organization_access` and `project_access_read` return it per person.",
         "primaryKey": false,
         "unique": false,
         "references": null,
