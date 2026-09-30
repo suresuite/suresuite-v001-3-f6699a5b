@@ -20555,6 +20555,17 @@ Lab's conflict resolves to `main`'s single gate fed by the project rights: `perm
 `useProjectRights`' `simulation_lab`, and `runGateState` gained an optional `refusal` so the
 button still says WHICH role refuses it.
 
+**And `main`'s `rehearsal/540` failed on this branch, for a reason that is not this branch's.**
+It read rows `20261001000002` SEEDS (the `docs_confidential` capability, sixteen section releases,
+the prepared answers). On the branch that added the migration those rows exist because the
+migration runs inside the rehearsal; on every branch after it merged, the migration is in the
+BASE, which is schema and not seed, and `540` §1 raised "no prepared answers were seeded" — D50's
+class, which `supabase/rehearsal/fixtures/README.md` names. Fixed in `540` itself: the rows are
+planted where missing (the capability, role rows and releases verbatim; one published answer per
+audience §4 reads) and nothing is planted when the migration seeded them. Proven both ways — the
+base with the migration (this branch) and `--since` the commit before it, where the migration
+runs and seeds.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
