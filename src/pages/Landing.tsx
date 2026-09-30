@@ -914,7 +914,7 @@ export default function Landing() {
             the last band adds the inset to its padding. */}
         <div className="pb-safe mx-auto flex min-h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] flex-col gap-3 px-5 py-4 text-xs text-muted-foreground md:flex-row md:items-start md:justify-between md:gap-x-8 md:px-6">
           <ResearchNotice />
-          <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex shrink-0 md:ml-auto flex-wrap items-center gap-x-4 gap-y-2">
             <a href="#video" className="hover:text-foreground md:hidden">Demo</a>
             {docsPublic && (
               <Link to="/docs" className="hover:text-foreground">Docs</Link>
