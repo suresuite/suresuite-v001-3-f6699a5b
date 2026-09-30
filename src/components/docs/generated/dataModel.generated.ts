@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "3bbc0900a869";
+export const CONTRACT_VERSION = "1cc84e15372a";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20260930000008_ai_chat_launcher_feature.sql";
+export const LAST_MIGRATION = "20260930000010_ai_chat_launcher_feature.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
   "tablesDescribed": 55,
-  "columnsDescribed": 695,
+  "columnsDescribed": 696,
   "tablesUndescribed": 26
 } as const;
 
@@ -351,7 +351,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "organization_members",
         "grain": "One user's membership of one organization, and the role they hold IN that organization. An account may hold several — one per organization it belongs to (§4 D210). Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for.",
-        "columns": 5,
+        "columns": 6,
         "owner": "platform"
       },
       {

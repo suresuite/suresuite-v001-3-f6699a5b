@@ -2,6 +2,7 @@
 // Data flow, RPCs (admin_list_projects/organizations/users_basic, copy/rename/
 // update_meta/transfer/delete) and search unchanged. Transfer also changes the
 // owner in place and offers only members of the target organization (D212).
+// "Members & access" lists who is on the project and what each may do (D215).
 // Model column shows a mono BOM/data chip pair; status is an outlined chip; row
 // actions live in a menu.
 import { useEffect, useMemo, useState } from 'react';
@@ -18,7 +19,8 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ArrowRightLeft, Copy, Loader2, MoreHorizontal, Pencil, Settings2, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Copy, Loader2, MoreHorizontal, Pencil, Settings2, Trash2, Users } from 'lucide-react';
+import { ProjectAccessDialog } from '@/components/admin/ProjectAccess';
 import { toast } from 'sonner';
 import { DIALOG_AS_SHEET, HDR_SEARCH_INPUT } from '@/components/shared';
 import { cn } from '@/lib/utils';
@@ -27,7 +29,7 @@ interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface ProjectRow { id: string; name: string; organization_id: string | null; organization: string | null; modeler_id: string; owner_name: string | null; owner_email: string | null; plant_name: string; supply_chain_model: string; bom_level: string; data_type: string; completed: boolean; simulation_start: string | null; simulation_end: string | null; created_at: string; updated_at: string; }
 interface OrgOption { id: string; name: string; }
 interface UserOption { id: string; name: string | null; email: string | null; organization_id: string | null; is_active: boolean | null; org_ids: string[] | null; }
-type DialogKind = 'copy' | 'rename' | 'meta' | 'transfer' | null;
+type DialogKind = 'access' | 'copy' | 'rename' | 'meta' | 'transfer' | null;
 
 const db = supabase as any;
 const NONE = '__none__';
@@ -131,6 +133,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
               } · ${p.data_type} · updated ${new Date(p.updated_at).toLocaleDateString()}`}
               value={p.completed ? 'done' : 'draft'}
               actions={[
+                { label: 'Members & access…', onClick: () => openDialog('access', p) },
                 { label: 'Copy…', onClick: () => openDialog('copy', p) },
                 { label: 'Rename…', onClick: () => openDialog('rename', p) },
                 { label: 'Edit metadata…', onClick: () => openDialog('meta', p) },
@@ -174,10 +177,13 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
                     <span className={`rounded-sm border px-1.5 py-0.5 text-[11px] ${p.completed ? 'border-[#d4d4d4] text-foreground' : 'border-[--zinc-border] text-muted-foreground'}`}>{p.completed ? 'completed' : 'draft'}</span>
                   </td>
                   <td className={`${TD} text-[12px] text-muted-foreground`}>{new Date(p.updated_at).toLocaleDateString()}</td>
-                  <td className={`${TD} text-right`}>
+                  <td className={`${TD} whitespace-nowrap text-right`}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" title="Members & access" aria-label={`Members and access of ${p.name}`} onClick={() => openDialog('access', p)}><Users className="h-4 w-4" /></Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('access', p)}><Users className="mr-2 h-4 w-4" /> Members &amp; access…</DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('copy', p)}><Copy className="mr-2 h-4 w-4" /> Copy…</DropdownMenuItem>
                         <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('rename', p)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
                         <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('meta', p)}><Settings2 className="mr-2 h-4 w-4" /> Edit metadata…</DropdownMenuItem>
@@ -195,6 +201,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
       </div>
       )}
 
+      {target && dialog === 'access' && <ProjectAccessDialog projectId={target.id} projectName={target.name} users={users} actorId={actor?.id} actorEmail={actor?.email} onClose={closeDialog} />}
       {target && dialog === 'copy' && <CopyDialog project={target} orgs={orgs} users={users} actorArgs={actorArgs} onClose={closeDialog} onDone={load} />}
       {target && dialog === 'rename' && <RenameDialog project={target} actorArgs={actorArgs} onClose={closeDialog} onDone={load} />}
       {target && dialog === 'meta' && <MetaDialog project={target} actorArgs={actorArgs} onClose={closeDialog} onDone={load} />}

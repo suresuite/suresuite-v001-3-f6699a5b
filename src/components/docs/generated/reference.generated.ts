@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 695;
+export const REFERENCE_COLUMN_COUNT = 696;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -1171,7 +1171,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The account's ACTIVE organization, by uuid — the one it is working in now, the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns, and therefore what every org-scoped RLS policy reads and what a new project is stamped with. Since §4 D210 an account may BELONG to several organizations (`organization_members`, the authority for membership) and this column is always one of them — NULL exactly when it belongs to none. Setting it adds the membership if missing; the account changes it itself through `switch_my_organization`, and sign-in moves it to a current membership when the active one's access period has ended. The `organization` text copy follows it (`trg_approved_users_track_active_org`).",
+        "meaning": "The account's ACTIVE organization, by uuid — the one it is working in now, the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns, and therefore what every org-scoped RLS policy reads and what a new project is stamped with. Since §4 D210 an account may BELONG to several organizations (`organization_members`, the authority for membership) and this column is always one of them — NULL exactly when it belongs to none. Setting it adds the membership if missing; the account changes it itself through `switch_my_organization`, and sign-in moves it to a current membership when the active one's access period has ended. Since §4 D216 sign-in first moves it to the account's DEFAULT organization (`organization_members.is_default`, set by a super admin) when that one is within its period, and leaving the active organization re-points to the default before the earliest membership. The `organization` text copy follows it (`trg_approved_users_track_active_org`).",
         "primaryKey": false,
         "unique": false,
         "references": {
@@ -11188,7 +11188,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "naturalKey": [
       "org_id",
       "user_id",
-      "id"
+      "id",
+      "user_id"
     ],
     "naturalKeyIntended": null,
     "checks": [
@@ -11343,6 +11344,37 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unique": false,
         "references": null,
         "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "is_default",
+        "type": "boolean",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "a membership is inserted without saying whether it is the default",
+            "value": "false — no membership becomes the default implicitly",
+            "provenance": "default",
+            "visibleAs": "the column default; /admin/users shows no default for the account until one is set"
+          }
+        ],
         "engineChain": null,
         "engineLevel": null,
         "blank": null,

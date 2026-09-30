@@ -400,7 +400,11 @@ fields:
       authority for membership) and this column is always one of them — NULL exactly
       when it belongs to none. Setting it adds the membership if missing; the account
       changes it itself through `switch_my_organization`, and sign-in moves it to a
-      current membership when the active one's access period has ended. The
+      current membership when the active one's access period has ended. Since §4 D216
+      sign-in first moves it to the account's DEFAULT organization
+      (`organization_members.is_default`, set by a super admin) when that one is
+      within its period, and leaving the active organization re-points to the default
+      before the earliest membership. The
       `organization` text copy follows it (`trg_approved_users_track_active_org`).
     grain: identifier
     engine: {consumed_by: null, transform: null, missing_default: null}

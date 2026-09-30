@@ -3,9 +3,13 @@
 // `v_admin_user_usage`, whose super-admin predicate is false for every browser read
 // (the app calls as anon with no session), so it listed NOBODY and said "No users
 // yet." The organization shown is resolved through `organization_id`, never the
-// stale text copy. Since D210 an account may belong to several organizations: the
-// cell shows the ACTIVE one (what RLS reads) and counts the rest, and "Organizations"
-// adds or removes memberships (`admin_add_org_member` / `admin_remove_org_member`). Mutations (admin_set_user_role, admin_set_user_active,
+// stale text copy. Since D210 an account may belong to several organizations, so the
+// table has TWO columns: "Default organization" is the membership a super admin marked
+// as the account's default (`is_default`, D216 — where EVERY sign-in lands, however
+// often the account switched in between; until D216 this column showed the ACTIVE
+// organization, which follows every switch), with the active one beneath it when they
+// differ; and "Accessible organizations" names every membership — it used to be one
+// cell reading "X +3", which hid which three. "Organizations" adds or removes memberships (`admin_add_org_member` / `admin_remove_org_member`). Mutations (admin_set_user_role, admin_set_user_active,
 // admin_create_user) are unchanged and the server now refuses suspending or demoting
 // yourself or the last active super admin. The
 // table now uses the shared TH/TD treatment, a status dot, inline icon actions
@@ -32,13 +36,13 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { DIALOG_AS_SHEET, HDR_PRIMARY_BUTTON, HDR_SEARCH_INPUT } from '@/components/shared';
-import { Ban, Building2, Loader2, Plus, SlidersHorizontal, Trash2, Undo2, X } from 'lucide-react';
+import { Ban, Building2, Loader2, Plus, SlidersHorizontal, Star, Trash2, Undo2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { planRefusal } from '@/lib/auth/organizationPlan';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface OrgOption { id: string; name: string; }
-interface Membership { org_id: string; name: string; status: string; org_role: string; is_current: boolean; }
+interface Membership { org_id: string; name: string; status: string; org_role: string; is_current: boolean; is_default?: boolean; }
 interface Row {
   user_id: string; name: string | null; email: string | null; role: string;
   organization_id: string | null; organization: string | null; organization_status: string | null;
@@ -48,16 +52,27 @@ interface Row {
 }
 
 /**
- * The organization cell: the ACTIVE organization's name through the uuid (a suspended
- * org says so), and how many others the account also belongs to (D210).
+ * The default organization (D216): the membership a super admin marked as the account's
+ * default — where every sign-in lands. Empty when none is set; such an account signs in
+ * where it last worked.
  */
-const orgLabel = (r: Row) => {
-  const active = r.organization ? (r.organization_status === 'suspended' ? `${r.organization} (suspended org)` : r.organization) : '';
-  const others = (r.memberships ?? []).filter((m) => !m.is_current).length;
-  return others ? `${active || '—'} +${others}` : active;
+const defaultOrg = (r: Row) => (r.memberships ?? []).find((m) => m.is_default) ?? null;
+const defaultOrgLabel = (r: Row) => {
+  const d = defaultOrg(r);
+  return d ? (d.status === 'suspended' ? `${d.name} (suspended org)` : d.name) : '';
 };
-/** Every organization the account belongs to, for search and the cell's tooltip. */
-const allOrgNames = (r: Row) => (r.memberships ?? []).map((m) => m.name).join(', ');
+/**
+ * The ACTIVE organization, by name through the uuid (a suspended org says so): where the
+ * account works now. The account switches it itself, among its memberships (D210).
+ */
+const activeOrgLabel = (r: Row) =>
+  r.organization ? (r.organization_status === 'suspended' ? `${r.organization} (suspended org)` : r.organization) : '';
+/** Every organization the account belongs to — the default first, then the active one, then by name. */
+const accessibleOrgs = (r: Row) =>
+  [...(r.memberships ?? [])].sort((a, b) =>
+    Number(!!b.is_default) - Number(!!a.is_default) || Number(b.is_current) - Number(a.is_current) || a.name.localeCompare(b.name));
+const accessibleOrgNames = (r: Row) =>
+  accessibleOrgs(r).map((m) => (m.status === 'suspended' ? `${m.name} (suspended org)` : m.name)).join(', ');
 
 const ORG_ROLES = ['member', 'admin', 'owner'];
 
@@ -106,18 +121,18 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
     return rows.filter((r) =>
       (r.name || '').toLowerCase().includes(s) ||
       (r.email || '').toLowerCase().includes(s) ||
-      allOrgNames(r).toLowerCase().includes(s));
+      accessibleOrgNames(r).toLowerCase().includes(s));
   }, [rows, q]);
 
   const colFilterGetters = useMemo(() => ({
-    org: (r: Row) => orgLabel(r), name: (r: Row) => r.name || '', email: (r: Row) => r.email || '',
+    org: (r: Row) => defaultOrgLabel(r), orgs: (r: Row) => accessibleOrgNames(r), name: (r: Row) => r.name || '', email: (r: Row) => r.email || '',
     role: (r: Row) => r.role, status: (r: Row) => (r.is_active !== false ? 'Active' : 'Suspended'),
     req: (r: Row) => String(r.mtd_requests), cost: (r: Row) => String(r.mtd_cost_usd), budget: (r: Row) => String(r.monthly_budget_usd ?? ''),
   }), []);
   const { filtered: colFiltered, FilterTH } = useColumnFilters(filtered, colFilterGetters);
 
   const sortGetters = useMemo(() => ({
-    org: (r: Row) => orgLabel(r).toLowerCase(), name: (r: Row) => (r.name || '').toLowerCase(),
+    org: (r: Row) => defaultOrgLabel(r).toLowerCase(), orgs: (r: Row) => (r.memberships ?? []).length, name: (r: Row) => (r.name || '').toLowerCase(),
     email: (r: Row) => (r.email || '').toLowerCase(), role: (r: Row) => r.role.toLowerCase(),
     status: (r: Row) => (r.is_active !== false ? 'active' : 'suspended'),
     req: (r: Row) => r.mtd_requests, cost: (r: Row) => r.mtd_cost_usd, budget: (r: Row) => r.monthly_budget_usd ?? -Infinity,
@@ -187,7 +202,8 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                 key={r.user_id}
                 label={r.name || '—'}
                 dot={active ? M.process : M.blocking}
-                sub={`${r.email || '—'} · ${orgLabel(r) || '—'} · ${r.role} · ${Number(
+                sub={`${r.email || '—'} · default org ${defaultOrgLabel(r) || 'not set'}${
+                  activeOrgLabel(r) && activeOrgLabel(r) !== defaultOrgLabel(r) ? ` · now in ${activeOrgLabel(r)}` : ''} · access ${(r.memberships ?? []).length} org(s) · ${r.role} · ${Number(
                   r.mtd_requests,
                 ).toLocaleString()} req MTD · budget ${budget != null ? `$${budget.toFixed(2)}` : '—'}${
                   remaining != null && remaining < 0 ? ' · over budget' : ''
@@ -234,22 +250,28 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead><tr>
-              <SortTH sortKey="org">Organization</SortTH><SortTH sortKey="name">Name</SortTH><SortTH sortKey="email">Email</SortTH>
+              <SortTH sortKey="org">
+                <span title="Where the account lands at every sign-in, set here by a super admin. Between sign-ins the account switches among the organizations it can access; the one it works in now is shown beneath when it differs.">Default organization</span>
+              </SortTH>
+              <SortTH sortKey="orgs">
+                <span title="Every organization the account belongs to and can switch to, the default first.">Accessible organizations</span>
+              </SortTH>
+              <SortTH sortKey="name">Name</SortTH><SortTH sortKey="email">Email</SortTH>
               <SortTH sortKey="role">Role</SortTH><SortTH sortKey="status">Status</SortTH>
               <SortTH sortKey="req" align="right">Req MTD</SortTH><SortTH sortKey="cost" align="right">Cost MTD</SortTH>
               <SortTH sortKey="budget" align="right">Budget</SortTH><th className={`${TH} w-[1%]`} />
             </tr>
             <tr>
-              <FilterTH filterKey="org" /><FilterTH filterKey="name" /><FilterTH filterKey="email" />
+              <FilterTH filterKey="org" /><FilterTH filterKey="orgs" /><FilterTH filterKey="name" /><FilterTH filterKey="email" />
               <FilterTH filterKey="role" /><FilterTH filterKey="status" />
               <FilterTH filterKey="req" align="right" /><FilterTH filterKey="cost" align="right" />
               <FilterTH filterKey="budget" align="right" /><th className="border-b border-[--hair-border] bg-white" />
             </tr></thead>
             <tbody>
-              {loading ? <LoadingRow colSpan={9} /> : loadError ? (
-                <EmptyRow colSpan={9} message={loadError} />
+              {loading ? <LoadingRow colSpan={10} /> : loadError ? (
+                <EmptyRow colSpan={10} message={loadError} />
               ) : sorted.length === 0 ? (
-                <EmptyRow colSpan={9} message={q ? 'No users match these filters.' : 'No users yet.'}
+                <EmptyRow colSpan={10} message={q ? 'No users match these filters.' : 'No users yet.'}
                   action={q ? <Button variant="ghost" size="sm" onClick={() => setQ('')}>Clear search</Button> : undefined} />
               ) : sorted.map((r) => {
                 const active = r.is_active !== false;
@@ -257,7 +279,20 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                 const remaining = budget != null ? budget - Number(r.mtd_cost_usd) : null;
                 return (
                   <tr key={r.user_id} className={ROW_HOVER}>
-                    <td className={`${TD} text-[13px]`} title={allOrgNames(r) || undefined}>{orgLabel(r) || '—'}</td>
+                    <td className={`${TD} whitespace-nowrap text-[13px]`}>
+                      {defaultOrgLabel(r) || <span className="text-muted-foreground" title="No default set: the account signs in where it last worked">not set</span>}
+                      {activeOrgLabel(r) && activeOrgLabel(r) !== defaultOrgLabel(r) && (
+                        <div className="text-[11px] text-muted-foreground" title="The organization the account is working in now">now in {activeOrgLabel(r)}</div>
+                      )}
+                    </td>
+                    <td className={`${TD} text-[12.5px] text-muted-foreground`}>
+                      {(r.memberships ?? []).length === 0 ? '—' : (
+                        <button title={`${accessibleOrgNames(r)} — manage organizations`} onClick={() => setMembershipsOf(r)}
+                          className="block max-w-[280px] truncate text-left underline-offset-2 hover:text-foreground hover:underline">
+                          {accessibleOrgNames(r)}
+                        </button>
+                      )}
+                    </td>
                     <td className={`${TD} whitespace-nowrap`}>
                       <button onClick={() => navigate(`/admin/users/${r.user_id}`)}
                         className="max-w-[260px] truncate text-left text-[13px] font-medium text-[#bf2330] underline-offset-2 hover:underline">
@@ -321,9 +356,11 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
 
 /**
  * D210 — the organizations one account belongs to. Adding counts against the
- * organization's user limit (D207); removing the account's CURRENT organization moves
- * it to its earliest remaining one, or to none. The account itself chooses which of
- * its organizations is current, from its account menu or /profile.
+ * organization's user limit (D207). D216 — one of them may be the account's DEFAULT,
+ * set here (`admin_set_default_org`): every sign-in lands there. The account switches
+ * between its organizations itself (account menu, /profile) and that does not change the
+ * default. Removing the organization it is working in moves it to its default, else to
+ * its earliest remaining one, or to none.
  */
 function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
   row: Row; orgs: OrgOption[]; actorArgs: () => { p_actor_id?: string; p_actor_email?: string };
@@ -356,6 +393,15 @@ function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
     onChanged();
   };
 
+  const setDefault = async (m: Membership | null) => {
+    setBusy(true);
+    const { error } = await db.rpc('admin_set_default_org', { ...actorArgs(), p_target_user_id: row.user_id, p_org_id: m?.org_id ?? null });
+    setBusy(false);
+    if (error) return toast.error(error.message.replace(/^not_a_member:\s*/, ''));
+    toast.success(m ? `${m.name} is now the default organization of ${row.email}` : `${row.email} has no default organization`);
+    onChanged();
+  };
+
   return (
     <Dialog open onOpenChange={(v) => !v && !busy && onClose()}>
       <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
@@ -371,7 +417,14 @@ function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
                     {m.name}{m.status === 'suspended' ? ' (suspended org)' : ''}
                   </span>
                   <span className="text-[12px] text-muted-foreground">{m.org_role}</span>
-                  {m.is_current && <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[11px]">current</span>}
+                  {m.is_default && <span className="rounded-sm bg-foreground px-1.5 py-0.5 text-[11px] text-background" title="Every sign-in lands here">default</span>}
+                  {m.is_current && <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[11px]" title="The organization the account is working in now">current</span>}
+                  <button title={m.is_default ? `Clear the default (${m.name})` : `Make ${m.name} the default`} disabled={busy}
+                    aria-label={m.is_default ? `Clear the default organization` : `Make ${m.name} the default organization`}
+                    className={cn('grid h-11 w-11 place-items-center hover:text-foreground disabled:opacity-50 md:h-7 md:w-7', m.is_default ? 'text-foreground' : 'text-[#a3a3a3]')}
+                    onClick={() => setDefault(m.is_default ? null : m)}>
+                    <Star className="h-[15px] w-[15px]" fill={m.is_default ? 'currentColor' : 'none'} />
+                  </button>
                   <button title={`Remove from ${m.name}`} disabled={busy}
                     className="grid h-11 w-11 place-items-center text-[#a3a3a3] hover:text-[#bf2330] disabled:opacity-50 md:h-7 md:w-7"
                     onClick={() => remove(m)}>
@@ -382,8 +435,10 @@ function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
             </ul>
           )}
           <p className="text-xs text-muted-foreground">
-            The account works in its <em>current</em> organization and switches between its organizations itself.
-            Removing the current one moves it to its next organization.
+            Every sign-in lands in the <em>default</em> organization (the star). Between sign-ins the account
+            switches to any other it belongs to from its account menu; that does not change the default. With no
+            default set, it signs in where it last worked. Removing the organization it is working in moves it to
+            its default, else to its next organization.
           </p>
           {available.length > 0 && (
             <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_120px_auto] md:items-end">

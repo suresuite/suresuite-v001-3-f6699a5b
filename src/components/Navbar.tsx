@@ -324,7 +324,9 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
                     >
                       {o.is_current ? <Check className="mr-2 h-4 w-4" /> : <Building2 className="mr-2 h-4 w-4" />}
                       <span className="truncate">{o.name}</span>
-                      {o.access_expired && <span className="ml-auto pl-2 text-[10px] text-muted-foreground">ended</span>}
+                      {o.access_expired
+                        ? <span className="ml-auto pl-2 text-[10px] text-muted-foreground">ended</span>
+                        : o.is_default && <span className="ml-auto pl-2 text-[10px] text-muted-foreground" title="You sign in to this organization">default</span>}
                     </DropdownMenuItem>
                   ))}
                   <DropdownMenuSeparator />

@@ -11,7 +11,7 @@
 
 **One row is** One user's membership of one organization, and the role they hold IN that organization. An account may hold several — one per organization it belongs to (§4 D210). Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for.
 
-THE AUTHORITY FOR WHICH ORGANIZATIONS AN ACCOUNT BELONGS TO since `20260930000004` (§4 D210) — an account may belong to several, and `approved_users.organization_id` names the ACTIVE one (what RLS reads). Between `20260929000002` (D205) and D210 this table was derived from that column and held at most one row per account. The rule now, kept by triggers and asserted by `rehearsal/450`: `organization_id` is NULL exactly when the account has no row here, and otherwise names one of its rows. Setting `organization_id` ADDS its row (`trg_approved_users_sync_org_membership`, the `20260709000002` role mapping — app `admin` → `org_role = 'admin'`, everyone else `member`) and removes none; a first row makes its organization active (`trg_organization_members_activate_first`); deleting the active organization's row re-points the account to its earliest remaining one, or none (`trg_organization_members_repoint_active`). A row's organization and account are fixed — an UPDATE of either is refused. Each row is a SEAT: an organization's `user_limit` counts these rows (`trg_tenant_allowance`, BEFORE INSERT; a re-add of an existing member takes no seat). Written by `admin_add_org_member` / `admin_remove_org_member` (logged through `log_admin_action`), by the sync trigger, and by the CASCADEs; read by the account through `list_my_organizations`.
+THE AUTHORITY FOR WHICH ORGANIZATIONS AN ACCOUNT BELONGS TO since `20260930000004` (§4 D210) — an account may belong to several, and `approved_users.organization_id` names the ACTIVE one (what RLS reads). Between `20260929000002` (D205) and D210 this table was derived from that column and held at most one row per account. The rule now, kept by triggers and asserted by `rehearsal/450`: `organization_id` is NULL exactly when the account has no row here, and otherwise names one of its rows. Setting `organization_id` ADDS its row (`trg_approved_users_sync_org_membership`, the `20260709000002` role mapping — app `admin` → `org_role = 'admin'`, everyone else `member`) and removes none; a first row makes its organization active (`trg_organization_members_activate_first`); deleting the active organization's row re-points the account to its earliest remaining one, or none (`trg_organization_members_repoint_active`) — to its DEFAULT one when it has one (`is_default`, D216), which is also where every sign-in lands. A row's organization and account are fixed — an UPDATE of either is refused. Each row is a SEAT: an organization's `user_limit` counts these rows (`trg_tenant_allowance`, BEFORE INSERT; a re-add of an existing member takes no seat). Written by `admin_add_org_member` / `admin_remove_org_member` and `admin_set_default_org` (logged through `log_admin_action`), by the sync trigger, and by the CASCADEs; read by the account through `list_my_organizations`.
 
 ## Uniqueness
 
@@ -19,6 +19,7 @@ THE AUTHORITY FOR WHICH ORGANIZATIONS AN ACCOUNT BELONGS TO since `2026093000000
 |---|---|---|
 | `org_id` + `user_id` | UNIQUE constraint | — |
 | `id` | column PRIMARY KEY | `organization_members_pkey` |
+| `user_id` | partial UNIQUE index | `organization_members_one_default_per_user` |
 
 ## Constraints
 
@@ -67,6 +68,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `user_id` | — | `uuid` | — | — | The approved user who is a member, by uuid. ON DELETE CASCADE. |
 | `org_role` | — | `text` | — | — | The member's standing in the organization — `owner`, `admin` or `member`, CHECK-constrained. This is an ORG vocabulary and it is not the project vocabulary: `min_project_role` throughout this contract speaks of viewer / analyst / editor / owner, which WP 2.2 creates on `project_members`. The two share the word "owner" and mean different things by it. |
 | `joined_at` | — | `timestamp with time zone` | — | — | When the membership was created. Server-stamped. |
+| `is_default` | — | `boolean` | — | — | This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour). |
 
 ## Each column in full
 
@@ -151,8 +153,35 @@ When the membership was created. Server-stamped.
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `is_default`
+
+This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour).
+
+| | |
+|---|---|
+| Type | `boolean`, `NOT NULL`, default `false` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260930000009_account_default_organization.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+**Substitutions** — every point where a value you did not supply can stand in
+for one you did.
+
+| When | The value used | Shown as | Visible where |
+|---|---|---|---|
+| a membership is inserted without saying whether it is the default | false — no membership becomes the default implicitly | `default` | the column default; /admin/users shows no default for the account until one is set |
+
+## Indexes
+
+| Index | Columns | Unique | Added by |
+|---|---|---|---|
+| `organization_members_one_default_per_user` | `user_id` | yes | `20260930000009_account_default_organization.sql` |
+
 ---
 
-*Generated from data contract `3bbc0900a869`, engine `0.2.8`,
+*Generated from data contract `1cc84e15372a`, engine `0.2.8`,
 sidecar `supabase/contract/organization_members.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
