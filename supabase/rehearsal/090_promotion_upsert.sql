@@ -250,9 +250,11 @@ BEGIN
   END IF;
 
   -- A table with only a surrogate key has no natural key, and the function says
-  -- so instead of returning something a promotion would upsert on.
+  -- so instead of returning something a promotion would upsert on. (This named
+  -- `audit_logs` until D186 gave it a unique `seq`; `ai_usage_logs` is the same
+  -- shape it had — a primary key and nothing else.)
   BEGIN
-    PERFORM public.ingest_target_natural_key('audit_logs');
+    PERFORM public.ingest_target_natural_key('ai_usage_logs');
     RAISE EXCEPTION 'WP 3.3: a table with only a surrogate key returned a natural key';
   EXCEPTION WHEN undefined_object THEN NULL;
   END;
@@ -396,7 +398,11 @@ BEGIN
   INSERT INTO public.projects (id, name, modeler_id, plant_name, organization)
     VALUES (v_project, 'WP33 D36', v_user, 'WP33D', 'WP33 Org');
 
+  -- audit_logs is append-only (D186); clearing it is allowed only here, inside
+  -- this file's rolled-back transaction, by lifting the guard around the DELETE.
+  ALTER TABLE public.audit_logs DISABLE TRIGGER audit_logs_guard_change;
   DELETE FROM public.audit_logs WHERE plane = 'data';
+  ALTER TABLE public.audit_logs ENABLE TRIGGER audit_logs_guard_change;
   PERFORM public.assign_material_supplier(v_project, 'MAT-A', 'SUP-A', v_user, 'wp33d36@example.invalid');
 
   SELECT count(*) INTO v_n FROM public.inbound_logistics

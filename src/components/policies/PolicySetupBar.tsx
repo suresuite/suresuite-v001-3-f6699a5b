@@ -36,6 +36,7 @@ import {
   MobileRow,
   MobileSegmented,
 } from "@/components/mobile";
+import { PLANNING_UNIT_NOTE, isSelectableUnit } from "@/hooks/useTimeUnit";
 
 export type StageId = "supplier" | "plant" | "customer" | "run_validate";
 export type PlanningUnit = "day" | "week" | "month";
@@ -84,7 +85,8 @@ function RailButton({
   );
 }
 
-/** day / week / month — white, 1px #d4d4d4, 3px padding, mono 10.5px items. */
+/** day / week / month — white, 1px #d4d4d4, 3px padding, mono 10.5px items.
+ *  Only the selectable unit (week, for now) responds; see useTimeUnit. */
 function UnitSegmented({
   value,
   onChange,
@@ -99,13 +101,19 @@ function UnitSegmented({
     >
       {(["day", "week", "month"] as PlanningUnit[]).map((u) => {
         const on = u === value;
+        // Day and month return with the unit rework; until then they are
+        // visible but inert, so nobody reads the fixed week as a choice they
+        // made by accident.
+        const enabled = isSelectableUnit(u);
         return (
           <button
             key={u}
             type="button"
-            onClick={() => onChange(u)}
-            className="min-h-11 flex-1 rounded-[2px] px-[7px] py-[2px] font-mono text-[10.5px] leading-normal transition-colors md:min-h-0 md:flex-none"
-            style={on ? { background: RAIL.ink, color: "#ffffff" } : { color: RAIL.muted }}
+            disabled={!enabled}
+            onClick={() => enabled && onChange(u)}
+            title={enabled ? PLANNING_UNIT_NOTE : "Coming later — the planning unit is fixed to weeks for now"}
+            className="min-h-11 flex-1 rounded-[2px] px-[7px] py-[2px] font-mono text-[10.5px] leading-normal transition-colors disabled:cursor-not-allowed md:min-h-0 md:flex-none"
+            style={on ? { background: RAIL.ink, color: "#ffffff" } : { color: RAIL.muted, opacity: enabled ? 1 : 0.45 }}
           >
             {u}
           </button>
@@ -255,13 +263,18 @@ export function PolicySetupBar({
               ariaLabel="Planning unit"
               value={unit}
               onChange={onUnitChange}
-              items={[
-                { value: "day", label: "Day" },
-                { value: "week", label: "Week" },
-                { value: "month", label: "Month" },
-              ]}
+              // Only the selectable unit is offered on a phone: a tap that does
+              // nothing is worse than a control that says what is fixed.
+              items={(
+                [
+                  { value: "day", label: "Day" },
+                  { value: "week", label: "Week" },
+                  { value: "month", label: "Month" },
+                ] as const
+              ).filter((i) => isSelectableUnit(i.value))}
             />
           </div>
+          <MobileRow chevron={false} label="Fixed to weeks" sub={PLANNING_UNIT_NOTE} />
           <MobileRow chevron={false} label="Horizon" value={horizon} />
           <MobileRow chevron={false} label="Unit mapping" sub={unitMap} />
         </MobilePanel>
@@ -312,7 +325,7 @@ export function PolicySetupBar({
           dot={RAIL.amber}
           label="step"
           value={`${openStep} open`}
-          tail="— set A and B, then work steps 1–4"
+          tail="— set A (B is fixed to weeks), then work steps 1–4"
         />
       </div>
 
@@ -358,6 +371,9 @@ export function PolicySetupBar({
           <span className={RAIL_EYEBROW}>Planning unit</span>
         </span>
         <UnitSegmented value={unit} onChange={onUnitChange} />
+        <span className="font-mono text-[11px]" style={{ color: RAIL.muted }} title={PLANNING_UNIT_NOTE}>
+          lead times in weeks
+        </span>
         <div className="hidden flex-1 md:block" />
         <span className="flex min-w-0 flex-wrap items-center gap-2.5 md:shrink-0 md:flex-nowrap">
           <span className="whitespace-nowrap font-mono text-[11.5px]" style={{ color: RAIL.muted }}>

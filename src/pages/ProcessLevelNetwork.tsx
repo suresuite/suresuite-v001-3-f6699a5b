@@ -1,38 +1,30 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  MiniMap,
-  Node,
-  Edge,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  Connection,
-  NodeMouseHandler,
-  Handle,
-  Position,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+import { Node, Edge, Position } from '@xyflow/react';
 
-
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { placeLaneNodes, echelonToLegacyType, labelForEchelon, type Echelon } from '@/lib/graph';
+import {
+  placeLaneNodes,
+  echelonToLegacyType,
+  labelForEchelon,
+  colorForEchelon,
+  directedFocusIds,
+  adaptiveColumnLayout,
+  lensNodeSize,
+  edgeWidthForFlow,
+  maxFlow,
+  DEPTH_SHADE,
+  GRAPH_INK,
+  type Echelon,
+} from '@/lib/graph';
 import { useAuth } from '@/hooks/useAuth';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
 import { fetchMultiTierNetworkData, MultiTierNetworkData } from '@/services/network';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
   RefreshCw,
-  Network,
-  Search,
   AlertTriangle,
   Tag,
 } from 'lucide-react';
@@ -47,7 +39,6 @@ import {
   HDR_ICON_BUTTON_ON,
   HDR_OUTLINE_BUTTON,
   HDR_PROJECT_SELECT,
-  HDR_SEARCH_INPUT,
 } from '@/components/shared';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { cn } from '@/lib/utils';
@@ -61,31 +52,22 @@ import {
   LensTable,
   LensSection,
 } from '@/components/network/MobileLens';
+import {
+  GraphCard,
+  LensSearch,
+  LensSummary,
+  LensDetails,
+  LensAnalyticsHeader,
+  LensCard,
+  BarRows,
+  LENS,
+  useLensGraph,
+  styleColumnEdge,
+  type GraphCardHandle,
+} from '@/components/network/lens';
 import { DisruptionDialog } from '@/components/DisruptionDialog';
 import MLPrediction from '@/components/MLPrediction';
 import { BarChart } from 'lucide-react';
-
-// Colors for integrated process network - left to right flow (Level 6 Suppliers → Customer)
-const NODE_TYPE_COLORS: Record<string, string> = {
-  supplier: '#2563eb',   // Blue - suppliers (leftmost)
-  material: '#059669',   // Green - base materials
-  product: '#dc2626',    // Red - products  
-  customer: '#7c2d12',   // Brown - customers (rightmost)
-};
-
-// Process level colors for corrected mapping (Level 6 Suppliers → Products → Customers)
-// const LEVEL_COLORS: Record<number, string> = {
-//   '-1': '#fb923c', // Level -1 (Customers) 
-//   0: '#3b82f6',    // Level 0 (Products)   
-//   1: '#059669',    // Level 1 (Materials) - Green
-//   2: '#ca8a04',    // Level 2 (Materials) - Gold
-//   3: '#ea580c',    // Level 3 (Materials) - Orange
-//   4: '#dc2626',    // Level 4 (Materials) - Red
-//   5: '#2563eb',    // Level 5 (Materials/Suppliers) - Blue
-//   6: '#22c55e',    // Level 6 (Suppliers) 
-// };
-
-const HIGHLIGHT_HEX = '#ff0000';
 
 interface MultiTierData {
   id: string;
@@ -115,7 +97,7 @@ interface NodeData extends Record<string, unknown> {
    */
   echelon: Echelon;
   /**
-   * The legacy four-value field, kept because `getNodeColor` and the level filters
+   * The legacy four-value field, kept because the lens classes and the level filters
    * still read it. DERIVED from `echelon` at the one place nodes are built, exactly
    * as `classify_node_type` is now a mapping over `classify_node_echelon` in SQL —
    * so the two vocabularies cannot disagree about the same node.
@@ -136,21 +118,8 @@ interface NodeData extends Record<string, unknown> {
   dataSource: string;
   isConnected: boolean;
   mappingConfidence: number | null;
-}
-
-function TooltipNode({ data }: { data: NodeData }) {
-  return (
-    <div className="relative group w-full h-full flex items-center justify-center">
-      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded shadow-md border border-border whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50">
-        {data.label}
-      </div>
-      <span className="truncate px-1 text-center leading-tight">
-        {data.label}
-      </span>
-      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
-    </div>
-  );
+  /** The lens class (legend item and column) this node is drawn in. */
+  classKey?: string;
 }
 
 interface NetworkVisualizationProps {
@@ -158,30 +127,65 @@ interface NetworkVisualizationProps {
   setIsCollapsed: (value: boolean) => void;
 }
 
-function getNodeColor(nodeType: string, level: number, maxLevel: number): string {
-  // Color from nodeType directly wherever it's authoritative — nodeType is
-  // now dataSource-aware (a row explicitly tagged "inbound" is always a
-  // supplier), while `level` alone is not: some projects' multi-tier
-  // pipeline never tiers inbound rows past level 1, so a supplier and a
-  // material can share the exact same level and be indistinguishable by
-  // level comparison alone.
-  if (nodeType === 'supplier') return '#22c55e';
-  if (nodeType === 'customer') return '#fb923c';
-  if (nodeType === 'product') return '#3b82f6';
+/**
+ * The process lens's classes, in flow order (network-lenses handoff §2.1):
+ * suppliers, materials by BOM depth deepest first, finished products, customers.
+ *
+ * A class is the node's ECHELON (via the legacy four-value mapping this page has
+ * always drawn), split by depth inside the material band. A node whose role the
+ * data does not carry gets a class of its own, drawn in the palette's `unknown`
+ * grey — the amber "low-confidence" border that used to say so is gone with the
+ * other border variants (§3), and the signal must not go with it (T2).
+ */
+interface ProcessClass {
+  key: string;
+  label: string;
+  color: string;
+  order: number;
+}
 
-  // Remaining nodes are materials — keep the existing dynamic shading by depth
-  if (level > 0 && level < maxLevel) {
-    const materialLevelsCount = Math.max(1, maxLevel - 1);
-    const lightnessStep = (80 - 20) / materialLevelsCount;
-    const calculatedLightness = 80 - (level * lightnessStep);
-    return `hsl(48, 96%, ${calculatedLightness}%)`;
+/** Depth 1 is the material yellow, the deepest the darker gold; between, a blend. */
+function materialDepthColor(depth: number, maxDepth: number): string {
+  if (maxDepth <= 1 || depth <= 1) return colorForEchelon('material');
+  if (depth >= maxDepth) return DEPTH_SHADE.deepMaterial;
+  const t = (depth - 1) / (maxDepth - 1);
+  const a = colorForEchelon('material');
+  const b = DEPTH_SHADE.deepMaterial;
+  const ch = (hex: string, i: number) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+  return '#' + [0, 1, 2].map((i) => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t).toString(16).padStart(2, '0')).join('');
+}
+
+function processClassOf(n: Pick<NodeData, 'echelon' | 'nodeType' | 'level'>, maxMaterialDepth: number): ProcessClass {
+  if (n.echelon === 'unknown') {
+    return { key: 'unknown', label: 'Unknown role', color: colorForEchelon('unknown'), order: -3000 };
   }
+  switch (n.nodeType) {
+    case 'supplier':
+      return { key: 'supplier', label: 'Suppliers', color: colorForEchelon('supplier'), order: 10000 };
+    case 'product':
+      return { key: 'product', label: 'Finished products', color: colorForEchelon('product'), order: -1000 };
+    case 'customer':
+      return { key: 'customer', label: 'Customers', color: colorForEchelon('customer'), order: -2000 };
+    default:
+      return {
+        key: `material-${n.level}`,
+        label: `Materials · depth ${n.level}`,
+        color: materialDepthColor(n.level, maxMaterialDepth),
+        order: 1000 + n.level,
+      };
+  }
+}
 
-  // A material sitting at the deepest available level (no shallower tier to
-  // shade against) still gets a material color, not the fallback gray.
-  if (level > 0) return 'hsl(48, 96%, 50%)';
+/** A depth bucket's colour for the analytics, on the same scale as the graph. */
+function depthBucketColor(level: number, maxMaterialDepth: number): string {
+  if (level === -1) return colorForEchelon('customer');
+  if (level === 0) return colorForEchelon('product');
+  return materialDepthColor(level, maxMaterialDepth);
+}
 
-  return '#6b7280';
+/** §8 — the path through the node: downstream along outgoing edges, upstream along incoming. */
+function processFocusSet(id: string, _nodes: Node<NodeData>[], edges: Edge[]): Set<string> {
+  return directedFocusIds(edges, id);
 }
 
 /*
@@ -211,15 +215,12 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const { globalSelectedProjectId, setGlobalSelectedProjectId } = useGlobalProject();
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<NodeData>>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [focusedNode, setFocusedNode] = useState<string | null>(null);
-  const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null);
+  const graphRef = useRef<GraphCardHandle>(null);
+  // Bumped after every load, so the card refits the graph it has just been handed.
+  const [loadNonce, setLoadNonce] = useState(0);
   const [loading, setLoading] = useState(false);
   const [levelCounts, setLevelCounts] = useState<Record<number, number>>({});
   const [legendGroups, setLegendGroups] = useState<Array<{ key: string; label: string; count: number; color: string }>>([]);
-  const [allNodes, setAllNodes] = useState<Node<NodeData>[]>([]);
-  const [allEdges, setAllEdges] = useState<Edge[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [topFlowFilter, setTopFlowFilter] = useState<string>('');
@@ -233,11 +234,14 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
     color: string;
   }
   const [levelStats, setLevelStats] = useState<LevelStats[]>([]);
-  const [topFlowNodes, setTopFlowNodes] = useState<{ id: string; flow: number; level: number }[]>([]);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [topFlowNodes, setTopFlowNodes] = useState<{ id: string; flow: number; level: number; echelon: Echelon }[]>([]);
+  // The legend's class order, which is also the column order — kept for Reset layout.
+  const [classOrder, setClassOrder] = useState<string[]>([]);
   const [maxLevel, setMaxLevel] = useState(0);
-  const [showLabels, setShowLabels] = useState(false);
+  // The deepest BOM depth a material class reaches — the end of the depth shade.
+  const [maxMaterialDepth, setMaxMaterialDepth] = useState(0);
+  // Labels default ON, to match the product lens (handoff §3).
+  const [showLabels, setShowLabels] = useState(true);
   
   // Level 1 node filter states
   const [selectedLevel1Node, setSelectedLevel1Node] = useState<string | null>(null);
@@ -245,6 +249,31 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
   const [isLevel1FilterActive, setIsLevel1FilterActive] = useState(false);
   const [level1Nodes, setLevel1Nodes] = useState<string[]>([]);
   const [disruptionDialogOpen, setDisruptionDialogOpen] = useState(false);
+
+  // Selection, focus, search and drags — shared with the other two lenses. The
+  // Level 1 filter applies first, then the focus, then the search (handoff §8).
+  const lens = useLensGraph<Node<NodeData>>({
+    prefilter: isLevel1FilterActive ? reachableNodes : null,
+    focusSet: processFocusSet,
+    searchLabel: (n) => n.id,
+    styleEdge: styleColumnEdge,
+  });
+  const { allNodes, allEdges, setAllNodes, setAllEdges, selectedNode, focusedId: focusedNode, setFocusedId: setFocusedNode } = lens;
+
+  /** §6 — each class folds by its own count into the canvas it has, in legend order. */
+  const layoutColumns = useCallback((list: Node<NodeData>[], classOrder: string[]): Node<NodeData>[] => {
+    if (list.length === 0) return list;
+    const { width: nodeWidth, height: nodeHeight } = lensNodeSize(list.length);
+    const size = graphRef.current?.canvasSize() ?? { width: 900, height: 596 };
+    const positions = adaptiveColumnLayout(
+      classOrder.map((key) => ({
+        ids: list.filter((n) => n.data.classKey === key).map((n) => n.id),
+        stagger: key === 'supplier' || key.startsWith('material-'),
+      })),
+      { canvasWidth: size.width, canvasHeight: size.height, nodeWidth, nodeHeight },
+    );
+    return list.map((n) => ({ ...n, position: positions.get(n.id) ?? n.position }));
+  }, []);
 
   const fetchProjects = async () => {
     if (!user) return;
@@ -271,20 +300,18 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
 
     if (!user || !globalSelectedProjectId) {
       console.log('❌ Clearing data - no user or project');
-      setNodes([]);
-      setEdges([]);
       setAllNodes([]);
       setAllEdges([]);
       setLevelCounts({});
       setLegendGroups([]);
-        setSelectedNode(null);
-        setFocusedNode(null);
-        setMaxLevel(0);
-        return;
+      lens.reset();
+      setMaxLevel(0);
+      return;
     }
 
     setLoading(true);
-    
+    lens.reset();
+
     try {
       console.log('📡 Fetching multi-tier network data via service for project:', globalSelectedProjectId);
       
@@ -299,16 +326,13 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
         console.log('⚠️ No multi-tier network data for selected project');
         
         // Clear visualization
-        setNodes([]);
-        setEdges([]);
         setAllNodes([]);
         setAllEdges([]);
         setLevelCounts({});
         setLegendGroups([]);
-        setSelectedNode(null);
-        setFocusedNode(null);
+        lens.reset();
         setMaxLevel(0);
-        
+
         toast.info('No process network data available. Please upload and combine your project datasets.');
         
         return;
@@ -484,21 +508,13 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
             nodeMap[fromNode].consumptionRate += consumptionRate;
             nodeMap[toNode].consumptionRate += consumptionRate;
 
-            // Use silver/gray styling for all edges to reduce visual noise
-            const strokeColor = '#8C8C8C';
-            const strokeWidth = 1.5;
-
-            // Create edge - labels controlled by showLabels state
+            // Stroke, width and arrowhead come from `styleColumnEdge`; the label
+            // from the Labels toggle, at render.
             edgeMap[edgeKey] = {
               id: edgeKey,
               source: fromNode,
               target: toNode,
-              label: '', // Labels will be set dynamically based on showLabels state
-              style: {
-                stroke: strokeColor,
-                strokeWidth,
-                strokeOpacity: 0.6,
-              },
+              label: '',
               animated: false,
               type: 'straight',
               data: { 
@@ -522,30 +538,32 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
       setLevelCounts(levelNodeCounts);
       setMaxLevel(currentMaxLevel);
 
-      // Build the sidebar legend from nodeType, not raw level — a level can
-      // hold a mix of nodeTypes (e.g. inbound suppliers this project's
-      // multi-tier pipeline never tiered past level 1), which grouping by
-      // level alone would silently merge into one mislabeled bucket.
-      const legendGroupMap: Record<string, { label: string; count: number; color: string; sortKey: number }> = {};
+      // The deepest depth a material class reaches, which ends the depth shade.
+      const materialDepth = Math.max(
+        0,
+        ...Object.values(nodeMap)
+          .filter((n) => n.nodeType === 'material' && n.echelon !== 'unknown')
+          .map((n) => n.level),
+      );
+      setMaxMaterialDepth(materialDepth);
+
+      // The legend and the columns are one list, grouped by class rather than by raw
+      // level — a level can hold a mix of nodeTypes (inbound suppliers this project's
+      // multi-tier pipeline never tiered past level 1), which grouping by level alone
+      // would silently merge into one mislabeled bucket. Flow order: suppliers,
+      // materials deepest → shallowest, products, customers, then any unplaced node.
+      const legendGroupMap: Record<string, { key: string; label: string; count: number; color: string; order: number }> = {};
       Object.values(nodeMap).forEach((n) => {
-        const key = n.nodeType === 'material' ? `material-${n.level}` : n.nodeType;
-        if (!legendGroupMap[key]) {
-          legendGroupMap[key] = {
-            label: labelForEchelon(n.echelon),
-            count: 0,
-            color: getNodeColor(n.nodeType, n.level, currentMaxLevel),
-            // Suppliers first, then materials deepest→shallowest, then product, then customer —
-            // mirrors the graph's own left-to-right flow.
-            sortKey: n.nodeType === 'supplier' ? 10000
-              : n.nodeType === 'material' ? 1000 + n.level
-              : n.nodeType === 'product' ? -1000
-              : -2000,
-          };
-        }
-        legendGroupMap[key].count++;
+        const cls = processClassOf(n, materialDepth);
+        n.classKey = cls.key;
+        if (!legendGroupMap[cls.key]) legendGroupMap[cls.key] = { ...cls, count: 0 };
+        legendGroupMap[cls.key].count++;
       });
-      setLegendGroups(Object.values(legendGroupMap).sort((a, b) => b.sortKey - a.sortKey));
-      
+      const legendList = Object.values(legendGroupMap).sort((a, b) => b.order - a.order);
+      setLegendGroups(legendList);
+      const classOrder = legendList.map((g) => g.key);
+      const classColor = Object.fromEntries(legendList.map((g) => [g.key, g.color]));
+
       // Extract Level 1 nodes for filtering
       const level1NodeIds = Object.entries(nodeMap)
         .filter(([_, nodeData]) => nodeData.level === 1)
@@ -555,233 +573,52 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
 
       console.log('📊 Level distribution:', levelNodeCounts);
       
-      // Group nodes by level for left-to-right layout
-      const nodesByLevel: Record<number, string[]> = {};
-      Object.entries(nodeMap).forEach(([nodeId, nodeData]) => {
-        const level = nodeData.level;
-        if (!nodesByLevel[level]) nodesByLevel[level] = [];
-        nodesByLevel[level].push(nodeId);
+      // §3 — the product-level node, now the standard here too: ReactFlow's 1px
+      // outline, the id in 10px bold white, one size for every node. The old
+      // variants (a 3px white border and a shadow on products, lighter borders on
+      // customers and materials, red and amber rings) are gone; an unplaced node is
+      // said by its own grey class instead of by a ring.
+      const { width: nodeWidth, height: nodeHeight } = lensNodeSize(Object.keys(nodeMap).length);
+      const nodeList: Node<NodeData>[] = classOrder.flatMap((key) =>
+        Object.entries(nodeMap)
+          .filter(([, d]) => d.classKey === key)
+          .map(([nodeId, nodeData]) => ({
+            id: nodeId,
+            position: { x: 0, y: 0 },
+            data: nodeData,
+            style: {
+              background: classColor[key],
+              color: 'white',
+              width: nodeWidth,
+              height: nodeHeight,
+              fontSize: 10,
+              fontWeight: 'bold',
+              borderRadius: 8,
+              border: `1px solid ${GRAPH_INK.nodeOutline}`,
+              // One line, clipped: React Flow's default 10px padding wrapped every
+              // id onto two lines inside a node this size.
+              padding: 2,
+              lineHeight: 1,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              display: 'flex',
+              // `safe`: an id wider than the node clips at its END, keeping the prefix.
+              justifyContent: 'safe center',
+              alignItems: 'center',
+              textAlign: 'center',
+            },
+            type: 'default',
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
+          })),
+      );
+
+      // §4 — width encodes flow, as on the product lens.
+      const edgeList = Object.values(edgeMap);
+      const flowMax = maxFlow(edgeList.map((e) => ({ flow: Number(e.data?.flowVolume) || 0 })));
+      edgeList.forEach((e) => {
+        e.data = { ...e.data, width: edgeWidthForFlow(Number(e.data?.flowVolume) || 0, flowMax) };
       });
-
-      // Create visual layout using clean group-based approach
-      const nodeList: Node<NodeData>[] = [];
-      const rowGap = 60; // Fixed consistent row gap
-      const startY = 100;
-
-      // Sort levels for left-to-right positioning (Level 6 → Level -1)
-      const sortedLevels = Object.keys(nodesByLevel).map(Number).sort((a, b) => b - a);
-
-      // Adaptive spacing: measure each present level's real horizontal
-      // footprint (based on how many nodes/sub-columns it actually needs)
-      // instead of assuming a fixed slot per absolute level number.
-      const baseColumnPadding = 150;
-      const totalNodesForSizing = Object.keys(nodeMap).length;
-      const baseNodeSizeForSizing = Math.max(50 - Math.log(totalNodesForSizing) * 3, 30);
-      const genericSpacing = baseNodeSizeForSizing * 1.2;
-
-      const levelFootprints: Record<number, number> = {};
-      sortedLevels.forEach((level) => {
-        const levelNodes = nodesByLevel[level];
-
-        if (level === 1) {
-          const level1Set = new Set(levelNodes);
-          const receivesFromLevel1 = new Set<string>();
-          Object.values(edgeMap).forEach(edge => {
-            if (level1Set.has(edge.source as string) && level1Set.has(edge.target as string)) {
-              receivesFromLevel1.add(edge.target as string);
-            }
-          });
-          const colACount = levelNodes.filter(id => !receivesFromLevel1.has(id)).length;
-          const colBCount = levelNodes.filter(id => receivesFromLevel1.has(id)).length;
-          const colASubCount = colACount >= 20 ? Math.ceil(colACount / 20) : (colACount > 0 ? 1 : 0);
-          const colBSubCount = colBCount >= 20 ? Math.ceil(colBCount / 20) : (colBCount > 0 ? 1 : 0);
-          const totalSubCols = Math.max(colASubCount + colBSubCount, 1);
-          levelFootprints[level] = (totalSubCols - 1) * genericSpacing + baseNodeSizeForSizing;
-        } else {
-          const count = levelNodes.length;
-          const subgroupCount = count >= 20 ? Math.ceil(count / 20) : 1;
-          levelFootprints[level] = (subgroupCount - 1) * genericSpacing + baseNodeSizeForSizing;
-        }
-      });
-
-      const levelXPositions: Record<number, number> = {};
-      let rightEdge = 100;
-      sortedLevels.forEach((level) => {
-        const width = levelFootprints[level];
-        const center = rightEdge + width / 2;
-        levelXPositions[level] = center;
-        rightEdge = center + width / 2 + baseColumnPadding;
-      });
-
-      const calculateLevelXPosition = (level: number): number => levelXPositions[level] ?? 100;
-      
-      sortedLevels.forEach((level) => {
-        const levelNodes = nodesByLevel[level];
-        const x = calculateLevelXPosition(level);
-
-        const totalNodes = Object.keys(nodeMap).length;
-        let baseNodeSize = Math.max(50 - Math.log(totalNodes) * 3, 30);
-
-        if (level === 0) baseNodeSize *= 1.1;
-        if (level === -1) baseNodeSize *= 0.9;
-
-        // ── Special split logic for Level 1 ──────────────────────────────
-        if (level === 1) {
-          const level1Set = new Set(levelNodes);
-          const receivesFromLevel1 = new Set<string>();
-
-          Object.values(edgeMap).forEach(edge => {
-            if (
-              level1Set.has(edge.source as string) &&
-              level1Set.has(edge.target as string)
-            ) {
-              receivesFromLevel1.add(edge.target as string);
-            }
-          });
-
-          const colA = levelNodes.filter(id => !receivesFromLevel1.has(id));
-          const colB = levelNodes.filter(id => receivesFromLevel1.has(id));
-          const spacing = baseNodeSize * 1.2;
-
-          // Same 20-per-column rule the generic levels use, applied to each
-          // side — so a single-level BOM with hundreds of level-1 nodes
-          // spreads into many columns instead of 2 absurdly tall ones.
-          const subdivide = (colNodes: string[]) => {
-            const subCount = colNodes.length >= 20 ? Math.ceil(colNodes.length / 20) : (colNodes.length > 0 ? 1 : 0);
-            const subs: string[][] = Array.from({ length: subCount }, () => []);
-            colNodes.forEach((id, idx) => subs[idx % subCount].push(id));
-            return subs;
-          };
-
-          const colASubs = subdivide(colA);
-          const colBSubs = subdivide(colB);
-
-          // Combine colA (left) and colB (right) into ONE centered sequence,
-          // the same way the generic subgroup logic centers its subcolumns —
-          // instead of centering colA and colB independently around x. colB
-          // is usually much larger than colA (most materials receive an edge
-          // from a supplier or another material, both level 1), so centering
-          // them separately made the real rightward extent exceed what the
-          // footprint calculation reserved, letting materials bleed into the
-          // next level's column.
-          const allSubs = [...colASubs, ...colBSubs];
-          const totalSubCols = allSubs.length;
-          const allOffsets = allSubs.map((_, i) => (i - (totalSubCols - 1) / 2) * spacing);
-
-          ([[allSubs, allOffsets]] as [string[][], number[]][]).forEach(([subs, offsets]) => {
-            subs.forEach((subIds, si) => {
-              const yOffset = -((subIds.length - 1) * rowGap) / 2;
-              subIds.forEach((nodeId, i) => {
-                const nodeData = nodeMap[nodeId];
-                const isDisconnected = !nodeData.isConnected && nodeData.dataSource !== 'bridge';
-                const hasLowConfidence = nodeData.mappingConfidence && nodeData.mappingConfidence < 0.8;
-
-                nodeList.push({
-                  id: nodeId,
-                  position: {
-                    x: x + offsets[si],
-                    y: startY + yOffset + i * rowGap,
-                  },
-                  data: nodeData,
-                  style: {
-                    background: isDisconnected ? '#6b7280' : getNodeColor(nodeData.nodeType, nodeData.level, currentMaxLevel),
-                    color: 'white',
-                    width: baseNodeSize,
-                    height: baseNodeSize * 0.7,
-                    fontSize: 10,
-                    fontWeight: 'normal',
-                    borderRadius: 8,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    textAlign: 'center',
-                    border: isDisconnected ? '2px solid #ef4444' :
-                            hasLowConfidence ? '2px solid #f59e0b' :
-                            '1px solid rgba(255,255,255,0.3)',
-                    boxShadow: isDisconnected ? '0 2px 8px rgba(239, 68, 68, 0.4)' : 'none',
-                    opacity: isDisconnected ? 0.7 : 1,
-                  },
-                  type: 'default',
-                  sourcePosition: Position.Right,
-                  targetPosition: Position.Left,
-                });
-              });
-            });
-          });
-
-          return; // Skip the generic subgroup logic below
-        }
-        // ── End Level 1 special logic ─────────────────────────────────────
-
-        // Generic subgroup logic (all other levels)
-        const subgroupCount = levelNodes.length >= 20 ? Math.ceil(levelNodes.length / 20) : 1;
-        const spacing = baseNodeSize * 1.2;
-        const subgroupOffsets = Array.from({ length: subgroupCount }, (_, i) =>
-          (i - (subgroupCount - 1) / 2) * spacing
-        );
-
-        const subgroups = Array.from({ length: subgroupCount }, () => [] as string[]);
-        levelNodes.forEach((nodeId, idx) => subgroups[idx % subgroupCount].push(nodeId));
-
-        subgroups.forEach((subIds, si) => {
-          const yOffset = -((subIds.length - 1) * rowGap) / 2;
-
-          subIds.forEach((nodeId, i) => {
-            const nodeData = nodeMap[nodeId];
-            const isProductNode = nodeData.nodeType === 'product';
-            const isCustomerNode = nodeData.nodeType === 'customer';
-            const isDisconnected = !nodeData.isConnected && nodeData.dataSource !== 'bridge';
-            const hasLowConfidence = nodeData.mappingConfidence && nodeData.mappingConfidence < 0.8;
-
-            nodeList.push({
-              id: nodeId,
-              position: {
-                x: x + subgroupOffsets[si],
-                y: startY + yOffset + i * rowGap,
-              },
-              data: nodeData,
-              style: {
-                background: isDisconnected ? '#6b7280' : getNodeColor(nodeData.nodeType, nodeData.level, currentMaxLevel),
-                color: 'white',
-                width: isProductNode ? 65 : isCustomerNode ? 50 : baseNodeSize,
-                height: isProductNode ? 45 : isCustomerNode ? 30 : baseNodeSize * 0.7,
-                fontSize: isProductNode ? 12 : 10,
-                fontWeight: isProductNode ? 'bold' : 'normal',
-                borderRadius: 8,
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                textAlign: 'center',
-                border: isProductNode ? '3px solid #fff' :
-                        isCustomerNode ? '2px solid rgba(255,255,255,0.5)' :
-                        isDisconnected ? '2px solid #ef4444' :
-                        hasLowConfidence ? '2px solid #f59e0b' :
-                        '1px solid rgba(255,255,255,0.3)',
-                boxShadow: isProductNode ? '0 4px 12px rgba(220, 38, 38, 0.3)' :
-                          isDisconnected ? '0 2px 8px rgba(239, 68, 68, 0.4)' : 'none',
-                opacity: isDisconnected ? 0.7 : 1,
-              },
-              type: 'default',
-              sourcePosition: Position.Right,
-              targetPosition: Position.Left,
-            });
-          });
-        });
-      });
-
-      // Apply label visibility based on showLabels state
-      const edgeList = Object.values(edgeMap).map(edge => ({
-        ...edge,
-        label: showLabels ? (edge.data?.originalLabel as string || '') : ''
-      }));
-      
-      const nodeListWithLabels = nodeList.map(node => ({
-        ...node,
-        data: {
-          ...node.data,
-          label: showLabels ? (node.data.label as string) : ''
-        }
-      }));
 
     // ── Analytics: level stats ──────────────────────────────────────────
     const levelStatMap: Record<number, {
@@ -808,24 +645,24 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
           avgIn:   Math.round((s.totalIn   / s.count) * 10) / 10,
           avgOut:  Math.round((s.totalOut  / s.count) * 10) / 10,
           avgFlow: Math.round( s.totalFlow / s.count),
-          color: getNodeColor('material', l, currentMaxLevel),
+          color: depthBucketColor(l, materialDepth),
         };
       });
     setLevelStats(computedLevelStats);
 
     // ── Analytics: top flow nodes ───────────────────────────────────────
     const topNodes = Object.entries(nodeMap)
-      .map(([id, n]) => ({ id, flow: n.flowVolume, level: n.level }))
+      .map(([id, n]) => ({ id, flow: n.flowVolume, level: n.level, echelon: n.echelon }))
       .sort((a, b) => b.flow - a.flow)
       .slice(0, 10);
     setTopFlowNodes(topNodes);
     const firstType = topNodes.length > 0 ? depthBucketLabel(topNodes[0].level) : '';
     setTopFlowFilter(firstType);
 
-      setNodes(nodeListWithLabels);
-      setEdges(edgeList);
-      setAllNodes(nodeListWithLabels);
+      setAllNodes(layoutColumns(nodeList, classOrder));
       setAllEdges(edgeList);
+      setClassOrder(classOrder);
+      setLoadNonce((k) => k + 1);
       
       console.log('✅ Integrated process visualization updated with', nodeList.length, 'nodes and', Object.keys(edgeMap).length, 'edges');
       
@@ -845,16 +682,13 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
       console.error('❌ fetchData error:', e);
       
       // Clear visualization on error
-      setNodes([]);
-      setEdges([]);
       setAllNodes([]);
       setAllEdges([]);
       setLevelCounts({});
       setLegendGroups([]);
-      setSelectedNode(null);
-      setFocusedNode(null);
+      lens.reset();
       setMaxLevel(0);
-      
+
       toast.error('Failed to load network data. Please check your connection and try again.');
     } finally {
       setLoading(false);
@@ -869,7 +703,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
 
   useEffect(() => {
     fetchData();
-  }, [globalSelectedProjectId, user, showLabels]);
+  }, [globalSelectedProjectId, user]);
 
   // Reset Level 1 filter when project changes
   useEffect(() => {
@@ -877,27 +711,6 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
     setIsLevel1FilterActive(false);
     setReachableNodes(new Set());
   }, [globalSelectedProjectId]);
-
-  // Update labels visibility when showLabels changes
-  useEffect(() => {
-    if (allNodes.length > 0 && allEdges.length > 0) {
-      const updatedNodes = allNodes.map(node => ({
-        ...node,
-        data: {
-          ...node.data,
-          label: showLabels ? (node.data.label as string) : ''
-        }
-      }));
-      
-      const updatedEdges = allEdges.map(edge => ({
-        ...edge,
-        label: showLabels ? (edge.data?.originalLabel as string || '') : ''
-      }));
-      
-      setNodes(updatedNodes);
-      setEdges(updatedEdges);
-    }
-  }, [showLabels, allNodes, allEdges]);
 
   // Store multiTierData in state for reachability algorithm
   const [multiTierDataCache, setMultiTierDataCache] = useState<MultiTierNetworkData[]>([]);
@@ -1041,117 +854,6 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
     }
   }, [allNodes, allEdges, multiTierDataCache, findReachableNodes]);
 
-  useEffect(() => {
-    if (!focusedNode && !isLevel1FilterActive) {
-      setNodes(allNodes);
-      setEdges(allEdges);
-      return;
-    }
-
-    let filteredNodes = allNodes;
-    let filteredEdges = allEdges;
-
-    // Apply Level 1 filtering first
-    if (isLevel1FilterActive && reachableNodes.size > 0) {
-      filteredNodes = allNodes.filter(n => reachableNodes.has(n.id));
-      filteredEdges = allEdges.filter(
-        e => reachableNodes.has(e.source as string) && reachableNodes.has(e.target as string)
-      );
-    }
-
-    // Then apply focus filtering if active
-    if (focusedNode) {
-      const node = filteredNodes.find(n => n.id === focusedNode);
-      if (!node) return;
-    
-      const included = new Set<string>([node.id]);
-      
-      // Include all nodes that are connected to the focused node (upstream and downstream)
-      const addConnectedNodes = (nodeId: string, visited: Set<string>) => {
-        if (visited.has(nodeId)) return;
-        visited.add(nodeId);
-        
-        // Add downstream nodes (children)
-        filteredEdges.forEach(edge => {
-          if (edge.source === nodeId && !included.has(edge.target as string)) {
-            included.add(edge.target as string);
-            addConnectedNodes(edge.target as string, visited);
-          }
-        });
-        
-        // Add upstream nodes (parents)
-        filteredEdges.forEach(edge => {
-          if (edge.target === nodeId && !included.has(edge.source as string)) {
-            included.add(edge.source as string);
-            addConnectedNodes(edge.source as string, visited);
-          }
-        });
-      };
-      
-      addConnectedNodes(focusedNode, new Set());
-    
-      filteredNodes = filteredNodes.filter(n => included.has(n.id));
-      filteredEdges = filteredEdges.filter(
-        e => included.has(e.source as string) && included.has(e.target as string)
-      );
-    }
-  
-    setNodes(filteredNodes);
-    setEdges(filteredEdges);
-  }, [focusedNode, allNodes, allEdges, isLevel1FilterActive, reachableNodes]);
-
-  useEffect(() => {
-    const updatedEdges = allEdges.map(edge => {
-      if (selectedNode && (edge.source === selectedNode.id || edge.target === selectedNode.id)) {
-        return { ...edge, style: { stroke: '#3b82f6', strokeWidth: 3, strokeOpacity: 0.9 } };
-      } else {
-        return { ...edge, style: { stroke: '#8C8C8C', strokeWidth: 2, strokeOpacity: 0.6 } };
-      }
-    });
-    setEdges(updatedEdges);
-  }, [selectedNode]);
-
-  useEffect(() => {
-    const term = searchTerm.trim();
-   
-    setNodes((current) => {
-      return current.map((n) => {
-        const base = allNodes.find((b) => b.id === n.id) || n;
-        const baseStyle: any = base.style || {};
-  
-        const isHit = term !== '' && n.id === term;
-  
-        const baseWidth =
-          typeof baseStyle.width === 'number'
-            ? baseStyle.width
-            : parseFloat(baseStyle.width) || baseStyle.width;
-        const baseHeight =
-          typeof baseStyle.height === 'number'
-            ? baseStyle.height
-            : parseFloat(baseStyle.height) || baseStyle.height;
-  
-        const factor = isHit ? 1.1 : 1;
-  
-        return {
-          ...n,
-          style: {
-            ...baseStyle,
-            background: isHit ? HIGHLIGHT_HEX : baseStyle.background,
-            width: typeof baseWidth === 'number' ? baseWidth * factor : baseWidth,
-            height: typeof baseHeight === 'number' ? baseHeight * factor : baseHeight,
-          },
-        };
-      });
-    });
-  }, [searchTerm, allNodes]);
-
-  const onNodeClick: NodeMouseHandler = useCallback((_, node) => setSelectedNode(node as Node<NodeData>), []);
-  const onNodeDoubleClick: NodeMouseHandler = useCallback((_, node) => {
-    const id = node.id;
-    setFocusedNode(prev => (prev === id ? null : id));
-  }, []);
-  const onConnect = useCallback((params: Connection) => setEdges(eds => addEdge(params, eds)), []);
-
   // Audit 2026-09-22 · F-10: "Resilience" was `0.4 + 0.6(1 - HHI)`, floored at 0.4
   // with a red alert on `< 0.4` that no input could reach, and "Bottlenecks" counted
   // `level === 1` nodes as "assembly steps" no table describes. Both are DELETED; a
@@ -1172,7 +874,36 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
     };
   }, [allNodes, levelCounts, topFlowNodes]);
 
-  const nodeTypes = useMemo(() => ({ default: TooltipNode }), []);
+  // The Labels toggle hides node ids and edge flow labels without touching the
+  // data, so the details card and the search still read the real id.
+  const displayNodes = useMemo(
+    () => (showLabels ? lens.nodes : lens.nodes.map((n) => ({ ...n, style: { ...n.style, color: 'transparent' } }))),
+    [lens.nodes, showLabels],
+  );
+  const displayEdges = useMemo(
+    () => lens.edges.map((e) => ({ ...e, label: showLabels ? ((e.data?.originalLabel as string) || '') : '' })),
+    [lens.edges, showLabels],
+  );
+
+  const classOf = useMemo(
+    () => new globalThis.Map(legendGroups.map((g) => [g.key, g])),
+    [legendGroups],
+  );
+
+  // §9 — the visible set, so search keeps working inside a focus and a filter.
+  const searchCandidates = useMemo(
+    () =>
+      lens.visibleNodes.map((n) => {
+        const cls = classOf.get(n.data.classKey ?? '');
+        return { id: n.id, label: n.id, color: cls?.color ?? colorForEchelon(null), classLabel: cls?.label ?? '' };
+      }),
+    [lens.visibleNodes, classOf],
+  );
+
+  const maxBomDepth = useMemo(
+    () => allNodes.reduce<number | null>((m, n) => (n.data.bomLevel != null ? Math.max(m ?? 0, n.data.bomLevel) : m), null),
+    [allNodes],
+  );
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
@@ -1269,35 +1000,17 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
               </Button>
             
 
-              {searchOpen ? (
-                <div className="relative w-48 transition-all">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <input
-                    autoFocus
-                    type="text"
-                    className={cn(
-                      'h-9 min-h-11 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm focus:outline-none',
-                      HDR_SEARCH_INPUT,
-                      'md:pl-9',
-                    )}
-                    placeholder="find a component"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onBlur={() => !searchTerm && setSearchOpen(false)}
-                  />
-                </div>
-              ) : (
-                <Button
-                  onClick={() => setSearchOpen(true)}
-                  variant="outline"
-                  size="icon"
-                  className={cn('text-muted-foreground hover:text-foreground', HDR_ICON_BUTTON)}
-                  aria-label="Search"
-                  title="Search"
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
-              )}
+              <LensSearch
+                open={lens.searchOpen}
+                onOpenChange={lens.setSearchOpen}
+                term={lens.searchTerm}
+                onTermChange={lens.setSearchTerm}
+                candidates={searchCandidates}
+                onPick={(c) => {
+                  lens.setSelectedId(c.id);
+                  graphRef.current?.centerOn(c.id);
+                }}
+              />
 
               <Button
                 variant={showAnalytics ? 'default' : 'outline'}
@@ -1444,332 +1157,197 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
         </div>
         {/* ── End mobile composition ── */}
 
-        <div className="hidden md:grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Main network view */}
-          <div className="lg:col-span-3">
-            <Card className="h-[800px]">
-              <CardContent className="p-0 h-full relative">
-                {loading ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10">
-                    <div className="flex flex-col items-center space-y-4">
-                      <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-                      <p className="text-sm text-muted-foreground">Loading process network data...</p>
-                    </div>
+        {/* ── Desktop workspace (network-lenses handoff §1) ──────────────
+             Graph card + right rail, then the analytics when toggled. The rail
+             stacks under the graph below `lg`, the sanctioned multi-pane step. */}
+        <div className="hidden md:grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <GraphCard
+            ref={graphRef}
+            legend={legendGroups}
+            nodes={displayNodes}
+            edges={displayEdges}
+            onNodesChange={lens.onNodesChange}
+            onNodeClick={lens.onNodeClick}
+            onNodeDoubleClick={lens.onNodeDoubleClick}
+            onNodeDragStart={lens.onNodeDragStart}
+            onPaneClick={lens.onPaneClick}
+            onResetLayout={() => setAllNodes((current) => layoutColumns(current, classOrder))}
+            fitKey={`${globalSelectedProjectId}|${loadNonce}|${focusedNode ?? ''}|${selectedLevel1Node ?? ''}`}
+            hint="Click a component to see details • Double-click to focus on process chain"
+            storageKey="suresuite.lens.process.graphHeight"
+            overlay={
+              loading ? (
+                <div className="absolute inset-0 z-30 flex items-center justify-center bg-white/80">
+                  <div className="flex flex-col items-center gap-3">
+                    <RefreshCw className="h-6 w-6 animate-spin text-[var(--hair-quiet)]" />
+                    <p className="text-[12.5px] text-[var(--hair-quiet)]">Loading process network data…</p>
                   </div>
-                ) : nodes.length === 0 ? (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center space-y-4">
-                      <AlertTriangle className="h-16 w-16 text-muted-foreground mx-auto" />
-                      <div>
-                        <h3 className="text-lg font-medium">No Process Network Data</h3>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          {globalSelectedProjectId 
-                            ? "This project doesn't have multi-tier supply chain data uploaded yet."
-                            : "Select a project to view its multi-level bill of materials."
-                          }
-                        </p>
-                        {globalSelectedProjectId && (
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Upload multi-tier supply chain data to see the visualization.
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                </div>
+              ) : allNodes.length === 0 ? (
+                <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+                  <div className="max-w-[360px] text-center">
+                    <AlertTriangle className="mx-auto h-8 w-8 text-[var(--hair-quiet)]" />
+                    <h3 className="mt-3 text-[13px] font-semibold">No process network data</h3>
+                    <p className="mt-1 text-[12.5px] text-[var(--hair-quiet)]">
+                      {globalSelectedProjectId
+                        ? "This project doesn't have multi-tier supply chain data uploaded yet. Upload it to see the visualization."
+                        : 'Select a project to view its multi-level bill of materials.'}
+                    </p>
                   </div>
-                ) : null}
-                <ReactFlow
-                  nodes={nodes}
-                  edges={edges}
-                  onNodesChange={onNodesChange}
-                  onEdgesChange={onEdgesChange}
-                  onConnect={onConnect}
-                  onNodeClick={onNodeClick}
-                  nodeTypes={nodeTypes}
-                  onNodeDoubleClick={onNodeDoubleClick}
-                  fitView
-                  attributionPosition="bottom-right"
-                >
-                  <Background />
-                  <Controls />
-                  <MiniMap 
-                  nodeStrokeColor={(n: Node) => getNodeColor((n.data as NodeData)?.nodeType || 'material', (n.data as NodeData)?.level || 0, maxLevel)}
-                  nodeColor={(n: Node) => getNodeColor((n.data as NodeData)?.nodeType || 'material', (n.data as NodeData)?.level || 0, maxLevel)}
-                  className="!bg-background"
-                  />
-                </ReactFlow>
-              </CardContent>
-            </Card>
-          </div>
+                </div>
+              ) : undefined
+            }
+          />
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-4">
-
-            {/* Selected Node Details */}
-            {selectedNode && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Component Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <div className="text-sm font-medium">{selectedNode.data.label}</div>
-                    <div className="text-xs text-muted-foreground capitalize">
-                      {labelForEchelon(selectedNode.data.echelon)}
-                    </div>
-                  </div>
-                  <Separator />
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Node ID:</span>
-                      <span className="font-medium text-right break-all">{selectedNode.id}</span>
-                    </div>
-                    {/* <div className="flex justify-between">
-                      <span className="text-muted-foreground">Node Name:</span>
-                      <span className="font-medium text-right break-all">{selectedNode.data.label as string}</span>
-                    </div> */}
-                    <div className="flex justify-between">
-                      {/* WP 8.5 · §4 D140. This is the lane's own `level`
-                          ordinate, and TWO live writers disagree about what it
-                          means — so it is labelled as the raw column it is rather
-                          than as a process level or a BOM depth, neither of which
-                          it reliably carries. `node_list.bom_depth` is the depth,
-                          and WP 8.4 is what puts it here. */}
-                      <span>Lane level (raw):</span>
-                      <Badge variant="outline" className="text-xs">
-                        {selectedNode.data.level}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Data Source:</span>
-                      <Badge variant="secondary" className="text-xs capitalize">
-                        {selectedNode.data.dataSource}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Incoming Connections:</span>
-                      <span className="font-medium">{selectedNode.data.incoming}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Outgoing Connections:</span>
-                      <span className="font-medium">{selectedNode.data.outgoing}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Total Connections:</span>
-                      <span className="font-medium">{selectedNode.data.incoming + selectedNode.data.outgoing}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Flow Volume:</span>
-                      <span className="font-medium">{selectedNode.data.flowVolume.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Consumption Rate:</span>
-                      <span className="font-medium">{selectedNode.data.consumptionRate?.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Chain Position:</span>
-                      <span className="text-xs text-muted-foreground">
-                        {/* F-10's class: this was a ladder over `level` that printed
-                            "Manufacturing" and "Direct Supplier" — nouns no table holds. */}
-                        {labelForEchelon(selectedNode.data.echelon)}
-                        {selectedNode.data.bomLevel != null ? ` · BOM depth ${selectedNode.data.bomLevel}` : ''}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <Separator />
-                  
-                  {focusedNode === selectedNode.id ? (
-                    <Button
-                      onClick={() => setFocusedNode(null)}
-                      variant="outline"  
-                      size="sm"
-                      className="w-full"
-                    >
-                      <Network className="h-4 w-4 mr-1" />
-                      Show All Components
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={() => setFocusedNode(selectedNode.id)}
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                    >
-                      <Network className="h-4 w-4 mr-1" />
-                      Focus Process Chain
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* WP 8.5 · §4 D139 — these buckets are echelons in a bill of
-                materials, not process levels. Nothing in this database describes a
-                process. */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Echelons</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {legendGroups.map((g) => (
-                  <div key={g.key} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div 
-                        className="w-4 h-4 rounded"
-                        style={{ backgroundColor: g.color }}
-                      />
-                      <span className="text-sm capitalize">
-                        {g.label}
-                      </span>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">{g.count}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Instructions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Instructions</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground space-y-2">
-                <p>• Click a component to see details</p>
-                <p>• Double-click to focus on process chain</p>
-                <p>• Use search to find specific components</p>
-                <p>• Horizontal layout shows supply chain flow</p>
-              </CardContent>
-            </Card>
+          {/* §10 right rail */}
+          <div className="flex min-w-0 flex-col gap-4">
+            <LensSummary
+              cells={[
+                { label: 'Nodes', value: allNodes.length },
+                { label: 'Edges', value: allEdges.length },
+                { label: 'BOM depth', value: maxBomDepth ?? '—' },
+                { label: 'Products', value: legendGroups.find((g) => g.key === 'product')?.count ?? 0 },
+              ]}
+            />
+            <LensDetails
+              title="Component details"
+              emptyText="Click a component to view details"
+              selected={
+                selectedNode
+                  ? {
+                      name: selectedNode.id,
+                      classLabel: classOf.get(selectedNode.data.classKey ?? '')?.label ?? labelForEchelon(selectedNode.data.echelon),
+                      classColor: classOf.get(selectedNode.data.classKey ?? '')?.color ?? colorForEchelon(selectedNode.data.echelon),
+                      rows: [
+                        { label: 'Node ID', value: selectedNode.id },
+                        // WP 8.5 · §4 D140. This is the lane's own `level` ordinate,
+                        // and TWO live writers disagree about what it means — so it
+                        // is labelled as the raw column it is rather than as a
+                        // process level or a BOM depth, neither of which it reliably
+                        // carries.
+                        { label: 'Lane level (raw)', value: selectedNode.data.level },
+                        { label: 'Data source', value: selectedNode.data.dataSource },
+                        { label: 'Incoming connections', value: selectedNode.data.incoming },
+                        { label: 'Outgoing connections', value: selectedNode.data.outgoing },
+                        { label: 'Total connections', value: selectedNode.data.incoming + selectedNode.data.outgoing },
+                        {
+                          label: 'Flow volume',
+                          value: selectedNode.data.flowVolume.toLocaleString('en-US', { maximumFractionDigits: 0 }),
+                        },
+                        {
+                          label: 'Consumption rate',
+                          value: selectedNode.data.consumptionRate?.toLocaleString('en-US', { maximumFractionDigits: 0 }) ?? '—',
+                        },
+                        {
+                          // F-10's class: this was a ladder over `level` that printed
+                          // "Manufacturing" and "Direct Supplier" — nouns no table holds.
+                          label: 'Chain position',
+                          value:
+                            labelForEchelon(selectedNode.data.echelon) +
+                            (selectedNode.data.bomLevel != null ? ` · BOM depth ${selectedNode.data.bomLevel}` : ''),
+                        },
+                      ],
+                    }
+                  : null
+              }
+              focus={
+                selectedNode
+                  ? {
+                      label: 'Focus process chain',
+                      active: focusedNode === selectedNode.id,
+                      onToggle: () => setFocusedNode(focusedNode === selectedNode.id ? null : selectedNode.id),
+                    }
+                  : undefined
+              }
+            />
+            <MLPrediction selectedPlant={
+              globalSelectedProjectId
+                ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
+                : null
+            } />
           </div>
         </div>
 
         <div className="hidden md:block">
         {showAnalytics && (
-          <div className="mt-6 space-y-6">
+          <div className="mt-8 flex flex-col gap-5">
+            <LensAnalyticsHeader
+              subtitle="Where the flow concentrates, and how connected each BOM depth is."
+              meta={`${allNodes.length} nodes · ${allEdges.length} edges`}
+            />
 
-            {/* Summary stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[
-                { label: 'Total nodes',  value: allNodes.length },
-                { label: 'BOM levels',   value: Object.keys(levelCounts).length },
-                { label: 'Total edges',  value: allEdges.length },
-                { label: 'Products',     value: levelStats.find(l => l.level === 0)?.count ?? 0 },
-              ].map(s => (
-                <Card key={s.label}>
-                  <CardContent className="pt-4">
-                    <div className="text-2xl font-medium">{s.value}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Top nodes by flow volume */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Top nodes by flow volume</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  Nodes handling the most weighted flow
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Filter buttons */}
-                <div className="flex flex-wrap gap-1 pb-2">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              <LensCard title="Top nodes by flow volume" subtitle="Nodes handling the most weighted flow">
+                <div className="flex flex-wrap gap-1 pb-3">
                   {Array.from(new Set(topFlowNodes.map(n => depthBucketLabel(n.level)))).map(type => (
                     <button
                       key={type}
+                      type="button"
                       onClick={() => setTopFlowFilter(type)}
-                      className={`text-xs px-2 py-1 rounded-sm border transition-colors capitalize ${
+                      className={cn(
+                        'h-11 rounded-[3px] border px-2 text-[11px] md:h-6',
                         topFlowFilter === type
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
-                      }`}
+                          ? 'border-[var(--brand-ink)] bg-[var(--brand-ink)] text-white'
+                          : cn(LENS.border, 'bg-white', LENS.muted, LENS.hoverControl),
+                      )}
                     >
                       {type}
                     </button>
                   ))}
                 </div>
+                <BarRows
+                  empty="No nodes for this type"
+                  rows={topFlowNodes
+                    .filter(n => topFlowFilter === '' || depthBucketLabel(n.level) === topFlowFilter)
+                    .map(n => ({
+                      key: n.id,
+                      label: n.id,
+                      value: n.flow,
+                      display: n.flow.toLocaleString(undefined, { maximumFractionDigits: 0 }),
+                      color: depthBucketColor(n.level, maxMaterialDepth),
+                    }))}
+                />
+              </LensCard>
 
-                {/* Chart */}
-                {(() => {
-                  const filtered = topFlowNodes.filter(n =>
-                    topFlowFilter === '' || depthBucketLabel(n.level) === topFlowFilter
-                  );
-                  const max = filtered[0]?.flow || 1;
-
-                  return filtered.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4">No nodes for this type</p>
-                  ) : (
-                    filtered.map(n => (
-                      <div key={n.id} className="flex items-center gap-3">
-                        <span
-                          className="text-xs text-muted-foreground w-36 shrink-0 truncate text-left"
-                          title={n.id}
-                        >
-                          {n.id}
-                        </span>
-                        <div className="flex-1 h-5 bg-muted rounded overflow-hidden">
-                          <div
-                            className="h-full rounded transition-all"
-                            style={{
-                              width: `${(n.flow / max) * 100}%`,
-                              background: getNodeColor('material', n.level, maxLevel),
-                            }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground w-16 shrink-0 text-right">
-                          {n.flow.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                        </span>
-                      </div>
-                    ))
-                  );
-                })()}
-              </CardContent>
-            </Card>
-
-            {/* Level connectivity table */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Level connectivity summary</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  Average connections and flow per level — reveals structural thinness or concentration
-                </p>
-              </CardHeader>
-              <CardContent>
-                <table className="w-full text-sm">
+              <LensCard
+                title="Level connectivity summary"
+                subtitle="Average connections and flow per level — reveals structural thinness or concentration"
+              >
+                <table className="w-full text-[12.5px] tabular-nums">
                   <thead>
-                    <tr className="border-b">
-                      <th className="text-left font-medium text-muted-foreground pb-2 pr-4">Level</th>
-                      <th className="text-left font-medium text-muted-foreground pb-2 pr-4">Type</th>
-                      <th className="text-right font-medium text-muted-foreground pb-2 pr-4">Nodes</th>
-                      <th className="text-right font-medium text-muted-foreground pb-2 pr-4">Avg in</th>
-                      <th className="text-right font-medium text-muted-foreground pb-2 pr-4">Avg out</th>
-                      <th className="text-right font-medium text-muted-foreground pb-2">Avg flow</th>
+                    <tr className={cn('border-b', LENS.hairline)}>
+                      {['Level', 'Type', 'Nodes', 'Avg in', 'Avg out', 'Avg flow'].map((h, i) => (
+                        <th
+                          key={h}
+                          className={cn('pb-2 pr-3 font-mono text-[10px] font-normal uppercase tracking-[0.16em]', LENS.muted, i >= 2 ? 'text-right' : 'text-left')}
+                        >
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {levelStats.map(l => (
-                      <tr key={l.level} className="border-b last:border-0">
-                        <td className="py-2 pr-4">{l.level}</td>
-                        <td className="py-2 pr-4">
+                      <tr key={l.level} className={cn('border-b last:border-0', LENS.hairline, LENS.hoverTableRow)}>
+                        <td className="py-[9px] pr-3">{l.level}</td>
+                        <td className="py-[9px] pr-3">
                           <span
-                            className="inline-block px-2 py-0.5 rounded-sm text-xs font-medium capitalize"
+                            className="inline-block whitespace-nowrap rounded-[3px] px-1.5 py-0.5 text-[11px] font-medium"
                             style={{ background: l.color + '22', color: l.color }}
                           >
                             {l.displayType}
                           </span>
                         </td>
-                        <td className="py-2 pr-4 text-right">{l.count}</td>
-                        <td className="py-2 pr-4 text-right">{l.avgIn}</td>
-                        <td className="py-2 pr-4 text-right">{l.avgOut}</td>
-                        <td className="py-2 text-right">{l.avgFlow.toLocaleString()}</td>
+                        <td className="py-[9px] pr-3 text-right">{l.count}</td>
+                        <td className="py-[9px] pr-3 text-right">{l.avgIn}</td>
+                        <td className="py-[9px] pr-3 text-right">{l.avgOut}</td>
+                        <td className="py-[9px] text-right">{l.avgFlow.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </CardContent>
-            </Card>
-
+              </LensCard>
+            </div>
           </div>
         )}
         </div>

@@ -37,7 +37,7 @@ const KPI_OPTIONS = [
 export function ScenarioSetupForm({ scenario, projectId, onSave, section = "all" }: Props) {
   const [local, setLocal] = useState<Scenario>(scenario);
   const { unit, setUnit, fromDays, toDays } = useTimeUnit(projectId);
-  const displayUnit = unit ?? "day";
+  const displayUnit = unit;
   const unitLabel = UNIT_LABEL_PLURAL[displayUnit];
 
   // Re-sync on server-side updates too (inheritance writes warm-up/replications

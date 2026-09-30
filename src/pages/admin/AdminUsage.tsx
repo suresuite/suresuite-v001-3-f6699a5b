@@ -1,10 +1,13 @@
 // AI Usage (/admin/usage) — SuReSuite "Ledger" redesign.
-// Data flow unchanged: last-500 ai_usage_logs (+ user-name lookup), the
+// The last-500 usage rows, each with its person's name, come from
+// `admin_usage_log_read` (PLAN.md §4 D205): the page used to read `ai_usage_logs`
+// and `approved_users` directly, and as anon it got no rows and no names. Also the
 // optional model-capability matrix (get_model_capability_matrix) and the
 // optional per-org file-workspace rollup (admin_org_file_usage). Status is a
 // dot (success=teal, error=red, blocked=grey); Export CSV preserved verbatim.
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { AdminMobileList, SURFACE, KX, TH, TD, ROW_HOVER, StatusDot, MonoChip, EmptyRow, LoadingRow, useTableSort, useColumnFilters, type DotTone } from '@/components/admin/adminUi';
@@ -39,18 +42,20 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
   const [fileRows, setFileRows] = useState<OrgFileUsageRow[]>([]);
   const [matrixRows, setMatrixRows] = useState<ModelMatrixAggregate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { user: actor } = useAuth();
 
   const load = async () => {
     setLoading(true);
-    const { data } = await db.from('ai_usage_logs').select('*').order('created_at', { ascending: false }).limit(500);
-    const logs = (data ?? []) as LogRow[];
-    const userIds = Array.from(new Set(logs.map((l) => l.user_id).filter(Boolean))) as string[];
-    let names: Record<string, string> = {};
-    if (userIds.length) {
-      const { data: users } = await db.from('approved_users').select('id,name,email').in('id', userIds);
-      names = Object.fromEntries((users ?? []).map((u: any) => [u.id, u.name || u.email]));
+    setLoadError(null);
+    const { data, error } = await db.rpc('admin_usage_log_read', { p_actor_id: actor?.id, p_actor_email: actor?.email, p_limit: 500 });
+    // A refused read is not an unused platform: say which it is (D205, D203).
+    if (error) {
+      setLoadError(error.message === 'forbidden'
+        ? 'Only an active super admin can read AI usage.'
+        : `Could not load AI usage: ${error.message}`);
     }
-    setRows(logs.map((l) => ({ ...l, user_name: l.user_id ? names[l.user_id] : undefined })));
+    setRows(((data ?? []) as LogRow[]).map((l) => ({ ...l, user_name: l.user_name ?? undefined })));
     try {
       const { data: usage, error } = await db.from('admin_org_file_usage').select('*');
       setFileRows(!error && Array.isArray(usage) ? (usage as OrgFileUsageRow[]) : []);
@@ -98,9 +103,9 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
           counter={`${sorted.length}`}
           loading={loading}
           empty={
-            sorted.length === 0
+            loadError ?? (sorted.length === 0
               ? 'No usage recorded yet. Trigger a chat request to see logs here.'
-              : undefined
+              : undefined)
           }
         >
           {sorted.slice(0, usageBudget).map((r) => (
@@ -148,7 +153,9 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
               <FilterTH filterKey="latency" align="right" /><FilterTH filterKey="status" />
             </tr></thead>
             <tbody>
-              {loading ? <LoadingRow colSpan={9} /> : sorted.length === 0 ? (
+              {loading ? <LoadingRow colSpan={9} /> : loadError ? (
+                <EmptyRow colSpan={9} message={loadError} />
+              ) : sorted.length === 0 ? (
                 <EmptyRow colSpan={9} message="No usage recorded yet. Trigger a chat request to see logs here." />
               ) : sorted.map((r) => (
                 <tr key={r.id} className={ROW_HOVER}>

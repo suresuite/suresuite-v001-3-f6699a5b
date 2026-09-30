@@ -1,39 +1,20 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
-import { Suspense, lazy, useEffect, useState, useCallback, useMemo } from 'react';
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  MiniMap,
-  Node,
-  Edge,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  Connection,
-  NodeMouseHandler,
-  Position,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+import { Suspense, lazy, useEffect, useState, useMemo, useRef } from 'react';
+import { Node, Edge } from '@xyflow/react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
   RefreshCw,
   Network,
-  Search,
   BarChart,
   RotateCcw,
   AlertTriangle,
   Map,
-  Building2,
 } from 'lucide-react';
 import {
   PageLayout,
@@ -45,7 +26,6 @@ import {
   HDR_ICON_BUTTON_ON,
   HDR_OUTLINE_BUTTON,
   HDR_PROJECT_SELECT,
-  HDR_SEARCH_INPUT,
 } from '@/components/shared';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { cn } from '@/lib/utils';
@@ -69,6 +49,20 @@ import {
   LensSection,
 } from '@/components/network/MobileLens';
 import { formatMoneyCompact } from '@/lib/sim/money';
+import { GRAPH_INK } from '@/lib/graph';
+import {
+  GraphCard,
+  LensSearch,
+  LensSummary,
+  LensDetails,
+  LensAnalyticsHeader,
+  LensCard,
+  BarRows,
+  LENS,
+  useLensGraph,
+  styleFirmEdge,
+  type GraphCardHandle,
+} from '@/components/network/lens';
 
 
 const TIER_ORDER = ['Tier 1', 'Tier 2', 'Tier 3', 'Plant'] as const;
@@ -80,8 +74,6 @@ const TIER_COLORS: Record<TierKey, string> = {
   'Tier 3': '#3b82f6',    // Blue
   'Plant': '#8b5cf6',     // Purple
 };
-
-const HIGHLIGHT_HEX = '#ff0000';
 
 const TIER_LABELS: Record<TierKey, string> = {
   'Tier 1': 'Tier 1 Suppliers',
@@ -137,6 +129,8 @@ interface NodeData extends Record<string, unknown> {
   revenue: number;
   country: string;
   industry: string;
+  /** Stored prominence, or the local fallback when none is stored (see calculateNodeImportance). */
+  prominence?: number;
 }
 
 interface FirmRevenueDatum {
@@ -162,21 +156,41 @@ function getTierFromDepth(depth: number | null, isPlant: boolean = false): TierK
   return 'Tier 3';
 }
 
+/** The firm lens's focus, unchanged: the firm and its direct neighbours (handoff §8). */
+function firmFocusSet(id: string, _nodes: Node<NodeData>[], edges: Edge[]): Set<string> {
+  const included = new Set<string>([id]);
+  for (const e of edges) {
+    if (e.source === id || e.target === id) {
+      included.add(e.source);
+      included.add(e.target);
+    }
+  }
+  return included;
+}
+
+/** Legend order, which is the shell order from the centre out (handoff §2.1). */
+const LEGEND_TIERS: TierKey[] = ['Plant', 'Tier 1', 'Tier 2', 'Tier 3'];
+
 export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLevelNetworkProps) {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const { globalSelectedProjectId, setGlobalSelectedProjectId } = useGlobalProject();
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<NodeData>>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [focusedNode, setFocusedNode] = useState<string | null>(null);
-  const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null);
+  const graphRef = useRef<GraphCardHandle>(null);
+  // Bumped after every load, so the card refits the graph it has just been handed.
+  const [loadNonce, setLoadNonce] = useState(0);
+  // The shell layout as computed, so Reset layout can discard dragged positions.
+  const shellPositionsRef = useRef<Record<string, { x: number; y: number }>>({});
+  // Selection, focus, search and drags — shared with the other two lenses. Search
+  // matches a firm's NAME exactly, which is what the user reads (handoff §9).
+  const lens = useLensGraph<Node<NodeData>>({
+    focusSet: firmFocusSet,
+    searchLabel: (n) => n.data.label,
+    styleEdge: styleFirmEdge,
+  });
+  const { allNodes, allEdges, setAllNodes, setAllEdges, selectedNode, focusedId: focusedNode, setFocusedId: setFocusedNode } = lens;
   const [loading, setLoading] = useState(false);
   const [tierCounts, setTierCounts] = useState<Record<TierKey, number>>({ 'Tier 1': 0, 'Tier 2': 0, 'Tier 3': 0, 'Plant': 0 });
-  const [allNodes, setAllNodes] = useState<Node<NodeData>[]>([]);
-  const [allEdges, setAllEdges] = useState<Edge[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [searchOpen, setSearchOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [firmRevenues, setFirmRevenues] = useState<FirmRevenueDatum[]>([]);
   const [firmConnections, setFirmConnections] = useState<FirmConnectionDatum[]>([]);
@@ -268,13 +282,10 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
 
     if (!user || !globalSelectedProjectId) {
       console.log('❌ Clearing data - no user or project');
-      setNodes([]);
-      setEdges([]);
       setAllNodes([]);
       setAllEdges([]);
       setTierCounts({ 'Tier 1': 0, 'Tier 2': 0, 'Tier 3': 0, 'Plant': 0 });
-      setSelectedNode(null);
-      setFocusedNode(null);
+      lens.reset();
       setFirmRevenues([]);
       setFirmConnections([]);
       // networkSummary state reset removed - no longer needed
@@ -282,6 +293,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
     }
 
     setLoading(true);
+    lens.reset();
     
     try {
       const [
@@ -489,11 +501,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
             id: edgeKey,
             source: e.src_uid,
             target: e.dst_uid,
-            style: {
-              stroke: '#8C8C8C',
-              strokeWidth: 1.5,
-              strokeOpacity: 0.6,
-            },
+            // Stroke and width come from `styleFirmEdge` — centre to centre, no arrowhead.
             type: 'straight',
             data: { 
               weight: e.relative_revenue || 1,
@@ -760,7 +768,6 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
               alignItems: 'center',
               boxShadow: `0 6px 20px rgba(0,0,0,0.15), 0 0 ${Math.round(glowIntensity * 20)}px ${glowColor}`,
               opacity,
-              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
               zIndex: 30,
               filter: `brightness(${1 + prominence * 0.2})`,
             },
@@ -841,8 +848,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                 alignItems: 'center',
                 boxShadow: `0 ${Math.round(2 + prominence * 6)}px ${Math.round(8 + prominence * 12)}px rgba(0,0,0,${0.1 + prominence * 0.15}), 0 0 ${Math.round(glowIntensity * 15)}px ${glowColor}`,
                 opacity,
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                zIndex: Math.round(20 + prominence * 5),
+                  zIndex: Math.round(20 + prominence * 5),
               },
               type: 'default',
             });
@@ -931,8 +937,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                 alignItems: 'center',
                 boxShadow: `0 ${Math.round(2 + prominence * 5)}px ${Math.round(8 + prominence * 10)}px rgba(0,0,0,${0.1 + prominence * 0.15}), 0 0 ${Math.round(glowIntensity * 12)}px ${glowColor}`,
                 opacity: opacity * 0.98, // Increased opacity for better visibility  
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                zIndex: Math.round(15 + prominence * 5), // Enhanced z-index range
+                  zIndex: Math.round(15 + prominence * 5), // Enhanced z-index range
               },
               type: 'default',
             });
@@ -995,7 +1000,6 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
               alignItems: 'center',
               boxShadow: `0 ${Math.round(0.5 + prominence * 2)}px ${Math.round(4 + prominence * 4)}px rgba(0,0,0,${0.06 + prominence * 0.08}), 0 0 ${Math.round(glowIntensity * 6)}px ${glowColor}`,
               opacity: opacity * 0.85, // Most subtle opacity
-              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
               zIndex: Math.round(10 + prominence * 2),
             },
             type: 'default',
@@ -1003,10 +1007,13 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
         });
       }
 
-      setNodes(nodeList);
-      setEdges(Object.values(edgeMap));
+      nodeList.forEach((n) => {
+        n.data.prominence = calculateNodeImportance(n.data, n.id).prominence;
+      });
+      shellPositionsRef.current = Object.fromEntries(nodeList.map((n) => [n.id, n.position]));
       setAllNodes(nodeList);
       setAllEdges(Object.values(edgeMap));
+      setLoadNonce((k) => k + 1);
       console.log('✅ Firm visualization updated with', nodeList.length, 'nodes and', Object.keys(edgeMap).length, 'edges');
       toast.success(`Loaded firm network: ${nodeList.length} firms, ${Object.keys(edgeMap).length} connections`);
     } catch (error) {
@@ -1027,85 +1034,17 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
     fetchData();
   }, [globalSelectedProjectId, user]);
 
-  useEffect(() => {
-    if (!focusedNode) {
-      setNodes(allNodes);
-      setEdges(allEdges);
-      return;
-    }
-  
-    const node = allNodes.find(n => n.id === focusedNode);
-    if (!node) return;
-
-    const tier = node.data.tier;
-    const included = new Set<string>([node.id]);
-  
-    // Include connected nodes from edges
-    allEdges.forEach(edge => {
-      if (edge.source === focusedNode || edge.target === focusedNode) {
-        included.add(edge.source as string);
-        included.add(edge.target as string);
-      }
-    });
-  
-    const subNodes = allNodes.filter(n => included.has(n.id));
-    const subEdges = allEdges.filter(
-      e => included.has(e.source as string) && included.has(e.target as string)
-    );
-  
-    setNodes(subNodes);
-    setEdges(subEdges);
-  }, [focusedNode, allNodes, allEdges]);
-
-  useEffect(() => {
-    const updatedEdges = allEdges.map(edge => {
-      if (selectedNode && (edge.source === selectedNode.id || edge.target === selectedNode.id)) {
-        return { ...edge, style: { stroke: '#3b82f6', strokeWidth: 2.5, strokeOpacity: 0.9, zIndex: 1 } };
-      } else {
-        return { ...edge, style: { stroke: '#8C8C8C', strokeWidth: 1, strokeOpacity: 0.25, zIndex: 1 } };
-      }
-    });
-    setEdges(updatedEdges);
-  }, [selectedNode]);
-
-  useEffect(() => {
-    const term = searchTerm.trim().toLowerCase();
-   
-    setNodes((current) => {
-      return current.map((n) => {
-        const base = allNodes.find((b) => b.id === n.id) || n;
-        const baseStyle: any = base.style || {};
-  
-        const isHit = term !== '' && (
-          n.id.toLowerCase().includes(term) || 
-          n.data.label.toLowerCase().includes(term)
-        );
-  
-        const baseWidth = typeof baseStyle.width === 'number' ? baseStyle.width : parseFloat(baseStyle.width) || baseStyle.width;
-        const baseHeight = typeof baseStyle.height === 'number' ? baseStyle.height : parseFloat(baseStyle.height) || baseStyle.height;
-  
-        const factor = isHit ? 1.15 : 1;
-  
-        return {
-          ...n,
-          style: {
-            ...baseStyle,
-            background: isHit ? HIGHLIGHT_HEX : baseStyle.background,
-            width: typeof baseWidth === 'number' ? baseWidth * factor : baseWidth,
-            height: typeof baseHeight === 'number' ? baseHeight * factor : baseHeight,
-            boxShadow: isHit ? '0 0 0 3px rgba(255,0,0,0.3)' : baseStyle.boxShadow,
-          },
-        };
-      });
-    });
-  }, [searchTerm, allNodes]);
-
-  const onNodeClick: NodeMouseHandler = useCallback((_, node) => setSelectedNode(node as Node<NodeData>), []);
-  const onNodeDoubleClick: NodeMouseHandler = useCallback((_, node) => {
-    const id = node.id;
-    setFocusedNode(prev => (prev === id ? null : id));
-  }, []);
-  const onConnect = useCallback((params: Connection) => setEdges(eds => addEdge(params, eds)), []);
+  // §9 — the visible set, by firm name, so search keeps working inside a focus.
+  const searchCandidates = useMemo(
+    () =>
+      lens.visibleNodes.map((n) => ({
+        id: n.id,
+        label: n.data.label,
+        color: TIER_COLORS[n.data.tier || 'Tier 1'],
+        classLabel: n.data.tier === 'Plant' ? 'Plant' : n.data.tier || 'Tier 1',
+      })),
+    [lens.visibleNodes],
+  );
 
   const mobileFirmMetrics = useMemo(() => {
     const totalNodes = networkNodes.length;
@@ -1230,35 +1169,18 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                 </Button>
               )}
               
-              {searchOpen ? (
-                <div className="relative w-48 transition-all">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <input
-                    autoFocus
-                    type="text"
-                    className={cn(
-                      'h-9 min-h-11 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm focus:outline-none',
-                      HDR_SEARCH_INPUT,
-                      'md:pl-9',
-                    )}
-                    placeholder="find a firm"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onBlur={() => !searchTerm && setSearchOpen(false)}
-                  />
-                </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className={HDR_ICON_BUTTON}
-                  onClick={() => setSearchOpen(true)}
-                  aria-label="Search"
-                  title="Search"
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
-              )}
+              <LensSearch
+                open={lens.searchOpen}
+                onOpenChange={lens.setSearchOpen}
+                term={lens.searchTerm}
+                onTermChange={lens.setSearchTerm}
+                candidates={searchCandidates}
+                monoLabels={false}
+                onPick={(c) => {
+                  lens.setSelectedId(c.id);
+                  graphRef.current?.centerOn(c.id);
+                }}
+              />
 
               <Button
                 variant={showAnalytics ? 'default' : 'outline'}
@@ -1438,142 +1360,113 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
         </div>
         {/* ── End mobile composition ── */}
 
-          <div className="hidden md:grid grid-cols-1 lg:grid-cols-4 gap-6">
-
-            {/* Graph Canvas or Map View */}
-            <div className="lg:col-span-3">
-              {globalSelectedProjectId && riskDataError && (
-                <RiskDataNotice reason={riskDataError} />
-              )}
-              <Card className="h-[560px]">
-                <CardContent className="p-0 h-full relative">
-                  {viewMode === 'network' ? (
-                    <>
-                      <ReactFlow
-                        nodes={nodes}
-                        edges={edges}
-                        onNodesChange={onNodesChange}
-                        onEdgesChange={onEdgesChange}
-                        onConnect={onConnect}
-                        onNodeClick={onNodeClick}
-                        onNodeDoubleClick={onNodeDoubleClick}
-                        fitView
-                        attributionPosition="bottom-left"
-                      >
-                        <Background />
-                        <Controls />
-                        <MiniMap
-                          nodeColor={(node) => TIER_COLORS[(node.data as NodeData).tier || 'Tier 1']}
-                          zoomable
-                          pannable
-                        />
-                      </ReactFlow>
-                      <p className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-[10px] text-muted-foreground text-center">
-                        Click/double-click firm to select and add disruptions • Double-click to focus network connections
-                      </p>
-                      {focusedNode && (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setFocusedNode(null)}
-                          className="absolute top-2 right-2"
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                          <span className="sr-only">Show All Firms</span>
-                        </Button>
-                      )}
-                    </>
-                  ) : (
-                    <Suspense
-                      fallback={
-                        <div className="h-full grid place-content-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                        </div>
-                      }
-                    >
+          {/* ── Desktop workspace (network-lenses handoff §1) ──────────────
+               Graph card + right rail, then the analytics when toggled. The shell
+               layout itself is unchanged (§5); only the card around it is shared.
+               The rail stacks under the graph below `lg`, the sanctioned step. */}
+          <div className="hidden md:block">
+            {globalSelectedProjectId && riskDataError && (
+              <RiskDataNotice reason={riskDataError} />
+            )}
+          </div>
+          <div className="hidden md:grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <GraphCard
+              ref={graphRef}
+              legendShape="round"
+              legend={LEGEND_TIERS.map((t) => ({ key: t, label: TIER_LABELS[t], color: TIER_COLORS[t], count: tierCounts[t] }))}
+              nodes={lens.nodes}
+              edges={lens.edges}
+              onNodesChange={lens.onNodesChange}
+              onNodeClick={lens.onNodeClick}
+              onNodeDoubleClick={lens.onNodeDoubleClick}
+              onNodeDragStart={lens.onNodeDragStart}
+              onPaneClick={lens.onPaneClick}
+              onResetLayout={() =>
+                setAllNodes((current) =>
+                  current.map((n) => ({ ...n, position: shellPositionsRef.current[n.id] ?? n.position })),
+                )
+              }
+              fitKey={`${globalSelectedProjectId}|${loadNonce}|${focusedNode ?? ''}`}
+              hint="Click/double-click firm to select and add disruptions • Double-click to focus network connections"
+              storageKey="suresuite.lens.firm.graphHeight"
+              minimapNodeColor={(n) => TIER_COLORS[(n.data as NodeData).tier || 'Tier 1']}
+              replaceCanvas={
+                viewMode === 'map' ? (
+                  <Suspense
+                    fallback={
+                      <div className="h-full grid place-content-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    }
+                  >
                     <MapView
-                      nodes={nodes}
+                      nodes={lens.nodes}
                       selectedNode={selectedNode}
-                      onNodeClick={(node) => {
-                        const matchingNode = allNodes.find(n => n.id === node.id);
-                        if (matchingNode) setSelectedNode(matchingNode);
-                      }}
+                      onNodeClick={(node) => lens.setSelectedId(node.id)}
                       projectId={globalSelectedProjectId}
-                      plantData={projects.find(p => p.id === globalSelectedProjectId) ?? null}  
+                      plantData={projects.find(p => p.id === globalSelectedProjectId) ?? null}
                       countryRiskMap={countryRiskMap}
                     />
-                    </Suspense>
-                  )}
-                  {!globalSelectedProjectId && (
-                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground pointer-events-none">
-                      Please select a project
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                  </Suspense>
+                ) : undefined
+              }
+              overlay={
+                !globalSelectedProjectId ? (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] text-muted-foreground">
+                    Please select a project
+                  </div>
+                ) : undefined
+              }
+            />
 
-            {/* Sidebar */}
-            <div className="lg:col-span-1 flex flex-col space-y-6 w-full">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Firm Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {selectedNode ? (
-                    <>
-                      <div>
-                        <h3 className="font-semibold text-base">{selectedNode.data.label}</h3>
-                        <Badge
-                          variant="secondary"
-                          className="text-xs"
-                          style={{
-                            backgroundColor: TIER_COLORS[selectedNode.data.tier || 'Tier 1'],
-                            color: 'white',
-                          }}
-                        >
-                          {TIER_LABELS[selectedNode.data.tier || 'Tier 1']}
-                        </Badge>
-                      </div>
-                      <Separator />
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Incoming:</span>
-                          <span className="text-sm font-medium">{selectedNode.data.incoming}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Outgoing:</span>
-                          <span className="text-sm font-medium">{selectedNode.data.outgoing}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Revenue:</span>
-                          <span className="text-sm font-medium">
-                            {selectedNode.data.revenue > 0 
-                              ? formatMoneyCompact(selectedNode.data.revenue)
-                              : 'N/A'
-                            }
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Country:</span>
-                          <span className="text-sm font-medium">{selectedNode.data.country}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Industry:</span>
-                          <span className="text-xs font-medium">{selectedNode.data.industry}</span>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center text-muted-foreground">
-                      <Building2 className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">Click a firm to view details</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            {/* §10 right rail */}
+            <div className="flex min-w-0 flex-col gap-4">
+              <LensSummary
+                cells={[
+                  { label: 'Firms', value: allNodes.length },
+                  { label: 'Connections', value: allEdges.length },
+                  { label: 'Tiers', value: (['Tier 1', 'Tier 2', 'Tier 3'] as TierKey[]).filter((t) => tierCounts[t] > 0).length },
+                  { label: 'Peak prominence', value: prominenceStats ? prominenceStats.max.toFixed(3) : '—' },
+                ]}
+              />
+              <LensDetails
+                title="Firm details"
+                emptyText="Click a firm to view details"
+                selected={
+                  selectedNode
+                    ? {
+                        name: selectedNode.data.label,
+                        classLabel: TIER_LABELS[selectedNode.data.tier || 'Tier 1'],
+                        classColor: TIER_COLORS[selectedNode.data.tier || 'Tier 1'],
+                        rows: [
+                          { label: 'Incoming', value: selectedNode.data.incoming },
+                          { label: 'Outgoing', value: selectedNode.data.outgoing },
+                          {
+                            label: 'Revenue',
+                            value: selectedNode.data.revenue > 0 ? formatMoneyCompact(selectedNode.data.revenue) : 'N/A',
+                          },
+                          { label: 'Country', value: selectedNode.data.country },
+                          { label: 'Industry', value: selectedNode.data.industry },
+                          {
+                            label: 'Prominence',
+                            value: typeof selectedNode.data.prominence === 'number' ? selectedNode.data.prominence.toFixed(3) : '—',
+                          },
+                        ],
+                      }
+                    : null
+                }
+                focus={
+                  selectedNode
+                    ? {
+                        label: 'Focus connections',
+                        active: focusedNode === selectedNode.id,
+                        onToggle: () => setFocusedNode(focusedNode === selectedNode.id ? null : selectedNode.id),
+                      }
+                    : undefined
+                }
+              />
               <MLPrediction selectedPlant={
-                globalSelectedProjectId 
+                globalSelectedProjectId
                   ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
                   : null
               } />
@@ -1582,356 +1475,251 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
 
           <div className="hidden md:block">
           {showAnalytics && (
-            <div className="grid grid-cols-1 gap-6 mt-6">
+            <div className="mt-8 flex flex-col gap-5">
+              <LensAnalyticsHeader
+                subtitle="Prominence, sector and country spread, tier composition and single-source exposure."
+                meta={`${networkNodes.length} firms · ${networkEdges.length} connections`}
+              />
+
               {prominenceStats && (
-                <Card className="p-6">
-                  <div className="mb-4">
-                    <h3 className="text-base font-medium">Prominence Statistics</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Node prominence distribution and calculation metrics
-                    </p>
+                <LensCard title="Prominence statistics" subtitle="Node prominence distribution and calculation metrics">
+                  <div className={cn('grid grid-cols-4 gap-px overflow-hidden rounded-[4px] border bg-[var(--hair-border)]', LENS.border)}>
+                    {[
+                      { label: 'Total nodes', value: String(prominenceStats.count) },
+                      { label: 'Average', value: prominenceStats.average.toFixed(3) },
+                      { label: 'Maximum', value: prominenceStats.max.toFixed(3) },
+                      { label: 'Minimum', value: prominenceStats.min.toFixed(3) },
+                      { label: 'Low (< 0.3)', value: String(prominenceStats.distribution.low) },
+                      { label: 'Medium (0.3–0.7)', value: String(prominenceStats.distribution.medium) },
+                      { label: 'High (> 0.7)', value: String(prominenceStats.distribution.high) },
+                    ].map((c) => (
+                      <div key={c.label} className="bg-white px-3.5 py-2.5">
+                        <div className={cn('text-[11px]', LENS.muted)}>{c.label}</div>
+                        <div className={cn('text-[20px] font-semibold leading-[1.1] tracking-[-0.019em] tabular-nums', LENS.ink)}>{c.value}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-primary">{prominenceStats.count}</div>
-                      <div className="text-xs text-muted-foreground">Total Nodes</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{prominenceStats.average.toFixed(3)}</div>
-                      <div className="text-xs text-muted-foreground">Average</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{prominenceStats.max.toFixed(3)}</div>
-                      <div className="text-xs text-muted-foreground">Maximum</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-600">{prominenceStats.min.toFixed(3)}</div>
-                      <div className="text-xs text-muted-foreground">Minimum</div>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <div className="text-lg font-semibold text-red-600">{prominenceStats.distribution.low}</div>
-                      <div className="text-xs text-muted-foreground">Low (&lt; 0.3)</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-semibold text-yellow-600">{prominenceStats.distribution.medium}</div>
-                      <div className="text-xs text-muted-foreground">Medium (0.3-0.7)</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-semibold text-green-600">{prominenceStats.distribution.high}</div>
-                      <div className="text-xs text-muted-foreground">High (&gt; 0.7)</div>
-                    </div>
-                  </div>
-                </Card>
+                </LensCard>
               )}
 
-
               {/* Industry breakdown + Geographic concentration */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                {(['industry', 'country'] as const).map((field) => {
+                  const counts: Record<string, number> = {};
+                  networkNodes.forEach(n => {
+                    const k = n[field] || 'Unknown';
+                    counts[k] = (counts[k] || 0) + 1;
+                  });
+                  const rows = Object.entries(counts)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([k, count]) => ({
+                      key: k,
+                      label: k,
+                      value: count,
+                      display: String(count),
+                      color: field === 'industry' ? TIER_COLORS['Plant'] : TIER_COLORS['Tier 3'],
+                    }));
+                  return (
+                    <LensCard
+                      key={field}
+                      title={field === 'industry' ? 'Industry breakdown' : 'Geographic concentration'}
+                      subtitle={field === 'industry' ? 'Firm count by sector' : 'Top countries by firm count'}
+                    >
+                      <div className="max-h-[168px] overflow-y-auto pr-1">
+                        <BarRows rows={rows} empty="No firms loaded" />
+                      </div>
+                    </LensCard>
+                  );
+                })}
+              </div>
 
-                  {/* Industry breakdown */}
-                  <Card className="p-6">
-                    <h3 className="text-base font-medium mb-1">Industry breakdown</h3>
-                    <p className="text-xs text-muted-foreground mb-4">Firm count by sector</p>
-                    {(() => {
-                      const industryCounts: Record<string, number> = {};
-                      networkNodes.forEach(n => {
-                        const ind = n.industry || 'Unknown';
-                        industryCounts[ind] = (industryCounts[ind] || 0) + 1;
-                      });
-                      const sorted = Object.entries(industryCounts)
-                        .sort(([, a], [, b]) => b - a)
-                        // .slice(0, 6);
-                      const max = sorted[0]?.[1] || 1;
-                      return (
-                        <div className="overflow-y-auto max-h-[168px] space-y-2 pr-1">
-                          {sorted.map(([industry, count]) => (
-                            <div key={industry} className="flex items-center gap-3">
-                              <span className="text-xs text-muted-foreground w-20 shrink-0 truncate" title={industry}>{industry}</span>
-                              <div className="flex-1 h-4 bg-muted rounded overflow-hidden">
-                                <div
-                                  className="h-full rounded"
-                                  style={{ width: `${(count / max) * 100}%`, background: '#8b5cf6' }}
-                                />
-                              </div>
-                              <span className="text-xs text-muted-foreground w-6 text-right">{count}</span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </Card>
-
-                  {/* Geographic concentration */}
-                  <Card className="p-6">
-                    <h3 className="text-base font-medium mb-1">Geographic concentration</h3>
-                    <p className="text-xs text-muted-foreground mb-4">Top countries by firm count</p>
-                    {(() => {
-                      const countryCounts: Record<string, number> = {};
-                      networkNodes.forEach(n => {
-                        const c = n.country || 'Unknown';
-                        countryCounts[c] = (countryCounts[c] || 0) + 1;
-                      });
-                      const sorted = Object.entries(countryCounts)
-                        .sort(([, a], [, b]) => b - a)
-                        // .slice(0, 6);
-                      const max = sorted[0]?.[1] || 1;
-                      return (
-                        <div className="overflow-y-auto max-h-[168px] space-y-2 pr-1">
-                          {sorted.map(([country, count]) => (
-                            <div key={country} className="flex items-center gap-3">
-                              <span className="text-xs text-muted-foreground w-20 shrink-0 truncate">{country}</span>
-                              <div className="flex-1 h-4 bg-muted rounded overflow-hidden">
-                                <div
-                                  className="h-full rounded"
-                                  style={{ width: `${(count / max) * 100}%`, background: '#3b82f6' }}
-                                />
-                              </div>
-                              <span className="text-xs text-muted-foreground w-6 text-right">{count}</span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </Card>
-                </div>
-
-                {/* Tier composition + Revenue coverage */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                  {/* Tier composition donut */}
-                  <Card className="p-6">
-                    <h3 className="text-base font-medium mb-1">Tier composition</h3>
-                    <p className="text-xs text-muted-foreground mb-4">Share of firms per supply chain tier</p>
-                    {(() => {
-                      const total = Object.values(tierCounts).reduce((a, b) => a + b, 0) || 1;
-                      const tiers = TIER_ORDER.map(t => ({
-                        label: t,
-                        count: tierCounts[t],
-                        pct: Math.round((tierCounts[t] / total) * 100),
-                        color: TIER_COLORS[t],
-                      }));
-                      const circumference = 2 * Math.PI * 32;
-                      let offset = 0;
-                      return (
-                        <div className="flex items-center gap-6">
-                          <svg width="90" height="90" viewBox="0 0 90 90" className="shrink-0">
-                            {tiers.map(t => {
-                              const dash = (t.pct / 100) * circumference;
-                              const seg = (
-                                <circle
-                                  key={t.label}
-                                  cx="45" cy="45" r="32"
-                                  fill="none"
-                                  stroke={t.color}
-                                  strokeWidth="14"
-                                  strokeDasharray={`${dash} ${circumference - dash}`}
-                                  strokeDashoffset={-offset}
-                                />
-                              );
-                              offset += dash;
-                              return seg;
-                            })}
-                          </svg>
-                          <div className="space-y-1.5">
-                            {tiers.map(t => (
-                              <div key={t.label} className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: t.color }} />
-                                {t.label} — {t.pct}% ({t.count})
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </Card>
-
-                  {/* Revenue coverage */}
-                  <Card className="p-6">
-                    <h3 className="text-base font-medium mb-1">Revenue coverage</h3>
-                    <p className="text-xs text-muted-foreground mb-4">Firms with known revenue per tier</p>
-                    {(() => {
-                      const tiers = TIER_ORDER.map(t => {
-                        const tierNodes = networkNodes.filter(n => {
-                          const isPlant = n.is_seed === true;
-                          return getTierFromDepth(n.depth, isPlant) === t;
-                        });
-                        const withRevenue = tierNodes.filter(n => n.revenue != null && n.revenue > 0).length;
-                        const pct = tierNodes.length > 0 ? Math.round((withRevenue / tierNodes.length) * 100) : 0;
-                        return { label: t, pct, color: TIER_COLORS[t] };
-                      });
-                      return (
-                        <div className="space-y-2">
-                          {tiers.map(t => (
-                            <div key={t.label} className="flex items-center gap-3">
-                              <span className="text-xs text-muted-foreground w-20 shrink-0">{t.label}</span>
-                              <div className="flex-1 h-4 bg-muted rounded overflow-hidden">
-                                <div
-                                  className="h-full rounded"
-                                  style={{ width: `${t.pct}%`, background: t.color }}
-                                />
-                              </div>
-                              <span className="text-xs text-muted-foreground w-8 text-right">{t.pct}%</span>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </Card>
-                </div>
-
-                {/* Single-source exposure */}
-                <Card className="p-6">
-                  <h3 className="text-base font-medium mb-1">Single-source exposure</h3>
-                  <p className="text-xs text-muted-foreground mb-4">
-                    Nodes with only one upstream supplier but multiple downstream connections — highest disruption risk
-                  </p>
+              {/* Tier composition + Revenue coverage */}
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <LensCard title="Tier composition" subtitle="Share of firms per supply chain tier">
                   {(() => {
-                    const inCount: Record<string, number> = {};
-                    const outCount: Record<string, number> = {};
-                    networkEdges.forEach(e => {
-                      inCount[e.dst_uid]  = (inCount[e.dst_uid]  || 0) + 1;
-                      outCount[e.src_uid] = (outCount[e.src_uid] || 0) + 1;
-                    });
-                    
+                    const total = Object.values(tierCounts).reduce((a, b) => a + b, 0) || 1;
+                    const tiers = TIER_ORDER.map(t => ({
+                      label: t,
+                      count: tierCounts[t],
+                      pct: Math.round((tierCounts[t] / total) * 100),
+                      color: TIER_COLORS[t],
+                    }));
+                    const circumference = 2 * Math.PI * 32;
+                    let offset = 0;
+                    return (
+                      <div className="flex items-center gap-6">
+                        <svg width="90" height="90" viewBox="0 0 90 90" className="shrink-0" aria-hidden>
+                          {tiers.map(t => {
+                            const dash = (t.pct / 100) * circumference;
+                            const seg = (
+                              <circle
+                                key={t.label}
+                                cx="45" cy="45" r="32"
+                                fill="none"
+                                stroke={t.color}
+                                strokeWidth="14"
+                                strokeDasharray={`${dash} ${circumference - dash}`}
+                                strokeDashoffset={-offset}
+                              />
+                            );
+                            offset += dash;
+                            return seg;
+                          })}
+                        </svg>
+                        <div className="flex flex-col gap-1.5">
+                          {tiers.map(t => (
+                            <div key={t.label} className={cn('flex items-center gap-2 text-[12px]', LENS.muted)}>
+                              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: t.color }} />
+                              {t.label} — {t.pct}% ({t.count})
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </LensCard>
+
+                <LensCard title="Revenue coverage" subtitle="Firms with known revenue per tier">
+                  <BarRows
+                    max={100}
+                    rows={TIER_ORDER.map(t => {
+                      const tierNodes = networkNodes.filter(n => getTierFromDepth(n.depth, n.is_seed === true) === t);
+                      const withRevenue = tierNodes.filter(n => n.revenue != null && n.revenue > 0).length;
+                      const pct = tierNodes.length > 0 ? Math.round((withRevenue / tierNodes.length) * 100) : 0;
+                      return { key: t, label: t, value: pct, display: `${pct}%`, color: TIER_COLORS[t] };
+                    })}
+                  />
+                </LensCard>
+              </div>
+
+              {/* Single-source exposure */}
+              <LensCard
+                title="Single-source exposure"
+                subtitle="Nodes with only one upstream supplier but multiple downstream connections — highest disruption risk"
+              >
+                {(() => {
+                  const inCount: Record<string, number> = {};
+                  const outCount: Record<string, number> = {};
+                  networkEdges.forEach(e => {
+                    inCount[e.dst_uid]  = (inCount[e.dst_uid]  || 0) + 1;
+                    outCount[e.src_uid] = (outCount[e.src_uid] || 0) + 1;
+                  });
+
                   const exposed = networkNodes
                     .filter(n => (inCount[n.uid] || 0) === 1 && (outCount[n.uid] || 0) > 0)
                     .map(n => {
                       const nodeCountry = n.country || 'Unknown';
-                      
-                      // 1. Force the lookup key to be exactly what we stored in the map (Uppercase & Trimmed)
-                      const lookupKey = nodeCountry.trim().toUpperCase();
-                      
-                      // 2. Fetch the risk, and trim any accidental spaces from the database string
-                      const rawRisk = countryRiskMap[lookupKey];
-                      const safeRisk = rawRisk ? rawRisk.trim() : 'Unknown';
-
+                      // The map is keyed `upper(btrim(country))`, exactly as stored.
+                      const rawRisk = countryRiskMap[nodeCountry.trim().toUpperCase()];
                       return {
                         name: n.name || n.uid,
                         tier: getTierFromDepth(n.depth, n.is_seed === true),
-                        country: nodeCountry, // Keep original casing for the UI display
+                        country: nodeCountry,
                         incoming: inCount[n.uid] || 0,
                         outgoing: outCount[n.uid] || 0,
-                        risk: safeRisk, 
+                        risk: rawRisk ? rawRisk.trim() : 'Unknown',
                       };
                     })
                     .sort((a, b) => b.outgoing - a.outgoing)
                     .slice(0, 10);
 
-                    if (exposed.length === 0) return (
-                      <p className="text-sm text-muted-foreground text-center py-4">No single-source nodes detected</p>
-                    );
+                  if (exposed.length === 0) return (
+                    <p className={cn('py-4 text-center text-[12.5px]', LENS.muted)}>No single-source nodes detected</p>
+                  );
 
-                    // IMPORTANT: You may need to update these keys if the text in "INFORM RISK" 
-                    // is different from "High", "Medium", "Low" (e.g., if it uses numbers or "Very High")
-                    // 1. Define the dynamic color mapping for the new Risk Classes
-                    // Note: Ensure the keys exactly match the capitalization in your database
-                    const riskStyle: Record<string, string> = {
-                      'Very High': 'bg-red-200 text-red-900 dark:bg-red-950 dark:text-red-200 font-bold',
-                      'High':      'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-                      'Medium':    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-                      'Low':       'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-                      'Very Low':  'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
-                      'Unknown':   'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                    };
+                  // Keys must match the risk class spelling stored in `risk_data`.
+                  const riskStyle: Record<string, string> = {
+                    'Very High': 'bg-red-200 text-red-900 dark:bg-red-950 dark:text-red-200 font-bold',
+                    'High':      'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+                    'Medium':    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+                    'Low':       'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                    'Very Low':  'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+                    'Unknown':   'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                  };
 
-                    return (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b">
-                              <th className={`text-left font-medium text-muted-foreground pb-2 pr-3 ${FROZEN_CELL}`}>Firm</th>
-                              <th className="text-left font-medium text-muted-foreground pb-2 pr-3">Tier</th>
-                              <th className="text-left font-medium text-muted-foreground pb-2 pr-3">Country</th>
-                              <th className="text-right font-medium text-muted-foreground pb-2 pr-3">In</th>
-                              <th className="text-right font-medium text-muted-foreground pb-2 pr-3">Out</th>
-                              <th className="text-left font-medium text-muted-foreground pb-2">Risk Class</th>
+                  return (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[12.5px] tabular-nums">
+                        <thead>
+                          <tr className={cn('border-b', LENS.hairline)}>
+                            {['Firm', 'Tier', 'Country', 'In', 'Out', 'Risk class'].map((h, i) => (
+                              <th
+                                key={h}
+                                className={cn(
+                                  'pb-2 pr-3 font-mono text-[10px] font-normal uppercase tracking-[0.16em]',
+                                  LENS.muted,
+                                  i === 3 || i === 4 ? 'text-right' : 'text-left',
+                                  i === 0 && FROZEN_CELL,
+                                )}
+                              >
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {exposed.map(row => (
+                            <tr key={row.name} className={cn('border-b last:border-0', LENS.hairline, LENS.hoverTableRow)}>
+                              <td className={`max-w-[160px] truncate py-[9px] pr-3 ${FROZEN_CELL}`} title={row.name}>{row.name}</td>
+                              <td className="py-[9px] pr-3">
+                                <span
+                                  className="inline-block whitespace-nowrap rounded-[3px] px-1.5 py-0.5 text-[11px] font-medium"
+                                  style={{ background: TIER_COLORS[row.tier] + '22', color: TIER_COLORS[row.tier] }}
+                                >
+                                  {row.tier}
+                                </span>
+                              </td>
+                              <td className={cn('py-[9px] pr-3', LENS.muted)}>{row.country}</td>
+                              <td className="py-[9px] pr-3 text-right">{row.incoming}</td>
+                              <td className="py-[9px] pr-3 text-right">{row.outgoing}</td>
+                              <td className="py-[9px]">
+                                <span className={`inline-block rounded-[3px] px-1.5 py-0.5 text-[11px] font-medium ${riskStyle[row.risk] || riskStyle['Unknown']}`}>
+                                  {row.risk}
+                                </span>
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {exposed.map(row => {
-                              // Safely grab the style, fallback to Unknown if the database has a weird string
-                              const badgeStyle = riskStyle[row.risk] || riskStyle['Unknown'];
-                              
-                              return (
-                                <tr key={row.name} className="border-b last:border-0">
-                                  <td className={`py-2 pr-3 max-w-[140px] truncate ${FROZEN_CELL}`} title={row.name}>{row.name}</td>
-                                  <td className="py-2 pr-3">
-                                    <span
-                                      className="inline-block px-2 py-0.5 rounded-sm text-xs font-medium"
-                                      style={{ background: TIER_COLORS[row.tier] + '22', color: TIER_COLORS[row.tier] }}
-                                    >
-                                      {row.tier}
-                                    </span>
-                                  </td>
-                                  <td className="py-2 pr-3 text-muted-foreground">{row.country}</td>
-                                  <td className="py-2 pr-3 text-right">{row.incoming}</td>
-                                  <td className="py-2 pr-3 text-right">{row.outgoing}</td>
-                                  <td className="py-2">
-                                    <span className={`inline-block px-2 py-0.5 rounded-sm text-xs font-medium ${badgeStyle}`}>
-                                      {row.risk}
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    );
-                  })()}
-                </Card>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+              </LensCard>
 
-              {firmRevenues.length > 0 && (
-                <Card className="p-6">
-                  <div className="mb-4">
-                    <h3 className="text-base font-medium">Top Firms by Revenue</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Revenue distribution across network firms
-                    </p>
-                  </div>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {firmRevenues.map((firm, index) => (
-                      <div key={firm.firm} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs font-medium w-6 text-center">{index + 1}</span>
-                          <span className="text-sm font-medium">{firm.firm}</span>
-                        </div>
-                        <Badge variant="outline">
-                          ${(firm.revenue / 1000000).toFixed(1)}M
-                        </Badge>
+              {(firmRevenues.length > 0 || firmConnections.length > 0) && (
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  {firmRevenues.length > 0 && (
+                    <LensCard title="Top firms by revenue" subtitle="Revenue distribution across network firms">
+                      <div className="max-h-60 overflow-y-auto pr-1">
+                        <BarRows
+                          rows={firmRevenues.map(f => ({
+                            key: f.firm,
+                            label: f.firm,
+                            value: f.revenue,
+                            display: formatMoneyCompact(f.revenue),
+                            color: TIER_COLORS['Tier 1'],
+                          }))}
+                        />
                       </div>
-                    ))}
-                  </div>
-                </Card>
+                    </LensCard>
+                  )}
+                  {firmConnections.length > 0 && (
+                    <LensCard title="Most connected firms" subtitle="Firms ranked by number of network connections">
+                      <div className="max-h-60 overflow-y-auto pr-1">
+                        <BarRows
+                          rows={firmConnections.map(f => ({
+                            key: f.firm,
+                            label: f.firm,
+                            value: f.connections,
+                            display: String(f.connections),
+                            color: TIER_COLORS['Tier 3'],
+                          }))}
+                        />
+                      </div>
+                    </LensCard>
+                  )}
+                </div>
               )}
-              
-              {firmConnections.length > 0 && (
-                <Card className="p-6">
-                  <div className="mb-4">
-                    <h3 className="text-base font-medium">Most Connected Firms</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Firms ranked by number of network connections
-                    </p>
-                  </div>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {firmConnections.map((firm, index) => (
-                      <div key={firm.firm} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs font-medium w-6 text-center">{index + 1}</span>
-                          <span className="text-sm font-medium">{firm.firm}</span>
-                        </div>
-                        <Badge variant="outline">
-                          {firm.connections} connections
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
-
-
             </div>
           )}
           </div>

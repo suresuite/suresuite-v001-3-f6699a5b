@@ -18,6 +18,7 @@ Coverage on the data plane is by TRIGGER, not by instrumented RPCs, and the diff
 | Columns | Source | Constraint |
 |---|---|---|
 | `id` | column PRIMARY KEY | `admin_audit_logs_pkey` |
+| `seq` | UNIQUE index | `audit_logs_seq_key` |
 
 ## Constraints
 
@@ -39,7 +40,7 @@ partially or get corrected — the write fails.
 | Row-level security | enabled |
 | Policies on the table | 2 — all carry a predicate |
 
-Two SELECT policies, and they are PERMISSIVE on purpose. A super admin reads every plane; an admin of the SAME ORGANIZATION as the actor reads that org's `data` and `access` rows. They grant DISJOINT slices, so the OR that D28 makes unavoidable is the intended union here rather than an accidental escape hatch — which is worth stating, because the same shape on `approved_users` IS the defect. There is no write policy: rows arrive from SECURITY DEFINER functions and from statement-level triggers, never from a client, so RLS denying writes by default is the enforcement (WP 2.2's pattern). `audited: false` on the audit table is not a joke — nothing records reads of it, and a deletion would leave no trace. Tamper-evidence is a Phase 4 question (hash-chaining a log is the same machinery as `input-hash`), not a WP 2.3 one.
+Two SELECT policies, and they are PERMISSIVE on purpose. A super admin reads every plane; an admin of the SAME ORGANIZATION as the actor reads that org's `data` and `access` rows. They grant DISJOINT slices, so the OR that D28 makes unavoidable is the intended union here rather than an accidental escape hatch — which is worth stating, because the same shape on `approved_users` IS the defect. There is no write policy: rows arrive from SECURITY DEFINER functions and from statement-level triggers, never from a client, so RLS denying writes by default is the enforcement (WP 2.2's pattern). `audited: false` on the audit table is not a joke — nothing records reads of it. What changed in `20260929000001` (§4 D185, D186): no reader in this application can satisfy those policies — the browser calls as `anon` and carries no GUC — so `/admin/audit` reads through `admin_audit_log_read`, which names its reader and requires a super admin, as every /admin RPC does. And the table is WRITE-ONCE and HASH-CHAINED: `audit_logs_guard` refuses DELETE, TRUNCATE and every UPDATE but the sealer's, and `admin_audit_log_verify` names the first edited, re-linked or missing row. A deletion now leaves a trace — except by a table owner who disables the guard and rewrites the chain from some row onward or cuts its tail, which only a chain head recorded OUTSIDE the database can reveal. The page shows the head for that reason.
 
 <details><summary>2 RLS policies</summary>
 
@@ -59,15 +60,18 @@ that gap is defect D21. A dash means the column has no CSV origin.
 |---|---|---|---|---|---|
 | `id` 🔑 | — | `uuid` | — | — | The row's identity. Returned by the emit functions so a caller can cite what it wrote. |
 | `actor_user_id` | — | `uuid` | — | — | Who did it. NULLABLE, and the null carries meaning: a service-role write with no session context has no attributable actor. |
-| `action` | — | `text` | — | — | What happened. Admin-plane rows use the existing dotted vocabulary (`org.update`, `api_key.revoke`); data-plane rows use the SQL operation (`insert`, `update`, `delete`); access-plane rows use `export.allowed` / `export.refused`. Three vocabularies in one column, which is a cost of one table and is recorded here rather than discovered by a reader. |
+| `action` | — | `text` | — | — | What happened. Admin-plane rows use the existing dotted vocabulary (`org.update`, `api_key.revoke`); data-plane rows use the SQL operation (`insert`, `update`, `delete`); access-plane rows use `export.allowed` / `export.refused`, and since `20260929000001` `auth.sign_in` / `auth.sign_in_failed`, written by `authenticate_approved_user` after the database has checked the password (throttled to one per person per minute; a failed attempt names the ACCOUNT as target and no actor). Three vocabularies in one column, which is a cost of one table and is recorded here rather than discovered by a reader. |
 | `target_type` | — | `text` | — | — | What kind of thing was acted on — a table name on the data plane, an entity name on the others. |
 | `target_id` | — | `text` | — | — | Which one, as text. NULL on data-plane rows: a statement-level trigger records a STATEMENT, and a statement that touched 5,000 rows has no single id. |
 | `before` | — | `jsonb` | — | — | The prior state, where the writer knows it. Admin RPCs capture it; data-plane trigger rows do NOT — a statement-level trigger has the transition tables but writing 5,000 prior rows into one jsonb would make the log unreadable and unbounded. Their row COUNT is in `after` instead. |
-| `after` | — | `jsonb` | — | — | The resulting state, or — on a data-plane row — the shape of the statement: `tier`, `rows_after`, `rows_before` and `actor_known`. On an access-plane row it carries the decision and what was asked for. |
+| `after` | — | `jsonb` | — | — | The resulting state, or — on a data-plane row — the shape of the statement: `tier`, `rows_after`, `rows_before`, `actor_known` and (since `20260929000001`) `projects`, the distinct `project_id`s it touched, at most 20. On an access-plane row it carries the decision and what was asked for. |
 | `ip` | — | `inet` | — | — | Caller IP where the writer recorded one. Never set by the triggers, which run inside the database. |
 | `user_agent` | — | `text` | — | — | Caller user agent where the writer recorded one. As with `ip`, absent on trigger-written rows. |
-| `created_at` | — | `timestamp with time zone` | — | — | When it happened. Server-stamped, and the column the plane index orders by. |
+| `created_at` | — | `timestamp with time zone` | — | — | When it happened. Server-stamped — since `20260929000001` the guard overwrites whatever an INSERT supplies with now(), so a row cannot be back-dated — and the column the plane index orders by. |
 | `plane` | — | `text` | — | — | Which plane the action belongs to — `admin`, `data` or `access`, CHECK-constrained. Added by WP 2.3; every row that predates it is `admin` by construction, because the only writer was `log_admin_action()`, which refuses anyone who is not a super admin. |
+| `seq` | — | `bigint` | — | — | The row's position in the hash chain (§4 D186), 1-based and gapless. NULL until `audit_log_seal()` chains the row, which it does right after the insert unless another transaction is sealing, in which case the next seal picks it up. Unique, so a fork is an error rather than a second chain. |
+| `prev_hash` | — | `text` | — | — | The `row_hash` of the row at `seq - 1` (64 zeros for the first). What makes a deleted or replaced row visible: the next row stops pointing at anything real. |
+| `row_hash` | — | `text` | — | — | sha256, hex, over `prev_hash`, `seq` and every content column (`audit_log_digest`). An edited row no longer matches it. The newest one is the chain HEAD, which is what must be recorded outside the database to detect a rewrite or a cut tail. |
 
 ## Each column in full
 
@@ -95,16 +99,15 @@ Who did it. NULLABLE, and the null carries meaning: a service-role write with no
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260709000002_super_admin_phase1.sql` |
-| References | `public.approved_users(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
-> THE HONEST LIMIT OF THIS TABLE. `audit_tier_write()` reads `get_current_user_id()`, which resolves only when the caller set `app.current_user_id`. The ingest and ETL edge functions run as the service role and do not, so their rows say WHAT changed and WHEN and record `actor_known: false` in `after` rather than inventing a WHO. That is worth having and it is not attribution; closing it means those functions setting user context, which is their change to make (§16, WP 2.3).
+> NO FOREIGN KEY since `20260929000001` (§4 D186). It was `REFERENCES approved_users ON DELETE SET NULL`, which is an UPDATE of a sealed row the moment a person who acted is deleted — so the key is gone, the row keeps the uuid, and the person's name and email leave with their `approved_users` row (the page says "deleted user"). THE HONEST LIMIT OF THIS TABLE. `audit_tier_write()` reads `get_current_user_id()`, which resolves only when the caller set `app.current_user_id`. The ingest and ETL edge functions run as the service role and do not, so their rows say WHAT changed and WHEN and record `actor_known: false` in `after` rather than inventing a WHO. That is worth having and it is not attribution; closing it means those functions setting user context, which is their change to make (§16, WP 2.3).
 
 ### `action`
 
-What happened. Admin-plane rows use the existing dotted vocabulary (`org.update`, `api_key.revoke`); data-plane rows use the SQL operation (`insert`, `update`, `delete`); access-plane rows use `export.allowed` / `export.refused`. Three vocabularies in one column, which is a cost of one table and is recorded here rather than discovered by a reader.
+What happened. Admin-plane rows use the existing dotted vocabulary (`org.update`, `api_key.revoke`); data-plane rows use the SQL operation (`insert`, `update`, `delete`); access-plane rows use `export.allowed` / `export.refused`, and since `20260929000001` `auth.sign_in` / `auth.sign_in_failed`, written by `authenticate_approved_user` after the database has checked the password (throttled to one per person per minute; a failed attempt names the ACCOUNT as target and no actor). Three vocabularies in one column, which is a cost of one table and is recorded here rather than discovered by a reader.
 
 | | |
 |---|---|
@@ -160,7 +163,7 @@ The prior state, where the writer knows it. Admin RPCs capture it; data-plane tr
 
 ### `after`
 
-The resulting state, or — on a data-plane row — the shape of the statement: `tier`, `rows_after`, `rows_before` and `actor_known`. On an access-plane row it carries the decision and what was asked for.
+The resulting state, or — on a data-plane row — the shape of the statement: `tier`, `rows_after`, `rows_before`, `actor_known` and (since `20260929000001`) `projects`, the distinct `project_id`s it touched, at most 20. On an access-plane row it carries the decision and what was asked for.
 
 | | |
 |---|---|
@@ -202,7 +205,7 @@ Caller user agent where the writer recorded one. As with `ip`, absent on trigger
 
 ### `created_at`
 
-When it happened. Server-stamped, and the column the plane index orders by.
+When it happened. Server-stamped — since `20260929000001` the guard overwrites whatever an INSERT supplies with now(), so a row cannot be back-dated — and the column the plane index orders by.
 
 | | |
 |---|---|
@@ -235,6 +238,48 @@ for one you did.
 |---|---|---|---|
 | a row is written without naming a plane | 'admin' | `default` | the column default, which is also what makes the `admin_audit_logs` compatibility view writable for callers that have not moved yet |
 
+### `seq`
+
+The row's position in the hash chain (§4 D186), 1-based and gapless. NULL until `audit_log_seal()` chains the row, which it does right after the insert unless another transaction is sealing, in which case the next seal picks it up. Unique, so a fork is an error rather than a second chain.
+
+| | |
+|---|---|
+| Type | `bigint` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20260929000001_audit_log_read_and_chain.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `prev_hash`
+
+The `row_hash` of the row at `seq - 1` (64 zeros for the first). What makes a deleted or replaced row visible: the next row stops pointing at anything real.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260929000001_audit_log_read_and_chain.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `row_hash`
+
+sha256, hex, over `prev_hash`, `seq` and every content column (`audit_log_digest`). An edited row no longer matches it. The newest one is the chain HEAD, which is what must be recorded outside the database to detect a rewrite or a cut tail.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260929000001_audit_log_read_and_chain.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -242,9 +287,11 @@ for one you did.
 | `idx_audit_created_at` | `created_at DESC` | no | `20260709000002_super_admin_phase1.sql` |
 | `idx_audit_actor` | `actor_user_id` | no | `20260709000002_super_admin_phase1.sql` |
 | `audit_logs_plane_created_idx` | `plane`, `created_at DESC` | no | `20260916000001_data_plane_audit.sql` |
+| `audit_logs_seq_key` | `seq` | yes | `20260929000001_audit_log_read_and_chain.sql` |
+| `audit_logs_unsealed_idx` | `created_at`, `id` | no | `20260929000001_audit_log_read_and_chain.sql` |
 
 ---
 
-*Generated from data contract `fd36cb9e7ac3`, engine `0.2.8`,
+*Generated from data contract `614b11585d9a`, engine `0.2.8`,
 sidecar `supabase/contract/audit_logs.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

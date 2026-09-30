@@ -76,16 +76,17 @@ export default function KnownLimits() {
           </p>
         </Callout>
 
-        <Callout tone="limit" title="The audit trail covers the administrative plane only">
+        <Callout tone="limit" title="The audit trail names the identity the browser presented">
           <p>
-            Changes to accounts, roles and organizations are recorded with the actor who made them.
-            Movements of data between tiers — a promotion, a recomputation, a policy change — are
-            not yet recorded to the same standard.
+            Administrative changes, data changes, sign-ins and exports are all recorded, and the
+            record cannot be edited or deleted. Who is named is the user the request said it came
+            from: this application signs people in against its own user list, so that identity is
+            asserted by the browser rather than proven. Some service writes name nobody.
           </p>
           <p>
-            <strong className="text-foreground">What this means:</strong> the record can tell you
-            who changed a permission, but not always who promoted a dataset. See{" "}
-            <DocLink to="audit-log">Audit log</DocLink>.
+            <strong className="text-foreground">What this means:</strong> the record reliably says
+            what changed and when, and under whose asserted identity — not who in the sense a court
+            would want. See <DocLink to="audit-log">Audit log</DocLink>.
           </p>
         </Callout>
 

@@ -42,7 +42,7 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc get_node_list"
     grain: table
-    evidence: "src/pages/DataManager.tsx:425"
+    evidence: "src/pages/DataManager.tsx:427"
     confirmed: true
   - page: "FirmLevelNetwork.tsx"
     via: "rpc get_node_list"
@@ -52,7 +52,7 @@ surfaces:
   - page: "ProductLevelNetwork.tsx"
     via: "rpc project_freshness"
     grain: table
-    evidence: "src/pages/ProductLevelNetwork.tsx:227"
+    evidence: "src/pages/ProductLevelNetwork.tsx:270"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "rpc project_freshness"

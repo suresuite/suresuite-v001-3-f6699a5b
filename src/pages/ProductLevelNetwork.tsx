@@ -1,36 +1,28 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
-import { Suspense, lazy, useEffect, useState, useCallback, useMemo } from 'react';
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  MiniMap,
-  Node,
-  Edge,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  Connection,
-  NodeMouseHandler,
-  Position,
-  MarkerType,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+import { Suspense, lazy, useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { Node, Edge, Position } from '@xyflow/react';
 
 import { supabase } from '@/integrations/supabase/client';
-import { buildProductLevelGraph, edgeWidthForFlow, maxFlow, GRAPH_INK, type FlatLaneRow } from '@/lib/graph';
+import {
+  buildProductLevelGraph,
+  edgeWidthForFlow,
+  maxFlow,
+  adaptiveColumnLayout,
+  lensNodeSize,
+  colorForEchelon,
+  labelForEchelon,
+  GRAPH_INK,
+  type Echelon,
+  type FlatLaneRow,
+} from '@/lib/graph';
 import { useAuth } from '@/hooks/useAuth';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
   RefreshCw,
   Network,
-  Search,
   BarChart,
   RotateCcw,
   AlertTriangle,
@@ -46,7 +38,6 @@ import {
   HDR_ICON_BUTTON,
   HDR_ICON_BUTTON_ON,
   HDR_PROJECT_SELECT,
-  HDR_SEARCH_INPUT,
 } from '@/components/shared';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { cn } from '@/lib/utils';
@@ -62,6 +53,16 @@ import { calculateSupplierMetrics, calculateMaterialMetrics } from '@/utils/netw
 import { MobileGroup, MobilePageHeader, ProjectChip } from '@/components/mobile';
 import { RiskDataNotice } from '@/components/network/RiskDataNotice';
 import {
+  GraphCard,
+  LensSearch,
+  LensSummary,
+  LensDetails,
+  LensAnalyticsHeader,
+  useLensGraph,
+  styleColumnEdge,
+  type GraphCardHandle,
+} from '@/components/network/lens';
+import {
   LensChip,
   LensSection,
   LensHowToRead,
@@ -75,21 +76,20 @@ import {
 const GROUP_ORDER = ['A', 'B', 'C', 'D'] as const;
 type GroupKey = typeof GROUP_ORDER[number];
 
+// The page's A/B/C/D columns ARE four echelons (WP 8.4), so their colours and labels
+// come from the one palette rather than from a table of this page's own.
 const GROUP_COLORS: Record<GroupKey, string> = {
-  A: '#22c55e',
-  B: '#facc15',
-  C: '#3b82f6',
-  D: '#fb923c',
+  A: colorForEchelon('supplier'),
+  B: colorForEchelon('material'),
+  C: colorForEchelon('product'),
+  D: colorForEchelon('customer'),
 };
 
-const HIGHLIGHT_HEX = '#ff0000';
-
-
 const GROUP_LABELS: Record<GroupKey, string> = {
-  A: 'Supplier',
-  B: 'Material',
-  C: 'Product',
-  D: 'Customer',
+  A: labelForEchelon('supplier'),
+  B: labelForEchelon('material'),
+  C: labelForEchelon('product'),
+  D: labelForEchelon('customer'),
 };
 
 interface SupplyChainData {
@@ -139,21 +139,40 @@ interface NetworkVisualizationProps {
  * the path actually drawn.
  */
 
+/**
+ * The product lens's focus, unchanged from the page's double-click handler: from the
+ * node's column, walk A→B→C→D forward and backward by role — the full supply path
+ * through the node (handoff §8, "keep the existing echelon-aware path").
+ */
+function productFocusSet(id: string, nodes: Node<NodeData>[], edges: Edge[]): Set<string> {
+  const groupOf = new globalThis.Map(nodes.map((n) => [n.id, n.data.group]));
+  const included = new Set<string>([id]);
+  const targets = (sources: Set<string>, g: GroupKey) =>
+    new Set(edges.filter((e) => sources.has(e.source) && groupOf.get(e.target) === g).map((e) => e.target));
+  const sources = (dests: Set<string>, g: GroupKey) =>
+    new Set(edges.filter((e) => dests.has(e.target) && groupOf.get(e.source) === g).map((e) => e.source));
+  const me = new Set([id]);
+  let A = new Set<string>(), B = new Set<string>(), C = new Set<string>(), D = new Set<string>();
+  switch (groupOf.get(id)) {
+    case 'A': B = targets(me, 'B'); C = targets(B, 'C'); D = targets(C, 'D'); break;
+    case 'B': A = sources(me, 'A'); C = targets(me, 'C'); D = targets(C, 'D'); break;
+    case 'C': B = sources(me, 'B'); A = sources(B, 'A'); D = targets(me, 'D'); break;
+    case 'D': C = sources(me, 'C'); B = sources(C, 'B'); A = sources(B, 'A'); break;
+  }
+  [A, B, C, D].forEach((set) => set.forEach((n) => included.add(n)));
+  return included;
+}
+
 export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: NetworkVisualizationProps) {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const { globalSelectedProjectId, setGlobalSelectedProjectId } = useGlobalProject();
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<NodeData>>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [focusedNode, setFocusedNode] = useState<string | null>(null);
-  const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null);
+  const graphRef = useRef<GraphCardHandle>(null);
+  // Bumped after every load, so the card refits the graph it has just been handed.
+  const [loadNonce, setLoadNonce] = useState(0);
   const [loading, setLoading] = useState(false);
   const [groupCounts, setGroupCounts] = useState<Record<GroupKey, number>>({ A: 0, B: 0, C: 0, D: 0 });
-  const [allNodes, setAllNodes] = useState<Node<NodeData>[]>([]);
-  const [allEdges, setAllEdges] = useState<Edge[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [searchOpen, setSearchOpen] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [supplierVolumes, setSupplierVolumes] = useState<SupplierVolumeDatum[]>([]);
   const [supplierMaterialCounts, setSupplierMaterialCounts] = useState<SupplierMaterialCount[]>([]);
@@ -188,6 +207,30 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
   // Add state for calculated risk metrics
   const [supplierMetrics, setSupplierMetrics] = useState({ supplierDiversity: 0, singleSourceRisk: '0%' });
   const [materialMetrics, setMaterialMetrics] = useState({ materialDiversity: 0, materialConcentrationRisk: '0%' });
+
+  // Selection, focus, search and drags — shared with the other two lenses. The
+  // focus is this page's echelon-aware supply path, unchanged (handoff §8).
+  const lens = useLensGraph<Node<NodeData>>({
+    focusSet: productFocusSet,
+    searchLabel: (n) => n.id,
+    styleEdge: styleColumnEdge,
+  });
+  const { allNodes, allEdges, setAllNodes, setAllEdges, selectedNode, focusedId: focusedNode, setFocusedId: setFocusedNode } = lens;
+
+  /** §6 — each class folds by its own count into the canvas it has. */
+  const layoutColumns = useCallback((list: Node<NodeData>[]): Node<NodeData>[] => {
+    if (list.length === 0) return list;
+    const { width: nodeWidth, height: nodeHeight } = lensNodeSize(list.length);
+    const size = graphRef.current?.canvasSize() ?? { width: 900, height: 596 };
+    const positions = adaptiveColumnLayout(
+      GROUP_ORDER.map((g) => ({
+        ids: list.filter((n) => n.data.group === g).map((n) => n.id),
+        stagger: g === 'A' || g === 'B',
+      })),
+      { canvasWidth: size.width, canvasHeight: size.height, nodeWidth, nodeHeight },
+    );
+    return list.map((n) => ({ ...n, position: positions.get(n.id) ?? n.position }));
+  }, []);
 
   const fetchProjects = async () => {
     if (!user) return;
@@ -489,20 +532,18 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
 
     if (!user || !globalSelectedProjectId) {
       console.log('❌ Clearing data - no user or project');
-      setNodes([]);
-      setEdges([]);
       setAllNodes([]);
       setAllEdges([]);
       setGroupCounts({ A: 0, B: 0, C: 0, D: 0 });
-      setSelectedNode(null);
-      setFocusedNode(null);
+      lens.reset();
       setSupplierVolumes([]);
       setSupplierMaterialCounts([]);
       return;
     }
 
     setLoading(true);
-    
+    lens.reset();
+
     try {
       console.log('📡 Fetching data for project:', globalSelectedProjectId);
       const [
@@ -659,18 +700,12 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
             id: edgeKey,
             source: e.source,
             target: e.target,
-            style: {
-              stroke: GRAPH_INK.edge,
-              // WIDTH ENCODES FLOW. It was a flat 1.5 on every edge while `weighted`
-              // was loaded, stored and never rendered — an encoding carrying no data.
-              strokeWidth: edgeWidthForFlow(e.flow, maxFlow(productGraph.edges)),
-              strokeOpacity: 0.65,
-            },
+            // WIDTH ENCODES FLOW, and DIRECTION IS VISIBLE: `styleColumnEdge` draws
+            // `data.width` and a fixed-size arrowhead, grey at rest and blue with a
+            // selection — `weighted` was once loaded, stored and never rendered, and
+            // these directed lanes read as undirected because nothing drew an arrow.
             type: 'straight',
-            // DIRECTION IS VISIBLE. These lanes are directed and the graph read as
-            // undirected because nothing drew an arrowhead.
-            markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: GRAPH_INK.edge },
-            data: { weight: e.flow, lane: e.lane },
+            data: { weight: e.flow, lane: e.lane, width: edgeWidthForFlow(e.flow, maxFlow(productGraph.edges)) },
           };
         }
       }
@@ -725,80 +760,48 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
       
       setGroupCounts({ A: grouped.A.length, B: grouped.B.length, C: grouped.C.length, D: grouped.D.length });
 
-      const nodeList: Node<NodeData>[] = [];
-      const columnX = isCollapsed ? 250 : 220;
-      const rowGap = 60;
-      const baseColumnPadding = 150;
+      // §3 — the product-level node is the standard the process lens now shares:
+      // a rounded rect sized from the graph's node count, ReactFlow's 1px outline,
+      // the id always visible. Positions come from the adaptive layout (§6).
+      const { width: nodeWidth, height: nodeHeight } = lensNodeSize(Object.keys(filteredNodeMap).length);
+      const nodeList: Node<NodeData>[] = GROUP_ORDER.flatMap((group) =>
+        grouped[group].map((id) => {
+          const data = filteredNodeMap[id];
+          return {
+            id,
+            position: { x: 0, y: 0 },
+            data,
+            style: {
+              background: GROUP_COLORS[data.group || 'A'],
+              color: 'white',
+              width: nodeWidth,
+              height: nodeHeight,
+              fontSize: 10,
+              fontWeight: 'bold',
+              borderRadius: 8,
+              border: `1px solid ${GRAPH_INK.nodeOutline}`,
+              // One line, clipped: React Flow's default 10px padding wrapped every
+              // id onto two lines inside a node this size.
+              padding: 2,
+              lineHeight: 1,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              display: 'flex',
+              // `safe`: an id wider than the node clips at its END, keeping the prefix.
+              justifyContent: 'safe center',
+              alignItems: 'center',
+              textAlign: 'center',
+            },
+            type: 'default',
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
+          } as Node<NodeData>;
+        }),
+      );
 
-      // nodeSize is the same for every node, so compute it once up front
-      const nodeSize = Math.max(50 - Math.log(Object.keys(filteredNodeMap).length) * 3, 30) * 1.05;
-      const spacing = nodeSize * 1.2;
-
-      // How wide each column's node cluster actually spreads, based on its own count
-      const columnWidths = GROUP_ORDER.map((group) => {
-        const count = grouped[group].length;
-        const subgroupCount = count >= 20 ? Math.ceil(count / 20) : 1;
-        return (subgroupCount - 1) * spacing + nodeSize;
-      });
-
-      // Turn those widths into center x-positions, packing columns with baseColumnPadding between them
-      const columnCenters: number[] = [];
-      let rightEdge = columnX;
-      GROUP_ORDER.forEach((_, i) => {
-        const width = columnWidths[i];
-        const center = rightEdge + width / 2;
-        columnCenters.push(center);
-        rightEdge = center + width / 2 + baseColumnPadding;
-      });
-
-      GROUP_ORDER.forEach((group, colIdx) => {
-        const ids = grouped[group];
-        const x = columnCenters[colIdx];
-
-        const subgroupCount = ids.length >= 20 ? Math.ceil(ids.length / 20) : 1;
-        const subgroupOffsets = Array.from({ length: subgroupCount }, (_, i) =>
-          (i - (subgroupCount - 1) / 2) * spacing
-        );
-
-        const subgroups = Array.from({ length: subgroupCount }, () => [] as string[]);
-        ids.forEach((id, idx) => subgroups[idx % subgroupCount].push(id));
-
-        subgroups.forEach((subIds, si) => {
-          const isOffsetGroup = (group === 'A' || group === 'B') && si % 2 === 1;
-          const additionalY = isOffsetGroup ? rowGap * 0.5 : 0;
-          const yOffset = -((subIds.length - 1) * rowGap) / 2 + additionalY;
-
-          subIds.forEach((id, i) => {
-            const data = filteredNodeMap[id];
-            nodeList.push({
-              id,
-              position: { x: x + subgroupOffsets[si], y: yOffset + i * rowGap },
-              data,
-              style: {
-                background: GROUP_COLORS[data.group || 'A'],
-                color: 'white',
-                width: nodeSize,
-                height: nodeSize * 0.62,
-                fontSize: 10,
-                fontWeight: 'bold',
-                borderRadius: 8,
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                textAlign: 'center',
-              },
-              type: 'default',
-              sourcePosition: Position.Right,
-              targetPosition: Position.Left,
-            });
-          });
-        });
-      });
-
-      setNodes(nodeList);
-      setEdges(Object.values(filteredEdgeMap));
-      setAllNodes(nodeList);
+      setAllNodes(layoutColumns(nodeList));
       setAllEdges(Object.values(filteredEdgeMap));
+      setLoadNonce((k) => k + 1);
       console.log('✅ Visualization updated with', nodeList.length, 'nodes and', Object.keys(filteredEdgeMap).length, 'edges');
       const message = filteredCount > 0 
         ? `Loaded ${filteredData.length} records for project (${filteredCount} zero-flow nodes filtered out)`
@@ -835,134 +838,6 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
     await fetchNetworkMetrics(globalSelectedProjectId, true);
   };
 
-  useEffect(() => {
-    if (!focusedNode) {
-      setNodes(allNodes);
-      setEdges(allEdges);
-      return;
-    }
-  
-    const node = allNodes.find(n => n.id === focusedNode);
-    if (!node) return;
-  
-    const group = node.data.group;
-    const included = new Set<string>([node.id]);
-  
-    const getTargets = (sources: Set<string>, targetGroup: GroupKey) =>
-      new Set(
-        allEdges
-          .filter(e => {
-            const sourceNode = allNodes.find(n => n.id === e.source);
-            const targetNode = allNodes.find(n => n.id === e.target);
-            return sources.has(e.source as string) && targetNode?.data.group === targetGroup;
-          })
-          .map(e => e.target as string)
-      );
-  
-    const getSources = (targets: Set<string>, sourceGroup: GroupKey) =>
-      new Set(
-        allEdges
-          .filter(e => {
-            const sourceNode = allNodes.find(n => n.id === e.source);
-            const targetNode = allNodes.find(n => n.id === e.target);
-            return targets.has(e.target as string) && sourceNode?.data.group === sourceGroup;
-          })
-          .map(e => e.source as string)
-      );
-  
-    let A = new Set<string>(), B = new Set<string>(), C = new Set<string>(), D = new Set<string>();
-  
-    if (group === 'A') {
-      B = getTargets(new Set([node.id]), 'B');
-      C = getTargets(B, 'C');
-      D = getTargets(C, 'D');
-      [B, C, D].forEach(set => set.forEach(id => included.add(id)));
-    } else if (group === 'B') {
-      A = getSources(new Set([node.id]), 'A');
-      C = getTargets(new Set([node.id]), 'C');
-      D = getTargets(C, 'D');
-      [A, C, D].forEach(set => set.forEach(id => included.add(id)));
-    } else if (group === 'C') {
-      B = getSources(new Set([node.id]), 'B');
-      A = getSources(B, 'A');
-      D = getTargets(new Set([node.id]), 'D');
-      [A, B, D].forEach(set => set.forEach(id => included.add(id)));
-    } else if (group === 'D') {
-      C = getSources(new Set([node.id]), 'C');
-      B = getSources(C, 'B');
-      A = getSources(B, 'A');
-      [A, B, C].forEach(set => set.forEach(id => included.add(id)));
-    }
-  
-    const subNodes = allNodes.filter(n => included.has(n.id));
-    const subEdges = allEdges.filter(
-      e => included.has(e.source as string) && included.has(e.target as string)
-    );
-  
-    setNodes(subNodes);
-    setEdges(subEdges);
-  }, [focusedNode, allNodes, allEdges]);
-
-
-  useEffect(() => {
-    const updatedEdges = allEdges.map(edge => {
-      if (selectedNode && (edge.source === selectedNode.id || edge.target === selectedNode.id)) {
-        return { ...edge, style: { stroke: '#3b82f6', strokeWidth: 1.8, strokeOpacity: 0.8 } };
-      } else {
-        return { ...edge, style: { stroke: '#8C8C8C', strokeWidth: 1.2, strokeOpacity: 0.5 } };
-      }
-    });
-    setEdges(updatedEdges);
-  }, [selectedNode]);
-
-
-  useEffect(() => {
-    const term = searchTerm.trim();
-  
-    // Apply highlight on top of the current visible set of nodes (works with or without focus mode)
-    setNodes((current) => {
-      return current.map((n) => {
-        // Find the baseline node (for original size/color) from allNodes
-        const base = allNodes.find((b) => b.id === n.id) || n;
-        const baseStyle: any = base.style || {};
-  
-        const isHit = term !== '' && n.id === term;
-  
-        // Safely read numeric width/height; if undefined, leave as-is
-        const baseWidth =
-          typeof baseStyle.width === 'number'
-            ? baseStyle.width
-            : parseFloat(baseStyle.width) || baseStyle.width;
-        const baseHeight =
-          typeof baseStyle.height === 'number'
-            ? baseStyle.height
-            : parseFloat(baseStyle.height) || baseStyle.height;
-  
-        const factor = isHit ? 1.1 : 1;
-  
-        return {
-          ...n,
-          style: {
-            ...baseStyle,
-            // change color only when it matches exactly
-            background: isHit ? HIGHLIGHT_HEX : baseStyle.background,
-            // increase size by 10% for the found node (if numeric sizes exist)
-            width: typeof baseWidth === 'number' ? baseWidth * factor : baseWidth,
-            height: typeof baseHeight === 'number' ? baseHeight * factor : baseHeight,
-          },
-        };
-      });
-    });
-  }, [searchTerm, allNodes]);
-
-
-  const onNodeClick: NodeMouseHandler = useCallback((_, node) => setSelectedNode(node as Node<NodeData>), []);
-  const onNodeDoubleClick: NodeMouseHandler = useCallback((_, node) => {
-    const id = node.id;
-    setFocusedNode(prev => (prev === id ? null : id));
-  }, []);
-  const onConnect = useCallback((params: Connection) => setEdges(eds => addEdge(params, eds)), []);
-
   // §4 D173 — F-10's cousin on THIS page, found by the 2026-09-23 acceptance
   // audit. "Resilience" here was `(hasSPOF ? 0 : 0.4) + 0.3(1−HHI) +
   // 0.3(1−peak prominence)`, red below 0.4 — the same class of ad-hoc
@@ -991,6 +866,18 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
       topNexusName: topNexus?.name ?? null,
     };
   }, [groupCounts, supplierVolumes, networkMetrics]);
+
+  // §9 — the visible set, so search keeps working inside a focus.
+  const searchCandidates = useMemo(
+    () =>
+      lens.visibleNodes.map((n) => ({
+        id: n.id,
+        label: n.id,
+        color: GROUP_COLORS[n.data.group || 'A'],
+        classLabel: GROUP_LABELS[n.data.group || 'A'],
+      })),
+    [lens.visibleNodes],
+  );
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
@@ -1065,35 +952,17 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                 </>
               )}
               
-              {searchOpen ? (
-                <div className="relative w-48 transition-all">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <input
-                    autoFocus
-                    type="text"
-                    className={cn(
-                      'h-9 min-h-11 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm focus:outline-none',
-                      HDR_SEARCH_INPUT,
-                      'md:pl-9',
-                    )}
-                    placeholder="find a node"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onBlur={() => !searchTerm && setSearchOpen(false)}
-                  />
-                </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className={HDR_ICON_BUTTON}
-                  onClick={() => setSearchOpen(true)}
-                  aria-label="Search"
-                  title="Search"
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
-              )}
+              <LensSearch
+                open={lens.searchOpen}
+                onOpenChange={lens.setSearchOpen}
+                term={lens.searchTerm}
+                onTermChange={lens.setSearchTerm}
+                candidates={searchCandidates}
+                onPick={(c) => {
+                  lens.setSelectedId(c.id);
+                  graphRef.current?.centerOn(c.id);
+                }}
+              />
 
               <Button
                 variant={showAnalytics ? 'default' : 'outline'}
@@ -1279,129 +1148,107 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
         </div>
         {/* ── End mobile composition ── */}
 
-          <div className="hidden md:grid grid-cols-1 lg:grid-cols-4 gap-6">
-
-            {/* Graph Canvas or Map View */}
-            <div className="lg:col-span-3">
-              {globalSelectedProjectId && riskDataError && (
-                <RiskDataNotice reason={riskDataError} />
-              )}
-              <Card className="h-[560px]">
-                <CardContent className="p-0 h-full relative">
-                  {viewMode === 'network' ? (
-                    <>
-                      <ReactFlow
-                        nodes={nodes}
-                        edges={edges}
-                        onNodesChange={onNodesChange}
-                        onEdgesChange={onEdgesChange}
-                        onConnect={onConnect}
-                        onNodeClick={onNodeClick}
-                        onNodeDoubleClick={onNodeDoubleClick}
-                        fitView
-                        attributionPosition="bottom-left"
-                      >
-                        <Background />
-                        <Controls />
-                        <MiniMap
-                          nodeColor={(node) => GROUP_COLORS[(node.data as NodeData).group || 'A']}
-                          zoomable
-                          pannable
-                        />
-                      </ReactFlow>
-                      <p className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-[10px] text-muted-foreground text-center">
-                        Click/double-click node to select and add disruptions • Double-click to focus supply chain path
-                      </p>
-                      {focusedNode && (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setFocusedNode(null)}
-                          className="absolute top-2 right-2"
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                          <span className="sr-only">Show All Nodes</span>
-                        </Button>
-                      )}
-                    </>
-                  ) : (
-                     <Suspense
-                       fallback={
-                         <div className="h-full grid place-content-center">
-                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                         </div>
-                       }
-                     >
-                     <MapView
-                      nodes={nodes}
+          {/* ── Desktop workspace (network-lenses handoff §1) ──────────────
+               Graph card + right rail, then the analytics when toggled. The rail
+               stacks under the graph below `lg`, the sanctioned multi-pane step. */}
+          <div className="hidden md:block">
+            {globalSelectedProjectId && riskDataError && (
+              <RiskDataNotice reason={riskDataError} />
+            )}
+          </div>
+          <div className="hidden md:grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <GraphCard
+              ref={graphRef}
+              legend={GROUP_ORDER.map((g) => ({ key: g, label: GROUP_LABELS[g], color: GROUP_COLORS[g], count: groupCounts[g] }))}
+              nodes={lens.nodes}
+              edges={lens.edges}
+              onNodesChange={lens.onNodesChange}
+              onNodeClick={lens.onNodeClick}
+              onNodeDoubleClick={lens.onNodeDoubleClick}
+              onNodeDragStart={lens.onNodeDragStart}
+              onPaneClick={lens.onPaneClick}
+              onResetLayout={() => setAllNodes((current) => layoutColumns(current))}
+              fitKey={`${globalSelectedProjectId}|${loadNonce}|${focusedNode ?? ''}`}
+              hint="Click/double-click node to select and add disruptions • Double-click to focus supply chain path"
+              storageKey="suresuite.lens.product.graphHeight"
+              replaceCanvas={
+                viewMode === 'map' ? (
+                  <Suspense
+                    fallback={
+                      <div className="h-full grid place-content-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    }
+                  >
+                    <MapView
+                      nodes={lens.nodes}
                       selectedNode={selectedNode}
-                      onNodeClick={(node) => setSelectedNode(node)}
+                      onNodeClick={(node) => lens.setSelectedId(node.id)}
                       projectId={globalSelectedProjectId}
                       plantData={projects.find(p => p.id === globalSelectedProjectId) ?? null}
                       countryRiskMap={countryRiskMap}
                     />
-                    </Suspense>
-                  )}
-                  {!globalSelectedProjectId && (
-                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground pointer-events-none">
-                      Please select a project
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                  </Suspense>
+                ) : undefined
+              }
+              overlay={
+                !globalSelectedProjectId ? (
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] text-muted-foreground">
+                    Please select a project
+                  </div>
+                ) : undefined
+              }
+            />
 
-            {/* Sidebar */}
-            <div className="lg:col-span-1 flex flex-col space-y-6 w-full">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Node Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {selectedNode ? (
-                    <>
-                      <div>
-                        <h3 className="font-semibold text-lg">{selectedNode.data.label}</h3>
-                        <Badge
-                          variant="secondary"
-                          style={{
-                            backgroundColor: GROUP_COLORS[selectedNode.data.group || 'A'],
-                            color: 'white',
-                          }}
-                        >
-                          {GROUP_LABELS[selectedNode.data.group || 'A']}
-                        </Badge>
-                      </div>
-                      <Separator />
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Incoming Connections:</span>
-                          <span className="font-normal">{selectedNode.data.incoming}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Incoming Flow:</span>
-                          <span className="font-normal">{selectedNode.data.incomingFlow.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Outgoing Connections:</span>
-                          <span className="font-normal">{selectedNode.data.outgoing}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Outgoing Flow:</span>
-                          <span className="font-normal">{selectedNode.data.outgoingFlow.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center text-muted-foreground">
-                      <Network className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>Click a node to view details</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+            {/* §10 right rail */}
+            <div className="flex min-w-0 flex-col gap-4">
+              <LensSummary
+                cells={[
+                  { label: 'Nodes', value: allNodes.length },
+                  { label: 'Edges', value: allEdges.length },
+                  { label: 'Echelons', value: GROUP_ORDER.filter((g) => groupCounts[g] > 0).length },
+                  {
+                    label: 'Single-source %',
+                    value: supplierMetrics.supplierDiversity > 0 ? supplierMetrics.singleSourceRisk : '—',
+                  },
+                ]}
+              />
+              <LensDetails
+                title="Node details"
+                emptyText="Click a node to view details"
+                selected={
+                  selectedNode
+                    ? {
+                        name: selectedNode.data.label,
+                        classLabel: GROUP_LABELS[selectedNode.data.group || 'A'],
+                        classColor: GROUP_COLORS[selectedNode.data.group || 'A'],
+                        rows: [
+                          { label: 'Incoming connections', value: selectedNode.data.incoming },
+                          {
+                            label: 'Incoming flow',
+                            value: selectedNode.data.incomingFlow.toLocaleString('en-US', { maximumFractionDigits: 0 }),
+                          },
+                          { label: 'Outgoing connections', value: selectedNode.data.outgoing },
+                          {
+                            label: 'Outgoing flow',
+                            value: selectedNode.data.outgoingFlow.toLocaleString('en-US', { maximumFractionDigits: 0 }),
+                          },
+                        ],
+                      }
+                    : null
+                }
+                focus={
+                  selectedNode
+                    ? {
+                        label: 'Focus supply path',
+                        active: focusedNode === selectedNode.id,
+                        onToggle: () => setFocusedNode(focusedNode === selectedNode.id ? null : selectedNode.id),
+                      }
+                    : undefined
+                }
+              />
               <MLPrediction selectedPlant={
-                globalSelectedProjectId 
+                globalSelectedProjectId
                   ? projects.find(p => p.id === globalSelectedProjectId)?.plant_name || null
                   : null
               } />
@@ -1410,37 +1257,35 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
 
           <div className="hidden md:block">
           {showAnalytics && (
-            <div className="grid grid-cols-1 gap-6 mt-6">
-              <SupplierVolumeChart
-                data={supplierVolumes}
-                materialDiversity={String(materialMetrics.materialDiversity)}
-                materialConcentrationRisk={materialMetrics.materialConcentrationRisk}
-                sidebarCollapsed={isCollapsed}
+            <div className="mt-8 flex flex-col gap-5">
+              <LensAnalyticsHeader
+                subtitle="Supplier volume and material spread, and the centrality of every material in this lens."
+                meta={
+                  metricsMetadata?.lastCalculated
+                    ? `Last calculated ${new Date(metricsMetadata.lastCalculated).toLocaleString()}`
+                    : undefined
+                }
               />
-              <SupplierMaterialChart
-                data={supplierMaterialCounts}
-                supplierDiversity={String(supplierMetrics.supplierDiversity)}
-                singleSourceRisk={supplierMetrics.singleSourceRisk}
-                sidebarCollapsed={isCollapsed}
-              />
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <SupplierVolumeChart
+                  data={supplierVolumes}
+                  materialDiversity={String(materialMetrics.materialDiversity)}
+                  materialConcentrationRisk={materialMetrics.materialConcentrationRisk}
+                  sidebarCollapsed={isCollapsed}
+                />
+                <SupplierMaterialChart
+                  data={supplierMaterialCounts}
+                  supplierDiversity={String(supplierMetrics.supplierDiversity)}
+                  singleSourceRisk={supplierMetrics.singleSourceRisk}
+                  sidebarCollapsed={isCollapsed}
+                />
+              </div>
               <NetworkMetricsTable
                 metrics={networkMetrics}
                 loading={networkMetricsLoading}
               />
               {metricsMetadata && (
-                <div className="mt-2 p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>
-                      Last calculated: {metricsMetadata.lastCalculated 
-                        ? new Date(metricsMetadata.lastCalculated).toLocaleString()
-                        : 'Never'
-                      }
-                    </span>
-                    <span className="text-xs">
-                      {metricsMetadata.reason}
-                    </span>
-                  </div>
-                </div>
+                <p className="text-[12px] text-muted-foreground">{metricsMetadata.reason}</p>
               )}
             </div>
           )}

@@ -30,7 +30,7 @@ import { useTimeUnit, DAYS_PER_UNIT, UNIT_LABEL_PLURAL } from "@/hooks/useTimeUn
 import { FocusedStage } from "@/components/policies/FocusedStage";
 import { GuidePanel } from "@/components/policies/GuidePanel";
 import { VerifiableExportsSection } from "@/components/policies/VerifiableExportsSection";
-import { DataMapGrid } from "@/components/policies/DataMapGrid";
+import { DataMapView } from "@/components/policies/DataMapView";
 import { PolicySetupBar, type PlanningUnit } from "@/components/policies/PolicySetupBar";
 import {
   formatVersionWhen,
@@ -152,21 +152,21 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
     setSelectedVersionId,
     restoreVersion,
     saveDefault,
-    applyResolvedPreset,
     clearActivePreset,
     bulkUpsertOverrides,
     deleteOverride,
     saveSnapshot,
     updateVersionNotes,
     deleteVersion,
+    deleteVersions,
     exportVersion,
   } = usePolicies(projectId);
 
   const { ctx, hasData } = useProjectContext({ projectId, fulfillmentStrategy });
-  const { unit: storedUnit, setUnit } = useTimeUnit(projectId);
-  // Unset behaves exactly like "day" — the engine stores days and adaptLabel
-  // leaves labels alone — so the control always shows the effective unit.
-  const unit: PlanningUnit = storedUnit ?? "day";
+  // Fixed to week for now (useTimeUnit's PLANNING_UNIT): the engine steps in
+  // weeks and lane lead times are canonical in weeks, so the control shows
+  // week and offers nothing else until unit selection is reworked.
+  const { unit, setUnit } = useTimeUnit(projectId);
   const { horizon, unitMap } = useHorizon(
     selectedProject?.simulation_start,
     selectedProject?.simulation_end,
@@ -395,7 +395,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
               </MobilePanel>
             )}
             {tab === "datamap" ? (
-              <DataMapGrid projectId={projectId} />
+              <DataMapView projectId={projectId} />
             ) : tab === "guide" ? (
               <GuidePanel
                 onJumpToStage={(s) => {
@@ -443,7 +443,6 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
               saveDefault={saveDefault}
               bulkUpsertOverrides={bulkUpsertOverrides}
               deleteOverride={deleteOverride}
-              applyResolvedPreset={applyResolvedPreset}
               clearActivePreset={clearActivePreset}
               saveSnapshot={saveSnapshot}
               selectedVersionId={selectedVersionId}
@@ -474,6 +473,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
           onRestore={restoreVersion}
           onExport={exportVersion}
           onDelete={deleteVersion}
+          onDeleteMany={deleteVersions}
           onUpdateNotes={updateVersionNotes}
           exportsSection={
             projectId ? (

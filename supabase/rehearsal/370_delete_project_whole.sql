@@ -23,7 +23,8 @@
 --      fired the D142 rebuild over what was left: 44 s on a project the size of
 --      production's largest, against an 8 s budget. §6 counts the insert audit rows
 --      the deletion wrote into the derived tables — a rebuild's footprint — and pins
---      the order in `prosrc`, since a timing assertion would be a flaky one.
+--      the order in `prosrc`, since a timing assertion would be a flaky one. The
+--      order is read from `_delete_project_rows`, the one sweep (D208).
 --
 -- The actors exist ONLY in `approved_users`, as all fourteen real ones do (D156).
 --
@@ -210,12 +211,17 @@ BEGIN
   IF v_rebuilt > 0 THEN
     RAISE EXCEPTION 'D170/370 §6: deleting the project wrote % insert statement(s) into its derived tables — the D142 rebuild ran on a project being deleted, which is what cost 44 s', v_rebuilt;
   END IF;
-  SELECT prosrc INTO v_src FROM pg_proc WHERE oid = 'public.delete_project(uuid, uuid, text)'::regprocedure;
+  -- The sweep lives in `_delete_project_rows` since `20260930000002` (D208), shared
+  -- with `admin_delete_organization`; `delete_project` is the gate plus that call.
+  SELECT prosrc INTO v_src FROM pg_proc WHERE oid = 'public._delete_project_rows(uuid, uuid, text)'::regprocedure;
+  IF position('_delete_project_rows' IN (SELECT prosrc FROM pg_proc WHERE oid = 'public.delete_project(uuid, uuid, text)'::regprocedure)) = 0 THEN
+    RAISE EXCEPTION 'D170/370 §6: delete_project no longer calls _delete_project_rows, so the order pinned below is not the order it runs';
+  END IF;
   IF position('DELETE FROM public.projects' IN v_src) = 0
      OR position('DELETE FROM public.projects' IN v_src) > position('DELETE FROM public.inbound_logistics' IN v_src)
      OR position('DELETE FROM public.projects' IN v_src) > position('DELETE FROM public.outbound_logistics' IN v_src)
      OR position('DELETE FROM public.projects' IN v_src) > position('DELETE FROM public.bom_single_level' IN v_src) THEN
-    RAISE EXCEPTION 'D170/370 §6: delete_project deletes a lane source before the project row, so every source delete rebuilds the project it is deleting';
+    RAISE EXCEPTION 'D170/370 §6: _delete_project_rows deletes a lane source before the project row, so every source delete rebuilds the project it is deleting';
   END IF;
 
   RAISE NOTICE 'D170/370: delete_project is whole, attributed, atomic, service-role only, and rebuilds nothing';

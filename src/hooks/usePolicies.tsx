@@ -60,6 +60,10 @@ interface UsePoliciesResult {
   updateVersionNotes: (versionId: string, notes: string) => Promise<void>;
   /** 6.D — delete a version; refused server-side if bound to a run/model card. */
   deleteVersion: (versionId: string) => Promise<boolean>;
+  /** Delete several versions at once; returns the ids actually deleted. Each
+   *  goes through the same per-version RPC, so the server still refuses any
+   *  version bound to a run or model card. */
+  deleteVersions: (versionIds: string[]) => Promise<string[]>;
   /** 6.D — download a saved version's policy bundle as an .xlsx workbook. */
   exportVersion: (version: PolicyVersion) => Promise<void>;
 }
@@ -597,6 +601,41 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     [selectedVersionId, refreshVersions, user?.id],
   );
 
+  const deleteVersions = useCallback(
+    async (versionIds: string[]): Promise<string[]> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+      const deleted: string[] = [];
+      const failures: string[] = [];
+      // Sequential, one RPC per version: each call is its own audited
+      // transaction, and one refusal must not roll back the others.
+      for (const versionId of versionIds) {
+        const { error } = await sb.rpc("delete_policy_version", {
+          p_version_id: versionId,
+          _actor_user_id: user?.id ?? null,   // WP 6.4 · §4 D71
+        });
+        if (error) {
+          console.error("deleteVersions failed", versionId, error);
+          failures.push(error.message ?? versionId);
+        } else {
+          deleted.push(versionId);
+        }
+      }
+      if (selectedVersionId && deleted.includes(selectedVersionId)) setSelectedVersionId(null);
+      if (deleted.length > 0) {
+        toast.success(`${deleted.length} version${deleted.length === 1 ? "" : "s"} deleted`);
+      }
+      if (failures.length > 0) {
+        toast.error(
+          `${failures.length} version${failures.length === 1 ? "" : "s"} could not be deleted: ${failures[0]}`,
+        );
+      }
+      void refreshVersions();
+      return deleted;
+    },
+    [selectedVersionId, refreshVersions, user?.id],
+  );
+
   // 6.D + W2/G17 — download a saved version's policy bundle as an .xlsx
   // workbook with per-cell PROVENANCE: values equal to the registry schema
   // default are marked as such (they may be placeholders, not real data),
@@ -672,6 +711,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     saveSnapshot,
     updateVersionNotes,
     deleteVersion,
+    deleteVersions,
     exportVersion,
   };
 }

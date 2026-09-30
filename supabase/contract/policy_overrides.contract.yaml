@@ -24,22 +24,22 @@ surfaces:
   - page: "ProductLevelNetwork.tsx"
     via: "rpc project_freshness"
     grain: table
-    evidence: "src/pages/ProductLevelNetwork.tsx:227"
+    evidence: "src/pages/ProductLevelNetwork.tsx:270"
     confirmed: true
   - page: "ProjectIntelligence.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/usePolicies.tsx:142"
+    evidence: "src/hooks/usePolicies.tsx:146"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/usePolicies.tsx:142"
+    evidence: "src/hooks/usePolicies.tsx:146"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/usePolicies.tsx:142"
+    evidence: "src/hooks/usePolicies.tsx:146"
     confirmed: true
 
 governance:

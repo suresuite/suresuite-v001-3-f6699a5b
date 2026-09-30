@@ -526,7 +526,7 @@ const STAGE_LABEL_OVERRIDE: Partial<Record<StageKey, Record<string, string>>> = 
   plant: { initial_on_hand: "Initial FG" },
 };
 
-function shortLabelFor(stage: StageKey, field: string, fallback: string): string {
+export function shortLabelFor(stage: StageKey, field: string, fallback: string): string {
   return STAGE_LABEL_OVERRIDE[stage]?.[field] ?? SHORT_LABEL[field] ?? fallback;
 }
 

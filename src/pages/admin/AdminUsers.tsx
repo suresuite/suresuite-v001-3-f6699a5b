@@ -1,6 +1,11 @@
 // Users (/admin/users) — SuReSuite "Ledger" redesign.
-// Data flow, RPCs (admin_set_user_role, admin_set_user_active, admin_create_user)
-// and search/filter logic are unchanged from the original AdminUsers.tsx. The
+// The list is `admin_list_users` (PLAN.md §4 D205): the page used to read the view
+// `v_admin_user_usage`, whose super-admin predicate is false for every browser read
+// (the app calls as anon with no session), so it listed NOBODY and said "No users
+// yet." The organization shown is resolved through `organization_id`, never the
+// stale text copy. Mutations (admin_set_user_role, admin_set_user_active,
+// admin_create_user) are unchanged and the server now refuses suspending or demoting
+// yourself or the last active super admin. The
 // table now uses the shared TH/TD treatment, a status dot, inline icon actions
 // (Access / Suspend-Enable) instead of ghost buttons, and the primary
 // "Add user" lives in the PageHeader actions.
@@ -21,14 +26,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { DIALOG_AS_SHEET, HDR_PRIMARY_BUTTON, HDR_SEARCH_INPUT } from '@/components/shared';
 import { Ban, Loader2, Plus, SlidersHorizontal, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { planRefusal } from '@/lib/auth/organizationPlan';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface OrgOption { id: string; name: string; }
 interface Row {
   user_id: string; name: string | null; email: string | null; role: string;
-  organization: string | null; is_active: boolean | null;
+  organization_id: string | null; organization: string | null; organization_status: string | null;
+  org_role: string | null; is_active: boolean | null;
   mtd_requests: number; mtd_cost_usd: number; monthly_budget_usd: number | null;
 }
+
+/** The organization cell: the name through the uuid, and a suspended org says so. */
+const orgLabel = (r: Row) =>
+  r.organization ? (r.organization_status === 'suspended' ? `${r.organization} (suspended org)` : r.organization) : '';
 
 const db = supabase as any;
 const ROLES = ['user', 'modeler', 'admin', 'super_admin'];
@@ -40,17 +51,24 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [orgs, setOrgs] = useState<OrgOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [q, setQ] = useState('');
 
   const actorArgs = () => ({ p_actor_id: actor?.id, p_actor_email: actor?.email });
 
   const load = async () => {
     setLoading(true);
+    setLoadError(null);
     const [usage, orgRes] = await Promise.all([
-      db.from('v_admin_user_usage').select('*').order('mtd_cost_usd', { ascending: false }),
+      db.rpc('admin_list_users', actorArgs()),
       db.rpc('admin_list_organizations', actorArgs()),
     ]);
-    if (usage.error) toast.error(usage.error.message);
+    // A refused read is not an empty platform: say which it is (D205, D203).
+    if (usage.error) {
+      setLoadError(usage.error.message === 'forbidden'
+        ? 'Only an active super admin can list users.'
+        : `Could not load users: ${usage.error.message}`);
+    }
     setRows((usage.data ?? []) as Row[]);
     setOrgs(((orgRes.data ?? []) as any[]).map((o) => ({ id: o.id, name: o.name })));
     setLoading(false);
@@ -63,18 +81,18 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
     return rows.filter((r) =>
       (r.name || '').toLowerCase().includes(s) ||
       (r.email || '').toLowerCase().includes(s) ||
-      (r.organization || '').toLowerCase().includes(s));
+      orgLabel(r).toLowerCase().includes(s));
   }, [rows, q]);
 
   const colFilterGetters = useMemo(() => ({
-    org: (r: Row) => r.organization || '', name: (r: Row) => r.name || '', email: (r: Row) => r.email || '',
+    org: (r: Row) => orgLabel(r), name: (r: Row) => r.name || '', email: (r: Row) => r.email || '',
     role: (r: Row) => r.role, status: (r: Row) => (r.is_active !== false ? 'Active' : 'Suspended'),
     req: (r: Row) => String(r.mtd_requests), cost: (r: Row) => String(r.mtd_cost_usd), budget: (r: Row) => String(r.monthly_budget_usd ?? ''),
   }), []);
   const { filtered: colFiltered, FilterTH } = useColumnFilters(filtered, colFilterGetters);
 
   const sortGetters = useMemo(() => ({
-    org: (r: Row) => (r.organization || '').toLowerCase(), name: (r: Row) => (r.name || '').toLowerCase(),
+    org: (r: Row) => orgLabel(r).toLowerCase(), name: (r: Row) => (r.name || '').toLowerCase(),
     email: (r: Row) => (r.email || '').toLowerCase(), role: (r: Row) => r.role.toLowerCase(),
     status: (r: Row) => (r.is_active !== false ? 'active' : 'suspended'),
     req: (r: Row) => r.mtd_requests, cost: (r: Row) => r.mtd_cost_usd, budget: (r: Row) => r.monthly_budget_usd ?? -Infinity,
@@ -126,7 +144,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
           label="Users"
           counter={`${sorted.length}`}
           loading={loading}
-          empty={sorted.length === 0 ? (q ? 'No users match these filters.' : 'No users yet.') : undefined}
+          empty={loadError ?? (sorted.length === 0 ? (q ? 'No users match these filters.' : 'No users yet.') : undefined)}
           emptyAction={
             q ? (
               <MobileButton weight="secondary" onClick={() => setQ('')}>
@@ -144,7 +162,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                 key={r.user_id}
                 label={r.name || '—'}
                 dot={active ? M.process : M.blocking}
-                sub={`${r.email || '—'} · ${r.organization || '—'} · ${r.role} · ${Number(
+                sub={`${r.email || '—'} · ${orgLabel(r) || '—'} · ${r.role} · ${Number(
                   r.mtd_requests,
                 ).toLocaleString()} req MTD · budget ${budget != null ? `$${budget.toFixed(2)}` : '—'}${
                   remaining != null && remaining < 0 ? ' · over budget' : ''
@@ -158,11 +176,13 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                     sub: 'per-user capability overrides',
                     onClick: () => navigate(`/admin/users/${r.user_id}`),
                   },
-                  {
-                    label: active ? 'Suspend' : 'Enable',
-                    tone: active ? 'danger' : 'default',
-                    onClick: () => toggleActive(r),
-                  },
+                  ...(r.user_id === actor?.id
+                    ? []
+                    : [{
+                        label: active ? 'Suspend' : 'Enable',
+                        tone: (active ? 'danger' : 'default') as 'danger' | 'default',
+                        onClick: () => toggleActive(r),
+                      }]),
                   ...ROLES.filter((role) => role !== r.role).map((role) => ({
                     label: `Change role to ${role}`,
                     onClick: () => changeRole(r, role),
@@ -189,7 +209,9 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
               <FilterTH filterKey="budget" align="right" /><th className="border-b border-[--hair-border] bg-white" />
             </tr></thead>
             <tbody>
-              {loading ? <LoadingRow colSpan={9} /> : sorted.length === 0 ? (
+              {loading ? <LoadingRow colSpan={9} /> : loadError ? (
+                <EmptyRow colSpan={9} message={loadError} />
+              ) : sorted.length === 0 ? (
                 <EmptyRow colSpan={9} message={q ? 'No users match these filters.' : 'No users yet.'}
                   action={q ? <Button variant="ghost" size="sm" onClick={() => setQ('')}>Clear search</Button> : undefined} />
               ) : sorted.map((r) => {
@@ -198,7 +220,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                 const remaining = budget != null ? budget - Number(r.mtd_cost_usd) : null;
                 return (
                   <tr key={r.user_id} className={ROW_HOVER}>
-                    <td className={`${TD} text-[13px]`}>{r.organization || '—'}</td>
+                    <td className={`${TD} text-[13px]`}>{orgLabel(r) || '—'}</td>
                     <td className={`${TD} whitespace-nowrap`}>
                       <button onClick={() => navigate(`/admin/users/${r.user_id}`)}
                         className="max-w-[260px] truncate text-left text-[13px] font-medium text-[#bf2330] underline-offset-2 hover:underline">
@@ -225,9 +247,11 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                         <button title="Manage access" className="hover:text-foreground" onClick={() => navigate(`/admin/users/${r.user_id}`)}>
                           <SlidersHorizontal className="h-[15px] w-[15px]" />
                         </button>
-                        <button title={active ? 'Suspend' : 'Enable'} className={active ? 'hover:text-[#bf2330]' : 'hover:text-foreground'} onClick={() => toggleActive(r)}>
-                          {active ? <Ban className="h-[15px] w-[15px]" /> : <Undo2 className="h-[15px] w-[15px]" />}
-                        </button>
+                        {r.user_id !== actor?.id && (
+                          <button title={active ? 'Suspend' : 'Enable'} className={active ? 'hover:text-[#bf2330]' : 'hover:text-foreground'} onClick={() => toggleActive(r)}>
+                            {active ? <Ban className="h-[15px] w-[15px]" /> : <Undo2 className="h-[15px] w-[15px]" />}
+                          </button>
+                        )}
                       </span>
                     </td>
                   </tr>
@@ -264,7 +288,8 @@ function AddUserDialog({ orgs, actorArgs, onCreated }: {
       p_password: password, p_role: role, p_org_id: orgId === 'none' ? null : orgId,
     });
     setSaving(false);
-    if (error) return toast.error(error.message);
+    // The organization's user limit (D207) refuses with a token before the sentence.
+    if (error) return toast.error(planRefusal(error.message) ?? error.message);
     toast.success(`User ${email.trim()} created`);
     reset(); setOpen(false); onCreated();
   };

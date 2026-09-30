@@ -114,7 +114,11 @@ BEGIN
   END;
 
   -- ── 2 · the landing ───────────────────────────────────────────────────────
+  -- audit_logs is append-only (D186); clearing it is allowed only here, inside
+  -- this file's rolled-back transaction, by lifting the guard around the DELETE.
+  ALTER TABLE public.audit_logs DISABLE TRIGGER audit_logs_guard_change;
   DELETE FROM public.audit_logs WHERE plane = 'data';
+  ALTER TABLE public.audit_logs ENABLE TRIGGER audit_logs_guard_change;
 
   v_landed := public.ingest_land_file(
     v_project, v_user, 'csv', 'transactional', 'inbound_logistics',
@@ -215,7 +219,11 @@ BEGIN
   END IF;
 
   -- ── 5 · the promotion, and the audit row IT owes ──────────────────────────
+  -- audit_logs is append-only (D186); clearing it is allowed only here, inside
+  -- this file's rolled-back transaction, by lifting the guard around the DELETE.
+  ALTER TABLE public.audit_logs DISABLE TRIGGER audit_logs_guard_change;
   DELETE FROM public.audit_logs WHERE plane = 'data';
+  ALTER TABLE public.audit_logs ENABLE TRIGGER audit_logs_guard_change;
   DELETE FROM public.inbound_logistics WHERE project_id = v_project;
 
   v_applied := public.ingest_apply_run(v_run, v_user);

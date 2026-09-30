@@ -47,6 +47,9 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
   // prefill and verification reads.
   const [bomLevel, setBomLevel] = useState<string>("single");
   const [bomRows, setBomRows] = useState<Record<string, unknown>[]>([]);
+  // The single-level BOM rows (product ← material), for the flat grid's
+  // "Qty / assy". Empty on a multi-level project, whose tree has its own.
+  const [singleBomRows, setSingleBomRows] = useState<Record<string, unknown>[]>([]);
   const [deepRows, setDeepRows] = useState<Record<string, unknown>[]>([]);
   // §4 D178 — a failed read is a RENDERED state, not a console line. When the
   // catch below fires, `rows` is empty for a reason the project's data did not
@@ -69,6 +72,7 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
     setTruncated([]);
     setBomLevel("single");
     setBomRows([]);
+    setSingleBomRows([]);
     setDeepRows([]);
     setLoadError(null);
     setDeepError(null);
@@ -121,6 +125,7 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
         if (!cancelled) {
           setBomLevel(hasMultiShape ? "multi" : "single");
           setBomRows(bom);
+          setSingleBomRows(hasMultiShape ? [] : lanes.bom);
         }
 
         // §4 D177 — the derived deep lane, read for the supplier stage's tree
@@ -794,5 +799,5 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
 
   const reload = () => setTick((t) => t + 1);
 
-  return { rows, loading, fallback, truncated, reload, bomLevel, bomRows, deepRows, loadError, deepError };
+  return { rows, loading, fallback, truncated, reload, bomLevel, bomRows, singleBomRows, deepRows, loadError, deepError };
 }

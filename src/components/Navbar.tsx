@@ -20,7 +20,8 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useCapabilities } from "@/hooks/useCapabilities";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { avatarClass } from "@/lib/avatarColors";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -255,8 +256,7 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
                     "group-hover:ring-primary/40 group-focus-visible:ring-primary"
                   )}
                 >
-                  {user?.avatar_url ? <AvatarImage src={user.avatar_url} alt="Avatar" /> : null}
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs leading-none">
+                  <AvatarFallback className={cn(avatarClass(user?.avatar_color), "text-xs leading-none")}>
                     {user?.name ? (
                       user.name.charAt(0).toUpperCase()
                     ) : (
