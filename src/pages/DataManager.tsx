@@ -986,8 +986,12 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                        }}
                      />
                      {/* Complementary to the Upload Wizard above, never a replacement —
-                         docs/design/erp-mrp-integration-plan.md §2.0, §6c. */}
-                     <ErpConnectionsPanel projectId={project.id} />
+                         docs/design/erp-mrp-integration-plan.md §2.0, §6c. Its
+                         connect/sync/revoke/apply are writes, so it keeps the same
+                         owner gate as Upload now that View data is open to every role. */}
+                     {canModify && (project.modeler_id === user?.id || role === 'admin') && (
+                       <ErpConnectionsPanel projectId={project.id} />
+                     )}
                   </div>
                 )}
                 {itemMasterProjectId === project.id && (

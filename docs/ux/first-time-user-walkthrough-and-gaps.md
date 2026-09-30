@@ -205,7 +205,8 @@ On the right edge of the card is a **toolbar** (only fully shown to the owner/ad
   across the app."* (So there are two selection concepts — local click-select and the global
   toggle — and only the global one carries to other pages.)
 - **View data** (eye) — expands an inline `ProjectDataViewer` below the card to inspect
-  uploaded rows.
+  uploaded rows. Shown to **every** role that can open the page, not only the owner/admin:
+  the viewer is read-only. The ERP connections panel it used to bring along stays owner/admin.
 - **Upload data** (upload icon) — expands the **Upload Wizard** inline (Scene 4a).
 - **Edit item master** (coin icon) — expands an `ItemMasterEditor` for per-item costs &
   capacities.
