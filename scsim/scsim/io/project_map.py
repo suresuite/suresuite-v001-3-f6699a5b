@@ -1146,6 +1146,22 @@ def _build_settings(sc: ScenarioSettings, w: list[MappingWarning]) -> Simulation
     return SimulationSettings(**kwargs)
 
 
+# ── The disruption-event rule — ONE author, exported (WP 9.4, PLAN.md §4 D226) ──
+#
+# `_map_events` below is the only place a schedule becomes engine events. The Lab's
+# event editor, the network pages' disruption dialog and the pre-run gate all need
+# to say, BEFORE a run, which events the mapper will keep; they read these through
+# `registry_export.disruption_rule()` rather than restating them, the way the run
+# window is exported above. Nothing in `src/` may restate 5 or 52.
+EVENT_CAP = 5                    # events beyond this many are dropped, with a warning
+EVENT_START_WEEK_MIN = 1         # an event starts no earlier than the first week
+EVENT_DURATION_WEEKS_MIN = 1
+EVENT_DURATION_WEEKS_MAX = 52
+# Target kinds the mapper names as "cannot be disrupted yet"; anything that is not
+# a supplier id of the project or the plant is skipped too, with its own warning.
+UNSUPPORTED_EVENT_KINDS = ("material", "edge", "customer", "lane")
+
+
 def _is_plant_target(raw: str, stripped: str) -> bool:
     """`plant:X`, `node:plant`, or bare `plant` address the (single) focal plant."""
     return raw.lower().startswith("plant:") or stripped.lower() == "plant"
@@ -1156,7 +1172,7 @@ def _map_events(
     w: list[MappingWarning],
 ) -> list[DisruptionEvent]:
     events: list[DisruptionEvent] = []
-    for entry in schedule[:5]:
+    for entry in schedule[:EVENT_CAP]:
         raw = str(entry.get("target", entry.get("target_id", "")))
         target = raw.rsplit(":", 1)[1] if ":" in raw else raw
         is_plant = target not in sup_ids and _is_plant_target(raw, target)
@@ -1166,7 +1182,7 @@ def _map_events(
             # this project simply does not have. The old single message blamed
             # "material/edge" even when the target was `supplier:primary`.
             kind = raw.split(":", 1)[0].lower() if ":" in raw else ""
-            if kind in ("material", "edge", "customer", "lane"):
+            if kind in UNSUPPORTED_EVENT_KINDS:
                 w.append(MappingWarning("warn", f"event:{raw}", "target",
                                         f"{kind} targets cannot be disrupted yet (land later in M7) — event skipped"))
             else:
@@ -1182,10 +1198,10 @@ def _map_events(
         kwargs: dict[str, Any] = dict(
             target_type=TargetType.NODE_PLANT if is_plant else TargetType.NODE_SUPPLIER,
             target_id=target or "plant",
-            start=int(_clamp(int(start_week), 1, float("inf"), w=w, entity=f"event:{raw}",
-                             field="start", unit=" wk")),
-            duration=int(_clamp(dur_weeks, 1, 52, w=w, entity=f"event:{raw}",
-                                field="duration", unit=" wk")),
+            start=int(_clamp(int(start_week), EVENT_START_WEEK_MIN, float("inf"), w=w,
+                             entity=f"event:{raw}", field="start", unit=" wk")),
+            duration=int(_clamp(dur_weeks, EVENT_DURATION_WEEKS_MIN, EVENT_DURATION_WEEKS_MAX,
+                                w=w, entity=f"event:{raw}", field="duration", unit=" wk")),
         )
         if magnitude < 100.0:
             # Plant capacity is always finite (products carry production_capacity),
@@ -1200,9 +1216,9 @@ def _map_events(
                                         f"{magnitude:.0f}% cut needs a finite supplier capacity — "
                                         f"mapped to a full lead-time-extension outage"))
         events.append(DisruptionEvent(**kwargs))
-    if len(schedule) > 5:
+    if len(schedule) > EVENT_CAP:
         w.append(MappingWarning("warn", "scenario", "disruption_schedule",
-                                f"{len(schedule) - 5} events beyond the 5-event cap dropped"))
+                                f"{len(schedule) - EVENT_CAP} events beyond the {EVENT_CAP}-event cap dropped"))
     return events
 
 

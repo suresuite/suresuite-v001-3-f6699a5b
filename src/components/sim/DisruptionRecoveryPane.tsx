@@ -27,6 +27,10 @@ interface Props {
   /** project-level recovery defaults (merged into overrides for the live preview) */
   projectRecovery: RecoveryConfig | null;
   onSave: (patch: Partial<ScenarioWithPlaybook>) => void;
+  /** The project's supplier ids, and those with no finite weekly capacity — the
+   *  event editor picks targets the engine can disrupt (WP 9.4 slice 6). */
+  supplierIds?: string[];
+  uncapacitated?: string[];
   /**
    * Which card to render. `"all"` is both and is what desktop mounts, so the
    * desktop pane is unchanged. The phone tree renders the schedule as the
@@ -190,7 +194,14 @@ function shallowEqualConfig(a: Record<string, unknown>, b: Record<string, unknow
   return true;
 }
 
-export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave, sections = "all" }: Props) {
+export function DisruptionRecoveryPane({
+  scenario,
+  projectRecovery,
+  onSave,
+  sections = "all",
+  supplierIds,
+  uncapacitated,
+}: Props) {
   const { globalSelectedProjectId: projectId } = useGlobalProject();
   const { playbooks, create: createPlaybook, update: updatePlaybook, remove: removePlaybook } =
     useRecoveryPlaybooks(projectId);
@@ -321,6 +332,8 @@ export function DisruptionRecoveryPane({ scenario, projectRecovery, onSave, sect
             onChange={(v) => onSave({ disruption_schedule: v })}
             projectId={projectId}
             warmup={{ days: scenario.warmup_days, mode: scenario.warmup_mode, horizonDays: scenario.horizon_days }}
+            supplierIds={supplierIds}
+            uncapacitated={uncapacitated}
           />
         </CardContent>
       </Card>

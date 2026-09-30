@@ -1,6 +1,6 @@
 /**
  * The manual's release keys and its prepared answers agree with the registry
- * (§4 D219, `20260930000013`).
+ * (§4 D229, `20261001000002`).
  *
  * A section's audience is keyed by `DocGroup.key`, and the database seeds one
  * row per key. The key SET belongs to the registry — a CHECK listing it would
@@ -21,7 +21,7 @@ import { DOC_GROUPS, getPage } from "../registry";
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
 const MIGRATION = readFileSync(
-  join(ROOT, "supabase", "migrations", "20260930000013_docs_release_and_questions.sql"),
+  join(ROOT, "supabase", "migrations", "20261001000002_docs_release_and_questions.sql"),
   "utf8",
 );
 

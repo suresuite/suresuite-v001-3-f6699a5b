@@ -8,10 +8,12 @@
 // deprecates either, so a project can hold disruptions in both and a reader of
 // one sees half the picture (§16 · WP 6.4 slice 13).
 //
-// Deprecating either is a product decision and a migration. This page documents
-// BOTH, says the choice is undecided, and does not quietly recommend one — a
-// manual that picked would be making the decision on the product's behalf and
-// hiding that it had.
+// WP 9.4 made the product-side half of that decision (a §16 decision entry): the
+// network pages' dialog, the only writer the product had for the profile split,
+// now writes the scenario's own schedule instead, so NO screen writes either
+// table any more. Deprecating the tables themselves is still a migration with a
+// §15 reading either side; this page documents both, as history, and says which
+// one the product now writes.
 
 import { PageTitle, Section, P, Key, Callout, Prose, Term, DocLink, Provenance } from "@/components/docs/prose";
 import { DocFigure } from "@/components/docs/DocFigure";
@@ -35,7 +37,7 @@ export default function Disruptions() {
         Disruptions
       </PageTitle>
 
-      <Callout tone="limit" title="Read this first: there are THREE disruption models, and the one the simulation reads is not on this page">
+      <Callout tone="limit" title="Read this first: the simulation reads the scenario's own schedule, and the two tables below are history">
         <p>
           <strong>The simulation runs off a disruption schedule stored on the scenario itself</strong>
           — the list you edit on stage 2 of{" "}
@@ -52,13 +54,18 @@ export default function Disruptions() {
           and the scenario, and no disruption table is in that list.
         </p>
         <p>
-          So a disruption recorded from a network map's dialog is recorded, and it does not change a
-          simulation. That is worth knowing before you build a library of them.
+          Until September 2026 a disruption added from a network map's dialog was written to the
+          second table set <em>and</em> to a new scenario — and the table half never changed a
+          simulation. <strong>The dialog now writes only the scenario's schedule</strong>, to a new
+          scenario started from the validated baseline or to one you already have, and it checks
+          the target first: the engine disrupts a supplier of the project or the plant, and says
+          so before anything is saved.
         </p>
         <p>
-          <strong>Which of the three wins has not been decided.</strong> That is a product decision
-          with a migration behind it, and this manual is not the place it gets made. What we can do
-          is tell you the situation, and describe both tables.
+          <strong>So the product writes one model, the scenario's schedule.</strong> The two tables
+          below keep the rows written before that change; no screen writes them now, and retiring
+          them is a migration that has not been made. They are described here so the rows that
+          exist can still be read.
         </p>
       </Callout>
 

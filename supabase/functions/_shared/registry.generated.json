@@ -128,6 +128,24 @@
       "reason": "Empty means unlimited (a valid modeling choice) \u2014 but partial-magnitude supplier disruptions need a finite capacity to throttle, else they degrade to full outages."
     }
   ],
+  "disruption": {
+    "duration_weeks_max": 52,
+    "duration_weeks_min": 1,
+    "event_cap": 5,
+    "full_outage_pct": 100,
+    "partial_cut_needs_finite_supplier_capacity": true,
+    "start_week_min": 1,
+    "supported_target_kinds": [
+      "supplier",
+      "plant"
+    ],
+    "unsupported_target_kinds": [
+      "material",
+      "edge",
+      "customer",
+      "lane"
+    ]
+  },
   "engine_version": "0.2.8",
   "entities": {
     "bom_line": {

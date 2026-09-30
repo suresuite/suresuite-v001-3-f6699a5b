@@ -403,7 +403,9 @@ tooltip discloses it).
  2. dataset_version_id ← rpc snapshot_dataset(project)      -- dedup-or-insert (§8.4)
  3. rpc record_model_validation(
       project, version_id, dataset_version_id,
-      scenario_id        = the "Policy validation (auto)" scenario,
+      scenario_id        = the project's validated baseline (scenarios.role =
+                           'validation_baseline' since WP 9.4 — found by role,
+                           never by its display name),
       adopted_warmup_days= warmCfg.warmup_days, warmup_method,
       recommended_replications = max over focal KPIs of adequacy n*,
       replication_basis  = {confidence, target_precision, per_kpi stats},
@@ -420,6 +422,14 @@ asserted that a run row cannot back (the A3 guardrail for the V&V Analyst
 agent later).
 
 ### 2.6 Lab inheritance and display
+
+> **WP 9.4 (2026-09-30).** The scenario Run & Validate runs into now has an identity:
+> `scenarios.role = 'validation_baseline'`, one per project (partial unique index,
+> migration `20261001000001`). The Lab pins it at the top of the scenario list, shows it
+> read-only with its latest run's results, and never dispatches it — the gate reads
+> `baseline` and points to Run & Validate. Inheritance below is unchanged; slice 5 of the
+> same package makes it reachable by seeding every new scenario from the card's
+> fingerprint (§4 D219).
 
 **Inheritance** (blueprint: scenarios under a validated triple inherit
 adopted warm-up + replication count):
@@ -576,7 +586,10 @@ const c = cred.resolve(policyVersionId, selected);       // Credibility (§3.2)
 //   Replications: 30                   [inherited from validation ✓]
 //   (hand-editing either clears inherited_validation_id → chip disappears)
 
-// Scenario creation:
+// Scenario creation — SUPERSEDED by WP 9.4: create("Scenario N") was born at the
+// engine-defaults horizon and could never match a card (PLAN.md §4 D219). Every new
+// scenario is now seeded from the card's fingerprint (`src/lib/sim/scenarioSeed.ts`)
+// through the New scenario dialog, and then inherits exactly as sketched below.
 onCreate: async () => {
   const s = await create(`Scenario ${n}`);
   const c = cred.resolve(policyVersionId, s);

@@ -7,6 +7,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { formatDuration } from "@/lib/sim/planningTime";
 import type {
   Credibility,
   DriftComponent,
@@ -54,7 +55,7 @@ function CardFacts({ card }: { card: ModelValidationCard }) {
         {card.author_email ? ` by ${card.author_email}` : ""}
       </div>
       <div>
-        Warm-up: {card.adopted_warmup_days} days ({card.warmup_method}) ·
+        Warm-up: {formatDuration(card.adopted_warmup_days)} ({card.warmup_method}) ·
         Replications: n = {card.recommended_replications}
       </div>
       {tests.length > 0 && (

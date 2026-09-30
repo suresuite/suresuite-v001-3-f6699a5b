@@ -25,9 +25,9 @@ partially or get corrected — the write fails.
 
 | Constraint | Rule | Added by |
 |---|---|---|
-| `docs_faq_question_nonblank` | `CHECK (btrim(question) <> '')` | `20260930000013_docs_release_and_questions.sql` |
-| `docs_faq_answer_nonblank` | `CHECK (btrim(answer) <> '')` | `20260930000013_docs_release_and_questions.sql` |
-| `docs_faq_section_key_shape` | `CHECK (section_key ~ '^[a-z][a-z0-9-]*$')` | `20260930000013_docs_release_and_questions.sql` |
+| `docs_faq_question_nonblank` | `CHECK (btrim(question) <> '')` | `20261001000002_docs_release_and_questions.sql` |
+| `docs_faq_answer_nonblank` | `CHECK (btrim(answer) <> '')` | `20261001000002_docs_release_and_questions.sql` |
+| `docs_faq_section_key_shape` | `CHECK (section_key ~ '^[a-z][a-z0-9-]*$')` | `20261001000002_docs_release_and_questions.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
@@ -80,7 +80,7 @@ Surrogate id, `gen_random_uuid()`.
 | Type | `uuid`, `NOT NULL`, default `gen_random_uuid()` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20260930000013_docs_release_and_questions.sql` |
+| Added by | `20261001000002_docs_release_and_questions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -94,7 +94,7 @@ The question as a reader would ask it. Non-blank, and unique — the natural key
 | Type | `text`, `NOT NULL` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20260930000013_docs_release_and_questions.sql` |
+| Added by | `20261001000002_docs_release_and_questions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | non-empty, unique |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -108,7 +108,7 @@ The prepared answer, as Markdown rendered with raw HTML disabled. Links into the
 | Type | `text`, `NOT NULL` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20260930000013_docs_release_and_questions.sql` |
+| Added by | `20261001000002_docs_release_and_questions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | non-empty |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -122,7 +122,7 @@ The manual section the question is about, by registry section key, or NULL for a
 | Type | `text` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20260930000013_docs_release_and_questions.sql` |
+| Added by | `20261001000002_docs_release_and_questions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | lowercase slug or null |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -136,7 +136,7 @@ Manual pages the answer points readers to, by slug. Presentation only; an unknow
 | Type | `text[]`, `NOT NULL`, default `'{}'` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20260930000013_docs_release_and_questions.sql` |
+| Added by | `20261001000002_docs_release_and_questions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -150,7 +150,7 @@ Display order within the list. Presentation only.
 | Type | `integer`, `NOT NULL`, default `0` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20260930000013_docs_release_and_questions.sql` |
+| Added by | `20261001000002_docs_release_and_questions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -164,7 +164,7 @@ Whether readers may see it at all. A draft is listed only to super admins.
 | Type | `boolean`, `NOT NULL`, default `false` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20260930000013_docs_release_and_questions.sql` |
+| Added by | `20261001000002_docs_release_and_questions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -178,7 +178,7 @@ When the entry was created. Server-stamped.
 | Type | `timestamp with time zone`, `NOT NULL`, default `now()` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20260930000013_docs_release_and_questions.sql` |
+| Added by | `20261001000002_docs_release_and_questions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -192,7 +192,7 @@ When the entry last changed. Server-stamped by the writer.
 | Type | `timestamp with time zone`, `NOT NULL`, default `now()` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20260930000013_docs_release_and_questions.sql` |
+| Added by | `20261001000002_docs_release_and_questions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -206,7 +206,7 @@ The super admin who created it; NULL for the seeded answers.
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20260930000013_docs_release_and_questions.sql` |
+| Added by | `20261001000002_docs_release_and_questions.sql` |
 | References | `public.approved_users(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -221,7 +221,7 @@ The super admin who last changed it; NULL for the seeded answers.
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20260930000013_docs_release_and_questions.sql` |
+| Added by | `20261001000002_docs_release_and_questions.sql` |
 | References | `public.approved_users(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -229,6 +229,6 @@ The super admin who last changed it; NULL for the seeded answers.
 
 ---
 
-*Generated from data contract `121733d8f344`, engine `0.2.8`,
-sidecar `supabase/contract/docs_faq.contract.yaml`, table created by `20260930000013_docs_release_and_questions.sql`. No wall-clock date: a generated
+*Generated from data contract `1c8717cf3a72`, engine `0.2.8`,
+sidecar `supabase/contract/docs_faq.contract.yaml`, table created by `20261001000002_docs_release_and_questions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

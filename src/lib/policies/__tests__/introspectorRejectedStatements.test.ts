@@ -40,7 +40,7 @@
  * database, and so has no base to be stale.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   splitStatements, splitTopLevel, parenBody, readQualifiedName, squash,
@@ -212,25 +212,25 @@ describe("WP 6.2 · D48 · which overload the caller actually reaches", () => {
     ]);
   });
 
-  it("the one call site names arguments only the 13-parameter overload has", () => {
-    // PostgREST resolves an RPC by NAMED arguments, so the question is which
-    // overload has every name the caller sends. `p_disruption_start` and
-    // `p_disruption_end` exist on exactly one.
-    const src = readFileSync(join(ROOT, "src", "components", "DisruptionDialog.tsx"), "utf8");
-    const at = src.indexOf("create_disruption_scenario_v2");
-    expect(at, "the call site moved — re-establish which overload it reaches").toBeGreaterThan(0);
-    const call = src.slice(at, src.indexOf("});", at));
-    const sent = [...call.matchAll(/^\s*(p_[a-z_]+):/gm)].map((m) => m[1]);
-    expect(sent.length).toBeGreaterThan(5);
-
-    const serves = overloads().filter((f) => {
-      const names = (f.args ?? []).map((a) => /^([a-z_][a-z0-9_]*)/i.exec(a.trim())?.[1]);
-      return sent.every((s) => names.includes(s));
-    });
-    expect(
-      serves.map((f) => f.defined_by),
-      "no recorded overload has every argument this call sends, or more than one does — " +
-        "either way the caller's target is not the one D48 assumed.",
-    ).toEqual(["20250828005114_4c7e88dc-9c73-4538-ab14-fe93b22d07dc.sql"]);
+  it("nothing in src/ calls it any more (WP 9.4 slice 7 · §4 D228)", () => {
+    // The one call site was the network pages' disruption dialog, which wrote the
+    // four legacy tables beside the scenario schedule the engine actually reads.
+    // WP 9.4 stopped that write (a §16 decision): the dialog now writes only
+    // `scenarios.disruption_schedule`. The overloads and their tables stay — the
+    // rows already written are history, and removing a function is a migration
+    // with its own §15 reading — but a caller coming back would be a second
+    // disruption model re-entering the product, so the absence is pinned.
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory()
+          ? walk(join(dir, e.name))
+          : /\.(ts|tsx)$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) && !e.name.includes(".generated.")
+            ? [join(dir, e.name)]
+            : [],
+      );
+    const callers = walk(join(ROOT, "src")).filter((f) =>
+      /rpc\(\s*["'`]create_disruption_scenario_v2/.test(readFileSync(f, "utf8")),
+    );
+    expect(callers, "a src/ file calls create_disruption_scenario_v2 again").toEqual([]);
   });
 });

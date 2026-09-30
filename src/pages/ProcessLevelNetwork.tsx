@@ -65,7 +65,7 @@ import {
   styleColumnEdge,
   type GraphCardHandle,
 } from '@/components/network/lens';
-import { DisruptionDialog } from '@/components/DisruptionDialog';
+import { NetworkDisruptionDialog } from '@/components/network/NetworkDisruptionDialog';
 import MLPrediction from '@/components/MLPrediction';
 import { BarChart } from 'lucide-react';
 
@@ -1352,19 +1352,18 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
         )}
         </div>
 
-        <DisruptionDialog
+        <NetworkDisruptionDialog
           open={disruptionDialogOpen}
           onOpenChange={setDisruptionDialogOpen}
-          nodeId={selectedNode?.id || ''}
-          projectId={globalSelectedProjectId || ''}
-          plantName={projects.find(p => p.id === globalSelectedProjectId)?.name || ''}
-          connectedEdges={allEdges.filter(edge => 
-            selectedNode && (edge.source === selectedNode.id || edge.target === selectedNode.id)
-          )}
-          onSuccess={() => {
-            fetchData();
-            setDisruptionDialogOpen(false);
-          }}
+          nodeId={selectedNode?.id ?? null}
+          projectId={globalSelectedProjectId ?? null}
+          plantName={projects.find((p) => p.id === globalSelectedProjectId)?.plant_name ?? null}
+          connectedEdges={
+            selectedNode
+              ? allEdges.filter((edge) => edge.source === selectedNode.id || edge.target === selectedNode.id)
+              : []
+          }
+          onSuccess={fetchData}
         />
       </div>
     </PageLayout>

@@ -365,16 +365,17 @@ export const FIGURE_SLOTS: FigureSlot[] = [
     alt:
       "The five run stages in order — Setup, Recovery playbook, Run, Results, Compare — with " +
       "the gate drawn between stages 2 and 3. The gate has three exits: clear runs, warnings " +
-      "run once acknowledged, and blocking findings do not run at all. A fourth state is " +
-      "marked, in which the Run button is disabled while the gate still reads clear.",
+      "run once acknowledged, and blocking findings do not run at all. A note marks the " +
+      "account without run permission, which reads not permitted rather than clear.",
     caption:
-      "The gate is the only place the sequence can stop. Its reason is always on screen beside " +
-      "the button — except in the fourth case, where the readout and the button disagree.",
+      "The gate is the only place the sequence can stop. The readout, the stage label, the " +
+      "button and its reason are one state, so they cannot disagree.",
     shows:
       "The five stages from buildStages, the gate between 2 and 3, and its three exits with " +
       "the literal button text each produces. STRUCTURE only — every sub-label on the real " +
       "screen is a live fact about the reader's own scenario, so no value is invented. The " +
-      "fourth state is drawn because it is a disagreement the screen can actually show.",
+      "permission note is drawn because it was once the state where the screen disagreed " +
+      "with itself (§4 D147), closed by runGateState.",
   },
   {
     id: "lever-map",

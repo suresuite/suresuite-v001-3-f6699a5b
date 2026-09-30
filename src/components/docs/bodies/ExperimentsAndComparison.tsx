@@ -75,14 +75,16 @@ export default function ExperimentsAndComparison() {
           </div>
           <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
             <p className="text-[13px] font-semibold text-foreground">
-              They must differ in exactly one of policies or world — not zero, not both
+              They must differ in exactly one of policies, world or disruptions — not zero, not two
             </p>
             <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              Two runs under the same policy version on the same data have nothing to compare, and
-              the panel says so rather than drawing a table of zeroes. Two runs that differ in{" "}
-              <em>both</em> are the mistake this whole screen exists to prevent: the difference is
-              real and it is not attributable, and no chart can make it so. Isolate one component
-              and run again.
+              Two runs under the same policy version, on the same data, with the same disruptions
+              have nothing to compare, and the panel says so rather than drawing a table of zeroes.
+              The most common valid pair is the validated baseline against a scenario that adds a
+              disruption to it — which is why the baseline is picked as A by default. Two runs that
+              differ in <em>two</em> components are the mistake this whole screen exists to prevent:
+              the difference is real and it is not attributable, and no chart can make it so.
+              Isolate one component and run again.
             </p>
           </div>
           <div className="rounded-sm border border-border bg-card p-4 shadow-xs">

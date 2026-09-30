@@ -1,7 +1,7 @@
 // Documentation (/admin/docs) — who may read each section of the manual, and
 // the questions and prepared answers on its Questions & answers page.
 //
-// Released SECTION BY SECTION (`20260930000013`, docsVisibility.ts):
+// Released SECTION BY SECTION (`20261001000002`, docsVisibility.ts):
 //   Public        anyone, signed in or not
 //   Internal      any signed-in user
 //   Confidential  super admins, and users granted `docs_confidential`

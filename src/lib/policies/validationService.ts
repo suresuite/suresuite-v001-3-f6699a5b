@@ -17,7 +17,6 @@ import {
   activeEnginePolicies as sharedActivePolicies,
   flattenFindings,
   gradeManifest,
-  scenarioCapacityFindings,
   type BridgeTables,
   type GradedField,
   type GradedFinding,
@@ -25,6 +24,10 @@ import {
   type RegistryPayload,
   type Row,
 } from "../../../supabase/functions/_shared/grading.ts";
+import {
+  scheduleFindings,
+  type DisruptionRule,
+} from "../../../supabase/functions/_shared/disruptionRules.ts";
 import { baseDataRequirements, policyCatalog } from "./registryAccess";
 import type { PolicyBundle } from "./schemas";
 import type { StageKey } from "./stages";
@@ -121,12 +124,12 @@ const LEVEL_WHEN_MISSING: Record<string, Severity> = {
 };
 
 /**
- * Grade the compiled manifest against the raw project dataset. Same findings
- * on all §8.2 surfaces: this one (the /policies verification stage and the
- * project-manager completeness view) and — through the shared module — the
- * sim-command pre-dispatch gate.
+ * The one grading preamble both entry points share (WP 9.4 slice 8): the raw
+ * dataset, graded by the shared module against the same registry and bridge.
+ * The two entry points differ only in how they SHAPE the result — per row for
+ * the /policies verification stage, per field (the gate's shape) for the Lab.
  */
-export function compileRequiredDataFindings(input: ManifestInput): Finding[] {
+function gradeInput(input: ManifestInput): { dataset: GradingDataset; graded: GradedField[] } {
   const dataset: GradingDataset = {
     materials: input.materials ?? [],
     products: input.products ?? [],
@@ -141,6 +144,17 @@ export function compileRequiredDataFindings(input: ManifestInput): Finding[] {
     registry as unknown as RegistryPayload,
     bridge as unknown as BridgeTables,
   );
+  return { dataset, graded };
+}
+
+/**
+ * Grade the compiled manifest against the raw project dataset. Same findings
+ * on all §8.2 surfaces: this one (the /policies verification stage and the
+ * project-manager completeness view) and — through the shared module — the
+ * sim-command pre-dispatch gate.
+ */
+export function compileRequiredDataFindings(input: ManifestInput): Finding[] {
+  const { graded } = gradeInput(input);
 
   const out: Finding[] = [];
   for (const g of graded) {
@@ -166,23 +180,14 @@ export function compileGateFindings(
   input: ManifestInput,
   disruptionSchedule: Row[] = [],
 ): GradedFinding[] {
-  const dataset: GradingDataset = {
-    materials: input.materials ?? [],
-    products: input.products ?? [],
-    suppliers: input.suppliers ?? [],
-    inbound: input.inbound ?? [],
-    outbound: input.outbound ?? [],
-    bom: input.bom ?? [],
-  };
-  const graded = gradeManifest(
-    dataset,
-    input.defaults as unknown as Row,
-    registry as unknown as RegistryPayload,
-    bridge as unknown as BridgeTables,
-  );
+  const { dataset, graded } = gradeInput(input);
   return [
     ...flattenFindings(graded),
-    ...scenarioCapacityFindings(dataset.suppliers, disruptionSchedule),
+    ...scheduleFindings(
+      dataset.suppliers,
+      disruptionSchedule,
+      (registry as unknown as { disruption: DisruptionRule }).disruption,
+    ),
   ];
 }
 

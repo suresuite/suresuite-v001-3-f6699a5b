@@ -278,8 +278,10 @@ const MAPPER_ANCHORS = [
   `if target not in sup_ids and not is_plant:`,
   `targets cannot be disrupted yet (land later in M7) — event skipped`,
   `no supplier or plant named {target!r} in this project's data — event skipped`,
-  // The cap: events beyond the fifth are dropped with a warning.
-  `for entry in schedule[:5]:`,
+  // The cap: events beyond EVENT_CAP (exported as `disruption.event_cap`) are
+  // dropped with a warning (WP 9.4 named the literal; the rule is unchanged).
+  `for entry in schedule[:EVENT_CAP]:`,
+  `EVENT_CAP = 5`,
   // Partial magnitudes become a capacity cut; a full one does not.
   `if magnitude < 100.0:`,
 ];

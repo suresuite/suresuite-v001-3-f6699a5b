@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { dispatchExperiment, type RunDispatchResult } from "@/lib/sim/dispatch";
 
 /** Engine fallback report (scsim MappingWarning, written by the worker). */
 export interface MappingWarning {
@@ -32,6 +33,10 @@ export interface SimulationRun {
   updated_at?: string | null;
   /** Baseline fingerprint stamped at dispatch (Phase B0 / G13 / §9.5). */
   scenario_hash?: string | null;
+  /** Seed and disruption schedule stamped at dispatch (audit WP 8) — what a
+   *  paired comparison reads, rather than the live scenario row. */
+  seed?: number | null;
+  disruption_schedule?: unknown[] | null;
   /** The model-validation card in force at dispatch — immutable history. */
   model_validation_id?: string | null;
   /** The pre-run gate could not load its data and dispatch proceeded unchecked
@@ -39,56 +44,9 @@ export interface SimulationRun {
   gate_skipped?: boolean | null;
 }
 
-/** One finding of a sim-command 422 — the §8.1 gate's typed shape. */
-export interface GateResponseFinding {
-  severity: "block" | "warn" | "info";
-  field: string;
-  policy: string;
-  rows: string[];
-  message: string;
-}
-
-/** Body of a sim-command 422 — the §8.1 required-data gate result. */
-interface GateErrorBody {
-  validation?: "blocked" | "ack_required";
-  ack_required?: boolean;
-  findings?: GateResponseFinding[];
-  /** Set on a 409 — the §9.2 reuse-or-rerun candidate. */
-  reuse_available?: boolean;
-  reuse_candidate?: ReuseCandidate;
-}
-
-/** A completed run identical to the requested one (reuse-or-rerun, §9.2). */
-export interface ReuseCandidate {
-  run_id: string;
-  ended_at: string | null;
-  created_at: string;
-  code_version: string | null;
-  rep_count_done: number | null;
-}
-
-/** Typed dispatch outcome: queued, or rejected with the gate's findings so
- *  the Lab renders them structurally instead of concatenating a toast. */
-export interface RunDispatchResult {
-  queued: boolean;
-  /** Set when queued=false — the rejection class. */
-  status?: "blocked" | "ack_required" | "reuse_available";
-  /** Set when queued=false — the gate's typed findings. */
-  findings?: GateResponseFinding[];
-  /** Set when status="reuse_available" — the identical completed run
-   *  (reuse is a USER choice: surface it, or re-dispatch with forceRerun). */
-  reuseCandidate?: ReuseCandidate;
-}
-
-async function parseFunctionError(error: unknown): Promise<GateErrorBody | null> {
-  const ctx = (error as { context?: Response }).context;
-  if (!ctx || typeof ctx.json !== "function") return null;
-  try {
-    return (await ctx.json()) as GateErrorBody;
-  } catch {
-    return null;
-  }
-}
+// The dispatch types and client live in lib/sim/dispatch.ts (WP 9.4 slice 8),
+// shared with Run & Validate; re-exported here for existing importers.
+export type { GateResponseFinding, ReuseCandidate, RunDispatchResult } from "@/lib/sim/dispatch";
 
 export interface Replication {
   id: string;
@@ -197,43 +155,13 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
       forceRerun = false,
     ): Promise<RunDispatchResult> => {
       if (!scenarioId) throw new Error("no scenario selected");
-      const { error } = await supabase.functions.invoke("sim-command", {
-        body: {
-          project_id: projectId,
-          scenario_id: scenarioId,
-          kind: "experiment.run",
-          payload: {
-            policy_version_id: policyVersionId,
-            acknowledge_warnings: acknowledgeWarnings,
-            ...(forceRerun ? { force_rerun: true } : {}),
-          },
-          client_ts: Date.now(),
-        },
+      return dispatchExperiment({
+        projectId,
+        scenarioId,
+        policyVersionId,
+        acknowledgeWarnings,
+        forceRerun,
       });
-      if (!error) return { queued: true };
-
-      // §8.1 required-data gate: sim-command returns 422 with typed findings
-      // instead of dispatching a run on silently-defaulted data. Hand them
-      // back to the caller — the Lab renders them in the pre-run panel with
-      // walk-to links and the acknowledgment control (no string toast).
-      const body = await parseFunctionError(error);
-      if (body?.validation) {
-        return {
-          queued: false,
-          status: body.validation,
-          findings: body.findings ?? [],
-        };
-      }
-      // §9.2 reuse-or-rerun (409): identical completed results exist — the
-      // caller asks the user whether to surface the stored run or recompute.
-      if (body?.reuse_available && body.reuse_candidate) {
-        return {
-          queued: false,
-          status: "reuse_available",
-          reuseCandidate: body.reuse_candidate,
-        };
-      }
-      throw error;
     },
     [scenarioId],
   );

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { ScenarioRole } from "@/lib/sim/validationBaseline";
 
 export interface Scenario {
   id: string;
@@ -27,6 +28,10 @@ export interface Scenario {
   /** Model-validation card that seeded warm-up/replications (B0 / G13 / §9.5);
    *  null once the user hand-edits either — divergence is explicit. */
   inherited_validation_id?: string | null;
+  /** What the scenario is for (§4 D227). Absent until the column deploys. */
+  role?: ScenarioRole;
+  /** Created from a network page rather than from the Lab. */
+  from_network?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -36,7 +41,7 @@ export interface Scenario {
  *  re-declaring the defaults next to the inputs. */
 export const SCENARIO_ENGINE_DEFAULTS = {
   description: "",
-  horizon_days: 90,
+  horizon_days: 364,
   time_step: "day",
   warmup_mode: "auto",
   warmup_days: 14,
@@ -58,6 +63,40 @@ const SCENARIO_DEFAULTS = (projectId: string, name = "Baseline"): Partial<Scenar
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb = supabase as any;
+
+/** PostgREST / PostgreSQL saying the `role` column does not exist yet. */
+const missingRoleColumn = (e: { code?: string; message?: string } | null) =>
+  !!e && (e.code === "PGRST204" || e.code === "42703") && /\brole\b/.test(e.message ?? "");
+
+/**
+ * The one insert every scenario goes through. If the `role` column has not
+ * deployed yet (it ships in a migration that applies on merge), the row is
+ * written without it rather than failing — the name fallback in
+ * `validationBaseline.ts` covers that window.
+ */
+export async function createScenarioRow(row: Partial<Scenario>): Promise<Scenario | null> {
+  const first = await sb.from("scenarios").insert(row).select().single();
+  if (!first.error) return first.data as Scenario;
+  if ("role" in row && missingRoleColumn(first.error)) {
+    const { role: _r, ...rest } = row;
+    const retry = await sb.from("scenarios").insert(rest).select().single();
+    if (retry.error) throw retry.error;
+    return retry.data as Scenario;
+  }
+  throw first.error;
+}
+
+/** The project's validated baseline, read by role (§4 D227); null when none. */
+export async function fetchValidationBaseline(projectId: string): Promise<Scenario | null> {
+  const { data, error } = await sb
+    .from("scenarios")
+    .select("*")
+    .eq("project_id", projectId)
+    .eq("role", "validation_baseline")
+    .maybeSingle();
+  if (error) throw error;
+  return (data as Scenario | null) ?? null;
+}
 
 export function useScenarios(projectId: string | null | undefined) {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
@@ -95,15 +134,9 @@ export function useScenarios(projectId: string | null | undefined) {
   }, [projectId, refresh]);
 
   const create = useCallback(
-    async (name = "New scenario"): Promise<Scenario | null> => {
+    async (name = "New scenario", extra?: Partial<Scenario>): Promise<Scenario | null> => {
       if (!projectId) return null;
-      const { data, error } = await sb
-        .from("scenarios")
-        .insert(SCENARIO_DEFAULTS(projectId, name))
-        .select()
-        .single();
-      if (error) throw error;
-      return data as Scenario;
+      return createScenarioRow({ ...SCENARIO_DEFAULTS(projectId, name), ...(extra ?? {}) });
     },
     [projectId],
   );
@@ -126,56 +159,11 @@ export function useScenarios(projectId: string | null | undefined) {
     async (s: Scenario): Promise<Scenario | null> => {
       if (!projectId) return null;
       const { id: _id, created_at: _c, updated_at: _u, ...rest } = s;
-      const { data, error } = await sb
-        .from("scenarios")
-        .insert({ ...rest, name: `${s.name} (copy)` })
-        .select()
-        .single();
-      if (error) throw error;
-      return data as Scenario;
+      // A copy is always an experiment — even a copy of the baseline (§4 D227).
+      return createScenarioRow({ ...rest, name: `${s.name} (copy)`, ...(s.role ? { role: "experiment" } : {}) });
     },
     [projectId],
   );
 
-  /**
-   * Create a new scenario pre-configured with a single-node disruption.
-   * Called from network pages (ProductLevelNetwork etc.) to let the user jump
-   * straight into SimulationLab with the disruption already set up.
-   */
-  const createFromNode = useCallback(
-    async (
-      targetProjectId: string,
-      nodeId: string,
-      nodeType: "supplier" | "material" | "product" | "customer" | string,
-      magnitudePct = 80,
-      durationDays = 42,
-      startDay = 7,
-    ): Promise<Scenario | null> => {
-      const disruption_schedule = [
-        {
-          target: nodeId,
-          target_type: "node" as const,
-          start_day: startDay,
-          duration_days: durationDays,
-          magnitude_pct: magnitudePct,
-        },
-      ];
-      const name = `Disruption: ${nodeType}/${nodeId}`;
-      const { data, error } = await sb
-        .from("scenarios")
-        .insert({
-          ...SCENARIO_DEFAULTS(targetProjectId, name),
-          disruption_schedule,
-          horizon_days: 182,
-          replications: 30,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data as Scenario;
-    },
-    [],
-  );
-
-  return { scenarios, loading, create, update, remove, duplicate, refresh, createFromNode };
+  return { scenarios, loading, create, update, remove, duplicate, refresh };
 }

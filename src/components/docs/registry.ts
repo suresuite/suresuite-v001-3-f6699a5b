@@ -86,7 +86,7 @@ export type DocGroup = {
    * each section; keying that by `section` would let a renumbering hand one
    * section's audience to another. Lowercase slug shape, unique, and never
    * renamed — `docsRelease.test.ts` checks all three against the seed in
-   * `20260930000013`.
+   * `20261001000002`.
    */
   key: string;
   group: string;
