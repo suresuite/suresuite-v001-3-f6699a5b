@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 360,
-      "migrations_applied": 352,
-      "last_migration": "20260930000008_admin_project_access.sql"
+      "migrations_found": 361,
+      "migrations_applied": 353,
+      "last_migration": "20260930000009_account_default_organization.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -18,7 +18,7 @@
   "counts": {
     "tables_in_schema": 81,
     "tables_covered": 55,
-    "columns_covered": 695,
+    "columns_covered": 696,
     "check_constraints": 54,
     "engine_requirements": 7,
     "orphans": 0,
@@ -1916,7 +1916,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The account's ACTIVE organization, by uuid — the one it is working in now, the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns, and therefore what every org-scoped RLS policy reads and what a new project is stamped with. Since §4 D210 an account may BELONG to several organizations (`organization_members`, the authority for membership) and this column is always one of them — NULL exactly when it belongs to none. Setting it adds the membership if missing; the account changes it itself through `switch_my_organization`, and sign-in moves it to a current membership when the active one's access period has ended. The `organization` text copy follows it (`trg_approved_users_track_active_org`).",
+          "meaning": "The account's ACTIVE organization, by uuid — the one it is working in now, the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns, and therefore what every org-scoped RLS policy reads and what a new project is stamped with. Since §4 D210 an account may BELONG to several organizations (`organization_members`, the authority for membership) and this column is always one of them — NULL exactly when it belongs to none. Setting it adds the membership if missing; the account changes it itself through `switch_my_organization`, and sign-in moves it to a current membership when the active one's access period has ended. Since §4 D216 sign-in first moves it to the account's DEFAULT organization (`organization_members.is_default`, set by a super admin) when that one is within its period, and leaving the active organization re-points to the default before the earliest membership. The `organization` text copy follows it (`trg_approved_users_track_active_org`).",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
@@ -17352,6 +17352,14 @@
             "id"
           ],
           "name": "organization_members_pkey"
+        },
+        {
+          "source": "partial UNIQUE index",
+          "columns": [
+            "user_id"
+          ],
+          "name": "organization_members_one_default_per_user",
+          "predicate": "is_default"
         }
       ],
       "natural_key_intended": null,
@@ -17420,7 +17428,19 @@
           "added_by": "20260709000002_super_admin_phase1.sql"
         }
       ],
-      "indexes": [],
+      "indexes": [
+        {
+          "name": "organization_members_one_default_per_user",
+          "unique": true,
+          "columns": [
+            "user_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "is_default",
+          "partial": true,
+          "added_by": "20260930000009_account_default_organization.sql"
+        }
+      ],
       "columns": [
         {
           "name": "id",
@@ -17602,9 +17622,48 @@
           "resolution": null,
           "note": null,
           "engine_requirement": null
+        },
+        {
+          "name": "is_default",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000009_account_default_organization.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [
+            {
+              "when": "a membership is inserted without saying whether it is the default",
+              "value": "false — no membership becomes the default implicitly",
+              "provenance": "default",
+              "visible_as": "the column default; /admin/users shows no default for the account until one is set"
+            }
+          ],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
         }
       ],
-      "note": "THE AUTHORITY FOR WHICH ORGANIZATIONS AN ACCOUNT BELONGS TO since `20260930000004` (§4 D210) — an account may belong to several, and `approved_users.organization_id` names the ACTIVE one (what RLS reads). Between `20260929000002` (D205) and D210 this table was derived from that column and held at most one row per account. The rule now, kept by triggers and asserted by `rehearsal/450`: `organization_id` is NULL exactly when the account has no row here, and otherwise names one of its rows. Setting `organization_id` ADDS its row (`trg_approved_users_sync_org_membership`, the `20260709000002` role mapping — app `admin` → `org_role = 'admin'`, everyone else `member`) and removes none; a first row makes its organization active (`trg_organization_members_activate_first`); deleting the active organization's row re-points the account to its earliest remaining one, or none (`trg_organization_members_repoint_active`). A row's organization and account are fixed — an UPDATE of either is refused. Each row is a SEAT: an organization's `user_limit` counts these rows (`trg_tenant_allowance`, BEFORE INSERT; a re-add of an existing member takes no seat). Written by `admin_add_org_member` / `admin_remove_org_member` (logged through `log_admin_action`), by the sync trigger, and by the CASCADEs; read by the account through `list_my_organizations`.",
+      "note": "THE AUTHORITY FOR WHICH ORGANIZATIONS AN ACCOUNT BELONGS TO since `20260930000004` (§4 D210) — an account may belong to several, and `approved_users.organization_id` names the ACTIVE one (what RLS reads). Between `20260929000002` (D205) and D210 this table was derived from that column and held at most one row per account. The rule now, kept by triggers and asserted by `rehearsal/450`: `organization_id` is NULL exactly when the account has no row here, and otherwise names one of its rows. Setting `organization_id` ADDS its row (`trg_approved_users_sync_org_membership`, the `20260709000002` role mapping — app `admin` → `org_role = 'admin'`, everyone else `member`) and removes none; a first row makes its organization active (`trg_organization_members_activate_first`); deleting the active organization's row re-points the account to its earliest remaining one, or none (`trg_organization_members_repoint_active`) — to its DEFAULT one when it has one (`is_default`, D216), which is also where every sign-in lands. A row's organization and account are fixed — an UPDATE of either is refused. Each row is a SEAT: an organization's `user_limit` counts these rows (`trg_tenant_allowance`, BEFORE INSERT; a re-add of an existing member takes no seat). Written by `admin_add_org_member` / `admin_remove_org_member` and `admin_set_default_org` (logged through `log_admin_action`), by the sync trigger, and by the CASCADEs; read by the account through `list_my_organizations`.",
       "analysis_kinds": null
     },
     "organizations": {
@@ -31304,5 +31363,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "c9ec2b76695f"
+  "contract_version": "457063b3f667"
 }

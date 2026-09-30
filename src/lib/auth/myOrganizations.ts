@@ -4,7 +4,9 @@
  * reads and what a new project is stamped with. The memberships are
  * `organization_members`; `list_my_organizations` returns them and marks the active one,
  * and `switch_my_organization` changes it (refusing an organization the account is not
- * in, and one whose access period has ended).
+ * in, and one whose access period has ended). Since D216 one of them may be the
+ * account's DEFAULT (`is_default`, set by a super admin): every sign-in lands there,
+ * however often the account switched before.
  *
  * The user is NAMED on both calls: the browser calls as `anon` (PLAN.md §4 D155).
  */
@@ -23,6 +25,11 @@ export interface MyOrganization {
   access_valid_until: string | null;
   /** The period has ended for this account (a super admin is exempt). */
   access_expired: boolean;
+  /**
+   * The account's DEFAULT organization (D216): every sign-in lands here. Set by a super
+   * admin; the account switches freely between sign-ins. At most one is true.
+   */
+  is_default: boolean;
 }
 
 /** The two RPCs are not in the generated client types yet; this is their shape. */

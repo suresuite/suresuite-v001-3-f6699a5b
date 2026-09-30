@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 360,
-  "migrations_applied": 352,
+  "migrations_found": 361,
+  "migrations_applied": 353,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260930000008_admin_project_access.sql",
+  "last_migration": "20260930000009_account_default_organization.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 322,
+    "functions": 323,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -11621,6 +11621,18 @@
           "unique": false,
           "references": null,
           "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "is_default",
+          "quoted": false,
+          "type": "boolean",
+          "type_raw": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000009_account_default_organization.sql"
         }
       ],
       "constraints": [
@@ -11655,7 +11667,19 @@
           "added_by": "20260709000002_super_admin_phase1.sql"
         }
       ],
-      "indexes": [],
+      "indexes": [
+        {
+          "name": "organization_members_one_default_per_user",
+          "unique": true,
+          "columns": [
+            "user_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "is_default",
+          "partial": true,
+          "added_by": "20260930000009_account_default_organization.sql"
+        }
+      ],
       "rls": {
         "enabled": true,
         "forced": false,
@@ -11696,6 +11720,14 @@
             "id"
           ],
           "name": "organization_members_pkey"
+        },
+        {
+          "source": "partial UNIQUE index",
+          "columns": [
+            "user_id"
+          ],
+          "name": "organization_members_one_default_per_user",
+          "predicate": "is_default"
         }
       ]
     },
@@ -21501,8 +21533,8 @@
       "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "VOLATILE",
-      "comment": "D211 — /admin/users/:userId's organization and project read. Active super admin only. ",
-      "defined_by": "20260930000005_admin_user_memberships.sql"
+      "comment": "D211, D216 — /admin/users/:userId's organization and project read. Active super admin only. ",
+      "defined_by": "20260930000009_account_default_organization.sql"
     },
     {
       "name": "admin_list_organizations",
@@ -21553,8 +21585,8 @@
       "returns": "TABLE ( user_id uuid, name text, email text, role text, is_active boolean, organization_id uuid, organization text, organization_status text, org_role text, mtd_requests bigint, mtd_tokens bigint, mtd_cost_usd numeric, monthly_budget_usd numeric, created_at timestamptz, memberships jsonb)",
       "security_definer": true,
       "volatility": "VOLATILE",
-      "comment": "D205, D210 — /admin/users's read. The reader is a parameter and must be an active super ",
-      "defined_by": "20260930000004_account_in_several_organizations.sql"
+      "comment": "D205, D210, D216 — /admin/users's read. The reader is a parameter and must be an active ",
+      "defined_by": "20260930000009_account_default_organization.sql"
     },
     {
       "name": "admin_platform_overview",
@@ -21645,6 +21677,21 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260711000002_unified_access_control.sql"
+    },
+    {
+      "name": "admin_set_default_org",
+      "signature": "admin_set_default_org(uuid, text, uuid, uuid)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_target_user_id uuid",
+        "p_org_id uuid"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D216 — a super admin makes one of an account's organizations its DEFAULT (where every ",
+      "defined_by": "20260930000009_account_default_organization.sql"
     },
     {
       "name": "admin_set_org_access_period",
@@ -22164,8 +22211,8 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": "D210 — keeps approved_users.organization_id (the ACTIVE organization) one of the ",
-      "defined_by": "20260930000004_account_in_several_organizations.sql"
+      "comment": "D210, D216 — keeps approved_users.organization_id (the ACTIVE organization) one of the ",
+      "defined_by": "20260930000009_account_default_organization.sql"
     },
     {
       "name": "archive_project_memory",
@@ -22307,7 +22354,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260930000004_account_in_several_organizations.sql"
+      "defined_by": "20260930000009_account_default_organization.sql"
     },
     {
       "name": "authenticate_user",
@@ -24292,11 +24339,11 @@
       "args": [
         "p_user_id uuid DEFAULT NULL"
       ],
-      "returns": "TABLE( org_id uuid, name text, slug text, status text, org_role text, is_current boolean, joined_at timestamptz, access_period text, access_valid_until timestamptz, access_expired boolean )",
+      "returns": "TABLE( org_id uuid, name text, slug text, status text, org_role text, is_current boolean, joined_at timestamptz, access_period text, access_valid_until timestamptz, access_expired boolean, is_default boolean )",
       "security_definer": true,
       "volatility": null,
-      "comment": "D210 — the organizations the signed-in account belongs to, its role in each, which one ",
-      "defined_by": "20260930000004_account_in_several_organizations.sql"
+      "comment": "D210, D216 — the organizations the signed-in account belongs to, its role in each, which one ",
+      "defined_by": "20260930000009_account_default_organization.sql"
     },
     {
       "name": "list_policy_versions",
