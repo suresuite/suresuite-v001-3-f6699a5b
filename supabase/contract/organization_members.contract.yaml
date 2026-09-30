@@ -19,8 +19,15 @@ natural_key_unique:
   - source: column PRIMARY KEY
     columns: [id]
     name: organization_members_pkey
+  - source: partial UNIQUE index
+    columns: [user_id]
+    name: organization_members_one_default_per_user
+    predicate: is_default
 # The real key is (org_id, user_id) and it is declared — one of the few tables in
 # the schema where `natural-key` (§2.1 I4) already holds. `id` is surrogate.
+# `organization_members_one_default_per_user` is not a key of the row: it says an
+# account has at most ONE default organization (§4 D216), over the rows where
+# `is_default` holds.
 
 governance:
   read: null
@@ -105,6 +112,31 @@ fields:
       therefore holds no more than a `member` does, which is the gap WP 2.2
       closes when it extends the resolver. Recorded rather than implied, per
       §5 T1.
+  is_default:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      This membership is the account's DEFAULT organization (§4 D216) — where every
+      sign-in lands (`authenticate_approved_user` makes it the active organization
+      when it is not, and its access period has not ended), and where the account
+      re-points when its active organization goes away. At most one per account, by
+      the partial unique index `organization_members_one_default_per_user`; always one
+      of the account's organizations because it IS a membership row, so removing the
+      membership removes the default with it. Set only by a super admin
+      (`admin_set_default_org`, /admin/users); the account switches freely between
+      sign-ins and cannot change it. `false` on every row of an account with no
+      default, which signs in where it last worked (D210's behaviour).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions:
+      - when: a membership is inserted without saying whether it is the default
+        value: "false — no membership becomes the default implicitly"
+        provenance: default
+        visible_as: the column default; /admin/users shows no default for the account until one is set
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
   joined_at:
     type: timestamp with time zone
     unit: null
@@ -129,9 +161,11 @@ note: >-
   else `member`) and removes none; a first row makes its organization active
   (`trg_organization_members_activate_first`); deleting the active organization's row
   re-points the account to its earliest remaining one, or none
-  (`trg_organization_members_repoint_active`). A row's organization and account are
+  (`trg_organization_members_repoint_active`) — to its DEFAULT one when it has one
+  (`is_default`, D216), which is also where every sign-in lands. A row's organization and account are
   fixed — an UPDATE of either is refused. Each row is a SEAT: an organization's
   `user_limit` counts these rows (`trg_tenant_allowance`, BEFORE INSERT; a re-add of an
   existing member takes no seat). Written by `admin_add_org_member` /
-  `admin_remove_org_member` (logged through `log_admin_action`), by the sync trigger,
+  `admin_remove_org_member` and `admin_set_default_org` (logged through
+  `log_admin_action`), by the sync trigger,
   and by the CASCADEs; read by the account through `list_my_organizations`.

@@ -285,6 +285,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                       {organizations.map((o) => (
                         <li key={o.org_id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
                           <span className="min-w-0 flex-1 truncate font-medium">{o.name}</span>
+                          {o.is_default && <Badge variant="outline" title="You sign in to this organization">Default</Badge>}
                           <span className="text-xs text-muted-foreground">{roleLabel(o.org_role)}</span>
                           {o.access_expired ? (
                             <Badge variant="outline" className="text-muted-foreground">Access ended</Badge>
@@ -301,6 +302,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                     </ul>
                     <p className="text-xs text-muted-foreground">
                       You work in one organization at a time: the projects you see and create are the current organization&rsquo;s. The plan below is the current organization&rsquo;s. Switching reloads the app.
+                      {organizations.some((o) => o.is_default) && <> Each time you sign in you start in your default organization, set by an administrator.</>}
                     </p>
                   </div>
                 )}

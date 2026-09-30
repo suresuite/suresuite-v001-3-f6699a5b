@@ -10,6 +10,8 @@
 // memberships through D211's verbs. The database refuses changing the project
 // modeler's own membership, which the page only mirrors. Which organization is active
 // is the account's own choice (account menu, /profile) and is shown, not set, here.
+// Which one is the DEFAULT — where every sign-in lands (D216) — is set here, through
+// `admin_set_default_org`, and the account cannot change it.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminSection, KX, MonoChip, Segmented, StatusDot } from '@/components/admin/adminUi';
@@ -19,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FROZEN_CELL } from '@/components/shared';
 import { cn } from '@/lib/utils';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { planRefusal } from '@/lib/auth/organizationPlan';
 import { PROJECT_ROLES, cap, day, endOfDay, toDateInput } from '@/components/admin/projectRoles';
@@ -27,7 +29,7 @@ import { PROJECT_ROLES, cap, day, endOfDay, toDateInput } from '@/components/adm
 interface Actor { id: string; email?: string | null }
 interface OrgInfo {
   id: string; name: string; slug: string | null; status: string | null;
-  access_valid_until: string | null; org_role: string; is_active: boolean; members: number; projects: number;
+  access_valid_until: string | null; org_role: string; is_active: boolean; is_default?: boolean; members: number; projects: number;
 }
 interface Member {
   project_role: string; expires_at: string | null; expired: boolean;
@@ -44,7 +46,7 @@ interface ProjectAccess {
 }
 interface MembershipData {
   user_id: string; role: string; is_super_admin: boolean;
-  active_organization_id: string | null; organizations: OrgInfo[]; projects: ProjectAccess[];
+  active_organization_id: string | null; default_organization_id?: string | null; organizations: OrgInfo[]; projects: ProjectAccess[];
   project_capabilities: { key: string; label: string }[];
   role_matrix: Record<string, Record<string, boolean>>;
 }
@@ -100,10 +102,17 @@ export function UserMemberships({ actor, userId, userLabel, onOrganizationChange
   };
 
   const removeOrg = async (o: OrgInfo) => {
-    const next = o.is_active ? '\n\nIt is their active organization, so they move to their earliest remaining one, or to none.' : '';
+    const home = data?.organizations.find((m) => m.is_default && m.id !== o.id);
+    const next = (o.is_active
+      ? `\n\nIt is their active organization, so they move to ${home ? `their default, ${home.name}` : 'their earliest remaining one, or to none'}.`
+      : '') + (o.is_default ? '\n\nIt is their default organization; they will have none until another is set.' : '');
     if (!confirm(`Remove ${userLabel} from ${o.name}? They stop seeing its projects. Project memberships are kept.${next}`)) return;
     if (await run('admin_remove_org_member', { p_org_id: o.id }, `Removed from ${o.name}`)) onOrganizationChanged?.();
   };
+
+  const setDefault = (o: OrgInfo | null) =>
+    run('admin_set_default_org', { p_org_id: o?.id ?? null },
+      o ? `${o.name} is now ${userLabel}'s default organization` : `${userLabel} has no default organization`);
 
   const setMember = (p: ProjectAccess, role: string, expiresAt: string | null) =>
     run('admin_set_project_member', { p_project_id: p.project_id, p_project_role: role, p_expires_at: expiresAt, p_rationale: null },
@@ -123,6 +132,7 @@ export function UserMemberships({ actor, userId, userLabel, onOrganizationChange
 
   const memberOf = new Set(data.projects.filter((p) => p.member).map((p) => p.project_id));
   const active = data.organizations.find((o) => o.is_active) ?? null;
+  const home = data.organizations.find((o) => o.is_default) ?? null;
 
   return (
     <>
@@ -136,7 +146,8 @@ export function UserMemberships({ actor, userId, userLabel, onOrganizationChange
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5 text-[length:var(--fs-row)] font-medium text-[#171717] md:text-[13px] md:text-foreground">
                     {o.name}
-                    {o.is_active && <MonoChip tone="solid">active</MonoChip>}
+                    {o.is_default && <MonoChip tone="solid">default</MonoChip>}
+                    {o.is_active && <MonoChip>active</MonoChip>}
                     {o.status === 'suspended' && <MonoChip>suspended</MonoChip>}
                   </div>
                   <div className="mt-0.5 text-[11px] text-muted-foreground">
@@ -149,6 +160,12 @@ export function UserMemberships({ actor, userId, userLabel, onOrganizationChange
                   options={ORG_ROLES}
                   onChange={(v) => v !== o.org_role && run('admin_set_user_org_role', { p_org_id: o.id, p_org_role: v }, `${o.name}: ${v}`)}
                 />
+                <Button variant="ghost" size="icon" className="h-11 w-11 md:h-8 md:w-8"
+                  title={o.is_default ? 'Default organization — every sign-in lands here. Click to clear.' : 'Make this the default organization — every sign-in lands here'}
+                  aria-label={o.is_default ? `Clear the default organization (${o.name})` : `Make ${o.name} the default organization`}
+                  onClick={() => setDefault(o.is_default ? null : o)}>
+                  <Star className="h-4 w-4" fill={o.is_default ? 'currentColor' : 'none'} />
+                </Button>
                 <Button variant="ghost" size="icon" className="h-11 w-11 md:h-8 md:w-8" title="Remove from organization" aria-label={`Remove from ${o.name}`} onClick={() => removeOrg(o)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -161,8 +178,11 @@ export function UserMemberships({ actor, userId, userLabel, onOrganizationChange
           onAdd={addOrg}
         />
         <p className="mt-3 text-[11.5px] leading-snug text-muted-foreground">
+          {home
+            ? <>Signs in to <strong className="text-foreground">{home.name}</strong>, every time (the star). </>
+            : data.organizations.length > 0 ? <>No default organization: signs in where they last worked — the star sets one. </> : null}
           {active
-            ? <>Working in <strong className="text-foreground">{active.name}</strong> — the user switches between their organizations from their account menu. </>
+            ? <>Working in <strong className="text-foreground">{active.name}</strong> now — the user switches between their organizations from their account menu, which does not change the default. </>
             : null}
           Owners and admins manage an organization's API keys. Platform role <MonoChip>{data.role.replace('_', ' ')}</MonoChip>
           {data.role === 'admin' ? ' also edits and deletes every project of the active organization.' : ''}
