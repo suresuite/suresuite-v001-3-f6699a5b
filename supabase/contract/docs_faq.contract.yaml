@@ -1,0 +1,167 @@
+# AUTHORED — the data contract's sidecar for `docs_faq`.
+table: docs_faq
+tier: G
+schema_name: public
+grain: >-
+  One question and its prepared answer, shown on the manual's Questions & answers
+  page. Authored by super admins from /admin/docs; readers only read.
+owner: platform
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [id]
+    name: docs_faq_pkey
+  - source: UNIQUE constraint
+    columns: [question]
+    name: docs_faq_question_key
+
+governance:
+  read: null
+  write: super_admin
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    RLS on and NO policy, deliberately: an unpublished answer, or one about a section
+    the reader may not open, must not be one PostgREST query away. Readers go through
+    `docs_list_faq(p_user_id)`, which applies the Q&A section's audience AND the
+    audience of the section each answer is about; super admins through
+    `admin_list_docs_faq`. Writes are `admin_save_docs_faq` / `admin_delete_docs_faq`,
+    each writing an `admin_audit_logs` row. The reader id is client-asserted (§4 D28),
+    so the filter is as strong as this application's sign-in. An answer should LINK
+    to the page that owns a fact rather than restate it (PLAN.md §6.1 rule 2) —
+    `check:docs` cannot see database content.
+
+fields:
+  id:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate id, `gen_random_uuid()`.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  question:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The question as a reader would ask it. Non-blank, and unique — the natural key, which also lets the seed re-run without duplicating.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "non-empty, unique"}
+    surfaces: []
+    resolution: null
+  answer:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The prepared answer, as Markdown rendered with raw HTML disabled. Links into the manual are written `/docs/<slug>`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: non-empty}
+    surfaces: []
+    resolution: null
+  section_key:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The manual section the question is about, by registry section key, or NULL for a general question. That section's audience applies on top of the Q&A section's own, so an answer about a confidential section stays confidential.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: lowercase slug or null}
+    surfaces: []
+    resolution: null
+  related_slugs:
+    type: text[]
+    unit: null
+    unit_source: none
+    meaning: >-
+      Manual pages the answer points readers to, by slug. Presentation only; an unknown slug is ignored by the reader page.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  sort_order:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      Display order within the list. Presentation only.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  is_published:
+    type: boolean
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether readers may see it at all. A draft is listed only to super admins.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the entry was created. Server-stamped.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the entry last changed. Server-stamped by the writer.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_by:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The super admin who created it; NULL for the seeded answers.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_by:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The super admin who last changed it; NULL for the seeded answers.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

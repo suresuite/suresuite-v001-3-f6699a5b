@@ -78,8 +78,17 @@ export type DocPage = {
 };
 
 export type DocGroup = {
-  /** §6.3's section number. */
+  /** §6.3's section number. An ORDERING — never an identity. */
   section: number;
+  /**
+   * The section's stable identity, and what its release is keyed by
+   * (`docs_section_releases.section_key`). A super admin sets who may read
+   * each section; keying that by `section` would let a renumbering hand one
+   * section's audience to another. Lowercase slug shape, unique, and never
+   * renamed — `docsRelease.test.ts` checks all three against the seed in
+   * `20261001000002`.
+   */
+  key: string;
   group: string;
   /** One line on what the section answers, shown at the top of a stub. */
   blurb: string;
@@ -92,6 +101,7 @@ const live = { status: "live" as const };
 export const DOC_GROUPS: DocGroup[] = [
   {
     section: 1,
+    key: "overview",
     group: "Overview & architecture",
     blurb: "How the software is put together, and whether you can trust it.",
     pages: [
@@ -156,6 +166,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 2,
+    key: "getting-started",
     group: "Getting started",
     blurb: "From an empty account to a first set of results.",
     pages: [
@@ -188,6 +199,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 3,
+    key: "input-tables",
     group: "Input tables",
     blurb: "The data you provide. One page per table, leading with the header you type.",
     pages: [
@@ -207,6 +219,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 4,
+    key: "computed-tables",
     group: "Computed tables",
     blurb: "What we build from your data. Always rebuildable, never edited by hand.",
     pages: [
@@ -218,6 +231,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 5,
+    key: "policies",
     group: "Policies",
     blurb: "The decisions you make about how the chain should behave.",
     pages: [
@@ -234,6 +248,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 6,
+    key: "verification",
     group: "Verification",
     blurb: "How to tell whether the model you have built can be believed.",
     pages: [
@@ -244,6 +259,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 7,
+    key: "experiments",
     group: "Experiments & scenarios",
     blurb: "Asking what would happen, and getting an answer you can defend.",
     pages: [
@@ -258,6 +274,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 8,
+    key: "networks",
     group: "Networks",
     blurb: "Seeing the chain's structure, and what the structure implies.",
     pages: [
@@ -270,6 +287,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 9,
+    key: "project-intelligence",
     group: "Project Intelligence",
     blurb: "The assistant, what it can see, and what it is allowed to change.",
     pages: [
@@ -281,6 +299,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 10,
+    key: "connectors",
     group: "Connectors",
     blurb: "Getting data in from a system you already run.",
     pages: [
@@ -291,6 +310,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 11,
+    key: "results",
     group: "Results & statistics",
     blurb: "Reading what came back, and knowing how much of it is signal.",
     pages: [
@@ -303,6 +323,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 12,
+    key: "exports",
     group: "Exports & reproducibility",
     blurb: "Taking a figure out of the system with its provenance attached.",
     pages: [
@@ -313,6 +334,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 13,
+    key: "access",
     group: "Access & administration",
     blurb: "Who can see what, and who decided that.",
     pages: [
@@ -327,6 +349,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 14,
+    key: "developer-api",
     group: "Developer API",
     blurb: "Driving the platform from your own code.",
     pages: [
@@ -338,6 +361,7 @@ export const DOC_GROUPS: DocGroup[] = [
   },
   {
     section: 15,
+    key: "reference",
     group: "Reference",
     blurb: "The lookup section — every table, every field, every term.",
     pages: [
@@ -347,10 +371,28 @@ export const DOC_GROUPS: DocGroup[] = [
       { ...live, slug: "field-index", title: "Field index", summary: "Every field, A to Z, linking to the table it belongs to.", keywords: "field index alphabetical a to z columns lookup", source: "contract" },
     ],
   },
+  {
+    section: 16,
+    key: "questions",
+    group: "Questions & answers",
+    blurb: "Common questions, with prepared answers that point to the page that owns each fact.",
+    pages: [
+      {
+        ...live,
+        slug: "questions",
+        title: "Questions & answers",
+        summary: "Common questions about the tool, answered briefly, each linking to the page that goes deeper.",
+        keywords: "faq questions answers help common q&a how do i why",
+        related: ["what-suresuite-is", "your-first-project", "known-limits"],
+      },
+    ],
+  },
 ];
 
-export const ALL_PAGES: (DocPage & { group: string; section: number })[] =
-  DOC_GROUPS.flatMap((g) => g.pages.map((p) => ({ ...p, group: g.group, section: g.section })));
+export const ALL_PAGES: (DocPage & { group: string; section: number; sectionKey: string })[] =
+  DOC_GROUPS.flatMap((g) =>
+    g.pages.map((p) => ({ ...p, group: g.group, section: g.section, sectionKey: g.key })),
+  );
 
 export const DEFAULT_SLUG = "what-suresuite-is";
 
@@ -370,16 +412,19 @@ export function getGroup(section: number) {
  * get neighbours — the nearest live page on either side of where the stub sits
  * in the full tree — so the reader is never stranded.
  */
-export function prevNext(slug: string) {
+export function prevNext(slug: string, canSee: (sectionKey: string) => boolean = () => true) {
   const i = ALL_PAGES.findIndex((p) => p.slug === slug);
   if (i < 0) return { prev: undefined, next: undefined };
   let prev: (typeof ALL_PAGES)[number] | undefined;
   let next: (typeof ALL_PAGES)[number] | undefined;
+  // A page in a section this reader may not open is not a neighbour: the pager
+  // would otherwise walk them straight into "not available to you".
+  const ok = (p: (typeof ALL_PAGES)[number]) => p.status === "live" && canSee(p.sectionKey);
   for (let k = i - 1; k >= 0; k--) {
-    if (ALL_PAGES[k].status === "live") { prev = ALL_PAGES[k]; break; }
+    if (ok(ALL_PAGES[k])) { prev = ALL_PAGES[k]; break; }
   }
   for (let k = i + 1; k < ALL_PAGES.length; k++) {
-    if (ALL_PAGES[k].status === "live") { next = ALL_PAGES[k]; break; }
+    if (ok(ALL_PAGES[k])) { next = ALL_PAGES[k]; break; }
   }
   return { prev, next };
 }
@@ -391,11 +436,12 @@ export function prevNext(slug: string) {
  * is better served by "KPIs & the Resilience Index — documented in WP 5.2d"
  * than by "No matches", which reads as "this product has no KPIs".
  */
-export function searchPages(query: string) {
+export function searchPages(query: string, canSee: (sectionKey: string) => boolean = () => true) {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const terms = q.split(/\s+/);
   return ALL_PAGES.filter((p) => {
+    if (!canSee(p.sectionKey)) return false;
     const hay = `${p.title} ${p.group} ${p.summary ?? ""} ${p.keywords ?? ""}`.toLowerCase();
     return terms.every((term) => hay.includes(term));
   })

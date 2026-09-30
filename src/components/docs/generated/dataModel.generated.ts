@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "75b0effebe46";
+export const CONTRACT_VERSION = "1c8717cf3a72";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261001000001_scenario_role.sql";
+export const LAST_MIGRATION = "20261001000002_docs_release_and_questions.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 81,
-  "tablesDescribed": 55,
-  "columnsDescribed": 697,
+  "tablesInSchema": 83,
+  "tablesDescribed": 57,
+  "columnsDescribed": 712,
   "tablesUndescribed": 26
 } as const;
 
@@ -340,6 +340,18 @@ export const TIERS: GlanceTier[] = [
         "table": "delegation_grants",
         "grain": "One temporary, subtractive grant of project access from one person to another. `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the grantor holds, and it always ends.",
         "columns": 9,
+        "owner": "platform"
+      },
+      {
+        "table": "docs_faq",
+        "grain": "One question and its prepared answer, shown on the manual's Questions & answers page. Authored by super admins from /admin/docs; readers only read.",
+        "columns": 11,
+        "owner": "platform"
+      },
+      {
+        "table": "docs_section_releases",
+        "grain": "One section of the /docs manual and who may read it. A row per registry section KEY; a section with no row is read as confidential by the database and the client alike, so a section added later is closed until a super admin opens it.",
+        "columns": 4,
         "owner": "platform"
       },
       {

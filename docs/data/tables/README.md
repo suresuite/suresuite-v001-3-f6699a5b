@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-55 of 81 tables are covered,
-697 columns in all. A table that is not here is listed
+57 of 83 tables are covered,
+712 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -27,6 +27,8 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`disruption_scenario_settings`](disruption_scenario_settings.md) | 4 | `policy-ui` | 8 | One simulation setting for one profile, as a key and a JSONB value. HOW the disruption is simulated, as against what it hits (`_targets`) and what it does (`_effects`). |
 | [`disruption_scenario_targets`](disruption_scenario_targets.md) | 4 | `policy-ui` | 10 | One target set for one profile: WHAT the disruption hits. Either a list of nodes or a list of edges, decided by `target_type`. |
 | [`disruption_scenarios`](disruption_scenarios.md) | 4 | `policy-ui` | 14 | One disruption applied to one node of one project: a capacity cut, a delay, or both. The ORIGINAL disruption shape, superseded in design by the `disruption_scenario_*` profile/target/effect/setting split but never migrated — both are live and neither reads the other. |
+| [`docs_faq`](docs_faq.md) | G | `platform` | 11 | One question and its prepared answer, shown on the manual's Questions & answers page. Authored by super admins from /admin/docs; readers only read. |
+| [`docs_section_releases`](docs_section_releases.md) | G | `platform` | 4 | One section of the /docs manual and who may read it. A row per registry section KEY; a section with no row is read as confidential by the database and the client alike, so a section added later is closed until a super admin opens it. |
 | [`external_evidence`](external_evidence.md) | 4 | `platform` | 9 | One retrieved external claim about a supply chain, as a subject–predicate–object triple with the source it came from, the confidence attached to it and the hash of the content it was read from. The network cartographer's evidence store: what an agent FOUND, kept apart from what a person entered. |
 | [`inbound_logistics`](inbound_logistics.md) | 2 | `data-ingestion` | 14 | One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed). |
 | [`ingest_files`](ingest_files.md) | 0 | `data-ingestion` | 11 | One file as received, in one run: the manifest for bytes held in storage — where they are, how many there were, and the SHA-256 of exactly the sequence received. Write-once: the row records an event that has already happened and cannot be edited into a different one. |
@@ -70,4 +72,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `75b0effebe46`, engine `0.2.8`.*
+*Generated from data contract `1c8717cf3a72`, engine `0.2.8`.*

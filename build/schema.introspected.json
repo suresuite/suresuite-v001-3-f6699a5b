@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 365,
-  "migrations_applied": 357,
+  "migrations_found": 366,
+  "migrations_applied": 358,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000001_scenario_role.sql",
+  "last_migration": "20261001000002_docs_release_and_questions.sql",
   "counts": {
-    "tables": 81,
+    "tables": 83,
     "views": 7,
     "enums": 4,
-    "functions": 327,
+    "functions": 335,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -6552,6 +6552,359 @@
             "id"
           ],
           "name": "disruption_scenarios_pkey"
+        }
+      ]
+    },
+    {
+      "name": "docs_faq",
+      "schema": "public",
+      "created_by": "20261001000002_docs_release_and_questions.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "question",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "answer",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "section_key",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "related_slugs",
+          "quoted": false,
+          "type": "text[]",
+          "type_raw": "text[]",
+          "nullable": false,
+          "default": "'{}'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "sort_order",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "is_published",
+          "quoted": false,
+          "type": "boolean",
+          "type_raw": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "updated_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "created_by",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "updated_by",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "docs_faq_question_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "question"
+          ],
+          "definition": "UNIQUE (question)",
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "docs_faq_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "docs_faq_question_nonblank",
+          "kind": "CHECK",
+          "columns": [
+            "question"
+          ],
+          "definition": "CHECK (btrim(question) <> '')",
+          "implicit": true,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "docs_faq_answer_nonblank",
+          "kind": "CHECK",
+          "columns": [
+            "answer"
+          ],
+          "definition": "CHECK (btrim(answer) <> '')",
+          "implicit": true,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "docs_faq_section_key_shape",
+          "kind": "CHECK",
+          "columns": [
+            "section_key"
+          ],
+          "definition": "CHECK (section_key ~ '^[a-z][a-z0-9-]*$')",
+          "implicit": true,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": null,
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "question"
+          ],
+          "name": "docs_faq_question_key"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "docs_faq_pkey"
+        }
+      ]
+    },
+    {
+      "name": "docs_section_releases",
+      "schema": "public",
+      "created_by": "20261001000002_docs_release_and_questions.sql",
+      "columns": [
+        {
+          "name": "section_key",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "audience",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "updated_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "updated_by",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "docs_section_releases_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "section_key"
+          ],
+          "definition": "PRIMARY KEY (section_key)",
+          "implicit": true,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "docs_section_releases_key_shape",
+          "kind": "CHECK",
+          "columns": [
+            "section_key"
+          ],
+          "definition": "CHECK (section_key ~ '^[a-z][a-z0-9-]*$')",
+          "implicit": true,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        },
+        {
+          "name": "docs_section_releases_audience",
+          "kind": "CHECK",
+          "columns": [
+            "audience"
+          ],
+          "definition": "CHECK (audience IN ('public','internal','confidential'))",
+          "implicit": true,
+          "added_by": "20261001000002_docs_release_and_questions.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "docs_section_releases_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20261001000002_docs_release_and_questions.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": null,
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "section_key"
+          ],
+          "name": "docs_section_releases_pkey"
         }
       ]
     },
@@ -21497,6 +21850,20 @@
       "defined_by": "20260711000003_admin_management_rpcs.sql"
     },
     {
+      "name": "admin_delete_docs_faq",
+      "signature": "admin_delete_docs_faq(uuid, text, uuid)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_id uuid"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000002_docs_release_and_questions.sql"
+    },
+    {
       "name": "admin_delete_organization",
       "signature": "admin_delete_organization(uuid, text, uuid, text)",
       "args": [
@@ -21567,6 +21934,19 @@
       "volatility": "VOLATILE",
       "comment": "D211, D216 — /admin/users/:userId's organization and project read. Active super admin only. ",
       "defined_by": "20260930000009_account_default_organization.sql"
+    },
+    {
+      "name": "admin_list_docs_faq",
+      "signature": "admin_list_docs_faq(uuid, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text"
+      ],
+      "returns": "SETOF",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000002_docs_release_and_questions.sql"
     },
     {
       "name": "admin_list_organizations",
@@ -21694,6 +22074,26 @@
       "defined_by": "20260711000003_admin_management_rpcs.sql"
     },
     {
+      "name": "admin_save_docs_faq",
+      "signature": "admin_save_docs_faq(uuid, text, uuid, text, text, text, text[], integer, boolean)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_id uuid",
+        "p_question text",
+        "p_answer text",
+        "p_section_key text",
+        "p_related_slugs text[]",
+        "p_sort_order integer",
+        "p_is_published boolean"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000002_docs_release_and_questions.sql"
+    },
+    {
       "name": "admin_set_capability",
       "signature": "admin_set_capability(uuid, text, text, text, text, boolean)",
       "args": [
@@ -21724,6 +22124,21 @@
       "volatility": null,
       "comment": "D216 — a super admin makes one of an account's organizations its DEFAULT (where every ",
       "defined_by": "20260930000009_account_default_organization.sql"
+    },
+    {
+      "name": "admin_set_docs_section_audience",
+      "signature": "admin_set_docs_section_audience(uuid, text, text, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_section_key text",
+        "p_audience text"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000002_docs_release_and_questions.sql"
     },
     {
       "name": "admin_set_org_access_period",
@@ -23319,6 +23734,54 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
+    },
+    {
+      "name": "docs_audience_rank",
+      "signature": "docs_audience_rank(text)",
+      "args": [
+        "p_audience text"
+      ],
+      "returns": "integer LANGUAGE sql IMMUTABLE AS",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000002_docs_release_and_questions.sql"
+    },
+    {
+      "name": "docs_list_faq",
+      "signature": "docs_list_faq(uuid)",
+      "args": [
+        "p_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "TABLE ( id uuid, question text, answer text, section_key text, related_slugs text[], sort_order integer, updated_at timestamptz)",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000002_docs_release_and_questions.sql"
+    },
+    {
+      "name": "docs_reader_level",
+      "signature": "docs_reader_level(uuid)",
+      "args": [
+        "p_user_id uuid"
+      ],
+      "returns": "text LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000002_docs_release_and_questions.sql"
+    },
+    {
+      "name": "docs_section_audience",
+      "signature": "docs_section_audience(text)",
+      "args": [
+        "p_section_key text"
+      ],
+      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000002_docs_release_and_questions.sql"
     },
     {
       "name": "due_erp_sync_links",

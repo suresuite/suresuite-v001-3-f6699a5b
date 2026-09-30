@@ -411,6 +411,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D226** | **The browser restates the engine's event bounds as literals.** `disruptionWeeks` clamps a duration to `1..52` weeks, and the mapper's own comment says nothing in `src/` may restate 52. The cap of five events and the supported target kinds are restated nowhere at all, so no pre-run surface could say an event would be dropped | `src/lib/sim/runWindow.ts` (`disruptionWeeks`); `scsim/scsim/io/project_map.py` (`_map_events`) | **CLOSED ✅ — WP 9.4 slice 6.** `project_map.py` names `EVENT_CAP`, `EVENT_START_WEEK_MIN`, `EVENT_DURATION_WEEKS_MIN/MAX` and `UNSUPPORTED_EVENT_KINDS` (behaviour unchanged, 305 engine tests green) and `registry_export.disruption_rule()` exports them as `registry.disruption`; `disruptionWeeks`, the event editor, the pre-run check and the gate read that block. `disruptionEvents.test.ts` fails if `runWindow.ts` restates `1, 52` again, and pins the shared target rule to the derived stress-preset classification. The browser-engine wheel is rebuilt because `project_map.py` changed |
 | **D227** | **The validated baseline was a scenario keyed by its display name.** Run & Validate finds "its" scenario with `scenarios.find(s => s.name === "Policy validation (auto)")`, and the Lab listed that row as an ordinary editable, deletable scenario. A rename orphaned the validation run from its scenario and the next validation created a second one; a Lab edit to it was overwritten by the next validation run without a word | `src/components/policies/RunValidateStage.tsx` (`VALIDATION_SCENARIO_NAME`, `ensureValidationScenario`) | **CLOSED ✅ (`20261001000001`) — WP 9.4 slice 4.** `scenarios.role` (`experiment` / `validation_baseline`, CHECK-constrained), at most one baseline per project by the partial unique index `scenarios_one_validation_baseline`, backfilled by `scenarios_assign_validation_baseline` (an active card's evidence scenario first, then the newest run, then the oldest; never granted to the API roles). Run & Validate selects and inserts by role and re-selects on 23505; the Lab pins the row read-only and never dispatches it. `supabase/rehearsal/530` proves all four, mutation-tested twice. The name survives only as a fallback while the column has not deployed |
 | **D228** | **"Add disruption" on the network pages wrote five things wrong and two tables nothing reads.** The shared dialog (a) wrote `create_disruption_scenario_v2`'s four legacy tables, which no run reads (§4 D48); (b) discarded the user's scenario name — every scenario was `Disruption: node/<id>`; (c) wrote an edge as a node target; (d) stored a time-delay amount as `magnitude_pct`, which the engine reads as a capacity cut; (e) counted `start_day` from TODAY rather than from the run's week 1; (f) never set `from_network`, so the Lab's "from network map" chip could not appear; and it skipped validation inheritance. It offered targets the engine skips (anything but a supplier or the plant) without saying so | `src/components/DisruptionDialog.tsx`; `src/hooks/useScenarios.tsx` (`createFromNode`) | **CLOSED ✅ — WP 9.4 slice 7.** One dialog, `src/components/network/NetworkDisruptionDialog.tsx`, on all three pages: it maps the selected node to the engine's target (a supplier of the project, or the plant by the project's `plant_name`), states the reason when the engine cannot disrupt it and offers the connected suppliers, authors run weeks and "Outage" / "Cut by N%" through `disruptionEvents.ts`, checks the result with the gate's own `scheduleFindings`, and writes ONLY `scenarios.disruption_schedule` — to a new scenario seeded from the validated baseline (`from_network = true`, then inheritance) or to an existing one below the cap. `DisruptionDialog.tsx` (a `@ts-nocheck` file) and `createFromNode` are deleted; `introspectorRejectedStatements.test.ts` now pins that no `src/` file calls `create_disruption_scenario_v2`. Stopping that write is a §16 decision |
+| **D229** | **Who could read the manual was one compile-time flag, and it had two answers: super admins, or everybody.** `DOCS_SUPER_ADMIN_ONLY` put all of /docs behind sign-in and super admin; turning it off opened all eighty pages to anyone, and either change was a deploy. There was no way to release the manual part by part, and no page for common questions. Asked for by the owner: "release phase by phase, part by part, a super admin could use UI to update it … select the category of the section: public — anyone can see it; internal — only signed-in users; confidential — only approved users; section by section", and "a list of questions and prepared answers readers could leverage". | `src/lib/ui/docsVisibility.ts` (`DOCS_SUPER_ADMIN_ONLY`, `DOCS_PUBLIC_ENTRY_POINTS`, `canReadDocs`); `src/hooks/useCapabilities.tsx` (`canAccessPage` → `canReadDocs(is_super_admin)`); `src/App.tsx` (`DocsGate`) | **CLOSED ✅ (`20261001000002`).** `docs_section_releases` holds one audience per registry section KEY (`DocGroup.key`, never the §6.3 number, so a renumbering cannot hand an audience to another section): `public`, `internal` (any signed-in account) or `confidential`. Every account that can sign in is an approved user, so "approved" is not a separate set — CONFIDENTIAL is the `docs_confidential` feature capability, seeded super_admin-only and grantable per role, organization or user on the existing capability screens. Every section is seeded confidential and a missing row reads as confidential on both sides, so the deploy changes nothing. The one writer is `admin_set_docs_section_audience` (active super admin, `docs.section_audience` audit row, a no-op writes nothing). The client rule is ONE function, `canReadDocsPath`, reached through `canAccessPage` before the signed-in check, so the route gate, the sidebar, the drawer and the manual's nav, search, pager, related links and front door agree; a page in a closed section says so and names what to do, and unreadable releases fail closed. The public site's Docs links follow "any section is public" (`docs.anyPublic`) instead of `DOCS_PUBLIC_ENTRY_POINTS`. Section 16, **Questions & answers** (`/docs/questions`): `docs_faq`, RLS on and NO policy, read only through `docs_list_faq(p_user_id)`, which applies the Q&A section's audience AND that of the section each answer is about, and hides drafts; written from /admin/docs through `admin_save_docs_faq` / `admin_delete_docs_faq`, each audited. Fourteen prepared answers are seeded, each linking to the page that owns its fact rather than restating it. `rehearsal/540` §1–§6; mutation-tested (the audience rank flattened turns §4 red). NOT closed, stated: page bodies are compiled into the bundle, so an audience controls what is SHOWN, not what can be downloaded — only the Q&A answers are withheld by the database; the reader id is D28's client assertion; `check:docs` cannot see an answer's text, so an answer that restates a fact can drift — the admin screen says to link instead; `docs_section_releases` joins the pinned unconditional-policy list on purpose (its rows name sections, not tenant data) |
 
 ### 4.1 Code map — the data layer
 
@@ -962,11 +963,16 @@ Why first: a prospective customer, a researcher and a new modeller all ask the s
 opening question — *how is this thing put together, and can I trust it?* Answering
 that before the reference section is what separates a manual from a data dictionary.
 
-**Where it stands today, which is not yet that.** The public links to it are switched
-off (`DOCS_PUBLIC_ENTRY_POINTS`), and the manual itself is a signed-in page for
-super admins only (`DOCS_SUPER_ADMIN_ONLY`), reached from a "Documentation" item in
-the app's sidebar. Both are flags in `src/lib/ui/docsVisibility.ts`; turning both
-off restores the public manual this section describes, links and all.
+**Where it stands today, and how it gets there (§4 D229).** The manual is released
+SECTION BY SECTION. A super admin sets each section's audience at /admin/docs —
+public (anyone), internal (any signed-in account) or confidential (super admins and
+accounts granted `docs_confidential`) — and every section starts confidential, which is
+the old super-admin-only manual. The public site's Docs links appear once any section is
+public. Publishing section 1 as this section describes is therefore one click, not a
+deploy; the rule is `canReadDocsPath` in `src/lib/ui/docsVisibility.ts`. An audience
+decides what a reader is shown, not what can be downloaded: page bodies ship in the
+bundle. Section 16, Questions & answers, is the one part whose words live in the
+database (`docs_faq`), filtered per reader.
 
 **The figures are authored in-repo as inline SVG** — `src/components/docs/figures.tsx`.
 *(Corrected in WP 5.2a; this paragraph said "WP 5.2a moves the figure SVGs into the
@@ -20450,6 +20456,45 @@ D219–D228 in the same order (D217→D219 … D226→D228) everywhere this bran
 engine's comments (so the browser wheel is rebuilt once more). The commit messages of the earlier
 slices keep the old numbers — history is not rewritten; this entry is the key. The rehearsal
 becomes `530_scenario_role.sql`.
+
+### Documentation · the manual released section by section, and a Questions & answers page · 2026-09-30 · `20261001000002`
+
+**Asked for.** "Release phase by phase, part by part, a super admin could use UI to update it"
+— "select the category of the section: public, anyone can see it; internal, only signed-in
+users; confidential, only approved users; it is section by section" — and "a list of questions
+and prepared answers readers could leverage".
+
+**Promised versus found.** §6.5 promised a public manual and parked it behind two compile-time
+flags, `DOCS_SUPER_ADMIN_ONLY` and `DOCS_PUBLIC_ENTRY_POINTS`, whose only states were "super
+admins" and "everybody" (D229). The registry had no stable section identity — only §6.3's
+numbers, which are an ordering.
+
+**Decisions.** (1) Page TEXT stays in code: the bodies bind to generated contract facts, and
+making them editable in a UI would reopen D21/D22. What the UI edits is who SEES each section,
+and the Q&A — the one part whose facts exist nowhere else. (2) "Approved user" is not a third
+set here: every account that can sign in is an `approved_users` row. Confidential is therefore
+a GRANT, the `docs_confidential` capability, so the existing role, organization and user
+screens grant it and no new permission surface was built. (3) Keyed by a new `DocGroup.key`,
+not the section number. (4) Fail closed everywhere: no row, an unknown key, unreadable
+releases — all confidential; so the deploy changes nothing. (5) The Q&A is filtered in the
+database by BOTH the Q&A section's audience and that of the section an answer is about, so a
+public Q&A never carries an answer about a confidential section.
+
+**Gap check.** (1) `docsEntryPoints.test.ts` branched on the removed constant; it now asserts
+each public surface still carries its link, guarded by `docsPublic`. (2) `docs_section_releases`
+is readable by anon with `USING (true)` and is added to the pinned list in
+`governanceEnforcement.test.ts` deliberately — the gate needs it before sign-in and it holds
+no tenant data. (3) The Q&A page's words are rows, so a static render sees only its frame:
+`pageDepth.test.tsx` exempts it by name with that reason — its first exemption. (4) Landing's
+documentation cards deep-link to fixed pages; once a section is public those cards show even if
+their own sections are not, and the page then says "not available to you" rather than failing.
+(5) No later package changes.
+
+**Measured locally.** `contract:rehearse` against PostgreSQL 16: every file passes, `540` new.
+Flattening the audience rank (`internal` ranked as `public`) turns `540` red at §4. `npm test`
+1 319 of 1 319; `contract:check` clean; `typecheck` 17 of 17 held; `audit:ui` 0 new; eslint 407
+problems before and after, none in the files this entry adds. Nothing reaches production until
+merge; any §15 reading belongs in the push after it (D153).
 
 ## 17. Sequencing
 

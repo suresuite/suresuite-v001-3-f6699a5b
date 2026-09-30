@@ -5,7 +5,7 @@
 // `npm run contract:capabilities`. `contract:check` fails when this file and
 // the migrations disagree (PLAN.md §4 D33).
 //
-// 34 capabilities: 12 page, 22 feature.
+// 35 capabilities: 12 page, 23 feature.
 
 export type CapabilityKind = 'page' | 'feature';
 
@@ -40,7 +40,8 @@ export type FeatureKey =
   | 'project_memory'
   | 'agent_cost_estimator'
   | 'agent_network_cartographer'
-  | 'agent_disruption_sentinel';
+  | 'agent_disruption_sentinel'
+  | 'docs_confidential';
 
 export const PAGE_CAPABILITIES: CapabilityMeta[] = [
   { key: '/', kind: 'page', label: 'Getting Started', description: 'Landing / getting-started page', sortOrder: 10 },  // 20260711000002_unified_access_control.sql
@@ -80,6 +81,7 @@ export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'agent_cost_estimator', kind: 'feature', label: 'Cost Estimator Agent', description: 'Routing eligibility for the Cost Estimator (parameter estimates with uncertainty intervals)', sortOrder: 350 },  // 20260726193000_cost_estimator.sql
   { key: 'agent_network_cartographer', kind: 'feature', label: 'Network Cartographer Agent', description: 'Routing eligibility for the Network Cartographer (evidence-cited deep-tier network mapping)', sortOrder: 360 },  // 20260727000001_network_cartographer.sql
   { key: 'agent_disruption_sentinel', kind: 'feature', label: 'Disruption Sentinel Agent', description: 'Routing eligibility for the Disruption Sentinel (on-demand corroborated risk alerts with simulation-sized impact)', sortOrder: 370 },  // 20260729000001_disruption_sentinel.sql
+  { key: 'docs_confidential', kind: 'feature', label: 'Confidential Documentation', description: 'Read the documentation sections marked Confidential', sortOrder: 400 },  // 20261001000002_docs_release_and_questions.sql
 ];
 
 export const FEATURE_KEYS: FeatureKey[] = FEATURE_CAPABILITIES.map((c) => c.key as FeatureKey);

@@ -129,8 +129,9 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "About",
         tooltip: "About",
       },
-      // Filtered like every other item, through canAccessPage — which reads
-      // DOCS_SUPER_ADMIN_ONLY, so only a super admin sees it for now.
+      // Filtered like every other item, through canAccessPage — which shows it
+      // to anyone who may read at least one section of the manual (each
+      // section's audience is set at /admin/docs).
       {
         to: "/docs",
         icon: BookText,

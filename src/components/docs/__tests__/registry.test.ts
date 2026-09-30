@@ -25,9 +25,9 @@ const live = ALL_PAGES.filter((p) => p.status === "live");
 const planned = ALL_PAGES.filter((p) => p.status === "planned");
 
 describe("the site map", () => {
-  it("covers all 15 sections of PLAN.md §6.3, numbered 1..15 in order", () => {
+  it("covers the 15 sections of PLAN.md §6.3 and the Q&A (§4 D229), numbered 1..16 in order", () => {
     expect(DOC_GROUPS.map((g) => g.section)).toEqual(
-      Array.from({ length: 15 }, (_, i) => i + 1),
+      Array.from({ length: 16 }, (_, i) => i + 1),
     );
   });
 
@@ -116,6 +116,7 @@ describe("pages and their bodies", () => {
     { section: 13, wp: "5.2g", pages: 7 },
     { section: 14, wp: "5.2g", pages: 4 },
     { section: 15, wp: "5.2h", pages: 4 },
+    { section: 16, wp: "D229", pages: 1 },
   ];
 
   it("ships every section a package has finished, in full", () => {

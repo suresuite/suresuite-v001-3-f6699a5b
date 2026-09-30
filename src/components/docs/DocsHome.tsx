@@ -25,11 +25,11 @@
 
 import { Link } from "react-router-dom";
 import { ArrowRight, BookText, Compass, Rocket, ShieldCheck } from "lucide-react";
-import { ALL_PAGES, DOC_GROUPS, getPage } from "@/components/docs/registry";
+import { DOC_GROUPS, getPage } from "@/components/docs/registry";
+import { useCapabilities } from "@/hooks/useCapabilities";
 
 const KICKER = "font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground";
 
-const LIVE_COUNT = ALL_PAGES.filter((p) => p.status === "live").length;
 
 /** The three questions §6.5 says every first-time reader arrives with. */
 const START_HERE = [
@@ -65,6 +65,18 @@ function Stat({ value, label }: { value: string | number; label: string }) {
 }
 
 export default function DocsHome() {
+  // Released section by section (/admin/docs): the front door lists only what
+  // this reader may open, so every card and link on it lands on a page.
+  const { docs } = useCapabilities();
+  const groups = DOC_GROUPS.filter((g) => docs.canReadSection(g.key));
+  const visible = (slug: string) => {
+    const page = getPage(slug);
+    return Boolean(page && docs.canReadSection(page.sectionKey));
+  };
+  const firstPage = groups[0]?.pages.find((p) => p.status === "live");
+  const startHere = START_HERE.filter(({ slug }) => visible(slug));
+  const pages = groups.flatMap((g) => g.pages);
+  const liveCount = pages.filter((p) => p.status === "live").length;
   return (
     <div className="space-y-12 md:space-y-16">
       {/* Hero */}
@@ -75,46 +87,58 @@ export default function DocsHome() {
           <span className="font-serif font-medium italic">written down.</span>
         </h1>
         <p className="max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
-          The whole manual is public and needs no account. A prospective user, a researcher and a
-          new modeller all open with the same question — how is this thing put together, and can I
+          The manual is released section by section, and this page lists every section open to
+          you. A prospective user, a researcher and a new modeller all open with the same question — how is this thing put together, and can I
           trust it? That question is answered first here, before the reference section, because a
           tool that asks you to stake a decision on its numbers owes you the way it got them.
         </p>
         <div className="flex flex-wrap items-center gap-3 pt-1">
-          <Link
-            to="/docs/what-suresuite-is"
-            className="group inline-flex h-11 items-center gap-2 rounded-sm bg-primary md:h-10 px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Start reading
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
-          <Link
-            to="/docs/all-tables"
-            className="inline-flex h-11 items-center rounded-sm border border-border md:h-10 px-4 text-sm font-medium transition-colors hover:bg-muted/60"
-          >
-            Jump to the reference
-          </Link>
+          {firstPage && (
+            <Link
+              to={visible("what-suresuite-is") ? "/docs/what-suresuite-is" : `/docs/${firstPage.slug}`}
+              className="group inline-flex h-11 items-center gap-2 rounded-sm bg-primary md:h-10 px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              Start reading
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          )}
+          {visible("all-tables") && (
+            <Link
+              to="/docs/all-tables"
+              className="inline-flex h-11 items-center rounded-sm border border-border md:h-10 px-4 text-sm font-medium transition-colors hover:bg-muted/60"
+            >
+              Jump to the reference
+            </Link>
+          )}
+          {visible("questions") && (
+            <Link
+              to="/docs/questions"
+              className="inline-flex h-11 items-center rounded-sm border border-border md:h-10 px-4 text-sm font-medium transition-colors hover:bg-muted/60"
+            >
+              Questions &amp; answers
+            </Link>
+          )}
         </div>
       </header>
 
       {/* What the manual covers, in numbers it cannot fake */}
       <div className="grid grid-cols-2 divide-x divide-y divide-[--hair-rule] border border-[--hair-rule] sm:grid-cols-4 sm:divide-y-0">
-        <Stat value={DOC_GROUPS.length} label="Sections" />
-        <Stat value={ALL_PAGES.length} label="Pages mapped" />
-        <Stat value={LIVE_COUNT} label="Written so far" />
-        <Stat value={ALL_PAGES.length - LIVE_COUNT} label="Owed, and named" />
+        <Stat value={groups.length} label="Sections" />
+        <Stat value={pages.length} label="Pages mapped" />
+        <Stat value={liveCount} label="Written so far" />
+        <Stat value={pages.length - liveCount} label="Owed, and named" />
       </div>
 
       {/* Start here */}
-      <section className="space-y-5">
+      <section className={startHere.length === 0 ? "hidden" : "space-y-5"}>
         <div className="space-y-2">
           <span className={KICKER}>Start here</span>
           <h2 className="text-xl font-semibold tracking-tight md:text-2xl">
-            Four pages, four questions
+            {startHere.length === START_HERE.length ? "Four pages, four questions" : "Where to begin"}
           </h2>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {START_HERE.map(({ slug, icon: Icon, question }) => {
+          {startHere.map(({ slug, icon: Icon, question }) => {
             const page = getPage(slug);
             if (!page) return null;
             return (
@@ -142,7 +166,7 @@ export default function DocsHome() {
         <div className="space-y-2">
           <span className={KICKER}>Everything in the manual</span>
           <h2 className="text-xl font-semibold tracking-tight md:text-2xl">
-            Fifteen sections, and what each one answers
+            {groups.length} {groups.length === 1 ? "section" : "sections"}, and what each one answers
           </h2>
           <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Every page the manual will ever have is listed — including the ones not yet written,
@@ -152,7 +176,7 @@ export default function DocsHome() {
         </div>
 
         <div className="border-t border-[--hair-rule]">
-          {DOC_GROUPS.map((g) => {
+          {groups.map((g) => {
             const written = g.pages.filter((p) => p.status === "live").length;
             const first = g.pages.find((p) => p.status === "live") ?? g.pages[0];
             return (

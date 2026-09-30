@@ -6,7 +6,6 @@ import { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { DOCS_PUBLIC_ENTRY_POINTS } from '@/lib/ui/docsVisibility';
 import ResearchNotice from '@/components/shared/ResearchNotice';
 
 // three.js + drei are ~1.5 MB of the bundle and this is the only thing on the
@@ -291,7 +290,10 @@ function HeroRipple() {
 
 export default function Landing() {
   const { user, loading } = useAuth();
-  const { homePath } = useCapabilities();
+  const { homePath, docs } = useCapabilities();
+  // The public site advertises the manual once a super admin has made at least
+  // one of its sections public (/admin/docs, docsVisibility.ts).
+  const docsPublic = docs.anyPublic;
   const [activeTech, setActiveTech] = useState<TechKey>('network');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -330,8 +332,8 @@ export default function Landing() {
             {/* The manual is public and needs no account (PLAN.md §6.5), so it
                 belongs in the same row as About rather than behind the login —
                 the people it is written for arrive before they have one. Hidden
-                while `DOCS_PUBLIC_ENTRY_POINTS` is off; the route still serves. */}
-            {DOCS_PUBLIC_ENTRY_POINTS && (
+                while no section of the manual is public; the route still serves. */}
+            {docsPublic && (
               <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex md:h-8">
                 <Link to="/docs">Docs</Link>
               </Button>
@@ -375,7 +377,7 @@ export default function Landing() {
             {/* The phone's half of the same row — hidden with it, because a
                 link present on one breakpoint and not the other is the failure
                 `docsEntryPoints.test.ts` was written for, in reverse. */}
-            {DOCS_PUBLIC_ENTRY_POINTS && (
+            {docsPublic && (
               <Link
                 to="/docs"
                 onClick={() => setMobileNavOpen(false)}
@@ -594,7 +596,7 @@ export default function Landing() {
             all want to know how the thing is put together BEFORE they have an
             account, and making them create one first answers a different
             question than the one they asked. */}
-        {DOCS_PUBLIC_ENTRY_POINTS && (
+        {docsPublic && (
           <section id="docs" className="border-b border-[--hair-rule]">
             <div className="mx-auto max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] px-5 py-[clamp(48px,12vw,96px)] md:px-6">
               <div className="max-w-2xl">
@@ -914,7 +916,7 @@ export default function Landing() {
           <ResearchNotice />
           <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
             <a href="#video" className="hover:text-foreground md:hidden">Demo</a>
-            {DOCS_PUBLIC_ENTRY_POINTS && (
+            {docsPublic && (
               <Link to="/docs" className="hover:text-foreground">Docs</Link>
             )}
             <Link to="/about" className="hover:text-foreground">About</Link>
