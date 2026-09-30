@@ -19937,8 +19937,8 @@ is still D28's client assertion. No later package changes.
 
 **Measured locally.** `contract:rehearse` against PostgreSQL 16, all three ways: every
 file passes, `450` and `460` included. Two mutations each turn `460` red at the
-assertion written for them — dropping the modeler refusal (§3) and making every project
-`visible` (§2). Its first draft passed on a base with no `project_role_capabilities`
+assertion written for them — dropping the modeler refusal (§3), and computing `visible`
+from ANY of the account's organizations instead of the active one (§6). Its first draft passed on a base with no `project_role_capabilities`
 rows because `NOT NULL::boolean` is NULL; every boolean check is now
 `IS NOT TRUE`/`IS NOT FALSE` and the file seeds WP 2.2's project layer where it is
 missing. `contract:check` holds; `npm test` passes. Nothing reaches production until

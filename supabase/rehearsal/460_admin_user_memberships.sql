@@ -201,7 +201,12 @@ BEGIN
     RAISE EXCEPTION 'D211/460 §6: org B''s project before the switch read as %', v_proj;
   END IF;
 
+  -- The account's own act, in the browser's shape: no session actor left over from the
+  -- admin calls above (the self-service resolver refuses a session naming someone else).
+  PERFORM set_config('app.current_user_id', '', true);
+  SET LOCAL ROLE anon;
   PERFORM public.switch_my_organization(v_org_b, v_user);
+  RESET ROLE;
   v_out := public.admin_get_user_memberships(v_super, 'd211s@example.invalid', v_user);
   SELECT p INTO v_proj FROM jsonb_array_elements(v_out -> 'projects') p WHERE p ->> 'project_id' = v_p3::text;
   IF v_proj IS NULL OR (v_proj ->> 'visible')::boolean IS NOT TRUE OR (v_proj ->> 'in_active_org')::boolean IS NOT TRUE THEN
