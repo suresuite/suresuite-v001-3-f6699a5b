@@ -439,6 +439,18 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   // Beside the gate rather than inside it: a product with no capacity figure is
   // not a finding, but the number it resolves to is max(2·demand, 1000), chosen
   // so capacity never binds, and the run has to say so before it is dispatched.
+  // The targets the engine can disrupt besides the plant (disruptionEvents.ts).
+  const supplierIds = useMemo(
+    () => itemMasters.suppliers.map((s) => s.supplier_id).filter(Boolean),
+    [itemMasters.suppliers],
+  );
+  const uncapacitated = useMemo(
+    () =>
+      itemMasters.suppliers
+        .filter((s) => !(Number(s.capacity_per_week) > 0))
+        .map((s) => s.supplier_id),
+    [itemMasters.suppliers],
+  );
   const capacityLine = (
     <CapacityReadinessPanel
       compact
@@ -623,6 +635,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                       scenario={selected}
                       projectRecovery={projectRecovery}
                       onSave={(patch) => update(selected.id, patch)}
+                      supplierIds={supplierIds}
+                      uncapacitated={uncapacitated}
                     />
                   </ReadOnlyFrame>
                 ) : pane === "run" ? (

@@ -223,7 +223,9 @@ export default function StressTests() {
         <p>
           A scenario's schedule is read up to five events. A sixth is discarded with a warning
           naming how many were dropped. Only <Term>Multi-hit (compound)</Term> ships more than one
-          event, so you will meet this limit only if you build a schedule by hand.
+          event, so you will meet this limit only if you build a schedule by hand — and the
+          schedule editor now stops at five and says why, and the pre-run check names any event
+          past it before the run rather than after.
         </p>
         <p>
           Two events on the <em>same</em> target do not add up either — the engine keeps the harsher

@@ -110,10 +110,10 @@ compares text, and a bare `tsc --noEmit` at the root passes VACUOUSLY because
 `tsconfig.json` is `"files": []` plus two project references. The script pins
 `tsconfig.app.json`, refuses to believe a clean result from a program that does
 not contain `src/main.tsx`, and ratchets against `scripts/typecheck-baseline.json`
-— 17 pre-existing errors in nine files as of audit WP 8 (the audit read 21 in nine; WP 8 paid four), each with a named owner; the list may
+— 15 pre-existing errors in eight files as of WP 9.4 (the audit read 21 in nine; audit WP 8 paid four, WP 9.4 two), each with a named owner; the list may
 shrink and may not grow, and one FEWER than the baseline also fails. It runs in
 `npm run lint` and in `data-contract.yml`. **It cannot see an `@ts-nocheck` file,
-and eighteen files in `src/` carry one** (§16 · WP 5.2e), so "17 of 17 held"
+and eighteen files in `src/` carry one** (§16 · WP 5.2e), so "15 of 15 held"
 describes the files it can see (it prints that count on every run), not all of `src/`.
 
 And one more EXECUTES the migrations a branch adds, which no static gate can (D31):

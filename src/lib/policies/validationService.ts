@@ -17,7 +17,6 @@ import {
   activeEnginePolicies as sharedActivePolicies,
   flattenFindings,
   gradeManifest,
-  scenarioCapacityFindings,
   type BridgeTables,
   type GradedField,
   type GradedFinding,
@@ -25,6 +24,10 @@ import {
   type RegistryPayload,
   type Row,
 } from "../../../supabase/functions/_shared/grading.ts";
+import {
+  scheduleFindings,
+  type DisruptionRule,
+} from "../../../supabase/functions/_shared/disruptionRules.ts";
 import { baseDataRequirements, policyCatalog } from "./registryAccess";
 import type { PolicyBundle } from "./schemas";
 import type { StageKey } from "./stages";
@@ -182,7 +185,11 @@ export function compileGateFindings(
   );
   return [
     ...flattenFindings(graded),
-    ...scenarioCapacityFindings(dataset.suppliers, disruptionSchedule),
+    ...scheduleFindings(
+      dataset.suppliers,
+      disruptionSchedule,
+      (registry as unknown as { disruption: DisruptionRule }).disruption,
+    ),
   ];
 }
 

@@ -79,14 +79,18 @@ export function runWindowFooter(s: { horizon_days: number; warmup_days: number; 
   return head + horizon + rest;
 }
 
-/** A disruption authored in days, as the engine will run it. */
+/** A disruption authored in days, as the engine will run it. The bounds are the
+ *  mapper's exported event rule (`registry.disruption`, §4 D224), not literals. */
 export function disruptionWeeks(startDay: number, durationDays: number): {
   startWeek: number;
   durationWeeks: number;
 } {
   const tick = R.days_per_tick;
+  const E = (registry as unknown as {
+    disruption: { start_week_min: number; duration_weeks_min: number; duration_weeks_max: number };
+  }).disruption;
   return {
-    startWeek: Math.max(1, pyRound(startDay / tick)),
-    durationWeeks: clamp(pyRound(durationDays / tick), 1, 52),
+    startWeek: Math.max(E.start_week_min, pyRound(startDay / tick)),
+    durationWeeks: clamp(pyRound(durationDays / tick), E.duration_weeks_min, E.duration_weeks_max),
   };
 }

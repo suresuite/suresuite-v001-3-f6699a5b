@@ -983,7 +983,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
           <MobileSheet
             open={sheet === "schedule"}
             title="Disruption schedule"
-            sub="Authored in days; the engine advances in weekly ticks."
+            sub="In weeks — the engine advances week by week."
             onClose={close}
           >
             <div className="p-3.5">
@@ -993,6 +993,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
                   onChange={(v) => onSaveScenario({ disruption_schedule: v })}
                   projectId={projectId}
                   warmup={{ days: selected.warmup_days, mode: selected.warmup_mode, horizonDays: selected.horizon_days }}
+                  supplierIds={supplierIds}
                 />
               </ReadOnlyFrame>
             </div>

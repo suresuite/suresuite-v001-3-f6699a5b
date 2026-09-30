@@ -17,10 +17,10 @@
 
 import registry from "./registry.generated.json" with { type: "json" };
 import bridge from "./engineBridge.json" with { type: "json" };
+import { scheduleFindings, type DisruptionRule } from "./disruptionRules.ts";
 import {
   flattenFindings,
   gradeManifest,
-  scenarioCapacityFindings,
   type BridgeTables,
   type GradingDataset,
   type RegistryPayload,
@@ -152,10 +152,14 @@ export function runValidationGate(args: {
       ({ severity, field, policy, rows, message }),
   );
 
-  // Scenario-conditional check — shared with the Lab pre-run panel via the
-  // grading module (one definition, two surfaces).
+  // Scenario-conditional checks — the engine's exported disruption rule, graded
+  // by the module the Lab's pre-run panel uses too (one definition, two surfaces).
   findings.push(
-    ...scenarioCapacityFindings(dataset.suppliers, disruptionSchedule ?? []).map(
+    ...scheduleFindings(
+      dataset.suppliers,
+      disruptionSchedule ?? [],
+      (registry as unknown as { disruption: DisruptionRule }).disruption,
+    ).map(
       ({ severity, field, policy, rows, message }) =>
         ({ severity, field, policy, rows, message }),
     ),

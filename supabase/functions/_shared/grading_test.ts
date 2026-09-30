@@ -339,3 +339,47 @@ Deno.test("a lane with no volume carries no weight rather than an epsilon one", 
     .find((g) => g.field === "materials.cost")!;
   assertEquals(graded.resolved.find((r) => r.id === "M_MULTI")!.value, 10, "S1's price alone");
 });
+
+// ── WP 9.4 slice 6 · the disruption rule, graded from the engine's export ─────
+import { engineTargetOf, scheduleFindings, type DisruptionRule } from "./disruptionRules.ts";
+
+const RULE = (registry as unknown as { disruption: DisruptionRule }).disruption;
+const SUPPLIERS: Row[] = [
+  { supplier_id: "S_CAP", capacity_per_week: 500 },
+  { supplier_id: "S_NOCAP", capacity_per_week: null },
+];
+const ev = (target: string, magnitude_pct = 100): Row => ({
+  target, target_type: "node", start_day: 140, duration_days: 28, magnitude_pct,
+});
+
+Deno.test("the rule is the engine's export, not a restatement", () => {
+  assertEquals(RULE.event_cap, 5, "project_map.EVENT_CAP");
+  assertEquals(RULE.duration_weeks_max, 52, "project_map.EVENT_DURATION_WEEKS_MAX");
+  assertEquals(RULE.supported_target_kinds, ["supplier", "plant"], "RULE.supported_target_kinds");
+});
+
+Deno.test("engineTargetOf follows _map_events: a supplier id, the plant, or skipped", () => {
+  const ids = new Set(["S_CAP"]);
+  assertEquals(engineTargetOf("supplier:S_CAP", ids, RULE).kind, "supplier", "engineTargetOf(\"supplier:S_CAP\"");
+  assertEquals(engineTargetOf("S_CAP", ids, RULE).kind, "supplier", "engineTargetOf(\"S_CAP\"");
+  assertEquals(engineTargetOf("node:plant", ids, RULE).kind, "plant", "engineTargetOf(\"node:plant\"");
+  assertEquals(engineTargetOf("plant:P1", ids, RULE).kind, "plant", "engineTargetOf(\"plant:P1\"");
+  assertEquals(engineTargetOf("material:M1", ids, RULE).kind, "unsupported", "engineTargetOf(\"material:M1\"");
+  assertEquals(engineTargetOf("customer:all", ids, RULE).kind, "unsupported", "engineTargetOf(\"customer:all\"");
+  assertEquals(engineTargetOf("supplier:NOPE", ids, RULE).kind, "unknown", "engineTargetOf(\"supplier:NOPE\"");
+});
+
+Deno.test("a clean schedule earns no finding", () => {
+  assertEquals(scheduleFindings(SUPPLIERS, [ev("supplier:S_CAP", 30), ev("node:plant")], RULE), [], "scheduleFindings(SUPPLIERS");
+});
+
+Deno.test("events past the cap, skipped targets and uncapacitated cuts are each said", () => {
+  const six = [1, 2, 3, 4, 5, 6].map(() => ev("supplier:S_CAP"));
+  assertEquals(scheduleFindings(SUPPLIERS, six, RULE).length, 1, "one cap finding");
+  const f = scheduleFindings(SUPPLIERS, [ev("material:M1"), ev("supplier:S_NOCAP", 30)], RULE);
+  assertEquals(f.length, 2, "f.length");
+  assertEquals(f[0].field, "scenarios.disruption_schedule", "f[0].field");
+  assertEquals(f[1].field, "suppliers.capacity_per_week", "f[1].field");
+  // §4 D221: the engine cuts BY the share — a 30% cut is not "to 30%".
+  assertEquals(f[1].message.includes("by 30%"), true, f[1].message);
+});
