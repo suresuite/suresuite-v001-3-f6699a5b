@@ -32,6 +32,10 @@ governance:
     WP 3.4 owner trigger and `admin_set_project_member` /
     `admin_remove_project_member` (active super admin, /admin/users/:userId), which
     log to `admin_audit_logs` and refuse to change the project modeler's own row.
+    Since D212 `admin_transfer_project` writes it too, because ownership is this
+    row as well as `projects.modeler_id`: the owner becomes a standing `owner`,
+    the previous owner's row is removed, and on an organization change so is the
+    row of every account outside the target organization.
 
 fields:
   project_id:

@@ -44,7 +44,7 @@ partially or get corrected — the write fails.
 | Row-level security | enabled |
 | Policies on the table | 1 — all carry a predicate |
 
-`write: null` again literal. SELECT is limited to the grantor, the grantee and super admins; there is NO write policy, so RLS denies writes and `grant_project_delegation()` / `revoke_project_delegation()` are the only way in. That is forced rather than chosen: subtraction has to be CHECKED against the grantor's own level, and a PERMISSIVE policy cannot subtract (D28) — it can only add another OR'd way to say yes. `audited: false` is the uncomfortable one: a privilege grant that writes no audit row is exactly what `audit-actor` (§2.1 G4) exists to prevent, and WP 2.3 owns it. Recorded here rather than left to be noticed.
+`write: null` again literal. SELECT is limited to the grantor, the grantee and super admins; there is NO write policy, so RLS denies writes and `grant_project_delegation()` / `revoke_project_delegation()` are the only way in. That is forced rather than chosen: subtraction has to be CHECKED against the grantor's own level, and a PERMISSIVE policy cannot subtract (D28) — it can only add another OR'd way to say yes. `audited: false` is the uncomfortable one: a privilege grant that writes no audit row is exactly what `audit-actor` (§2.1 G4) exists to prevent, and WP 2.3 owns it. Recorded here rather than left to be noticed. One further writer since D212: `admin_transfer_project` sets `revoked_at` on the live delegations the previous owner granted (the grantor no longer holds a level to subtract from) and, on an organization change, on those held by accounts outside the target organization — logged in its `admin_audit_logs` row.
 
 <details><summary>1 RLS policy</summary>
 
@@ -210,6 +210,6 @@ When the grant was made. Server-stamped.
 
 ---
 
-*Generated from data contract `8fdc41952a3f`, engine `0.2.8`,
+*Generated from data contract `71ef6477a817`, engine `0.2.8`,
 sidecar `supabase/contract/delegation_grants.contract.yaml`, table created by `20260915000005_project_membership_and_delegation.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

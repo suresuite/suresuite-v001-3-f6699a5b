@@ -32,7 +32,11 @@ governance:
     only add another OR'd way to say yes. `audited: false` is the uncomfortable
     one: a privilege grant that writes no audit row is exactly what
     `audit-actor` (§2.1 G4) exists to prevent, and WP 2.3 owns it. Recorded here
-    rather than left to be noticed.
+    rather than left to be noticed. One further writer since D212:
+    `admin_transfer_project` sets `revoked_at` on the live delegations the
+    previous owner granted (the grantor no longer holds a level to subtract from)
+    and, on an organization change, on those held by accounts outside the target
+    organization — logged in its `admin_audit_logs` row.
 
 fields:
   id:
