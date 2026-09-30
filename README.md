@@ -91,7 +91,7 @@ Copyright © 2023–2026 Phu Nguyen. SuReSuite is a research prototype and part 
 PhD thesis of Phu Nguyen (cooperative doctorate, HWR Berlin & TU Berlin); all rights
 are reserved. Its core algorithms — supply chain network analysis, the simulation
 library and stress-test framework in [`scsim/`](scsim/NOTICE.md), and surrogate models
-for stress testing — are results of the Horizon Europe project ACCURATE
+for stress testing — were developed in part within the Horizon Europe project ACCURATE
 (GA 101138269) and will be published as open access: source code under an OSI-approved
 open-source licence, publications and documentation under CC BY 4.0. See
 [`COPYRIGHT.md`](COPYRIGHT.md) and the

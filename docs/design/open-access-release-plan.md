@@ -9,8 +9,9 @@
 
 ## 1. What is being released, and why
 
-The core algorithms of SuReSuite are results of the Horizon Europe project ACCURATE
-(GA 101138269) and are to be released publicly as open access:
+The core algorithms of SuReSuite — developed in part within the Horizon Europe project
+ACCURATE (GA 101138269) and in part within the PhD research — are to be released
+publicly as open access:
 
 1. **The supply chain network-analysis methods** — network-science metrics, node
    centrality and prominence, critical-node identification (to be extracted into the

@@ -73,6 +73,6 @@ accidental contract drift.
 
 ## Copyright, licence and funding
 
-Copyright © 2023–2026 Phu Nguyen. SCSIM is being prepared for open-access release as a
-result of the Horizon Europe project ACCURATE (GA 101138269); until a `LICENSE` file is
+Copyright © 2023–2026 Phu Nguyen. SCSIM is being prepared for open-access release; it was
+developed in part within the Horizon Europe project ACCURATE (GA 101138269). Until a `LICENSE` file is
 added here, all rights are reserved. See [`NOTICE.md`](NOTICE.md).

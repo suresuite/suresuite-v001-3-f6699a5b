@@ -1,7 +1,7 @@
 # SCSIM — supply chain simulation library and stress-test framework.
 # Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
 # release; see scsim/NOTICE.md for licensing, funding and citation.
-# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+# Developed in part within the ACCURATE project (Horizon Europe, GA 101138269).
 
 """Disruption timing and recovery metrics (audit 2026-09-22, WP 3: F-03/F-04/F-05).
 
