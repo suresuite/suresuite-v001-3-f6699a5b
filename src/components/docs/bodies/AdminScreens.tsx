@@ -28,8 +28,8 @@ const WHAT: Record<string, { what: string; care?: string }> = {
     care: "Two organizations can share a display name and are not the same organization.",
   },
   "/admin/projects": {
-    what: "Every project, across organizations.",
-    care: "Transferring a project or changing its owner hands the project role over with it: the owner must belong to the target organization, the previous owner's membership and the delegations they granted are removed, and on a move to another organization the members who do not belong to it lose their role on the project. An owner working in another of their organizations sees the project after switching to it.",
+    what: "Every project, across organizations, and for each one who is on it: its owner, its members and delegates, and the members of its organization, with each person's project role and rights.",
+    care: "A person sees a project only while its organization is the one they are working in, so a member from another organization is recorded but does not see it. Super admins are owner on every project and are listed only when they are recorded on it. Transferring a project or changing its owner hands the project role over with it: the owner must belong to the target organization, the previous owner's membership and the delegations they granted are removed, and on a move to another organization the members who do not belong to it lose their role on the project. An owner working in another of their organizations sees the project after switching to it.",
   },
   "/admin/models": {
     what: "Which AI models are configured and available.",

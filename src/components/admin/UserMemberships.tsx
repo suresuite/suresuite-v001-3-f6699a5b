@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { planRefusal } from '@/lib/auth/organizationPlan';
+import { PROJECT_ROLES, cap, day, endOfDay, toDateInput } from '@/components/admin/projectRoles';
 
 interface Actor { id: string; email?: string | null }
 interface OrgInfo {
@@ -52,18 +53,8 @@ interface Option { id: string; name: string; organization?: string | null }
 interface RpcResult { data: unknown; error: { message: string } | null }
 // The admin RPCs are not in the generated Database types; name only what is called.
 const db = supabase as unknown as { rpc: (fn: string, args?: Record<string, unknown>) => Promise<RpcResult> };
-const PROJECT_ROLES = ['owner', 'editor', 'analyst', 'viewer'] as const;
 const ORG_ROLES = [{ value: 'owner', label: 'Owner' }, { value: 'admin', label: 'Admin' }, { value: 'member', label: 'Member' }];
 const NONE = '__none__';
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const day = (iso: string) => new Date(iso).toLocaleDateString();
-/** A date input's day → the END of that day, local time, as an instant. */
-const endOfDay = (d: string) => (d ? new Date(`${d}T23:59:59`).toISOString() : null);
-const toDateInput = (iso: string | null) => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
 
 export function UserMemberships({ actor, userId, userLabel, onOrganizationChanged }: {
   actor: Actor; userId: string; userLabel: string; onOrganizationChanged?: () => void;
@@ -372,7 +363,9 @@ function AddMembership({ projects, onAdd }: {
   );
 }
 
-function RoleLegend({ matrix, caps }: { matrix: Record<string, Record<string, boolean>>; caps: { key: string; label: string }[] }) {
+export function RoleLegend({ matrix, caps, note = "A user's own overrides in Features above take precedence over the project role." }: {
+  matrix: Record<string, Record<string, boolean>>; caps: { key: string; label: string }[]; note?: string;
+}) {
   if (caps.length === 0) return null;
   return (
     <details className="mt-4 text-[12px]">
@@ -393,7 +386,7 @@ function RoleLegend({ matrix, caps }: { matrix: Record<string, Record<string, bo
         </table>
       </div>
       <p className="mt-2 text-[11px] text-muted-foreground">
-        A user's own overrides in Features above take precedence over the project role. Promoting an uploaded file needs Editor or Owner.
+        {note} Promoting an uploaded file needs Editor or Owner.
       </p>
     </details>
   );
