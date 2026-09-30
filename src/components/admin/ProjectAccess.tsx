@@ -101,8 +101,13 @@ export function ProjectAccessDialog({ projectId, projectName, users, actorId, ac
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-h-[85vh] md:max-w-3xl md:overflow-y-auto md:rounded-sm')}>
-        <DialogHeader>
+      <DialogContent
+        className={cn(
+          DIALOG_AS_SHEET,
+          'gap-0 p-0 md:max-w-3xl md:rounded-sm',
+        )}
+      >
+        <DialogHeader className="border-b border-[--hair-border] px-4 pb-3 pr-12 pt-4 md:px-6 md:pr-12 md:pt-6">
           <DialogTitle>Members &amp; access — “{projectName}”</DialogTitle>
           <DialogDescription>
             Who can see and work on this project, where their access comes from, and what they may do.
@@ -110,63 +115,66 @@ export function ProjectAccessDialog({ projectId, projectName, users, actorId, ac
           </DialogDescription>
         </DialogHeader>
 
-        {loading ? (
-          <div className="grid h-24 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-        ) : error || !data ? (
-          <div className="rounded-sm border border-[#bf2330]/40 bg-[#bf2330]/10 p-3 text-sm text-[#bf2330]">{error}</div>
-        ) : (
-          <div className="grid gap-4">
-            <section>
-              <div className={`${KX} mb-1`}>With a project role · {withRole.length}</div>
-              {withRole.length === 0 ? (
-                <div className="py-2 text-[12px] text-muted-foreground">Nobody holds a role on this project.</div>
-              ) : (
-                <div className="divide-y divide-[#e8e8ea] md:divide-[--hair-divider]">
-                  {withRole.map((p) => (
-                    <PersonRow key={p.user_id} p={p} orgName={orgName} caps={data.project_capabilities}
-                      onRole={(role) => (role === NONE ? removeMember(p) : setMember(p, role, p.member && !p.member.expired ? p.member.expires_at : null))}
-                      onExpiry={(iso) => p.member && setMember(p, p.member.project_role, iso)}
-                      onRemove={() => removeMember(p)} />
-                  ))}
-                </div>
-              )}
-            </section>
+        {/* The body caps its own height, so scrolling doesn't depend on how
+            DialogContent or DIALOG_AS_SHEET lay out their children. */}
+        <div className="max-h-[calc(90dvh-9rem)] overflow-y-auto overscroll-contain px-4 py-4 md:max-h-[calc(85vh-9rem)] md:px-6 md:pb-6">
+          {loading ? (
+            <div className="grid h-24 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : error || !data ? (
+            <div className="rounded-sm border border-[#bf2330]/40 bg-[#bf2330]/10 p-3 text-sm text-[#bf2330]">{error}</div>
+          ) : (
+            <div className="grid gap-4">
+              <AddMember users={addable} orgName={orgName}
+                onAdd={(userId, role, expiresAt, rationale) =>
+                  run('admin_set_project_member', { p_target_user_id: userId, p_project_role: role, p_expires_at: expiresAt, p_rationale: rationale || null },
+                    `Added as ${role}`)} />
 
-            <section>
-              <div className={`${KX} mb-1`}>In {orgName}, no project role · {orgOnly.length}</div>
-              {orgOnly.length === 0 ? (
-                <div className="py-2 text-[12px] text-muted-foreground">
-                  {data.organization_id ? `Every member of ${orgName} holds a role on this project.` : 'The project belongs to no organization.'}
-                </div>
-              ) : (
-                <>
-                  <p className="mb-1 text-[11px] text-muted-foreground">
-                    They see the project while {orgName} is the organization they are working in, and hold no project role on it.
-                  </p>
+              <section>
+                <div className={`${KX} mb-1`}>With a project role · {withRole.length}</div>
+                {withRole.length === 0 ? (
+                  <div className="py-2 text-[12px] text-muted-foreground">Nobody holds a role on this project.</div>
+                ) : (
                   <div className="divide-y divide-[#e8e8ea] md:divide-[--hair-divider]">
-                    {orgOnly.map((p) => (
+                    {withRole.map((p) => (
                       <PersonRow key={p.user_id} p={p} orgName={orgName} caps={data.project_capabilities}
-                        onRole={(role) => role !== NONE && setMember(p, role, null)}
-                        onExpiry={() => undefined} onRemove={() => undefined} />
+                        onRole={(role) => (role === NONE ? removeMember(p) : setMember(p, role, p.member && !p.member.expired ? p.member.expires_at : null))}
+                        onExpiry={(iso) => p.member && setMember(p, p.member.project_role, iso)}
+                        onRemove={() => removeMember(p)} />
                     ))}
                   </div>
-                </>
-              )}
-            </section>
+                )}
+              </section>
 
-            <AddMember users={addable} orgName={orgName}
-              onAdd={(userId, role, expiresAt, rationale) =>
-                run('admin_set_project_member', { p_target_user_id: userId, p_project_role: role, p_expires_at: expiresAt, p_rationale: rationale || null },
-                  `Added as ${role}`)} />
+              <section>
+                <div className={`${KX} mb-1`}>In {orgName}, no project role · {orgOnly.length}</div>
+                {orgOnly.length === 0 ? (
+                  <div className="py-2 text-[12px] text-muted-foreground">
+                    {data.organization_id ? `Every member of ${orgName} holds a role on this project.` : 'The project belongs to no organization.'}
+                  </div>
+                ) : (
+                  <>
+                    <p className="mb-1 text-[11px] text-muted-foreground">
+                      They see the project while {orgName} is the organization they are working in, and hold no project role on it.
+                    </p>
+                    <div className="divide-y divide-[#e8e8ea] md:divide-[--hair-divider]">
+                      {orgOnly.map((p) => (
+                        <PersonRow key={p.user_id} p={p} orgName={orgName} caps={data.project_capabilities}
+                          onRole={(role) => role !== NONE && setMember(p, role, null)}
+                          onExpiry={() => undefined} onRemove={() => undefined} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </section>
 
-            <RoleLegend matrix={data.role_matrix} caps={data.project_capabilities}
-              note="A person's own overrides on their user page take precedence over the project role." />
-          </div>
-        )}
+              <RoleLegend matrix={data.role_matrix} caps={data.project_capabilities}
+                note="A person's own overrides on their user page take precedence over the project role." />
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
-}
 
 function PersonRow({ p, orgName, caps, onRole, onExpiry, onRemove }: {
   p: Person; orgName: string; caps: { key: string; label: string }[];
@@ -273,7 +281,7 @@ function AddMember({ users, orgName, onAdd }: {
     if (ok) { setUserId(''); setUntil(''); setWhy(''); }
   };
   return (
-    <div className="border-t border-[--hair-border] pt-4">
+    <div className="border-b border-[--hair-border] pt-4">
       <div className={`${KX} mb-2`}>Add a member</div>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,2fr)_124px_150px_minmax(0,1.5fr)_auto] md:items-end [&>*]:min-w-0">
         <Select value={userId} onValueChange={setUserId}>
@@ -302,4 +310,5 @@ function AddMember({ users, orgName, onAdd }: {
       </p>
     </div>
   );
+}
 }
