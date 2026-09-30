@@ -17,7 +17,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { PAGE_CAPABILITIES, FEATURE_CAPABILITIES } from '@/lib/capabilities';
-import { AlertCircle, Ban, Check, Loader2 } from 'lucide-react';
+import { AlertCircle, Ban, Check, Copy, Loader2 } from 'lucide-react';
 import { describeExpiry, formatDate, passwordStatus, relativeDay } from '@/lib/auth/passwordPolicy';
 import { AVATAR_COLORS, DEFAULT_AVATAR_CLASS, avatarClass, isAvatarColor } from '@/lib/avatarColors';
 import { formatPlanDate, periodLabel, usage } from '@/lib/auth/organizationPlan';
@@ -63,8 +63,9 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   const initialTab = locked || params.get('tab') === 'password' ? 'password' : 'profile';
 
   const [tab, setTab] = useState(initialTab);
-  // The stored display name only; the account name is the placeholder, not a value
-  // that "Save changes" would silently copy into display_name.
+  const [copiedId, setCopiedId] = useState(false);
+  // The user name is the stored `display_name` only; the account name is the
+  // placeholder, not a value that "Save changes" would silently copy into it.
   const [displayName, setDisplayName] = useState(user?.display_name ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   // The avatar is the user's initial on a colour they choose; there is no image upload
@@ -89,7 +90,9 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
 
   const onSaveProfile = async () => {
     setSavingProfile(true);
-    // A blank string CLEARS the field; NULL would leave it unchanged (D206).
+    // A blank string CLEARS the field; NULL would leave it unchanged (D206). The first
+    // and last name are not sent: they identify the account holder and only an
+    // administrator changes them (D209).
     const { error } = await supabase.rpc('update_own_profile', {
       p_display_name: displayName.trim(),
       p_phone: phone.trim(),
@@ -103,6 +106,17 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
     }
     await refreshProfile();
     toast({ title: 'Profile updated' });
+  };
+
+  const onCopyId = async () => {
+    if (!user?.id) return;
+    try {
+      await navigator.clipboard.writeText(user.id);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 1500);
+    } catch {
+      toast({ title: 'Could not copy', description: 'Select the ID and copy it manually.', variant: 'destructive' });
+    }
   };
 
   const onChangePassword = async () => {
@@ -178,7 +192,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
           <Card>
             <CardHeader>
               <CardTitle>Profile information</CardTitle>
-              <CardDescription>Your name and contact details visible to teammates.</CardDescription>
+              <CardDescription>Who this account belongs to, and the user name and contact details visible to teammates.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center gap-4">
@@ -213,6 +227,37 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="user_id">User ID</Label>
+                  <div className="flex gap-2">
+                    <Input id="user_id" value={user?.id ?? ''} readOnly className="font-mono text-xs md:text-sm" onFocus={(e) => e.target.select()} />
+                    <Button type="button" variant="outline" size="icon" className="h-11 w-11 md:h-10 md:w-10 shrink-0" onClick={onCopyId} aria-label="Copy user ID" title="Copy user ID">
+                      {copiedId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Your account's permanent identifier — it does not change when your name or email does.
+                    API keys you create on the Developer API page are recorded as created by this ID.
+                  </p>
+                </div>
+                {/* D209 — the account holder's identity, as an administrator recorded it. Read-only
+                    here so every action stays attributable to an identified person. */}
+                <div className="space-y-2">
+                  <Label htmlFor="first_name">First name</Label>
+                  <Input id="first_name" value={user?.first_name ?? ''} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="last_name">Last name</Label>
+                  <Input id="last_name" value={user?.last_name ?? ''} placeholder="—" disabled />
+                </div>
+                <p className="-mt-2 text-xs text-muted-foreground sm:col-span-2">
+                  Your first and last name identify you as the account holder and can only be changed by an administrator.
+                </p>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="display_name">User name</Label>
+                  <Input id="display_name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={user?.name ?? ''} autoComplete="nickname" />
+                  <p className="text-xs text-muted-foreground">The name shown in the navigation bar and account menu. Leave blank to use your full name.</p>
+                </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
                   <Input value={user?.email ?? ''} disabled />
@@ -246,10 +291,6 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                 <div className="space-y-2">
                   <Label>Organization projects</Label>
                   <Input value={user?.projects_used == null ? '—' : usage(user.projects_used, user.project_limit)} disabled />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="display_name">Display name</Label>
-                  <Input id="display_name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={user?.name ?? ''} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="phone">Phone</Label>

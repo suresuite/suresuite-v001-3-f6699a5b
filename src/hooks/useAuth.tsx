@@ -6,6 +6,9 @@ import { mintAndVerifySession } from '@/lib/auth/sessionMint';
 interface User {
   id: string;
   name: string;
+  /** The parts of `name`, derived by the database and read-only to the user (D209). */
+  first_name?: string | null;
+  last_name?: string | null;
   email: string;
   role: string;
   organization: string;
@@ -50,6 +53,8 @@ async function readProfile(userId: string) {
   return {
     profile: {
       name: p.name as string | null,
+      first_name: p.first_name as string | null,
+      last_name: p.last_name as string | null,
       role: p.role as string | null,
       organization: p.organization as string | null,
       display_name: p.display_name as string | null,

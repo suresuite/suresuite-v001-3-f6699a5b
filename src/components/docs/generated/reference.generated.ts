@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 693;
+export const REFERENCE_COLUMN_COUNT = 695;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -772,7 +772,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "Profile.tsx",
         "via": "rpc change_own_password",
-        "evidence": "src/pages/Profile.tsx:122"
+        "evidence": "src/pages/Profile.tsx:136"
       }
     ],
     "governance": {
@@ -821,7 +821,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": "non-empty",
-        "meaning": "The person's name as entered when the account was approved.",
+        "meaning": "The account holder's full name, as entered when the account was approved. Their identity for accountability: its owner cannot change it (§4 D209) — `update_own_profile` has no parameter for it — and only the administrator paths write it. `first_name` / `last_name` are a reading of it.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1003,7 +1003,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The name the user chose for themselves, overriding `name` in the UI.",
+        "meaning": "The name the user chose for themselves, overriding `name` in the UI — labelled \"User name\" on /profile, and the one name its owner can change (§4 D209). It never replaces `name` as the account holder's identity.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1219,6 +1219,68 @@ export const REFERENCE_TABLES: RefTable[] = [
             "value": "the theme's primary colour",
             "provenance": "default",
             "visibleAs": "the \"Default\" swatch, selected, on /profile"
+          }
+        ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "first_name",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "never accepted from a client",
+        "meaning": "The first word of `name` (§4 D209), derived by the `approved_users_derive_name_parts` trigger on every write that names `name` or either part, so a value written into it directly is overwritten. Shown read-only on /profile; changed only by an administrator changing `name`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "always — the column is derived, never authored",
+            "value": "the first word of `name` (`split_person_name`)",
+            "provenance": "default",
+            "visibleAs": "the read-only First name field on /profile"
+          }
+        ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "last_name",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "never accepted from a client",
+        "meaning": "`name` after its first word (§4 D209); NULL when the name is one word. Derived with `first_name` by the same trigger, read-only on /profile.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "always — the column is derived, never authored",
+            "value": "everything in `name` after its first word (`split_person_name`)",
+            "provenance": "default",
+            "visibleAs": "the read-only Last name field on /profile"
           }
         ],
         "engineChain": null,

@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 354,
-  "migrations_applied": 346,
+  "migrations_found": 355,
+  "migrations_applied": 347,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260930000002_admin_delete_organization.sql",
+  "last_migration": "20260930000003_account_identity_name_parts.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 307,
+    "functions": 309,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -2895,6 +2895,30 @@
           "unique": false,
           "references": null,
           "added_by": "20260929000003_account_self_service_names_its_user.sql"
+        },
+        {
+          "name": "first_name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000003_account_identity_name_parts.sql"
+        },
+        {
+          "name": "last_name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000003_account_identity_name_parts.sql"
         }
       ],
       "constraints": [
@@ -21967,6 +21991,16 @@
       "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
+      "name": "approved_users_derive_name_parts",
+      "signature": "approved_users_derive_name_parts()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path",
+      "security_definer": false,
+      "volatility": null,
+      "comment": "D209 — derives approved_users.first_name / last_name from name on every write that ",
+      "defined_by": "20260930000003_account_identity_name_parts.sql"
+    },
+    {
       "name": "approved_users_enforce_org_allowance",
       "signature": "approved_users_enforce_org_allowance()",
       "args": [],
@@ -23388,11 +23422,11 @@
       "args": [
         "p_user_id uuid DEFAULT NULL"
       ],
-      "returns": "TABLE( id uuid, email text, name text, display_name text, phone text, avatar_color text, role text, organization text, is_active boolean, force_password_change boolean, password_changed_at timestamptz, password_expires_at timestamptz, password_expired boolean, password_max_age_days integer, access_period text, access_valid_from timestamptz, access_valid_until timestamptz, access_expired boolean, access_exempt boolean, project_limit integer, projects_used bigint, user_limit integer, users_used bigint )",
+      "returns": "TABLE( id uuid, email text, name text, first_name text, last_name text, display_name text, phone text, avatar_color text, role text, organization text, is_active boolean, force_password_change boolean, password_changed_at timestamptz, password_expires_at timestamptz, password_expired boolean, password_max_age_days integer, access_period text, access_valid_from timestamptz, access_valid_until timestamptz, access_expired boolean, access_exempt boolean, project_limit integer, projects_used bigint, user_limit integer, users_used bigint )",
       "security_definer": true,
       "volatility": null,
-      "comment": "D206, D207 — the signed-in user's own account row, with password_expired computed on ",
-      "defined_by": "20260929000004_organization_plan.sql"
+      "comment": "D206, D207, D209 — the signed-in user's own account row: their name whole and as ",
+      "defined_by": "20260930000003_account_identity_name_parts.sql"
     },
     {
       "name": "get_network_edges_for_prominence",
@@ -24954,6 +24988,18 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260919000007_decision_plane_actor.sql"
+    },
+    {
+      "name": "split_person_name",
+      "signature": "split_person_name(text)",
+      "args": [
+        "p_name text"
+      ],
+      "returns": "text[] LANGUAGE sql IMMUTABLE PARALLEL SAFE SET search_path",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": "D209 — a full name as {first word, the rest}, each NULL when empty. The one ",
+      "defined_by": "20260930000003_account_identity_name_parts.sql"
     },
     {
       "name": "supersede_agent_proposal",
