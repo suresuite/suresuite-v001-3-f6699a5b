@@ -28,6 +28,7 @@ import {
   ColResizeHandle,
   RowFlag,
   SortHeader,
+  FilterInput,
   rowAccent,
   type Provenance,
 } from "./policyGridUi";
@@ -2701,14 +2702,13 @@ export function StagePolicyTable({
                   <div className="flex h-[23px] items-center">
                     {treePivot && (
                       <>
-                        <input
+                        <FilterInput
                           value={colFilters[materialColId] ?? ""}
-                          onChange={(e) => setColFilter(materialColId, e.target.value)}
+                          onCommit={(v) => setColFilter(materialColId, v)}
                           placeholder="Filter… opens the path to matches"
-                          aria-label="Filter materials — opens the path to matches"
-                          size={1}
-                          style={{ boxSizing: "border-box", minWidth: 0, width: 240 }}
-                          className="ml-1.5 h-[17px] shrink-0 rounded border border-[--zinc-border] bg-white px-[5px] text-[10px] text-foreground outline-none placeholder:text-[#a3a3a3] focus:border-foreground"
+                          ariaLabel="Filter materials — opens the path to matches"
+                          style={{ width: 240 }}
+                          className="ml-1.5 h-[17px] shrink-0"
                         />
                         <span className="ml-2 min-w-0 truncate font-mono text-[9px] text-white/55">{treeMaterialSub}</span>
                       </>

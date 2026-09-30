@@ -6,7 +6,7 @@
  * sort glyph and the per-cell <Select>s. Everything here is presentational;
  * resolution/draft logic stays in StagePolicyTable.
  */
-import React, { useRef } from "react";
+import React, { startTransition, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { LAYER, tint } from "@/components/intelligence/piUi";
 
@@ -367,16 +367,106 @@ export function SortHeader({
         </span>
       )}
       {onFilter && (
-        <input
+        <FilterInput
           value={filter ?? ""}
-          onChange={(e) => onFilter(e.target.value)}
+          onCommit={onFilter}
           placeholder={filterPlaceholder ?? "filter"}
-          size={1}
-          style={{ boxSizing: "border-box", minWidth: 0 }}
-          className="h-[18px] w-full rounded border border-[--zinc-border] bg-white px-[5px] text-[10px] text-foreground outline-none placeholder:text-[#a3a3a3] focus:border-foreground"
+          ariaLabel={`Filter ${label}`}
+          className="h-[18px] w-full"
         />
       )}
     </div>
+  );
+}
+
+/**
+ * A grid filter box whose TYPING never waits on the grid.
+ *
+ * The policy grid is not virtualized: every row and every cell re-renders when a
+ * filter changes. Wired straight to `onChange`, each keystroke re-filtered and
+ * re-rendered the whole table before the character could appear, so typing lagged
+ * and dropped letters on any real project. The text is held here; the grid hears
+ * about it after a short pause (or at once on Enter / blur) inside a transition, so
+ * React can interrupt that render for the next keystroke. Escape clears.
+ *
+ * `value` is still the source of truth for the committed filter: when the parent
+ * changes it (clear filters, a stage or project switch) the box adopts it.
+ */
+export function FilterInput({
+  value,
+  onCommit,
+  placeholder,
+  ariaLabel,
+  className,
+  style,
+  delayMs = 200,
+}: {
+  value: string;
+  onCommit: (v: string) => void;
+  placeholder?: string;
+  ariaLabel?: string;
+  className?: string;
+  style?: React.CSSProperties;
+  delayMs?: number;
+}) {
+  const [text, setText] = useState(value);
+  const committed = useRef(value);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onCommitRef = useRef(onCommit);
+  onCommitRef.current = onCommit;
+
+  const cancel = () => {
+    if (timer.current !== null) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  };
+  const commit = (v: string) => {
+    cancel();
+    if (v === committed.current) return;
+    committed.current = v;
+    startTransition(() => onCommitRef.current(v));
+  };
+
+  // The parent reset the filter: drop any pending keystrokes and show its value.
+  useEffect(() => {
+    if (value !== committed.current) {
+      cancel();
+      committed.current = value;
+      setText(value);
+    }
+  }, [value]);
+  useEffect(() => cancel, []);
+
+  return (
+    <input
+      value={text}
+      onChange={(e) => {
+        const v = e.target.value;
+        setText(v);
+        cancel();
+        timer.current = setTimeout(() => commit(v), delayMs);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit(text);
+        else if (e.key === "Escape" && text !== "") {
+          e.stopPropagation();
+          setText("");
+          commit("");
+        }
+      }}
+      onBlur={() => commit(text)}
+      placeholder={placeholder}
+      aria-label={ariaLabel ?? placeholder}
+      autoComplete="off"
+      spellCheck={false}
+      size={1}
+      style={{ boxSizing: "border-box", minWidth: 0, ...style }}
+      className={cn(
+        "rounded border border-[--zinc-border] bg-white px-[5px] text-[10px] text-foreground outline-none placeholder:text-[#a3a3a3] focus:border-foreground",
+        className,
+      )}
+    />
   );
 }
 
