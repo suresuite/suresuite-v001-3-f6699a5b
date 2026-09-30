@@ -8,6 +8,7 @@
 // selector can come back later, but no surface may select them today: the
 // effective unit is always PLANNING_UNIT, whatever an older session stored.
 import { useCallback, useEffect, useState } from "react";
+import { UNIT_DAYS } from "../../supabase/functions/_shared/grading";
 
 export type TimeUnit = "day" | "week" | "month";
 
@@ -31,10 +32,12 @@ export const UNIT_LABEL_PLURAL: Record<TimeUnit, string> = {
   month: "months",
 };
 
+/** Read from the one unit table (`contract:units` gates it), never restated:
+ *  a second `month: 30` here disagreed with its 30.4375 (§4 D225). */
 export const DAYS_PER_UNIT: Record<TimeUnit, number> = {
-  day: 1,
-  week: 7,
-  month: 30,
+  day: UNIT_DAYS.day,
+  week: UNIT_DAYS.week,
+  month: UNIT_DAYS.month,
 };
 
 const storageKey = (projectId: string | null | undefined) =>

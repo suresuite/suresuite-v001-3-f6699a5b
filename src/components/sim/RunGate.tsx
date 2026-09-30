@@ -3,12 +3,8 @@ import { cn } from "@/lib/utils";
 import { LAYER } from "@/components/intelligence/piUi";
 
 /**
- * The run gate, made legible without being louder.
- *
- * runBlockedReason used to hide in a `title` attribute on a disabled button.
- * Now: dots + counts sit next to the Run control, the reason is visible text,
- * and the findings table stays the detail. The acknowledge-to-run path is
- * unchanged — same ackWarnings state, same dispatch call.
+ * The run gate's findings table. The gate itself — reason, button, readout — is
+ * one `RunGateState` (lib/sim/runGate.ts) rendered by RunCard (WP 9.4 slice 2).
  */
 
 const SEV_COLOR: Record<string, string> = { block: LAYER.brand, warn: LAYER.firm, info: "#d4d4d8" };
@@ -20,87 +16,6 @@ export interface Finding {
   policy?: string;
   message: string;
   hint?: string;
-}
-
-export function GateBar({
-  blocks,
-  warns,
-  acknowledged,
-  reason,
-  dirty,
-  onRun,
-  onSaveVersionAndRun,
-  onShowFindings,
-}: {
-  blocks: number;
-  warns: number;
-  acknowledged: boolean;
-  reason: string | null;
-  dirty: boolean;
-  onRun: () => void;
-  onSaveVersionAndRun: () => void;
-  onShowFindings: () => void;
-}) {
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  const canRun = !reason;
-
-  return (
-    // Three children on one non-wrapping row squeeze to nothing at 320px.
-    <div className="flex flex-wrap items-center gap-3 border-t border-[--hair-rule] bg-[#fafafa] px-3 py-[9px] md:flex-nowrap">
-      <button
-        type="button"
-        onClick={onShowFindings}
-        className="flex min-h-11 items-center gap-3 rounded-sm border border-[--hair-rule] bg-white px-[10px] py-[5px] md:min-h-0"
-      >
-        <span className="flex items-center gap-[7px]">
-          <span
-            className="h-[7px] w-[7px] rounded-full"
-            style={{ background: blocks > 0 ? LAYER.brand : "#d4d4d8" }}
-          />
-          <span className="whitespace-nowrap text-[12.5px] text-[#27272a]">
-            {plural(blocks, "blocking finding", "blocking findings")}
-          </span>
-        </span>
-        <span className="flex items-center gap-[7px]">
-          <span
-            className="h-[7px] w-[7px] rounded-full"
-            style={{
-              background: warns > 0 ? (acknowledged ? LAYER.process : LAYER.firm) : "#d4d4d8",
-            }}
-          />
-          <span className="whitespace-nowrap text-[12.5px] text-[#27272a]">
-            {plural(warns, "warning", "warnings")}
-          </span>
-        </span>
-      </button>
-
-      {/* the Run control always says why it can't fire */}
-      {/* §3.1: the reason a control is disabled is on the never-truncate
-          list. It wraps below `md`; `md:truncate` is the desktop literal. */}
-      <span
-        className="min-w-0 flex-1 basis-full text-[12.5px] [text-wrap:pretty] md:basis-auto md:truncate"
-        style={{ color: blocks > 0 ? LAYER.brand : reason ? LAYER.firm : "#a1a1aa" }}
-        title={reason ?? undefined}
-      >
-        {reason ?? ""}
-      </span>
-
-      <button
-        type="button"
-        disabled={!canRun}
-        onClick={dirty ? onSaveVersionAndRun : onRun}
-        className={cn(
-          "h-[30px] min-h-11 rounded-sm border text-[13px] font-medium md:min-h-0",
-          dirty ? "px-[14px]" : "px-5",
-          canRun
-            ? "border-foreground bg-foreground text-background"
-            : "cursor-not-allowed border-[--hair-rule] bg-[#f4f4f5] text-[#a1a1aa]",
-        )}
-      >
-        {dirty ? "Save version & run" : warns > 0 && acknowledged ? "Acknowledge & run" : "Run"}
-      </button>
-    </div>
-  );
 }
 
 export function FindingsPanel<F extends Finding>({
@@ -115,7 +30,8 @@ export function FindingsPanel<F extends Finding>({
   source: string;
   warns: number;
   acknowledged: boolean;
-  onAcknowledge: () => void;
+  /** omitted when the acknowledgement lives elsewhere (RunCard) */
+  onAcknowledge?: () => void;
   /** per-finding inline remediation (e.g. supplier assignment) */
   renderFix?: (f: F) => ReactNode;
 }) {
@@ -182,7 +98,7 @@ export function FindingsPanel<F extends Finding>({
         </div>
       ))}
 
-      {warns > 0 ? (
+      {warns > 0 && onAcknowledge ? (
         <button
           type="button"
           onClick={onAcknowledge}

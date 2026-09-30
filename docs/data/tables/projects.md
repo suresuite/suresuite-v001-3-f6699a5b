@@ -313,11 +313,11 @@ First day of the horizon the project simulates.
 | Validated at ingest | — |
 | Rendered at | `[object Object]`, `[object Object]`, `[object Object]` |
 
-**Rendered on** `FirmLevelNetwork.tsx` (`src/components/DisruptionDialog.tsx:254`), `ProcessLevelNetwork.tsx` (`src/components/DisruptionDialog.tsx:254`), `ProductLevelNetwork.tsx` (`src/components/DisruptionDialog.tsx:254`) —
+**Rendered on** `FirmLevelNetwork.tsx` (`src/components/network/NetworkDisruptionDialog.tsx:353`), `ProcessLevelNetwork.tsx` (`src/components/network/NetworkDisruptionDialog.tsx:353`), `ProductLevelNetwork.tsx` (`src/components/network/NetworkDisruptionDialog.tsx:353`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
-> NOT TRACED into `scsim` from this column: the worker takes the horizon from the run request, not from the project row. The two can disagree, and nothing today reconciles them — recorded rather than implied (§5 T1).
+> NOT TRACED into `scsim` from this column: the worker takes the horizon from the run request, not from the project row. The two can disagree, and nothing today reconciles them — recorded rather than implied (§5 T1). Since WP 9.4 the network pages' disruption dialog reads it for ONE thing: an approximate calendar date beside a run week, labelled as such and never stored — the event itself is authored in run weeks.
 
 ### `simulation_end`
 
@@ -331,13 +331,9 @@ Last day of the horizon the project simulates.
 | Added by | `20250828000823_c0efd8c6-4b46-444d-bb81-b5b76c988c4f.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
-| Rendered at | `[object Object]`, `[object Object]`, `[object Object]` |
+| Rendered at | *not yet recorded (WP 5.1)* |
 
-**Rendered on** `FirmLevelNetwork.tsx` (`src/components/DisruptionDialog.tsx:254`), `ProcessLevelNetwork.tsx` (`src/components/DisruptionDialog.tsx:254`), `ProductLevelNetwork.tsx` (`src/components/DisruptionDialog.tsx:254`) —
-each of these names this column in an explicit `select` list, so the claim
-is about the column and not only about the table.
-
-> As `simulation_start` — the run request is what the engine actually reads.
+> As `simulation_start` — the run request is what the engine actually reads. No screen reads it since WP 9.4: the network pages' disruption dialog used it to bound a date picker, and the dialog now authors run weeks (§4 D228).
 
 ### `plant_latitude`
 
@@ -445,6 +441,6 @@ The owning organization by uuid. This is what the public /v1 API authorizes on (
 
 ---
 
-*Generated from data contract `1810759ef6a5`, engine `0.2.8`,
+*Generated from data contract `75b0effebe46`, engine `0.2.8`,
 sidecar `supabase/contract/projects.contract.yaml`, table created by `20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

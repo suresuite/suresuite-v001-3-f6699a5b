@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 364,
-      "migrations_applied": 356,
-      "last_migration": "20260930000012_organization_limit_options.sql"
+      "migrations_found": 365,
+      "migrations_applied": 357,
+      "last_migration": "20261001000001_scenario_role.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -18,8 +18,8 @@
   "counts": {
     "tables_in_schema": 81,
     "tables_covered": 55,
-    "columns_covered": 696,
-    "check_constraints": 54,
+    "columns_covered": 697,
+    "check_constraints": 55,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -23795,26 +23795,26 @@
               "page": "FirmLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/DisruptionDialog.tsx:254",
+              "evidence": "src/components/network/NetworkDisruptionDialog.tsx:353",
               "confirmed": true
             },
             {
               "page": "ProcessLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/DisruptionDialog.tsx:254",
+              "evidence": "src/components/network/NetworkDisruptionDialog.tsx:353",
               "confirmed": true
             },
             {
               "page": "ProductLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/DisruptionDialog.tsx:254",
+              "evidence": "src/components/network/NetworkDisruptionDialog.tsx:353",
               "confirmed": true
             }
           ],
           "resolution": null,
-          "note": "NOT TRACED into `scsim` from this column: the worker takes the horizon from the run request, not from the project row. The two can disagree, and nothing today reconciles them — recorded rather than implied (§5 T1).",
+          "note": "NOT TRACED into `scsim` from this column: the worker takes the horizon from the run request, not from the project row. The two can disagree, and nothing today reconciles them — recorded rather than implied (§5 T1). Since WP 9.4 the network pages' disruption dialog reads it for ONE thing: an approximate calendar date beside a run week, labelled as such and never stored — the event itself is authored in run weeks.",
           "engine_requirement": null
         },
         {
@@ -23844,31 +23844,9 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [
-            {
-              "page": "FirmLevelNetwork.tsx",
-              "via": "table read",
-              "grain": "column",
-              "evidence": "src/components/DisruptionDialog.tsx:254",
-              "confirmed": true
-            },
-            {
-              "page": "ProcessLevelNetwork.tsx",
-              "via": "table read",
-              "grain": "column",
-              "evidence": "src/components/DisruptionDialog.tsx:254",
-              "confirmed": true
-            },
-            {
-              "page": "ProductLevelNetwork.tsx",
-              "via": "table read",
-              "grain": "column",
-              "evidence": "src/components/DisruptionDialog.tsx:254",
-              "confirmed": true
-            }
-          ],
+          "surfaces": [],
           "resolution": null,
-          "note": "As `simulation_start` — the run request is what the engine actually reads.",
+          "note": "As `simulation_start` — the run request is what the engine actually reads. No screen reads it since WP 9.4: the network pages' disruption dialog used it to bound a date picker, and the dialog now authors run weeks (§4 D228).",
           "engine_requirement": null
         },
         {
@@ -25257,7 +25235,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "hook useSimulationRun → select * from run_replications",
           "grain": "table",
-          "evidence": "src/hooks/useSimulationRun.tsx:127",
+          "evidence": "src/hooks/useSimulationRun.tsx:85",
           "confirmed": true,
           "note": "Both result surfaces reach this table through the SAME hook, so the evidence is the hook's read rather than either page's render. Run & Validate reads every replication of the newest run: the weekly series charts, the financial statement, the per-seed explorer and the inventory chart all render from these rows."
         },
@@ -25265,7 +25243,7 @@
           "page": "SimulationLab.tsx",
           "via": "hook useSimulationRun::loadReps → select * from run_replications",
           "grain": "table",
-          "evidence": "src/hooks/useSimulationRun.tsx:261",
+          "evidence": "src/hooks/useSimulationRun.tsx:189",
           "confirmed": true
         },
         {
@@ -26370,6 +26348,14 @@
             "id"
           ],
           "name": "scenarios_pkey"
+        },
+        {
+          "source": "partial UNIQUE index",
+          "columns": [
+            "project_id"
+          ],
+          "name": "scenarios_one_validation_baseline",
+          "predicate": "role = 'validation_baseline'"
         }
       ],
       "natural_key_intended": null,
@@ -26379,7 +26365,7 @@
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/useScenarios.tsx:70",
+          "evidence": "src/hooks/useScenarios.tsx:109",
           "confirmed": true
         },
         {
@@ -26436,6 +26422,13 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        },
+        {
+          "name": "scenarios_role_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (role IN ('experiment', 'validation_baseline'))",
+          "added_by": "20261001000001_scenario_role.sql"
         }
       ],
       "indexes": [
@@ -26449,6 +26442,17 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        },
+        {
+          "name": "scenarios_one_validation_baseline",
+          "unique": true,
+          "columns": [
+            "project_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "role = 'validation_baseline'",
+          "partial": true,
+          "added_by": "20261001000001_scenario_role.sql"
         }
       ],
       "columns": [
@@ -26632,7 +26636,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The granularity the scenario was set up at — `day` by default. A NAME, from a small fixed vocabulary, with no table behind it.",
+          "meaning": "A step-size label (`day` by default) that NO run reads: the engine steps in weeks (`run_window.days_per_tick`), and no screen offers the control any more (WP 9.4). Retained because the model card's baseline fingerprint (`_build_scenario_fingerprint`, fingerprint v1) hashes it, so dropping or rewriting it would turn every validated scenario stale. A new scenario copies its baseline's value rather than choosing one (§4 D222).",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -27165,8 +27169,40 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The validation run this scenario inherited its data-readiness verdict from, so a re-run does not re-grade an unchanged dataset. NULL where it was never graded — and that is different from graded-and-clean.",
+          "meaning": "The model card (`model_validations.id`) whose adopted warm-up and recommended replication count `apply_validation_to_scenario` wrote into this scenario. NULL where nothing was inherited, or where a person hand-edited either value afterwards — divergence from the validated settings is explicit, never silent. A credibility provenance, not a data-readiness grade, which is what this line said until §4 D222.",
           "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": false,
+          "default": "'experiment'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000001_scenario_role.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What the scenario is for — `experiment`, a what-if a person set up in the Lab (the default), or `validation_baseline`, the one scenario per project that Run & Validate on /policies runs its validation into (a partial unique index keeps it to one). The Lab pins the baseline, shows it read-only and reuses its run, and every new scenario is seeded from it. It replaced finding that scenario by its display name, which a rename broke (§4 D227). The door a scenario came through is `from_network`, a different fact.",
+          "grain": "metadata",
           "computed_by": null,
           "engine": {
             "consumed_by": null,
@@ -31357,5 +31393,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "1810759ef6a5"
+  "contract_version": "75b0effebe46"
 }

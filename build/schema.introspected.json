@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 364,
-  "migrations_applied": 356,
+  "migrations_found": 365,
+  "migrations_applied": 357,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260930000012_organization_limit_options.sql",
+  "last_migration": "20261001000001_scenario_role.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 326,
+    "functions": 327,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -16892,6 +16892,18 @@
             "on_delete": "SET NULL"
           },
           "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "role",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'experiment'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000001_scenario_role.sql"
         }
       ],
       "constraints": [
@@ -16904,6 +16916,13 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        },
+        {
+          "name": "scenarios_role_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (role IN ('experiment', 'validation_baseline'))",
+          "added_by": "20261001000001_scenario_role.sql"
         }
       ],
       "indexes": [
@@ -16917,6 +16936,17 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        },
+        {
+          "name": "scenarios_one_validation_baseline",
+          "unique": true,
+          "columns": [
+            "project_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "role = 'validation_baseline'",
+          "partial": true,
+          "added_by": "20261001000001_scenario_role.sql"
         }
       ],
       "rls": {
@@ -16956,6 +16986,14 @@
             "id"
           ],
           "name": "scenarios_pkey"
+        },
+        {
+          "source": "partial UNIQUE index",
+          "columns": [
+            "project_id"
+          ],
+          "name": "scenarios_one_validation_baseline",
+          "predicate": "role = 'validation_baseline'"
         }
       ]
     },
@@ -25003,6 +25041,18 @@
       "volatility": "STABLE",
       "comment": null,
       "defined_by": "20260710000001_model_validations.sql"
+    },
+    {
+      "name": "scenarios_assign_validation_baseline",
+      "signature": "scenarios_assign_validation_baseline(uuid)",
+      "args": [
+        "p_project_id uuid DEFAULT NULL"
+      ],
+      "returns": "integer LANGUAGE plpgsql SET search_path",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000001_scenario_role.sql"
     },
     {
       "name": "search_chat_messages",

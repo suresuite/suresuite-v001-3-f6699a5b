@@ -146,14 +146,22 @@ console.log("── data-plane preflight (anon grants)");
   }
 }
 
-// ── 3. find-or-create the auto validation scenario (same as the UI) ─────────
+// ── 3. find-or-create the validated baseline scenario (same as the UI) ──────
+// By `scenarios.role` (§4 D227); by name only while the column has not deployed.
 console.log("── preparing scenario");
 const SCENARIO_NAME = "Policy validation (auto)";
 let scenarioId = null;
+let hasRole = true;
 {
-  const found = await rest(
-    `scenarios?select=id&project_id=eq.${projectId}&name=eq.${encodeURIComponent(SCENARIO_NAME)}&limit=1`,
+  let found = await rest(
+    `scenarios?select=id&project_id=eq.${projectId}&role=eq.validation_baseline&limit=1`,
   );
+  if (found.status !== 200) {
+    hasRole = false;
+    found = await rest(
+      `scenarios?select=id&project_id=eq.${projectId}&name=eq.${encodeURIComponent(SCENARIO_NAME)}&limit=1`,
+    );
+  }
   if (found.status === 200 && found.body.length > 0) {
     scenarioId = found.body[0].id;
   } else {
@@ -163,6 +171,7 @@ let scenarioId = null;
       body: JSON.stringify({
         project_id: projectId,
         name: SCENARIO_NAME,
+        ...(hasRole ? { role: "validation_baseline" } : {}),
         description: "",
         horizon_days: HORIZON_DAYS,
         replications: REPLICATIONS,

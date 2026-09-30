@@ -690,6 +690,14 @@ Two runs are *comparable* iff they are CRN-paired (same seed spec) and their Run
 > engine versions each block the table and name the reason instead. The paired *statistics* remain
 > Phase C: the pane reports the stored aggregates, their 95% CI half-widths, and whether the
 > intervals separate — not yet a paired-t over the CRN-matched replication pairs.
+>
+> **WP 9.4 (2026-09-30): the disruption-impact component was missing.** The predicate compared
+> `policy_version_id` and the stamped `scenario_hash` only — and that hash is the card's baseline
+> fingerprint, which EXCLUDES the disruption schedule (B0 §2.3). So the one comparison a stress
+> test exists for — the validated baseline against the same model under a disruption — read
+> "nothing to compare". The rule (`src/lib/sim/comparability.ts`) now has three components —
+> policies, world, and the run's stamped disruption schedule — reads the seed from the run rather
+> than the live scenario, and the pane picks the validated baseline as A by default (PLAN.md §4 D221).
 
 ### 9.4 Worker orchestration
 
@@ -892,6 +900,8 @@ rank_criticality job
 
 Triggers: on-demand (analyst), scheduled (quarterly stress review, annual supplier-panel refresh), event-driven (new `dataset_version`). Every stage is idempotent and resumable because every intermediate is content-addressed — a crashed job re-runs only missing cells.
 
+**Where it surfaces (placeholder shipped, WP 9.4).** In the product this job is named **"Surrogate model: nexus node detection"** — the nodes it ranks highest are the network's nexus nodes, the ones whose loss hurts most. Its entry point sits in the Simulation Lab's left column, directly below *Stress-test experiments*, because a stress test is the question and the ranking is what decides which stress tests are worth simulating. Until Phase D lands it is a non-interactive "coming soon" card (`src/components/sim/SurrogateCard.tsx`) that prints no figure, per the A3 honest-catalog rule: a placeholder ranking would be an invented number on the surface that chooses what to simulate. It is distinct from the network pages' existing "Nexus node prediction" panel (`MLPrediction.tsx`, the `predict-critical-nodes` function), which is not this job and carries none of §11.4's validity scoping; reconciling the two is part of Phase D.
+
 ### 11.6 Storage concepts (summary)
 
 New conceptual stores introduced by §§8–11, all following the established immutable-snapshot-plus-hash pattern (A5) — concept-level only, no DDL here:
@@ -1088,7 +1098,7 @@ first slice of G10/§9.2.
 - **Exit:** a full ST-1 battery over a reference network runs sharded, cache-aware, and a repeat run costs near-zero compute. **Closes:** G8, G9, G10; G11 substantially.
 
 ### Phase D — AI-native
-- Surrogate pipeline + `surrogate_models` registry + `rank_criticality` analysis job with dual-gate fallback (§11).
+- Surrogate pipeline + `surrogate_models` registry + `rank_criticality` analysis job with dual-gate fallback (§11). Surfaces as "Surrogate model: nexus node detection" in the Simulation Lab, where a placeholder card already stands (§11.5).
 - Drift-triggered retraining; provenance-labeled rankings in the UI.
 - LLM assist (flagged): the five-agent roster completed (§12, per `docs/design/ai-agents.md` Stages 4–5) — B4 Experiment Designer and B5 Explainer join B1–B3 landed with their rooms in Phases B/C; golden agent-task suites in CI.
 - Legacy engine removal (gate E4).

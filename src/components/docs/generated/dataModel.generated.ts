@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "1810759ef6a5";
+export const CONTRACT_VERSION = "75b0effebe46";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20260930000012_organization_limit_options.sql";
+export const LAST_MIGRATION = "20261001000001_scenario_role.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
   "tablesDescribed": 55,
-  "columnsDescribed": 696,
+  "columnsDescribed": 697,
   "tablesUndescribed": 26
 } as const;
 
@@ -297,7 +297,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "scenarios",
         "grain": "One what-if a person set up and can run: the horizon, the warm-up, the replications, the seed, the demand model, the disruption schedule and the recovery overrides. The scenario half of `result-binding` (I8) — a run cites one of these rows, and the export reads it back whole.",
-        "columns": 22,
+        "columns": 23,
         "owner": "engine"
       }
     ]

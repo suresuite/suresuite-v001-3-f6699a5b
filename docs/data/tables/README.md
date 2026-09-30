@@ -6,7 +6,7 @@
 > `supabase/contract/`, not these pages.
 
 55 of 81 tables are covered,
-696 columns in all. A table that is not here is listed
+697 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -59,7 +59,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`role_capabilities`](role_capabilities.md) | G | `platform` | 5 | One grant or denial, for one role and one capability. The OUTERMOST layer: what a role gets before any org, project or user says otherwise. |
 | [`run_replications`](run_replications.md) | 5 | `engine` | 12 | One replication of one simulation run: the seed it used, the KPI row the engine computed for it, and its weekly series. A run has as many rows here as it has replications, and `rep_index` orders them. Tier 5 — a RESULT, derived from a tier-2 dataset by a named engine version, never an input to anything. Nothing downstream reads it except the result surfaces; a row is superseded by re-running, never edited. |
 | [`scenario_templates`](scenario_templates.md) | 4 | `engine` | 15 | One shipped starting point for a scenario: a named disruption shape with its schedule, its suggested playbook and the run settings that go with it. A template is not a scenario — applying one WRITES a scenario, and the two diverge from that moment. |
-| [`scenarios`](scenarios.md) | 4 | `engine` | 22 | One what-if a person set up and can run: the horizon, the warm-up, the replications, the seed, the demand model, the disruption schedule and the recovery overrides. The scenario half of `result-binding` (I8) — a run cites one of these rows, and the export reads it back whole. |
+| [`scenarios`](scenarios.md) | 4 | `engine` | 23 | One what-if a person set up and can run: the horizon, the warm-up, the replications, the seed, the demand model, the disruption schedule and the recovery overrides. The scenario half of `result-binding` (I8) — a run cites one of these rows, and the export reads it back whole. |
 | [`suppliers`](suppliers.md) | 2 | `data-ingestion` | 12 | One supplier in one project: what the simulation needs to know about them beyond the arcs that connect them to materials. |
 | [`supply_chain_data`](supply_chain_data.md) | 3 | `etl` | 21 | One edge of the project's PRODUCT-LEVEL supply graph — four echelons with the BILL OF MATERIALS COLLAPSED: supplier → purchased material → finished product → customer. A bom edge here runs from a material the plant BUYS to the product it ends up in, however many assemblies lie between them; `supply_chain_data_multi_tier` is the same network with the tree intact. Derived from the four lane tables by `rebuild_supply_chain_lanes` and always safe to drop and rebuild — which since WP 8.2 it IS, on every change to any of those four tables (§4 D142). |
 | [`supply_chain_data_multi_tier`](supply_chain_data_multi_tier.md) | 3 | `etl` | 16 | One edge of the REAL BOM TREE, at the BOM's own depth — where `supply_chain_data` is the same network with the BOM COLLAPSED to purchased-material → finished-product. A bom edge appears once per root product, so `(from_location, to_location, path_root)` is its grain and not `(from_location, to_location)`. Read by the network pages, and NOT propagated into the simulation: the engine models a single focal plant with three echelons (blueprint §2.4). WP 8.2 REWROTE THIS LINE. It said "tier-2 and tier-3 suppliers behind the direct ones", which is `tier2_suppliers` / `tier3_suppliers` and a different node universe — and it is where `level`'s "tiers upstream" claim came from (§4 D140). Nothing has ever written a tier-2 supplier into this table. |
@@ -70,4 +70,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `1810759ef6a5`, engine `0.2.8`.*
+*Generated from data contract `75b0effebe46`, engine `0.2.8`.*

@@ -28,8 +28,6 @@ const WHAT_IT_DOES: Record<string, string> = {
     "The point at which the model stops filling its pipes and starts counting. Weeks before it are simulated and excluded from every measure — which is why a result can look nothing like the first ten weeks of its own chart.",
   warmup_mode:
     "On auto, the engine detects where the model settled and reports the week it chose. On manual you fix it yourself, and typing a warm-up switches this to manual for you rather than silently overriding your number.",
-  time_step:
-    "The engine's clock. Day is the tested path; the chain's physics are weekly regardless, so this changes resolution rather than behaviour.",
   replications:
     "How many times the same world is run with different random draws. This is the single biggest lever on how much you can trust a difference between two scenarios.",
   crn:
@@ -112,23 +110,24 @@ export default function Scenarios() {
         ))}
       </Section>
 
-      <Callout tone="limit" title="Two settings are stored in days and shown in whatever unit you chose">
+      <Callout tone="limit" title="Two settings are stored in days and shown in weeks">
         <p>
-          The horizon and the warm-up are days underneath, always. The bar above the form switches
-          the display between days, weeks and months, and the form converts as you type — so a
-          horizon reading “13” in weeks is 91 days, and the footer under the card prints both.
+          The horizon and the warm-up are days underneath, always. Every figure on the Simulation
+          Lab reads in the <Term>planning unit</Term>, which is set once on the policies page and
+          is fixed to weeks, because the engine simulates week by week. There is no selector on the
+          Lab: a control with one option looked like a choice and was not.
         </p>
         <p>
-          <strong>Rounding happens on the way in.</strong> Typing 13 weeks stores 91 days; switching
-          the display to months then shows 3, because a month here is 30 days and 91 is not three of
-          them. The stored number has not changed. Read the footer, which always prints days, when
-          the number matters.
+          <strong>A stored value that is not a whole number of weeks says so.</strong> A 365-day
+          horizon reads “≈52 wk”, because the engine runs it as 52 weeks and the stored number is
+          not 364. Typing 52 back does not rewrite it: the horizon is part of what a validation
+          certifies, and moving it by a day would make every scenario that inherited that
+          validation read stale. Typing a different number of weeks stores whole weeks.
         </p>
         <p>
-          <strong>The unit is your browser's, not the project's.</strong> It is remembered locally,
-          per project, on the machine you set it on — so a colleague opening the same scenario may
-          be reading it in days while you are reading it in weeks. Quote days when you quote a
-          horizon to somebody.
+          <strong>There is no time-step setting.</strong> Older scenarios carry a stored step of
+          “day” that no run has ever read; it is kept only because the validation fingerprint
+          hashes it, and a new scenario copies its baseline's value rather than choosing one.
         </p>
       </Callout>
 

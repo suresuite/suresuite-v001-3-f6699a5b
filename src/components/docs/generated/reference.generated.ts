@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 696;
+export const REFERENCE_COLUMN_COUNT = 697;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -16226,12 +16226,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "hook useSimulationRun → select * from run_replications",
-        "evidence": "src/hooks/useSimulationRun.tsx:127"
+        "evidence": "src/hooks/useSimulationRun.tsx:85"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "hook useSimulationRun::loadReps → select * from run_replications",
-        "evidence": "src/hooks/useSimulationRun.tsx:261"
+        "evidence": "src/hooks/useSimulationRun.tsx:189"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -16969,16 +16969,22 @@ export const REFERENCE_TABLES: RefTable[] = [
     "owner": "engine",
     "grain": "One what-if a person set up and can run: the horizon, the warm-up, the replications, the seed, the demand model, the disruption schedule and the recovery overrides. The scenario half of `result-binding` (I8) — a run cites one of these rows, and the export reads it back whole.",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "scenarios_role_check",
+        "definition": "CHECK (role IN ('experiment', 'validation_baseline'))"
+      }
+    ],
     "ingestDataset": null,
     "surfaces": [
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/useScenarios.tsx:70"
+        "evidence": "src/hooks/useScenarios.tsx:109"
       }
     ],
     "governance": {
@@ -17130,7 +17136,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The granularity the scenario was set up at — `day` by default. A NAME, from a small fixed vocabulary, with no table behind it.",
+        "meaning": "A step-size label (`day` by default) that NO run reads: the engine steps in weeks (`run_window.days_per_tick`), and no screen offers the control any more (WP 9.4). Retained because the model card's baseline fingerprint (`_build_scenario_fingerprint`, fingerprint v1) hashes it, so dropping or rewriting it would turn every validated scenario stale. A new scenario copies its baseline's value rather than choosing one (§4 D222).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -17528,7 +17534,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The validation run this scenario inherited its data-readiness verdict from, so a re-run does not re-grade an unchanged dataset. NULL where it was never graded — and that is different from graded-and-clean.",
+        "meaning": "The model card (`model_validations.id`) whose adopted warm-up and recommended replication count `apply_validation_to_scenario` wrote into this scenario. NULL where nothing was inherited, or where a person hand-edited either value afterwards — divergence from the validated settings is explicit, never silent. A credibility provenance, not a data-readiness grade, which is what this line said until §4 D222.",
         "primaryKey": false,
         "unique": false,
         "references": {
@@ -17549,6 +17555,30 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "role",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "What the scenario is for — `experiment`, a what-if a person set up in the Lab (the default), or `validation_baseline`, the one scenario per project that Run & Validate on /policies runs its validation into (a partial unique index keeps it to one). The Lab pins the baseline, shows it read-only and reuses its run, and every new scenario is seeded from it. It replaced finding that scenario by its display name, which a rename broke (§4 D227). The door a scenario came through is `from_network`, a different fact.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
         "computedBy": null
       }
     ]

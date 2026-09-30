@@ -49,6 +49,7 @@
  * report.
  */
 import { replicationLabel } from "@/lib/sim/replicationLabel";
+import type { RunGateState } from "@/lib/sim/runGate";
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Truck } from "lucide-react";
@@ -82,9 +83,12 @@ import { ResultsDashboard } from "./ResultsDashboard";
 import { CompareScenariosPanel } from "./CompareScenariosPanel";
 import { ExperimentLibraryBox, ScenarioList } from "./ScenarioRail";
 import { StressTestDrawer, type StressTestPreset } from "./StressTestCard";
+import { SurrogateCard } from "./SurrogateCard";
+import { ReadOnlyFrame } from "./ReadOnlyFrame";
 import { RESPONSE_LABELS, type RecoveryConfig, type RecoveryResponseKey } from "@/lib/sim/recoveryScore";
 import { kpiDisplay } from "@/lib/sim/kpiDisplay";
 import { useTimeUnit, UNIT_LABEL_PLURAL } from "@/hooks/useTimeUnit";
+import { formatDuration, formatWeek } from "@/lib/sim/planningTime";
 import type { PaneId } from "./StageRail";
 import type { Scenario } from "@/hooks/useScenarios";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
@@ -171,6 +175,12 @@ export interface MobileSimulationLabProps {
   ackWarnings: boolean;
   onAckWarnings: (v: boolean) => void;
   runBlockedReason: string | null;
+  /** the one gate state the desktop rail and Run card read (runGate.ts) */
+  runGate: RunGateState;
+  /** the capacity line the desktop Run pane shows (§4 D167 / D224) */
+  capacity?: React.ReactNode;
+  /** non-null when the selected scenario is the validated baseline (§4 D227) */
+  readOnlyReason?: string | null;
   findingsSource: "pre-run check" | "gate rejection";
   supplierIds: string[];
   latestRun: SimulationRun | null;
@@ -219,6 +229,9 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
     ackWarnings,
     onAckWarnings,
     runBlockedReason,
+    runGate,
+    capacity,
+    readOnlyReason = null,
     findingsSource,
     supplierIds,
     latestRun,
@@ -240,8 +253,8 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   const eventBudget = useRowBudget();
   const repBudget = useRowBudget(4, 6, 9);
   const statBudget = useStatBudget();
-  // Read-only here: the planning unit is set by TimeUnitBar inside the
-  // Scenario sheet, which is the real control. This only labels the row.
+  // Read-only here, as everywhere in the Lab: the planning unit is set on
+  // /policies. This only labels the row (WP 9.4 slice 1).
   const { unit } = useTimeUnit(projectId);
 
   const activeProject = projects.find((p) => p.id === projectId) ?? null;
@@ -382,7 +395,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
           value: UNIT_LABEL_PLURAL[unit],
           sheet: "scenario",
         },
-        { label: "Horizon", hint: "simulated period", value: `${selected.horizon_days} d`, sheet: "runWindow" },
+        { label: "Horizon", hint: "simulated period", value: formatDuration(selected.horizon_days), sheet: "runWindow" },
         {
           label: "Replications",
           hint: inherited ? "adopted n* · from model validation" : "not adopted — engine default",
@@ -394,7 +407,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
           hint: inherited
             ? `adopted · detection ${selected.warmup_mode}`
             : `not adopted · detection ${selected.warmup_mode}`,
-          value: `${selected.warmup_days} d`,
+          value: formatDuration(selected.warmup_days),
           sheet: "runWindow",
         },
         {
@@ -482,8 +495,8 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
                   key={i}
                   chevron={false}
                   label={`${e.target_type === "edge" ? "Lane" : "Node"} · ${e.magnitude_pct}%`}
-                  sub={`${e.target || "—"} · from d${e.start_day} · ${e.duration_days} d`}
-                  value={`d${e.start_day}`}
+                  sub={`${e.target || "—"} · from ${formatWeek(e.start_day)} · ${formatDuration(e.duration_days)}`}
+                  value={formatWeek(e.start_day)}
                 />
               ))}
               {/* Defer, never truncate (§10, v2 §5.4). What the device cannot
@@ -544,7 +557,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   const runStats: MobileStat[] = selected
     ? [
         { label: "Replications", value: String(repsTarget) },
-        { label: "Warm-up", value: `${selected.warmup_days} d` },
+        { label: "Warm-up", value: formatDuration(selected.warmup_days) },
         { label: "Seed", value: String(selected.seed) },
         { label: "Events", value: String(events.length) },
       ]
@@ -552,6 +565,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
 
   const runPane = (
     <>
+      {capacity ? <div className="px-3 pt-1">{capacity}</div> : null}
       <MobileGroup label="Progress">
         <MobilePanel tone={paneTone} label="Run" counter={runStatus ?? "not started"}>
         <div className="flex flex-col gap-2.5 p-3">
@@ -729,7 +743,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
             sub={[
               selected?.name,
               runVersionLabel ?? policyVersionLabel,
-              selected ? `warm-up ${selected.warmup_days} d` : null,
+              selected ? `warm-up ${formatDuration(selected.warmup_days)}` : null,
               selected ? `seed ${selected.seed}` : null,
               `${events.length} events`,
             ]
@@ -771,20 +785,24 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
     );
 
   /* ── the action bar — the honest gate ─────────────────────────────────── */
-  const canRun = !runBlockedReason;
-  const runLabel = policyDirty
-    ? "Save version & run"
-    : gateBlocks > 0
+  // One gate state, the same one the desktop rail reads (§4 D147).
+  const canRun = runGate.canRun;
+  const runLabel =
+    runGate.kind === "blocked"
       ? `Blocked by ${gateBlocks} ${gateBlocks === 1 ? "finding" : "findings"}`
-      : gateWarns > 0 && !ackWarnings
+      : runGate.kind === "ack_required"
         ? "Acknowledge to run"
-        : !canRun
-          ? "Run unavailable"
-          : active
-            ? "Running…"
-            : done
-              ? "Run again"
-              : "Run simulation";
+        : runGate.kind === "baseline"
+          ? "Runs in Policies"
+          : runGate.kind === "capability"
+            ? "Run unavailable"
+            : policyDirty
+              ? "Save version & run"
+              : active
+                ? "Running…"
+                : done
+                  ? "Run again"
+                  : "Run simulation";
 
   // §8: a control that cannot be used is shown, disabled and explained in one
   // line underneath. The policy-binding state is that line whether or not it
@@ -883,6 +901,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
         <div className="p-3.5">
           <ExperimentLibraryBox count={stressCount} open={stressOpen} onToggle={onToggleStress} />
           {stressOpen ? <StressTestDrawer onLaunch={onLaunchStress} /> : null}
+          <SurrogateCard />
           <ScenarioList
             scenarios={scenarios}
             selectedId={selectedId}
@@ -911,72 +930,85 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
         <>
           <MobileSheet open={sheet === "scenario"} title="Scenario" onClose={close}>
             <div className="p-3.5">
-              <ScenarioSetupForm
-                section="identity"
-                scenario={selected}
-                projectId={projectId}
-                onSave={onSaveScenario}
-              />
+              <ReadOnlyFrame reason={readOnlyReason}>
+                <ScenarioSetupForm
+                  section="identity"
+                  scenario={selected}
+                  projectId={projectId}
+                  onSave={onSaveScenario}
+                />
+              </ReadOnlyFrame>
             </div>
           </MobileSheet>
 
           <MobileSheet open={sheet === "runWindow"} title="Run window" onClose={close}>
             <div className="p-3.5">
-              <ScenarioSetupForm
-                section="runWindow"
-                scenario={selected}
-                projectId={projectId}
-                onSave={onSaveScenario}
-              />
+              <ReadOnlyFrame reason={readOnlyReason}>
+                <ScenarioSetupForm
+                  section="runWindow"
+                  scenario={selected}
+                  projectId={projectId}
+                  onSave={onSaveScenario}
+                />
+              </ReadOnlyFrame>
             </div>
           </MobileSheet>
 
           <MobileSheet open={sheet === "precision"} title="Precision" onClose={close}>
             <div className="p-3.5">
-              <ScenarioSetupForm
-                section="precision"
-                scenario={selected}
-                projectId={projectId}
-                onSave={onSaveScenario}
-              />
+              <ReadOnlyFrame reason={readOnlyReason}>
+                <ScenarioSetupForm
+                  section="precision"
+                  scenario={selected}
+                  projectId={projectId}
+                  onSave={onSaveScenario}
+                />
+              </ReadOnlyFrame>
             </div>
           </MobileSheet>
 
           <MobileSheet open={sheet === "objective"} title="Objective" onClose={close}>
             <div className="p-3.5">
-              <ScenarioSetupForm
-                section="objective"
-                scenario={selected}
-                projectId={projectId}
-                onSave={onSaveScenario}
-              />
+              <ReadOnlyFrame reason={readOnlyReason}>
+                <ScenarioSetupForm
+                  section="objective"
+                  scenario={selected}
+                  projectId={projectId}
+                  onSave={onSaveScenario}
+                />
+              </ReadOnlyFrame>
             </div>
           </MobileSheet>
 
           <MobileSheet
             open={sheet === "schedule"}
             title="Disruption schedule"
-            sub="Authored in days; the engine advances in weekly ticks."
+            sub="In weeks — the engine advances week by week."
             onClose={close}
           >
             <div className="p-3.5">
-              <DisruptionScheduleEditor
-                value={selected.disruption_schedule}
-                onChange={(v) => onSaveScenario({ disruption_schedule: v })}
-                projectId={projectId}
-                warmup={{ days: selected.warmup_days, mode: selected.warmup_mode, horizonDays: selected.horizon_days }}
-              />
+              <ReadOnlyFrame reason={readOnlyReason}>
+                <DisruptionScheduleEditor
+                  value={selected.disruption_schedule}
+                  onChange={(v) => onSaveScenario({ disruption_schedule: v })}
+                  projectId={projectId}
+                  warmup={{ days: selected.warmup_days, mode: selected.warmup_mode, horizonDays: selected.horizon_days }}
+                  supplierIds={supplierIds}
+                />
+              </ReadOnlyFrame>
             </div>
           </MobileSheet>
 
           <MobileSheet open={sheet === "playbook"} title="Recovery playbook" onClose={close}>
             <div className="p-3.5">
-              <DisruptionRecoveryPane
-                sections="playbook"
-                scenario={selected}
-                projectRecovery={projectRecovery}
-                onSave={onSaveScenario}
-              />
+              <ReadOnlyFrame reason={readOnlyReason}>
+                <DisruptionRecoveryPane
+                  sections="playbook"
+                  scenario={selected}
+                  projectRecovery={projectRecovery}
+                  onSave={onSaveScenario}
+                />
+              </ReadOnlyFrame>
             </div>
           </MobileSheet>
         </>
@@ -1029,8 +1061,8 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
               key={i}
               chevron={false}
               label={`${e.target_type === "edge" ? "Lane" : "Node"} · ${e.magnitude_pct}%`}
-              sub={`${e.target || "—"} · from d${e.start_day} · ${e.duration_days} d`}
-              value={`d${e.start_day}`}
+              sub={`${e.target || "—"} · from ${formatWeek(e.start_day)} · ${formatDuration(e.duration_days)}`}
+              value={formatWeek(e.start_day)}
             />
           ))}
         </div>

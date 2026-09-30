@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { runWindowFooter } from "@/lib/sim/runWindow";
-import { ParameterCard, TimeUnitBar, type ParamGroup, type Provenance } from "./ParameterCard";
+import { ParameterCard, PlanningUnitChip, type ParamGroup, type Provenance } from "./ParameterCard";
 import type { Scenario } from "@/hooks/useScenarios";
 import { SCENARIO_ENGINE_DEFAULTS } from "@/hooks/useScenarios";
 import { useTimeUnit, UNIT_LABEL_PLURAL } from "@/hooks/useTimeUnit";
+import { HORIZON_WEEKS, editWeeks, engineWeeks, formatDuration } from "@/lib/sim/planningTime";
 
 interface Props {
   scenario: Scenario;
@@ -20,7 +21,7 @@ interface Props {
   section?: "all" | "identity" | "runWindow" | "precision" | "objective";
 }
 
-const KPI_OPTIONS = [
+export const KPI_OPTIONS = [
   { value: "fill_rate", label: "Fill rate" },
   { value: "otif", label: "OTIF" },
   { value: "lead_time_days", label: "Lead time" },
@@ -36,9 +37,10 @@ const KPI_OPTIONS = [
  */
 export function ScenarioSetupForm({ scenario, projectId, onSave, section = "all" }: Props) {
   const [local, setLocal] = useState<Scenario>(scenario);
-  const { unit, setUnit, fromDays, toDays } = useTimeUnit(projectId);
-  const displayUnit = unit;
-  const unitLabel = UNIT_LABEL_PLURAL[displayUnit];
+  // The planning unit is read, never chosen, here: /policies sets it, and
+  // every figure below is converted by planningTime (WP 9.4 slice 1).
+  const { unit } = useTimeUnit(projectId);
+  const unitLabel = UNIT_LABEL_PLURAL[unit];
 
   // Re-sync on server-side updates too (inheritance writes warm-up/replications
   // through the apply_validation_to_scenario RPC, not through this form).
@@ -65,7 +67,7 @@ export function ScenarioSetupForm({ scenario, projectId, onSave, section = "all"
     inherited ? "inherited" : differs ? "edited" : null;
   const inherited = !!local.inherited_validation_id;
 
-  const simDays = local.replications * local.horizon_days;
+  const runWeeks = local.replications * engineWeeks(local.horizon_days);
 
   const runWindow: ParamGroup = {
     name: "Run window",
@@ -76,9 +78,12 @@ export function ScenarioSetupForm({ scenario, projectId, onSave, section = "all"
         provenance: prov(local.horizon_days !== SCENARIO_ENGINE_DEFAULTS.horizon_days),
         control: {
           kind: "number",
-          value: Math.round(fromDays(local.horizon_days)),
-          min: 1,
-          onChange: (v) => patch({ horizon_days: Math.max(1, Math.round(toDays(v))) }),
+          value: engineWeeks(local.horizon_days),
+          min: HORIZON_WEEKS.min,
+          max: HORIZON_WEEKS.max,
+          // Against the STORED value, so retyping the same week never moves a
+          // fingerprinted horizon (365 d stays 365, not 364).
+          onChange: (v) => patch({ horizon_days: editWeeks(scenario.horizon_days, Math.max(1, v)) }),
           onCommit: commit,
         },
       },
@@ -88,13 +93,13 @@ export function ScenarioSetupForm({ scenario, projectId, onSave, section = "all"
         provenance: prov(local.warmup_days !== SCENARIO_ENGINE_DEFAULTS.warmup_days, inherited),
         control: {
           kind: "number",
-          value: Math.round(fromDays(local.warmup_days)),
+          value: engineWeeks(local.warmup_days),
           min: 0,
           // hand-setting warm-up leaves auto mode and drops the inheritance —
           // divergence from the validated settings is explicit, never silent
           onChange: (v) =>
             patch({
-              warmup_days: Math.max(0, Math.round(toDays(v))),
+              warmup_days: editWeeks(scenario.warmup_days, Math.max(0, v)),
               warmup_mode: "manual",
               inherited_validation_id: null,
             }),
@@ -112,19 +117,6 @@ export function ScenarioSetupForm({ scenario, projectId, onSave, section = "all"
             { value: "manual", label: "manual" },
           ],
           onChange: (v) => patchNow({ warmup_mode: v as Scenario["warmup_mode"] }),
-        },
-      },
-      {
-        label: "Time step",
-        provenance: prov(local.time_step !== SCENARIO_ENGINE_DEFAULTS.time_step),
-        control: {
-          kind: "segmented",
-          value: local.time_step,
-          options: [
-            { value: "day", label: "day" },
-            { value: "hour", label: "hour" },
-          ],
-          onChange: (v) => patchNow({ time_step: v as Scenario["time_step"] }),
         },
       },
     ],
@@ -222,11 +214,7 @@ export function ScenarioSetupForm({ scenario, projectId, onSave, section = "all"
             className="min-h-11 w-full rounded-sm border border-transparent px-1 py-px text-[12.5px] text-[#52525b] hover:border-[--hair-rule] focus:border-foreground focus:outline-none md:min-h-0"
           />
         </div>
-        <TimeUnitBar
-          unit={displayUnit}
-          onUnit={setUnit}
-          horizonDays={local.horizon_days}
-        />
+        <PlanningUnitChip unit={unit} />
       </section>
       ) : null}
 
@@ -240,13 +228,13 @@ export function ScenarioSetupForm({ scenario, projectId, onSave, section = "all"
           group={runWindow}
           // The engine's window, not `horizon − warm-up` (audit F-02): the rule is
           // exported by the engine and pinned by `runWindow.test.ts`.
-          footer={`${local.horizon_days} d horizon · ${runWindowFooter(local)}`}
+          footer={`${formatDuration(local.horizon_days)} horizon · ${runWindowFooter(local)}`}
         />
         ) : null}
         {show("precision") ? (
         <ParameterCard
           group={precision}
-          footer={`${local.replications} × ${local.horizon_days} d = ${simDays.toLocaleString()} sim-days · seed ${local.seed}`}
+          footer={`${local.replications} × ${formatDuration(local.horizon_days)} = ${runWeeks.toLocaleString()} run-weeks · seed ${local.seed}`}
         />
         ) : null}
       </div>
