@@ -9,6 +9,7 @@ import { ReactNode, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { MobileSheet } from '@/components/shared/MobileSheet';
 import { M, MobilePanel, MobileRow } from '@/components/mobile';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 
 // ── Core treatment ──────────────────────────────────────────────────────────
 /** Card/table container: 4px corners, --hair-border rule, white surface. */
@@ -66,6 +67,30 @@ export function MonoChip({ children, tone = 'default' }: { children: ReactNode; 
     >
       {children}
     </span>
+  );
+}
+
+// ── Titled section (the user-access screen's card) ──────────────────────────
+/** v2 §4B: below `md` a section is the panel — its title is the head's mono
+ *  micro-label and the badge is the head's one counter. Above `md` it is the
+ *  SURFACE card with a title row. */
+export function AdminSection({ title, badge, children }: { title: string; badge?: string; children: ReactNode }) {
+  const isMobile = useIsMobile();
+  if (isMobile) {
+    return (
+      <MobilePanel label={title} counter={badge} bare bodyClassName="px-3 py-2">
+        {children}
+      </MobilePanel>
+    );
+  }
+  return (
+    <section className={`${SURFACE} p-4`}>
+      <div className="mb-3 flex items-center gap-2">
+        <h2 className="text-[13px] font-semibold">{title}</h2>
+        {badge && <MonoChip tone="solid">{badge}</MonoChip>}
+      </div>
+      {children}
+    </section>
   );
 }
 
