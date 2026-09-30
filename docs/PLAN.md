@@ -946,6 +946,12 @@ Why first: a prospective customer, a researcher and a new modeller all ask the s
 opening question — *how is this thing put together, and can I trust it?* Answering
 that before the reference section is what separates a manual from a data dictionary.
 
+**Where it stands today, which is not yet that.** The public links to it are switched
+off (`DOCS_PUBLIC_ENTRY_POINTS`), and the manual itself is a signed-in page for
+super admins only (`DOCS_SUPER_ADMIN_ONLY`), reached from a "Documentation" item in
+the app's sidebar. Both are flags in `src/lib/ui/docsVisibility.ts`; turning both
+off restores the public manual this section describes, links and all.
+
 **The figures are authored in-repo as inline SVG** — `src/components/docs/figures.tsx`.
 *(Corrected in WP 5.2a; this paragraph said "WP 5.2a moves the figure SVGs into the
 repo".)* There was nothing to move: the repository contained **zero** SVG files, and

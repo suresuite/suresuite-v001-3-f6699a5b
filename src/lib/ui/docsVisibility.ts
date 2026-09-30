@@ -25,3 +25,32 @@
  * `FLAG && <…>` to `false` and the guarded markup stops being typechecked.
  */
 export const DOCS_PUBLIC_ENTRY_POINTS: boolean = false;
+
+/**
+ * Who may READ the manual, and where a signed-in reader finds it.
+ *
+ * While this is on, `/docs` (and `/help`, which redirects there) is a
+ * signed-in page for super admins only — anyone else is sent to `/forbidden`,
+ * and a signed-out visitor to `/auth` — and the app's sidebar and phone drawer
+ * carry a "Documentation" link that only a super admin sees. The link lives in
+ * the app, never on the public site: `DOCS_PUBLIC_ENTRY_POINTS` above governs
+ * that, independently.
+ *
+ * Turning it off opens the manual to everyone again: every signed-in user sees
+ * the sidebar link and `/docs` renders with no sign-in, as §6.5 intends.
+ *
+ * The rule is enforced in ONE place — `canAccessPage` in useCapabilities — so
+ * the route guard and both navigations cannot disagree about who sees it.
+ * Typed `boolean` for the same reason as the flag above.
+ */
+export const DOCS_SUPER_ADMIN_ONLY: boolean = true;
+
+/** True for `/docs`, `/docs/<slug>`, and the legacy `/help` paths that redirect there. */
+export function isDocsPath(pathname: string): boolean {
+  return /^\/(docs|help)(\/|$)/.test(pathname);
+}
+
+/** Whether a reader may open the manual, given whether they are a super admin. */
+export function canReadDocs(isSuperAdmin: boolean): boolean {
+  return !DOCS_SUPER_ADMIN_ONLY || isSuperAdmin;
+}

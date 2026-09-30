@@ -22,6 +22,7 @@ import {
   type FeatureKey,
   type ModelGateResult,
 } from '@/lib/capabilities';
+import { canReadDocs, isDocsPath } from '@/lib/ui/docsVisibility';
 
 interface CapabilitiesContextValue {
   /** Resolved set — server-provided when available, role fallback otherwise. */
@@ -101,6 +102,9 @@ export const CapabilitiesProvider = ({ children }: { children: ReactNode }) => {
     };
     const canAccessPage = (pathname: string): boolean => {
       if (!capabilities) return false;
+      // The manual has no page capability of its own; who reads it is one
+      // flag in docsVisibility.ts (super admins only, for now).
+      if (isDocsPath(pathname)) return canReadDocs(capabilities.is_super_admin);
       const key = pageKeyForPath(pathname);
       if (!key) return true; // unmanaged route (e.g. /help) — open
       return capabilities.pages[key] ?? false;
