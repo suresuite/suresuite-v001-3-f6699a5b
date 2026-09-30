@@ -20182,6 +20182,26 @@ callers that have no Run card.
 disagreement as live; both now describe the closed state. The server gate is unchanged —
 the client grading it mirrors is slice 6's. No later package changes.
 
+### WP 9.4 slice 3 · the surrogate model, signposted · 2026-09-30 · no migration
+
+**Asked for.** "Below the Stress-test experiments, add surrogate model: nexus node detection.
+It is also a feature for us. We are working and will implement it later."
+
+**Promised versus found.** Nothing to reconcile in the Lab — no surrogate code exists in
+`src/`, and the blueprint never used the word "nexus". Two nearby things had to be kept
+apart: the `nexus_attack` stress preset (disabled; the engine cannot target `node:nexus`)
+and the network pages' "Nexus node prediction" panel, which reads `predict-critical-nodes`,
+a different function with none of §11.4's validity scoping.
+
+**Decisions.** (1) A non-interactive card, neutral palette, "coming soon", no figure and no
+button — a placeholder ranking would be an invented number on the surface that decides
+what to simulate. (2) Not added to `STRESS_TESTS`, so `deriveStressPresets` and the
+manual's preset count are untouched. (3) The blueprint names the product term: §11.5 maps
+"nexus node detection" to the `rank_criticality` job and records the placeholder; Phase D
+carries the reconciliation with `MLPrediction`.
+
+**Gap check.** No later package changes; Phase D owns the feature.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |

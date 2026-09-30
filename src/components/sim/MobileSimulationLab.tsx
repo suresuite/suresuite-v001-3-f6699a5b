@@ -83,6 +83,7 @@ import { ResultsDashboard } from "./ResultsDashboard";
 import { CompareScenariosPanel } from "./CompareScenariosPanel";
 import { ExperimentLibraryBox, ScenarioList } from "./ScenarioRail";
 import { StressTestDrawer, type StressTestPreset } from "./StressTestCard";
+import { SurrogateCard } from "./SurrogateCard";
 import { RESPONSE_LABELS, type RecoveryConfig, type RecoveryResponseKey } from "@/lib/sim/recoveryScore";
 import { kpiDisplay } from "@/lib/sim/kpiDisplay";
 import { useTimeUnit, UNIT_LABEL_PLURAL } from "@/hooks/useTimeUnit";
@@ -896,6 +897,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
         <div className="p-3.5">
           <ExperimentLibraryBox count={stressCount} open={stressOpen} onToggle={onToggleStress} />
           {stressOpen ? <StressTestDrawer onLaunch={onLaunchStress} /> : null}
+          <SurrogateCard />
           <ScenarioList
             scenarios={scenarios}
             selectedId={selectedId}

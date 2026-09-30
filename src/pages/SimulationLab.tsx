@@ -36,6 +36,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { PreRunValidationPanel } from "@/components/sim/PreRunValidationPanel";
 import { CapacityReadinessPanel } from "@/components/sim/CapacityReadiness";
 import { RunCard } from "@/components/sim/RunCard";
+import { SurrogateCard } from "@/components/sim/SurrogateCard";
 import { runGateState } from "@/lib/sim/runGate";
 import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
 import {
@@ -510,6 +511,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   onToggle={() => setStressOpen((v) => !v)}
                 />
                 {stressOpen ? <StressTestDrawer onLaunch={launchStress} /> : null}
+                <SurrogateCard />
                 <ScenarioList
                   scenarios={scenarios}
                   selectedId={selectedId}
