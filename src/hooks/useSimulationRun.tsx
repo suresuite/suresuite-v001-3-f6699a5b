@@ -32,6 +32,10 @@ export interface SimulationRun {
   updated_at?: string | null;
   /** Baseline fingerprint stamped at dispatch (Phase B0 / G13 / §9.5). */
   scenario_hash?: string | null;
+  /** Seed and disruption schedule stamped at dispatch (audit WP 8) — what a
+   *  paired comparison reads, rather than the live scenario row. */
+  seed?: number | null;
+  disruption_schedule?: unknown[] | null;
   /** The model-validation card in force at dispatch — immutable history. */
   model_validation_id?: string | null;
   /** The pre-run gate could not load its data and dispatch proceeded unchecked

@@ -38,6 +38,13 @@ import { CapacityReadinessPanel } from "@/components/sim/CapacityReadiness";
 import { RunCard } from "@/components/sim/RunCard";
 import { SurrogateCard } from "@/components/sim/SurrogateCard";
 import { ReadOnlyFrame } from "@/components/sim/ReadOnlyFrame";
+import {
+  NewScenarioDialog,
+  type NewScenarioRequest,
+  type NewScenarioStart,
+} from "@/components/sim/NewScenarioDialog";
+import { buildScenarioSeed, uniqueName, worldOf } from "@/lib/sim/scenarioSeed";
+import { useValidatedBaseline } from "@/hooks/useValidatedBaseline";
 import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/validationBaseline";
 import { runGateState } from "@/lib/sim/runGate";
 import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
@@ -178,6 +185,13 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   // ── B0b credibility (Phase B0 / G13 / §9.5) ───────────────────────────────
   const cred = useModelValidation(projectId);
   const credibility = cred.resolveScenario(policyVersionId, selected, { dirty: policyDirty });
+  const validated = useValidatedBaseline({ scenarios, cred, policyVersionId, dirty: policyDirty });
+  const [newOpen, setNewOpen] = useState(false);
+  const [newStart, setNewStart] = useState<NewScenarioStart>("baseline");
+  const newName = uniqueName(
+    `Scenario ${scenarios.filter((x) => !isValidationBaseline(x)).length + 1}`,
+    scenarios.map((x) => x.name),
+  );
   // Inheritance on first render of a never-touched scenario under a validated
   // triple (§2.6) — creation-time inheritance happens in onCreate below.
   const inheritTried = useRef(new Set<string>());
@@ -300,21 +314,48 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     scenariosWithResults: scenarios.filter((s) => runsByScenario[s.id]).length,
   });
 
-  // The five scenario mutations the aside owns, lifted so both trees dispatch
-  // the identical call. Nothing here is new behaviour — it is the desktop
-  // aside's own handlers, named.
-  const createScenario = async () => {
-    // §2.6: scenarios created under a validated triple inherit the adopted
-    // warm-up + replication count at birth.
-    const s = await create(`Scenario ${scenarios.length + 1}`);
-    if (!s) return;
+  // The scenario mutations the aside owns, lifted so both trees dispatch the
+  // identical call. Every new scenario is seeded from the validated baseline's
+  // world (scenarioSeed.ts, §4 D217), so inheritance can match its card.
+  const inherit = (s: (typeof scenarios)[number]) => {
     inheritTried.current.add(s.id);
     void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty }).then((cardId) => {
       if (cardId) toast.message("Warm-up & replications inherited from the model validation.");
     });
+  };
+  // "+" asks first (WP 9.4 slice 5) instead of creating "Scenario N" on the spot.
+  const createScenario = () => {
+    setNewStart("baseline");
+    setNewOpen(true);
+  };
+  const createFromRequest = async (req: NewScenarioRequest) => {
+    if (req.start === "stress") {
+      const t = STRESS_TESTS.find((p) => p.id === req.presetId);
+      if (t) await launchStress(t.scenario, req);
+      return;
+    }
+    const fromBaseline = req.start === "baseline";
+    const seed = buildScenarioSeed({
+      name: req.name,
+      world: fromBaseline ? validated.world : worldOf(null, null),
+      baseline: fromBaseline ? validated.baseline : null,
+      primary_kpi: req.primary_kpi,
+      horizon_days: req.horizon_days,
+    });
+    const s = await create(req.name, seed);
+    if (!s) return;
+    if (fromBaseline) inherit(s);
     setSelectedId(s.id);
+    setPane("setup");
   };
   const duplicateScenario = async (s: (typeof scenarios)[number]) => {
+    // The baseline's copy button starts a new scenario FROM it — through the
+    // dialog, so the new one is an experiment in the baseline's world.
+    if (isValidationBaseline(s)) {
+      setNewStart("baseline");
+      setNewOpen(true);
+      return;
+    }
     const d = await duplicate(s);
     if (d) setSelectedId(d.id);
   };
@@ -322,7 +363,10 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     await remove(id);
     if (selectedId === id) setSelectedId(null);
   };
-  const launchStress = async (preset: StressTestPreset) => {
+  const launchStress = async (
+    preset: StressTestPreset,
+    opts?: { name?: string; primary_kpi?: string; horizon_days?: number },
+  ) => {
     // §4 D172 — a placeholder target never reaches a scenario. `supplier:primary`
     // is resolved here to the project's top-volume supplier (the same weekly
     // normalization the lane ETL applies), and a project that cannot name one
@@ -355,16 +399,23 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       schedule = resolved.schedule;
       if (resolved.note) description = `${description} ${resolved.note}`;
     }
-    const s = await create(preset.name);
+    const name = opts?.name ?? preset.name;
+    const s = await create(
+      name,
+      buildScenarioSeed({
+        name,
+        world: validated.world,
+        baseline: validated.baseline,
+        description,
+        disruption_schedule: schedule,
+        primary_kpi: opts?.primary_kpi,
+        horizon_days: opts?.horizon_days,
+      }),
+    );
     if (!s) return;
-    await update(s.id, {
-      description,
-      disruption_schedule: schedule,
-    });
     // Stress scenarios share the baseline world (events are excluded from the
     // fingerprint, §2.3) — they inherit too.
-    inheritTried.current.add(s.id);
-    void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty });
+    inherit(s);
     setSelectedId(s.id);
     setPane("recovery");
     toast.success(`Stress test ready: ${preset.name.replace(/^\[Stress\]\s*/, "")}`);
@@ -454,10 +505,23 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           onAddReps={handleAddReps}
           runsByScenario={runsByScenario}
         />
+        <NewScenarioDialog
+          open={newOpen}
+          onOpenChange={setNewOpen}
+          defaultName={newName}
+          initialStart={newStart}
+          hasBaseline={!!validated.baseline || !!validated.card}
+          world={validated.world}
+          card={validated.card}
+          onCreate={createFromRequest}
+          onBrowseLibrary={() => setLibraryOpen(true)}
+        />
         {projectId && (
           <ScenarioLibraryPanel
             open={libraryOpen}
             projectId={projectId}
+            world={validated.world}
+            baseline={validated.baseline}
             onClose={() => setLibraryOpen(false)}
             onCloned={(id) => {
               setSelectedId(id);
@@ -611,10 +675,23 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
         )}
       </div>
 
+      <NewScenarioDialog
+        open={newOpen}
+        onOpenChange={setNewOpen}
+        defaultName={newName}
+        initialStart={newStart}
+        hasBaseline={!!validated.baseline || !!validated.card}
+        world={validated.world}
+        card={validated.card}
+        onCreate={createFromRequest}
+        onBrowseLibrary={() => setLibraryOpen(true)}
+      />
       {projectId && (
         <ScenarioLibraryPanel
           open={libraryOpen}
           projectId={projectId}
+          world={validated.world}
+          baseline={validated.baseline}
           onClose={() => setLibraryOpen(false)}
           onCloned={(id) => {
             setSelectedId(id);

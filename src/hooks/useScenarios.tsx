@@ -74,7 +74,7 @@ const missingRoleColumn = (e: { code?: string; message?: string } | null) =>
  * written without it rather than failing — the name fallback in
  * `validationBaseline.ts` covers that window.
  */
-async function insertScenario(row: Partial<Scenario>): Promise<Scenario | null> {
+export async function createScenarioRow(row: Partial<Scenario>): Promise<Scenario | null> {
   const first = await sb.from("scenarios").insert(row).select().single();
   if (!first.error) return first.data as Scenario;
   if ("role" in row && missingRoleColumn(first.error)) {
@@ -136,7 +136,7 @@ export function useScenarios(projectId: string | null | undefined) {
   const create = useCallback(
     async (name = "New scenario", extra?: Partial<Scenario>): Promise<Scenario | null> => {
       if (!projectId) return null;
-      return insertScenario({ ...SCENARIO_DEFAULTS(projectId, name), ...(extra ?? {}) });
+      return createScenarioRow({ ...SCENARIO_DEFAULTS(projectId, name), ...(extra ?? {}) });
     },
     [projectId],
   );
@@ -160,7 +160,7 @@ export function useScenarios(projectId: string | null | undefined) {
       if (!projectId) return null;
       const { id: _id, created_at: _c, updated_at: _u, ...rest } = s;
       // A copy is always an experiment — even a copy of the baseline (§4 D225).
-      return insertScenario({ ...rest, name: `${s.name} (copy)`, ...(s.role ? { role: "experiment" } : {}) });
+      return createScenarioRow({ ...rest, name: `${s.name} (copy)`, ...(s.role ? { role: "experiment" } : {}) });
     },
     [projectId],
   );

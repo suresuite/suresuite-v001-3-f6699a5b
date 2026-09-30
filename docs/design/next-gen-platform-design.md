@@ -690,6 +690,14 @@ Two runs are *comparable* iff they are CRN-paired (same seed spec) and their Run
 > engine versions each block the table and name the reason instead. The paired *statistics* remain
 > Phase C: the pane reports the stored aggregates, their 95% CI half-widths, and whether the
 > intervals separate — not yet a paired-t over the CRN-matched replication pairs.
+>
+> **WP 9.4 (2026-09-30): the disruption-impact component was missing.** The predicate compared
+> `policy_version_id` and the stamped `scenario_hash` only — and that hash is the card's baseline
+> fingerprint, which EXCLUDES the disruption schedule (B0 §2.3). So the one comparison a stress
+> test exists for — the validated baseline against the same model under a disruption — read
+> "nothing to compare". The rule (`src/lib/sim/comparability.ts`) now has three components —
+> policies, world, and the run's stamped disruption schedule — reads the seed from the run rather
+> than the live scenario, and the pane picks the validated baseline as A by default (PLAN.md §4 D219).
 
 ### 9.4 Worker orchestration
 

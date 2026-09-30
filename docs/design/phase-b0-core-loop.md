@@ -586,7 +586,10 @@ const c = cred.resolve(policyVersionId, selected);       // Credibility (§3.2)
 //   Replications: 30                   [inherited from validation ✓]
 //   (hand-editing either clears inherited_validation_id → chip disappears)
 
-// Scenario creation:
+// Scenario creation — SUPERSEDED by WP 9.4: create("Scenario N") was born at the
+// engine-defaults horizon and could never match a card (PLAN.md §4 D217). Every new
+// scenario is now seeded from the card's fingerprint (`src/lib/sim/scenarioSeed.ts`)
+// through the New scenario dialog, and then inherits exactly as sketched below.
 onCreate: async () => {
   const s = await create(`Scenario ${n}`);
   const c = cred.resolve(policyVersionId, s);
