@@ -93,10 +93,12 @@ export default function ProcessLevelNetwork() {
 
       <Section id="focus" title="Following one component through the tree">
         <P>
-          Selecting a node highlights what it can reach. That is the question a BOM view is
-          actually for: <em>if this component is unavailable, what stops?</em> — and the answer is
-          everything downstream of it, which is visible at a glance and very hard to work out from
-          a spreadsheet.
+          Double-clicking a node focuses the path through it: everything downstream along the
+          arcs leaving it, and everything upstream along the arcs arriving at it. That is the
+          question a BOM view is actually for: <em>if this component is unavailable, what
+          stops?</em> — and the answer is visible at a glance and very hard to work out from a
+          spreadsheet. Sibling components that merely share a parent stay out of the picture;
+          double-click again, or use <em>Show all</em>, to bring the whole tree back.
         </P>
         <P>
           Search finds a component by name when the tree is too large to scan, and labels can be

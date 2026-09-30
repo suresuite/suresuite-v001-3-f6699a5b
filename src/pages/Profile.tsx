@@ -20,10 +20,21 @@ import { PAGE_CAPABILITIES, FEATURE_CAPABILITIES } from '@/lib/capabilities';
 import { AlertCircle, Ban, Check, Loader2 } from 'lucide-react';
 import { describeExpiry, formatDate, passwordStatus, relativeDay } from '@/lib/auth/passwordPolicy';
 import { AVATAR_COLORS, DEFAULT_AVATAR_CLASS, avatarClass, isAvatarColor } from '@/lib/avatarColors';
+import { formatPlanDate, periodLabel, usage } from '@/lib/auth/organizationPlan';
 
 /** `super_admin` → "Super admin". The stored value is an enum token, not a label. */
 const roleLabel = (role: string | undefined | null) =>
   role ? role.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : '';
+
+/**
+ * D207 — the organization's access period as one line: "1 month, from 3 Sep 2026".
+ * An account with no organization has no plan, and says so.
+ */
+function validityText(user: { organization?: string | null; users_used?: number | null; access_period?: string | null; access_valid_from?: string | null } | null) {
+  if (!user || user.users_used == null) return 'No organization';
+  if (!user.access_period) return periodLabel(null);
+  return `${periodLabel(user.access_period)}, from ${formatPlanDate(user.access_valid_from)}`;
+}
 
 /** The RPCs' refusals, in words (see PLAN.md §4 D206 for where each is raised). */
 function accountError(message: string | undefined): string {
@@ -213,6 +224,28 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                 <div className="space-y-2">
                   <Label>Organization</Label>
                   <Input value={user?.organization ?? ''} disabled />
+                </div>
+                {/* D207 — the organization's plan, set by an administrator; read here, never edited. */}
+                <div className="space-y-2">
+                  <Label>Valid for</Label>
+                  <Input value={validityText(user)} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label>Valid until</Label>
+                  <Input
+                    value={user?.access_valid_until
+                      ? `${formatPlanDate(user.access_valid_until)}${user.access_exempt ? ' (does not apply to super admins)' : ''}`
+                      : '—'}
+                    disabled
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Organization users</Label>
+                  <Input value={user?.users_used == null ? '—' : usage(user.users_used, user.user_limit)} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label>Organization projects</Label>
+                  <Input value={user?.projects_used == null ? '—' : usage(user.projects_used, user.project_limit)} disabled />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="display_name">Display name</Label>

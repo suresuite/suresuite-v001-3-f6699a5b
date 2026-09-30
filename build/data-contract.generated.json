@@ -5,8 +5,8 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 353,
-      "migrations_applied": 345,
+      "migrations_found": 354,
+      "migrations_applied": 346,
       "last_migration": "20260930000002_admin_delete_organization.sql"
     },
     "sidecars": 55,
@@ -18,8 +18,8 @@
   "counts": {
     "tables_in_schema": 81,
     "tables_covered": 55,
-    "columns_covered": 688,
-    "check_constraints": 50,
+    "columns_covered": 693,
+    "check_constraints": 54,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -366,7 +366,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -1080,7 +1080,7 @@
           "page": "Auth.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1088,7 +1088,7 @@
           "page": "DataManager.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1103,7 +1103,7 @@
           "page": "FirmLevelNetwork.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1111,7 +1111,7 @@
           "page": "Forbidden.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1119,7 +1119,7 @@
           "page": "GettingStarted.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1127,7 +1127,7 @@
           "page": "InteractiveNetworkSpace.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1135,7 +1135,7 @@
           "page": "Landing.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1143,7 +1143,7 @@
           "page": "NotFound.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1151,7 +1151,7 @@
           "page": "ProcessLevelNetwork.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1159,7 +1159,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1167,14 +1167,14 @@
           "page": "Profile.tsx",
           "via": "rpc change_own_password",
           "grain": "table",
-          "evidence": "src/pages/Profile.tsx:111",
+          "evidence": "src/pages/Profile.tsx:122",
           "confirmed": true
         },
         {
           "page": "ProjectIntelligence.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1182,7 +1182,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         },
@@ -1190,7 +1190,7 @@
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "shell",
-          "evidence": "src/hooks/useAuth.tsx:122",
+          "evidence": "src/hooks/useAuth.tsx:144",
           "confirmed": true,
           "note": "every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered"
         }
@@ -1542,7 +1542,7 @@
               "page": "Auth.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1550,7 +1550,7 @@
               "page": "DataManager.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1558,7 +1558,7 @@
               "page": "DeveloperApi.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1566,7 +1566,7 @@
               "page": "FirmLevelNetwork.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1574,7 +1574,7 @@
               "page": "Forbidden.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1582,7 +1582,7 @@
               "page": "GettingStarted.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1590,7 +1590,7 @@
               "page": "InteractiveNetworkSpace.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1598,7 +1598,7 @@
               "page": "Landing.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1606,7 +1606,7 @@
               "page": "NotFound.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1614,7 +1614,7 @@
               "page": "ProcessLevelNetwork.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1622,7 +1622,7 @@
               "page": "ProductLevelNetwork.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1630,7 +1630,7 @@
               "page": "Profile.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1638,7 +1638,7 @@
               "page": "ProjectIntelligence.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1646,7 +1646,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             },
@@ -1654,7 +1654,7 @@
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "shell",
-              "evidence": "src/hooks/useAuth.tsx:122",
+              "evidence": "src/hooks/useAuth.tsx:144",
               "confirmed": true,
               "note": "named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered"
             }
@@ -2622,7 +2622,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:413",
+          "evidence": "src/pages/DataManager.tsx:415",
           "confirmed": true
         },
         {
@@ -2636,7 +2636,7 @@
           "page": "ProcessLevelNetwork.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/ProcessLevelNetwork.tsx:359",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:383",
           "confirmed": true
         },
         {
@@ -2957,7 +2957,7 @@
               "page": "ProcessLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/ProcessLevelNetwork.tsx:359",
+              "evidence": "src/pages/ProcessLevelNetwork.tsx:383",
               "confirmed": true
             }
           ],
@@ -3251,7 +3251,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:413",
+          "evidence": "src/pages/DataManager.tsx:415",
           "confirmed": true
         },
         {
@@ -4552,7 +4552,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -8131,7 +8131,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:413",
+          "evidence": "src/pages/DataManager.tsx:415",
           "confirmed": true
         },
         {
@@ -13448,7 +13448,7 @@
           "page": "DataManager.tsx",
           "via": "rpc delete_project_dataset",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:697",
+          "evidence": "src/pages/DataManager.tsx:699",
           "confirmed": true
         },
         {
@@ -13872,14 +13872,14 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:413",
+          "evidence": "src/pages/DataManager.tsx:415",
           "confirmed": true
         },
         {
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc get_network_metrics_for_materials",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:241",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:284",
           "confirmed": true
         }
       ],
@@ -14476,14 +14476,14 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:413",
+          "evidence": "src/pages/DataManager.tsx:415",
           "confirmed": true
         },
         {
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -15597,7 +15597,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -16134,7 +16134,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_node_list",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:425",
+          "evidence": "src/pages/DataManager.tsx:427",
           "confirmed": true
         },
         {
@@ -16148,7 +16148,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -17569,7 +17569,7 @@
         "min_project_role": "viewer",
         "audited": true,
         "rls_enabled": true,
-        "note": "`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status` / `admin_delete_organization`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that takes the organization's projects and accounts with it, and is a different verb from suspension. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first."
+        "note": "`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status` / `admin_set_org_access_period` / `admin_set_org_limits` / `admin_delete_organization`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that takes the organization's projects and accounts with it, and is a different verb from suspension. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first."
       },
       "rls": {
         "enabled": true,
@@ -17624,6 +17624,43 @@
           "definition": "CHECK (status IN ('active','suspended'))",
           "implicit": true,
           "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "organizations_access_period_check",
+          "kind": "CHECK",
+          "columns": [
+            "access_period"
+          ],
+          "definition": "CHECK (access_period IN ('week', 'month', 'quarter', 'year'))",
+          "implicit": true,
+          "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "organizations_project_limit_check",
+          "kind": "CHECK",
+          "columns": [
+            "project_limit"
+          ],
+          "definition": "CHECK (project_limit IN (1, 2, 3, 5))",
+          "implicit": true,
+          "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "organizations_user_limit_check",
+          "kind": "CHECK",
+          "columns": [
+            "user_limit"
+          ],
+          "definition": "CHECK (user_limit IN (1, 2, 3, 5))",
+          "implicit": true,
+          "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "organizations_access_period_start_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((access_period IS NULL) = (access_valid_from IS NULL))",
+          "added_by": "20260929000004_organization_plan.sql"
         }
       ],
       "indexes": [],
@@ -17890,6 +17927,166 @@
           "resolution": null,
           "note": null,
           "engine_requirement": null
+        },
+        {
+          "name": "access_period",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000004_organization_plan.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "How long the organization may be used, counted from `access_valid_from`: `week`, `month`, `quarter` or `year`, CHECK-constrained to those four; NULL means it does not expire, which every organization that existed before D207 keeps. Set by `admin_set_org_access_period` (choosing a period again renews it from now) or `admin_create_organization`. The lengths are written once, in `org_access_period_interval()`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of week / month / quarter / year, or NULL"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "access_valid_from",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000004_organization_plan.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the current access period started — the database clock at the moment an administrator set it, never the browser's. NULL exactly when `access_period` is NULL (a CHECK).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "access_valid_until",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000004_organization_plan.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the access period ends. DERIVED by `trg_organizations_access_valid_until` from the two columns above; a write that names it is overwritten. At or after this instant `authenticate_approved_user` refuses every member except a super admin, `get_my_profile` reports `access_expired`, and no project can be added to the organization (D207).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_limit",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000004_organization_plan.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of 1 / 2 / 3 / 5, or NULL"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "user_limit",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000004_organization_plan.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The most accounts the organization may have, counted by `approved_users.organization_id` (the authority since D205) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `approved_users`. Lowering it removes nobody; no account can be added until under it.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "one of 1 / 2 / 3 / 5, or NULL"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
         }
       ],
       "note": "Created by `20260709000002_super_admin_phase1.sql`, which seeded one row per DISTINCT `approved_users.organization` string. That seeding is why the uuid plane and the text plane started out agreeing, and why nothing has kept them agreeing since: the seed ran once, `set_project_defaults()` never stamped the uuid (D27), and `admin_update_organization` renames without propagating. WP 2.1 fixed the trigger, backfilled what it could match unambiguously, and routed every live comparison through one predicate. It deliberately did NOT re-seed this table from distinct strings: after a rename, a user carrying the new name slugifies to a slug no row holds, and seeding would split one organization into two.",
@@ -17942,7 +18139,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_project_dataset_status",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:413",
+          "evidence": "src/pages/DataManager.tsx:415",
           "confirmed": true
         },
         {
@@ -19245,7 +19442,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -22892,7 +23089,7 @@
           "page": "DataManager.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:200",
+          "evidence": "src/pages/DataManager.tsx:201",
           "confirmed": true
         },
         {
@@ -22906,7 +23103,7 @@
           "page": "FirmLevelNetwork.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/FirmLevelNetwork.tsx:244",
+          "evidence": "src/pages/FirmLevelNetwork.tsx:258",
           "confirmed": true
         },
         {
@@ -22920,14 +23117,14 @@
           "page": "ProcessLevelNetwork.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/ProcessLevelNetwork.tsx:253",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:282",
           "confirmed": true
         },
         {
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:196",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:239",
           "confirmed": true
         },
         {
@@ -24213,14 +24410,14 @@
           "page": "FirmLevelNetwork.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/FirmLevelNetwork.tsx:303",
+          "evidence": "src/pages/FirmLevelNetwork.tsx:315",
           "confirmed": true
         },
         {
           "page": "ProductLevelNetwork.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:518",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:559",
           "confirmed": true
         }
       ],
@@ -24363,14 +24560,14 @@
               "page": "FirmLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/FirmLevelNetwork.tsx:303",
+              "evidence": "src/pages/FirmLevelNetwork.tsx:315",
               "confirmed": true
             },
             {
               "page": "ProductLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/ProductLevelNetwork.tsx:518",
+              "evidence": "src/pages/ProductLevelNetwork.tsx:559",
               "confirmed": true
             }
           ],
@@ -24417,14 +24614,14 @@
               "page": "FirmLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/FirmLevelNetwork.tsx:303",
+              "evidence": "src/pages/FirmLevelNetwork.tsx:315",
               "confirmed": true
             },
             {
               "page": "ProductLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/ProductLevelNetwork.tsx:518",
+              "evidence": "src/pages/ProductLevelNetwork.tsx:559",
               "confirmed": true
             }
           ],
@@ -27445,7 +27642,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:640",
+          "evidence": "src/pages/DataManager.tsx:642",
           "confirmed": true
         },
         {
@@ -27466,7 +27663,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:227",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
           "confirmed": true
         },
         {
@@ -28400,7 +28597,7 @@
           "page": "DataManager.tsx",
           "via": "rpc combine_project_into_supply_chain",
           "grain": "table",
-          "evidence": "src/pages/DataManager.tsx:640",
+          "evidence": "src/pages/DataManager.tsx:642",
           "confirmed": true
         },
         {
@@ -31025,5 +31222,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "6cd1e7f89e68"
+  "contract_version": "f59bce1fe382"
 }

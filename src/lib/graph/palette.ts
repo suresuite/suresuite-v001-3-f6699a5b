@@ -56,6 +56,20 @@ export const GRAPH_INK = {
   nodeBorder: '#ffffff',
   nodeText: '#111827',
   dimmed: '#d1d5db',
+  /** React Flow's default node outline — the standard product/process node border. */
+  nodeOutline: '#1a192b',
+  /** The search hit's fill, on all three lenses. */
+  searchHit: '#ff0000',
+  /** The canvas dot grid. */
+  dotGrid: '#d4d4d4',
+} as const;
+
+/**
+ * Process-lens legend classes that are not an echelon of their own: a material's
+ * BOM depth is a shade within the material colour, and depth 2+ is the darker one.
+ */
+export const DEPTH_SHADE = {
+  deepMaterial: '#ca8a04',
 } as const;
 
 /**

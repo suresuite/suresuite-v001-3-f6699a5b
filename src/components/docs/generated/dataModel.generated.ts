@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "6cd1e7f89e68";
+export const CONTRACT_VERSION = "f59bce1fe382";
 export const ENGINE_VERSION = "0.2.8";
 export const LAST_MIGRATION = "20260930000002_admin_delete_organization.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
   "tablesDescribed": 55,
-  "columnsDescribed": 688,
+  "columnsDescribed": 693,
   "tablesUndescribed": 26
 } as const;
 
@@ -357,7 +357,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "organizations",
         "grain": "One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold.",
-        "columns": 8,
+        "columns": 13,
         "owner": "platform"
       },
       {
