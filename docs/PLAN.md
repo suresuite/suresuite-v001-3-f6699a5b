@@ -20130,6 +20130,32 @@ index dropped (§1), the verb not clearing the previous default (§1). Nothing r
 production until merge; whether Phu's default was set is read on /admin/users or from the
 `org.default_set` / `org.default_unresolved` row, in the push after it (D153).
 
+### WP 9.4 slice 1 · one planning unit on the Lab · 2026-09-30 · no migration
+
+**Asked for.** "Consider the planning unit … it should be interconnected and consistent."
+
+**Promised versus found.** WP 9.4's opening entry promised that the Lab reads the unit
+/policies sets. It found the unit already fixed to week by `useTimeUnit`, and the Lab
+contradicting it in five places: its own selector with one option, day-denominated footers
+and rail sub-labels, a phone view in days, and a Time step control whose column the engine
+has never read (§4 D220). Two defaults described runs the engine never makes — 90 d and
+182 d both run as the 52-week floor (D218) — and the hook's month disagreed with the one
+unit table (D223).
+
+**Decisions.** (1) One module, `src/lib/sim/planningTime.ts`, turns a stored day count into
+the week the engine runs; every Lab figure, the scenario library, the credibility badge and
+Run & Validate's three inputs go through it. (2) A stored value that is not whole weeks
+reads "≈N wk" and is NOT snapped: `horizon_days` is in the card's fingerprint, and a silent
+365 → 364 would stale every validated scenario. `editWeeks` keeps the stored value when the
+typed week is the one it already rounds to; `WeeksInput` commits on blur against the value
+it was given, never an intermediate keystroke. (3) The Time step control goes; the column
+stays, because fingerprint v1 hashes it. (4) The default horizon is 364 d, pinned to
+`horizon_weeks_floor × days_per_tick` by `planningTime.test.ts`.
+
+**Gap check.** The run-window footer now reads weeks only; its test pins the same F-02 facts
+in weeks (52 measured, not 987 days). The disruption editor still takes days until slice 6
+rewrites it — named there, not here. No later package changes.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |

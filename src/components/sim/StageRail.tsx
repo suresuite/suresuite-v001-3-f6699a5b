@@ -12,6 +12,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { KX_TIGHT, LAYER } from "@/components/intelligence/piUi";
+import { formatDuration } from "@/lib/sim/planningTime";
 
 /* ── shared rail rule set ────────────────────────────────────────────────
  * Resolved values of the product tokens: --brand-ink, --zinc-quiet,
@@ -423,7 +424,7 @@ export function buildStages(args: {
       "setup",
       "1",
       "Setup",
-      `${scenario.horizon_days} d · ${plural(scenario.replications, "rep", "reps")} · ${scenario.primary_kpi}`,
+      `${formatDuration(scenario.horizon_days)} · ${plural(scenario.replications, "rep", "reps")} · ${scenario.primary_kpi}`,
       !!scenario.primary_kpi,
     ),
     stage(

@@ -85,6 +85,7 @@ import { StressTestDrawer, type StressTestPreset } from "./StressTestCard";
 import { RESPONSE_LABELS, type RecoveryConfig, type RecoveryResponseKey } from "@/lib/sim/recoveryScore";
 import { kpiDisplay } from "@/lib/sim/kpiDisplay";
 import { useTimeUnit, UNIT_LABEL_PLURAL } from "@/hooks/useTimeUnit";
+import { formatDuration, formatWeek } from "@/lib/sim/planningTime";
 import type { PaneId } from "./StageRail";
 import type { Scenario } from "@/hooks/useScenarios";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
@@ -240,8 +241,8 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   const eventBudget = useRowBudget();
   const repBudget = useRowBudget(4, 6, 9);
   const statBudget = useStatBudget();
-  // Read-only here: the planning unit is set by TimeUnitBar inside the
-  // Scenario sheet, which is the real control. This only labels the row.
+  // Read-only here, as everywhere in the Lab: the planning unit is set on
+  // /policies. This only labels the row (WP 9.4 slice 1).
   const { unit } = useTimeUnit(projectId);
 
   const activeProject = projects.find((p) => p.id === projectId) ?? null;
@@ -382,7 +383,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
           value: UNIT_LABEL_PLURAL[unit],
           sheet: "scenario",
         },
-        { label: "Horizon", hint: "simulated period", value: `${selected.horizon_days} d`, sheet: "runWindow" },
+        { label: "Horizon", hint: "simulated period", value: formatDuration(selected.horizon_days), sheet: "runWindow" },
         {
           label: "Replications",
           hint: inherited ? "adopted n* · from model validation" : "not adopted — engine default",
@@ -394,7 +395,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
           hint: inherited
             ? `adopted · detection ${selected.warmup_mode}`
             : `not adopted · detection ${selected.warmup_mode}`,
-          value: `${selected.warmup_days} d`,
+          value: formatDuration(selected.warmup_days),
           sheet: "runWindow",
         },
         {
@@ -482,8 +483,8 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
                   key={i}
                   chevron={false}
                   label={`${e.target_type === "edge" ? "Lane" : "Node"} · ${e.magnitude_pct}%`}
-                  sub={`${e.target || "—"} · from d${e.start_day} · ${e.duration_days} d`}
-                  value={`d${e.start_day}`}
+                  sub={`${e.target || "—"} · from ${formatWeek(e.start_day)} · ${formatDuration(e.duration_days)}`}
+                  value={formatWeek(e.start_day)}
                 />
               ))}
               {/* Defer, never truncate (§10, v2 §5.4). What the device cannot
@@ -544,7 +545,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   const runStats: MobileStat[] = selected
     ? [
         { label: "Replications", value: String(repsTarget) },
-        { label: "Warm-up", value: `${selected.warmup_days} d` },
+        { label: "Warm-up", value: formatDuration(selected.warmup_days) },
         { label: "Seed", value: String(selected.seed) },
         { label: "Events", value: String(events.length) },
       ]
@@ -729,7 +730,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
             sub={[
               selected?.name,
               runVersionLabel ?? policyVersionLabel,
-              selected ? `warm-up ${selected.warmup_days} d` : null,
+              selected ? `warm-up ${formatDuration(selected.warmup_days)}` : null,
               selected ? `seed ${selected.seed}` : null,
               `${events.length} events`,
             ]
@@ -1029,8 +1030,8 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
               key={i}
               chevron={false}
               label={`${e.target_type === "edge" ? "Lane" : "Node"} · ${e.magnitude_pct}%`}
-              sub={`${e.target || "—"} · from d${e.start_day} · ${e.duration_days} d`}
-              value={`d${e.start_day}`}
+              sub={`${e.target || "—"} · from ${formatWeek(e.start_day)} · ${formatDuration(e.duration_days)}`}
+              value={formatWeek(e.start_day)}
             />
           ))}
         </div>

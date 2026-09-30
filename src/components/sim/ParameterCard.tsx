@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { FROZEN_CELL_ON_TINT } from "@/components/shared";
 import {
   DAYS_PER_UNIT,
   PLANNING_UNIT_NOTE,
   UNIT_LABEL_PLURAL,
-  isSelectableUnit,
   type TimeUnit,
 } from "@/hooks/useTimeUnit";
 
@@ -19,7 +19,7 @@ import {
 export type Provenance = "edited" | "inherited" | null;
 
 export type FieldControl =
-  | { kind: "number"; value: number; onChange: (v: number) => void; onCommit?: () => void; width?: number; min?: number }
+  | { kind: "number"; value: number; onChange: (v: number) => void; onCommit?: () => void; width?: number; min?: number; max?: number }
   | { kind: "segmented"; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void }
   | { kind: "toggle"; value: boolean; onChange: (v: boolean) => void; onLabel?: string; offLabel?: string };
 
@@ -133,6 +133,7 @@ function NumberField({
     <input
       type="number"
       min={control.min}
+      max={control.max}
       value={text}
       onChange={(e) => {
         const raw = e.target.value;
@@ -267,35 +268,24 @@ export function ParameterCard({ group, footer }: { group: ParamGroup; footer?: s
  *  and the page share one contract. */
 export { DAYS_PER_UNIT, UNIT_LABEL_PLURAL, type TimeUnit };
 
-export function TimeUnitBar({
-  unit,
-  onUnit,
-  horizonDays,
-}: {
-  unit: TimeUnit;
-  onUnit: (u: TimeUnit) => void;
-  horizonDays: number;
-}) {
-  const factor = DAYS_PER_UNIT[unit];
+/**
+ * The planning unit, read-only (WP 9.4 slice 1). It is SET once, on /policies
+ * ("B — Planning unit"), and every Lab figure reads in it; the Lab used to carry
+ * its own selector with a single option, which looked like a choice and was not.
+ */
+export function PlanningUnitChip({ unit }: { unit: TimeUnit }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 bg-[#fcfcfc] px-4 py-[10px] md:flex-nowrap">
-      <span className="whitespace-nowrap text-[12.5px] text-[#3f3f46]">Show time in</span>
-      <Segmented
-        value={unit}
-        onChange={(v) => onUnit(v as TimeUnit)}
-        // Week only for now — see useTimeUnit's PLANNING_UNIT.
-        options={(Object.keys(DAYS_PER_UNIT) as TimeUnit[]).filter(isSelectableUnit).map((u) => ({
-          value: u,
-          label: UNIT_LABEL_PLURAL[u],
-        }))}
-      />
-      <span className="text-[13px] tabular-nums text-[#52525b]">
-        {horizonDays} days
-        {unit === "day" ? "" : ` · ${(horizonDays / factor).toFixed(1)} ${UNIT_LABEL_PLURAL[unit]}`}
+    <div className="flex flex-wrap items-center gap-2 bg-[#fcfcfc] px-4 py-2 text-[12px] text-[#52525b]">
+      <span>
+        Time in <span className="font-medium text-[#18181b]">{UNIT_LABEL_PLURAL[unit]}</span>
       </span>
-      <span className="text-[12px] text-[#71717a]" title={PLANNING_UNIT_NOTE}>
-        lead times in weeks
-      </span>
+      <Link
+        to="/policies"
+        title={PLANNING_UNIT_NOTE}
+        className="inline-flex min-h-11 items-center text-[#52525b] underline-offset-2 hover:text-[#18181b] hover:underline md:min-h-0"
+      >
+        planning unit ›
+      </Link>
     </div>
   );
 }

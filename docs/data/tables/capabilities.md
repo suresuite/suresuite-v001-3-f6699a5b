@@ -178,6 +178,6 @@ When its metadata last changed. Server-stamped.
 
 ---
 
-*Generated from data contract `1cc84e15372a`, engine `0.2.8`,
+*Generated from data contract `5f244e8738ea`, engine `0.2.8`,
 sidecar `supabase/contract/capabilities.contract.yaml`, table created by `20260711000002_unified_access_control.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

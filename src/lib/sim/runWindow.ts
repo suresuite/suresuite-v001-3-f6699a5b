@@ -18,7 +18,7 @@ const R = registry.run_window;
 
 /** Python's `round()` — half to even. Integer days never land on .5 weeks,
  *  but the mapper's rule is the rule, not an approximation of it. */
-function pyRound(x: number): number {
+export function pyRound(x: number): number {
   const f = Math.floor(x);
   const d = x - f;
   if (d > 0.5) return f + 1;
@@ -62,22 +62,20 @@ export function runWindow(s: {
   return { horizonWeeks, windowWeeks, warmupWeeks, measuredWeeks, horizonBounded: rawHorizon !== horizonWeeks };
 }
 
-/** The card's footer: what the engine measures, not `horizon − warm-up`. */
+/** The card's footer: what the engine measures, not `horizon − warm-up`.
+ *  In weeks only — the planning unit and the engine tick (WP 9.4 slice 1). */
 export function runWindowFooter(s: { horizon_days: number; warmup_days: number; warmup_mode: string }): string {
   const w = runWindow(s);
-  const tick = R.days_per_tick;
   const measured = w.measuredWeeks ?? w.windowWeeks;
   const head =
     w.warmupWeeks === null
-      ? `engine measures ${measured} wk (${measured * tick} d) after the detected warm-up`
-      : `engine measures ${measured} wk (${measured * tick} d) after a ${w.warmupWeeks} wk warm-up`;
+      ? `measures ${measured} wk after the detected warm-up`
+      : `measures ${measured} wk after a ${w.warmupWeeks} wk warm-up`;
   const horizon = w.horizonBounded
     ? ` · horizon run as ${w.horizonWeeks} wk (engine range ${R.horizon_weeks_floor}–${R.horizon_weeks_ceiling})`
     : "";
-  const rest =
-    w.warmupWeeks === null
-      ? ""
-      : ` · ${(w.horizonWeeks - w.warmupWeeks - measured) * tick} d simulated, not measured`;
+  const unmeasured = w.warmupWeeks === null ? 0 : w.horizonWeeks - w.warmupWeeks - measured;
+  const rest = unmeasured > 0 ? ` · ${unmeasured} wk run, not measured` : "";
   return head + horizon + rest;
 }
 

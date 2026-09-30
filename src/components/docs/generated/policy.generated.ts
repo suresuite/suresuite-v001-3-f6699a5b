@@ -2862,7 +2862,7 @@ export const SCENARIO_SETUP: ScenarioSetupGroup[] = [
         "label": "Planning horizon",
         "unit": "the project's planning unit",
         "key": "horizon_days",
-        "default": "90"
+        "default": "364"
       },
       {
         "label": "Steady state starts at",
@@ -2875,12 +2875,6 @@ export const SCENARIO_SETUP: ScenarioSetupGroup[] = [
         "unit": null,
         "key": "warmup_mode",
         "default": "\"auto\""
-      },
-      {
-        "label": "Time step",
-        "unit": null,
-        "key": "time_step",
-        "default": "\"day\""
       }
     ]
   },

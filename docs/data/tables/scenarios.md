@@ -76,7 +76,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `name` | — | `text` | — | — | What a person called it. |
 | `description` | — | `text` | — | — | Their own note about it. Defaults to the empty string rather than NULL. |
 | `horizon_days` | — | `integer` | — | — | How long the simulated world runs, in days. The engine's own clock is weekly, so this is divided at the boundary rather than stored twice — `normalize-at-promotion` (I3) applied to a decision. |
-| `time_step` | — | `text` | — | — | The granularity the scenario was set up at — `day` by default. A NAME, from a small fixed vocabulary, with no table behind it. |
+| `time_step` | — | `text` | — | — | A step-size label (`day` by default) that NO run reads: the engine steps in weeks (`run_window.days_per_tick`), and no screen offers the control any more (WP 9.4). Retained because the model card's baseline fingerprint (`_build_scenario_fingerprint`, fingerprint v1) hashes it, so dropping or rewriting it would turn every validated scenario stale. A new scenario copies its baseline's value rather than choosing one (§4 D220). |
 | `warmup_mode` | — | `text` | — | — | Whether the warm-up is detected or fixed. `auto` means the run decides and writes `warmup_detected_at`; `fixed` means `warmup_days` below is used verbatim. |
 | `warmup_days` | — | `integer` | — | — | The fixed warm-up, in days. Read only when `warmup_mode` is not `auto` — so a non-default value here with `auto` set is a setting that does nothing, and nothing says so. |
 | `replications` | — | `integer` | — | — | How many independent runs. The KPI table's `n` column is the count that ACTUALLY completed, which is a different number whenever a replication fails. |
@@ -92,7 +92,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `updated_at` | — | `timestamp with time zone` | — | — | When it was last changed, server-stamped. A scenario is mutable, which is why a run binds to a scenario ID AND carries its own copy of what it ran. |
 | `recovery_playbook_id` | — | `uuid` | — | — | The playbook this scenario applies, by id. The one place a playbook is referenced by key rather than by name, which is what `scenario_templates.suggested_playbook_name` is not. |
 | `from_network` | — | `boolean` | — | — | TRUE when the scenario was created from a network screen rather than from the simulation lab. It records the door a decision came through, which nothing else does. |
-| `inherited_validation_id` | — | `uuid` | — | — | The validation run this scenario inherited its data-readiness verdict from, so a re-run does not re-grade an unchanged dataset. NULL where it was never graded — and that is different from graded-and-clean. |
+| `inherited_validation_id` | — | `uuid` | — | — | The model card (`model_validations.id`) whose adopted warm-up and recommended replication count `apply_validation_to_scenario` wrote into this scenario. NULL where nothing was inherited, or where a person hand-edited either value afterwards — divergence from the validated settings is explicit, never silent. A credibility provenance, not a data-readiness grade, which is what this line said until §4 D220. |
 
 ## Each column in full
 
@@ -169,7 +169,7 @@ How long the simulated world runs, in days. The engine's own clock is weekly, so
 
 ### `time_step`
 
-The granularity the scenario was set up at — `day` by default. A NAME, from a small fixed vocabulary, with no table behind it.
+A step-size label (`day` by default) that NO run reads: the engine steps in weeks (`run_window.days_per_tick`), and no screen offers the control any more (WP 9.4). Retained because the model card's baseline fingerprint (`_build_scenario_fingerprint`, fingerprint v1) hashes it, so dropping or rewriting it would turn every validated scenario stale. A new scenario copies its baseline's value rather than choosing one (§4 D220).
 
 | | |
 |---|---|
@@ -395,7 +395,7 @@ TRUE when the scenario was created from a network screen rather than from the si
 
 ### `inherited_validation_id`
 
-The validation run this scenario inherited its data-readiness verdict from, so a re-run does not re-grade an unchanged dataset. NULL where it was never graded — and that is different from graded-and-clean.
+The model card (`model_validations.id`) whose adopted warm-up and recommended replication count `apply_validation_to_scenario` wrote into this scenario. NULL where nothing was inherited, or where a person hand-edited either value afterwards — divergence from the validated settings is explicit, never silent. A credibility provenance, not a data-readiness grade, which is what this line said until §4 D220.
 
 | | |
 |---|---|
@@ -416,6 +416,6 @@ The validation run this scenario inherited its data-readiness verdict from, so a
 
 ---
 
-*Generated from data contract `1cc84e15372a`, engine `0.2.8`,
+*Generated from data contract `5f244e8738ea`, engine `0.2.8`,
 sidecar `supabase/contract/scenarios.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

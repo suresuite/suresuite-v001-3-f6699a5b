@@ -101,6 +101,11 @@ import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { M, MobileChip, MobileGroup, MobilePanel, MobileRow } from '@/components/mobile';
 import { formatMoney, MONEY_SYMBOL } from "@/lib/sim/money";
+import { WeeksInput } from "@/components/sim/WeeksInput";
+import { formatDuration } from "@/lib/sim/planningTime";
+
+/** The planning-unit inputs, sized like the seed input beside them. */
+const WEEKS_FIELD = "h-6 w-[94px] text-right font-mono text-[11.5px] md:min-h-0";
 
 // Runs launched from the policies stage all reuse this single auto-managed
 // scenario so the Lab's scenario list doesn't fill up with validation runs.
@@ -1162,7 +1167,7 @@ export function RunValidateStage({
     const days = Math.round(weeks * 7);
     setWarmCfg((c) => ({ ...c, warmup_days: days }));
     setWarmupComputed(true);
-    toast.success(`Warm-up via ${label}: week ${weeks} (${days} days) — from ${doneReps.length} replication(s).`);
+    toast.success(`Warm-up via ${label}: week ${weeks} — from ${doneReps.length} replication(s).`);
   };
 
   const onIndicatorFile = async (id: KpiId, file: File | null) => {
@@ -1322,7 +1327,7 @@ export function RunValidateStage({
         : { text: "no run yet" };
     if (i === 2)
       return warmupComputed && warmCfg.warmup_days > 0
-        ? { text: `${warmCfg.warmup_days} days · ${warmCfg.method}` }
+        ? { text: `${formatDuration(warmCfg.warmup_days)} · ${warmCfg.method}` }
         : { text: "not detected", blocked: hasRealData };
     if (i === 3)
       return validationResult
@@ -1582,12 +1587,13 @@ export function RunValidateStage({
                       onChange={(e) => setSingleCfg((c) => ({ ...c, seed: parseInt(e.target.value, 10) || 1 }))}
                     />
                   </Field>
-                  <Field label="Horizon (days)">
-                    <Input
-                      type="number"
-                      className="h-6 w-[94px] text-right font-mono text-[11.5px] tabular-nums"
-                      value={singleCfg.horizon_days}
-                      onChange={(e) => setSingleCfg((c) => ({ ...c, horizon_days: parseInt(e.target.value, 10) || 1 }))}
+                  <Field label="Horizon (weeks)">
+                    <WeeksInput
+                      ariaLabel="Horizon in weeks"
+                      className={WEEKS_FIELD}
+                      days={singleCfg.horizon_days}
+                      min={1}
+                      onDays={(d) => setSingleCfg((c) => ({ ...c, horizon_days: d }))}
                     />
                   </Field>
                   {/* Inspection mode (G17/§9.5.1 — W3): opt-in per-item evidence
@@ -1645,12 +1651,13 @@ export function RunValidateStage({
                         )}
                       </div>
                     </Field>
-                    <Field label="Simulation time (days)">
-                      <Input
-                        type="number"
-                        className="h-6 w-[94px] text-right font-mono text-[11.5px] tabular-nums"
-                        value={multiCfg.horizon_days}
-                        onChange={(e) => setMultiCfg((c) => ({ ...c, horizon_days: parseInt(e.target.value, 10) || 1 }))}
+                    <Field label="Simulation time (weeks)">
+                      <WeeksInput
+                        ariaLabel="Simulation time in weeks"
+                        className={WEEKS_FIELD}
+                        days={multiCfg.horizon_days}
+                        min={1}
+                        onDays={(d) => setMultiCfg((c) => ({ ...c, horizon_days: d }))}
                       />
                     </Field>
                     <Field label="Confidence">
@@ -1870,12 +1877,12 @@ export function RunValidateStage({
                       ]}
                     />
                   </Field>
-                  <Field label="Warm-up (days)">
-                    <Input
-                      type="number"
-                      className="h-6 w-[94px] text-right font-mono text-[11.5px] tabular-nums"
-                      value={warmCfg.warmup_days}
-                      onChange={(e) => setWarmCfg((c) => ({ ...c, warmup_days: parseInt(e.target.value, 10) || 0 }))}
+                  <Field label="Warm-up (weeks)">
+                    <WeeksInput
+                      ariaLabel="Warm-up in weeks"
+                      className={WEEKS_FIELD}
+                      days={warmCfg.warmup_days}
+                      onDays={(d) => setWarmCfg((c) => ({ ...c, warmup_days: d }))}
                     />
                   </Field>
                   <Button
@@ -1891,7 +1898,7 @@ export function RunValidateStage({
                   <div className="mt-1 flex flex-col gap-2.5">
                     <div className={cn(SURFACE, "flex flex-wrap items-center gap-2.5 px-2.5 py-1.5")}>
                       <span className={KX_TIGHT}>Detected warm-up</span>
-                      <span className="font-mono text-[11.5px] font-medium">{warmCfg.warmup_days} days</span>
+                      <span className="font-mono text-[11.5px] font-medium">{formatDuration(warmCfg.warmup_days)}</span>
                       <span className="font-mono text-[11px] text-muted-foreground">
                         method <b className="font-medium text-foreground">{warmCfg.method}</b> · reps{" "}
                         <b className="font-medium text-foreground">{doneReps.length}</b>
@@ -1928,7 +1935,7 @@ export function RunValidateStage({
           <StepShell
             index={3}
             title="Validation"
-            sub={`t > ${warmCfg.warmup_days}d · KS + Welch t`}
+            sub={`t > ${formatDuration(warmCfg.warmup_days)} · KS + Welch t`}
             action={
               <Button
                 size="sm"
@@ -2276,7 +2283,7 @@ function AdoptStep({
             label="Warm-up"
             detail={
               warmupComputed && warmCfg.warmup_days > 0
-                ? `${warmCfg.warmup_days} days (${warmCfg.method})`
+                ? `${formatDuration(warmCfg.warmup_days)} (${warmCfg.method})`
                 : "detect the warm-up first (step 3)"
             }
           />

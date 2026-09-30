@@ -17130,7 +17130,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The granularity the scenario was set up at — `day` by default. A NAME, from a small fixed vocabulary, with no table behind it.",
+        "meaning": "A step-size label (`day` by default) that NO run reads: the engine steps in weeks (`run_window.days_per_tick`), and no screen offers the control any more (WP 9.4). Retained because the model card's baseline fingerprint (`_build_scenario_fingerprint`, fingerprint v1) hashes it, so dropping or rewriting it would turn every validated scenario stale. A new scenario copies its baseline's value rather than choosing one (§4 D220).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -17528,7 +17528,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The validation run this scenario inherited its data-readiness verdict from, so a re-run does not re-grade an unchanged dataset. NULL where it was never graded — and that is different from graded-and-clean.",
+        "meaning": "The model card (`model_validations.id`) whose adopted warm-up and recommended replication count `apply_validation_to_scenario` wrote into this scenario. NULL where nothing was inherited, or where a person hand-edited either value afterwards — divergence from the validated settings is explicit, never silent. A credibility provenance, not a data-readiness grade, which is what this line said until §4 D220.",
         "primaryKey": false,
         "unique": false,
         "references": {

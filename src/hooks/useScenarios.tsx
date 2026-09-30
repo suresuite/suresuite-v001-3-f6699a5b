@@ -36,7 +36,7 @@ export interface Scenario {
  *  re-declaring the defaults next to the inputs. */
 export const SCENARIO_ENGINE_DEFAULTS = {
   description: "",
-  horizon_days: 90,
+  horizon_days: 364,
   time_step: "day",
   warmup_mode: "auto",
   warmup_days: 14,

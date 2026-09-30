@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { Scenario } from "@/hooks/useScenarios";
 import type { Credibility } from "@/hooks/useModelValidation";
+import { formatDuration } from "@/lib/sim/planningTime";
 
 /**
  * Left column, top to bottom:
@@ -145,7 +146,7 @@ export function ScenarioList({
                   {s.name || "Untitled scenario"}
                 </span>
                 <span className="truncate text-[12.5px] tabular-nums text-[#52525b]">
-                  {s.replications} reps · {s.horizon_days}d ·{" "}
+                  {s.replications} reps · {formatDuration(s.horizon_days)} ·{" "}
                   {events > 0 ? `${events} event${events > 1 ? "s" : ""}` : "steady state"}
                 </span>
               </div>

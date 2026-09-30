@@ -11,6 +11,7 @@ import {
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useScenarioTemplates, type ScenarioTemplate } from "@/hooks/useScenarioTemplates";
+import { formatDuration } from "@/lib/sim/planningTime";
 
 interface Props {
   open: boolean;
@@ -64,7 +65,7 @@ function TemplateCard({
           {template.severity}
         </span>
         <span className="text-[10px] text-muted-foreground ml-auto">
-          {Math.round(template.horizon_days / 7)}w · {template.replications} reps
+          {formatDuration(template.horizon_days)} · {template.replications} reps
         </span>
       </div>
       {template.suggested_playbook_name && (
