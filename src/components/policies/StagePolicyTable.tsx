@@ -2666,9 +2666,15 @@ export function StagePolicyTable({
         </div>
       )}
 
+      {/* `isolate` keeps the grid's own z-indices inside the grid. The frozen
+          key heads are z-40 — the same as the sticky PageHeader — and the
+          frozen body cells z-20, the same as the toolbar above; without a
+          stacking context of its own, a page scroll carried the left heads
+          OVER the page title and the frozen body cells over the toolbar,
+          while the value heads (z-30) slid under both. */}
       <div
         ref={scrollRef}
-        className="max-h-[614px] overflow-auto rounded-sm border border-[--hair-border] border-t-2 border-t-foreground [scrollbar-gutter:stable]"
+        className="isolate max-h-[614px] overflow-auto rounded-sm border border-[--hair-border] border-t-2 border-t-foreground [scrollbar-gutter:stable]"
       >
         <table
           className="border-separate border-spacing-0"
