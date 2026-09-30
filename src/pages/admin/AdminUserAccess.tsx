@@ -2,7 +2,7 @@
 // All data flow and RPCs unchanged from the original AdminUserAccess.tsx:
 // get_user_access, admin_set_capability, admin_set_user_models,
 // admin_set_user_budget, optimistic updates and effective-permission math.
-// Organization & projects (§4 D210) is `UserMemberships`, above the matrices.
+// Organizations & projects (§4 D211) is `UserMemberships`, above the matrices.
 // Presentation: SectionCard treatment, a segmented Inherit/Allow/Deny tri
 // control, teal On / grey Off status dots, mono model codes, and a sticky
 // "Preview as user" panel.
@@ -216,9 +216,10 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
         <div className={`grid gap-5 ${preview ? 'md:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
           <div className="space-y-4">
             {identityLine && <div className="-mt-1">{identityLine}</div>}
-            {/* §4 D210 — which organization, which projects, and what the account may
-                do on each, before the platform-wide matrices below. A move changes
-                which organization's overrides apply, so it reloads those too. */}
+            {/* §4 D211 — which organizations, which projects, and what the account may
+                do on each, before the platform-wide matrices below. Adding or removing
+                an organization can change the ACTIVE one (D210), whose overrides the
+                matrices apply, so it reloads those too. */}
             {actor?.id && (
               <UserMemberships actor={actor} userId={data.user_id} userLabel={data.name || data.email || 'this user'} onOrganizationChanged={load} />
             )}

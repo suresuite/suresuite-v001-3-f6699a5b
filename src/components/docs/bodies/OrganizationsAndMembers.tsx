@@ -60,6 +60,28 @@ export default function OrganizationsAndMembers() {
         </p>
       </Callout>
 
+      <Section id="several-organizations" title="Belonging to more than one organization">
+        <P>
+          One account can belong to several organizations — a consultant working for two
+          tenants signs in once, with one address and one password. An administrator adds or
+          removes an account&rsquo;s organizations on <AppLink to="/admin/users">/admin/users</AppLink>,
+          and each membership takes one of that organization&rsquo;s user places.
+        </P>
+        <P>
+          You work in one organization at a time: your <em>current organization</em>. The
+          projects you see, the projects you create and the plan shown on your profile are all the
+          current organization&rsquo;s, so two tenants&rsquo; projects never share a screen. Switch from
+          the account menu or from <AppLink to="/profile">your profile</AppLink>; the app reloads
+          on the other side of the wall. You cannot switch into an organization whose access
+          period has ended, and if your current one ends while another is still valid, signing in
+          takes you to the valid one.
+        </P>
+        <P>
+          Deleting an organization deletes only the accounts that belong to no other organization.
+          An account that also belongs elsewhere is removed from the deleted one and keeps the rest.
+        </P>
+      </Section>
+
       <Section id="members" title="Members — every column">
         <SuppliedAndComputed table={members} />
       </Section>

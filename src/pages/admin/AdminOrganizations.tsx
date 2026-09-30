@@ -8,6 +8,9 @@
 // reversible status; delete (`admin_delete_organization`) removes the organization,
 // its projects with all their data, and its user accounts, in one transaction, and
 // cannot be undone. The dialog says so and asks for the slug, which the server checks.
+// Since D210 an account may belong to several organizations: the delete removes the
+// accounts that belong to NO other organization and only detaches the rest, and the
+// dialog states both counts (`members_only_here`).
 //
 // The plan (PLAN.md §4 D207): each organization is valid for 1 week, 1 month, 1 quarter
 // or 1 year (or has no expiry), and may have 1, 2, 3 or 5 users and projects (or
@@ -43,6 +46,8 @@ interface OrgRow {
   id: string; name: string; slug: string; status: string; created_at: string; members: number; projects: number; cost_mtd: number;
   access_period: string | null; access_valid_until: string | null; access_expired: boolean;
   project_limit: number | null; user_limit: number | null;
+  /** Members that belong to no other organization — the accounts a delete removes (D210). */
+  members_only_here: number;
 }
 
 const untilLabel = (o: OrgRow) => (o.access_valid_until ? `${o.access_expired ? 'ended' : 'until'} ${formatPlanDate(o.access_valid_until)}` : '');
@@ -100,6 +105,7 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
       members: Number(o.members || 0), projects: Number(o.projects || 0), cost_mtd: Number(o.cost_mtd || 0),
       access_period: o.access_period ?? null, access_valid_until: o.access_valid_until ?? null,
       access_expired: !!o.access_expired, project_limit: o.project_limit ?? null, user_limit: o.user_limit ?? null,
+      members_only_here: Number(o.members_only_here ?? o.members ?? 0),
     })));
     setLoading(false);
   };
@@ -237,7 +243,7 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
                   <td className={`${TD} whitespace-nowrap`}>
                     <div className="flex items-center gap-2">
                       <span className={cn('w-8 text-right font-mono text-[12px] tabular-nums', overLimit(o.members, o.user_limit) && 'text-[#bf2330]')}
-                        title="Accounts in this organization, against its user limit">{o.members}</span>
+                        title="Accounts that belong to this organization (an account may belong to several), against its user limit">{o.members}</span>
                       <LimitSelect value={o.user_limit} noun="user" onChange={(v) => changeLimits(o, { user_limit: limitFromSelect(v) })} />
                     </div>
                   </td>
@@ -307,10 +313,11 @@ function RenameOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
   );
 }
 
-// Permanent deletion (§4 D208). The counts are the list's own — the same
-// `organization_id` the server deletes by — and the server refuses anything the
-// dialog cannot promise: a wrong slug, the admin's own organization, one holding a
-// super admin, or an account with recorded work in another organization's project.
+// Permanent deletion (§4 D208). The counts are the list's own — the memberships the
+// server deletes by, split into accounts it deletes (`members_only_here`) and accounts it
+// detaches (D210) — and the server refuses anything the dialog cannot promise: a wrong
+// slug, an organization the admin belongs to, one whose delete would remove a super
+// admin, or an account with recorded work in another organization's project.
 function DeleteOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; actorArgs: () => Record<string, unknown>; onClose: () => void; onDone: () => void }) {
   const [typed, setTyped] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -324,7 +331,9 @@ function DeleteOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
     if (error) return toast.error(error.message);
     const projects = Number(data?.projects ?? 0);
     const users = Number(data?.users ?? 0);
-    toast.success(`Deleted "${org.name}" with ${plural(projects, 'project', 'projects')} and ${plural(users, 'user account', 'user accounts')}`);
+    const detached = Number(data?.detached ?? 0);
+    toast.success(`Deleted "${org.name}" with ${plural(projects, 'project', 'projects')} and ${plural(users, 'user account', 'user accounts')}${
+      detached ? `; ${plural(detached, 'account', 'accounts')} removed from it and kept in their other organizations` : ''}`);
     onClose(); onDone();
   };
   return (
@@ -341,10 +350,15 @@ function DeleteOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
             <p className="font-medium">Deleted, forever:</p>
             <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
               <li>{plural(org.projects, 'project', 'projects')} and all of their data — datasets, the network, scenarios, policies, simulation runs and results</li>
-              <li>{plural(org.members, 'user account', 'user accounts')} — they will no longer be able to sign in</li>
+              <li>{plural(org.members_only_here, 'user account', 'user accounts')} that belong to no other organization — they will no longer be able to sign in</li>
               <li>the organization’s API keys, access defaults and AI budgets</li>
             </ul>
           </div>
+          {org.members > org.members_only_here && (
+            <p className="text-muted-foreground">
+              Removed from this organization but kept: {plural(org.members - org.members_only_here, 'account that also belongs', 'accounts that also belong')} to another organization.
+            </p>
+          )}
           <p className="text-muted-foreground">Kept: the audit log and usage logs, which record what happened.</p>
           <p className="text-muted-foreground">If you may need it back, suspend it instead.</p>
           <div>
@@ -410,7 +424,7 @@ function AddOrgDialog({ actorArgs, onCreated }: { actorArgs: () => any; onCreate
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            The period is counted from when the organization is created; after it ends its members cannot sign in (super admins excepted) until it is renewed.
+            The period is counted from when the organization is created; after it ends its members cannot sign in (super admins excepted) until it is renewed — unless they also belong to another organization that is still current, which they are switched to.
           </p>
         </div>
         <DialogFooter>

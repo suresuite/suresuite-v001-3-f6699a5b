@@ -9,9 +9,9 @@
 
 **Tier G** — governance — identity, capability, delegation, audit · owned by `platform` · `public.organization_members`
 
-**One row is** One user's membership of one organization, and the role they hold IN that organization. Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for.
+**One row is** One user's membership of one organization, and the role they hold IN that organization. An account may hold several — one per organization it belongs to (§4 D210). Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for.
 
-DERIVED from `approved_users.organization_id` since `20260929000002` (§4 D205). An account is in at most one organization, and this table holds its role IN that organization: exactly one row when `organization_id` is set, none when it is not. `trg_approved_users_sync_org_membership` inserts the row (the `20260709000002` mapping — app `admin` → `org_role = 'admin'`, everyone else `member`) and deletes any row in another organization whenever the account's organization changes; `trg_organization_members_match_account` refuses a row naming an organization the account is not in. Before it, `admin_update_user` added a row on a move and never removed the old one, so the Members figure could not agree with the Users page. §15 run `36641092611` measured zero contradictions before the backfill.
+THE AUTHORITY FOR WHICH ORGANIZATIONS AN ACCOUNT BELONGS TO since `20260930000004` (§4 D210) — an account may belong to several, and `approved_users.organization_id` names the ACTIVE one (what RLS reads). Between `20260929000002` (D205) and D210 this table was derived from that column and held at most one row per account. The rule now, kept by triggers and asserted by `rehearsal/450`: `organization_id` is NULL exactly when the account has no row here, and otherwise names one of its rows. Setting `organization_id` ADDS its row (`trg_approved_users_sync_org_membership`, the `20260709000002` role mapping — app `admin` → `org_role = 'admin'`, everyone else `member`) and removes none; a first row makes its organization active (`trg_organization_members_activate_first`); deleting the active organization's row re-points the account to its earliest remaining one, or none (`trg_organization_members_repoint_active`). A row's organization and account are fixed — an UPDATE of either is refused. Each row is a SEAT: an organization's `user_limit` counts these rows (`trg_tenant_allowance`, BEFORE INSERT; a re-add of an existing member takes no seat). Written by `admin_add_org_member` / `admin_remove_org_member` (logged through `log_admin_action`), by the sync trigger, and by the CASCADEs; read by the account through `list_my_organizations`.
 
 ## Uniqueness
 
@@ -44,7 +44,7 @@ partially or get corrected — the write fails.
 | Row-level security | enabled |
 | Policies on the table | 2 — all carry a predicate |
 
-A member may read only their OWN membership row (`user_id = get_current_user_id()`); there is no policy letting a member enumerate who else is in their organization, and the admin pages that do so run through super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member` and friends log through `log_admin_action`, but membership rows are also written by the `20260709000002` backfill and by nothing else that audits, so the general claim fails. WP 2.3 is where it becomes true. Since D210 an account's `org_role` is also set by `admin_set_user_org_role` (active super admin, /admin/users/:userId), logged to `admin_audit_logs`.
+A member may read only their OWN membership row (`user_id = get_current_user_id()`); there is no policy letting a member enumerate who else is in their organization, and the admin pages that do so run through super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member` and friends log through `log_admin_action`, but membership rows are also written by the `20260709000002` backfill and by nothing else that audits, so the general claim fails. WP 2.3 is where it becomes true. Since D211 an account's `org_role` in each of its organizations is also set by `admin_set_user_org_role` (active super admin, /admin/users/:userId), logged to `admin_audit_logs`.
 
 <details><summary>2 RLS policies</summary>
 
@@ -153,6 +153,6 @@ When the membership was created. Server-stamped.
 
 ---
 
-*Generated from data contract `559e2ef20421`, engine `0.2.8`,
+*Generated from data contract `8fdc41952a3f`, engine `0.2.8`,
 sidecar `supabase/contract/organization_members.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

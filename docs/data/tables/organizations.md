@@ -44,7 +44,7 @@ partially or get corrected — the write fails.
 | Row-level security | enabled |
 | Policies on the table | 2 — all carry a predicate |
 
-`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status` / `admin_set_org_access_period` / `admin_set_org_limits` / `admin_delete_organization`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that takes the organization's projects and accounts with it, and is a different verb from suspension. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first.
+`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status` / `admin_set_org_access_period` / `admin_set_org_limits` / `admin_delete_organization`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that takes the organization's projects and accounts with it, and is a different verb from suspension — since §4 D210 only the accounts that belong to NO other organization; an account that also belongs elsewhere loses this membership and keeps the rest. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first.
 
 <details><summary>2 RLS policies</summary>
 
@@ -86,7 +86,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `access_valid_from` | — | `timestamp with time zone` | — | — | When the current access period started — the database clock at the moment an administrator set it, never the browser's. NULL exactly when `access_period` is NULL (a CHECK). |
 | `access_valid_until` | — | `timestamp with time zone` | — | — | When the access period ends. DERIVED by `trg_organizations_access_valid_until` from the two columns above; a write that names it is overwritten. At or after this instant `authenticate_approved_user` refuses every member except a super admin, `get_my_profile` reports `access_expired`, and no project can be added to the organization (D207). |
 | `project_limit` | — | `integer` | — | — | The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it. |
-| `user_limit` | — | `integer` | — | — | The most accounts the organization may have, counted by `approved_users.organization_id` (the authority since D205) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `approved_users`. Lowering it removes nobody; no account can be added until under it. |
+| `user_limit` | — | `integer` | — | — | The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it. |
 
 ## Each column in full
 
@@ -265,7 +265,7 @@ The most projects the organization may hold, counted by `projects.organization_i
 
 ### `user_limit`
 
-The most accounts the organization may have, counted by `approved_users.organization_id` (the authority since D205) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `approved_users`. Lowering it removes nobody; no account can be added until under it.
+The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it.
 
 | | |
 |---|---|
@@ -279,6 +279,6 @@ The most accounts the organization may have, counted by `approved_users.organiza
 
 ---
 
-*Generated from data contract `559e2ef20421`, engine `0.2.8`,
+*Generated from data contract `8fdc41952a3f`, engine `0.2.8`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

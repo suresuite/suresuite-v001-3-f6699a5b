@@ -41,7 +41,9 @@ governance:
     `admin_delete_organization`, each of which opens with `_assert_super_admin` and
     closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that
     takes the organization's projects and accounts with it, and is a different verb
-    from suspension. This is one of the few tables where
+    from suspension — since §4 D210 only the accounts that belong to NO other
+    organization; an account that also belongs elsewhere loses this membership and
+    keeps the rest. This is one of the few tables where
     `audited: true` is literally true today — WP 2.3 is what makes the claim
     general. Read is open to any member of the org via the self-bridge policy
     below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name`
@@ -244,11 +246,15 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The most accounts the organization may have, counted by
-      `approved_users.organization_id` (the authority since D205) — 1, 2, 3 or 5,
-      CHECK-constrained; NULL is unlimited. Enforced on every writer by
-      `trg_tenant_allowance` on `approved_users`. Lowering it removes nobody; no
-      account can be added until under it.
+      The most accounts the organization may have, counted as its
+      `organization_members` rows — an account may belong to several organizations
+      and takes a seat in each (§4 D210; between D207 and D210 it counted
+      `approved_users.organization_id`) — 1, 2, 3 or 5, CHECK-constrained; NULL is
+      unlimited. Enforced on every writer by `trg_tenant_allowance` on
+      `organization_members`, which every path that adds an account to an
+      organization goes through; switching to an organization the account already
+      belongs to takes no seat. Lowering it removes nobody; no account can be added
+      until under it.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []

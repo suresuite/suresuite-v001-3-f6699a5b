@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 356,
-  "migrations_applied": 348,
+  "migrations_found": 357,
+  "migrations_applied": 349,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260930000004_admin_user_memberships.sql",
+  "last_migration": "20260930000005_admin_user_memberships.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 314,
+    "functions": 319,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -21331,6 +21331,22 @@
       "defined_by": "20260710000001_model_validations.sql"
     },
     {
+      "name": "admin_add_org_member",
+      "signature": "admin_add_org_member(uuid, text, uuid, uuid, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_target_user_id uuid",
+        "p_org_id uuid",
+        "p_org_role text DEFAULT NULL"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D210 — a super admin adds an account to an organization (it may already belong to others). ",
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
+    },
+    {
       "name": "admin_audit_log_read",
       "signature": "admin_audit_log_read(uuid, text, timestamptz, text, integer)",
       "args": [
@@ -21424,8 +21440,8 @@
       "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": "D208 — PERMANENTLY deletes an organization, its projects (each through ",
-      "defined_by": "20260930000002_admin_delete_organization.sql"
+      "comment": "D208, D210 — PERMANENTLY deletes an organization, its projects (each through ",
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
     },
     {
       "name": "admin_delete_project",
@@ -21452,8 +21468,8 @@
       "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "VOLATILE",
-      "comment": "D210 — /admin/users/:userId's organization and project read. Active super admin only. ",
-      "defined_by": "20260930000004_admin_user_memberships.sql"
+      "comment": "D211 — /admin/users/:userId's organization and project read. Active super admin only. ",
+      "defined_by": "20260930000005_admin_user_memberships.sql"
     },
     {
       "name": "admin_list_organizations",
@@ -21462,11 +21478,11 @@
         "p_actor_id uuid",
         "p_actor_email text"
       ],
-      "returns": "TABLE ( id uuid, name text, slug text, status text, created_at timestamptz, members bigint, projects bigint, cost_mtd numeric, access_period text, access_valid_from timestamptz, access_valid_until timestamptz, access_expired boolean, project_limit integer, user_limit integer)",
+      "returns": "TABLE ( id uuid, name text, slug text, status text, created_at timestamptz, members bigint, projects bigint, cost_mtd numeric, access_period text, access_valid_from timestamptz, access_valid_until timestamptz, access_expired boolean, project_limit integer, user_limit integer, members_only_here bigint)",
       "security_definer": true,
       "volatility": null,
-      "comment": "D205, D207 — /admin/organizations's read. Members and projects are counted by the ",
-      "defined_by": "20260929000004_organization_plan.sql"
+      "comment": "D205, D207, D210 — /admin/organizations's read. members counts memberships (what the ",
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
     },
     {
       "name": "admin_list_projects",
@@ -21501,11 +21517,11 @@
         "p_actor_id uuid",
         "p_actor_email text"
       ],
-      "returns": "TABLE ( user_id uuid, name text, email text, role text, is_active boolean, organization_id uuid, organization text, organization_status text, org_role text, mtd_requests bigint, mtd_tokens bigint, mtd_cost_usd numeric, monthly_budget_usd numeric, created_at timestamptz)",
+      "returns": "TABLE ( user_id uuid, name text, email text, role text, is_active boolean, organization_id uuid, organization text, organization_status text, org_role text, mtd_requests bigint, mtd_tokens bigint, mtd_cost_usd numeric, monthly_budget_usd numeric, created_at timestamptz, memberships jsonb)",
       "security_definer": true,
       "volatility": "VOLATILE",
-      "comment": "D205 — /admin/users's read. The reader is a parameter and must be an active super ",
-      "defined_by": "20260929000002_admin_users_read.sql"
+      "comment": "D205, D210 — /admin/users's read. The reader is a parameter and must be an active super ",
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
     },
     {
       "name": "admin_platform_overview",
@@ -21521,6 +21537,21 @@
       "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
+      "name": "admin_remove_org_member",
+      "signature": "admin_remove_org_member(uuid, text, uuid, uuid)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_target_user_id uuid",
+        "p_org_id uuid"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D210 — a super admin removes an account from one organization. If it was the account's ",
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
+    },
+    {
       "name": "admin_remove_project_member",
       "signature": "admin_remove_project_member(uuid, text, uuid, uuid)",
       "args": [
@@ -21533,7 +21564,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260930000004_admin_user_memberships.sql"
+      "defined_by": "20260930000005_admin_user_memberships.sql"
     },
     {
       "name": "admin_rename_project",
@@ -21644,7 +21675,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260930000004_admin_user_memberships.sql"
+      "defined_by": "20260930000005_admin_user_memberships.sql"
     },
     {
       "name": "admin_set_user_active",
@@ -21699,33 +21730,19 @@
     },
     {
       "name": "admin_set_user_org_role",
-      "signature": "admin_set_user_org_role(uuid, text, uuid, text)",
+      "signature": "admin_set_user_org_role(uuid, text, uuid, uuid, text)",
       "args": [
         "p_actor_id uuid",
         "p_actor_email text",
         "p_target_user_id uuid",
+        "p_org_id uuid",
         "p_org_role text"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260930000004_admin_user_memberships.sql"
-    },
-    {
-      "name": "admin_set_user_organization",
-      "signature": "admin_set_user_organization(uuid, text, uuid, uuid)",
-      "args": [
-        "p_actor_id uuid",
-        "p_actor_email text",
-        "p_target_user_id uuid",
-        "p_org_id uuid"
-      ],
-      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20260930000004_admin_user_memberships.sql"
+      "defined_by": "20260930000005_admin_user_memberships.sql"
     },
     {
       "name": "admin_set_user_role",
@@ -22078,16 +22095,6 @@
       "defined_by": "20260930000003_account_identity_name_parts.sql"
     },
     {
-      "name": "approved_users_enforce_org_allowance",
-      "signature": "approved_users_enforce_org_allowance()",
-      "args": [],
-      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20260929000004_organization_plan.sql"
-    },
-    {
       "name": "approved_users_stamp_organization_id",
       "signature": "approved_users_stamp_organization_id()",
       "args": [],
@@ -22104,8 +22111,18 @@
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260929000002_admin_users_read.sql"
+      "comment": "D205, D210 — when approved_users.organization_id (the ACTIVE organization) is set, ",
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
+    },
+    {
+      "name": "approved_users_track_active_org",
+      "signature": "approved_users_track_active_org()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D210 — keeps approved_users.organization_id (the ACTIVE organization) one of the ",
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
     },
     {
       "name": "archive_project_memory",
@@ -22247,7 +22264,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260929000004_organization_plan.sql"
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
     },
     {
       "name": "authenticate_user",
@@ -23502,8 +23519,8 @@
       "returns": "TABLE( id uuid, email text, name text, first_name text, last_name text, display_name text, phone text, avatar_color text, role text, organization text, is_active boolean, force_password_change boolean, password_changed_at timestamptz, password_expires_at timestamptz, password_expired boolean, password_max_age_days integer, access_period text, access_valid_from timestamptz, access_valid_until timestamptz, access_expired boolean, access_exempt boolean, project_limit integer, projects_used bigint, user_limit integer, users_used bigint )",
       "security_definer": true,
       "volatility": null,
-      "comment": "D206, D207, D209 — the signed-in user's own account row: their name whole and as ",
-      "defined_by": "20260930000003_account_identity_name_parts.sql"
+      "comment": "D206, D207, D209, D210 — the signed-in user's own account row: their name whole and as ",
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
     },
     {
       "name": "get_network_edges_for_prominence",
@@ -24227,6 +24244,18 @@
       "defined_by": "20260710000001_model_validations.sql"
     },
     {
+      "name": "list_my_organizations",
+      "signature": "list_my_organizations(uuid)",
+      "args": [
+        "p_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "TABLE( org_id uuid, name text, slug text, status text, org_role text, is_current boolean, joined_at timestamptz, access_period text, access_valid_until timestamptz, access_expired boolean )",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D210 — the organizations the signed-in account belongs to, its role in each, which one ",
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
+    },
+    {
       "name": "list_policy_versions",
       "signature": "list_policy_versions(uuid)",
       "args": [
@@ -24439,14 +24468,34 @@
       "defined_by": "20260916000011_org_identity_uuid_only.sql"
     },
     {
-      "name": "organization_members_match_account",
-      "signature": "organization_members_match_account()",
+      "name": "organization_members_activate_first",
+      "signature": "organization_members_activate_first()",
       "args": [],
       "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260929000002_admin_users_read.sql"
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
+    },
+    {
+      "name": "organization_members_enforce_org_allowance",
+      "signature": "organization_members_enforce_org_allowance()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
+    },
+    {
+      "name": "organization_members_repoint_active",
+      "signature": "organization_members_repoint_active()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
     },
     {
       "name": "organizations_derive_access_valid_until",
@@ -25102,6 +25151,19 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
+    },
+    {
+      "name": "switch_my_organization",
+      "signature": "switch_my_organization(uuid, uuid)",
+      "args": [
+        "p_org_id uuid",
+        "p_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "text LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D210 — makes one of the signed-in account's organizations its ACTIVE one (what RLS and ",
+      "defined_by": "20260930000004_account_in_several_organizations.sql"
     },
     {
       "name": "sync_disruption_to_sim_scenario",

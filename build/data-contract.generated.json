@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 356,
-      "migrations_applied": 348,
-      "last_migration": "20260930000004_admin_user_memberships.sql"
+      "migrations_found": 357,
+      "migrations_applied": 349,
+      "last_migration": "20260930000005_admin_user_memberships.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -1167,7 +1167,7 @@
           "page": "Profile.tsx",
           "via": "rpc change_own_password",
           "grain": "table",
-          "evidence": "src/pages/Profile.tsx:136",
+          "evidence": "src/pages/Profile.tsx:143",
           "confirmed": true
         },
         {
@@ -1914,7 +1914,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it.",
+          "meaning": "The account's ACTIVE organization, by uuid — the one it is working in now, the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns, and therefore what every org-scoped RLS policy reads and what a new project is stamped with. Since §4 D210 an account may BELONG to several organizations (`organization_members`, the authority for membership) and this column is always one of them — NULL exactly when it belongs to none. Setting it adds the membership if missing; the account changes it itself through `switch_my_organization`, and sign-in moves it to a current membership when the active one's access period has ended. The `organization` text copy follows it (`trg_approved_users_track_active_org`).",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
@@ -17331,7 +17331,7 @@
       "schema_name": "public",
       "tier": "G",
       "tier_name": "governance — identity, capability, delegation, audit",
-      "grain": "One user's membership of one organization, and the role they hold IN that organization. Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for.",
+      "grain": "One user's membership of one organization, and the role they hold IN that organization. An account may hold several — one per organization it belongs to (§4 D210). Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for.",
       "owner": "platform",
       "created_by": "20260709000002_super_admin_phase1.sql",
       "sidecar": "supabase/contract/organization_members.contract.yaml",
@@ -17361,7 +17361,7 @@
         "min_project_role": "viewer",
         "audited": false,
         "rls_enabled": true,
-        "note": "A member may read only their OWN membership row (`user_id = get_current_user_id()`); there is no policy letting a member enumerate who else is in their organization, and the admin pages that do so run through super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member` and friends log through `log_admin_action`, but membership rows are also written by the `20260709000002` backfill and by nothing else that audits, so the general claim fails. WP 2.3 is where it becomes true. Since D210 an account's `org_role` is also set by `admin_set_user_org_role` (active super admin, /admin/users/:userId), logged to `admin_audit_logs`."
+        "note": "A member may read only their OWN membership row (`user_id = get_current_user_id()`); there is no policy letting a member enumerate who else is in their organization, and the admin pages that do so run through super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member` and friends log through `log_admin_action`, but membership rows are also written by the `20260709000002` backfill and by nothing else that audits, so the general claim fails. WP 2.3 is where it becomes true. Since D211 an account's `org_role` in each of its organizations is also set by `admin_set_user_org_role` (active super admin, /admin/users/:userId), logged to `admin_audit_logs`."
       },
       "rls": {
         "enabled": true,
@@ -17602,7 +17602,7 @@
           "engine_requirement": null
         }
       ],
-      "note": "DERIVED from `approved_users.organization_id` since `20260929000002` (§4 D205). An account is in at most one organization, and this table holds its role IN that organization: exactly one row when `organization_id` is set, none when it is not. `trg_approved_users_sync_org_membership` inserts the row (the `20260709000002` mapping — app `admin` → `org_role = 'admin'`, everyone else `member`) and deletes any row in another organization whenever the account's organization changes; `trg_organization_members_match_account` refuses a row naming an organization the account is not in. Before it, `admin_update_user` added a row on a move and never removed the old one, so the Members figure could not agree with the Users page. §15 run `36641092611` measured zero contradictions before the backfill.",
+      "note": "THE AUTHORITY FOR WHICH ORGANIZATIONS AN ACCOUNT BELONGS TO since `20260930000004` (§4 D210) — an account may belong to several, and `approved_users.organization_id` names the ACTIVE one (what RLS reads). Between `20260929000002` (D205) and D210 this table was derived from that column and held at most one row per account. The rule now, kept by triggers and asserted by `rehearsal/450`: `organization_id` is NULL exactly when the account has no row here, and otherwise names one of its rows. Setting `organization_id` ADDS its row (`trg_approved_users_sync_org_membership`, the `20260709000002` role mapping — app `admin` → `org_role = 'admin'`, everyone else `member`) and removes none; a first row makes its organization active (`trg_organization_members_activate_first`); deleting the active organization's row re-points the account to its earliest remaining one, or none (`trg_organization_members_repoint_active`). A row's organization and account are fixed — an UPDATE of either is refused. Each row is a SEAT: an organization's `user_limit` counts these rows (`trg_tenant_allowance`, BEFORE INSERT; a re-add of an existing member takes no seat). Written by `admin_add_org_member` / `admin_remove_org_member` (logged through `log_admin_action`), by the sync trigger, and by the CASCADEs; read by the account through `list_my_organizations`.",
       "analysis_kinds": null
     },
     "organizations": {
@@ -17647,7 +17647,7 @@
         "min_project_role": "viewer",
         "audited": true,
         "rls_enabled": true,
-        "note": "`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status` / `admin_set_org_access_period` / `admin_set_org_limits` / `admin_delete_organization`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that takes the organization's projects and accounts with it, and is a different verb from suspension. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first."
+        "note": "`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status` / `admin_set_org_access_period` / `admin_set_org_limits` / `admin_delete_organization`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that takes the organization's projects and accounts with it, and is a different verb from suspension — since §4 D210 only the accounts that belong to NO other organization; an account that also belongs elsewhere loses this membership and keeps the rest. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first."
       },
       "rls": {
         "enabled": true,
@@ -18147,7 +18147,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The most accounts the organization may have, counted by `approved_users.organization_id` (the authority since D205) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `approved_users`. Lowering it removes nobody; no account can be added until under it.",
+          "meaning": "The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -22554,7 +22554,7 @@
         "min_project_role": "owner",
         "audited": false,
         "rls_enabled": true,
-        "note": "`write: null` is LITERAL and load-bearing. The table has a SELECT policy and NO insert/update/delete policy, so RLS denies writes by default and the SECURITY DEFINER RPCs are the only way in. That is not an oversight to be tidied up later: D28 says every policy here is PERMISSIVE and permissive policies OR, so a \"deny writes\" policy added beside anything else would deny nothing. The ABSENCE of a policy is the enforcement. `audited: false` — a membership change writes no audit row; WP 2.3 is where that becomes true, and this table is one of the reasons it matters. Since D210 the writers are the WP 3.4 owner trigger and `admin_set_project_member` / `admin_remove_project_member` (active super admin, /admin/users/:userId), which log to `admin_audit_logs` and refuse to change the project modeler's own row."
+        "note": "`write: null` is LITERAL and load-bearing. The table has a SELECT policy and NO insert/update/delete policy, so RLS denies writes by default and the SECURITY DEFINER RPCs are the only way in. That is not an oversight to be tidied up later: D28 says every policy here is PERMISSIVE and permissive policies OR, so a \"deny writes\" policy added beside anything else would deny nothing. The ABSENCE of a policy is the enforcement. `audited: false` — a membership change writes no audit row; WP 2.3 is where that becomes true, and this table is one of the reasons it matters. Since D211 the writers are the WP 3.4 owner trigger and `admin_set_project_member` / `admin_remove_project_member` (active super admin, /admin/users/:userId), which log to `admin_audit_logs` and refuse to change the project modeler's own row."
       },
       "rls": {
         "enabled": true,
@@ -31300,5 +31300,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "559e2ef20421"
+  "contract_version": "8fdc41952a3f"
 }

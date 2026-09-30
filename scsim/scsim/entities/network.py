@@ -125,7 +125,8 @@ class Material(BaseModel):
         None, ge=0,
         json_schema_extra=_meta(
             "units", "M",
-            "None → initialized to the order-up-to level S_m at t=0 (warm start).",
+            "None → warm start at t=0: on hand = S_m − E[D_m]·T_s = E[D_m]·κ + "
+            "safety stock, pipeline primed so position = S_m.",
         ),
     )
 

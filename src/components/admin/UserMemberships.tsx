@@ -1,11 +1,15 @@
-// Organization & projects for one account — /admin/users/:userId (PLAN.md §4 D210).
+// Organizations & projects for one account — /admin/users/:userId (PLAN.md §4 D211).
 //
-// Reads `admin_get_user_memberships`: the account's organization with its role IN that
-// organization, and every project it can reach or is recorded on, each with WHERE the
-// access comes from (organization, ownership, membership, delegation) and the rights
-// the resolver gives it there (`capabilities_for_user(user, project)` — never computed
-// here a second time). Writes through four super-admin verbs; the database refuses
-// changing the project modeler's own membership, which the page only mirrors.
+// Reads `admin_get_user_memberships`: every organization the account belongs to (D210)
+// with its role in each and which one is ACTIVE, and every project it can reach or is
+// recorded on, each with WHERE the access comes from (active organization, another of
+// its organizations, ownership, membership, delegation) and the rights the resolver
+// gives it there (`capabilities_for_user(user, project)` — never computed here a second
+// time). Organization memberships are added and removed through D210's
+// `admin_add_org_member` / `admin_remove_org_member`; the org role and project
+// memberships through D211's verbs. The database refuses changing the project
+// modeler's own membership, which the page only mirrors. Which organization is active
+// is the account's own choice (account menu, /profile) and is shown, not set, here.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AdminSection, KX, MonoChip, Segmented, StatusDot } from '@/components/admin/adminUi';
@@ -17,11 +21,12 @@ import { FROZEN_CELL } from '@/components/shared';
 import { cn } from '@/lib/utils';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { planRefusal } from '@/lib/auth/organizationPlan';
 
 interface Actor { id: string; email?: string | null }
 interface OrgInfo {
   id: string; name: string; slug: string | null; status: string | null;
-  access_valid_until: string | null; org_role: string | null; members: number; projects: number;
+  access_valid_until: string | null; org_role: string; is_active: boolean; members: number; projects: number;
 }
 interface Member {
   project_role: string; expires_at: string | null; expired: boolean;
@@ -31,14 +36,14 @@ interface Delegation { id: string; project_role: string; expires_at: string; rat
 interface ProjectAccess {
   project_id: string; name: string; plant_name: string | null;
   organization_id: string | null; organization_name: string | null;
-  in_user_org: boolean; is_modeler: boolean; owner_name: string | null;
+  in_active_org: boolean; in_member_org: boolean; is_modeler: boolean; owner_name: string | null;
   visible: boolean; can_edit_project: boolean;
   member: Member | null; delegations: Delegation[];
   effective_role: string | null; capabilities: Record<string, boolean>;
 }
 interface MembershipData {
   user_id: string; role: string; is_super_admin: boolean;
-  organization: OrgInfo | null; projects: ProjectAccess[];
+  active_organization_id: string | null; organizations: OrgInfo[]; projects: ProjectAccess[];
   project_capabilities: { key: string; label: string }[];
   role_matrix: Record<string, Record<string, boolean>>;
 }
@@ -89,18 +94,24 @@ export function UserMemberships({ actor, userId, userLabel, onOrganizationChange
 
   const run = async (fn: string, args: Record<string, unknown>, ok: string) => {
     const { error: err } = await db.rpc(fn, { ...actorArgs, p_target_user_id: userId, ...args });
-    if (err) { toast.error(err.message); return false; }
+    if (err) {
+      toast.error(planRefusal(err.message) ?? err.message.replace(/^(already_a_member|not_a_member):\s*/, ''));
+      return false;
+    }
     toast.success(ok);
     await load();
     return true;
   };
 
-  const moveOrg = async (orgId: string) => {
-    if (!data || orgId === data.organization?.id) return;
-    const to = orgs.find((o) => o.id === orgId)?.name ?? 'the selected organization';
-    const from = data.organization?.name ?? 'no organization';
-    if (!confirm(`Move ${userLabel} from ${from} to ${to}?\n\nThey will see ${to}'s projects instead of ${from}'s, and their role in the organization is reset to the default for their platform role. Project memberships are kept.`)) return;
-    if (await run('admin_set_user_organization', { p_org_id: orgId }, `Moved to ${to}`)) onOrganizationChanged?.();
+  const addOrg = async (orgId: string, orgRole: string) => {
+    const name = orgs.find((o) => o.id === orgId)?.name ?? 'the organization';
+    if (await run('admin_add_org_member', { p_org_id: orgId, p_org_role: orgRole }, `Added to ${name}`)) onOrganizationChanged?.();
+  };
+
+  const removeOrg = async (o: OrgInfo) => {
+    const next = o.is_active ? '\n\nIt is their active organization, so they move to their earliest remaining one, or to none.' : '';
+    if (!confirm(`Remove ${userLabel} from ${o.name}? They stop seeing its projects. Project memberships are kept.${next}`)) return;
+    if (await run('admin_remove_org_member', { p_org_id: o.id }, `Removed from ${o.name}`)) onOrganizationChanged?.();
   };
 
   const setMember = (p: ProjectAccess, role: string, expiresAt: string | null) =>
@@ -119,45 +130,52 @@ export function UserMemberships({ actor, userId, userLabel, onOrganizationChange
     return <AdminSection title="Organization & projects"><div className="rounded-sm border border-[#bf2330]/40 bg-[#bf2330]/10 p-3 text-sm text-[#bf2330]">{error}</div></AdminSection>;
   }
 
-  const org = data.organization;
   const memberOf = new Set(data.projects.filter((p) => p.member).map((p) => p.project_id));
+  const active = data.organizations.find((o) => o.is_active) ?? null;
 
   return (
     <>
-      <AdminSection title="Organization" badge={org?.status === 'suspended' ? 'suspended' : undefined}>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-[repeat(2,minmax(0,1fr))] [&>*]:min-w-0">
-          <div>
-            <Label className="text-xs">Organization</Label>
-            <Select value={org?.id ?? NONE} onValueChange={moveOrg}>
-              <SelectTrigger className="mt-1 min-h-11 rounded-sm md:min-h-0"><SelectValue placeholder="No organization" /></SelectTrigger>
-              <SelectContent>
-                {!org && <SelectItem value={NONE} disabled className="min-h-11 md:min-h-0">No organization</SelectItem>}
-                {orgs.map((o) => <SelectItem key={o.id} value={o.id} className="min-h-11 md:min-h-0">{o.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <p className="mt-1.5 text-[11.5px] leading-snug text-muted-foreground">
-              {org
-                ? <>Sees every project of {org.name} · {org.members} member(s) · {org.projects} project(s){org.access_valid_until ? ` · access until ${day(org.access_valid_until)}` : ''}</>
-                : 'In no organization, so no project is visible through one.'}
-            </p>
-          </div>
-          <div>
-            <Label className="text-xs">Role in the organization</Label>
-            <div className="mt-1">
-              {org ? (
+      <AdminSection title="Organizations" badge={`${data.organizations.length}`}>
+        {data.organizations.length === 0 ? (
+          <div className="py-2 text-[12px] text-muted-foreground">In no organization, so no project is visible through one.</div>
+        ) : (
+          <div className="divide-y divide-[#e8e8ea] md:divide-[--hair-divider]">
+            {data.organizations.map((o) => (
+              <div key={o.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5 text-[length:var(--fs-row)] font-medium text-[#171717] md:text-[13px] md:text-foreground">
+                    {o.name}
+                    {o.is_active && <MonoChip tone="solid">active</MonoChip>}
+                    {o.status === 'suspended' && <MonoChip>suspended</MonoChip>}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    {o.members} member(s) · {o.projects} project(s){o.access_valid_until ? ` · access until ${day(o.access_valid_until)}` : ''}
+                    {!o.is_active && ' · its projects are visible when they switch to it'}
+                  </div>
+                </div>
                 <Segmented
-                  value={org.org_role ?? ''}
+                  value={o.org_role}
                   options={ORG_ROLES}
-                  onChange={(v) => v !== org.org_role && run('admin_set_user_org_role', { p_org_role: v }, `Organization role: ${v}`)}
+                  onChange={(v) => v !== o.org_role && run('admin_set_user_org_role', { p_org_id: o.id, p_org_role: v }, `${o.name}: ${v}`)}
                 />
-              ) : <span className="text-[12px] text-muted-foreground">Set an organization first</span>}
-            </div>
-            <p className="mt-1.5 text-[11.5px] leading-snug text-muted-foreground">
-              Owners and admins manage the organization's API keys. Platform role <MonoChip>{data.role.replace('_', ' ')}</MonoChip>
-              {data.role === 'admin' ? ' also edits and deletes every project of the organization.' : ''}
-            </p>
+                <Button variant="ghost" size="icon" className="h-11 w-11 md:h-8 md:w-8" title="Remove from organization" aria-label={`Remove from ${o.name}`} onClick={() => removeOrg(o)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
+        <AddOrganization
+          orgs={orgs.filter((o) => !data.organizations.some((m) => m.id === o.id))}
+          onAdd={addOrg}
+        />
+        <p className="mt-3 text-[11.5px] leading-snug text-muted-foreground">
+          {active
+            ? <>Working in <strong className="text-foreground">{active.name}</strong> — the user switches between their organizations from their account menu. </>
+            : null}
+          Owners and admins manage an organization's API keys. Platform role <MonoChip>{data.role.replace('_', ' ')}</MonoChip>
+          {data.role === 'admin' ? ' also edits and deletes every project of the active organization.' : ''}
+        </p>
       </AdminSection>
 
       <AdminSection title="Projects" badge={`${data.projects.length} project${data.projects.length === 1 ? '' : 's'}`}>
@@ -204,8 +222,9 @@ function ProjectRow({ p, caps, onRole, onExpiry, onRemove }: {
             <span>{p.organization_name ?? 'No organization'}</span>
             {p.is_modeler && <MonoChip tone="solid">owner (modeler)</MonoChip>}
             {!p.is_modeler && p.owner_name && <span>· owned by {p.owner_name}</span>}
-            {p.in_user_org && <MonoChip>via organization</MonoChip>}
-            {!p.in_user_org && <MonoChip>other organization</MonoChip>}
+            {p.in_active_org && <MonoChip>via active organization</MonoChip>}
+            {!p.in_active_org && p.in_member_org && <MonoChip>via another of their organizations</MonoChip>}
+            {!p.in_member_org && <MonoChip>outside their organizations</MonoChip>}
             {p.delegations.map((d) => (
               <MonoChip key={d.id}>delegated {d.project_role} by {d.grantor ?? 'unknown'} until {day(d.expires_at)}</MonoChip>
             ))}
@@ -256,8 +275,10 @@ function ProjectRow({ p, caps, onRole, onExpiry, onRemove }: {
         </div>
       )}
       {!p.visible && (
-        <div className="mt-1.5 text-[11px] text-[#bf2330]">
-          Not visible to this user in the app: project visibility follows the organization. The role still applies to uploads and to the rights below.
+        <div className={`mt-1.5 text-[11px] ${p.in_member_org ? 'text-muted-foreground' : 'text-[#bf2330]'}`}>
+          {p.in_member_org
+            ? `Visible when they switch to ${p.organization_name ?? 'that organization'}: visibility follows the active organization.`
+            : 'Not visible to this user in the app: they are not in this project\'s organization, and visibility follows the organization. The role still applies to uploads and to the rights below.'}
         </div>
       )}
 
@@ -269,6 +290,38 @@ function ProjectRow({ p, caps, onRole, onExpiry, onRemove }: {
           <StatusDot key={c.key} tone={p.capabilities[c.key] ? 'active' : 'neutral'} label={c.label} />
         ))}
       </div>
+    </div>
+  );
+}
+
+function AddOrganization({ orgs, onAdd }: { orgs: Option[]; onAdd: (orgId: string, orgRole: string) => Promise<void> }) {
+  const [orgId, setOrgId] = useState('');
+  const [role, setRole] = useState('member');
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!orgId) return;
+    setBusy(true);
+    await onAdd(orgId, role);
+    setBusy(false);
+    setOrgId('');
+  };
+  return (
+    <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,2fr)_124px_auto] md:items-center [&>*]:min-w-0">
+      <Select value={orgId} onValueChange={setOrgId}>
+        <SelectTrigger className="min-h-11 rounded-sm md:h-8 md:min-h-0"><SelectValue placeholder="Add to an organization…" /></SelectTrigger>
+        <SelectContent>
+          {orgs.length === 0
+            ? <SelectItem value={NONE} disabled className="min-h-11 md:min-h-0">No other organization</SelectItem>
+            : orgs.map((o) => <SelectItem key={o.id} value={o.id} className="min-h-11 md:min-h-0">{o.name}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      <Select value={role} onValueChange={setRole}>
+        <SelectTrigger className="min-h-11 rounded-sm md:h-8 md:min-h-0"><SelectValue /></SelectTrigger>
+        <SelectContent>{ORG_ROLES.map((r) => <SelectItem key={r.value} value={r.value} className="min-h-11 md:min-h-0">{r.label}</SelectItem>)}</SelectContent>
+      </Select>
+      <Button size="sm" variant="outline" className="min-h-11 gap-1 rounded-sm md:min-h-0" disabled={!orgId || busy} onClick={submit}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Add
+      </Button>
     </div>
   );
 }

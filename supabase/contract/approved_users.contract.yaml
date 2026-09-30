@@ -97,7 +97,7 @@ surfaces:
   - page: "Profile.tsx"
     via: "rpc change_own_password"
     grain: table
-    evidence: "src/pages/Profile.tsx:136"
+    evidence: "src/pages/Profile.tsx:143"
     confirmed: true
   - page: "ProjectIntelligence.tsx"
     via: "table read"
@@ -392,11 +392,16 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The user's tenant, by uuid — the same organization `organization` names, and
-      the plane that survives a rename. What `get_current_user_org_id(_user_id)`
-      returns. THE one author of an account's organization (§4 D205): the admin pages
-      show the organization's name through it and count Members by it, and
-      `organization_members` follows it by trigger rather than being written beside it.
+      The account's ACTIVE organization, by uuid — the one it is working in now, the
+      same organization `organization` names, and the plane that survives a rename.
+      What `get_current_user_org_id(_user_id)` returns, and therefore what every
+      org-scoped RLS policy reads and what a new project is stamped with. Since §4 D210
+      an account may BELONG to several organizations (`organization_members`, the
+      authority for membership) and this column is always one of them — NULL exactly
+      when it belongs to none. Setting it adds the membership if missing; the account
+      changes it itself through `switch_my_organization`, and sign-in moves it to a
+      current membership when the active one's access period has ended. The
+      `organization` text copy follows it (`trg_approved_users_track_active_org`).
     grain: identifier
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []

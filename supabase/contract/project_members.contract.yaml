@@ -28,7 +28,7 @@ governance:
     policies OR, so a "deny writes" policy added beside anything else would deny
     nothing. The ABSENCE of a policy is the enforcement. `audited: false` — a
     membership change writes no audit row; WP 2.3 is where that becomes true, and
-    this table is one of the reasons it matters. Since D210 the writers are the
+    this table is one of the reasons it matters. Since D211 the writers are the
     WP 3.4 owner trigger and `admin_set_project_member` /
     `admin_remove_project_member` (active super admin, /admin/users/:userId), which
     log to `admin_audit_logs` and refuse to change the project modeler's own row.
