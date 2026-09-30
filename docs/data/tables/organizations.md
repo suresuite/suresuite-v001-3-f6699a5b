@@ -28,6 +28,10 @@ partially or get corrected — the write fails.
 | Constraint | Rule | Added by |
 |---|---|---|
 | `organizations_status_check` | `CHECK (status IN ('active','suspended'))` | `20260709000002_super_admin_phase1.sql` |
+| `organizations_access_period_check` | `CHECK (access_period IN ('week', 'month', 'quarter', 'year'))` | `20260929000004_organization_plan.sql` |
+| `organizations_project_limit_check` | `CHECK (project_limit IN (1, 2, 3, 5))` | `20260929000004_organization_plan.sql` |
+| `organizations_user_limit_check` | `CHECK (user_limit IN (1, 2, 3, 5))` | `20260929000004_organization_plan.sql` |
+| `organizations_access_period_start_check` | `CHECK ((access_period IS NULL) = (access_valid_from IS NULL))` | `20260929000004_organization_plan.sql` |
 
 ## Governance
 
@@ -40,7 +44,7 @@ partially or get corrected — the write fails.
 | Row-level security | enabled |
 | Policies on the table | 2 — all carry a predicate |
 
-`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first.
+`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status` / `admin_set_org_access_period` / `admin_set_org_limits`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first.
 
 <details><summary>2 RLS policies</summary>
 
@@ -78,6 +82,11 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `settings` | — | `jsonb` | — | — | Per-tenant configuration, free-form. No key of it is read by any migration, edge function or page today; it is a forward-declared extension point. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the organization was created. Server-stamped. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the row was last modified. Server-stamped by DEFAULT only — no trigger maintains it, and `admin_update_organization` does not set it, so a renamed organization still shows its creation time here. |
+| `access_period` | — | `text` | — | — | How long the organization may be used, counted from `access_valid_from`: `week`, `month`, `quarter` or `year`, CHECK-constrained to those four; NULL means it does not expire, which every organization that existed before D207 keeps. Set by `admin_set_org_access_period` (choosing a period again renews it from now) or `admin_create_organization`. The lengths are written once, in `org_access_period_interval()`. |
+| `access_valid_from` | — | `timestamp with time zone` | — | — | When the current access period started — the database clock at the moment an administrator set it, never the browser's. NULL exactly when `access_period` is NULL (a CHECK). |
+| `access_valid_until` | — | `timestamp with time zone` | — | — | When the access period ends. DERIVED by `trg_organizations_access_valid_until` from the two columns above; a write that names it is overwritten. At or after this instant `authenticate_approved_user` refuses every member except a super admin, `get_my_profile` reports `access_expired`, and no project can be added to the organization (D207). |
+| `project_limit` | — | `integer` | — | — | The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it. |
+| `user_limit` | — | `integer` | — | — | The most accounts the organization may have, counted by `approved_users.organization_id` (the authority since D205) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `approved_users`. Lowering it removes nobody; no account can be added until under it. |
 
 ## Each column in full
 
@@ -198,8 +207,78 @@ When the row was last modified. Server-stamped by DEFAULT only — no trigger ma
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `access_period`
+
+How long the organization may be used, counted from `access_valid_from`: `week`, `month`, `quarter` or `year`, CHECK-constrained to those four; NULL means it does not expire, which every organization that existed before D207 keeps. Set by `admin_set_org_access_period` (choosing a period again renews it from now) or `admin_create_organization`. The lengths are written once, in `org_access_period_interval()`.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260929000004_organization_plan.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | one of week / month / quarter / year, or NULL |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `access_valid_from`
+
+When the current access period started — the database clock at the moment an administrator set it, never the browser's. NULL exactly when `access_period` is NULL (a CHECK).
+
+| | |
+|---|---|
+| Type | `timestamp with time zone` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260929000004_organization_plan.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `access_valid_until`
+
+When the access period ends. DERIVED by `trg_organizations_access_valid_until` from the two columns above; a write that names it is overwritten. At or after this instant `authenticate_approved_user` refuses every member except a super admin, `get_my_profile` reports `access_expired`, and no project can be added to the organization (D207).
+
+| | |
+|---|---|
+| Type | `timestamp with time zone` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260929000004_organization_plan.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `project_limit`
+
+The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it.
+
+| | |
+|---|---|
+| Type | `integer` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260929000004_organization_plan.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | one of 1 / 2 / 3 / 5, or NULL |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `user_limit`
+
+The most accounts the organization may have, counted by `approved_users.organization_id` (the authority since D205) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `approved_users`. Lowering it removes nobody; no account can be added until under it.
+
+| | |
+|---|---|
+| Type | `integer` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260929000004_organization_plan.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | one of 1 / 2 / 3 / 5, or NULL |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ---
 
-*Generated from data contract `2930c0b65674`, engine `0.2.8`,
+*Generated from data contract `441f3b0a10c1`, engine `0.2.8`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

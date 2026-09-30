@@ -1225,6 +1225,84 @@ async function wp42Smear() {
  * holding the table grant. That is not "permissive RLS" in the PostgreSQL sense of
  * `AS PERMISSIVE` — it is RLS that refuses nothing.
  */
+// ── D205 · /admin's users: who exists, who can see them, and which org they are in ──
+// Read-only. Counts and organization names only — no person's name or email is
+// printed, because this report is published to a branch.
+async function d205AdminUsers() {
+  section("D205 — /admin's users: the list the page reads, and the three org facts");
+
+  out("**A · Accounts by role and state** (the population /admin/users should list):");
+  report("A", await tryQ(`
+    select role::text as role, is_active, count(*)::int as accounts
+      from public.approved_users group by 1, 2 order by 1, 2`), (r) => out(...table(r)));
+
+  out("", "**B · What `v_admin_user_usage` returns to a reader who carries no GUC and no",
+      "session** — the browser's shape (D155). The Management API runs as the owner, so",
+      "this is the view's OWN predicate answering, not a grant:");
+  report("B", await tryQ(`
+    select (select count(*) from public.approved_users)::int as accounts,
+           (select count(*) from public.v_admin_user_usage)::int as view_rows,
+           public.current_is_super_admin() as predicate_for_this_reader`), (r) => out(...table(r)));
+
+  out("", "**C · Per organization: the three authors of \"who is in it\"** — `organization_id`",
+      "(the authority, D13), the `organization_members` rows (the Organizations page's",
+      "Members figure), and the `organization` text copy:");
+  report("C", await tryQ(`
+    select o.name as organization, o.status,
+           (select count(*) from public.approved_users u where u.organization_id = o.id)::int as by_uuid,
+           (select count(*) from public.organization_members m where m.org_id = o.id)::int as member_rows,
+           (select count(*) from public.approved_users u where u.organization = o.name)::int as by_text
+      from public.organizations o order by o.name`), (r) => out(...table(r)));
+
+  out("", "**D · Contradictions between `organization_members` and `organization_id`:**");
+  report("D", await tryQ(`
+    select
+      (select count(*) from public.organization_members m
+         join public.approved_users u on u.id = m.user_id
+        where m.org_id is distinct from u.organization_id)::int as member_rows_in_another_org,
+      (select count(*) from public.organization_members m
+         join public.approved_users u on u.id = m.user_id
+        where m.org_id is distinct from u.organization_id and m.org_role <> 'member')::int as of_which_owner_or_admin,
+      (select count(*) from public.approved_users u
+        where u.organization_id is not null
+          and not exists (select 1 from public.organization_members m
+                           where m.user_id = u.id and m.org_id = u.organization_id))::int as accounts_missing_their_row,
+      (select count(*) from public.approved_users u where u.organization_id is null)::int as accounts_without_org,
+      (select count(*) from public.approved_users u
+         join public.organizations o on o.id = u.organization_id
+        where u.organization is distinct from o.name)::int as text_copy_disagrees`), (r) => out(...table(r)));
+
+  out("", "**E · Org roles held, by whether the row agrees with the account's org:**");
+  report("E", await tryQ(`
+    select m.org_role, (m.org_id = u.organization_id) as agrees, u.role::text as app_role,
+           count(*)::int as rows
+      from public.organization_members m join public.approved_users u on u.id = m.user_id
+     group by 1, 2, 3 order by 1, 2, 3`), (r) => out(...table(r)));
+
+  out("", "**F · Suspended accounts that signed in AFTER they were suspended** (the login",
+      "never reads `is_active`; the sign-in rows exist since D185):");
+  report("F", await tryQ(`
+    with susp as (
+      select u.id,
+             (select max(l.created_at) from public.audit_logs l
+               where l.action = 'user.set_active' and l.target_id = u.id::text
+                 and (l.after ->> 'is_active') = 'false') as suspended_at
+        from public.approved_users u where u.is_active = false)
+    select count(*)::int as suspended_accounts,
+           count(*) filter (where suspended_at is null)::int as suspension_not_in_log,
+           (select count(*) from public.audit_logs l join susp s on l.actor_user_id = s.id
+             where l.action = 'auth.sign_in' and (s.suspended_at is null or l.created_at > s.suspended_at))::int as sign_ins_after
+      from susp`), (r) => out(...table(r)));
+
+  out("", "**G · What the Overview's zeros may be hiding:**");
+  report("G", await tryQ(`
+    select (select count(*) from public.ai_usage_logs)::int as usage_rows,
+           (select count(*) from public.ai_usage_logs where created_at >= date_trunc('month', now()))::int as usage_rows_mtd,
+           (select count(*) from public.organizations)::int as organizations,
+           (select count(*) from public.projects)::int as projects,
+           (select count(*) from public.approved_users where role = 'super_admin' and is_active)::int as active_super_admins`), (r) => out(...table(r)));
+}
+
 async function wp71Stage0() {
   section("§15 · WP 7.1 stage 0 — the access surface, from the live database");
 
@@ -5009,6 +5087,7 @@ async function main() {
   await migrationFenceOpen();
 
   await rqScenarioDiagnostic();
+  await d205AdminUsers();
 
   await schemaProbe();
   await viewSecurity();

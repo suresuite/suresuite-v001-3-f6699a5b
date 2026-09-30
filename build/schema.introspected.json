@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 350,
-  "migrations_applied": 342,
+  "migrations_found": 353,
+  "migrations_applied": 345,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260929000001_audit_log_read_and_chain.sql",
+  "last_migration": "20260929000004_organization_plan.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 290,
+    "functions": 305,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -2835,7 +2835,7 @@
           "type": "timestamp with time zone",
           "type_raw": "timestamptz",
           "nullable": false,
-          "default": "(now() + interval '90 days')",
+          "default": "(now() + public.password_max_age())",
           "primary_key": false,
           "unique": false,
           "references": null,
@@ -2883,6 +2883,18 @@
             "on_delete": "SET NULL"
           },
           "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "avatar_color",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000003_account_self_service_names_its_user.sql"
         }
       ],
       "constraints": [
@@ -2905,6 +2917,13 @@
           "definition": "UNIQUE (email)",
           "implicit": true,
           "added_by": "20250815000000_approved_users_base.sql"
+        },
+        {
+          "name": "approved_users_avatar_color_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ( avatar_color IS NULL OR avatar_color IN ( 'slate', 'red', 'orange', 'amber', 'green', 'teal', 'blue', 'indigo', 'violet', 'pink'))",
+          "added_by": "20260929000003_account_self_service_names_its_user.sql"
         }
       ],
       "indexes": [
@@ -11761,6 +11780,66 @@
           "unique": false,
           "references": null,
           "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "access_period",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "access_valid_from",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "access_valid_until",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "project_limit",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "user_limit",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260929000004_organization_plan.sql"
         }
       ],
       "constraints": [
@@ -11793,6 +11872,43 @@
           "definition": "CHECK (status IN ('active','suspended'))",
           "implicit": true,
           "added_by": "20260709000002_super_admin_phase1.sql"
+        },
+        {
+          "name": "organizations_access_period_check",
+          "kind": "CHECK",
+          "columns": [
+            "access_period"
+          ],
+          "definition": "CHECK (access_period IN ('week', 'month', 'quarter', 'year'))",
+          "implicit": true,
+          "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "organizations_project_limit_check",
+          "kind": "CHECK",
+          "columns": [
+            "project_limit"
+          ],
+          "definition": "CHECK (project_limit IN (1, 2, 3, 5))",
+          "implicit": true,
+          "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "organizations_user_limit_check",
+          "kind": "CHECK",
+          "columns": [
+            "user_limit"
+          ],
+          "definition": "CHECK (user_limit IN (1, 2, 3, 5))",
+          "implicit": true,
+          "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "organizations_access_period_start_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((access_period IS NULL) = (access_valid_from IS NULL))",
+          "added_by": "20260929000004_organization_plan.sql"
         }
       ],
       "indexes": [],
@@ -20972,6 +21088,16 @@
   },
   "functions": [
     {
+      "name": "_active_super_admin_count",
+      "signature": "_active_super_admin_count()",
+      "args": [],
+      "returns": "integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20260929000002_admin_users_read.sql"
+    },
+    {
       "name": "_api_key_audit",
       "signature": "_api_key_audit(uuid, text, uuid, jsonb, jsonb)",
       "args": [
@@ -21011,7 +21137,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000003_admin_management_rpcs.sql"
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "_build_dataset_snapshot_v2",
@@ -21121,6 +21247,16 @@
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     },
     {
+      "name": "_lock_active_super_admins",
+      "signature": "_lock_active_super_admins()",
+      "args": [],
+      "returns": "void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": null,
+      "defined_by": "20260929000002_admin_users_read.sql"
+    },
+    {
       "name": "_proposals_touch",
       "signature": "_proposals_touch()",
       "args": [],
@@ -21129,6 +21265,18 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260715000001_agent_proposals.sql"
+    },
+    {
+      "name": "account_self_resolve",
+      "signature": "account_self_resolve(uuid)",
+      "args": [
+        "p_user_id uuid"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D206 — the user an account self-service RPC acts for: the named user, or the ",
+      "defined_by": "20260929000003_account_self_service_names_its_user.sql"
     },
     {
       "name": "active_model_validation",
@@ -21192,18 +21340,21 @@
     },
     {
       "name": "admin_create_organization",
-      "signature": "admin_create_organization(uuid, text, text, text)",
+      "signature": "admin_create_organization(uuid, text, text, text, text, integer, integer)",
       "args": [
         "p_actor_id uuid",
         "p_actor_email text",
         "p_name text",
-        "p_slug text"
+        "p_slug text",
+        "p_access_period text DEFAULT NULL",
+        "p_project_limit integer DEFAULT NULL",
+        "p_user_limit integer DEFAULT NULL"
       ],
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000003_admin_management_rpcs.sql"
+      "defined_by": "20260929000004_organization_plan.sql"
     },
     {
       "name": "admin_create_user",
@@ -21244,11 +21395,11 @@
         "p_actor_id uuid",
         "p_actor_email text"
       ],
-      "returns": "TABLE ( id uuid, name text, slug text, status text, created_at timestamptz, members bigint, projects bigint, cost_mtd numeric)",
+      "returns": "TABLE ( id uuid, name text, slug text, status text, created_at timestamptz, members bigint, projects bigint, cost_mtd numeric, access_period text, access_valid_from timestamptz, access_valid_until timestamptz, access_expired boolean, project_limit integer, user_limit integer)",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260712000002_admin_project_management.sql"
+      "comment": "D205, D207 — /admin/organizations's read. Members and projects are counted by the ",
+      "defined_by": "20260929000004_organization_plan.sql"
     },
     {
       "name": "admin_list_projects",
@@ -21275,6 +21426,32 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260712000002_admin_project_management.sql"
+    },
+    {
+      "name": "admin_list_users",
+      "signature": "admin_list_users(uuid, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text"
+      ],
+      "returns": "TABLE ( user_id uuid, name text, email text, role text, is_active boolean, organization_id uuid, organization text, organization_status text, org_role text, mtd_requests bigint, mtd_tokens bigint, mtd_cost_usd numeric, monthly_budget_usd numeric, created_at timestamptz)",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": "D205 — /admin/users's read. The reader is a parameter and must be an active super ",
+      "defined_by": "20260929000002_admin_users_read.sql"
+    },
+    {
+      "name": "admin_platform_overview",
+      "signature": "admin_platform_overview(uuid, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": "D205 — /admin's figures. Reader is a parameter and must be an active super admin; ",
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "admin_rename_project",
@@ -21324,6 +21501,37 @@
       "defined_by": "20260711000002_unified_access_control.sql"
     },
     {
+      "name": "admin_set_org_access_period",
+      "signature": "admin_set_org_access_period(uuid, text, uuid, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_org_id uuid",
+        "p_period text"
+      ],
+      "returns": "timestamptz LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D207 — set (or renew, from now) an organization's access period: week, month, quarter ",
+      "defined_by": "20260929000004_organization_plan.sql"
+    },
+    {
+      "name": "admin_set_org_limits",
+      "signature": "admin_set_org_limits(uuid, text, uuid, integer, integer)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_org_id uuid",
+        "p_project_limit integer",
+        "p_user_limit integer"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "D207 — set how many projects and user accounts an organization may have: 1, 2, 3 or 5; ",
+      "defined_by": "20260929000004_organization_plan.sql"
+    },
+    {
       "name": "admin_set_org_status",
       "signature": "admin_set_org_status(uuid, text, uuid, text)",
       "args": [
@@ -21351,7 +21559,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000003_admin_management_rpcs.sql"
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "admin_set_user_budget",
@@ -21402,7 +21610,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000003_admin_management_rpcs.sql"
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "admin_transfer_project",
@@ -21471,6 +21679,20 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260711000003_admin_management_rpcs.sql"
+    },
+    {
+      "name": "admin_usage_log_read",
+      "signature": "admin_usage_log_read(uuid, text, integer)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_limit integer DEFAULT 500"
+      ],
+      "returns": "TABLE ( id uuid, user_id uuid, user_name text, model_code text, provider_code text, prompt_tokens integer, completion_tokens integer, total_tokens integer, cost_usd numeric, latency_ms integer, status text, created_at timestamptz)",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": "D205 — /admin/usage's read. Reader is a parameter and must be an active super admin.",
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "advance_chat_plan_step",
@@ -21716,6 +21938,16 @@
       "defined_by": "20260919000007_decision_plane_actor.sql"
     },
     {
+      "name": "approved_users_enforce_org_allowance",
+      "signature": "approved_users_enforce_org_allowance()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260929000004_organization_plan.sql"
+    },
+    {
       "name": "approved_users_stamp_organization_id",
       "signature": "approved_users_stamp_organization_id()",
       "args": [],
@@ -21724,6 +21956,16 @@
       "volatility": null,
       "comment": "Fills `approved_users.organization_id` from the organization display name when ",
       "defined_by": "20260918000001_org_row_uuid_only.sql"
+    },
+    {
+      "name": "approved_users_sync_org_membership",
+      "signature": "approved_users_sync_org_membership()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
       "name": "archive_project_memory",
@@ -21865,7 +22107,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260929000001_audit_log_read_and_chain.sql"
+      "defined_by": "20260929000004_organization_plan.sql"
     },
     {
       "name": "authenticate_user",
@@ -22213,16 +22455,17 @@
     },
     {
       "name": "change_own_password",
-      "signature": "change_own_password(text, text)",
+      "signature": "change_own_password(text, text, uuid)",
       "args": [
         "p_old_password text",
-        "p_new_password text"
+        "p_new_password text",
+        "p_user_id uuid DEFAULT NULL"
       ],
-      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "returns": "timestamptz LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+      "comment": "D206 — the signed-in user sets a new password. Requires the current one (checked ",
+      "defined_by": "20260929000003_account_self_service_names_its_user.sql"
     },
     {
       "name": "chat_quick_thread_id",
@@ -23112,13 +23355,15 @@
     },
     {
       "name": "get_my_profile",
-      "signature": "get_my_profile()",
-      "args": [],
-      "returns": "TABLE( id uuid, email text, name text, display_name text, phone text, avatar_url text, role text, organization text, is_active boolean, force_password_change boolean, password_changed_at timestamptz, password_expires_at timestamptz )",
+      "signature": "get_my_profile(uuid)",
+      "args": [
+        "p_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "TABLE( id uuid, email text, name text, display_name text, phone text, avatar_color text, role text, organization text, is_active boolean, force_password_change boolean, password_changed_at timestamptz, password_expires_at timestamptz, password_expired boolean, password_max_age_days integer, access_period text, access_valid_from timestamptz, access_valid_until timestamptz, access_expired boolean, access_exempt boolean, project_limit integer, projects_used bigint, user_limit integer, users_used bigint )",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+      "comment": "D206, D207 — the signed-in user's own account row, with password_expired computed on ",
+      "defined_by": "20260929000004_organization_plan.sql"
     },
     {
       "name": "get_network_edges_for_prominence",
@@ -24029,6 +24274,18 @@
       "defined_by": "20250830232755_57126f90-ac86-4211-982f-d7a6fb93822f.sql"
     },
     {
+      "name": "org_access_period_interval",
+      "signature": "org_access_period_interval(text)",
+      "args": [
+        "p_period text"
+      ],
+      "returns": "interval LANGUAGE sql IMMUTABLE SET search_path",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": "D207 — the length of each organization access period. The only place the lengths are written.",
+      "defined_by": "20260929000004_organization_plan.sql"
+    },
+    {
       "name": "org_is_current_user_org",
       "signature": "org_is_current_user_org(uuid, text)",
       "args": [
@@ -24040,6 +24297,36 @@
       "volatility": "STABLE",
       "comment": "Is this organization the caller's? UUID only, since Phase 3 / WP 3.0 (D29): ",
       "defined_by": "20260916000011_org_identity_uuid_only.sql"
+    },
+    {
+      "name": "organization_members_match_account",
+      "signature": "organization_members_match_account()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260929000002_admin_users_read.sql"
+    },
+    {
+      "name": "organizations_derive_access_valid_until",
+      "signature": "organizations_derive_access_valid_until()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260929000004_organization_plan.sql"
+    },
+    {
+      "name": "password_max_age",
+      "signature": "password_max_age()",
+      "args": [],
+      "returns": "interval LANGUAGE sql IMMUTABLE PARALLEL SAFE AS",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": "D206 — how long a password is valid after it is set. The one statement of the ",
+      "defined_by": "20260929000003_account_self_service_names_its_user.sql"
     },
     {
       "name": "project_freshness",
@@ -24074,6 +24361,16 @@
       "volatility": "IMMUTABLE",
       "comment": "Total order on project_role. The ONE place the ordering is written: ",
       "defined_by": "20260915000005_project_membership_and_delegation.sql"
+    },
+    {
+      "name": "projects_enforce_org_allowance",
+      "signature": "projects_enforce_org_allowance()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260929000004_organization_plan.sql"
     },
     {
       "name": "proposal_grounding_state",
@@ -24678,17 +24975,18 @@
     },
     {
       "name": "update_own_profile",
-      "signature": "update_own_profile(text, text, text)",
+      "signature": "update_own_profile(text, text, text, uuid)",
       "args": [
         "p_display_name text DEFAULT NULL",
         "p_phone text DEFAULT NULL",
-        "p_avatar_url text DEFAULT NULL"
+        "p_avatar_color text DEFAULT NULL",
+        "p_user_id uuid DEFAULT NULL"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": null,
-      "defined_by": "20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql"
+      "comment": "D206 — the signed-in user edits their own display name, phone and avatar colour. NULL ",
+      "defined_by": "20260929000003_account_self_service_names_its_user.sql"
     },
     {
       "name": "update_policy_version_notes",

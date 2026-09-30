@@ -20,6 +20,15 @@ The table WP 1.4 found existed in production but in no migration — the authent
 | `id` | column PRIMARY KEY | `approved_users_pkey` |
 | `email` | column UNIQUE | `approved_users_email_key` |
 
+## Constraints
+
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `approved_users_avatar_color_check` | `CHECK ( avatar_color IS NULL OR avatar_color IN ( 'slate', 'red', 'orange', 'amber', 'green', 'teal', 'blue', 'indigo', 'violet', 'pink'))` | `20260929000003_account_self_service_names_its_user.sql` |
+
 ## Governance
 
 | | |
@@ -58,7 +67,7 @@ READ THE POLICIES BEFORE TRUSTING THIS ROW. The table carries two policies and t
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DeveloperApi.tsx` | rpc list_api_keys | `src/pages/DeveloperApi.tsx:261` | yes |
-| `Profile.tsx` | rpc change_own_password | `src/pages/Profile.tsx:110` | yes |
+| `Profile.tsx` | rpc change_own_password | `src/pages/Profile.tsx:122` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -68,19 +77,19 @@ unnoticed.
 
 <details><summary>13 app-shell read(s) — not lineage</summary>
 
-* `Auth.tsx` — `src/hooks/useAuth.tsx:82`
-* `DataManager.tsx` — `src/hooks/useAuth.tsx:82`
-* `FirmLevelNetwork.tsx` — `src/hooks/useAuth.tsx:82`
-* `Forbidden.tsx` — `src/hooks/useAuth.tsx:82`
-* `GettingStarted.tsx` — `src/hooks/useAuth.tsx:82`
-* `InteractiveNetworkSpace.tsx` — `src/hooks/useAuth.tsx:82`
-* `Landing.tsx` — `src/hooks/useAuth.tsx:82`
-* `NotFound.tsx` — `src/hooks/useAuth.tsx:82`
-* `ProcessLevelNetwork.tsx` — `src/hooks/useAuth.tsx:82`
-* `ProductLevelNetwork.tsx` — `src/hooks/useAuth.tsx:82`
-* `ProjectIntelligence.tsx` — `src/hooks/useAuth.tsx:82`
-* `ProjectPolicies.tsx` — `src/hooks/useAuth.tsx:82`
-* `SimulationLab.tsx` — `src/hooks/useAuth.tsx:82`
+* `Auth.tsx` — `src/hooks/useAuth.tsx:144`
+* `DataManager.tsx` — `src/hooks/useAuth.tsx:144`
+* `FirmLevelNetwork.tsx` — `src/hooks/useAuth.tsx:144`
+* `Forbidden.tsx` — `src/hooks/useAuth.tsx:144`
+* `GettingStarted.tsx` — `src/hooks/useAuth.tsx:144`
+* `InteractiveNetworkSpace.tsx` — `src/hooks/useAuth.tsx:144`
+* `Landing.tsx` — `src/hooks/useAuth.tsx:144`
+* `NotFound.tsx` — `src/hooks/useAuth.tsx:144`
+* `ProcessLevelNetwork.tsx` — `src/hooks/useAuth.tsx:144`
+* `ProductLevelNetwork.tsx` — `src/hooks/useAuth.tsx:144`
+* `ProjectIntelligence.tsx` — `src/hooks/useAuth.tsx:144`
+* `ProjectPolicies.tsx` — `src/hooks/useAuth.tsx:144`
+* `SimulationLab.tsx` — `src/hooks/useAuth.tsx:144`
 
 These reach the table only through modules the shell mounts on every page.
 Listing them as surfaces would be true about the imports and false about
@@ -104,13 +113,14 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `updated_at` | — | `timestamp with time zone` | — | — | When the row was last modified. Server-stamped. |
 | `organization` | — | `text` | — | — | The user's tenant, as a string. This is the value `get_current_user_org()` returns, and it was the left-hand side of every access comparison in the schema until WP 2.1. |
 | `display_name` | — | `text` | — | — | The name the user chose for themselves, overriding `name` in the UI. |
-| `avatar_url` | — | `text` | — | — | URL of the user's profile image, if they uploaded one. |
+| `avatar_url` | — | `text` | — | — | URL of a profile image uploaded to the `avatars` bucket. RETIRED by §4 D206: the upload was refused for every `anon` caller by its storage policies, and the owner chose an avatar colour instead, so no RPC reads or writes this column any more. Kept rather than dropped so nothing uploaded before is destroyed. |
 | `phone` | — | `text` | — | — | Contact number. Not used for authentication or for any second factor. |
 | `password_changed_at` | — | `timestamp with time zone` | — | — | When the password was last set. Server-stamped. |
-| `password_expires_at` | — | `timestamp with time zone` | — | — | When the current password stops being accepted — `now() + 90 days` at the time the row was written. |
-| `force_password_change` | — | `boolean` | — | — | Whether the user must set a new password before continuing. Set when an administrator resets an account. |
-| `is_active` | — | `boolean` | — | — | Whether the account may sign in. Checked at login; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`. |
-| `organization_id` | — | `uuid` | — | — | The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. |
+| `password_expires_at` | — | `timestamp with time zone` | — | — | When the current password expires — `now() + password_max_age()` (90 days) when the password was last set. Expiry does not refuse a sign-in: it sends the user to /profile and closes every other page until the password is changed (`RoleGuard`, reading `get_my_profile`'s server-computed `password_expired`; §4 D206). Rows that predate `20260527011429` were stamped by that migration's column default, not by a real password change. |
+| `force_password_change` | — | `boolean` | — | — | Whether the user must set a new password before continuing. Set when an administrator creates or resets an account; cleared by `change_own_password`. Enforced by `RoleGuard`, which could not see it until §4 D206. |
+| `is_active` | — | `boolean` | — | — | Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. The browser also checks it through `get_my_profile` at login and on every reload — a check that, until §4 D206, raised for every user and was ignored, so before these two changes the column was set and never read. It is not consulted by any RLS policy, so between reloads a suspended user's open session is not revoked (D28's client-asserted identity). |
+| `organization_id` | — | `uuid` | — | — | The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it. |
+| `avatar_color` | — | `text` | — | — | The colour of the user's initial on their avatar — one token of a fixed palette, CHECK-constrained; the page maps each token to its fill (`src/lib/avatarColors.ts`, pinned to the CHECK by `avatarColors.test.ts`). §4 D206. |
 
 ## Each column in full
 
@@ -258,7 +268,7 @@ The name the user chose for themselves, overriding `name` in the UI.
 
 ### `avatar_url`
 
-URL of the user's profile image, if they uploaded one.
+URL of a profile image uploaded to the `avatars` bucket. RETIRED by §4 D206: the upload was refused for every `anon` caller by its storage policies, and the owner chose an avatar colour instead, so no RPC reads or writes this column any more. Kept rather than dropped so nothing uploaded before is destroyed.
 
 | | |
 |---|---|
@@ -300,11 +310,11 @@ When the password was last set. Server-stamped.
 
 ### `password_expires_at`
 
-When the current password stops being accepted — `now() + 90 days` at the time the row was written.
+When the current password expires — `now() + password_max_age()` (90 days) when the password was last set. Expiry does not refuse a sign-in: it sends the user to /profile and closes every other page until the password is changed (`RoleGuard`, reading `get_my_profile`'s server-computed `password_expired`; §4 D206). Rows that predate `20260527011429` were stamped by that migration's column default, not by a real password change.
 
 | | |
 |---|---|
-| Type | `timestamp with time zone`, `NOT NULL`, default `(now() + interval '90 days')` |
+| Type | `timestamp with time zone`, `NOT NULL`, default `(now() + public.password_max_age())` |
 | Grain | `metadata` |
 | Unit | dimensionless |
 | Added by | `20260527011429_f6324329-8a1e-4382-89fe-3bbe364efa92.sql` |
@@ -317,11 +327,11 @@ for one you did.
 
 | When | The value used | Shown as | Visible where |
 |---|---|---|---|
-| no expiry is supplied | 90 days after the row is written | `default` | the column default; the account pages render the resulting date |
+| no expiry is supplied | password_max_age() (90 days) after the row is written | `default` | the column default; the account pages render the resulting date |
 
 ### `force_password_change`
 
-Whether the user must set a new password before continuing. Set when an administrator resets an account.
+Whether the user must set a new password before continuing. Set when an administrator creates or resets an account; cleared by `change_own_password`. Enforced by `RoleGuard`, which could not see it until §4 D206.
 
 | | |
 |---|---|
@@ -335,7 +345,7 @@ Whether the user must set a new password before continuing. Set when an administ
 
 ### `is_active`
 
-Whether the account may sign in. Checked at login; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.
+Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. The browser also checks it through `get_my_profile` at login and on every reload — a check that, until §4 D206, raised for every user and was ignored, so before these two changes the column was set and never read. It is not consulted by any RLS policy, so between reloads a suspended user's open session is not revoked (D28's client-asserted identity).
 
 | | |
 |---|---|
@@ -349,7 +359,7 @@ Whether the account may sign in. Checked at login; it is not consulted by any RL
 
 ### `organization_id`
 
-The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns.
+The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it.
 
 | | |
 |---|---|
@@ -364,6 +374,27 @@ The user's tenant, by uuid — the same organization `organization` names, and t
 
 > NULLABLE, and rows are genuinely NULL here. It was added and backfilled once by `20260709000002`; WP 2.1 re-ran the backfill matching on `name` OR `slug` and leaving ambiguous matches alone rather than picking one. A row whose text org matches no organization — `'default_org'`, or a tenant renamed and re-typed — stays NULL and keeps working on the text branch. How many is a §15 question; no work-package session can reach the database.
 
+### `avatar_color`
+
+The colour of the user's initial on their avatar — one token of a fixed palette, CHECK-constrained; the page maps each token to its fill (`src/lib/avatarColors.ts`, pinned to the CHECK by `avatarColors.test.ts`). §4 D206.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20260929000003_account_self_service_names_its_user.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | one of the palette tokens in the CHECK |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+**Substitutions** — every point where a value you did not supply can stand in
+for one you did.
+
+| When | The value used | Shown as | Visible where |
+|---|---|---|---|
+| the user has not chosen a colour (NULL) | the theme's primary colour | `default` | the "Default" swatch, selected, on /profile |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -372,6 +403,6 @@ The user's tenant, by uuid — the same organization `organization` names, and t
 
 ---
 
-*Generated from data contract `2930c0b65674`, engine `0.2.8`,
+*Generated from data contract `441f3b0a10c1`, engine `0.2.8`,
 sidecar `supabase/contract/approved_users.contract.yaml`, table created by `20250815000000_approved_users_base.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -10,11 +10,69 @@ interface User {
   role: string;
   organization: string;
   display_name?: string | null;
-  avatar_url?: string | null;
+  /** A token of `AVATAR_COLORS`; the image upload is retired (D206). */
+  avatar_color?: string | null;
   phone?: string | null;
   is_active?: boolean;
   force_password_change?: boolean;
   password_expires_at?: string | null;
+  password_changed_at?: string | null;
+  /** Computed on the database clock when the row was read (D206). */
+  password_expired?: boolean;
+  /** The policy, `password_max_age()`, in days (D206). */
+  password_max_age_days?: number | null;
+  /** D207 — the account's ORGANIZATION's plan, read through `get_my_profile`. */
+  access_period?: string | null;
+  access_valid_from?: string | null;
+  access_valid_until?: string | null;
+  /** The organization's period has ended FOR THIS ACCOUNT, on the database clock. */
+  access_expired?: boolean;
+  /** A super admin is not locked out by their organization's period. */
+  access_exempt?: boolean;
+  project_limit?: number | null;
+  projects_used?: number | null;
+  user_limit?: number | null;
+  users_used?: number | null;
+}
+
+/**
+ * The account row's fields as `get_my_profile` returns them. The user is NAMED: the
+ * browser calls as `anon`, and the GUC `set_current_user_context` sets is LOCAL to its
+ * own request, so a call that named nobody resolved nobody and raised
+ * `not_authenticated` for everyone — which is how forced and expired password changes
+ * went unenforced (PLAN.md §4 D206).
+ */
+async function readProfile(userId: string) {
+  const { data, error } = await supabase.rpc('get_my_profile', { p_user_id: userId });
+  if (error) return { profile: null, error };
+  const p = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
+  if (!p) return { profile: null, error: { message: 'no account row' } };
+  return {
+    profile: {
+      name: p.name as string | null,
+      role: p.role as string | null,
+      organization: p.organization as string | null,
+      display_name: p.display_name as string | null,
+      avatar_color: p.avatar_color as string | null,
+      phone: p.phone as string | null,
+      is_active: p.is_active as boolean,
+      force_password_change: p.force_password_change as boolean,
+      password_expires_at: p.password_expires_at as string | null,
+      password_changed_at: p.password_changed_at as string | null,
+      password_expired: p.password_expired as boolean,
+      password_max_age_days: p.password_max_age_days as number | null,
+      access_period: p.access_period as string | null,
+      access_valid_from: p.access_valid_from as string | null,
+      access_valid_until: p.access_valid_until as string | null,
+      access_expired: p.access_expired as boolean,
+      access_exempt: p.access_exempt as boolean,
+      project_limit: p.project_limit as number | null,
+      projects_used: p.projects_used == null ? null : Number(p.projects_used),
+      user_limit: p.user_limit as number | null,
+      users_used: p.users_used == null ? null : Number(p.users_used),
+    },
+    error: null,
+  };
 }
 
 interface AuthContextType {
@@ -60,8 +118,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (!data || data.length === 0) {
+        // The server returns no row for a wrong password, a suspended account (PLAN.md
+        // §4 D205) and a member of an organization whose access period has ended (D207),
+        // and does not say which, so the message may not either.
         console.log('[AUTH] No user data returned from authentication');
-        return { success: false, error: 'Invalid email or password' };
+        return { success: false, error: 'Invalid email or password, or the account is suspended or its organization\'s access period has ended. Contact your administrator if this persists.' };
       }
 
       const userData = data[0];
@@ -99,20 +160,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('[AUTH] Created user object:', userObj);
 
-      // Enrich with profile fields (display_name, avatar, is_active, password expiry, force_change)
-      const { data: profile, error: profileError } = await supabase.rpc('get_my_profile');
-      if (!profileError && profile && profile.length > 0) {
-        const p = profile[0] as any;
-        if (p.is_active === false) {
-          return { success: false, error: 'Your account has been deactivated. Contact your administrator.' };
-        }
-        userObj.display_name = p.display_name;
-        userObj.avatar_url = p.avatar_url;
-        userObj.phone = p.phone;
-        userObj.is_active = p.is_active;
-        userObj.force_password_change = p.force_password_change;
-        userObj.password_expires_at = p.password_expires_at;
+      // The account row: deactivation, forced change and password expiry. FAIL CLOSED —
+      // an unreadable row used to be skipped silently, which is exactly how none of the
+      // three was ever enforced (D206).
+      const { profile, error: profileError } = await readProfile(userData.user_id);
+      if (!profile) {
+        console.error('[AUTH] Account status could not be read:', profileError);
+        return { success: false, error: 'Could not verify your account status. Please try again.' };
       }
+      if (profile.is_active === false) {
+        return { success: false, error: 'Your account has been deactivated. Contact your administrator.' };
+      }
+      if (profile.access_expired) {
+        return { success: false, error: 'Your organization\'s access period has ended. Contact your administrator to renew it.' };
+      }
+      Object.assign(userObj, profile, {
+        name: profile.name || userObj.name,
+        role: profile.role || userObj.role,
+        organization: profile.organization || userObj.organization,
+      });
 
       setUser(userObj);
       localStorage.setItem('auth_user', JSON.stringify(userObj));
@@ -165,19 +231,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshProfile = async () => {
     if (!user?.id) return;
-    const { data, error } = await supabase.rpc('get_my_profile');
-    if (error || !data || data.length === 0) return;
-    const p = data[0] as any;
+    const { profile, error } = await readProfile(user.id);
+    if (!profile) {
+      console.warn('[AUTH] Profile refresh failed; keeping the last known account state:', error);
+      return;
+    }
+    // A session that outlived its account: suspended, or its organization's access
+    // period ended since sign-in (D207). The database refuses the next sign-in either way.
+    if (profile.is_active === false || profile.access_expired) {
+      await logout();
+      return;
+    }
     const updated: User = {
       ...user,
-      name: p.name || user.name,
-      display_name: p.display_name,
-      avatar_url: p.avatar_url,
-      phone: p.phone,
-      is_active: p.is_active,
-      force_password_change: p.force_password_change,
-      password_expires_at: p.password_expires_at,
-      role: p.role || user.role,
+      ...profile,
+      name: profile.name || user.name,
+      role: profile.role || user.role,
+      organization: profile.organization || user.organization,
     };
     setUser(updated);
     localStorage.setItem('auth_user', JSON.stringify(updated));
@@ -197,7 +267,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.error('[AUTH] Error setting user context on mount:', error);
         }
       });
+      // A stored session carries the account state from its sign-in. Re-read it, so a
+      // reset, a deactivation or an expiry since then is enforced on reload too.
+      refreshProfile();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per signed-in user
   }, [user?.id, user?.email]);
 
   return (

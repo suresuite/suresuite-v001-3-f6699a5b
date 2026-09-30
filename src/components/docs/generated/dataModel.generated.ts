@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "2930c0b65674";
+export const CONTRACT_VERSION = "441f3b0a10c1";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20260929000001_audit_log_read_and_chain.sql";
+export const LAST_MIGRATION = "20260929000004_organization_plan.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,
   "tablesDescribed": 55,
-  "columnsDescribed": 687,
+  "columnsDescribed": 693,
   "tablesUndescribed": 26
 } as const;
 
@@ -321,7 +321,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "approved_users",
         "grain": "One person who may sign in. This is the authentication table: the product does not use Supabase Auth for its own users, so a row here IS an account — credential, role, tenant and profile in one.",
-        "columns": 16,
+        "columns": 17,
         "owner": "platform"
       },
       {
@@ -357,7 +357,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "organizations",
         "grain": "One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold.",
-        "columns": 8,
+        "columns": 13,
         "owner": "platform"
       },
       {

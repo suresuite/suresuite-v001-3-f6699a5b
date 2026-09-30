@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 687;
+export const REFERENCE_COLUMN_COUNT = 693;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -756,7 +756,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       "email"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "approved_users_avatar_color_check",
+        "definition": "CHECK ( avatar_color IS NULL OR avatar_color IN ( 'slate', 'red', 'orange', 'amber', 'green', 'teal', 'blue', 'indigo', 'violet', 'pink'))"
+      }
+    ],
     "ingestDataset": null,
     "surfaces": [
       {
@@ -767,7 +772,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "Profile.tsx",
         "via": "rpc change_own_password",
-        "evidence": "src/pages/Profile.tsx:110"
+        "evidence": "src/pages/Profile.tsx:122"
       }
     ],
     "governance": {
@@ -1022,7 +1027,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "URL of the user's profile image, if they uploaded one.",
+        "meaning": "URL of a profile image uploaded to the `avatars` bucket. RETIRED by §4 D206: the upload was refused for every `anon` caller by its storage policies, and the owner chose an avatar colour instead, so no RPC reads or writes this column any more. Kept rather than dropped so nothing uploaded before is destroyed.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1094,14 +1099,14 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "When the current password stops being accepted — `now() + 90 days` at the time the row was written.",
+        "meaning": "When the current password expires — `now() + password_max_age()` (90 days) when the password was last set. Expiry does not refuse a sign-in: it sends the user to /profile and closes every other page until the password is changed (`RoleGuard`, reading `get_my_profile`'s server-computed `password_expired`; §4 D206). Rows that predate `20260527011429` were stamped by that migration's column default, not by a real password change.",
         "primaryKey": false,
         "unique": false,
         "references": null,
         "substitutions": [
           {
             "when": "no expiry is supplied",
-            "value": "90 days after the row is written",
+            "value": "password_max_age() (90 days) after the row is written",
             "provenance": "default",
             "visibleAs": "the column default; the account pages render the resulting date"
           }
@@ -1125,7 +1130,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Whether the user must set a new password before continuing. Set when an administrator resets an account.",
+        "meaning": "Whether the user must set a new password before continuing. Set when an administrator creates or resets an account; cleared by `change_own_password`. Enforced by `RoleGuard`, which could not see it until §4 D206.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1149,7 +1154,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Whether the account may sign in. Checked at login; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.",
+        "meaning": "Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. The browser also checks it through `get_my_profile` at login and on every reload — a check that, until §4 D206, raised for every user and was ignored, so before these two changes the column was set and never read. It is not consulted by any RLS policy, so between reloads a suspended user's open session is not revoked (D28's client-asserted identity).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1173,7 +1178,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns.",
+        "meaning": "The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it.",
         "primaryKey": false,
         "unique": false,
         "references": {
@@ -1194,6 +1199,37 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "avatar_color",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "one of the palette tokens in the CHECK",
+        "meaning": "The colour of the user's initial on their avatar — one token of a fixed palette, CHECK-constrained; the page maps each token to its fill (`src/lib/avatarColors.ts`, pinned to the CHECK by `avatarColors.test.ts`). §4 D206.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [
+          {
+            "when": "the user has not chosen a colour (NULL)",
+            "value": "the theme's primary colour",
+            "provenance": "default",
+            "visibleAs": "the \"Default\" swatch, selected, on /profile"
+          }
+        ],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
         "computedBy": null
       }
     ]
@@ -1610,7 +1646,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:415"
       },
       {
         "page": "InteractiveNetworkSpace.tsx",
@@ -1973,7 +2009,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:415"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -5111,7 +5147,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:415"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -8546,7 +8582,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc delete_project_dataset",
-        "evidence": "src/pages/DataManager.tsx:697"
+        "evidence": "src/pages/DataManager.tsx:699"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -8814,7 +8850,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:415"
       },
       {
         "page": "ProductLevelNetwork.tsx",
@@ -9219,7 +9255,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:415"
       },
       {
         "page": "ProductLevelNetwork.tsx",
@@ -10355,7 +10391,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_node_list",
-        "evidence": "src/pages/DataManager.tsx:425"
+        "evidence": "src/pages/DataManager.tsx:427"
       },
       {
         "page": "FirmLevelNetwork.tsx",
@@ -11280,6 +11316,22 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "organizations_status_check",
         "definition": "CHECK (status IN ('active','suspended'))"
+      },
+      {
+        "name": "organizations_access_period_check",
+        "definition": "CHECK (access_period IN ('week', 'month', 'quarter', 'year'))"
+      },
+      {
+        "name": "organizations_project_limit_check",
+        "definition": "CHECK (project_limit IN (1, 2, 3, 5))"
+      },
+      {
+        "name": "organizations_user_limit_check",
+        "definition": "CHECK (user_limit IN (1, 2, 3, 5))"
+      },
+      {
+        "name": "organizations_access_period_start_check",
+        "definition": "CHECK ((access_period IS NULL) = (access_valid_from IS NULL))"
       }
     ],
     "ingestDataset": null,
@@ -11502,6 +11554,126 @@ export const REFERENCE_TABLES: RefTable[] = [
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
         "computedBy": null
+      },
+      {
+        "name": "access_period",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "one of week / month / quarter / year, or NULL",
+        "meaning": "How long the organization may be used, counted from `access_valid_from`: `week`, `month`, `quarter` or `year`, CHECK-constrained to those four; NULL means it does not expire, which every organization that existed before D207 keeps. Set by `admin_set_org_access_period` (choosing a period again renews it from now) or `admin_create_organization`. The lengths are written once, in `org_access_period_interval()`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "access_valid_from",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the current access period started — the database clock at the moment an administrator set it, never the browser's. NULL exactly when `access_period` is NULL (a CHECK).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "access_valid_until",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the access period ends. DERIVED by `trg_organizations_access_valid_until` from the two columns above; a write that names it is overwritten. At or after this instant `authenticate_approved_user` refuses every member except a super admin, `get_my_profile` reports `access_expired`, and no project can be added to the organization (D207).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "project_limit",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "one of 1 / 2 / 3 / 5, or NULL",
+        "meaning": "The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "user_limit",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "one of 1 / 2 / 3 / 5, or NULL",
+        "meaning": "The most accounts the organization may have, counted by `approved_users.organization_id` (the authority since D205) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `approved_users`. Lowering it removes nobody; no account can be added until under it.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -11537,7 +11709,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:415"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -14677,7 +14849,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/DataManager.tsx:200"
+        "evidence": "src/pages/DataManager.tsx:201"
       },
       {
         "page": "DeveloperApi.tsx",
@@ -17669,7 +17841,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc combine_project_into_supply_chain",
-        "evidence": "src/pages/DataManager.tsx:640"
+        "evidence": "src/pages/DataManager.tsx:642"
       },
       {
         "page": "FirmLevelNetwork.tsx",
@@ -18240,7 +18412,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc combine_project_into_supply_chain",
-        "evidence": "src/pages/DataManager.tsx:640"
+        "evidence": "src/pages/DataManager.tsx:642"
       },
       {
         "page": "InteractiveNetworkSpace.tsx",
