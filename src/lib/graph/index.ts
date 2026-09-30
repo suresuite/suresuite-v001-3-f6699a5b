@@ -25,3 +25,4 @@ export * from './focus';
 export * from './echelon';
 export * from './productGraph';
 export * from './placement';
+export * from './lensLayout';
