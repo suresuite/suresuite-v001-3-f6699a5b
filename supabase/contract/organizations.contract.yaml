@@ -37,8 +37,11 @@ governance:
   note: >-
     `write: super_admin` is enforced, not aspirational: every mutation goes
     through `admin_create_organization` / `admin_update_organization` /
-    `admin_set_org_status` / `admin_set_org_access_period` / `admin_set_org_limits`, each of which opens with `_assert_super_admin` and
-    closes with `log_admin_action`. This is one of the few tables where
+    `admin_set_org_status` / `admin_set_org_access_period` / `admin_set_org_limits` /
+    `admin_delete_organization`, each of which opens with `_assert_super_admin` and
+    closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that
+    takes the organization's projects and accounts with it, and is a different verb
+    from suspension. This is one of the few tables where
     `audited: true` is literally true today — WP 2.3 is what makes the claim
     general. Read is open to any member of the org via the self-bridge policy
     below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name`
@@ -119,7 +122,9 @@ fields:
     unit_source: none
     meaning: >-
       Whether the tenant is live — `active` or `suspended`, CHECK-constrained to
-      those two. Set through `admin_set_org_status`.
+      those two. Set through `admin_set_org_status`. Suspension is the
+      REVERSIBLE verb; removing a tenant is `admin_delete_organization` (§4 D208),
+      which deletes the row rather than setting a status.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []

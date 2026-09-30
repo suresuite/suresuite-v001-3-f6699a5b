@@ -1380,21 +1380,23 @@ export function deriveProjectDeletion(root) {
     return null;
   };
 
-  // WHERE THE LIST LIVES NOW (§4 D170). The edge function used to delete a
+  // WHERE THE LIST LIVES NOW (§4 D170, D208). The edge function used to delete a
   // hand-written list over PostgREST, in batches, in the background. Since
-  // `20260922000003` the whole deletion is `public.delete_project`, one transaction,
-  // and the function only relays its answer — so the list is read from the LATEST
-  // migration that defines it, which is the definition production runs.
+  // `20260922000003` the whole deletion is one transaction, and since
+  // `20260930000002` the sweep itself is `public._delete_project_rows`, which
+  // `delete_project` and `admin_delete_organization` both call — so the list is read
+  // from the LATEST migration that defines THAT function, which is the definition
+  // production runs, and no second copy exists for this derivation to miss.
   const migDir = join(root, "supabase", "migrations");
   const defining = readdirSync(migDir)
     .filter((f) => f.endsWith(".sql"))
     .sort()
-    .filter((f) => /FUNCTION\s+public\.delete_project\s*\(/i.test(readFileSync(join(migDir, f), "utf8")));
+    .filter((f) => /FUNCTION\s+public\._delete_project_rows\s*\(/i.test(readFileSync(join(migDir, f), "utf8")));
   if (!defining.length) {
-    throw new Error("chains: no migration defines public.delete_project — the page cannot say what a deletion reaches.");
+    throw new Error("chains: no migration defines public._delete_project_rows — the page cannot say what a deletion reaches.");
   }
   const sql = readFileSync(join(migDir, defining[defining.length - 1]), "utf8");
-  const body = sql.slice(sql.search(/FUNCTION\s+public\.delete_project\s*\(/i));
+  const body = sql.slice(sql.search(/FUNCTION\s+public\._delete_project_rows\s*\(/i));
   const fnBody = body.slice(0, body.indexOf("\n$$;") > 0 ? body.indexOf("\n$$;") : body.length);
   const swept = new Set(
     [...fnBody.matchAll(/DELETE\s+FROM\s+public\.(\w+)/gi)].map((m) => m[1]).filter((t) => t !== "projects"),

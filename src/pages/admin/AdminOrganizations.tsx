@@ -4,6 +4,11 @@
 // hook-in are unchanged. Table reskinned with mono slug, status dot, and a
 // reskinned row action menu; Add-organization lives in the header.
 //
+// §4 D208 — "Delete permanently…" is a DIFFERENT verb from Suspend. Suspend is a
+// reversible status; delete (`admin_delete_organization`) removes the organization,
+// its projects with all their data, and its user accounts, in one transaction, and
+// cannot be undone. The dialog says so and asks for the slug, which the server checks.
+//
 // The plan (PLAN.md §4 D207): each organization is valid for 1 week, 1 month, 1 quarter
 // or 1 year (or has no expiry), and may have 1, 2, 3 or 5 users and projects (or
 // unlimited). Choosing a period — even the same one — renews it from now. The database
@@ -21,9 +26,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Ban, Loader2, MoreHorizontal, Pencil, Plus, ShieldCheck, Undo2 } from 'lucide-react';
+import { Ban, Loader2, MoreHorizontal, Pencil, Plus, ShieldCheck, Trash2, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { OrgAccessDrawer } from '@/components/admin/OrgAccessDrawer';
 import { DIALOG_AS_SHEET, HDR_PRIMARY_BUTTON } from '@/components/shared';
@@ -83,6 +88,7 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
   const [loading, setLoading] = useState(true);
   const [accessOrg, setAccessOrg] = useState<OrgRow | null>(null);
   const [renameOrg, setRenameOrg] = useState<OrgRow | null>(null);
+  const [deleteOrg, setDeleteOrg] = useState<OrgRow | null>(null);
   const actorArgs = () => ({ p_actor_id: actor?.id, p_actor_email: actor?.email });
 
   const load = async () => {
@@ -187,6 +193,7 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
                   tone: o.status === 'active' ? 'danger' : 'default',
                   onClick: () => toggleStatus(o),
                 },
+                { label: 'Delete permanently…', tone: 'danger', onClick: () => setDeleteOrg(o) },
               ]}
             />
           ))}
@@ -254,6 +261,9 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
                         <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => toggleStatus(o)}>
                           {o.status === 'active' ? <><Ban className="mr-2 h-4 w-4" /> Suspend</> : <><Undo2 className="mr-2 h-4 w-4" /> Reactivate</>}
                         </DropdownMenuItem>
+                        <DropdownMenuItem className="min-h-11 text-[#bf2330] focus:text-[#bf2330] md:min-h-0" onClick={() => setDeleteOrg(o)}>
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete permanently…
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -267,6 +277,7 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
 
       {accessOrg && <OrgAccessDrawer orgId={accessOrg.id} orgName={accessOrg.name} open={!!accessOrg} onClose={() => setAccessOrg(null)} />}
       {renameOrg && <RenameOrgDialog org={renameOrg} actorArgs={actorArgs} onClose={() => setRenameOrg(null)} onDone={load} />}
+      {deleteOrg && <DeleteOrgDialog org={deleteOrg} actorArgs={actorArgs} onClose={() => setDeleteOrg(null)} onDone={load} />}
     </AdminLayout>
   );
 }
@@ -290,6 +301,62 @@ function RenameOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
         <DialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={save} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Rename</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Permanent deletion (§4 D208). The counts are the list's own — the same
+// `organization_id` the server deletes by — and the server refuses anything the
+// dialog cannot promise: a wrong slug, the admin's own organization, one holding a
+// super admin, or an account with recorded work in another organization's project.
+function DeleteOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; actorArgs: () => Record<string, unknown>; onClose: () => void; onDone: () => void }) {
+  const [typed, setTyped] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const matches = typed.trim() === org.slug;
+  const remove = async () => {
+    if (!matches) return;
+    setDeleting(true);
+    const { data, error } = await db.rpc('admin_delete_organization', { ...actorArgs(), p_org_id: org.id, p_confirm_slug: typed.trim() });
+    setDeleting(false);
+    if (error) return toast.error(error.message);
+    const projects = Number(data?.projects ?? 0);
+    const users = Number(data?.users ?? 0);
+    toast.success(`Deleted "${org.name}" with ${plural(projects, 'project', 'projects')} and ${plural(users, 'user account', 'user accounts')}`);
+    onClose(); onDone();
+  };
+  return (
+    <Dialog open onOpenChange={(v) => !v && !deleting && onClose()}>
+      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <DialogHeader>
+          <DialogTitle>Delete “{org.name}” permanently</DialogTitle>
+          <DialogDescription>
+            This cannot be undone. Suspending can be reversed; deleting cannot.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 text-[13px]">
+          <div>
+            <p className="font-medium">Deleted, forever:</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
+              <li>{plural(org.projects, 'project', 'projects')} and all of their data — datasets, the network, scenarios, policies, simulation runs and results</li>
+              <li>{plural(org.members, 'user account', 'user accounts')} — they will no longer be able to sign in</li>
+              <li>the organization’s API keys, access defaults and AI budgets</li>
+            </ul>
+          </div>
+          <p className="text-muted-foreground">Kept: the audit log and usage logs, which record what happened.</p>
+          <p className="text-muted-foreground">If you may need it back, suspend it instead.</p>
+          <div>
+            <Label className="text-xs">Type <span className="font-mono">{org.slug}</span> to confirm</Label>
+            <Input value={typed} onChange={(e) => setTyped(e.target.value)} className="mt-1 rounded-sm font-mono" autoFocus autoComplete="off" spellCheck={false} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={deleting}>Cancel</Button>
+          <Button variant="destructive" className="rounded-sm" onClick={remove} disabled={!matches || deleting}>
+            {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete organization
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
