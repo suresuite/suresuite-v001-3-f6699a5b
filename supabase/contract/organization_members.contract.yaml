@@ -126,7 +126,9 @@ fields:
       membership removes the default with it. Set only by a super admin
       (`admin_set_default_org`, /admin/users); the account switches freely between
       sign-ins and cannot change it. `false` on every row of an account with no
-      default, which signs in where it last worked (D210's behaviour).
+      default, which signs in where it last worked (D210's behaviour). Shown to the
+      account's fellow members by NAME on /profile's My organization tab (§4 D217):
+      `get_my_organization_access` and `project_access_read` return it per person.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions:

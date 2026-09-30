@@ -22,6 +22,7 @@ import { describeExpiry, formatDate, passwordStatus, relativeDay } from '@/lib/a
 import { AVATAR_COLORS, DEFAULT_AVATAR_CLASS, avatarClass, isAvatarColor } from '@/lib/avatarColors';
 import { formatPlanDate, periodLabel, usage } from '@/lib/auth/organizationPlan';
 import { useMyOrganizations } from '@/hooks/useMyOrganizations';
+import { MyOrganizationTab } from '@/components/profile/MyOrganizationTab';
 
 /** `super_admin` → "Super admin". The stored value is an enum token, not a label. */
 const roleLabel = (role: string | undefined | null) =>
@@ -67,7 +68,9 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   // where RoleGuard sends you, and editing it away must not unlock the other tabs.
   const pw = passwordStatus(user);
   const locked = pw.mustChange;
-  const initialTab = locked || params.get('tab') === 'password' ? 'password' : 'profile';
+  const initialTab = locked || params.get('tab') === 'password'
+    ? 'password'
+    : params.get('tab') === 'organization' ? 'organization' : 'profile';
 
   const [tab, setTab] = useState(initialTab);
   const [copiedId, setCopiedId] = useState(false);
@@ -188,10 +191,11 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
         </Alert>
       )}
 
-      <Tabs value={tab} onValueChange={(v) => { if (locked) return; setTab(v); setParams(v === 'password' ? { tab: 'password' } : {}, { replace: true }); }} className="max-w-3xl">
-        <TabsList>
+      <Tabs value={tab} onValueChange={(v) => { if (locked) return; setTab(v); setParams(v === 'password' || v === 'organization' ? { tab: v } : {}, { replace: true }); }} className="max-w-3xl">
+        <TabsList className="max-w-full justify-start overflow-x-auto">
           <TabsTrigger value="profile" disabled={locked}>Profile</TabsTrigger>
           <TabsTrigger value="access" disabled={locked}>My Access</TabsTrigger>
+          <TabsTrigger value="organization" disabled={locked}>My Organization</TabsTrigger>
           <TabsTrigger value="password">Change Password</TabsTrigger>
         </TabsList>
 
@@ -346,6 +350,11 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
 
         <TabsContent value="access">
           <MyAccessTab />
+        </TabsContent>
+
+        {/* D217 — who else is in the organization and on its projects, and what each may do. */}
+        <TabsContent value="organization">
+          <MyOrganizationTab />
         </TabsContent>
 
         <TabsContent value="password">

@@ -68,7 +68,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `user_id` | — | `uuid` | — | — | The approved user who is a member, by uuid. ON DELETE CASCADE. |
 | `org_role` | — | `text` | — | — | The member's standing in the organization — `owner`, `admin` or `member`, CHECK-constrained. This is an ORG vocabulary and it is not the project vocabulary: `min_project_role` throughout this contract speaks of viewer / analyst / editor / owner, which WP 2.2 creates on `project_members`. The two share the word "owner" and mean different things by it. |
 | `joined_at` | — | `timestamp with time zone` | — | — | When the membership was created. Server-stamped. |
-| `is_default` | — | `boolean` | — | — | This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour). |
+| `is_default` | — | `boolean` | — | — | This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour). Shown to the account's fellow members by NAME on /profile's My organization tab (§4 D217): `get_my_organization_access` and `project_access_read` return it per person. |
 
 ## Each column in full
 
@@ -155,7 +155,7 @@ When the membership was created. Server-stamped.
 
 ### `is_default`
 
-This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour).
+This membership is the account's DEFAULT organization (§4 D216) — where every sign-in lands (`authenticate_approved_user` makes it the active organization when it is not, and its access period has not ended), and where the account re-points when its active organization goes away. At most one per account, by the partial unique index `organization_members_one_default_per_user`; always one of the account's organizations because it IS a membership row, so removing the membership removes the default with it. Set only by a super admin (`admin_set_default_org`, /admin/users); the account switches freely between sign-ins and cannot change it. `false` on every row of an account with no default, which signs in where it last worked (D210's behaviour). Shown to the account's fellow members by NAME on /profile's My organization tab (§4 D217): `get_my_organization_access` and `project_access_read` return it per person.
 
 | | |
 |---|---|
@@ -182,6 +182,6 @@ for one you did.
 
 ---
 
-*Generated from data contract `1cc84e15372a`, engine `0.2.8`,
+*Generated from data contract `8e55e321d029`, engine `0.2.8`,
 sidecar `supabase/contract/organization_members.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
