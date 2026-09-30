@@ -17,6 +17,11 @@
 --      what /admin/users/:userId shows (`admin_get_user_memberships`).
 --   §5 REFUSAL: another tenant's project and an unknown one answer `forbidden` alike; a call
 --      naming another user than the session is refused; a suspended account is refused.
+--   §6 IN THE PROJECT (D231): the rights are the rights IN the project, whichever
+--      organization the person is working in right now — a Viewer member of the project's
+--      organization working in another one sees it (`working_in_project_org` false), the
+--      owner working elsewhere still edits its settings, and a member with no project role
+--      takes the organization layer from the PROJECT's organization, not the active one.
 
 DO $d219$
 DECLARE
@@ -36,6 +41,7 @@ DECLARE
   v_adm     jsonb;
   v_code    text;
   v_uid     uuid;
+  v_plain_a uuid := gen_random_uuid();   -- org A member, account role 'user', no project role
   k         text;
 BEGIN
   INSERT INTO public.organizations (id, name, slug) VALUES
@@ -197,6 +203,56 @@ BEGIN
   PERFORM set_config('app.current_user_id', '', true);
   IF v_code IS DISTINCT FROM 'account_inactive' THEN
     RAISE EXCEPTION 'D230/550 §5: a suspended account got %, expected account_inactive', COALESCE(v_code, 'success');
+  END IF;
+
+  -- ══ §6 · the rights are the rights in the project (D231) ══
+  -- Org A lets its members run simulations; org B does not. Both org-layer rows are this
+  -- rehearsal's own, so the answer can only come from the organization the resolver reads.
+  INSERT INTO public.org_capabilities (org_id, capability_key, allowed) VALUES
+    (v_org_a, 'simulation_lab', true), (v_org_b, 'simulation_lab', false)
+  ON CONFLICT (org_id, capability_key) DO UPDATE SET allowed = EXCLUDED.allowed;
+  INSERT INTO public.approved_users (id, email, name, password_hash, role, organization, organization_id, is_active) VALUES
+    (v_plain_a, 'd219p@example.invalid', 'D219 PlainA', 'x', 'user', 'D219 Org A', v_org_a, true);
+  -- The Viewer, the owner and the plain member also belong to org B and work there now —
+  -- Aliona's shape: a member of the project's organization, signed in to another.
+  PERFORM set_config('app.current_user_id', '', true);
+  SET LOCAL ROLE anon;
+  FOREACH v_uid IN ARRAY ARRAY[v_viewer, v_owner, v_plain_a] LOOP
+    PERFORM public.admin_add_org_member(v_super, 'd219s@example.invalid', v_uid, v_org_b, 'member');
+  END LOOP;
+  RESET ROLE;
+  PERFORM set_config('app.current_user_id', '', true);
+  UPDATE public.approved_users SET organization_id = v_org_b, organization = 'D219 Org B'
+   WHERE id IN (v_viewer, v_owner, v_plain_a);
+
+  SET LOCAL ROLE anon;
+  v_people := public.admin_get_project_access(v_super, 'd219s@example.invalid', v_p) -> 'people';
+  RESET ROLE;
+  PERFORM set_config('app.current_user_id', '', true);
+
+  SELECT p INTO v_pers FROM jsonb_array_elements(v_people) p WHERE p ->> 'user_id' = v_viewer::text;
+  IF (v_pers ->> 'active_in_project_org')::boolean IS NOT FALSE
+     OR (v_pers ->> 'visible')::boolean IS NOT TRUE
+     OR (v_pers -> 'capabilities' ->> 'simulation_lab')::boolean IS NOT FALSE THEN
+    RAISE EXCEPTION 'D231/550 §6: a Viewer member of the project''s organization working in another read as %', v_pers;
+  END IF;
+  SELECT p INTO v_pers FROM jsonb_array_elements(v_people) p WHERE p ->> 'user_id' = v_owner::text;
+  IF (v_pers ->> 'visible')::boolean IS NOT TRUE OR (v_pers ->> 'can_edit_project')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'D231/550 §6: the owner working in another organization read as %', v_pers;
+  END IF;
+  SELECT p INTO v_pers FROM jsonb_array_elements(v_people) p WHERE p ->> 'user_id' = v_plain_a::text;
+  IF v_pers IS NULL OR v_pers ->> 'effective_role' IS NOT NULL
+     OR (v_pers ->> 'visible')::boolean IS NOT TRUE
+     OR (v_pers -> 'capabilities' ->> 'simulation_lab')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'D231/550 §6: a member with no project role working in org B read as % — the organization layer must be the project''s (org A allows it)', v_pers;
+  END IF;
+  -- And the gate the browser reads says the same for the account itself.
+  SET LOCAL ROLE anon;
+  v_mine := public.get_my_project_rights(v_p, v_owner);
+  RESET ROLE;
+  PERFORM set_config('app.current_user_id', '', true);
+  IF (v_mine ->> 'working_in_project_org')::boolean IS NOT FALSE OR (v_mine ->> 'can_edit_project')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'D231/550 §6: the owner''s own gate, working in another organization, read as %', v_mine;
   END IF;
 
   RAISE NOTICE 'D230/550: one answer for a person''s rights on a project — the gate, /profile and /admin agree, and it is what the app applies';

@@ -17,8 +17,10 @@
 --      resolves to no role.
 --   §5 REMOVAL: a removed cross-organization membership drops the project from the read.
 --   §6 A SECOND ORGANIZATION (D210): once the account also belongs to org B, org B's
---      project is listed as a member organization's but is NOT visible until the account
---      switches — and after the switch the visibility follows the ACTIVE organization.
+--      project is listed as a member organization's, and — since D231 — its rights are the
+--      rights IN that project: visible whichever organization the account is working in,
+--      with `in_active_org` saying where it is right now; after the switch it is in it, and
+--      the project it owns in org A keeps its owner's rights.
 --   §7 ORG ROLE: set per organization, each independently; invalid and non-member refused.
 --   §8 ATTRIBUTION: every change left an admin log row naming the super admin.
 
@@ -193,7 +195,7 @@ BEGIN
     RAISE EXCEPTION 'D211/460 §5: removing a membership twice got %', COALESCE(v_code, 'success');
   END IF;
 
-  -- ══ §6 · a second organization: listed, not visible until the switch ══
+  -- ══ §6 · a second organization: listed; its rights are the rights in the project (D231) ══
   PERFORM public.admin_add_org_member(v_super, 'd211s@example.invalid', v_user, v_org_b, 'member');
   v_out := public.admin_get_user_memberships(v_super, 'd211s@example.invalid', v_user);
   IF jsonb_array_length(v_out -> 'organizations') IS DISTINCT FROM 2
@@ -201,7 +203,8 @@ BEGIN
     RAISE EXCEPTION 'D211/460 §6: after joining org B the organizations read % (active %)', v_out -> 'organizations', v_out ->> 'active_organization_id';
   END IF;
   SELECT p INTO v_proj FROM jsonb_array_elements(v_out -> 'projects') p WHERE p ->> 'project_id' = v_p3::text;
-  IF v_proj IS NULL OR (v_proj ->> 'in_member_org')::boolean IS NOT TRUE OR (v_proj ->> 'visible')::boolean IS NOT FALSE THEN
+  IF v_proj IS NULL OR (v_proj ->> 'in_member_org')::boolean IS NOT TRUE OR (v_proj ->> 'in_active_org')::boolean IS NOT FALSE
+     OR (v_proj ->> 'visible')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'D211/460 §6: org B''s project before the switch read as %', v_proj;
   END IF;
 
@@ -217,7 +220,8 @@ BEGIN
     RAISE EXCEPTION 'D211/460 §6: org B''s project after the switch read as %', v_proj;
   END IF;
   SELECT p INTO v_proj FROM jsonb_array_elements(v_out -> 'projects') p WHERE p ->> 'project_id' = v_p1::text;
-  IF v_proj IS NULL OR (v_proj ->> 'visible')::boolean IS NOT FALSE OR (v_proj ->> 'can_edit_project')::boolean IS NOT FALSE
+  IF v_proj IS NULL OR (v_proj ->> 'visible')::boolean IS NOT TRUE OR (v_proj ->> 'can_edit_project')::boolean IS NOT TRUE
+     OR (v_proj ->> 'in_active_org')::boolean IS NOT FALSE
      OR (v_proj ->> 'in_member_org')::boolean IS NOT TRUE OR v_proj ->> 'effective_role' IS DISTINCT FROM 'owner' THEN
     RAISE EXCEPTION 'D211/460 §6: org A''s owned project after switching away read as %', v_proj;
   END IF;

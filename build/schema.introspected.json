@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 367,
-  "migrations_applied": 359,
+  "migrations_found": 368,
+  "migrations_applied": 360,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000003_project_rights_one_answer.sql",
+  "last_migration": "20261001000004_project_rights_in_the_project.sql",
   "counts": {
     "tables": 83,
     "views": 7,
@@ -23133,7 +23133,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260915000005_project_membership_and_delegation.sql"
+      "defined_by": "20261001000004_project_rights_in_the_project.sql"
     },
     {
       "name": "capabilities_for_user",
@@ -25184,8 +25184,8 @@
       "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
-      "comment": "D230 — one person's rights on one project, as the app applies them: visible, ",
-      "defined_by": "20261001000003_project_rights_one_answer.sql"
+      "comment": "D230, D231 — one person's rights on one project, as the app applies them while the person ",
+      "defined_by": "20261001000004_project_rights_in_the_project.sql"
     },
     {
       "name": "project_role_rank",

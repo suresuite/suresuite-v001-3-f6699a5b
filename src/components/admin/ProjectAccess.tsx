@@ -247,11 +247,11 @@ function PersonRow({ p, orgName, caps, onRole, onExpiry, onRemove }: {
           {m.rationale && ` · "${m.rationale}"`}
         </div>
       )}
-      {!p.visible && p.account_active && (
-        <div className={`mt-1.5 text-[11px] ${p.in_project_org ? 'text-muted-foreground' : 'text-[#bf2330]'}`}>
-          {p.in_project_org
-            ? `Sees the project after switching to ${orgName}: visibility follows the organization they are working in.`
-            : `Does not see the project in the app: not a member of ${orgName}, and visibility follows the organization. The role still applies to uploads and to the rights below.`}
+      {/* D231 — the rights below are the rights in this project (while working in its
+          organization); where they are working right now is a note, not a right. */}
+      {p.account_active && !p.is_super_admin && !p.in_project_org && (
+        <div className="mt-1.5 text-[11px] text-[#bf2330]">
+          Does not see the project in the app: not a member of {orgName}, and visibility follows the organization. The role still applies to uploads.
         </div>
       )}
 
