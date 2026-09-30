@@ -29,9 +29,9 @@ partially or get corrected — the write fails.
 |---|---|---|
 | `organizations_status_check` | `CHECK (status IN ('active','suspended'))` | `20260709000002_super_admin_phase1.sql` |
 | `organizations_access_period_check` | `CHECK (access_period IN ('week', 'month', 'quarter', 'year'))` | `20260929000004_organization_plan.sql` |
-| `organizations_project_limit_check` | `CHECK (project_limit IN (1, 2, 3, 5))` | `20260929000004_organization_plan.sql` |
-| `organizations_user_limit_check` | `CHECK (user_limit IN (1, 2, 3, 5))` | `20260929000004_organization_plan.sql` |
 | `organizations_access_period_start_check` | `CHECK ((access_period IS NULL) = (access_valid_from IS NULL))` | `20260929000004_organization_plan.sql` |
+| `organizations_project_limit_check` | `CHECK (project_limit IN (1, 2, 3, 5, 10, 20, 50, 100))` | `20260930000012_organization_limit_options.sql` |
+| `organizations_user_limit_check` | `CHECK (user_limit IN (1, 2, 3, 5, 10, 20, 50, 100))` | `20260930000012_organization_limit_options.sql` |
 
 ## Governance
 
@@ -85,8 +85,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `access_period` | — | `text` | — | — | How long the organization may be used, counted from `access_valid_from`: `week`, `month`, `quarter` or `year`, CHECK-constrained to those four; NULL means it does not expire, which every organization that existed before D207 keeps. Set by `admin_set_org_access_period` (choosing a period again renews it from now) or `admin_create_organization`. The lengths are written once, in `org_access_period_interval()`. |
 | `access_valid_from` | — | `timestamp with time zone` | — | — | When the current access period started — the database clock at the moment an administrator set it, never the browser's. NULL exactly when `access_period` is NULL (a CHECK). |
 | `access_valid_until` | — | `timestamp with time zone` | — | — | When the access period ends. DERIVED by `trg_organizations_access_valid_until` from the two columns above; a write that names it is overwritten. At or after this instant `authenticate_approved_user` refuses every member except a super admin, `get_my_profile` reports `access_expired`, and no project can be added to the organization (D207). |
-| `project_limit` | — | `integer` | — | — | The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it. |
-| `user_limit` | — | `integer` | — | — | The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it. |
+| `project_limit` | — | `integer` | — | — | The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four added by §4 D218), CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it. |
+| `user_limit` | — | `integer` | — | — | The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four added by §4 D218), CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it. |
 
 ## Each column in full
 
@@ -251,7 +251,7 @@ When the access period ends. DERIVED by `trg_organizations_access_valid_until` f
 
 ### `project_limit`
 
-The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it.
+The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four added by §4 D218), CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it.
 
 | | |
 |---|---|
@@ -260,12 +260,12 @@ The most projects the organization may hold, counted by `projects.organization_i
 | Unit | dimensionless |
 | Added by | `20260929000004_organization_plan.sql` |
 | Read by the engine | **not traced** |
-| Validated at ingest | one of 1 / 2 / 3 / 5, or NULL |
+| Validated at ingest | one of 1 / 2 / 3 / 5 / 10 / 20 / 50 / 100, or NULL |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 ### `user_limit`
 
-The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it.
+The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four added by §4 D218), CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it.
 
 | | |
 |---|---|
@@ -274,11 +274,11 @@ The most accounts the organization may have, counted as its `organization_member
 | Unit | dimensionless |
 | Added by | `20260929000004_organization_plan.sql` |
 | Read by the engine | **not traced** |
-| Validated at ingest | one of 1 / 2 / 3 / 5, or NULL |
+| Validated at ingest | one of 1 / 2 / 3 / 5 / 10 / 20 / 50 / 100, or NULL |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 ---
 
-*Generated from data contract `8e55e321d029`, engine `0.2.8`,
+*Generated from data contract `1810759ef6a5`, engine `0.2.8`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

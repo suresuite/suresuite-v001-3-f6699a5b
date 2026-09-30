@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 363,
-  "migrations_applied": 355,
+  "migrations_found": 364,
+  "migrations_applied": 356,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260930000011_my_organization_access.sql",
+  "last_migration": "20260930000012_organization_limit_options.sql",
   "counts": {
     "tables": 81,
     "views": 7,
@@ -11942,31 +11942,25 @@
           "added_by": "20260929000004_organization_plan.sql"
         },
         {
-          "name": "organizations_project_limit_check",
-          "kind": "CHECK",
-          "columns": [
-            "project_limit"
-          ],
-          "definition": "CHECK (project_limit IN (1, 2, 3, 5))",
-          "implicit": true,
-          "added_by": "20260929000004_organization_plan.sql"
-        },
-        {
-          "name": "organizations_user_limit_check",
-          "kind": "CHECK",
-          "columns": [
-            "user_limit"
-          ],
-          "definition": "CHECK (user_limit IN (1, 2, 3, 5))",
-          "implicit": true,
-          "added_by": "20260929000004_organization_plan.sql"
-        },
-        {
           "name": "organizations_access_period_start_check",
           "kind": "CHECK",
           "columns": [],
           "definition": "CHECK ((access_period IS NULL) = (access_valid_from IS NULL))",
           "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "organizations_project_limit_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (project_limit IN (1, 2, 3, 5, 10, 20, 50, 100))",
+          "added_by": "20260930000012_organization_limit_options.sql"
+        },
+        {
+          "name": "organizations_user_limit_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (user_limit IN (1, 2, 3, 5, 10, 20, 50, 100))",
+          "added_by": "20260930000012_organization_limit_options.sql"
         }
       ],
       "indexes": [],
@@ -21444,7 +21438,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260929000004_organization_plan.sql"
+      "defined_by": "20260930000012_organization_limit_options.sql"
     },
     {
       "name": "admin_create_user",
@@ -21721,8 +21715,8 @@
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": null,
-      "comment": "D207 — set how many projects and user accounts an organization may have: 1, 2, 3 or 5; ",
-      "defined_by": "20260929000004_organization_plan.sql"
+      "comment": "D207/D218 — set how many projects and user accounts an organization may have: 1, 2, 3, 5, ",
+      "defined_by": "20260930000012_organization_limit_options.sql"
     },
     {
       "name": "admin_set_org_status",

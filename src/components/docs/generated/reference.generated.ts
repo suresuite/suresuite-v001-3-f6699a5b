@@ -11409,16 +11409,16 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (access_period IN ('week', 'month', 'quarter', 'year'))"
       },
       {
+        "name": "organizations_access_period_start_check",
+        "definition": "CHECK ((access_period IS NULL) = (access_valid_from IS NULL))"
+      },
+      {
         "name": "organizations_project_limit_check",
-        "definition": "CHECK (project_limit IN (1, 2, 3, 5))"
+        "definition": "CHECK (project_limit IN (1, 2, 3, 5, 10, 20, 50, 100))"
       },
       {
         "name": "organizations_user_limit_check",
-        "definition": "CHECK (user_limit IN (1, 2, 3, 5))"
-      },
-      {
-        "name": "organizations_access_period_start_check",
-        "definition": "CHECK ((access_period IS NULL) = (access_valid_from IS NULL))"
+        "definition": "CHECK (user_limit IN (1, 2, 3, 5, 10, 20, 50, 100))"
       }
     ],
     "ingestDataset": null,
@@ -11721,8 +11721,8 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unit": null,
         "csvHeader": null,
         "required": false,
-        "validate": "one of 1 / 2 / 3 / 5, or NULL",
-        "meaning": "The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it.",
+        "validate": "one of 1 / 2 / 3 / 5 / 10 / 20 / 50 / 100, or NULL",
+        "meaning": "The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four added by §4 D218), CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -11745,8 +11745,8 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unit": null,
         "csvHeader": null,
         "required": false,
-        "validate": "one of 1 / 2 / 3 / 5, or NULL",
-        "meaning": "The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it.",
+        "validate": "one of 1 / 2 / 3 / 5 / 10 / 20 / 50 / 100, or NULL",
+        "meaning": "The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four added by §4 D218), CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it.",
         "primaryKey": false,
         "unique": false,
         "references": null,
