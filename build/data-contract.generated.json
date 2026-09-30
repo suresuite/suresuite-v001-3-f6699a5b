@@ -25241,7 +25241,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "hook useSimulationRun → select * from run_replications",
           "grain": "table",
-          "evidence": "src/hooks/useSimulationRun.tsx:131",
+          "evidence": "src/hooks/useSimulationRun.tsx:85",
           "confirmed": true,
           "note": "Both result surfaces reach this table through the SAME hook, so the evidence is the hook's read rather than either page's render. Run & Validate reads every replication of the newest run: the weekly series charts, the financial statement, the per-seed explorer and the inventory chart all render from these rows."
         },
@@ -25249,7 +25249,7 @@
           "page": "SimulationLab.tsx",
           "via": "hook useSimulationRun::loadReps → select * from run_replications",
           "grain": "table",
-          "evidence": "src/hooks/useSimulationRun.tsx:265",
+          "evidence": "src/hooks/useSimulationRun.tsx:189",
           "confirmed": true
         },
         {
@@ -31399,5 +31399,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "2a7a9dc5ba8e"
+  "contract_version": "7d86c8ed700e"
 }

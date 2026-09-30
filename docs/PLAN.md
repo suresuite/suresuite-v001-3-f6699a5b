@@ -20321,6 +20321,28 @@ run weeks, and `simulation_start` is read only for an approximate calendar hint,
 for `simulation_start` points at the new reader. D48's citation of the old call site is marked
 historical. One `@ts-nocheck` file fewer (seventeen). No later package changes.
 
+### WP 9.4 slice 8 · one dispatch client, one grading preamble · 2026-09-30 · no migration
+
+**Asked for.** "Reuse the simulation run and validation in the prior stage" — the plumbing half.
+
+**Promised versus found.** Run & Validate and the Lab each held a copy of the `sim-command`
+dispatch — payload, 422 parse, 409 parse, reuse prompt — and the copies had drifted: Run &
+Validate surfaced the server's error, the Lab surfaced the SDK's "non-2xx". The two grading
+entry points repeated the same dataset build and `gradeManifest` call.
+
+**Decisions.** (1) `src/lib/sim/dispatch.ts` is the one client: `dispatchExperiment` returns
+queued (with the run id), the gate's typed findings, or the reuse candidate, and throws the
+server's own words otherwise; `reusePromptText` words the reuse question once. The dispatch
+types move with it and `useSimulationRun` re-exports them. (2) What stays per caller is a
+decision, not plumbing: Run & Validate still acknowledges warnings (its verification step
+showed them) and may compute in the browser; the Lab still asks for the tick. (3)
+`validationService` grades through one preamble; the per-row and per-field shapes stay
+separate because they serve different surfaces.
+
+**Gap check.** `useSimulationRun.tsx` lost its type block and two `run_replications` lineage
+lines moved; R12 said so and they are repointed. `ExperimentDesigner` still invokes
+`sim-command` directly — it is unimported (G8) and is Phase C's. No later package changes.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |

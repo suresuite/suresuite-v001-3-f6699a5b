@@ -62,6 +62,7 @@ import { useItemMasters } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
 import { fetchValidationBaseline, useScenarios } from "@/hooks/useScenarios";
+import { dispatchExperiment, reusePromptText } from "@/lib/sim/dispatch";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
 import {
   fetchScenarioFingerprintHash,
@@ -773,95 +774,40 @@ export function RunValidateStage({
     inspection = false,
     forceRerun = false,
   ): Promise<{ runId: string; reused: boolean }> => {
-    const { data, error } = await supabase.functions.invoke("sim-command", {
-      body: {
-        project_id: projectId,
-        scenario_id: scenarioId,
-        kind: "experiment.run",
-        // Runs from this stage always follow a verification pass in which any
-        // warn-level manifest findings were displayed — that is the §8.1
-        // acknowledgment the sim-command gate requires for `recommended` gaps.
-        payload: {
-          policy_version_id: policyVersionId,
-          acknowledge_warnings: true,
-          ...(computeClient ? { compute: "client" } : {}),
-          ...(inspection ? { inspection: true } : {}),
-          ...(forceRerun ? { force_rerun: true } : {}),
-        },
-        client_ts: Date.now(),
-      },
+    if (!projectId) throw new Error("no project selected");
+    const result = await dispatchExperiment({
+      projectId,
+      scenarioId,
+      policyVersionId,
+      // Runs from this stage always follow a verification pass in which any
+      // warn-level manifest findings were displayed — that is the §8.1
+      // acknowledgment the sim-command gate requires for `recommended` gaps.
+      // The Lab asks for the tick instead; the client is shared, the decision is not.
+      acknowledgeWarnings: true,
+      compute: computeClient ? "client" : undefined,
+      inspection,
+      forceRerun,
     });
-    if (!error) {
-      const runId = (data as { run_id?: string } | null)?.run_id;
-      if (!runId) throw new Error("sim-command did not return a run_id");
-      return { runId, reused: false };
+    if (result.queued) {
+      if (!result.runId) throw new Error("sim-command did not return a run_id");
+      return { runId: result.runId, reused: false };
     }
     // Reuse-or-rerun (G17 / §9.2 read-path slice): the dispatcher found a
     // completed run with the identical (policy_hash, graph_hash, scenario
     // fingerprint, seed spec) and answers 409 instead of recomputing. Reuse
     // is ALWAYS the user's choice — never silent.
-    const reuseCtx = (error as { context?: Response }).context;
-    if (reuseCtx?.status === 409 && typeof reuseCtx.json === "function") {
-      let reuseBody: {
-        reuse_candidate?: {
-          run_id: string;
-          ended_at?: string | null;
-          code_version?: string | null;
-          rep_count_done?: number;
-        };
-      } | null = null;
-      try {
-        reuseBody = await reuseCtx.clone().json();
-      } catch {
-        /* fall through to normal error handling */
+    if (result.status === "reuse_available" && result.reuseCandidate) {
+      if (window.confirm(reusePromptText(result.reuseCandidate))) {
+        toast.success("Reusing the stored run — no recompute needed.");
+        return { runId: result.reuseCandidate.run_id, reused: true };
       }
-      const cand = reuseBody?.reuse_candidate;
-      if (cand?.run_id) {
-        const when = cand.ended_at ? new Date(cand.ended_at).toLocaleString() : "earlier";
-        const reuse = window.confirm(
-          `Identical results already exist from ${when} ` +
-            `(${cand.rep_count_done ?? "?"} replication(s), engine ${cand.code_version || "unknown"}).\n\n` +
-            `OK — reuse the stored results (no recompute).\n` +
-            `Cancel — re-run the simulation from scratch.`,
-        );
-        if (reuse) {
-          toast.success("Reusing the stored run — no recompute needed.");
-          return { runId: cand.run_id, reused: true };
-        }
-        return dispatchRun(scenarioId, policyVersionId, computeClient, inspection, true);
-      }
+      return dispatchRun(scenarioId, policyVersionId, computeClient, inspection, true);
     }
-    // Surface the server's actual response instead of supabase-js's generic
-    // "non-2xx" message — a §8.1 gate rejection carries typed findings, and
-    // operational failures carry an error string worth reading.
-    const ctx = (error as { context?: Response }).context;
-    if (ctx && typeof ctx.json === "function") {
-      let body: {
-        error?: unknown;
-        validation?: string;
-        findings?: Array<{ message: string }>;
-      } | null = null;
-      try {
-        body = await ctx.json();
-      } catch {
-        /* non-JSON body — fall through to the status line */
-      }
-      if (body?.validation) {
-        const lines = (body.findings ?? []).slice(0, 4).map((f) => f.message).join(" · ");
-        throw new Error(
-          `run rejected by the required-data gate (${body.validation}): ${lines || "see verification step"}`,
-        );
-      }
-      if (body?.error) {
-        const msg = typeof body.error === "string" ? body.error : JSON.stringify(body.error);
-        throw new Error(`sim-command HTTP ${ctx.status}: ${msg.slice(0, 300)}`);
-      }
-      throw new Error(
-        `sim-command HTTP ${ctx.status} — check the function logs in the Supabase dashboard ` +
-        `(a 503 boot error means a stale/broken function version is deployed)`,
-      );
-    }
-    throw error;
+    // A §8.1 gate rejection carries typed findings; name the first few.
+    const lines = (result.findings ?? []).slice(0, 4).map((f) => f.message).join(" · ");
+    throw new Error(
+      `run rejected by the required-data gate (${result.status}): ${lines || "see verification step"}`,
+    );
   };
 
   /** The dataset the serverless engine needs — exactly the rows the hooks

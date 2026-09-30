@@ -447,6 +447,6 @@ for one you did.
 
 ---
 
-*Generated from data contract `2a7a9dc5ba8e`, engine `0.2.8`,
+*Generated from data contract `7d86c8ed700e`, engine `0.2.8`,
 sidecar `supabase/contract/approved_users.contract.yaml`, table created by `20250815000000_approved_users_base.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

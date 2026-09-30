@@ -47,6 +47,7 @@ import { buildScenarioSeed, uniqueName, worldOf } from "@/lib/sim/scenarioSeed";
 import { useValidatedBaseline } from "@/hooks/useValidatedBaseline";
 import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/validationBaseline";
 import { runGateState } from "@/lib/sim/runGate";
+import { reusePromptText } from "@/lib/sim/dispatch";
 import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
 import {
   compileGateFindings,
@@ -225,14 +226,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       // the stored run is surfaced (it is this scenario's newest completed
       // run), on re-run we dispatch again with force_rerun.
       if (result.status === "reuse_available" && result.reuseCandidate) {
-        const c = result.reuseCandidate;
-        const when = c.ended_at ? new Date(c.ended_at).toLocaleString() : "earlier";
-        const reuse = window.confirm(
-          `Identical results already exist from ${when} ` +
-            `(${c.rep_count_done ?? "?"} replication(s), engine ${c.code_version || "unknown"}).\n\n` +
-            `OK — reuse the stored results (no recompute).\n` +
-            `Cancel — re-run the simulation from scratch.`,
-        );
+        const reuse = window.confirm(reusePromptText(result.reuseCandidate));
         if (reuse) {
           toast.success("Reusing the stored run — no recompute needed.");
           setPane("results");
