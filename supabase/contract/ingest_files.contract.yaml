@@ -212,7 +212,10 @@ fields:
     meaning: >-
       The person who uploaded the file, in `approved_users`. NULL when the
       landing had no human — an API push or a scheduled pull — which is stated
-      rather than filled with a service account.
+      rather than filled with a service account — or when the uploader's account
+      has since been DELETED: `ON DELETE SET NULL`, and the one change the
+      write-once guard admits (WP 7.2 (a), §4 D161). The file itself is not
+      touched.
     grain: identifier
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
@@ -245,6 +248,10 @@ note: >-
   session. WRITE-ONCE IS ENFORCED, NOT ASSERTED. `ingest_files_write_once()`
   refuses every UPDATE, and `supabase/rehearsal/060` proves it against a real
   database — both halves, because the rule is 'immutable' and not
-  'undeletable'. §2's tier laws have been sentences in a plan for three
+  'undeletable'. ONE EXCEPTION, SINCE `20260930000007` (WP 7.2 (a), §4 D161):
+  `uploaded_by` may go from a value to NULL, with every other column unchanged,
+  once that account no longer exists — the SET NULL of deleting the uploader.
+  Content is immutable; the actor may be anonymised. `rehearsal/480` §2 proves
+  the guard still refuses it while the account exists. §2's tier laws have been sentences in a plan for three
   phases; a sentence nothing enforces drifts within two months, which is the
   lesson of the two orphan tables.

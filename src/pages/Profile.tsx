@@ -267,7 +267,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                   <Label>Email</Label>
                   <Input value={user?.email ?? ''} disabled />
                 </div>
-                {/* D213 — the stored role is the PLATFORM level (super admin) or the account
+                {/* D215 — the stored role is the PLATFORM level (super admin) or the account
                     TIER (admin | modeler | user); My Access shows all three levels. */}
                 <div className="space-y-2">
                   <Label>{user?.role === 'super_admin' ? 'Platform role' : 'Account tier'}</Label>

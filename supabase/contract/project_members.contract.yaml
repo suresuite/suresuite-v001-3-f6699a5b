@@ -33,7 +33,7 @@ governance:
     Since D212 `admin_transfer_project` writes it too, because ownership is this
     row as well as `projects.modeler_id`: the owner becomes a standing `owner`,
     the previous owner's row is removed, and on an organization change so is the
-    row of every account outside the target organization. Since D213 the same two
+    row of every account outside the target organization. Since D215 the same two
     verbs are also reached from /admin/projects › Access, which reads every
     account with standing on ONE project at all three levels
     (`admin_project_access`); the account reads its own through
@@ -153,7 +153,7 @@ note: >-
   owner. `modeler_id` is NOT a declared foreign key to `approved_users`, so the
   backfill filters on the user existing; a project whose modeler row is gone gets
   no owner and is visible only to the organization, which is the honest outcome
-  and a §15 question worth asking. THE PROJECT LEVEL OF THREE (§4 D213): a row here
+  and a §15 question worth asking. THE PROJECT LEVEL OF THREE (§4 D215): a row here
   is the project role; `approved_users.role` is the platform level and the account
   tier, `organization_members.org_role` the role inside an organization. The rules
   that read a row here are the promotion (`ingest_apply_run`, editor or higher) and

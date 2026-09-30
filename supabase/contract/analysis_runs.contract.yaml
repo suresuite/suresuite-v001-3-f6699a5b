@@ -423,9 +423,14 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      WHO asked for this run. NOT NULL, so a run that cannot name its actor cannot
-      exist — the same stance `assert_writer_may_act` takes for the RPC writers
-      (`20260917000005`). Note what attribution means here: the application
+      WHO asked for this run. Required when the run is CREATED — a BEFORE INSERT
+      trigger, `analysis_runs_actor_required`, refuses a run that cannot name its
+      actor, the same stance `assert_writer_may_act` takes for the RPC writers
+      (`20260917000005`). NULL only afterwards, when that person's account is
+      deleted: the key is `ON DELETE SET NULL` and the identity guard admits
+      exactly that change, so the run is kept and its actor becomes unknown
+      (WP 7.2 (a), §4 D213). Until `20260930000007` the column was NOT NULL with
+      no ON DELETE rule, so nobody who had ever run an analysis could be deleted. Note what attribution means here: the application
       authenticates against `approved_users` and not Supabase Auth, so the id is
       CLIENT-ASSERTED (D28) — the database refuses a write into a project the user
       cannot reach, which is a real constraint, but it is not proof of identity.

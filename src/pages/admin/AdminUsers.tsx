@@ -11,6 +11,12 @@
 // table now uses the shared TH/TD treatment, a status dot, inline icon actions
 // (Access / Suspend-Enable) instead of ghost buttons, and the primary
 // "Add user" lives in the PageHeader actions.
+//
+// §4 D161/D213 — "Delete permanently…" is a DIFFERENT verb from Suspend, as on
+// /admin/organizations. `admin_delete_user` removes the account and its memberships;
+// what the person recorded (uploaded files, runs, lanes) is KEPT with its actor
+// anonymised — WP 7.2 (a). The dialog says so and asks for the email, which the
+// server checks.
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,9 +30,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { DIALOG_AS_SHEET, HDR_PRIMARY_BUTTON, HDR_SEARCH_INPUT } from '@/components/shared';
-import { AlertTriangle, Ban, Building2, Loader2, Plus, SlidersHorizontal, Undo2, X } from 'lucide-react';
+import { AlertTriangle, Ban, Building2, Loader2, Plus, SlidersHorizontal, Trash2, Undo2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { planRefusal } from '@/lib/auth/organizationPlan';
 import { ACCOUNT_TIERS, ALIGNMENT_HINT, ORG_ROLES, ORG_ROLE_INFO, accountTier, orgRoleLabel, platformRole, tierLabel, tierOrgMismatch } from '@/lib/auth/accessLevels';
@@ -57,7 +63,7 @@ const orgLabel = (r: Row) => {
 const allOrgNames = (r: Row) => (r.memberships ?? []).map((m) => m.name).join(', ');
 
 /**
- * D213 — the memberships where the account tier and the role in the organization say
+ * D215 — the memberships where the account tier and the role in the organization say
  * different things (the tier is what the rules read, in every organization).
  */
 const mismatches = (r: Row) => (r.memberships ?? [])
@@ -77,6 +83,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [membershipsOf, setMembershipsOf] = useState<Row | null>(null);
+  const [deleteOf, setDeleteOf] = useState<Row | null>(null);
 
   const actorArgs = () => ({ p_actor_id: actor?.id, p_actor_email: actor?.email });
 
@@ -166,7 +173,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
       }
       actions={<AddUserDialog orgs={orgs} actorArgs={actorArgs} onCreated={load} />}
     >
-      {/* D213 — the three levels this page sets, and what each role allows today. */}
+      {/* D215 — the three levels this page sets, and what each role allows today. */}
       <details className={`${SURFACE} mb-3 px-4 py-2`}>
         <summary className="flex min-h-11 cursor-pointer items-center text-[13px] font-medium md:min-h-0">
           How roles work &mdash; platform, organization, project
@@ -234,6 +241,13 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                     label: `Change account tier to ${tierLabel(role)}`,
                     onClick: () => changeRole(r, role),
                   })),
+                  ...(r.user_id === actor?.id
+                    ? []
+                    : [{
+                        label: 'Delete permanently…',
+                        tone: 'danger' as const,
+                        onClick: () => setDeleteOf(r),
+                      }]),
                 ]}
               />
             );
@@ -312,6 +326,11 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                             {active ? <Ban className="h-[15px] w-[15px]" /> : <Undo2 className="h-[15px] w-[15px]" />}
                           </button>
                         )}
+                        {r.user_id !== actor?.id && (
+                          <button title="Delete permanently…" className="hover:text-[#bf2330]" onClick={() => setDeleteOf(r)}>
+                            <Trash2 className="h-[15px] w-[15px]" />
+                          </button>
+                        )}
                       </span>
                     </td>
                   </tr>
@@ -326,12 +345,16 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
         <MembershipsDialog row={membershipsOf} orgs={orgs} actorArgs={actorArgs}
           onClose={() => setMembershipsOf(null)} onChanged={load} />
       )}
+      {deleteOf && (
+        <DeleteUserDialog row={deleteOf} actorArgs={actorArgs}
+          onClose={() => setDeleteOf(null)} onDone={load} />
+      )}
     </AdminLayout>
   );
 }
 
 /**
- * D210/D213 — one account's roles at all three levels. The platform level and the account
+ * D210/D215 — one account's roles at all three levels. The platform level and the account
  * tier are set in the table; this dialog sets the account's ORGANIZATIONS and its role in
  * each (in place, D211's `admin_set_user_org_role`: remove-and-re-add would move its active
  * organization), and points to the account's page for its PROJECT roles (D211). Adding
@@ -472,6 +495,86 @@ function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={busy}>Done</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Permanent deletion of one account (§4 D161, D213 — WP 7.2 (a)). The server refuses
+ * anything the dialog cannot promise: a wrong email, the admin's own account, a super
+ * admin, or an account that still owns projects (it names them). What the person
+ * recorded stays, with its author shown as unknown.
+ */
+function DeleteUserDialog({ row, actorArgs, onClose, onDone }: {
+  row: Row; actorArgs: () => { p_actor_id?: string; p_actor_email?: string };
+  onClose: () => void; onDone: () => void;
+}) {
+  const [typed, setTyped] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const email = row.email ?? '';
+  const isSuper = row.role === 'super_admin';
+  const matches = !!email && typed.trim().toLowerCase() === email.toLowerCase();
+  const remove = async () => {
+    if (!matches || isSuper) return;
+    setDeleting(true);
+    const { data, error } = await db.rpc('admin_delete_user', {
+      ...actorArgs(), p_target_user_id: row.user_id, p_confirm_email: typed.trim(),
+    });
+    setDeleting(false);
+    if (error) return toast.error(error.message);
+    const a = (data?.anonymised ?? {}) as Record<string, number>;
+    const kept = Number(a.files_uploaded ?? 0) + Number(a.ingest_runs ?? 0)
+      + Number(a.analysis_runs ?? 0) + Number(a.supply_chain_rows ?? 0);
+    toast.success(`Deleted ${email}${kept ? ` — ${kept} record(s) they created are kept, with the author shown as unknown` : ''}`);
+    onClose(); onDone();
+  };
+  return (
+    <Dialog open onOpenChange={(v) => !v && !deleting && onClose()}>
+      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <DialogHeader>
+          <DialogTitle>Delete “{row.name || email}” permanently</DialogTitle>
+          <DialogDescription>
+            This cannot be undone. Suspending can be reversed; deleting cannot.
+          </DialogDescription>
+        </DialogHeader>
+        {isSuper ? (
+          <p className="text-[13px] text-muted-foreground">
+            This account is a super admin. Change its role first, then delete it — the role change is where the
+            platform makes sure at least one super admin remains.
+          </p>
+        ) : (
+          <div className="grid gap-3 text-[13px]">
+            <div>
+              <p className="font-medium">Deleted, forever:</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
+                <li>the account — they will no longer be able to sign in</li>
+                <li>its organization memberships, project roles, delegations, capabilities, AI permissions and AI budget</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium">Kept, with the author shown as unknown:</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
+                <li>files they uploaded and the data promoted from them</li>
+                <li>analyses they ran and lanes they uploaded</li>
+              </ul>
+            </div>
+            <p className="text-muted-foreground">
+              The audit log keeps its entries and shows them as a deleted user. An account that still owns projects
+              cannot be deleted — transfer or delete those projects first.
+            </p>
+            <div>
+              <Label className="text-xs">Type <span className="font-mono">{email}</span> to confirm</Label>
+              <Input value={typed} onChange={(e) => setTyped(e.target.value)} className="mt-1 rounded-sm font-mono" autoFocus autoComplete="off" spellCheck={false} />
+            </div>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={deleting}>Cancel</Button>
+          <Button variant="destructive" className="rounded-sm" onClick={remove} disabled={isSuper || !matches || deleting}>
+            {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete account
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

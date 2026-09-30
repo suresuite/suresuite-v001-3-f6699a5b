@@ -1,5 +1,5 @@
 /**
- * §4 D213 — the three access levels, and what every role on each one lets a person do,
+ * §4 D215 — the three access levels, and what every role on each one lets a person do,
  * written ONCE. /profile, /admin/users, /admin/projects and the manual read it from here.
  *
  *   PLATFORM      is the account a super admin?          approved_users.role = 'super_admin'

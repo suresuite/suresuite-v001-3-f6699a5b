@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 359,
-      "migrations_applied": 351,
-      "last_migration": "20260930000007_three_access_levels.sql"
+      "migrations_found": 360,
+      "migrations_applied": 352,
+      "last_migration": "20260930000008_three_access_levels.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -430,6 +430,15 @@
           "definition": "CHECK (status IN ('running','succeeded','failed'))",
           "implicit": true,
           "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "analysis_runs_actor_user_id_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "actor_user_id"
+          ],
+          "definition": "FOREIGN KEY (actor_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL",
+          "added_by": "20260930000007_admin_delete_user.sql"
         }
       ],
       "indexes": [
@@ -889,24 +898,17 @@
         {
           "name": "actor_user_id",
           "type": "uuid",
-          "nullable": false,
+          "nullable": true,
           "default": null,
           "primary_key": false,
           "unique": false,
-          "references": {
-            "schema": "public",
-            "table": "approved_users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": null
-          },
+          "references": null,
           "added_by": "20260917000006_analysis_store.sql",
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "WHO asked for this run. NOT NULL, so a run that cannot name its actor cannot exist — the same stance `assert_writer_may_act` takes for the RPC writers (`20260917000005`). Note what attribution means here: the application authenticates against `approved_users` and not Supabase Auth, so the id is CLIENT-ASSERTED (D28) — the database refuses a write into a project the user cannot reach, which is a real constraint, but it is not proof of identity.",
+          "meaning": "WHO asked for this run. Required when the run is CREATED — a BEFORE INSERT trigger, `analysis_runs_actor_required`, refuses a run that cannot name its actor, the same stance `assert_writer_may_act` takes for the RPC writers (`20260917000005`). NULL only afterwards, when that person's account is deleted: the key is `ON DELETE SET NULL` and the identity guard admits exactly that change, so the run is kept and its actor becomes unknown (WP 7.2 (a), §4 D213). Until `20260930000007` the column was NOT NULL with no ON DELETE rule, so nobody who had ever run an analysis could be deleted. Note what attribution means here: the application authenticates against `approved_users` and not Supabase Auth, so the id is CLIENT-ASSERTED (D28) — the database refuses a write into a project the user cannot reach, which is a real constraint, but it is not proof of identity.",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
@@ -2051,7 +2053,7 @@
           "engine_requirement": null
         }
       ],
-      "note": "The table WP 1.4 found existed in production but in no migration — the authentication table, untracked for a year, discovered by the orphan rule (D4). `20250815000000_approved_users_base.sql` now builds it on a fresh database, and the parts of that file which are reconstruction rather than evidence are marked as such in it. This sidecar describes the table as the migrations now define it.",
+      "note": "The table WP 1.4 found existed in production but in no migration — the authentication table, untracked for a year, discovered by the orphan rule (D4). `20250815000000_approved_users_base.sql` now builds it on a fresh database, and the parts of that file which are reconstruction rather than evidence are marked as such in it. This sidecar describes the table as the migrations now define it. DELETING A ROW (`admin_delete_user`, `20260930000007`, WP 7.2 (a)): memberships, delegations, AI permissions and capabilities CASCADE; every actor column that records what the person did — `ingest_files.uploaded_by`, `ingest_runs`' two, `analysis_runs.actor_user_id`, `supply_chain_data.uploaded_by` and the rest — is `ON DELETE SET NULL`, so the fact stays and its actor becomes unknown; `audit_logs.actor_user_id` carries no key and keeps the uuid (§4 D161, D213).",
       "analysis_kinds": null
     },
     "audit_logs": {
@@ -9425,7 +9427,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The person who uploaded the file, in `approved_users`. NULL when the landing had no human — an API push or a scheduled pull — which is stated rather than filled with a service account.",
+          "meaning": "The person who uploaded the file, in `approved_users`. NULL when the landing had no human — an API push or a scheduled pull — which is stated rather than filled with a service account — or when the uploader's account has since been DELETED: `ON DELETE SET NULL`, and the one change the write-once guard admits (WP 7.2 (a), §4 D161). The file itself is not touched.",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
@@ -9477,7 +9479,7 @@
           "engine_requirement": null
         }
       ],
-      "note": "TIER 0, CREATED IN PHASE 3 / WP 3.1, AND NOTHING WRITES IT YET. PLAN.md §2 lists six tiers and this repository had five: there has never been a record of what a user actually uploaded. `UploadWizard` parses the file in the browser and throws it away, which is why every parse defect — D6's quoted comma, D7's blank numerics, D8's untrimmed identifiers, D46's integer `time_unit` — is unreproducible after the fact. You cannot re-read a file that was never kept. WP 3.2 is the writer: upload lands the bytes here, opens a run, and parses SERVER-SIDE. Landing the table one package ahead means that package does not have to invent a schema and a parser in the same session. WRITE-ONCE IS ENFORCED, NOT ASSERTED. `ingest_files_write_once()` refuses every UPDATE, and `supabase/rehearsal/060` proves it against a real database — both halves, because the rule is 'immutable' and not 'undeletable'. §2's tier laws have been sentences in a plan for three phases; a sentence nothing enforces drifts within two months, which is the lesson of the two orphan tables.",
+      "note": "TIER 0, CREATED IN PHASE 3 / WP 3.1, AND NOTHING WRITES IT YET. PLAN.md §2 lists six tiers and this repository had five: there has never been a record of what a user actually uploaded. `UploadWizard` parses the file in the browser and throws it away, which is why every parse defect — D6's quoted comma, D7's blank numerics, D8's untrimmed identifiers, D46's integer `time_unit` — is unreproducible after the fact. You cannot re-read a file that was never kept. WP 3.2 is the writer: upload lands the bytes here, opens a run, and parses SERVER-SIDE. Landing the table one package ahead means that package does not have to invent a schema and a parser in the same session. WRITE-ONCE IS ENFORCED, NOT ASSERTED. `ingest_files_write_once()` refuses every UPDATE, and `supabase/rehearsal/060` proves it against a real database — both halves, because the rule is 'immutable' and not 'undeletable'. ONE EXCEPTION, SINCE `20260930000007` (WP 7.2 (a), §4 D161): `uploaded_by` may go from a value to NULL, with every other column unchanged, once that account no longer exists — the SET NULL of deleting the uploader. Content is immutable; the actor may be anonymised. `rehearsal/480` §2 proves the guard still refuses it while the account exists. §2's tier laws have been sentences in a plan for three phases; a sentence nothing enforces drifts within two months, which is the lesson of the two orphan tables.",
       "analysis_kinds": null
     },
     "ingest_runs": {
@@ -17566,7 +17568,7 @@
           },
           "surfaces": [],
           "resolution": null,
-          "note": "READ BY ONE RULE: the API-key verbs (`_api_key_management_org`) let an organization `owner` or `admin` manage that organization's keys whatever the account tier. No policy and no other RPC consults it — `capabilities_for_user()` resolves through `approved_users.role`, the ACCOUNT TIER, which applies in every organization the account belongs to. So an organization `admin` holds no more than a `member` does anywhere else, and an account with the `admin` tier edits every project of an organization where this column says `member`. /admin/users and /profile flag that disagreement (§4 D213) rather than hide it; the owner's decision is that an organization admin is an owner of every project in its organization, which WP 7.1 makes the rule. Recorded rather than implied, per §5 T1.",
+          "note": "READ BY ONE RULE: the API-key verbs (`_api_key_management_org`) let an organization `owner` or `admin` manage that organization's keys whatever the account tier. No policy and no other RPC consults it — `capabilities_for_user()` resolves through `approved_users.role`, the ACCOUNT TIER, which applies in every organization the account belongs to. So an organization `admin` holds no more than a `member` does anywhere else, and an account with the `admin` tier edits every project of an organization where this column says `member`. /admin/users and /profile flag that disagreement (§4 D215) rather than hide it; the owner's decision is that an organization admin is an owner of every project in its organization, which WP 7.1 makes the rule. Recorded rather than implied, per §5 T1.",
           "engine_requirement": null
         },
         {
@@ -22554,7 +22556,7 @@
         "min_project_role": "owner",
         "audited": false,
         "rls_enabled": true,
-        "note": "There is still NO insert/update/delete POLICY, and that absence is load-bearing: D28 says every policy here is PERMISSIVE and permissive policies OR, so a \"deny writes\" policy added beside anything else would deny nothing. The ABSENCE of a policy is the enforcement. `audited: false` — a membership change writes no audit row; WP 2.3 is where that becomes true, and this table is one of the reasons it matters. Since D211 the writers are the WP 3.4 owner trigger and `admin_set_project_member` / `admin_remove_project_member` (active super admin, /admin/users/:userId), which log to `admin_audit_logs` and refuse to change the project modeler's own row. Since D212 `admin_transfer_project` writes it too, because ownership is this row as well as `projects.modeler_id`: the owner becomes a standing `owner`, the previous owner's row is removed, and on an organization change so is the row of every account outside the target organization. Since D213 the same two verbs are also reached from /admin/projects › Access, which reads every account with standing on ONE project at all three levels (`admin_project_access`); the account reads its own through `list_my_project_roles` on /profile."
+        "note": "There is still NO insert/update/delete POLICY, and that absence is load-bearing: D28 says every policy here is PERMISSIVE and permissive policies OR, so a \"deny writes\" policy added beside anything else would deny nothing. The ABSENCE of a policy is the enforcement. `audited: false` — a membership change writes no audit row; WP 2.3 is where that becomes true, and this table is one of the reasons it matters. Since D211 the writers are the WP 3.4 owner trigger and `admin_set_project_member` / `admin_remove_project_member` (active super admin, /admin/users/:userId), which log to `admin_audit_logs` and refuse to change the project modeler's own row. Since D212 `admin_transfer_project` writes it too, because ownership is this row as well as `projects.modeler_id`: the owner becomes a standing `owner`, the previous owner's row is removed, and on an organization change so is the row of every account outside the target organization. Since D215 the same two verbs are also reached from /admin/projects › Access, which reads every account with standing on ONE project at all three levels (`admin_project_access`); the account reads its own through `list_my_project_roles` on /profile."
       },
       "rls": {
         "enabled": true,
@@ -22880,7 +22882,7 @@
           "engine_requirement": null
         }
       ],
-      "note": "Backfilled from `projects.modeler_id` — every project's modeler becomes its owner. That records a fact that already held rather than granting anything new: every write policy in the schema already reads `modeler_id` as the project's owner. `modeler_id` is NOT a declared foreign key to `approved_users`, so the backfill filters on the user existing; a project whose modeler row is gone gets no owner and is visible only to the organization, which is the honest outcome and a §15 question worth asking. THE PROJECT LEVEL OF THREE (§4 D213): a row here is the project role; `approved_users.role` is the platform level and the account tier, `organization_members.org_role` the role inside an organization. The rules that read a row here are the promotion (`ingest_apply_run`, editor or higher) and the export decision (`capabilities_for_user(user, project)`); NO row-level policy does (D66), so an editor who did not create the project still cannot write its data. A row held by an account outside the project's organization is reported (`admin_project_access.in_project_org = false`) and the Access dialog offers such an account only its removal.",
+      "note": "Backfilled from `projects.modeler_id` — every project's modeler becomes its owner. That records a fact that already held rather than granting anything new: every write policy in the schema already reads `modeler_id` as the project's owner. `modeler_id` is NOT a declared foreign key to `approved_users`, so the backfill filters on the user existing; a project whose modeler row is gone gets no owner and is visible only to the organization, which is the honest outcome and a §15 question worth asking. THE PROJECT LEVEL OF THREE (§4 D215): a row here is the project role; `approved_users.role` is the platform level and the account tier, `organization_members.org_role` the role inside an organization. The rules that read a row here are the promotion (`ingest_apply_run`, editor or higher) and the export decision (`capabilities_for_user(user, project)`); NO row-level policy does (D66), so an editor who did not create the project still cannot write its data. A row held by an account outside the project's organization is reported (`admin_project_access.in_project_org = false`) and the Access dialog offers such an account only its removal.",
       "analysis_kinds": null
     },
     "project_role_capabilities": {
@@ -27834,6 +27836,15 @@
           ],
           "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
           "added_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
+        },
+        {
+          "name": "supply_chain_data_uploaded_by_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "uploaded_by"
+          ],
+          "definition": "FOREIGN KEY (uploaded_by) REFERENCES public.approved_users(id) ON DELETE SET NULL",
+          "added_by": "20260930000007_admin_delete_user.sql"
         }
       ],
       "indexes": [
@@ -28358,20 +28369,13 @@
           "default": null,
           "primary_key": false,
           "unique": false,
-          "references": {
-            "schema": "public",
-            "table": "approved_users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": null
-          },
+          "references": null,
           "added_by": "20250816052311_4c23d5ab-f132-41b1-8924-47d1d14f5a27.sql",
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The user whose upload produced this edge. Referenced by the RLS policies.",
+          "meaning": "The user whose upload produced this edge. Referenced by the RLS policies. NULL once that account is deleted (`ON DELETE SET NULL` since `20260930000007`; before it the key had no ON DELETE rule and refused the delete — §4 D213).",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
@@ -31300,5 +31304,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "7de2caf54569"
+  "contract_version": "9d452584355e"
 }

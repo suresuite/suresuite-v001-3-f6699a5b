@@ -1,4 +1,4 @@
-// §4 D213 — the three access levels side by side: every role on each level, who it is,
+// §4 D215 — the three access levels side by side: every role on each level, who it is,
 // and what it lets a person do as the rules stand today. Rendered on /profile (My Access)
 // and on /admin (Users, Projects); the words live in `src/lib/auth/accessLevels.ts`.
 import { Check, Minus } from 'lucide-react';

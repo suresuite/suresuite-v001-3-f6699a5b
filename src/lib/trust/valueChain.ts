@@ -263,7 +263,7 @@ export function buildValueChain(input: ValueChainInput): ValueChain {
     absentBecause: uploader
       ? undefined
       : row?.has_provenance
-        ? "the upload recorded no user — the identity is client-asserted (§4 D28)"
+        ? "no uploader is on record — either the landing had no user, or the uploader's account was deleted and the upload kept (§4 D161); where one is recorded it is client-asserted (§4 D28)"
         : "no upload is recorded for this row",
   });
   const approver = row?.has_provenance ? person(row.promoted_by_name, row.promoted_by_email) : null;

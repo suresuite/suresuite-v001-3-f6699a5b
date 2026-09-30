@@ -335,6 +335,9 @@ fields:
     unit_source: none
     meaning: >-
       The user whose upload produced this edge. Referenced by the RLS policies.
+      NULL once that account is deleted (`ON DELETE SET NULL` since
+      `20260930000007`; before it the key had no ON DELETE rule and refused the
+      delete — §4 D213).
     grain: identifier
     engine:
       consumed_by: null

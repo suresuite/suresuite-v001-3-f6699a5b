@@ -11,7 +11,7 @@
 
 **One row is** One person who may sign in. This is the authentication table: the product does not use Supabase Auth for its own users, so a row here IS an account — credential, role, tenant and profile in one.
 
-The table WP 1.4 found existed in production but in no migration — the authentication table, untracked for a year, discovered by the orphan rule (D4). `20250815000000_approved_users_base.sql` now builds it on a fresh database, and the parts of that file which are reconstruction rather than evidence are marked as such in it. This sidecar describes the table as the migrations now define it.
+The table WP 1.4 found existed in production but in no migration — the authentication table, untracked for a year, discovered by the orphan rule (D4). `20250815000000_approved_users_base.sql` now builds it on a fresh database, and the parts of that file which are reconstruction rather than evidence are marked as such in it. This sidecar describes the table as the migrations now define it. DELETING A ROW (`admin_delete_user`, `20260930000007`, WP 7.2 (a)): memberships, delegations, AI permissions and capabilities CASCADE; every actor column that records what the person did — `ingest_files.uploaded_by`, `ingest_runs`' two, `analysis_runs.actor_user_id`, `supply_chain_data.uploaded_by` and the rest — is `ON DELETE SET NULL`, so the fact stays and its actor becomes unknown; `audit_logs.actor_user_id` carries no key and keeps the uuid (§4 D161, D213).
 
 ## Uniqueness
 
@@ -447,6 +447,6 @@ for one you did.
 
 ---
 
-*Generated from data contract `7de2caf54569`, engine `0.2.8`,
+*Generated from data contract `9d452584355e`, engine `0.2.8`,
 sidecar `supabase/contract/approved_users.contract.yaml`, table created by `20250815000000_approved_users_base.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

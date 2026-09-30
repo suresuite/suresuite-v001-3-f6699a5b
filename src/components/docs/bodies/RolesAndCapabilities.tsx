@@ -6,7 +6,7 @@
 //
 // The three access levels and the project-role matrix are DERIVED, not
 // authored here: the levels and what each role allows come from
-// `src/lib/auth/accessLevels.ts` (§4 D213, the one place the product says them,
+// `src/lib/auth/accessLevels.ts` (§4 D215, the one place the product says them,
 // tested against the policies it restates), the matrix and the rank ladder from
 // `capabilities.generated.ts` (read out of the migration seeds — I1, D101),
 // and the screen table from the route guard itself.

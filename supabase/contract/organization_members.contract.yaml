@@ -107,7 +107,7 @@ fields:
       organization `admin` holds no more than a `member` does anywhere else, and an
       account with the `admin` tier edits every project of an organization where
       this column says `member`. /admin/users and /profile flag that disagreement
-      (§4 D213) rather than hide it; the owner's decision is that an organization
+      (§4 D215) rather than hide it; the owner's decision is that an organization
       admin is an owner of every project in its organization, which WP 7.1 makes
       the rule. Recorded rather than implied, per §5 T1.
   joined_at:

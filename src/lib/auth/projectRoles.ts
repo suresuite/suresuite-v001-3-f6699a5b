@@ -1,5 +1,5 @@
 /**
- * §4 D213 — reading and setting roles at the organization and project levels. The RPCs
+ * §4 D215 — reading and setting roles at the organization and project levels. The RPCs
  * return facts only (who holds what); what those facts let someone do is written once,
  * in `accessLevels.ts`.
  *
@@ -9,7 +9,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { projectRoleRefusal } from '@/lib/auth/accessLevels';
 
-/** One account's standing on one project, from `admin_project_access` (D213). */
+/** One account's standing on one project, from `admin_project_access` (D215). */
 export interface ProjectAccessRow {
   user_id: string;
   name: string | null;

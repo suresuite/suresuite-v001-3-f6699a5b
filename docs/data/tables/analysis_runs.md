@@ -32,6 +32,10 @@ partially or get corrected — the write fails.
 | `analysis_runs_analysis_kind_check` | `CHECK (analysis_kind ~ '^[a-z][a-z0-9_]*$')` | `20260917000006_analysis_store.sql` |
 | `analysis_runs_status_check` | `CHECK (status IN ('running','succeeded','failed'))` | `20260917000006_analysis_store.sql` |
 
+| Constraint | Kind | Definition |
+|---|---|---|
+| `analysis_runs_actor_user_id_fkey` | FOREIGN KEY | `FOREIGN KEY (actor_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL` |
+
 ## Governance
 
 | | |
@@ -86,7 +90,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `duration_ms` | — | `integer` | — | — | Wall-clock milliseconds from claim to finish. Reporting only — nothing keys on it, and a staleness rule that compared it to anything would be the timestamp comparison D12 is about. |
 | `row_counts` | — | `jsonb` | — | — | What the run produced, by entity type. Reporting and the Trust Report's input (A3); WP 4.4 assembles it. |
 | `warnings` | — | `jsonb` | — | — | The run's own account of its blind spots, carried with the result rather than left in a log — transparency commitment T3, which says every report states the known limits of its own computation. |
-| `actor_user_id` | — | `uuid` | — | — | WHO asked for this run. NOT NULL, so a run that cannot name its actor cannot exist — the same stance `assert_writer_may_act` takes for the RPC writers (`20260917000005`). Note what attribution means here: the application authenticates against `approved_users` and not Supabase Auth, so the id is CLIENT-ASSERTED (D28) — the database refuses a write into a project the user cannot reach, which is a real constraint, but it is not proof of identity. |
+| `actor_user_id` | — | `uuid` | — | — | WHO asked for this run. Required when the run is CREATED — a BEFORE INSERT trigger, `analysis_runs_actor_required`, refuses a run that cannot name its actor, the same stance `assert_writer_may_act` takes for the RPC writers (`20260917000005`). NULL only afterwards, when that person's account is deleted: the key is `ON DELETE SET NULL` and the identity guard admits exactly that change, so the run is kept and its actor becomes unknown (WP 7.2 (a), §4 D213). Until `20260930000007` the column was NOT NULL with no ON DELETE rule, so nobody who had ever run an analysis could be deleted. Note what attribution means here: the application authenticates against `approved_users` and not Supabase Auth, so the id is CLIENT-ASSERTED (D28) — the database refuses a write into a project the user cannot reach, which is a real constraint, but it is not proof of identity. |
 | `created_at` | — | `timestamp with time zone` | — | — | Row insert time, maintained by the database. |
 | `updated_at` | — | `timestamp with time zone` | — | — | Last lifecycle change. The IDENTITY columns are frozen by `analysis_runs_identity_is_immutable`; only status, finish and reporting columns move, which is the line between what a run IS and what it is DOING. |
 
@@ -279,15 +283,14 @@ The run's own account of its blind spots, carried with the result rather than le
 
 ### `actor_user_id`
 
-WHO asked for this run. NOT NULL, so a run that cannot name its actor cannot exist — the same stance `assert_writer_may_act` takes for the RPC writers (`20260917000005`). Note what attribution means here: the application authenticates against `approved_users` and not Supabase Auth, so the id is CLIENT-ASSERTED (D28) — the database refuses a write into a project the user cannot reach, which is a real constraint, but it is not proof of identity.
+WHO asked for this run. Required when the run is CREATED — a BEFORE INSERT trigger, `analysis_runs_actor_required`, refuses a run that cannot name its actor, the same stance `assert_writer_may_act` takes for the RPC writers (`20260917000005`). NULL only afterwards, when that person's account is deleted: the key is `ON DELETE SET NULL` and the identity guard admits exactly that change, so the run is kept and its actor becomes unknown (WP 7.2 (a), §4 D213). Until `20260930000007` the column was NOT NULL with no ON DELETE rule, so nobody who had ever run an analysis could be deleted. Note what attribution means here: the application authenticates against `approved_users` and not Supabase Auth, so the id is CLIENT-ASSERTED (D28) — the database refuses a write into a project the user cannot reach, which is a real constraint, but it is not proof of identity.
 
 | | |
 |---|---|
-| Type | `uuid`, `NOT NULL` |
+| Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20260917000006_analysis_store.sql` |
-| References | `public.approved_users(id)` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -329,6 +332,6 @@ Last lifecycle change. The IDENTITY columns are frozen by `analysis_runs_identit
 
 ---
 
-*Generated from data contract `7de2caf54569`, engine `0.2.8`,
+*Generated from data contract `9d452584355e`, engine `0.2.8`,
 sidecar `supabase/contract/analysis_runs.contract.yaml`, table created by `20260917000006_analysis_store.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -17,6 +17,7 @@ import {
   Code2,
   Building2,
   Check,
+  BookText,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -127,6 +128,14 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Info,
         label: "About",
         tooltip: "About",
+      },
+      // Filtered like every other item, through canAccessPage — which reads
+      // DOCS_SUPER_ADMIN_ONLY, so only a super admin sees it for now.
+      {
+        to: "/docs",
+        icon: BookText,
+        label: "Documentation",
+        tooltip: "The SuReSuite manual",
       },
     ],
   },

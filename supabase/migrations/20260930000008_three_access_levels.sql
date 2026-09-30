@@ -1,4 +1,4 @@
--- Access levels / §4 D213 — three levels, each role said once: PLATFORM, ORGANIZATION,
+-- Access levels / §4 D215 — three levels, each role said once: PLATFORM, ORGANIZATION,
 -- PROJECT — and the two reads that were missing to show them. Nothing here changes what
 -- any policy admits, and nothing here writes.
 --
@@ -108,7 +108,7 @@ BEGIN
             lower(COALESCE(au.name, au.email)), au.id;
 END; $$;
 COMMENT ON FUNCTION public.admin_project_access(uuid, text, uuid) IS
-  'D213 — everyone with standing on one project (its organization''s members, and anyone '
+  'D215 — everyone with standing on one project (its organization''s members, and anyone '
   'holding a project row or a live delegation on it) with all three levels: the account '
   'tier, the role in the project''s organization, the project role, and effective_role.';
 REVOKE ALL ON FUNCTION public.admin_project_access(uuid, text, uuid) FROM PUBLIC;
@@ -144,7 +144,7 @@ BEGIN
    ORDER BY lower(p.name), p.id;
 END; $$;
 COMMENT ON FUNCTION public.list_my_project_roles(uuid) IS
-  'D213 — the signed-in account''s project role on each project of its ACTIVE organization '
+  'D215 — the signed-in account''s project role on each project of its ACTIVE organization '
   '(the projects it can see), and whether it owns each (modeler). The user is a parameter '
   'because the browser calls as anon (D155).';
 REVOKE ALL ON FUNCTION public.list_my_project_roles(uuid) FROM PUBLIC;

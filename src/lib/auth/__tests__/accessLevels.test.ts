@@ -1,5 +1,5 @@
 /**
- * §4 D213 — the three access levels. `accessLevels.ts` RESTATES the database's rules in
+ * §4 D215 — the three access levels. `accessLevels.ts` RESTATES the database's rules in
  * words, for /profile and /admin; a restatement nothing compares is how a screen comes to
  * say something false (D103). So this reads each rule back out of the schema — the
  * policies from the introspected artifact, a function's body from the migration that
