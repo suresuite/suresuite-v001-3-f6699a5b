@@ -96,7 +96,7 @@ the cheapest `unit_price` wins, ties broken by shortest lead time ⚠.
 ### Material — from `materials` master, else links/policy
 | `cost` c_m | `materials.cost` → volume-weighted average inbound `unit_price` → cheapest supplier link (no lane volumes) → 1.0 ⚠ | master first; the weight is the lane's weekly volume rate, and a lane with no volume carries none |
 | `holding_cost_rate` | `materials.holding_cost_pct` → policy `inventory.holding_cost_pct` → 20 | ×100, clamp [5,50] |
-| `initial_on_hand` | `materials.initial_on_hand` | else engine warm-starts at S_m |
+| `initial_on_hand` | `materials.initial_on_hand` | else engine warm-starts on hand at E[D]·κ + safety stock (position at S_m) |
 
 ### Product — from `products` master, else outbound/policy
 | `unit_price` u_p | `products.sell_price` → **demand-weighted average** of `outbound_logistics.unit_price` → 1.0 ⚠ | weighted by weekly volume |

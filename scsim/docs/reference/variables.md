@@ -85,7 +85,7 @@ Plant material master — §3.4.
 | `name` | - | M | '' | — |  |
 | `cost` | €/unit | M | required | [0, ∞] | c_m at the primary source. |
 | `holding_cost_rate` | %/yr of c_m | G/M | 20.0 | [5.0, 50.0] | h_m |
-| `initial_on_hand` | units | M | — | see schema | None → initialized to the order-up-to level S_m at t=0 (warm start). |
+| `initial_on_hand` | units | M | — | see schema | None → warm start at t=0: on hand = S_m − E[D_m]·T_s = E[D_m]·κ + safety stock, pipeline primed so position = S_m. |
 
 ## §3.5 Supplier echelon — `supplier`
 
