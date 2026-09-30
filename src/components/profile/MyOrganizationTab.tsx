@@ -174,7 +174,8 @@ function ProjectsCard({ orgId, orgName, projects, projectId, onProject, userId }
       <CardHeader>
         <CardTitle>Projects</CardTitle>
         <CardDescription>
-          For each project of {orgName}: everyone who has access, where it comes from, and what they may do there.
+          For each project of {orgName}: everyone who has access, where it comes from, and what they may do in the
+          project — as they would working in {orgName}, whichever organization they are in right now.
           Super admins can reach every project and are listed only when they are recorded on it.
         </CardDescription>
       </CardHeader>
@@ -221,7 +222,7 @@ function ProjectsCard({ orgId, orgName, projects, projectId, onProject, userId }
               ) : (
                 <>
                   <p className="mb-1 text-xs text-muted-foreground">
-                    They see the project while {orgName} is the organization they are working in, and hold no project role on it.
+                    They see the project as members of {orgName}, and hold no project role on it.
                   </p>
                   <ul className="divide-y rounded-md border">
                     {orgOnly.map((p) => <PersonRow key={p.user_id} p={p} orgId={orgId} orgName={orgName} caps={access.project_capabilities} />)}
@@ -278,11 +279,11 @@ function PersonRow({ p, orgId, orgName, caps }: {
           ))}
         </div>
       )}
-      {!p.visible && p.account_active && (
+      {/* D231 — the ticks below are the rights IN THIS PROJECT, i.e. while working in
+          its organization; where the person is right now is a note, not a right. */}
+      {p.account_active && !p.in_project_org && !p.is_super_admin && (
         <div className="text-xs text-muted-foreground">
-          {p.in_project_org
-            ? `Sees the project after switching to ${orgName}.`
-            : `Does not see the project in the app: visibility follows the organization. The role still applies to uploads and to the rights below.`}
+          Not a member of {orgName}, so the project never appears for them: visibility follows the organization. The role still applies to uploads.
         </div>
       )}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

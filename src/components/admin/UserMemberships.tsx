@@ -289,11 +289,11 @@ function ProjectRow({ p, caps, onRole, onExpiry, onRemove }: {
           {m.rationale && ` · "${m.rationale}"`}
         </div>
       )}
-      {!p.visible && (
-        <div className={`mt-1.5 text-[11px] ${p.in_member_org ? 'text-muted-foreground' : 'text-[#bf2330]'}`}>
-          {p.in_member_org
-            ? `Visible when they switch to ${p.organization_name ?? 'that organization'}: visibility follows the active organization.`
-            : 'Not visible to this user in the app: they are not in this project\'s organization, and visibility follows the organization. The role still applies to uploads and to the rights below.'}
+      {/* D231 — the rights below are the rights in this project (while working in its
+          organization); where they are working right now is a note, not a right. */}
+      {!p.visible && !p.in_member_org && (
+        <div className="mt-1.5 text-[11px] text-[#bf2330]">
+          Not visible to this user in the app: they are not in this project&apos;s organization, and visibility follows the organization. The role still applies to uploads.
         </div>
       )}
 

@@ -23,8 +23,10 @@ export const PROJECT_RIGHT_LABELS: Record<ProjectRight, string> = {
 
 export interface ProjectRights {
   account_active: boolean;
-  /** "Projects: org-wide view" — the project's organization is the one the account works in. */
+  /** Sees the project while working in its organization (D231): a member of it, or a super admin. */
   visible: boolean;
+  /** The account is working in the project's organization right now (D210's active one). */
+  working_in_project_org?: boolean;
   /** "Projects: org update by owner or admin". */
   can_edit_project: boolean;
   /** The upload gate (`has_project_access`): the project's owner or an app admin. */

@@ -23,6 +23,7 @@ import { join } from "node:path";
 // @ts-expect-error — .mjs helper shared with the data-contract scripts; no types.
 import { liveDefinitions } from "../../../../scripts/data-contract/live-sql.mjs";
 import { FEATURE_CAPABILITIES } from "../../capabilities";
+import { PROJECT_ROLE_DEFAULTS } from "../../capabilities.generated";
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
 const squash = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -142,12 +143,18 @@ describe("the data_editing split", () => {
     expect(FEATURE_CAPABILITIES.map((c) => c.key)).toContain("data_editing");
   });
 
-  it("an analyst may edit policies and NOT inputs — the whole point of splitting", () => {
-    const sql = readFileSync(
-      join(ROOT, "supabase", "migrations", "20260915000005_project_membership_and_delegation.sql"), "utf8");
-    const seed = squash(sql.slice(sql.indexOf("INSERT INTO public.project_role_capabilities")));
-    expect(seed).toMatch(/\('analyst',\s*'data_edit_inputs',\s*false\)/);
-    expect(seed).toMatch(/\('analyst',\s*'data_edit_policies',\s*true\)/);
-    expect(seed).toMatch(/\('viewer',\s*'data_edit_policies',\s*false\)/);
+  it("an analyst runs simulations and edits nothing (D232); a viewer does neither", () => {
+    // The EFFECTIVE matrix — every project_role_capabilities seed with the last one
+    // winning, as in the database — not WP 2.2's first seed, which D232 superseded.
+    const grant = (role: string, key: string) =>
+      PROJECT_ROLE_DEFAULTS.find((g) => g.projectRole === role && g.capabilityKey === key)?.allowed;
+    expect(grant("analyst", "simulation_lab")).toBe(true);
+    expect(grant("analyst", "data_edit_policies")).toBe(false);
+    expect(grant("analyst", "data_edit_inputs")).toBe(false);
+    expect(grant("analyst", "export")).toBe(false);
+    expect(grant("viewer", "data_edit_policies")).toBe(false);
+    expect(grant("viewer", "simulation_lab")).toBe(false);
+    // Editing policies still needs a role above analyst.
+    expect(grant("editor", "data_edit_policies")).toBe(true);
   });
 });

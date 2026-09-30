@@ -131,10 +131,10 @@ export const PROJECT_ROLE_DEFAULTS: ProjectRoleGrant[] = [
   { projectRole: 'editor', capabilityKey: 'data_edit_inputs', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
   { projectRole: 'editor', capabilityKey: 'data_edit_policies', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
   { projectRole: 'editor', capabilityKey: 'export', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
-  { projectRole: 'analyst', capabilityKey: 'simulation_lab', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
-  { projectRole: 'analyst', capabilityKey: 'data_edit_inputs', allowed: false },  // 20260915000005_project_membership_and_delegation.sql
-  { projectRole: 'analyst', capabilityKey: 'data_edit_policies', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
-  { projectRole: 'analyst', capabilityKey: 'export', allowed: true },  // 20260915000005_project_membership_and_delegation.sql
+  { projectRole: 'analyst', capabilityKey: 'simulation_lab', allowed: true },  // 20261001000005_analyst_runs_only.sql
+  { projectRole: 'analyst', capabilityKey: 'data_edit_inputs', allowed: false },  // 20261001000005_analyst_runs_only.sql
+  { projectRole: 'analyst', capabilityKey: 'data_edit_policies', allowed: false },  // 20261001000005_analyst_runs_only.sql
+  { projectRole: 'analyst', capabilityKey: 'export', allowed: false },  // 20261001000005_analyst_runs_only.sql
   { projectRole: 'viewer', capabilityKey: 'simulation_lab', allowed: false },  // 20260915000005_project_membership_and_delegation.sql
   { projectRole: 'viewer', capabilityKey: 'data_edit_inputs', allowed: false },  // 20260915000005_project_membership_and_delegation.sql
   { projectRole: 'viewer', capabilityKey: 'data_edit_policies', allowed: false },  // 20260915000005_project_membership_and_delegation.sql
