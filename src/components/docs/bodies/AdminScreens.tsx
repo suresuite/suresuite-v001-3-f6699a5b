@@ -36,6 +36,10 @@ const WHAT: Record<string, { what: string; care?: string }> = {
     care: "A model available here can still be unusable because a budget is spent.",
   },
   "/admin/usage": { what: "Spend against budgets, over time." },
+  "/admin/docs": {
+    what: "Who may read each section of this manual — Public, Internal or Confidential — and the questions and prepared answers on its Questions & answers page.",
+    care: "An audience decides what a reader is shown, not what can be downloaded: page text ships with the app. Confidential means super admins plus the people granted Confidential Documentation on the capability screens, which nobody else holds until you grant it.",
+  },
   "/admin/audit": {
     what: "Who signed in and what they changed, over the last day, week or month — and whether the log itself is intact.",
     care: "Not every table writes here, and the identity is the one the client presented.",

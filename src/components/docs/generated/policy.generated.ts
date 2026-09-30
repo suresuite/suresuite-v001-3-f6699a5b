@@ -3663,6 +3663,11 @@ export const ADMIN_SCREENS: AdminScreens = {
       "gate": "/admin"
     },
     {
+      "path": "/admin/docs",
+      "component": "AdminDocs",
+      "gate": "/admin"
+    },
+    {
       "path": "/admin/audit",
       "component": "AdminAudit",
       "gate": "/admin"
@@ -3689,7 +3694,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 55,
+  "described": 57,
   "open": [
     {
       "table": "approved_users",
@@ -3726,6 +3731,13 @@ export const READ_EXPOSURE: ReadExposure = {
     },
     {
       "table": "dataset_versions",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "docs_section_releases",
       "roles": [
         "anon",
         "authenticated"
@@ -3848,6 +3860,7 @@ export const READ_EXPOSURE: ReadExposure = {
     "capabilities",
     "customers",
     "dataset_versions",
+    "docs_section_releases",
     "external_evidence",
     "inbound_logistics",
     "materials",

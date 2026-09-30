@@ -1,9 +1,11 @@
 // The route element behind /docs/:slug.
 //
-// Three cases, and all three are deliberate:
+// Four cases, and all four are deliberate:
 //   · a live page    → its body
 //   · a planned page → a stub naming the work package that owes it
 //   · an unknown slug → a "no such page" panel that stays inside the manual
+//   · a page in a section not released to this reader → says so, and how to
+//     get it (sign in, or ask an administrator) — docsVisibility.ts
 //
 // The stub is the interesting one. A site map that hid its unwritten pages
 // would be a smaller, tidier manual that quietly misrepresents itself — the
@@ -11,8 +13,11 @@
 // written yet". Naming the owing package makes the absence a fact rather than
 // a silence (§5.3 T3).
 
-import { useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { PageTitle, P, Key, DocLink } from "@/components/docs/prose";
 import { ALL_PAGES, DEFAULT_SLUG, getGroup, getPage } from "@/components/docs/registry";
 import { DOC_BODIES } from "@/components/docs/bodies";
@@ -72,6 +77,44 @@ function Stub({ slug }: { slug: string }) {
   );
 }
 
+/**
+ * A page in a section this reader may not open. Said plainly rather than
+ * answered with /forbidden or a 404: the page exists, the section has not been
+ * released to them, and the two things they can do about it are named.
+ */
+function NotReleased({ slug }: { slug: string }) {
+  const page = getPage(slug);
+  const { user } = useAuth();
+  const location = useLocation();
+  if (!page) return null;
+  return (
+    <>
+      <PageTitle lead={`Part of ${page.group}.`}>{page.title}</PageTitle>
+      <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <Badge variant="outline">Not available to you</Badge>
+        </div>
+        <Key>
+          {user
+            ? "This section of the manual has not been released to your account."
+            : "This section of the manual is open to signed-in users only."}
+        </Key>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          The manual is released section by section.{" "}
+          {user
+            ? "If you need it, ask your administrator for access."
+            : "Sign in to see whether your account can read it."}
+        </p>
+        {!user && (
+          <Button asChild size="sm" className="mt-3">
+            <Link to="/auth" state={{ from: location }}>Sign in</Link>
+          </Button>
+        )}
+      </div>
+    </>
+  );
+}
+
 function Unknown({ slug }: { slug: string }) {
   return (
     <>
@@ -97,8 +140,10 @@ export default function DocPage() {
   const params = useParams();
   const slug = params.slug ?? DEFAULT_SLUG;
   const page = getPage(slug);
+  const { docs } = useCapabilities();
 
   if (!page) return <Unknown slug={slug} />;
+  if (!docs.canReadSection(page.sectionKey)) return <NotReleased slug={slug} />;
 
   const Body = DOC_BODIES[slug];
   if (page.status !== "live" || !Body) return <Stub slug={slug} />;

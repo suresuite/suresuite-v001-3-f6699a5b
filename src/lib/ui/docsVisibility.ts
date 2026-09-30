@@ -1,56 +1,112 @@
 /**
- * Whether the public site advertises the manual (PLAN.md §6.5).
+ * Who may read which part of the manual (PLAN.md §6.5).
  *
- * §6.5's argument is that a prospective customer, a researcher and a new
- * modeller all ask the same opening question, and that answering it should not
- * require an account — so the manual is public and every public page links to
- * it. This flag suspends the ADVERTISING of it, not the manual itself: the
- * `/docs` routes stay served, every page still renders, and a direct URL or a
- * search result still opens. What goes away is the Docs link in the desktop top
- * bar, the Docs link in the phone drawer, the Documentation section on the
- * landing page, and the Docs link in both public footers.
+ * The manual is released SECTION BY SECTION. A super admin sets each section's
+ * audience from /admin/docs, and the answer lives in the database
+ * (`docs_section_releases`, `20260930000012`) rather than in a constant here:
  *
- * ONE CONSTANT, AND THE GATE READS IT TOO. `docsEntryPoints.test.ts` exists
- * because a link is one attribute in a nav and removing it breaks no build, no
- * type and no render — the orphaned page goes on rendering perfectly for anyone
- * who already knows the address, and nothing else in the suite would notice.
- * Deleting the markup would have meant deleting that gate, which is the same
- * failure one level up: the invariant would survive as a comment. Instead the
- * test branches on this value — with the flag on it asserts every surface links
- * to the manual, and with it off it asserts every one of those surfaces is
- * still GUARDED by this constant rather than quietly gone. Flipping this line
- * back to `true` restores the links and the original assertions together.
+ *   public        anyone, signed in or not
+ *   internal      any signed-in account
+ *   confidential  super admins, and accounts granted `docs_confidential`
  *
- * Typed `boolean` on purpose: as a literal type, TypeScript narrows every
- * `FLAG && <…>` to `false` and the guarded markup stops being typechecked.
+ * Every account that can sign in is an approved user — there is no
+ * self-sign-up — so "approved" is not a level of its own. Confidential is a
+ * GRANT, the `docs_confidential` capability, which the admin screens already
+ * edit per role, per organization and per user.
+ *
+ * FAIL CLOSED. A section with no row, a registry section the database has never
+ * heard of, and every section while the releases cannot be read, are all
+ * `confidential` — which, with nobody else holding the grant, is exactly the
+ * super-admin-only manual the old `DOCS_SUPER_ADMIN_ONLY` flag produced. The
+ * database applies the same default (`docs_section_audience`).
+ *
+ * THE RULE IS APPLIED IN ONE PLACE. `canAccessPage` in useCapabilities answers
+ * every docs path through `canReadDocsPath` below, so the route gate, the
+ * sidebar, the phone drawer and the manual's own navigation cannot disagree
+ * about who sees what (`docsAccess.test.ts`).
+ *
+ * WHAT IT PROTECTS (T3). Page bodies are compiled into the app bundle, so an
+ * audience decides what a reader is SHOWN, not what a determined person can
+ * download. The Q&A answers are the exception: they are filtered in the
+ * database by `docs_list_faq`.
  */
-export const DOCS_PUBLIC_ENTRY_POINTS: boolean = false;
+import { DOC_GROUPS, getPage } from "@/components/docs/registry";
 
-/**
- * Who may READ the manual, and where a signed-in reader finds it.
- *
- * While this is on, `/docs` (and `/help`, which redirects there) is a
- * signed-in page for super admins only — anyone else is sent to `/forbidden`,
- * and a signed-out visitor to `/auth` — and the app's sidebar and phone drawer
- * carry a "Documentation" link that only a super admin sees. The link lives in
- * the app, never on the public site: `DOCS_PUBLIC_ENTRY_POINTS` above governs
- * that, independently.
- *
- * Turning it off opens the manual to everyone again: every signed-in user sees
- * the sidebar link and `/docs` renders with no sign-in, as §6.5 intends.
- *
- * The rule is enforced in ONE place — `canAccessPage` in useCapabilities — so
- * the route guard and both navigations cannot disagree about who sees it.
- * Typed `boolean` for the same reason as the flag above.
- */
-export const DOCS_SUPER_ADMIN_ONLY: boolean = true;
+export type DocsAudience = "public" | "internal" | "confidential";
+
+export const DOCS_AUDIENCES: { value: DocsAudience; label: string; description: string }[] = [
+  { value: "public", label: "Public", description: "Anyone can read it, signed in or not." },
+  { value: "internal", label: "Internal", description: "Any signed-in user can read it." },
+  {
+    value: "confidential",
+    label: "Confidential",
+    description: "Super admins, and users granted Confidential Documentation access.",
+  },
+];
+
+/** What a section is when nothing says otherwise. */
+export const DEFAULT_DOCS_AUDIENCE: DocsAudience = "confidential";
+
+/** section key → audience, as read from `docs_section_releases`. */
+export type DocsReleases = Record<string, DocsAudience>;
+
+const RANK: Record<DocsAudience, number> = { public: 0, internal: 1, confidential: 2 };
+
+export function isDocsAudience(value: unknown): value is DocsAudience {
+  return value === "public" || value === "internal" || value === "confidential";
+}
+
+/** The highest audience a reader may see. */
+export function docsReaderLevel(reader: {
+  signedIn: boolean;
+  isSuperAdmin: boolean;
+  hasConfidentialGrant: boolean;
+}): DocsAudience {
+  if (!reader.signedIn) return "public";
+  if (reader.isSuperAdmin || reader.hasConfidentialGrant) return "confidential";
+  return "internal";
+}
+
+/** A section's audience; unknown or unreadable means confidential. */
+export function sectionAudience(releases: DocsReleases | null, sectionKey: string): DocsAudience {
+  const a = releases?.[sectionKey];
+  return isDocsAudience(a) ? a : DEFAULT_DOCS_AUDIENCE;
+}
+
+export function canReadAudience(audience: DocsAudience, level: DocsAudience): boolean {
+  return RANK[audience] <= RANK[level];
+}
+
+export function canReadSection(releases: DocsReleases | null, sectionKey: string, level: DocsAudience): boolean {
+  return canReadAudience(sectionAudience(releases, sectionKey), level);
+}
+
+/** Whether the reader can open any section at all — the manual's front door. */
+export function canReadAnySection(releases: DocsReleases | null, level: DocsAudience): boolean {
+  return DOC_GROUPS.some((g) => canReadSection(releases, g.key, level));
+}
+
+/** Whether any section is public — what the public site's Docs links follow. */
+export function hasPublicSection(releases: DocsReleases | null): boolean {
+  return DOC_GROUPS.some((g) => sectionAudience(releases, g.key) === "public");
+}
 
 /** True for `/docs`, `/docs/<slug>`, and the legacy `/help` paths that redirect there. */
 export function isDocsPath(pathname: string): boolean {
   return /^\/(docs|help)(\/|$)/.test(pathname);
 }
 
-/** Whether a reader may open the manual, given whether they are a super admin. */
-export function canReadDocs(isSuperAdmin: boolean): boolean {
-  return !DOCS_SUPER_ADMIN_ONLY || isSuperAdmin;
+/**
+ * Whether a reader may open a docs path.
+ *
+ * `/docs/<slug>` of a known page follows that page's section. Everything else
+ * under the manual — the index, an unknown slug (which DocPage answers with its
+ * own "no such page"), and the legacy `/help` redirects — follows the front
+ * door: can this reader open any section at all.
+ */
+export function canReadDocsPath(pathname: string, releases: DocsReleases | null, level: DocsAudience): boolean {
+  const m = /^\/docs\/([^/]+)\/?$/.exec(pathname);
+  const page = m ? getPage(m[1]) : undefined;
+  if (page) return canReadSection(releases, page.sectionKey, level);
+  return canReadAnySection(releases, level);
 }

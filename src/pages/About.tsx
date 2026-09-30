@@ -20,7 +20,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import HeroLattice from '@/components/about/HeroLattice';
-import { DOCS_PUBLIC_ENTRY_POINTS } from '@/lib/ui/docsVisibility';
+import { useCapabilities } from '@/hooks/useCapabilities';
 
 const ACCENT = '#BF2330';
 const KICKER = 'font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground';
@@ -247,6 +247,9 @@ function Portrait({ p }: { p: Person }) {
 }
 
 export default function About() {
+  // Docs links follow the manual's release: shown once any section is public.
+  const { docs } = useCapabilities();
+  const docsPublic = docs.anyPublic;
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       {/* Top bar — same as Landing */}
@@ -269,8 +272,8 @@ export default function About() {
               <Link to="/about">About</Link>
             </Button>
             {/* Same row as About on every public page — see Landing.tsx, and
-                hidden with it while `DOCS_PUBLIC_ENTRY_POINTS` is off. */}
-            {DOCS_PUBLIC_ENTRY_POINTS && (
+                hidden with it while no section of the manual is public. */}
+            {docsPublic && (
               <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
                 <Link to="/docs">Docs</Link>
               </Button>
@@ -428,7 +431,7 @@ export default function About() {
             <Link to="/#video" className="hover:text-foreground md:hidden">
               Demo
             </Link>
-            {DOCS_PUBLIC_ENTRY_POINTS && (
+            {docsPublic && (
               <Link to="/docs" className="hover:text-foreground">
                 Docs
               </Link>

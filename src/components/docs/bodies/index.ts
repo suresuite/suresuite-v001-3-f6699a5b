@@ -105,6 +105,7 @@ import GettingAnApiKey from "./GettingAnApiKey";
 import EndpointsAndSchemas from "./EndpointsAndSchemas";
 import RateLimitsAndIdempotency from "./RateLimitsAndIdempotency";
 import RequestLog from "./RequestLog";
+import QuestionsAndAnswers from "./QuestionsAndAnswers";
 
 export const DOC_BODIES: Record<string, ComponentType> = {
   // 1 · Overview & architecture
@@ -216,4 +217,7 @@ export const DOC_BODIES: Record<string, ComponentType> = {
   "units-and-conventions": UnitsAndConventions,
   glossary: Glossary,
   "field-index": FieldIndex,
+
+  // 16 · Questions & answers
+  questions: QuestionsAndAnswers,
 };

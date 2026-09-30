@@ -5,21 +5,21 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 363,
-      "migrations_applied": 355,
-      "last_migration": "20260930000011_my_organization_access.sql"
+      "migrations_found": 364,
+      "migrations_applied": 356,
+      "last_migration": "20260930000012_docs_release_and_questions.sql"
     },
-    "sidecars": 55,
+    "sidecars": 57,
     "registry": {
       "engine_version": "0.2.8",
       "policies": 23
     }
   },
   "counts": {
-    "tables_in_schema": 81,
-    "tables_covered": 55,
-    "columns_covered": 696,
-    "check_constraints": 54,
+    "tables_in_schema": 83,
+    "tables_covered": 57,
+    "columns_covered": 711,
+    "check_constraints": 59,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -7725,6 +7725,691 @@
         }
       ],
       "note": "TWO DISRUPTION MODELS ARE LIVE AT ONCE AND NEITHER READS THE OTHER. This table is the 2025-08-26 shape — one row per node, capacity and delay inline. The `disruption_scenario_profiles`/`_targets`/`_effects`/`_settings` group is the 2025-08-27 redesign that normalises the same idea. Nothing migrated the rows and nothing deprecates either, so a project can hold disruptions in both and a reader of one sees half the picture. Naming that is this sidecar's job; deciding it is not, and it belongs with WP 6.4's gap check.",
+      "analysis_kinds": null
+    },
+    "docs_faq": {
+      "table": "docs_faq",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One question and its prepared answer, shown on the manual's Questions & answers page. Authored by super admins from /admin/docs; readers only read.",
+      "owner": "platform",
+      "created_by": "20260930000012_docs_release_and_questions.sql",
+      "sidecar": "supabase/contract/docs_faq.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "question"
+          ],
+          "name": "docs_faq_question_key"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "docs_faq_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": null,
+        "write": "super_admin",
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "RLS on and NO policy, deliberately: an unpublished answer, or one about a section the reader may not open, must not be one PostgREST query away. Readers go through `docs_list_faq(p_user_id)`, which applies the Q&A section's audience AND the audience of the section each answer is about; super admins through `admin_list_docs_faq`. Writes are `admin_save_docs_faq` / `admin_delete_docs_faq`, each writing an `admin_audit_logs` row. The reader id is client-asserted (§4 D28), so the filter is as strong as this application's sign-in. An answer should LINK to the page that owns a fact rather than restate it (PLAN.md §6.1 rule 2) — `check:docs` cannot see database content."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "docs_faq_question_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "question"
+          ],
+          "definition": "UNIQUE (question)",
+          "added_by": "20260930000012_docs_release_and_questions.sql"
+        },
+        {
+          "name": "docs_faq_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260930000012_docs_release_and_questions.sql"
+        },
+        {
+          "name": "docs_faq_question_nonblank",
+          "kind": "CHECK",
+          "columns": [
+            "question"
+          ],
+          "definition": "CHECK (btrim(question) <> '')",
+          "implicit": true,
+          "added_by": "20260930000012_docs_release_and_questions.sql"
+        },
+        {
+          "name": "docs_faq_answer_nonblank",
+          "kind": "CHECK",
+          "columns": [
+            "answer"
+          ],
+          "definition": "CHECK (btrim(answer) <> '')",
+          "implicit": true,
+          "added_by": "20260930000012_docs_release_and_questions.sql"
+        },
+        {
+          "name": "docs_faq_section_key_shape",
+          "kind": "CHECK",
+          "columns": [
+            "section_key"
+          ],
+          "definition": "CHECK (section_key ~ '^[a-z][a-z0-9-]*$')",
+          "implicit": true,
+          "added_by": "20260930000012_docs_release_and_questions.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate id, `gen_random_uuid()`.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "question",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The question as a reader would ask it. Non-blank, and unique — the natural key, which also lets the seed re-run without duplicating.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "non-empty, unique"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "answer",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The prepared answer, as Markdown rendered with raw HTML disabled. Links into the manual are written `/docs/<slug>`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "non-empty"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "section_key",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The manual section the question is about, by registry section key, or NULL for a general question. That section's audience applies on top of the Q&A section's own, so an answer about a confidential section stays confidential.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "lowercase slug or null"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "related_slugs",
+          "type": "text[]",
+          "nullable": false,
+          "default": "'{}'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Manual pages the answer points readers to, by slug. Presentation only; an unknown slug is ignored by the reader page.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "sort_order",
+          "type": "integer",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Display order within the list. Presentation only.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "is_published",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Whether readers may see it at all. A draft is listed only to super admins.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the entry was created. Server-stamped.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the entry last changed. Server-stamped by the writer.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The super admin who created it; NULL for the seeded answers.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The super admin who last changed it; NULL for the seeded answers.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
+      "analysis_kinds": null
+    },
+    "docs_section_releases": {
+      "table": "docs_section_releases",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One section of the /docs manual and who may read it. A row per registry section KEY; a section with no row is read as confidential by the database and the client alike, so a section added later is closed until a super admin opens it.",
+      "owner": "platform",
+      "created_by": "20260930000012_docs_release_and_questions.sql",
+      "sidecar": "supabase/contract/docs_section_releases.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "section_key"
+          ],
+          "name": "docs_section_releases_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": null,
+        "write": "super_admin",
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "Read is open to anon and authenticated — the /docs gate needs it BEFORE sign-in to know whether a public section may render, and a row says only which sections are open, whose titles are already in the bundle. There is no write policy; the one writer is `admin_set_docs_section_audience`, which asserts an active super admin and writes an `admin_audit_logs` row naming them. `audited: false` means no data-plane trigger, which this tier-G table does not carry; the admin audit row is the record. What an audience protects is presentation, not secrecy: page bodies are compiled into the app bundle (PLAN.md §6.5)."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "docs_section_releases_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260930000012_docs_release_and_questions.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "docs_section_releases_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "section_key"
+          ],
+          "definition": "PRIMARY KEY (section_key)",
+          "implicit": true,
+          "added_by": "20260930000012_docs_release_and_questions.sql"
+        },
+        {
+          "name": "docs_section_releases_key_shape",
+          "kind": "CHECK",
+          "columns": [
+            "section_key"
+          ],
+          "definition": "CHECK (section_key ~ '^[a-z][a-z0-9-]*$')",
+          "implicit": true,
+          "added_by": "20260930000012_docs_release_and_questions.sql"
+        },
+        {
+          "name": "docs_section_releases_audience",
+          "kind": "CHECK",
+          "columns": [
+            "audience"
+          ],
+          "definition": "CHECK (audience IN ('public','internal','confidential'))",
+          "implicit": true,
+          "added_by": "20260930000012_docs_release_and_questions.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "section_key",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The registry's stable section key (`DocGroup.key` in `src/components/docs/registry.ts`), not §6.3's section number, so renumbering a section cannot hand its audience to another. CHECK-constrained to a lowercase slug shape; the key SET is the registry's, and `docsRelease.test.ts` compares the seed against it.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "lowercase slug"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "audience",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "`public` (anyone, signed in or not), `internal` (any signed-in account) or `confidential` (super admins and accounts holding the `docs_confidential` capability). CHECK-constrained; no DEFAULT, so a row always states its audience.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "public, internal or confidential"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the audience last changed. Server-stamped by the writer.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260930000012_docs_release_and_questions.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The super admin who last changed it. NULL for the seeded rows and after that account is deleted.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
       "analysis_kinds": null
     },
     "external_evidence": {
@@ -31363,5 +32048,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "8e55e321d029"
+  "contract_version": "babd6dc88113"
 }

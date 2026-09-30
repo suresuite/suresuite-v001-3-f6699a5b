@@ -26,16 +26,16 @@
  *   · /docs still resolves to the front door — the index route is one word,
  *     and reverting it to DocPage silently reopens the manual mid-article
  *
- * THE ADVERTISING CAN BE SWITCHED OFF, AND THIS FILE IS WHY IT IS A SWITCH.
- * `DOCS_PUBLIC_ENTRY_POINTS` (src/lib/ui/docsVisibility.ts) hides every one of
- * them at once. Hiding them by DELETING the markup would have meant
- * deleting the assertions below with it — and then the invariant §6.5 argues
- * for survives only as a comment, which is the same silent failure one level
- * up. So the flag is the single source and this gate reads it:
- *   · flag ON  — every surface links to the manual, exactly as before
- *   · flag OFF — every surface still CARRIES that markup, and every one of
- *     them is guarded by the flag, so flipping one line restores the links and
- *     these assertions together. A surface deleted outright fails either way.
+ * THE ADVERTISING FOLLOWS THE RELEASE, AND THIS FILE IS WHY IT IS NOT DELETED.
+ * Until §4 D218 a compile-time flag, `DOCS_PUBLIC_ENTRY_POINTS`, hid every
+ * surface at once. The manual is now released section by section from
+ * /admin/docs, and every surface shows its link exactly when at least one
+ * section is public — `docsPublic`, read from `docs.anyPublic` in
+ * useCapabilities. Hiding them by DELETING the markup would have meant deleting
+ * the assertions below with it, and the invariant §6.5 argues for would survive
+ * only as a comment. So every surface must still CARRY its link and be guarded
+ * by `docsPublic`; a surface deleted outright, or one whose guard was dropped,
+ * fails.
  *
  * Source text rather than a render: what is being asserted is that the LINK
  * EXISTS IN THE TREE, and a render test of Landing would need auth, viewport
@@ -45,7 +45,6 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getPage } from "../registry";
-import { DOCS_PUBLIC_ENTRY_POINTS } from "../../../lib/ui/docsVisibility";
 
 const ROOT = join(__dirname, "..", "..", "..", "..");
 const read = (...parts: string[]) => readFileSync(join(ROOT, ...parts), "utf8");
@@ -70,7 +69,7 @@ function docSlugs(source: string) {
   return [...new Set([...literal, ...fields])].filter((slug) => !slug.includes("$"));
 }
 
-const GUARD = "DOCS_PUBLIC_ENTRY_POINTS";
+const GUARD = "docsPublic";
 
 /**
  * One surface of the public site, as a SLICE of its page's source.
@@ -106,7 +105,7 @@ const SURFACES: Surface[] = [
   { name: "About footer", source: ABOUT, from: "<footer" },
 ];
 
-describe.runIf(DOCS_PUBLIC_ENTRY_POINTS)("the public site points at the manual", () => {
+describe("the public site points at the manual", () => {
   it.each([
     ["Landing.tsx", LANDING],
     ["About.tsx", ABOUT],
@@ -134,25 +133,25 @@ describe.runIf(DOCS_PUBLIC_ENTRY_POINTS)("the public site points at the manual",
   });
 });
 
-describe.runIf(!DOCS_PUBLIC_ENTRY_POINTS)("the manual is hidden by the flag, not by deletion", () => {
+describe("the links follow the release, not a deletion", () => {
   it.each([
     ["Landing.tsx", LANDING],
     ["About.tsx", ABOUT],
-  ])("%s reads the flag rather than hard-coding the answer", (_name, source) => {
-    expect(source).toContain(GUARD);
+  ])("%s reads the release rather than hard-coding the answer", (_name, source) => {
+    expect(source).toContain("const docsPublic = docs.anyPublic;");
   });
 
   it.each(SURFACES.map((s) => [s.name, s] as const))("%s still carries the link, guarded", (_name, surface) => {
     const slice = cut(surface);
     expect(
       slice,
-      `${surface.name} no longer mentions /docs at all. The flag is meant to be ` +
-        `flipped back — hiding a surface means guarding its markup, not deleting it.`,
+      `${surface.name} no longer mentions /docs at all. Hiding a surface means ` +
+        `guarding its markup with ${GUARD}, not deleting it.`,
     ).toMatch(/to="\/docs"/);
     expect(
       slice,
       `${surface.name} links /docs but names no ${GUARD}. Either the guard was ` +
-        `removed — the link is live again while the flag says it is not — or the ` +
+        `removed — the link shows while no section is public — or the ` +
         `surface was rewritten without one.`,
     ).toContain(GUARD);
   });

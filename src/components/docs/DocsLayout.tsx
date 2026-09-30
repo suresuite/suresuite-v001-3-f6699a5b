@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useCapabilities } from "@/hooks/useCapabilities";
+import { DocsReaderContext } from "@/components/docs/docsReader";
 import {
   Search, ChevronRight, ArrowLeft, ArrowRight, X,
   PanelLeftClose, PanelLeftOpen, BookText,
@@ -114,9 +115,12 @@ function FontSizeControl({
 
 function DocsSearch() {
   const navigate = useNavigate();
+  const { docs } = useCapabilities();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
-  const results = useMemo(() => searchPages(q), [q]);
+  // Only sections this reader may open: a result that lands on "not available
+  // to you" is a result that should not have been offered.
+  const results = useMemo(() => searchPages(q, docs.canReadSection), [q, docs.canReadSection]);
 
   function go(slug: string) {
     navigate(`/docs/${slug}`);
@@ -203,12 +207,16 @@ function NavTree({ activeSlug, onNavigate }: { activeSlug: string; onNavigate: (
   // empty rather than being seeded with fourteen `true`s.
   // Falls back to 1 so an unknown slug still shows an open section rather than
   // fifteen closed ones — the reader who mistyped a URL needs the nav most.
-  const activeSection = getPage(activeSlug)?.section ?? 1;
+  const { docs } = useCapabilities();
+  // Sections this reader may not open are left out entirely — released
+  // section by section from /admin/docs (docsVisibility.ts).
+  const groups = DOC_GROUPS.filter((g) => docs.canReadSection(g.key));
+  const activeSection = getPage(activeSlug)?.section ?? groups[0]?.section ?? 1;
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   return (
     <nav className="text-sm">
       <ul className="space-y-4">
-        {DOC_GROUPS.map((g) => {
+        {groups.map((g) => {
           const isCollapsed = collapsed[g.group] ?? g.section !== activeSection;
           return (
             <li key={g.group}>
@@ -367,7 +375,10 @@ export default function DocsLayout() {
   const page = getPage(slug);
   const contentRef = useRef<HTMLDivElement>(null);
   const { headings, activeId } = useHeadings(contentRef, slug);
-  const { prev, next } = prevNext(slug);
+  const { docs } = useCapabilities();
+  const { user } = useAuth();
+  const reader = useMemo(() => ({ userId: user?.id ?? null }), [user?.id]);
+  const { prev, next } = prevNext(slug, docs.canReadSection);
 
   // Closed by default. The aside is `lg:block`, so this state only governs
   // phone and tablet — where an open tree pushes the page itself below the
@@ -399,7 +410,7 @@ export default function DocsLayout() {
   // reader is not on.
   const related = (isHome ? [] : (page?.related ?? []))
     .map((s) => getPage(s))
-    .filter((p): p is NonNullable<typeof p> => Boolean(p));
+    .filter((p): p is NonNullable<typeof p> => Boolean(p) && docs.canReadSection(p.sectionKey));
 
   return (
     <div className="flex min-h-[calc(100dvh-2.5rem)] flex-col bg-background text-foreground">
@@ -462,7 +473,9 @@ export default function DocsLayout() {
           )}
 
           <div ref={contentRef} style={{ zoom: FONT_STEPS[fontStep] }} className="m-cq space-y-6">
-            <Outlet />
+            <DocsReaderContext.Provider value={reader}>
+              <Outlet />
+            </DocsReaderContext.Provider>
           </div>
 
           {/* Prev / next pager */}
