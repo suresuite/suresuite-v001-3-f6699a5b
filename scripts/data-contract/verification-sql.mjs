@@ -1927,10 +1927,14 @@ async function wp42Landed() {
           "adoption either until an analyzer is the caller.**",
       );
     }
+    // Not a gate since `20260930000007` (WP 7.2 (a), §4 D213): deleting an account
+    // anonymises the runs it asked for, so a NULL actor is what an erasure LOOKS like.
+    // "A run is created naming who asked" moved from NOT NULL to the BEFORE INSERT
+    // trigger `analysis_runs_actor_required`, which `rehearsal/480` §2 proves.
     if (Number(r.runs_with_no_actor) > 0) {
-      gateFailures.push(
-        `WP 4.2: ${r.runs_with_no_actor} run(s) carry no actor, which the NOT NULL ` +
-        "column should make impossible. `audit-actor` (G4) is failing in a new place.",
+      out(
+        `- ${r.runs_with_no_actor} run(s) have no actor: the account that asked for each ` +
+          "was deleted and the run kept (WP 7.2 (a)). A run cannot be CREATED without one.",
       );
     }
   });

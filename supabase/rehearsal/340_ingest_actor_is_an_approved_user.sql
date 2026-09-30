@@ -22,6 +22,7 @@ DECLARE
   v_run2    uuid;
   v_seen    uuid;
   v_rows    integer;
+  v_file    jsonb;
 BEGIN
   -- ══ §1 · an uploader who is NOT in auth.users can land a file ══
   --
@@ -31,7 +32,7 @@ BEGIN
   INSERT INTO public.approved_users (id, name, email, password_hash, role) VALUES
     (v_user,  'WP65 uploader', 'wp65@example.invalid',  'x', 'user'),
     -- A second actor who triggers a run and uploads no file. §3 needs one (see the note
-    -- there): the uploader from §1 cannot be deleted at all, which is D161.
+    -- there): deleting the uploader from §1 is D161's question, answered in §4.
     (v_user2, 'WP65 trigger',  'wp65b@example.invalid', 'x', 'user');
   INSERT INTO public.projects (id, name, modeler_id, plant_name)
     VALUES (v_project, 'WP65 landing', v_user, 'WP65');
@@ -113,9 +114,10 @@ BEGIN
   --     `ingest_files.uploaded_by` is also `ON DELETE SET NULL`, and `ingest_files` is
   --     TIER 0 and write-once, enforced by `ingest_files_write_once()`. So deleting a user
   --     who has ever uploaded a file makes PostgreSQL attempt an UPDATE on a tier-0 row and
-  --     the trigger REFUSES it: **that user cannot be deleted at all.** Using the landed
-  --     run from §1 here would have measured that collision instead of this key. It is
-  --     recorded as its own defect rather than worked around silently.
+  --     the trigger REFUSED it: **that user could not be deleted at all.** Using the landed
+  --     run from §1 here would have measured that collision instead of this key. It was
+  --     recorded as its own defect rather than worked around silently, and §4 is where
+  --     its decision (WP 7.2 (a), `20260930000007`) is asserted.
   INSERT INTO public.ingest_runs (project_id, source_kind, triggered_by, triggered_by_user_id)
     VALUES (v_project, 'csv', 'manual', v_user2)
     RETURNING id INTO v_run2;
@@ -135,27 +137,36 @@ BEGIN
 
   RAISE NOTICE 'WP 6.5a/320 §3: deleting the actor leaves the run with an unknown actor rather than deleting it';
 
-  -- ══ §4 · D161, PINNED AS THE COLLISION IT IS ══
+  -- ══ §4 · D161, DECIDED: THE UPLOADER IS ANONYMISED, THE FILE IS NOT TOUCHED ══
   --
-  -- The uploader from §1 has an `ingest_files` row, so deleting them is refused by the
-  -- tier-0 write-once trigger rather than by anything about identity. This asserts that
-  -- refusal so the defect cannot be "fixed" by accident without this file noticing, and so
-  -- the day somebody decides what erasure means for tier-0 provenance, the assertion tells
-  -- them which decision they changed.
-  BEGIN
-    DELETE FROM public.approved_users WHERE id = v_user;
+  -- Until `20260930000007` this section asserted the COLLISION: the uploader from §1 has
+  -- an `ingest_files` row, so deleting them was refused by the tier-0 write-once trigger
+  -- rather than by anything about identity. It was pinned so that the day somebody
+  -- decided what erasure means for tier-0 provenance, this file would say which decision
+  -- they changed — and it did, the first time it ran against that migration.
+  --
+  -- The decision is WP 7.2's option (a): content is immutable, the ACTOR may be
+  -- anonymised. So the delete now succeeds, and what this asserts is the half that keeps
+  -- tier 0 meaning something: the file row survives with `uploaded_by` NULL and every
+  -- other column exactly as it was. `rehearsal/480` §2 asserts the other half — that the
+  -- guard still refuses the same UPDATE while the uploader's account exists.
+  SELECT to_jsonb(f) - 'uploaded_by' INTO v_file
+    FROM public.ingest_files f JOIN public.ingest_runs r ON r.id = f.ingest_run_id
+   WHERE r.id = v_run;
+
+  DELETE FROM public.approved_users WHERE id = v_user;
+
+  SELECT count(*) INTO v_rows
+    FROM public.ingest_files f
+   WHERE f.ingest_run_id = v_run
+     AND f.uploaded_by IS NULL
+     AND (to_jsonb(f) - 'uploaded_by') = v_file;
+  IF v_rows <> 1 THEN
     RAISE EXCEPTION
-      'WP 6.5a/320 §4: a user with an ingest_files row WAS deleted. D161 says the tier-0 write-once trigger refuses the SET NULL that deletion requires — if that changed, the tier-0 immutability rule or the key changed with it, and this file needs rewriting rather than passing.';
-  EXCEPTION WHEN restrict_violation THEN
-    -- `ingest_files_write_once()` raises `USING ERRCODE = 'restrict_violation'`
-    -- (`20260916000013`). The first draft caught `raise_exception` — the default for a bare
-    -- RAISE — so it caught nothing and the error escaped the block, which is how this was
-    -- found. The message is checked as well as the code, so an unrelated
-    -- `restrict_violation` cannot read as this one.
-    IF position('tier 0' IN SQLERRM) = 0 THEN RAISE; END IF;
-  END;
+      'WP 6.5a/320 §4: after deleting the uploader, the landed file is gone, still names them, or changed in some other column — WP 7.2 (a) anonymises the actor and nothing else (D161)';
+  END IF;
 
-  RAISE NOTICE 'WP 6.5a/320 §4: a user who has uploaded a file cannot be deleted — D161, pinned not fixed';
+  RAISE NOTICE 'WP 6.5a/320 §4: deleting the uploader leaves the tier-0 file intact with an unknown uploader — D161, decided as WP 7.2 (a)';
 
-  RAISE NOTICE 'WP 6.5a · 320: a real uploader can land, both keys point at approved_users, and the record outlives the person; D161 pinned — 4 section(s)';
+  RAISE NOTICE 'WP 6.5a · 320: a real uploader can land, both keys point at approved_users, and the record outlives the person; D161 decided as (a) — 4 section(s)';
 END $wp65pre$;

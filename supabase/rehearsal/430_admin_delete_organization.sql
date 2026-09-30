@@ -7,17 +7,18 @@
 --
 --   §1 REFUSALS, each leaving everything in place: a non-super-admin; a confirmation
 --      that is not the slug; the acting admin's own organization; an organization
---      holding a super admin; an account recorded as the uploader of a row in ANOTHER
---      organization's project (the refusal names the account, rather than a foreign key
---      on some other table).
+--      holding a super admin. (Until `20260930000007` it also refused an account recorded
+--      as the uploader of a row in ANOTHER organization's project, because no foreign key
+--      there let go. Under WP 7.2 (a) they all do, so §3 asserts that row is KEPT with
+--      its uploader anonymised instead — §4 D213.)
 --   §2 ATOMIC: a failure at the LAST step (the organization row) leaves every project,
 --      every account and every lane in place.
 --   §3 THE DELETE: the organization, both its accounts, its project, the org-less
 --      project one of its accounts owned, its API key, capability, membership and AI
 --      budgets are gone; no project-scoped table holds a row of either project —
---      including an uploader's landed file (D161 does not bite: the cascade removes the
---      file before the account); the OTHER organization, its project and its lanes are
---      untouched.
+--      including an uploader's landed file (the cascade removes the file with its
+--      project); the OTHER organization, its project and its lanes are untouched, except
+--      that the lane row a deleted account uploaded there now has no uploader (D213).
 --   §4 ATTRIBUTION: the admin log records `org.delete` with what was removed, and every
 --      data-plane delete row names the super admin — with the session actor blanked
 --      first, so the check cannot pass on a value the setup left behind.
@@ -137,16 +138,9 @@ BEGIN
   UPDATE public.approved_users SET organization_id = v_kept, organization = 'D208 Kept' WHERE id = v_super2;
 
   -- The modeler is recorded as the uploader of a lane row in the KEPT org's project.
+  -- This used to be a refusal; since WP 7.2 (a) it is anonymised — §3 reads it back.
   INSERT INTO public.supply_chain_data (project_id, plant_name, from_location, to_location, uploaded_by)
     VALUES (v_q, 'D208Q', 'X', 'Y', v_mod);
-  v_code := NULL; v_msg := NULL;
-  BEGIN PERFORM public.admin_delete_organization(v_super, 'd208s@example.invalid', v_doomed, v_slug);
-  EXCEPTION WHEN OTHERS THEN v_code := SQLSTATE; v_msg := SQLERRM; END;
-  IF v_code IS DISTINCT FROM '23503' OR v_msg NOT LIKE '%d208m@example.invalid%' THEN
-    RAISE EXCEPTION 'D208/430 §1: an account with work in another organization''s project ended with % (%), expected 23503 naming the account',
-      COALESCE(v_code, '(none)'), COALESCE(v_msg, '');
-  END IF;
-  DELETE FROM public.supply_chain_data WHERE project_id = v_q AND uploaded_by = v_mod;
 
   IF NOT EXISTS (SELECT 1 FROM public.organizations WHERE id = v_doomed)
      OR NOT EXISTS (SELECT 1 FROM public.approved_users WHERE id = v_mod)
@@ -234,6 +228,10 @@ BEGIN
       RAISE EXCEPTION 'D208/430 §3: the OTHER organization''s project lost its % rows', v_tbl;
     END IF;
   END LOOP;
+  IF (SELECT count(*) FROM public.supply_chain_data
+       WHERE project_id = v_q AND from_location = 'X' AND to_location = 'Y' AND uploaded_by IS NULL) <> 1 THEN
+    RAISE EXCEPTION 'D208/430 §3: the lane row a deleted account uploaded into the OTHER organization''s project is gone or still names them — WP 7.2 (a) keeps it, anonymised (D213)';
+  END IF;
 
   -- ══ §4 · attribution ══
   SELECT count(*) INTO v_n FROM public.audit_logs

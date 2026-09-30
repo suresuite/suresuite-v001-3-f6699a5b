@@ -667,22 +667,15 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "actor_user_id",
         "type": "uuid",
-        "nullable": false,
+        "nullable": true,
         "unit": null,
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "WHO asked for this run. NOT NULL, so a run that cannot name its actor cannot exist — the same stance `assert_writer_may_act` takes for the RPC writers (`20260917000005`). Note what attribution means here: the application authenticates against `approved_users` and not Supabase Auth, so the id is CLIENT-ASSERTED (D28) — the database refuses a write into a project the user cannot reach, which is a real constraint, but it is not proof of identity.",
+        "meaning": "WHO asked for this run. Required when the run is CREATED — a BEFORE INSERT trigger, `analysis_runs_actor_required`, refuses a run that cannot name its actor, the same stance `assert_writer_may_act` takes for the RPC writers (`20260917000005`). NULL only afterwards, when that person's account is deleted: the key is `ON DELETE SET NULL` and the identity guard admits exactly that change, so the run is kept and its actor becomes unknown (WP 7.2 (a), §4 D213). Until `20260930000007` the column was NOT NULL with no ON DELETE rule, so nobody who had ever run an analysis could be deleted. Note what attribution means here: the application authenticates against `approved_users` and not Supabase Auth, so the id is CLIENT-ASSERTED (D28) — the database refuses a write into a project the user cannot reach, which is a real constraint, but it is not proof of identity.",
         "primaryKey": false,
         "unique": false,
-        "references": {
-          "schema": "public",
-          "table": "approved_users",
-          "columns": [
-            "id"
-          ],
-          "onDelete": null
-        },
+        "references": null,
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null,
@@ -5914,7 +5907,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The person who uploaded the file, in `approved_users`. NULL when the landing had no human — an API push or a scheduled pull — which is stated rather than filled with a service account.",
+        "meaning": "The person who uploaded the file, in `approved_users`. NULL when the landing had no human — an API push or a scheduled pull — which is stated rather than filled with a service account — or when the uploader's account has since been DELETED: `ON DELETE SET NULL`, and the one change the write-once guard admits (WP 7.2 (a), §4 D161). The file itself is not touched.",
         "primaryKey": false,
         "unique": false,
         "references": {
@@ -18241,17 +18234,10 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The user whose upload produced this edge. Referenced by the RLS policies.",
+        "meaning": "The user whose upload produced this edge. Referenced by the RLS policies. NULL once that account is deleted (`ON DELETE SET NULL` since `20260930000007`; before it the key had no ON DELETE rule and refused the delete — §4 D213).",
         "primaryKey": false,
         "unique": false,
-        "references": {
-          "schema": "public",
-          "table": "approved_users",
-          "columns": [
-            "id"
-          ],
-          "onDelete": null
-        },
+        "references": null,
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null,
