@@ -44,7 +44,7 @@ partially or get corrected — the write fails.
 | Row-level security | enabled |
 | Policies on the table | 2 — all carry a predicate |
 
-A member may read only their OWN membership row (`user_id = get_current_user_id()`); there is no policy letting a member enumerate who else is in their organization, and the admin pages that do so run through super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member` and friends log through `log_admin_action`, but membership rows are also written by the `20260709000002` backfill and by nothing else that audits, so the general claim fails. WP 2.3 is where it becomes true.
+A member may read only their OWN membership row (`user_id = get_current_user_id()`); there is no policy letting a member enumerate who else is in their organization, and the admin pages that do so run through super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member` and friends log through `log_admin_action`, but membership rows are also written by the `20260709000002` backfill and by nothing else that audits, so the general claim fails. WP 2.3 is where it becomes true. Since D211 an account's `org_role` in each of its organizations is also set by `admin_set_user_org_role` (active super admin, /admin/users/:userId), logged to `admin_audit_logs`.
 
 <details><summary>2 RLS policies</summary>
 
@@ -135,7 +135,7 @@ for one you did.
 |---|---|---|---|
 | a member row is inserted without a role | 'member' — the least of the three | `default` | the column default, and the admin member list renders the resulting role verbatim |
 
-> READ BY ONE RULE: the API-key verbs (`_api_key_management_org`) let an organization `owner` or `admin` manage that organization's keys whatever the account tier. No policy and no other RPC consults it — `capabilities_for_user()` resolves through `approved_users.role`, the ACCOUNT TIER, which applies in every organization the account belongs to. So an organization `admin` holds no more than a `member` does anywhere else, and an account with the `admin` tier edits every project of an organization where this column says `member`. /admin/users and /profile flag that disagreement (§4 D211) rather than hide it; the owner's decision is that an organization admin is an owner of every project in its organization, which WP 7.1 makes the rule. Recorded rather than implied, per §5 T1.
+> READ BY ONE RULE: the API-key verbs (`_api_key_management_org`) let an organization `owner` or `admin` manage that organization's keys whatever the account tier. No policy and no other RPC consults it — `capabilities_for_user()` resolves through `approved_users.role`, the ACCOUNT TIER, which applies in every organization the account belongs to. So an organization `admin` holds no more than a `member` does anywhere else, and an account with the `admin` tier edits every project of an organization where this column says `member`. /admin/users and /profile flag that disagreement (§4 D213) rather than hide it; the owner's decision is that an organization admin is an owner of every project in its organization, which WP 7.1 makes the rule. Recorded rather than implied, per §5 T1.
 
 ### `joined_at`
 
@@ -153,6 +153,6 @@ When the membership was created. Server-stamped.
 
 ---
 
-*Generated from data contract `995735d1046b`, engine `0.2.8`,
+*Generated from data contract `7de2caf54569`, engine `0.2.8`,
 sidecar `supabase/contract/organization_members.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

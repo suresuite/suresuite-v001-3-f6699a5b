@@ -1,4 +1,4 @@
-// §4 D211 — /profile › My Access: the signed-in account's roles at all three levels, and
+// §4 D213 — /profile › My Access: the signed-in account's roles at all three levels, and
 // what they let it do on each project of its current organization, with the reason.
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Check, Loader2, Minus } from 'lucide-react';
@@ -109,10 +109,10 @@ export function MyRolesCard() {
             ) : (
               <ul className="space-y-2">
                 {projects.map((p) => {
-                  const rights = projectRights({ accountRole: role, inProjectOrg: true, isCreator: p.is_creator, effectiveRole: p.effective_role })
+                  const rights = projectRights({ accountRole: role, inProjectOrg: true, isModeler: p.is_modeler, effectiveRole: p.effective_role })
                     .filter((r) => r.key !== 'see');
                   const source = roleSource({
-                    isCreator: p.is_creator, memberRole: p.member_role, delegatedRole: p.delegated_role,
+                    isModeler: p.is_modeler, memberRole: p.member_role, delegatedRole: p.delegated_role,
                     accountRole: role, effectiveRole: p.effective_role,
                   });
                   return (

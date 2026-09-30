@@ -6,7 +6,7 @@
 //
 // The three access levels and the project-role matrix are DERIVED, not
 // authored here: the levels and what each role allows come from
-// `src/lib/auth/accessLevels.ts` (§4 D211, the one place the product says them,
+// `src/lib/auth/accessLevels.ts` (§4 D213, the one place the product says them,
 // tested against the policies it restates), the matrix and the rank ladder from
 // `capabilities.generated.ts` (read out of the migration seeds — I1, D101),
 // and the screen table from the route guard itself.
@@ -276,7 +276,7 @@ export default function RolesAndCapabilities() {
           those decisions are judged against. Roles can also be lent for a time — a delegation
           only <em>subtracts</em> (never more than the grantor holds) and always expires.{" "}
           <DocLink to="project-access">Project access</DocLink> has the two rules, the columns of
-          both tables, and where a super administrator sets them (Projects &rarr; Access). Delegation has no screen yet.
+          both tables, and where a super administrator sets them (a person&rsquo;s page, or Projects &rarr; Access &amp; roles). Delegation has no screen yet.
         </P>
         <Callout title="One gate reads the ladder today">
           <p>

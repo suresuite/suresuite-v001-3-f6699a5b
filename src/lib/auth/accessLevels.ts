@@ -1,5 +1,5 @@
 /**
- * §4 D211 — the three access levels, and what every role on each one lets a person do,
+ * §4 D213 — the three access levels, and what every role on each one lets a person do,
  * written ONCE. /profile, /admin/users, /admin/projects and the manual read it from here.
  *
  *   PLATFORM      is the account a super admin?          approved_users.role = 'super_admin'
@@ -18,8 +18,9 @@
  *   see a project     `Projects: org-wide view` — the project's organization is the
  *                     account's CURRENT one (org_is_current_user_org)
  *   edit its data     the write policies on projects and every project table, and
- *                     has_project_access (the CSV landing): the project's creator
- *                     (`modeler_id`) or an account whose tier is `admin`
+ *                     has_project_access (the CSV landing): the project's owner
+ *                     (`modeler_id` — its creator, or whoever it was transferred to,
+ *                     D212) or an account whose tier is `admin`
  *   promote an upload ingest_apply_run: effective_project_role ≥ editor
  *   export            record_export → capabilities_for_user(user, project): a project role,
  *                     when held, decides; otherwise the account tier's default
@@ -70,7 +71,7 @@ export const LEVELS: LevelInfo[] = [
     key: 'project',
     label: 'Project',
     question: 'What may this person do on one project?',
-    where: 'A project role on each project (Owner, Editor, Analyst or Viewer). A project’s creator is always its Owner.',
+    where: 'A project role on each project (Owner, Editor, Analyst or Viewer). The project’s owner — its creator, or whoever it was transferred to — always holds Owner.',
   },
 ];
 
@@ -86,7 +87,7 @@ export const PLATFORM_ROLES: Record<'super_admin' | 'standard', RoleInfo> = {
     ],
     cannot: [
       'See another organization’s projects on the regular pages — those follow the organization you have switched to',
-      'Create a project, or edit one it did not create, on the regular pages: the write rules name the Admin tier and the creator, not Super admin',
+      'Create a project, or edit one it does not own, on the regular pages: the write rules name the Admin tier and the project’s owner, not Super admin',
     ],
   },
   standard: {
@@ -118,11 +119,11 @@ export const ACCOUNT_TIERS: Record<AccountTier, RoleInfo> = {
     can: [
       'See every project in the current organization',
       'Create projects, and becomes their Owner',
-      'Edit, upload to and delete the projects they created',
+      'Edit, upload to and delete the projects they own (created, or transferred to them)',
       'Manage the organization’s API keys',
     ],
     cannot: [
-      'Edit a project someone else created — not even with the project role Editor (planned: WP 7.1)',
+      'Edit a project someone else owns — not even with the project role Editor (planned: WP 7.1)',
     ],
   },
   user: {
@@ -165,7 +166,7 @@ export const ORG_ROLE_INFO: Record<OrgRole, RoleInfo> = {
 export const PROJECT_ROLE_INFO: Record<ProjectRole, RoleInfo> = {
   owner: {
     label: 'Owner',
-    summary: 'Full standing on the project. Its creator is always an Owner.',
+    summary: 'Full standing on the project. The project’s owner always holds it.',
     can: ['Promote uploaded CSVs into the project', 'Export from the project'],
     cannot: [],
   },
@@ -173,7 +174,7 @@ export const PROJECT_ROLE_INFO: Record<ProjectRole, RoleInfo> = {
     label: 'Editor',
     summary: 'Maintains the project’s data.',
     can: ['Promote uploaded CSVs into the project', 'Export from the project'],
-    cannot: ['Edit the data directly unless they created the project or hold the Admin tier (planned: WP 7.1)'],
+    cannot: ['Edit the data directly unless they own the project or hold the Admin tier (planned: WP 7.1)'],
   },
   analyst: {
     label: 'Analyst',
@@ -192,7 +193,7 @@ export const PROJECT_ROLE_INFO: Record<ProjectRole, RoleInfo> = {
 /** The note every project-role surface carries, because the level is only partly live. */
 export const PROJECT_LEVEL_NOTE =
   'Today a project role decides who may promote an uploaded CSV (Editor or higher) and who may export. ' +
-  'Editing a project’s data still follows the organization level: its creator, or an account with the Admin tier. ' +
+  'Editing a project’s data still follows the organization level: its owner, or an account with the Admin tier. ' +
   'Planned (WP 7.1): the project role decides editing too, and an organization admin is an Owner of every project in its organization.';
 
 /** D28 — the rules are real rules, but the database cannot yet verify who is asking. */
@@ -274,7 +275,8 @@ export interface ProjectStanding {
   accountRole: string | null | undefined;
   /** The account is a member of the project's organization. */
   inProjectOrg: boolean;
-  isCreator: boolean;
+  /** The account owns the project (`projects.modeler_id`). */
+  isModeler: boolean;
   /** What effective_project_role() returned. */
   effectiveRole: string | null | undefined;
 }
@@ -295,13 +297,13 @@ export function projectRights(s: ProjectStanding): Right[] {
 
   let edit: Right;
   if (!s.inProjectOrg) edit = { key: 'edit', label: 'Edit data & upload', allowed: false, because: 'not a member of its organization' };
-  else if (s.isCreator) edit = { key: 'edit', label: 'Edit data & upload', allowed: true, because: 'created the project' };
+  else if (s.isModeler) edit = { key: 'edit', label: 'Edit data & upload', allowed: true, because: 'owns the project' };
   else if (tier === 'admin') edit = { key: 'edit', label: 'Edit data & upload', allowed: true, because: 'Admin account tier' };
-  else if (isSuperAdmin(s.accountRole)) edit = { key: 'edit', label: 'Edit data & upload', allowed: false, because: 'the rule names the creator and the Admin tier, not Super admin — use /admin' };
-  else edit = { key: 'edit', label: 'Edit data & upload', allowed: false, because: `only the creator or an Admin-tier account${role ? `; a ${roleText} does not count yet` : ''}` };
+  else if (isSuperAdmin(s.accountRole)) edit = { key: 'edit', label: 'Edit data & upload', allowed: false, because: 'the rule names the owner and the Admin tier, not Super admin — use /admin' };
+  else edit = { key: 'edit', label: 'Edit data & upload', allowed: false, because: `only the owner or an Admin-tier account${role ? `; a ${roleText} does not count yet` : ''}` };
 
   const promote: Right = projectRoleRank(role) >= PROJECT_ROLE_RANK.editor
-    ? { key: 'promote', label: 'Promote uploads', allowed: true, because: isSuperAdmin(s.accountRole) && !s.isCreator ? 'Super admin counts as Owner' : roleText }
+    ? { key: 'promote', label: 'Promote uploads', allowed: true, because: isSuperAdmin(s.accountRole) && !s.isModeler ? 'Super admin counts as Owner' : roleText }
     : { key: 'promote', label: 'Promote uploads', allowed: false, because: `needs Editor or higher; has ${roleText}` };
 
   let exportRight: Right;
@@ -317,22 +319,25 @@ export function projectRights(s: ProjectStanding): Right[] {
 
 /** Where a project role came from, in words. */
 export function roleSource(r: {
-  isCreator: boolean;
+  isModeler: boolean;
   memberRole: string | null | undefined;
   delegatedRole: string | null | undefined;
   accountRole?: string | null;
   effectiveRole: string | null | undefined;
 }): string {
   if (!r.effectiveRole) return '';
-  if (r.memberRole && r.memberRole === r.effectiveRole) return r.isCreator ? 'creator' : 'assigned';
+  if (r.memberRole && r.memberRole === r.effectiveRole) return r.isModeler ? 'owns it' : 'assigned';
   if (r.delegatedRole && r.delegatedRole === r.effectiveRole) return 'delegated';
   if (isSuperAdmin(r.accountRole ?? null)) return 'super admin';
   return 'assigned';
 }
 
-/** The project-role refusals the admin verbs raise, as sentences. */
+/**
+ * A refusal from the admin verbs as a sentence: a leading `token:` (`not_a_member:`,
+ * `owner_not_in_organization:`) is dropped; a plain sentence is kept.
+ */
 export function projectRoleRefusal(message: string | null | undefined): string {
-  const m = /(?:not_in_organization|creator_is_owner|last_owner|not_a_member):\s*(.*)$/s.exec(message ?? '');
-  if (!m) return message || 'The change was refused.';
-  return m[1].charAt(0).toUpperCase() + m[1].slice(1);
+  const text = (message ?? '').replace(/^[a-z_]+:\s*/, '').trim();
+  if (!text) return 'The change was refused.';
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }

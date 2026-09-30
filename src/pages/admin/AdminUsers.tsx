@@ -12,7 +12,7 @@
 // (Access / Suspend-Enable) instead of ghost buttons, and the primary
 // "Add user" lives in the PageHeader actions.
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from '@/components/admin/AdminLayout';
@@ -29,8 +29,8 @@ import { DIALOG_AS_SHEET, HDR_PRIMARY_BUTTON, HDR_SEARCH_INPUT } from '@/compone
 import { AlertTriangle, Ban, Building2, Loader2, Plus, SlidersHorizontal, Undo2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { planRefusal } from '@/lib/auth/organizationPlan';
-import { ACCOUNT_TIERS, ALIGNMENT_HINT, ORG_ROLES, ORG_ROLE_INFO, accountTier, orgRoleLabel, platformRole, projectRoleLabel, roleSource, tierLabel, tierOrgMismatch } from '@/lib/auth/accessLevels';
-import { adminSetOrgMemberRole, adminUserProjectRoles, type UserProjectRoleRow } from '@/lib/auth/projectRoles';
+import { ACCOUNT_TIERS, ALIGNMENT_HINT, ORG_ROLES, ORG_ROLE_INFO, accountTier, orgRoleLabel, platformRole, tierLabel, tierOrgMismatch } from '@/lib/auth/accessLevels';
+import { adminSetOrgRole } from '@/lib/auth/projectRoles';
 import { AccessLevelsGuide } from '@/components/access/AccessLevelsGuide';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
@@ -57,7 +57,7 @@ const orgLabel = (r: Row) => {
 const allOrgNames = (r: Row) => (r.memberships ?? []).map((m) => m.name).join(', ');
 
 /**
- * D211 — the memberships where the account tier and the role in the organization say
+ * D213 — the memberships where the account tier and the role in the organization say
  * different things (the tier is what the rules read, in every organization).
  */
 const mismatches = (r: Row) => (r.memberships ?? [])
@@ -166,7 +166,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
       }
       actions={<AddUserDialog orgs={orgs} actorArgs={actorArgs} onCreated={load} />}
     >
-      {/* D211 — the three levels this page sets, and what each role allows today. */}
+      {/* D213 — the three levels this page sets, and what each role allows today. */}
       <details className={`${SURFACE} mb-3 px-4 py-2`}>
         <summary className="flex min-h-11 cursor-pointer items-center text-[13px] font-medium md:min-h-0">
           How roles work &mdash; platform, organization, project
@@ -176,7 +176,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
             The <span className="font-medium text-foreground">Account tier</span> column is the platform level (Super admin) or the tier
             that applies in every organization the account belongs to. Roles inside each organization, and the account&rsquo;s project
             roles, are under <Building2 className="inline h-3.5 w-3.5" aria-label="Roles & organizations" />. Project roles are set on
-            Projects &rarr; Access.
+            the person&rsquo;s page (their name) or on Projects &rarr; Access &amp; roles.
           </p>
           <AccessLevelsGuide />
         </div>
@@ -331,12 +331,12 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
 }
 
 /**
- * D210/D211 — one account's roles at all three levels. The platform level and the account
+ * D210/D213 — one account's roles at all three levels. The platform level and the account
  * tier are set in the table; this dialog sets the account's ORGANIZATIONS and its role in
- * each (in place: remove-and-re-add would move its active organization), and lists its
- * PROJECT roles, which are set per project on /admin/projects. Adding counts against the
- * organization's user limit (D207); removing the account's CURRENT organization moves it
- * to its earliest remaining one, or to none.
+ * each (in place, D211's `admin_set_user_org_role`: remove-and-re-add would move its active
+ * organization), and points to the account's page for its PROJECT roles (D211). Adding
+ * counts against the organization's user limit (D207); removing the account's CURRENT
+ * organization moves it to its earliest remaining one, or to none.
  */
 function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
   row: Row; orgs: OrgOption[]; actorArgs: () => { p_actor_id?: string; p_actor_email?: string };
@@ -345,25 +345,11 @@ function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
   const [busy, setBusy] = useState(false);
   const [addOrg, setAddOrg] = useState<string>('');
   const [addRole, setAddRole] = useState<string>(row.role === 'admin' ? 'admin' : 'member');
-  const [projects, setProjects] = useState<UserProjectRoleRow[] | null>(null);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
   const memberships = row.memberships ?? [];
   const available = orgs.filter((o) => !memberships.some((m) => m.org_id === o.id));
   const actor = () => { const a = actorArgs(); return { id: a.p_actor_id, email: a.p_actor_email }; };
   const tier = accountTier(row.role);
   const platform = platformRole(row.role);
-
-  useEffect(() => {
-    let live = true;
-    adminUserProjectRoles(actor(), row.user_id).then((res) => {
-      if (!live) return;
-      setProjects(res.data);
-      setProjectsError(res.error);
-    });
-    return () => { live = false; };
-    // The account's project roles do not change from this dialog.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.user_id]);
 
   const add = async () => {
     if (!addOrg) return;
@@ -380,7 +366,7 @@ function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
   const changeOrgRole = async (m: Membership, next: string) => {
     if (next === m.org_role) return;
     setBusy(true);
-    const { error } = await adminSetOrgMemberRole(actor(), row.user_id, m.org_id, next);
+    const { error } = await adminSetOrgRole(actor(), row.user_id, m.org_id, next);
     setBusy(false);
     if (error) return toast.error(error);
     toast.success(`${row.email} is now ${orgRoleLabel(next)} in ${m.name}`);
@@ -477,35 +463,11 @@ function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
 
           <section>
             <div className={levelHead}>Level 3 &middot; Project roles</div>
-            {projects === null ? (
-              <div className="flex h-10 items-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
-            ) : projectsError ? (
-              <p className="text-[#bf2330]">Could not load project roles: {projectsError}</p>
-            ) : projects.length === 0 ? (
-              <p className="text-muted-foreground">No project role on any project.</p>
-            ) : (
-              <ul className="divide-y rounded-sm border">
-                {projects.map((p) => {
-                  const source = roleSource({ isCreator: p.is_creator, memberRole: p.member_role, delegatedRole: p.delegated_role, accountRole: row.role, effectiveRole: p.effective_role });
-                  return (
-                    <li key={p.project_id} className="flex flex-wrap items-center gap-2 px-3 py-2">
-                      <span className="min-w-0 flex-1 truncate">
-                        <span className="font-medium">{p.project_name}</span>
-                        <span className="text-muted-foreground"> &middot; {p.organization || 'no organization'}</span>
-                      </span>
-                      <span className="text-[12px]">{projectRoleLabel(p.effective_role)}{source ? ` \u00b7 ${source}` : ''}</span>
-                      {!p.in_project_org && (
-                        <span className="rounded-sm border border-amber-500/40 px-1.5 py-0.5 text-[11px] text-amber-700 dark:text-amber-400"
-                          title="The account no longer belongs to this project's organization. Remove the role on Projects → Access.">
-                          outside its organization
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            <p className="mt-2 text-xs text-muted-foreground">Set on Projects &rarr; Access. A project&rsquo;s creator is always its Owner.</p>
+            <p className="text-muted-foreground">
+              Which projects this account holds a role on, and what it may do on each, is on{' '}
+              <Link to={`/admin/users/${row.user_id}`} className="text-[#bf2330] underline-offset-2 hover:underline">its own page</Link>.
+              For everyone on one project at once, use Projects &rarr; Access &amp; roles.
+            </p>
           </section>
         </div>
         <DialogFooter>

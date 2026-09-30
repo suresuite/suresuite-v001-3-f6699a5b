@@ -1,4 +1,4 @@
-// §4 D211 — /admin/projects › Access: everyone with standing on one project, at all three
+// §4 D213 — /admin/projects › Access: everyone with standing on one project, at all three
 // levels (platform/tier, role in the project's organization, project role), what each may
 // do there today and why, and the project role — the one level set here.
 import { useCallback, useEffect, useState } from 'react';
@@ -71,7 +71,7 @@ export function ProjectAccessDialog({ project, actor, onClose }: {
           <ul className="max-h-[60vh] divide-y overflow-y-auto rounded-sm border text-[13px]">
             {(rows ?? []).map((r) => {
               const rights = projectRights({
-                accountRole: r.account_role, inProjectOrg: r.in_project_org, isCreator: r.is_creator, effectiveRole: r.effective_role,
+                accountRole: r.account_role, inProjectOrg: r.in_project_org, isModeler: r.is_modeler, effectiveRole: r.effective_role,
               }).filter((x) => x.key !== 'see');
               const mismatch = r.in_project_org ? tierOrgMismatch(r.account_role, r.org_role) : null;
               const delegated = r.delegated_role && r.delegated_role === r.effective_role && r.delegated_role !== r.member_role;
@@ -85,7 +85,7 @@ export function ProjectAccessDialog({ project, actor, onClose }: {
                       </div>
                       <div className="truncate text-[12px] text-muted-foreground">
                         {tierLabel(r.account_role)} tier &middot; {r.in_project_org ? `${orgRoleLabel(r.org_role)} in the organization` : 'not in this organization'}
-                        {r.is_creator ? ' · created the project' : ''}
+                        {r.is_modeler ? ' · owns the project' : ''}
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -93,10 +93,10 @@ export function ProjectAccessDialog({ project, actor, onClose }: {
                       <Select
                         value={r.member_role ?? NO_ROLE}
                         onValueChange={(v) => setRole(r, v)}
-                        disabled={busy !== null || r.is_creator || (!r.in_project_org && !r.member_role)}
+                        disabled={busy !== null || r.is_modeler || (!r.in_project_org && !r.member_role)}
                       >
                         <SelectTrigger className="h-8 w-32 rounded-sm text-[12px]" aria-label={`Project role of ${r.name || r.email}`}
-                          title={r.is_creator ? 'The creator is always an Owner. Transfer the project to change its creator.' : undefined}>
+                          title={r.is_modeler ? 'The project’s owner always holds Owner. Transfer the project to change its owner.' : undefined}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

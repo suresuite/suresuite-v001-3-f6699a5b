@@ -57,13 +57,16 @@ export default function ProjectAccess() {
 
       <Callout title="Where project roles are set">
         <p>
-          <strong>A super administrator sets project roles</strong>, on{" "}
-          <AppLink to="/admin/projects">/admin/projects</AppLink> &rarr; Access &amp; roles. That
-          dialog lists everyone in the project&rsquo;s organization with their roles at all three
-          levels and what they may do on the project today, and it refuses three things: a role
-          for someone outside the project&rsquo;s organization, taking the Owner role from the
-          project&rsquo;s creator, and removing a project&rsquo;s last owner. You can see your own
-          project roles on your profile, under My Access.
+          <strong>A super administrator sets project roles</strong>, in two places that write
+          the same row: a person&rsquo;s page on{" "}
+          <AppLink to="/admin/users">/admin/users</AppLink> (every project that person is on),
+          and <AppLink to="/admin/projects">/admin/projects</AppLink> &rarr; Access &amp; roles
+          (everyone on one project). The Access dialog lists everyone in the project&rsquo;s
+          organization with their roles at all three levels and what they may do on the project
+          today. The project&rsquo;s owner always keeps the Owner role &mdash; transfer the project
+          to change who owns it &mdash; and the dialog offers a role only to members of the
+          project&rsquo;s organization. You can see your own project roles on your profile, under
+          My Access.
         </p>
         <p>
           <strong>Nothing delegates a role yet.</strong> The delegation rules below are the
@@ -96,12 +99,13 @@ export default function ProjectAccess() {
         </p>
       </Callout>
 
-      <Callout title="A project's creator is always an Owner">
+      <Callout title="A project's owner always holds the Owner role">
         <p>
-          Creating a project makes you its Owner, and so does becoming its creator when an
-          administrator transfers a project to you. Projects created in the window before that
-          rule existed, or handed over before the transfer did the same, were given their missing
-          owner once, and the Access dialog will not take the role away from a creator.
+          Creating a project makes you its owner and gives you the Owner role; so does an
+          administrator transferring a project to you, which also removes the previous
+          owner&rsquo;s role. Projects from the window before either rule existed were given
+          their missing owner once. Neither admin screen will take the Owner role away from a
+          project&rsquo;s owner.
         </p>
       </Callout>
 
@@ -113,7 +117,7 @@ export default function ProjectAccess() {
         </P>
       </Section>
 
-      <Provenance from="the project_members and delegation_grants sidecars joined to the schema; the Access dialog's refusals are the admin_set_project_member and admin_remove_project_member functions, and no screen writes delegation_grants" />
+      <Provenance from="the project_members and delegation_grants sidecars joined to the schema; the refusals are the admin_set_project_member, admin_remove_project_member and admin_transfer_project functions, and no screen writes delegation_grants" />
     </>
   );
 }

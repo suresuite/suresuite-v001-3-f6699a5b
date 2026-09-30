@@ -1,5 +1,5 @@
 /**
- * §4 D211 — the three access levels. `accessLevels.ts` RESTATES the database's rules in
+ * §4 D213 — the three access levels. `accessLevels.ts` RESTATES the database's rules in
  * words, for /profile and /admin; a restatement nothing compares is how a screen comes to
  * say something false (D103). So this reads each rule back out of the schema — the
  * policies from the introspected artifact, a function's body from the migration that
@@ -95,7 +95,7 @@ describe('the rules accessLevels.ts restates', () => {
   it('export: a held project role decides; the account default otherwise', () => {
     expect(body('record_export')).toContain('capabilities_for_user(_actor_user_id, _project_id)');
     // The Viewer's export is refused and the Analyst's is not — as PROJECT_ROLE_INFO says.
-    const exportAllowed = (role: string) => projectRights({ accountRole: 'user', inProjectOrg: true, isCreator: false, effectiveRole: role })
+    const exportAllowed = (role: string) => projectRights({ accountRole: 'user', inProjectOrg: true, isModeler: false, effectiveRole: role })
       .find((r) => r.key === 'export')!.allowed;
     expect(exportAllowed('viewer')).toBe(false);
     expect(exportAllowed('analyst')).toBe(true);
@@ -126,47 +126,65 @@ describe('the vocabularies match the database', () => {
     expect([...Object.keys(ACCOUNT_TIERS), 'super_admin'].sort()).toEqual([...enumValues].sort());
   });
 
-  it('every refusal the D211 verbs raise is turned into a sentence', () => {
-    const sql = read('supabase/migrations/20260930000005_three_access_levels.sql');
-    for (const token of ['not_in_organization', 'creator_is_owner', 'last_owner', 'not_a_member']) {
-      expect(sql).toContain(`'${token}:`);
+  it('a refusal from the D211 verbs reads as a sentence, with or without a token', () => {
+    const sql = read('supabase/migrations/20260930000005_admin_user_memberships.sql');
+    expect(sql).toContain("'not_a_member: the account does not belong to that organization'");
+    expect(sql).toContain('this user owns the project (its modeler) and stays a standing owner');
+    expect(projectRoleRefusal('not_a_member: the account does not belong to that organization'))
+      .toBe('The account does not belong to that organization');
+    expect(projectRoleRefusal('this user owns the project (its modeler) and stays a standing owner'))
+      .toBe('This user owns the project (its modeler) and stays a standing owner');
+    expect(projectRoleRefusal('')).toBe('The change was refused.');
+  });
+
+  it('the Access dialog calls the D211 verbs by their own argument names', () => {
+    const verbs = read('supabase/migrations/20260930000005_admin_user_memberships.sql');
+    const client = read('src/lib/auth/projectRoles.ts');
+    for (const [fn, args] of [
+      ['admin_set_project_member', ['p_target_user_id', 'p_project_id', 'p_project_role', 'p_expires_at', 'p_rationale']],
+      ['admin_remove_project_member', ['p_target_user_id', 'p_project_id']],
+      ['admin_set_user_org_role', ['p_target_user_id', 'p_org_id', 'p_org_role']],
+    ] as const) {
+      const sig = new RegExp(`FUNCTION public\\.${fn}\\(([\\s\\S]*?)\\)\\s*RETURNS`).exec(verbs)?.[1] ?? '';
+      const call = new RegExp(`'${fn}', \\{([\\s\\S]*?)\\}\\)`).exec(client)?.[1] ?? '';
+      for (const a of args) {
+        expect(sig, `${fn} declares ${a}`).toContain(a);
+        expect(call, `projectRoles.ts passes ${a} to ${fn}`).toContain(`${a}:`);
+      }
     }
-    expect(projectRoleRefusal("not_in_organization: the account is not a member of this project's organization"))
-      .toBe("The account is not a member of this project's organization");
-    expect(projectRoleRefusal('forbidden')).toBe('forbidden');
   });
 });
 
 describe('projectRights', () => {
   const right = (s: Parameters<typeof projectRights>[0], key: string) => projectRights(s).find((r) => r.key === key)!;
 
-  it('an Editor who did not create the project cannot edit it, and can promote', () => {
-    const s = { accountRole: 'modeler', inProjectOrg: true, isCreator: false, effectiveRole: 'editor' };
+  it('an Editor who does not own the project cannot edit it, and can promote', () => {
+    const s = { accountRole: 'modeler', inProjectOrg: true, isModeler: false, effectiveRole: 'editor' };
     expect(right(s, 'edit').allowed).toBe(false);
     expect(right(s, 'edit').because).toContain('does not count yet');
     expect(right(s, 'promote').allowed).toBe(true);
   });
 
   it('an Admin-tier account with no project role edits and cannot promote (D66)', () => {
-    const s = { accountRole: 'admin', inProjectOrg: true, isCreator: false, effectiveRole: null };
+    const s = { accountRole: 'admin', inProjectOrg: true, isModeler: false, effectiveRole: null };
     expect(right(s, 'edit')).toMatchObject({ allowed: true, because: 'Admin account tier' });
     expect(right(s, 'promote').allowed).toBe(false);
   });
 
-  it('the creator edits and promotes', () => {
-    const s = { accountRole: 'user', inProjectOrg: true, isCreator: true, effectiveRole: 'owner' };
-    expect(right(s, 'edit')).toMatchObject({ allowed: true, because: 'created the project' });
+  it('the owner edits and promotes', () => {
+    const s = { accountRole: 'user', inProjectOrg: true, isModeler: true, effectiveRole: 'owner' };
+    expect(right(s, 'edit')).toMatchObject({ allowed: true, because: 'owns the project' });
     expect(right(s, 'promote').allowed).toBe(true);
   });
 
   it('a super admin promotes as owner but does not edit someone else\'s project', () => {
-    const s = { accountRole: 'super_admin', inProjectOrg: true, isCreator: false, effectiveRole: 'owner' };
+    const s = { accountRole: 'super_admin', inProjectOrg: true, isModeler: false, effectiveRole: 'owner' };
     expect(right(s, 'edit').allowed).toBe(false);
     expect(right(s, 'promote')).toMatchObject({ allowed: true, because: 'Super admin counts as Owner' });
   });
 
   it('outside the organization nothing but a stale role remains', () => {
-    const s = { accountRole: 'admin', inProjectOrg: false, isCreator: false, effectiveRole: 'editor' };
+    const s = { accountRole: 'admin', inProjectOrg: false, isModeler: false, effectiveRole: 'editor' };
     expect(right(s, 'see').allowed).toBe(false);
     expect(right(s, 'edit').allowed).toBe(false);
   });
@@ -188,9 +206,9 @@ describe('tierOrgMismatch', () => {
 
 describe('roleSource', () => {
   it('says where the effective role came from', () => {
-    expect(roleSource({ isCreator: true, memberRole: 'owner', delegatedRole: null, effectiveRole: 'owner' })).toBe('creator');
-    expect(roleSource({ isCreator: false, memberRole: 'viewer', delegatedRole: 'editor', effectiveRole: 'editor' })).toBe('delegated');
-    expect(roleSource({ isCreator: false, memberRole: null, delegatedRole: null, accountRole: 'super_admin', effectiveRole: 'owner' })).toBe('super admin');
-    expect(roleSource({ isCreator: false, memberRole: null, delegatedRole: null, effectiveRole: null })).toBe('');
+    expect(roleSource({ isModeler: true, memberRole: 'owner', delegatedRole: null, effectiveRole: 'owner' })).toBe('owns it');
+    expect(roleSource({ isModeler: false, memberRole: 'viewer', delegatedRole: 'editor', effectiveRole: 'editor' })).toBe('delegated');
+    expect(roleSource({ isModeler: false, memberRole: null, delegatedRole: null, accountRole: 'super_admin', effectiveRole: 'owner' })).toBe('super admin');
+    expect(roleSource({ isModeler: false, memberRole: null, delegatedRole: null, effectiveRole: null })).toBe('');
   });
 });

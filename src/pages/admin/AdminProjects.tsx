@@ -1,7 +1,9 @@
 // Projects (/admin/projects) — SuReSuite "Ledger" redesign.
 // Data flow, RPCs (admin_list_projects/organizations/users_basic, copy/rename/
-// update_meta/transfer/delete) and search unchanged. Model column shows a mono
-// BOM/data chip pair; status is an outlined chip; row actions live in a menu.
+// update_meta/transfer/delete) and search unchanged. Transfer also changes the
+// owner in place and offers only members of the target organization (D212).
+// Model column shows a mono BOM/data chip pair; status is an outlined chip; row
+// actions live in a menu.
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -25,7 +27,7 @@ import { ProjectAccessDialog } from '@/components/access/ProjectAccessDialog';
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface ProjectRow { id: string; name: string; organization_id: string | null; organization: string | null; modeler_id: string; owner_name: string | null; owner_email: string | null; plant_name: string; supply_chain_model: string; bom_level: string; data_type: string; completed: boolean; simulation_start: string | null; simulation_end: string | null; created_at: string; updated_at: string; }
 interface OrgOption { id: string; name: string; }
-interface UserOption { id: string; name: string | null; email: string | null; organization_id: string | null; is_active: boolean | null; }
+interface UserOption { id: string; name: string | null; email: string | null; organization_id: string | null; is_active: boolean | null; org_ids: string[] | null; }
 type DialogKind = 'access' | 'copy' | 'rename' | 'meta' | 'transfer' | null;
 
 const db = supabase as any;
@@ -134,7 +136,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
                 { label: 'Copy…', onClick: () => openDialog('copy', p) },
                 { label: 'Rename…', onClick: () => openDialog('rename', p) },
                 { label: 'Edit metadata…', onClick: () => openDialog('meta', p) },
-                { label: 'Transfer to organization…', onClick: () => openDialog('transfer', p) },
+                { label: 'Transfer or change owner…', onClick: () => openDialog('transfer', p) },
                 { label: 'Delete', tone: 'danger', onClick: () => remove(p) },
               ]}
             />
@@ -145,7 +147,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead><tr>
-              <SortTH sortKey="name">Name</SortTH><SortTH sortKey="org">Organization</SortTH><SortTH sortKey="owner">Creator</SortTH>
+              <SortTH sortKey="name">Name</SortTH><SortTH sortKey="org">Organization</SortTH><SortTH sortKey="owner">Owner</SortTH>
               <SortTH sortKey="plant">Plant</SortTH><SortTH sortKey="model">Model</SortTH><SortTH sortKey="status">Status</SortTH>
               <SortTH sortKey="updated">Last activity</SortTH><th className={`${TH} w-[1%]`} />
             </tr>
@@ -183,7 +185,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
                         <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('copy', p)}><Copy className="mr-2 h-4 w-4" /> Copy…</DropdownMenuItem>
                         <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('rename', p)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
                         <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('meta', p)}><Settings2 className="mr-2 h-4 w-4" /> Edit metadata…</DropdownMenuItem>
-                        <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('transfer', p)}><ArrowRightLeft className="mr-2 h-4 w-4" /> Transfer to organization…</DropdownMenuItem>
+                        <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('transfer', p)}><ArrowRightLeft className="mr-2 h-4 w-4" /> Transfer or change owner…</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="min-h-11 text-[#bf2330] focus:text-[#bf2330] md:min-h-0" onClick={() => remove(p)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                       </DropdownMenuContent>
@@ -230,7 +232,7 @@ function CopyDialog({ project, orgs, users, actorArgs, onClose, onDone }: { proj
           <div><Label className="text-xs">Organization</Label>
             <Select value={orgId} onValueChange={setOrgId}><SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value={NONE}>Keep current ({project.organization || '—'})</SelectItem>{orgs.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent></Select></div>
-          <div><Label className="text-xs">Creator</Label>
+          <div><Label className="text-xs">Owner</Label>
             <Select value={ownerId} onValueChange={setOwnerId}><SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value={NONE}>Keep current ({project.owner_name || project.owner_email || '—'})</SelectItem>{users.map((u) => <SelectItem key={u.id} value={u.id}>{userLabel(u)}</SelectItem>)}</SelectContent></Select></div>
         </div>
@@ -317,33 +319,69 @@ function MetaDialog({ project, actorArgs, onClose, onDone }: { project: ProjectR
 }
 
 function TransferDialog({ project, orgs, users, actorArgs, onClose, onDone }: { project: ProjectRow; orgs: OrgOption[]; users: UserOption[]; actorArgs: ActorArgs; onClose: () => void; onDone: () => void }) {
-  const [orgId, setOrgId] = useState<string>('');
+  // D212 — the owner must belong to the target organization (any of the account's
+  // memberships, not only the one it is working in), so the picker offers only those.
+  const [orgId, setOrgId] = useState<string>(project.organization_id ?? '');
   const [ownerId, setOwnerId] = useState<string>(NONE);
   const [saving, setSaving] = useState(false);
-  const sortedUsers = useMemo(() => { if (!orgId) return users; return [...users].sort((a, b) => Number(b.organization_id === orgId) - Number(a.organization_id === orgId)); }, [users, orgId]);
+  const orgName = orgs.find((o) => o.id === orgId)?.name ?? 'the organization';
+  const inOrg = (u: UserOption) => !!orgId && (u.org_ids ?? []).includes(orgId);
+  const eligible = useMemo(() => users.filter((u) => u.is_active !== false && !!orgId && (u.org_ids ?? []).includes(orgId)), [users, orgId]);
+  const currentOwner = users.find((u) => u.id === project.modeler_id);
+  const canKeepOwner = !!currentOwner && currentOwner.is_active !== false && inOrg(currentOwner);
+  const sameOrg = orgId === project.organization_id;
+  const effectiveOwnerId = ownerId === NONE ? (canKeepOwner ? project.modeler_id : '') : ownerId;
+  const nothingToChange = sameOrg && effectiveOwnerId === project.modeler_id;
+  const chosenOwner = users.find((u) => u.id === effectiveOwnerId);
+  const mustSwitch = !!chosenOwner && chosenOwner.organization_id !== orgId;
+
   const save = async () => {
     if (!orgId) return toast.error('Pick a target organization');
+    if (!effectiveOwnerId) return toast.error(`Pick a new owner who belongs to ${orgName}`);
+    if (nothingToChange) return toast.error('Pick another organization or another owner');
     setSaving(true);
-    const { error } = await db.rpc('admin_transfer_project', { ...actorArgs(), p_project_id: project.id, p_org_id: orgId, p_new_owner_id: ownerId === NONE ? null : ownerId });
+    const { data, error } = await db.rpc('admin_transfer_project', { ...actorArgs(), p_project_id: project.id, p_org_id: orgId, p_new_owner_id: ownerId === NONE ? null : ownerId });
     setSaving(false);
     if (error) return toast.error(error.message);
-    toast.success(`"${project.name}" transferred to ${orgs.find((o) => o.id === orgId)?.name ?? 'organization'}`); onClose(); onDone();
+    const r = (data ?? {}) as { owner_name?: string; organization_changed?: boolean; owner_active_org_is_target?: boolean; memberships_removed?: unknown[]; delegations_revoked?: unknown[] };
+    const removed = r.memberships_removed?.length ?? 0;
+    const revoked = r.delegations_revoked?.length ?? 0;
+    const lines = [
+      r.organization_changed ? `"${project.name}" moved to ${orgName}, owned by ${r.owner_name}.` : `"${project.name}" is now owned by ${r.owner_name}.`,
+      removed || revoked ? `${removed} project membership(s) removed, ${revoked} delegation(s) revoked.` : '',
+      r.owner_active_org_is_target === false ? `${r.owner_name} is working in another organization and will see the project after switching to ${orgName}.` : '',
+    ].filter(Boolean);
+    toast.success(lines[0], lines.length > 1 ? { description: lines.slice(1).join(' ') } : undefined);
+    onClose(); onDone();
   };
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Transfer “{project.name}”</DialogTitle><DialogDescription>Moves the project (and all its data) from <span className="font-medium">{project.organization || 'no organization'}</span> to another organization. Optionally make a user there its creator, who becomes an Owner of it; the previous creator keeps their project role until you change it under Access.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Transfer or change owner — “{project.name}”</DialogTitle><DialogDescription>Moves the project (and all its data) from <span className="font-medium">{project.organization || 'no organization'}</span> to another organization, hands it to a new owner, or both.</DialogDescription></DialogHeader>
         <div className="grid gap-3">
-          <div><Label className="text-xs">Target organization</Label>
-            <Select value={orgId} onValueChange={setOrgId}><SelectTrigger className="mt-1 rounded-sm"><SelectValue placeholder="Select organization…" /></SelectTrigger>
-              <SelectContent>{orgs.filter((o) => o.id !== project.organization_id).map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent></Select></div>
-          <div><Label className="text-xs">New creator (optional)</Label>
-            <Select value={ownerId} onValueChange={setOwnerId}><SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value={NONE}>Keep current creator ({project.owner_name || project.owner_email || '—'})</SelectItem>{sortedUsers.map((u) => <SelectItem key={u.id} value={u.id}>{userLabel(u)}{orgId && u.organization_id === orgId ? ' · target org' : ''}</SelectItem>)}</SelectContent></Select></div>
+          <div><Label className="text-xs">Organization</Label>
+            <Select value={orgId} onValueChange={(v) => { setOrgId(v); setOwnerId(NONE); }}><SelectTrigger className="mt-1 rounded-sm"><SelectValue placeholder="Select organization…" /></SelectTrigger>
+              <SelectContent>{orgs.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}{o.id === project.organization_id ? ' (current)' : ''}</SelectItem>)}</SelectContent></Select></div>
+          <div><Label className="text-xs">Owner</Label>
+            <Select value={ownerId} onValueChange={setOwnerId} disabled={!orgId}><SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>{canKeepOwner ? `Keep current owner (${project.owner_name || project.owner_email || '—'})` : 'Select a new owner…'}</SelectItem>
+                {eligible.filter((u) => u.id !== project.modeler_id).map((u) => <SelectItem key={u.id} value={u.id}>{userLabel(u)}</SelectItem>)}
+              </SelectContent></Select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {orgId && !canKeepOwner && currentOwner ? `The current owner does not belong to ${orgName}, so a new owner is required. ` : ''}
+              {orgId ? `Only active accounts that belong to ${orgName} are listed — add someone to it on their user page first.` : ''}
+              {eligible.length === 0 && orgId ? ` ${orgName} has no eligible account yet.` : ''}
+            </p>
+          </div>
+          <div className="rounded-sm border border-[--hair-border] p-2 text-[11px] text-muted-foreground">
+            The owner becomes the project's standing owner. The previous owner's project membership and the delegations they granted are removed{sameOrg ? '' : `, and members who do not belong to ${orgName} lose their role on the project`}.
+            {mustSwitch ? ` ${chosenOwner ? userLabel(chosenOwner) : 'The owner'} is working in another organization and will see the project after switching to ${orgName}.` : ''}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button className="rounded-sm" onClick={save} disabled={saving || !orgId}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Transfer project</Button>
+          <Button className="rounded-sm" onClick={save} disabled={saving || !orgId || !effectiveOwnerId || nothingToChange}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{sameOrg ? 'Change owner' : 'Transfer project'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

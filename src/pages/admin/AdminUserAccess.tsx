@@ -2,6 +2,7 @@
 // All data flow and RPCs unchanged from the original AdminUserAccess.tsx:
 // get_user_access, admin_set_capability, admin_set_user_models,
 // admin_set_user_budget, optimistic updates and effective-permission math.
+// Organizations & projects (§4 D211) is `UserMemberships`, above the matrices.
 // Presentation: SectionCard treatment, a segmented Inherit/Allow/Deny tri
 // control, teal On / grey Off status dots, mono model codes, and a sticky
 // "Preview as user" panel.
@@ -10,9 +11,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { MobilePanel } from '@/components/mobile';
-import { useIsMobile } from '@/hooks/use-is-mobile';
-import { SURFACE, KX, StatusDot, Segmented, MonoChip, type Tri } from '@/components/admin/adminUi';
+import { SURFACE, KX, StatusDot, Segmented, MonoChip, AdminSection as Section, type Tri } from '@/components/admin/adminUi';
+import { UserMemberships } from '@/components/admin/UserMemberships';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -216,6 +216,13 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
         <div className={`grid gap-5 ${preview ? 'md:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
           <div className="space-y-4">
             {identityLine && <div className="-mt-1">{identityLine}</div>}
+            {/* §4 D211 — which organizations, which projects, and what the account may
+                do on each, before the platform-wide matrices below. Adding or removing
+                an organization can change the ACTIVE one (D210), whose overrides the
+                matrices apply, so it reloads those too. */}
+            {actor?.id && (
+              <UserMemberships actor={actor} userId={data.user_id} userLabel={data.name || data.email || 'this user'} onOrganizationChanged={load} />
+            )}
             <Section title="Pages"><CapMatrix rows={pages} isSuper={isSuper} onSet={setOverride} /></Section>
             <Section title="Features"><CapMatrix rows={features} isSuper={isSuper} onSet={setOverride} /></Section>
 
@@ -347,31 +354,6 @@ export default function AdminUserAccess({ isCollapsed, setIsCollapsed }: Props) 
         </div>
       )}
     </AdminLayout>
-  );
-}
-
-function Section({ title, badge, children }: { title: string; badge?: string; children: React.ReactNode }) {
-  const isMobile = useIsMobile();
-
-  // v2 §4B: below `md` a section is the panel — its title is the head's mono
-  // micro-label and the badge is the head's one counter, which is exactly what
-  // the head is for. Above `md` it is the SURFACE card it has always been.
-  if (isMobile) {
-    return (
-      <MobilePanel label={title} counter={badge} bare bodyClassName="px-3 py-2">
-        {children}
-      </MobilePanel>
-    );
-  }
-
-  return (
-    <section className={`${SURFACE} p-4`}>
-      <div className="mb-3 flex items-center gap-2">
-        <h2 className="text-[13px] font-semibold">{title}</h2>
-        {badge && <MonoChip tone="solid">{badge}</MonoChip>}
-      </div>
-      {children}
-    </section>
   );
 }
 
