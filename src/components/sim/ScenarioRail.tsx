@@ -157,7 +157,7 @@ export function ScenarioList({
                   </span>
                 ) : null}
                 <span className="truncate text-[12.5px] tabular-nums text-[#52525b]">
-                  {s.replications} reps · {formatDuration(s.horizon_days)} ·{" "}
+                  {s.replications} {s.replications === 1 ? "rep" : "reps"} · {formatDuration(s.horizon_days)} ·{" "}
                   {events > 0 ? `${events} event${events > 1 ? "s" : ""}` : "steady state"}
                 </span>
               </div>
