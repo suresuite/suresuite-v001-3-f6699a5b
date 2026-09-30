@@ -22,6 +22,8 @@
 --      organization working in another one sees it (`working_in_project_org` false), the
 --      owner working elsewhere still edits its settings, and a member with no project role
 --      takes the organization layer from the PROJECT's organization, not the active one.
+--   §7 THE ANALYST RUNS AND DOES NOTHING ELSE (D232): an analyst member's own gate holds Run
+--      Simulations and refuses Edit Policies, Edit Input Data and Export.
 
 DO $d219$
 DECLARE
@@ -42,6 +44,7 @@ DECLARE
   v_code    text;
   v_uid     uuid;
   v_plain_a uuid := gen_random_uuid();   -- org A member, account role 'user', no project role
+  v_analyst uuid := gen_random_uuid();   -- org A, modeler account, analyst on p
   k         text;
 BEGIN
   INSERT INTO public.organizations (id, name, slug) VALUES
@@ -59,7 +62,8 @@ BEGIN
     (v_p, 'D230 p', v_owner, 'D230P', 'D230 Org A', v_org_a, 'single');
 
   -- The rehearsal base is schema, not seed: plant WP 2.2's project layer where it is
-  -- missing, verbatim from `20260915000005` (as `460`, `490` and `510` do).
+  -- missing, as the migrations leave it (`20260915000005`, and D232's analyst row from
+  -- `20261001000005` — a planted row must match what every later base will hold) (as `460`, `490` and `510` do).
   INSERT INTO public.capabilities (key, kind, label, sort_order) VALUES
     ('data_edit_inputs', 'feature', 'Edit Input Data', 241),
     ('data_edit_policies', 'feature', 'Edit Policies', 242),
@@ -71,8 +75,8 @@ BEGIN
     ('owner',   'export', true),            ('owner',   'simulation_lab', true),
     ('editor',  'data_edit_inputs', true),  ('editor',  'data_edit_policies', true),
     ('editor',  'export', true),            ('editor',  'simulation_lab', true),
-    ('analyst', 'data_edit_inputs', false), ('analyst', 'data_edit_policies', true),
-    ('analyst', 'export', true),            ('analyst', 'simulation_lab', true),
+    ('analyst', 'data_edit_inputs', false), ('analyst', 'data_edit_policies', false),
+    ('analyst', 'export', false),           ('analyst', 'simulation_lab', true),
     ('viewer',  'data_edit_inputs', false), ('viewer',  'data_edit_policies', false),
     ('viewer',  'export', false),           ('viewer',  'simulation_lab', false)
   ON CONFLICT (project_role, capability_key) DO NOTHING;
@@ -253,6 +257,35 @@ BEGIN
   PERFORM set_config('app.current_user_id', '', true);
   IF (v_mine ->> 'working_in_project_org')::boolean IS NOT FALSE OR (v_mine ->> 'can_edit_project')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'D231/550 §6: the owner''s own gate, working in another organization, read as %', v_mine;
+  END IF;
+
+  -- ══ §7 · the analyst runs and does nothing else (D232) ══
+  -- Where this rehearsal runs the migration, the rows planted above are ON CONFLICT DO NOTHING
+  -- and the analyst's grants are the ones `20261001000005` wrote; where the migration is already
+  -- in the base, the planted rows are the same values. A modeler ACCOUNT, so no role layer can
+  -- hand the rights back.
+  INSERT INTO public.approved_users (id, email, name, password_hash, role, organization, organization_id, is_active) VALUES
+    (v_analyst, 'd232a@example.invalid', 'D232 Analyst', 'x', 'modeler', 'D219 Org A', v_org_a, true);
+  SET LOCAL ROLE anon;
+  PERFORM public.admin_set_project_member(v_super, 'd219s@example.invalid', v_analyst, v_p, 'analyst', NULL, 'D232 analyst');
+  RESET ROLE;
+  PERFORM set_config('app.current_user_id', '', true);
+  SET LOCAL ROLE anon;
+  v_mine := public.get_my_project_rights(v_p, v_analyst);
+  RESET ROLE;
+  PERFORM set_config('app.current_user_id', '', true);
+  IF v_mine ->> 'effective_role' IS DISTINCT FROM 'analyst'
+     OR (v_mine -> 'capabilities' ->> 'simulation_lab')::boolean IS NOT TRUE
+     OR (v_mine -> 'capabilities' ->> 'data_edit_policies')::boolean IS NOT FALSE
+     OR (v_mine -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT FALSE
+     OR (v_mine -> 'capabilities' ->> 'export')::boolean IS NOT FALSE THEN
+    RAISE EXCEPTION 'D232/550 §7: an analyst''s own gate read as %', v_mine;
+  END IF;
+  SELECT r.caps INTO v_pers FROM (
+    SELECT public.project_access_read(v_p) -> 'role_matrix' -> 'analyst' AS caps) r;
+  IF (v_pers ->> 'simulation_lab')::boolean IS NOT TRUE OR (v_pers ->> 'data_edit_policies')::boolean IS NOT FALSE
+     OR (v_pers ->> 'export')::boolean IS NOT FALSE THEN
+    RAISE EXCEPTION 'D232/550 §7: the legend''s analyst row read as %', v_pers;
   END IF;
 
   RAISE NOTICE 'D230/550: one answer for a person''s rights on a project — the gate, /profile and /admin agree, and it is what the app applies';

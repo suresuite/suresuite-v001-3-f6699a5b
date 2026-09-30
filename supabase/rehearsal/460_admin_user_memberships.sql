@@ -10,7 +10,8 @@
 --      are exactly the organization's, the owned one and the cross-organization
 --      membership — no other — each with where access comes from, and the rights are
 --      the RESOLVER's (an editor's role grants inputs and the upload gate refuses them unless it owns
---      the project or is an app admin — D230; an analyst does not, the owner does).
+--      the project or is an app admin — D230; an analyst runs and edits nothing — D232; the
+--      owner does).
 --   §3 THE MODELER STAYS AN OWNER: demoting, expiring or removing the modeler's own
 --      membership is refused, and the row is unchanged.
 --   §4 EXPIRY: a past end date is refused; a lapsed membership is listed as expired and
@@ -53,8 +54,9 @@ BEGIN
     (v_p3, 'D211 p3', v_other, 'D211P3', 'D211 Org B', v_org_b, 'single');
 
   -- The rehearsal base is schema, not seed: plant WP 2.2's project layer where it is
-  -- missing, verbatim from `20260915000005`, so the rights asserted below are the
-  -- resolver's and not four NULLs.
+  -- missing, as the migrations leave it (`20260915000005`, and D232's analyst row from
+  -- `20261001000005` — a planted row must match what every later base will hold), so the
+  -- rights asserted below are the resolver's and not four NULLs.
   INSERT INTO public.capabilities (key, kind, label, sort_order) VALUES
     ('data_edit_inputs', 'feature', 'Edit Input Data', 241),
     ('data_edit_policies', 'feature', 'Edit Policies', 242),
@@ -64,7 +66,8 @@ BEGIN
   INSERT INTO public.project_role_capabilities (project_role, capability_key, allowed) VALUES
     ('owner', 'data_edit_inputs', true),    ('owner', 'data_edit_policies', true),
     ('editor', 'data_edit_inputs', true),   ('editor', 'data_edit_policies', true),
-    ('analyst', 'data_edit_inputs', false), ('analyst', 'data_edit_policies', true),
+    ('analyst', 'data_edit_inputs', false), ('analyst', 'data_edit_policies', false),
+    ('analyst', 'export', false),           ('analyst', 'simulation_lab', true),
     ('viewer', 'data_edit_inputs', false),  ('viewer', 'data_edit_policies', false)
   ON CONFLICT (project_role, capability_key) DO NOTHING;
 
@@ -133,7 +136,9 @@ BEGIN
   IF v_proj ->> 'effective_role' IS DISTINCT FROM 'analyst' OR (v_proj ->> 'visible')::boolean IS NOT FALSE
      OR (v_proj ->> 'in_member_org')::boolean IS NOT FALSE OR (v_proj ->> 'in_active_org')::boolean IS NOT FALSE
      OR (v_proj -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT FALSE
-     OR (v_proj -> 'capabilities' ->> 'data_edit_policies')::boolean IS NOT TRUE THEN
+     -- D232: the analyst runs simulations and edits nothing, policies included.
+     OR (v_proj -> 'capabilities' ->> 'data_edit_policies')::boolean IS NOT FALSE
+     OR (v_proj -> 'capabilities' ->> 'simulation_lab')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'D211/460 §2: the cross-organization analyst membership read as %', v_proj;
   END IF;
   IF jsonb_array_length(v_out -> 'project_capabilities') = 0 OR v_out -> 'role_matrix' -> 'viewer' IS NULL THEN

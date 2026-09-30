@@ -47,7 +47,7 @@ const ORG_ROLES: { role: string; gloss: string }[] = [
 const PROJECT_GLOSS: Record<string, string> = {
   owner: "The project's principal — a project's creator holds this automatically.",
   editor: "May rewrite the measured inputs and the decisions alike.",
-  analyst: "May retune decisions, and may not rewrite the measured data those decisions are judged against.",
+  analyst: "May run simulations, and may not change the policies or the measured data those runs are made of.",
   viewer: "May look.",
 };
 
@@ -343,9 +343,9 @@ export default function RolesAndCapabilities() {
           </table>
         </div>
         <P>
-          The split in the first two rows is the point of the vocabulary: an{" "}
-          <Term>analyst</Term> may retune the decisions and may not rewrite the measured inputs
-          those decisions are judged against. Roles can also be lent for a time — a delegation
+          The first two rows split what an <Term>editor</Term> may change: the measured inputs and
+          the decisions. An <Term>analyst</Term> may change neither — it runs simulations on what
+          the editors have set up, which is the one right it holds. Roles can also be lent for a time — a delegation
           only <em>subtracts</em> (never more than the grantor holds) and always expires.{" "}
           <DocLink to="project-access">Project access</DocLink> has the two rules, the columns of
           both tables, and the honest note that there is no screen for any of it yet.

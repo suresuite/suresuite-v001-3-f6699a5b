@@ -48,7 +48,8 @@ BEGIN
     (v_p, 'D215 p', v_owner, 'D215P', 'D215 Org A', v_org_a, 'single');
 
   -- The rehearsal base is schema, not seed: plant WP 2.2's project layer where it is
-  -- missing, verbatim from `20260915000005` (as `460` does).
+  -- missing, as the migrations leave it (`20260915000005`, and D232's analyst row from
+  -- `20261001000005` — a planted row must match what every later base will hold) (as `460` does).
   INSERT INTO public.capabilities (key, kind, label, sort_order) VALUES
     ('data_edit_inputs', 'feature', 'Edit Input Data', 241),
     ('data_edit_policies', 'feature', 'Edit Policies', 242),
@@ -58,7 +59,7 @@ BEGIN
   INSERT INTO public.project_role_capabilities (project_role, capability_key, allowed) VALUES
     ('owner', 'data_edit_inputs', true),    ('owner', 'data_edit_policies', true),
     ('editor', 'data_edit_inputs', true),   ('editor', 'data_edit_policies', true),
-    ('analyst', 'data_edit_inputs', false), ('analyst', 'data_edit_policies', true),
+    ('analyst', 'data_edit_inputs', false), ('analyst', 'data_edit_policies', false),
     ('viewer', 'data_edit_inputs', false),  ('viewer', 'data_edit_policies', false)
   ON CONFLICT (project_role, capability_key) DO NOTHING;
 
