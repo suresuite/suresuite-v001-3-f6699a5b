@@ -1,8 +1,10 @@
 /**
- * D207 — the organization plan's choices are authored in the migration's CHECKs and
+ * D207 — the organization plan's choices are authored in the migrations' CHECKs and
  * offered by `organizationPlan.ts`, which cannot import each other. This compares them.
+ * A later migration may restate a list (D218 widened the limits in `20260930000012`),
+ * so each list is read from the LATEST migration that states it — the one in force.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -10,14 +12,33 @@ import {
   periodFromSelect, periodLabel, planRefusal, usage,
 } from '../organizationPlan';
 
-const MIGRATION = path.resolve(
-  __dirname, '../../../../supabase/migrations/20260929000004_organization_plan.sql');
-const sql = readFileSync(MIGRATION, 'utf8');
+const MIGRATIONS = path.resolve(__dirname, '../../../../supabase/migrations');
+/** Every migration's text, oldest first (the file names sort by timestamp). */
+const migrations = readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()
+  .map((f) => ({ file: f, sql: readFileSync(path.join(MIGRATIONS, f), 'utf8') }));
+const sql = readFileSync(path.join(MIGRATIONS, '20260929000004_organization_plan.sql'), 'utf8');
+
+/** The latest migration whose text matches `re`, and the match. */
+function latest(re: RegExp): { file: string; sql: string; match: RegExpExecArray } {
+  for (let i = migrations.length - 1; i >= 0; i--) {
+    const match = re.exec(migrations[i].sql);
+    if (match) return { ...migrations[i], match };
+  }
+  throw new Error(`no migration matches ${re}`);
+}
+
+const parseList = (text: string) => text.split(',').map((t) => t.trim().replace(/^'|'$/g, ''));
 
 function checkList(column: string): string[] {
-  const m = new RegExp(`CHECK \\(${column} IN \\(([^)]*)\\)\\)`).exec(sql);
-  if (!m) throw new Error(`no \`${column} IN (...)\` CHECK found in the migration`);
-  return m[1].split(',').map((t) => t.trim().replace(/^'|'$/g, ''));
+  return parseList(latest(new RegExp(`CHECK \\(${column} IN \\(([^)]*)\\)\\)`)).match[1]);
+}
+
+/** Every `p_<param> NOT IN (...)` list in the latest body of `fn`. */
+function rpcLists(fn: string, param: string): string[][] {
+  const { sql: text, match } = latest(new RegExp(`CREATE (?:OR REPLACE )?FUNCTION public\\.${fn}\\(`));
+  const start = match.index;
+  const body = text.slice(start, text.indexOf('END; $$', start));
+  return [...body.matchAll(new RegExp(`${param} NOT IN \\(([^)]*)\\)`, 'g'))].map((m) => parseList(m[1]));
 }
 
 describe('organization plan choices', () => {
@@ -37,11 +58,26 @@ describe('organization plan choices', () => {
     expect(offered).toEqual(checkList('user_limit').sort());
   });
 
+  it('has the verbs refuse exactly what the CHECKs refuse', () => {
+    for (const fn of ['admin_set_org_limits', 'admin_create_organization']) {
+      for (const [param, column] of [['p_project_limit', 'project_limit'], ['p_user_limit', 'user_limit']]) {
+        const lists = rpcLists(fn, param);
+        expect(lists.length, `${fn} validates ${param}`).toBe(1);
+        expect(lists[0].sort(), `${fn}.${param}`).toEqual(checkList(column).sort());
+      }
+    }
+  });
+
+  it('offers the D218 list, ascending', () => {
+    expect([...COUNT_LIMITS]).toEqual([1, 2, 3, 5, 10, 20, 50, 100]);
+  });
+
   it('labels the choices the way the owner asked for them', () => {
     expect(ACCESS_PERIODS.map((p) => p.label)).toEqual(['1 week', '1 month', '1 quarter', '1 year']);
     expect(periodLabel(null)).toBe('No expiry');
     expect(limitLabel(1, 'project')).toBe('1 project');
     expect(limitLabel(5, 'user')).toBe('5 users');
+    expect(limitLabel(100, 'project')).toBe('100 projects');
     expect(limitLabel(null, 'user')).toBe('Unlimited');
   });
 
@@ -52,6 +88,8 @@ describe('organization plan choices', () => {
     expect(limitFromSelect(NONE)).toBeNull();
     expect(limitFromSelect('3')).toBe(3);
     expect(limitFromSelect('4')).toBeNull();
+    expect(limitFromSelect('50')).toBe(50);
+    expect(limitFromSelect('1000')).toBeNull();
     expect(limitToSelect(null)).toBe(NONE);
     expect(limitToSelect(5)).toBe('5');
   });

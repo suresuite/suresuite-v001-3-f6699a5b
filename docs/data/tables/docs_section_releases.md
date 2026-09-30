@@ -24,8 +24,8 @@ partially or get corrected — the write fails.
 
 | Constraint | Rule | Added by |
 |---|---|---|
-| `docs_section_releases_key_shape` | `CHECK (section_key ~ '^[a-z][a-z0-9-]*$')` | `20260930000012_docs_release_and_questions.sql` |
-| `docs_section_releases_audience` | `CHECK (audience IN ('public','internal','confidential'))` | `20260930000012_docs_release_and_questions.sql` |
+| `docs_section_releases_key_shape` | `CHECK (section_key ~ '^[a-z][a-z0-9-]*$')` | `20260930000013_docs_release_and_questions.sql` |
+| `docs_section_releases_audience` | `CHECK (audience IN ('public','internal','confidential'))` | `20260930000013_docs_release_and_questions.sql` |
 
 ## Governance
 
@@ -55,7 +55,7 @@ Read is open to anon and authenticated — the /docs gate needs it BEFORE sign-i
 
 | Policy | Command | Roles | Added by |
 |---|---|---|---|
-| docs_section_releases_read | SELECT | anon, authenticated | `20260930000012_docs_release_and_questions.sql` |
+| docs_section_releases_read | SELECT | anon, authenticated | `20260930000013_docs_release_and_questions.sql` |
 
 </details>
 
@@ -82,7 +82,7 @@ The registry's stable section key (`DocGroup.key` in `src/components/docs/regist
 | Type | `text`, `NOT NULL` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20260930000012_docs_release_and_questions.sql` |
+| Added by | `20260930000013_docs_release_and_questions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | lowercase slug |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -96,7 +96,7 @@ The registry's stable section key (`DocGroup.key` in `src/components/docs/regist
 | Type | `text`, `NOT NULL` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20260930000012_docs_release_and_questions.sql` |
+| Added by | `20260930000013_docs_release_and_questions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | public, internal or confidential |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -110,7 +110,7 @@ When the audience last changed. Server-stamped by the writer.
 | Type | `timestamp with time zone`, `NOT NULL`, default `now()` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20260930000012_docs_release_and_questions.sql` |
+| Added by | `20260930000013_docs_release_and_questions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -124,7 +124,7 @@ The super admin who last changed it. NULL for the seeded rows and after that acc
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20260930000012_docs_release_and_questions.sql` |
+| Added by | `20260930000013_docs_release_and_questions.sql` |
 | References | `public.approved_users(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -132,6 +132,6 @@ The super admin who last changed it. NULL for the seeded rows and after that acc
 
 ---
 
-*Generated from data contract `babd6dc88113`, engine `0.2.8`,
-sidecar `supabase/contract/docs_section_releases.contract.yaml`, table created by `20260930000012_docs_release_and_questions.sql`. No wall-clock date: a generated
+*Generated from data contract `121733d8f344`, engine `0.2.8`,
+sidecar `supabase/contract/docs_section_releases.contract.yaml`, table created by `20260930000013_docs_release_and_questions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -198,7 +198,7 @@ export function roleFallbackCapabilities(
     // seeded false like every other per-agent key.
     reports: true,
     agent_report_builder: false,
-    // 20260930000012 seeds it super_admin-only: Confidential documentation
+    // 20260930000013 seeds it super_admin-only: Confidential documentation
     // sections are closed to everyone else until a super admin grants it.
     docs_confidential: isSuper,
   };

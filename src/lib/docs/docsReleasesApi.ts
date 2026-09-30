@@ -1,6 +1,6 @@
 /**
  * The manual's release settings and its Q&A, as the browser reaches them
- * (`20260930000012`).
+ * (`20260930000013`).
  *
  * Readers: `docs_section_releases` is a table anyone may SELECT; the Q&A comes
  * only through `docs_list_faq`, which filters by audience in the database.

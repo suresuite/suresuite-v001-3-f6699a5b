@@ -1,5 +1,6 @@
 -- Organization plan · D207 — each ORGANIZATION is valid for 1 week, 1 month, 1 quarter
--- or 1 year and may have 1, 2, 3 or 5 users and projects (or unlimited), and the
+-- or 1 year and may have 1, 2, 3 or 5 users and projects (or unlimited; D218 widened
+-- the list to 10, 20, 50 and 100 as well — `520` asserts it), and the
 -- DATABASE enforces all three; every member reads the plan through `get_my_profile`.
 --
 -- Every claim is about what the database does for the role the browser uses (`anon`,
@@ -104,8 +105,9 @@ BEGIN
     RAISE EXCEPTION 'D207/420 §1: project_limit 4 was accepted';
   EXCEPTION WHEN check_violation THEN NULL; END;
   BEGIN
-    UPDATE public.organizations SET user_limit = 10 WHERE id = v_org_a;
-    RAISE EXCEPTION 'D207/420 §1: user_limit 10 was accepted';
+    -- 7, not 10: D218 (`20260930000012`) made 10 a valid choice; `520` owns the list.
+    UPDATE public.organizations SET user_limit = 7 WHERE id = v_org_a;
+    RAISE EXCEPTION 'D207/420 §1: user_limit 7 was accepted';
   EXCEPTION WHEN check_violation THEN NULL; END;
   BEGIN
     UPDATE public.organizations SET access_valid_from = NULL WHERE id = v_org_a;

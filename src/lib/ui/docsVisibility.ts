@@ -3,7 +3,7 @@
  *
  * The manual is released SECTION BY SECTION. A super admin sets each section's
  * audience from /admin/docs, and the answer lives in the database
- * (`docs_section_releases`, `20260930000012`) rather than in a constant here:
+ * (`docs_section_releases`, `20260930000013`) rather than in a constant here:
  *
  *   public        anyone, signed in or not
  *   internal      any signed-in account

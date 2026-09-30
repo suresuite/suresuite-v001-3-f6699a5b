@@ -27,7 +27,7 @@
  *     and reverting it to DocPage silently reopens the manual mid-article
  *
  * THE ADVERTISING FOLLOWS THE RELEASE, AND THIS FILE IS WHY IT IS NOT DELETED.
- * Until §4 D218 a compile-time flag, `DOCS_PUBLIC_ENTRY_POINTS`, hid every
+ * Until §4 D219 a compile-time flag, `DOCS_PUBLIC_ENTRY_POINTS`, hid every
  * surface at once. The manual is now released section by section from
  * /admin/docs, and every surface shows its link exactly when at least one
  * section is public — `docsPublic`, read from `docs.anyPublic` in

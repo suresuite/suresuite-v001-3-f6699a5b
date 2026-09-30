@@ -121,7 +121,7 @@ describe("D28 — the truth table of what is actually unconditional", () => {
    * which is the stage that deletes these policies and therefore has to know which
    * ones the repository believes in (D158).
    *
-   * ONE NAME WAS ADDED ON PURPOSE, and it is not tenant data — §4 D218:
+   * ONE NAME WAS ADDED ON PURPOSE, and it is not tenant data — §4 D219:
    * `docs_section_releases` says which sections of the manual are public, internal
    * or confidential. The /docs gate must read it BEFORE sign-in to know whether a
    * public section may render, and its rows name sections whose titles are already

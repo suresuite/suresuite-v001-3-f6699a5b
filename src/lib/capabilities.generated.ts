@@ -81,7 +81,7 @@ export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'agent_cost_estimator', kind: 'feature', label: 'Cost Estimator Agent', description: 'Routing eligibility for the Cost Estimator (parameter estimates with uncertainty intervals)', sortOrder: 350 },  // 20260726193000_cost_estimator.sql
   { key: 'agent_network_cartographer', kind: 'feature', label: 'Network Cartographer Agent', description: 'Routing eligibility for the Network Cartographer (evidence-cited deep-tier network mapping)', sortOrder: 360 },  // 20260727000001_network_cartographer.sql
   { key: 'agent_disruption_sentinel', kind: 'feature', label: 'Disruption Sentinel Agent', description: 'Routing eligibility for the Disruption Sentinel (on-demand corroborated risk alerts with simulation-sized impact)', sortOrder: 370 },  // 20260729000001_disruption_sentinel.sql
-  { key: 'docs_confidential', kind: 'feature', label: 'Confidential Documentation', description: 'Read the documentation sections marked Confidential', sortOrder: 400 },  // 20260930000012_docs_release_and_questions.sql
+  { key: 'docs_confidential', kind: 'feature', label: 'Confidential Documentation', description: 'Read the documentation sections marked Confidential', sortOrder: 400 },  // 20260930000013_docs_release_and_questions.sql
 ];
 
 export const FEATURE_KEYS: FeatureKey[] = FEATURE_CAPABILITIES.map((c) => c.key as FeatureKey);

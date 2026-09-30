@@ -1,5 +1,5 @@
 /**
- * Who may read which part of the manual, and where a reader finds it (§4 D218).
+ * Who may read which part of the manual, and where a reader finds it (§4 D219).
  *
  * Each SECTION of the manual has an audience a super admin sets at /admin/docs
  * — public, internal, confidential — and the failure this file exists for is
