@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { DIALOG_AS_SHEET, HDR_PRIMARY_BUTTON, HDR_SEARCH_INPUT } from '@/components/shared';
 import { Ban, Loader2, Plus, SlidersHorizontal, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { planRefusal } from '@/lib/auth/organizationPlan';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface OrgOption { id: string; name: string; }
@@ -287,7 +288,8 @@ function AddUserDialog({ orgs, actorArgs, onCreated }: {
       p_password: password, p_role: role, p_org_id: orgId === 'none' ? null : orgId,
     });
     setSaving(false);
-    if (error) return toast.error(error.message);
+    // The organization's user limit (D207) refuses with a token before the sentence.
+    if (error) return toast.error(planRefusal(error.message) ?? error.message);
     toast.success(`User ${email.trim()} created`);
     reset(); setOpen(false); onCreated();
   };

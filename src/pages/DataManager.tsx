@@ -46,6 +46,7 @@ import UploadWizard from '@/components/UploadWizard';
 import { ProjectCard } from '@/components/ProjectCard';
 import { ErpConnectionsPanel } from '@/components/erp/ErpConnectionsPanel';
 import { confirmProjectDeletion } from '@/lib/projects/projectDeletion';
+import { planRefusal } from '@/lib/auth/organizationPlan';
 
 interface Project {
   id: string;
@@ -296,7 +297,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
       console.error('Project creation error:', error);
       toast.error(error.message?.includes('uq_modeler_project') 
         ? 'A project with this name already exists for your account'
-        : error.message || 'Unknown error');
+        : planRefusal(error.message) ?? (error.message || 'Unknown error'));
     }
   };
 
@@ -368,7 +369,8 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
       toast.success(`Project "${project.name}" duplicated as "${newName}"`);
       loadProjects();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unknown error');
+      const message = (error as { message?: string } | null)?.message;
+      toast.error(planRefusal(message) ?? (error instanceof Error ? error.message : message || 'Unknown error'));
     }
   };
 
