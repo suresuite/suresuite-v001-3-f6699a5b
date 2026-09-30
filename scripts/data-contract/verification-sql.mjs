@@ -1303,6 +1303,34 @@ async function d205AdminUsers() {
            (select count(*) from public.approved_users where role = 'super_admin' and is_active)::int as active_super_admins`), (r) => out(...table(r)));
 }
 
+// WP 9.4 slice 4 · §4 D225 — the validated baseline, before and after `scenarios.role`
+// deploys. Reads the role through `to_jsonb(s)` so the probe runs on a database that
+// does not have the column yet (the BEFORE read) and on one that does (the AFTER read,
+// taken in the push after the merge — D153). Every project, never one (D42).
+async function wp94ScenarioRole() {
+  section("WP 9.4 — the validated baseline: by name, and by role (D225)");
+  out("**A · Per project: scenarios named like the baseline, and baselines by role.** More",
+      "than one named row is the rename/duplicate shape the name lookup produced; after the",
+      "deploy every project with a validation run should read exactly one by role:");
+  report("A", await tryQ(`
+    select p.name as project,
+           count(*) filter (where s.name = 'Policy validation (auto)')::int as named_baseline,
+           count(*) filter (where to_jsonb(s) ->> 'role' = 'validation_baseline')::int as by_role,
+           count(*) filter (where to_jsonb(s) ? 'role')::int as rows_with_column,
+           count(*)::int as scenarios
+      from public.projects p join public.scenarios s on s.project_id = p.id
+     group by p.name order by p.name`), (r) => out(...table(r)));
+  out("", "**B · Active model cards whose evidence run belongs to a scenario that is NOT the",
+      "project's baseline by role** — should be 0 after the deploy:");
+  report("B", await tryQ(`
+    select count(*)::int as cards_off_baseline
+      from public.model_validations mv
+      join public.simulation_runs r on r.id = mv.evidence_run_id
+      join public.scenarios s on s.id = r.scenario_id
+     where mv.status = 'active'
+       and coalesce(to_jsonb(s) ->> 'role', '') <> 'validation_baseline'`), (r) => out(...table(r)));
+}
+
 async function wp71Stage0() {
   section("§15 · WP 7.1 stage 0 — the access surface, from the live database");
 
@@ -5092,6 +5120,7 @@ async function main() {
 
   await rqScenarioDiagnostic();
   await d205AdminUsers();
+  await wp94ScenarioRole();
 
   await schemaProbe();
   await viewSecurity();
