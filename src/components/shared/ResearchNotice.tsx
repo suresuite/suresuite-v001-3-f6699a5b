@@ -14,10 +14,10 @@ export default function ResearchNotice({ className = '' }: ResearchNoticeProps) 
       SuReSuite is a research prototype and part of the PhD thesis of Phu Nguyen
       (cooperative doctorate, HWR Berlin &amp; TU Berlin). Parts of this work were developed
       within the Horizon Europe project ACCURATE (Grant Agreement 101138269). Its core
-      algorithms — network
-      analysis, supply chain simulation and surrogate models for stress testing — will be
-      published as open access: source code under an OSI-approved open-source licence,
-      publications and documentation under CC&nbsp;BY&nbsp;4.0.
+      algorithms — network analysis, supply chain simulation and surrogate models for
+      stress testing — will be published as open access: source code under an
+      OSI-approved open-source licence, publications and documentation under
+      CC&nbsp;BY&nbsp;4.0.
     </p>
   );
 }
