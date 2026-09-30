@@ -23,6 +23,7 @@
 |---|---|---|
 | `fk_supply_chain_data_project_id` | FOREIGN KEY | `FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE` |
 | `fk_scd_project` | FOREIGN KEY | `FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE` |
+| `supply_chain_data_uploaded_by_fkey` | FOREIGN KEY | `FOREIGN KEY (uploaded_by) REFERENCES public.approved_users(id) ON DELETE SET NULL` |
 
 ## Governance
 
@@ -84,7 +85,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `is_critical_node` | — | `boolean` | — | — | Whether an analyzer flagged this edge's node as critical. An analysis result stored on an entity row — exactly the smearing D19 names. |
 | `critical_node_score` | — | `numeric(5,4)` | `score in [0, 1]` | — | The score behind `is_critical_node`. |
 | `prediction_timestamp` | — | `timestamp with time zone` | — | — | When the criticality prediction was made. The closest thing this table has to a version stamp, and it names no model and no input hash. |
-| `uploaded_by` | — | `uuid` | — | — | The user whose upload produced this edge. Referenced by the RLS policies. |
+| `uploaded_by` | — | `uuid` | — | — | The user whose upload produced this edge. Referenced by the RLS policies. NULL once that account is deleted (`ON DELETE SET NULL` since `20260930000007`; before it the key had no ON DELETE rule and refused the delete — §4 D213). |
 | `organization` | — | `text` | — | — | The owning organization, as a NAME with a `default_org` default. A displayable string used as an authorization key — the second half of G1, and the identity D13 says is compared by string. |
 | `project_id` | — | `uuid` | — | — | The project this edge belongs to. NULLABLE here, unlike every lane table — a row with no project is reachable only through the organization/uploader policies. |
 | `data_source` | — | `text` | — | — | Which lane produced this edge — inbound, outbound or BOM. |
@@ -282,7 +283,7 @@ When the criticality prediction was made. The closest thing this table has to a 
 
 ### `uploaded_by`
 
-The user whose upload produced this edge. Referenced by the RLS policies.
+The user whose upload produced this edge. Referenced by the RLS policies. NULL once that account is deleted (`ON DELETE SET NULL` since `20260930000007`; before it the key had no ON DELETE rule and refused the delete — §4 D213).
 
 | | |
 |---|---|
@@ -290,7 +291,6 @@ The user whose upload produced this edge. Referenced by the RLS policies.
 | Grain | `identifier` |
 | Unit | dimensionless |
 | Added by | `20250816052311_4c23d5ab-f132-41b1-8924-47d1d14f5a27.sql` |
-| References | `public.approved_users(id)` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -437,6 +437,6 @@ WP 4.3 · when the run that wrote the criticality columns finished. It is proven
 
 ---
 
-*Generated from data contract `71ef6477a817`, engine `0.2.8`,
+*Generated from data contract `bcc6ce89fa6a`, engine `0.2.8`,
 sidecar `supabase/contract/supply_chain_data.contract.yaml`, table created by `20250815235125_cfc18b38-6bb4-4fc3-9c2a-5247afb7f311.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

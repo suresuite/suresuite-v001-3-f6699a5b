@@ -13,7 +13,7 @@ const WHAT: Record<string, { what: string; care?: string }> = {
   },
   "/admin/users": {
     what: "Who may sign in, and the way into each person's own entitlements.",
-    care: "The entitlements themselves are on the per-user page below, not here.",
+    care: "The entitlements themselves are on the per-user page below, not here. Suspending an account can be undone; deleting it cannot. A deleted person's uploads, analyses and lanes are kept with the author shown as unknown, and an account that still owns projects cannot be deleted until they are transferred.",
   },
   "/admin/users/:userId": {
     what: "One person's access: the organizations they belong to and their role in each, every project they can reach with their role and rights on each, their capability grants and denials, and their permitted AI models.",

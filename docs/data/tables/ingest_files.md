@@ -11,7 +11,7 @@
 
 **One row is** One file as received, in one run: the manifest for bytes held in storage — where they are, how many there were, and the SHA-256 of exactly the sequence received. Write-once: the row records an event that has already happened and cannot be edited into a different one.
 
-TIER 0, CREATED IN PHASE 3 / WP 3.1, AND NOTHING WRITES IT YET. PLAN.md §2 lists six tiers and this repository had five: there has never been a record of what a user actually uploaded. `UploadWizard` parses the file in the browser and throws it away, which is why every parse defect — D6's quoted comma, D7's blank numerics, D8's untrimmed identifiers, D46's integer `time_unit` — is unreproducible after the fact. You cannot re-read a file that was never kept. WP 3.2 is the writer: upload lands the bytes here, opens a run, and parses SERVER-SIDE. Landing the table one package ahead means that package does not have to invent a schema and a parser in the same session. WRITE-ONCE IS ENFORCED, NOT ASSERTED. `ingest_files_write_once()` refuses every UPDATE, and `supabase/rehearsal/060` proves it against a real database — both halves, because the rule is 'immutable' and not 'undeletable'. §2's tier laws have been sentences in a plan for three phases; a sentence nothing enforces drifts within two months, which is the lesson of the two orphan tables.
+TIER 0, CREATED IN PHASE 3 / WP 3.1, AND NOTHING WRITES IT YET. PLAN.md §2 lists six tiers and this repository had five: there has never been a record of what a user actually uploaded. `UploadWizard` parses the file in the browser and throws it away, which is why every parse defect — D6's quoted comma, D7's blank numerics, D8's untrimmed identifiers, D46's integer `time_unit` — is unreproducible after the fact. You cannot re-read a file that was never kept. WP 3.2 is the writer: upload lands the bytes here, opens a run, and parses SERVER-SIDE. Landing the table one package ahead means that package does not have to invent a schema and a parser in the same session. WRITE-ONCE IS ENFORCED, NOT ASSERTED. `ingest_files_write_once()` refuses every UPDATE, and `supabase/rehearsal/060` proves it against a real database — both halves, because the rule is 'immutable' and not 'undeletable'. ONE EXCEPTION, SINCE `20260930000007` (WP 7.2 (a), §4 D161): `uploaded_by` may go from a value to NULL, with every other column unchanged, once that account no longer exists — the SET NULL of deleting the uploader. Content is immutable; the actor may be anonymised. `rehearsal/480` §2 proves the guard still refuses it while the account exists. §2's tier laws have been sentences in a plan for three phases; a sentence nothing enforces drifts within two months, which is the lesson of the two orphan tables.
 
 ## Uniqueness
 
@@ -84,7 +84,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `content_type` | — | `text` | — | — | The MIME type as reported at upload. NULLABLE and not trusted: browsers report `application/vnd.ms-excel` for CSVs often enough that a parser keying on it would reject real files. WP 3.2's parser decides from the bytes. |
 | `byte_size` | — | `bigint` | — | — | How many bytes were received. The cheapest possible check that a file is the file somebody meant to send, and the number a quota will eventually be about. |
 | `content_sha256` | — | `text` | — | — | SHA-256 of the bytes AS RECEIVED, lowercase hex, computed before any parse. The anchor: with it, 'the file you uploaded on Tuesday' is a checkable claim rather than a memory. |
-| `uploaded_by` | — | `uuid` | — | — | The person who uploaded the file, in `approved_users`. NULL when the landing had no human — an API push or a scheduled pull — which is stated rather than filled with a service account. |
+| `uploaded_by` | — | `uuid` | — | — | The person who uploaded the file, in `approved_users`. NULL when the landing had no human — an API push or a scheduled pull — which is stated rather than filled with a service account — or when the uploader's account has since been DELETED: `ON DELETE SET NULL`, and the one change the write-once guard admits (WP 7.2 (a), §4 D161). The file itself is not touched. |
 | `received_at` | — | `timestamp with time zone` | — | — | When the bytes were received. Server-stamped, never the client's clock. |
 
 ## Each column in full
@@ -232,7 +232,7 @@ is about the column and not only about the table.
 
 ### `uploaded_by`
 
-The person who uploaded the file, in `approved_users`. NULL when the landing had no human — an API push or a scheduled pull — which is stated rather than filled with a service account.
+The person who uploaded the file, in `approved_users`. NULL when the landing had no human — an API push or a scheduled pull — which is stated rather than filled with a service account — or when the uploader's account has since been DELETED: `ON DELETE SET NULL`, and the one change the write-once guard admits (WP 7.2 (a), §4 D161). The file itself is not touched.
 
 | | |
 |---|---|
@@ -268,6 +268,6 @@ When the bytes were received. Server-stamped, never the client's clock.
 
 ---
 
-*Generated from data contract `71ef6477a817`, engine `0.2.8`,
+*Generated from data contract `bcc6ce89fa6a`, engine `0.2.8`,
 sidecar `supabase/contract/ingest_files.contract.yaml`, table created by `20260916000013_ingest_files_tier0.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

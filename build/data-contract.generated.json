@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 358,
-      "migrations_applied": 350,
-      "last_migration": "20260930000006_admin_transfer_project_moves_ownership.sql"
+      "migrations_found": 359,
+      "migrations_applied": 351,
+      "last_migration": "20260930000007_admin_delete_user.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -430,6 +430,15 @@
           "definition": "CHECK (status IN ('running','succeeded','failed'))",
           "implicit": true,
           "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "analysis_runs_actor_user_id_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "actor_user_id"
+          ],
+          "definition": "FOREIGN KEY (actor_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL",
+          "added_by": "20260930000007_admin_delete_user.sql"
         }
       ],
       "indexes": [
@@ -889,24 +898,17 @@
         {
           "name": "actor_user_id",
           "type": "uuid",
-          "nullable": false,
+          "nullable": true,
           "default": null,
           "primary_key": false,
           "unique": false,
-          "references": {
-            "schema": "public",
-            "table": "approved_users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": null
-          },
+          "references": null,
           "added_by": "20260917000006_analysis_store.sql",
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "WHO asked for this run. NOT NULL, so a run that cannot name its actor cannot exist — the same stance `assert_writer_may_act` takes for the RPC writers (`20260917000005`). Note what attribution means here: the application authenticates against `approved_users` and not Supabase Auth, so the id is CLIENT-ASSERTED (D28) — the database refuses a write into a project the user cannot reach, which is a real constraint, but it is not proof of identity.",
+          "meaning": "WHO asked for this run. Required when the run is CREATED — a BEFORE INSERT trigger, `analysis_runs_actor_required`, refuses a run that cannot name its actor, the same stance `assert_writer_may_act` takes for the RPC writers (`20260917000005`). NULL only afterwards, when that person's account is deleted: the key is `ON DELETE SET NULL` and the identity guard admits exactly that change, so the run is kept and its actor becomes unknown (WP 7.2 (a), §4 D213). Until `20260930000007` the column was NOT NULL with no ON DELETE rule, so nobody who had ever run an analysis could be deleted. Note what attribution means here: the application authenticates against `approved_users` and not Supabase Auth, so the id is CLIENT-ASSERTED (D28) — the database refuses a write into a project the user cannot reach, which is a real constraint, but it is not proof of identity.",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
@@ -2051,7 +2053,7 @@
           "engine_requirement": null
         }
       ],
-      "note": "The table WP 1.4 found existed in production but in no migration — the authentication table, untracked for a year, discovered by the orphan rule (D4). `20250815000000_approved_users_base.sql` now builds it on a fresh database, and the parts of that file which are reconstruction rather than evidence are marked as such in it. This sidecar describes the table as the migrations now define it.",
+      "note": "The table WP 1.4 found existed in production but in no migration — the authentication table, untracked for a year, discovered by the orphan rule (D4). `20250815000000_approved_users_base.sql` now builds it on a fresh database, and the parts of that file which are reconstruction rather than evidence are marked as such in it. This sidecar describes the table as the migrations now define it. DELETING A ROW (`admin_delete_user`, `20260930000007`, WP 7.2 (a)): memberships, delegations, AI permissions and capabilities CASCADE; every actor column that records what the person did — `ingest_files.uploaded_by`, `ingest_runs`' two, `analysis_runs.actor_user_id`, `supply_chain_data.uploaded_by` and the rest — is `ON DELETE SET NULL`, so the fact stays and its actor becomes unknown; `audit_logs.actor_user_id` carries no key and keeps the uuid (§4 D161, D213).",
       "analysis_kinds": null
     },
     "audit_logs": {
@@ -9425,7 +9427,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The person who uploaded the file, in `approved_users`. NULL when the landing had no human — an API push or a scheduled pull — which is stated rather than filled with a service account.",
+          "meaning": "The person who uploaded the file, in `approved_users`. NULL when the landing had no human — an API push or a scheduled pull — which is stated rather than filled with a service account — or when the uploader's account has since been DELETED: `ON DELETE SET NULL`, and the one change the write-once guard admits (WP 7.2 (a), §4 D161). The file itself is not touched.",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
@@ -9477,7 +9479,7 @@
           "engine_requirement": null
         }
       ],
-      "note": "TIER 0, CREATED IN PHASE 3 / WP 3.1, AND NOTHING WRITES IT YET. PLAN.md §2 lists six tiers and this repository had five: there has never been a record of what a user actually uploaded. `UploadWizard` parses the file in the browser and throws it away, which is why every parse defect — D6's quoted comma, D7's blank numerics, D8's untrimmed identifiers, D46's integer `time_unit` — is unreproducible after the fact. You cannot re-read a file that was never kept. WP 3.2 is the writer: upload lands the bytes here, opens a run, and parses SERVER-SIDE. Landing the table one package ahead means that package does not have to invent a schema and a parser in the same session. WRITE-ONCE IS ENFORCED, NOT ASSERTED. `ingest_files_write_once()` refuses every UPDATE, and `supabase/rehearsal/060` proves it against a real database — both halves, because the rule is 'immutable' and not 'undeletable'. §2's tier laws have been sentences in a plan for three phases; a sentence nothing enforces drifts within two months, which is the lesson of the two orphan tables.",
+      "note": "TIER 0, CREATED IN PHASE 3 / WP 3.1, AND NOTHING WRITES IT YET. PLAN.md §2 lists six tiers and this repository had five: there has never been a record of what a user actually uploaded. `UploadWizard` parses the file in the browser and throws it away, which is why every parse defect — D6's quoted comma, D7's blank numerics, D8's untrimmed identifiers, D46's integer `time_unit` — is unreproducible after the fact. You cannot re-read a file that was never kept. WP 3.2 is the writer: upload lands the bytes here, opens a run, and parses SERVER-SIDE. Landing the table one package ahead means that package does not have to invent a schema and a parser in the same session. WRITE-ONCE IS ENFORCED, NOT ASSERTED. `ingest_files_write_once()` refuses every UPDATE, and `supabase/rehearsal/060` proves it against a real database — both halves, because the rule is 'immutable' and not 'undeletable'. ONE EXCEPTION, SINCE `20260930000007` (WP 7.2 (a), §4 D161): `uploaded_by` may go from a value to NULL, with every other column unchanged, once that account no longer exists — the SET NULL of deleting the uploader. Content is immutable; the actor may be anonymised. `rehearsal/480` §2 proves the guard still refuses it while the account exists. §2's tier laws have been sentences in a plan for three phases; a sentence nothing enforces drifts within two months, which is the lesson of the two orphan tables.",
       "analysis_kinds": null
     },
     "ingest_runs": {
@@ -27834,6 +27836,15 @@
           ],
           "definition": "FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE",
           "added_by": "20250829104528_58ea0ced-8ea2-4102-98af-96f92b85cb4d.sql"
+        },
+        {
+          "name": "supply_chain_data_uploaded_by_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "uploaded_by"
+          ],
+          "definition": "FOREIGN KEY (uploaded_by) REFERENCES public.approved_users(id) ON DELETE SET NULL",
+          "added_by": "20260930000007_admin_delete_user.sql"
         }
       ],
       "indexes": [
@@ -28358,20 +28369,13 @@
           "default": null,
           "primary_key": false,
           "unique": false,
-          "references": {
-            "schema": "public",
-            "table": "approved_users",
-            "columns": [
-              "id"
-            ],
-            "on_delete": null
-          },
+          "references": null,
           "added_by": "20250816052311_4c23d5ab-f132-41b1-8924-47d1d14f5a27.sql",
           "unit": null,
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The user whose upload produced this edge. Referenced by the RLS policies.",
+          "meaning": "The user whose upload produced this edge. Referenced by the RLS policies. NULL once that account is deleted (`ON DELETE SET NULL` since `20260930000007`; before it the key had no ON DELETE rule and refused the delete — §4 D213).",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
@@ -31300,5 +31304,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "71ef6477a817"
+  "contract_version": "bcc6ce89fa6a"
 }

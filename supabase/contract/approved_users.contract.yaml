@@ -568,4 +568,10 @@ note: >-
   (D4). `20250815000000_approved_users_base.sql` now builds it on a fresh
   database, and the parts of that file which are reconstruction rather than
   evidence are marked as such in it. This sidecar describes the table as the
-  migrations now define it.
+  migrations now define it. DELETING A ROW (`admin_delete_user`,
+  `20260930000007`, WP 7.2 (a)): memberships, delegations, AI permissions and
+  capabilities CASCADE; every actor column that records what the person did —
+  `ingest_files.uploaded_by`, `ingest_runs`' two, `analysis_runs.actor_user_id`,
+  `supply_chain_data.uploaded_by` and the rest — is `ON DELETE SET NULL`, so
+  the fact stays and its actor becomes unknown; `audit_logs.actor_user_id`
+  carries no key and keeps the uuid (§4 D161, D213).

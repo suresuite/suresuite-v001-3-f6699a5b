@@ -416,6 +416,6 @@ The validation run this scenario inherited its data-readiness verdict from, so a
 
 ---
 
-*Generated from data contract `71ef6477a817`, engine `0.2.8`,
+*Generated from data contract `bcc6ce89fa6a`, engine `0.2.8`,
 sidecar `supabase/contract/scenarios.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
