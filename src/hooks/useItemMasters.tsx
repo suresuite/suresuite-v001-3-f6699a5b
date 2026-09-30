@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProjectRights } from "@/hooks/useProjectRights";
+import { ProjectRightRefused } from "@/lib/auth/projectRights";
+import { toast } from "sonner";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import {
   demandWeightedSellPrice,
@@ -121,6 +124,9 @@ interface UseItemMastersResult {
     table: ItemMasterTable,
     rows: Array<MaterialRow | ProductRow | SupplierRow>,
   ) => Promise<void>;
+  /** D219 — "Edit Input Data" on this project, as /profile lists it; `saveRows` refuses without it. */
+  canEditInputs: boolean;
+  inputEditRefusal: string | null;
 }
 
 /**
@@ -130,6 +136,11 @@ interface UseItemMastersResult {
  */
 export function useItemMasters(projectId: string | null | undefined): UseItemMastersResult {
   const { user } = useAuth();
+  const rights = useProjectRights(projectId);
+  const canEditInputs = rights.can("data_edit_inputs");
+  const inputEditRefusal = rights.loading
+    ? "Checking your rights on this project…"
+    : rights.refusal("data_edit_inputs");
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
@@ -241,6 +252,11 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
   const saveRows = useCallback(
     async (table: ItemMasterTable, rows: Array<MaterialRow | ProductRow | SupplierRow>) => {
       if (!projectId || rows.length === 0) return;
+      if (!canEditInputs) {
+        const reason = inputEditRefusal ?? "You may not edit input data on this project.";
+        toast.error(reason);
+        throw new ProjectRightRefused(reason);
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
       for (let i = 0; i < rows.length; i += SAVE_BATCH_SIZE) {
@@ -257,7 +273,7 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
       }
       await loadTable(table);
     },
-    [projectId, loadTable, user?.id],
+    [projectId, loadTable, user?.id, canEditInputs, inputEditRefusal],
   );
 
   const derived: DerivedEconomics = useMemo(
@@ -299,5 +315,8 @@ export function useItemMasters(projectId: string | null | undefined): UseItemMas
     [inboundArcs, outboundArcs, bomRows, bomLevel, laneTruncation, lanesLoaded],
   );
 
-  return { materials, products, suppliers, loading, error, missingCounts, derived, lanes, reload, saveRows };
+  return {
+    materials, products, suppliers, loading, error, missingCounts, derived, lanes, reload, saveRows,
+    canEditInputs, inputEditRefusal,
+  };
 }

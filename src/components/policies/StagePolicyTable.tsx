@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { ProjectRightRefused } from "@/lib/auth/projectRights";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -78,6 +79,7 @@ import { ValueChainPopover, type ValueChainTarget } from "@/components/policies/
 import { sourceFor } from "@/lib/trust/valueChain";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useItemMasters, type ItemMasterTable } from "@/hooks/useItemMasters";
+import { useProjectRights } from "@/hooks/useProjectRights";
 import { useDerivedMaps } from "@/hooks/useDerivedMaps";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
@@ -293,6 +295,8 @@ export function StagePolicyTable({
     lanes,
     saveRows,
     error: mastersError,
+    canEditInputs,
+    inputEditRefusal,
   } = useItemMasters(projectId);
   // The economics maps plus the capacity chain, which needs the bundle and its
   // overrides as well as the lanes — assembled by the one hook both grid
@@ -340,6 +344,11 @@ export function StagePolicyTable({
   const [newSupplierId, setNewSupplierId] = useState("");
   const assignSupplier = async (materialId: string, supplierId: string) => {
     if (!projectId || !user) return;
+    // D219 — assigning a supplier writes the input lanes: "Edit Input Data".
+    if (!canEditInputs) {
+      toast.error(inputEditRefusal ?? "You may not edit input data on this project.", TOAST);
+      return;
+    }
     setAssigning(materialId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
@@ -1153,8 +1162,11 @@ export function StagePolicyTable({
       if (toUpsert.length > 0) await bulkUpsertOverrides(toUpsert);
     } catch (e) {
       // Surface RPC failures (e.g. bulk_upsert_* missing in this DB) instead
-      // of swallowing them — the click handler has no other catch.
-      toast.error(errMsg(e, "Failed to save changes"), TOAST);
+      // of swallowing them — the click handler has no other catch. A D219
+      // refusal was already said by the hook that refused it.
+      if (!(e instanceof ProjectRightRefused)) {
+        toast.error(errMsg(e, "Failed to save changes"), TOAST);
+      }
       return;
     }
     setDrafts({});
@@ -1195,6 +1207,8 @@ export function StagePolicyTable({
   const [applying, setApplying] = useState(false);
   /** A prefill has run for the current (project, stage) — see `dataBannerState`. */
   const [prefillSettled, setPrefillSettled] = useState(false);
+  const policyRights = useProjectRights(projectId);
+  const canSeedPolicies = policyRights.can("data_edit_policies");
   useEffect(() => {
     setPrefillSettled(false);
   }, [projectId, stageKey]);
@@ -1264,6 +1278,11 @@ export function StagePolicyTable({
   };
 
   const runPrefill = async ({ silent = false }: { silent?: boolean }) => {
+    // D219 — the prefill writes policy overrides: "Edit Policies" on this project.
+    if (!canSeedPolicies) {
+      if (!silent) toast.error(policyRights.refusal("data_edit_policies") ?? "You may not change policies on this project.", TOAST);
+      return;
+    }
     const toUpsert: OverrideRow[] = [];
     let written = 0;
     let skipped = 0;
@@ -1343,6 +1362,9 @@ export function StagePolicyTable({
   useEffect(() => {
     const marker = `${projectId}::${stageKey}`;
     if (autoSeededRef.current.has(marker)) return;
+    // D219 — wait for the rights before marking: a seed skipped while they load would
+    // never be retried, and one the person may not write is not attempted at all.
+    if (!canSeedPolicies) return;
     if (loading || applying || dataRows.length === 0) return;
     if (!hasSeedableData || hasOverridesForStage) return;
     autoSeededRef.current.add(marker);
@@ -1352,7 +1374,7 @@ export function StagePolicyTable({
     // user did not ask for it, so it does not toast.
     void applyPrefill({ silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, applying, dataRows, hasSeedableData, hasOverridesForStage]);
+  }, [loading, applying, dataRows, hasSeedableData, hasOverridesForStage, canSeedPolicies]);
 
   // Banner state: derived from project data presence + override existence.
   const dataBannerState = useMemo(():

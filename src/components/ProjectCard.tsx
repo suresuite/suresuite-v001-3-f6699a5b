@@ -37,6 +37,7 @@ import {
 import { getCombineStatusStyle, getCombineStatusIcon, getCombineStatusText } from '@/utils/combineStatus';
 import { getFallbackSimulationDates } from '@/utils/dateHelpers';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useProjectRights } from '@/hooks/useProjectRights';
 import { MobileSheet } from '@/components/shared/MobileSheet';
 import {
   M,
@@ -297,7 +298,27 @@ export function ProjectCard({
     fallbackDates.start.toLocaleDateString() + ' → ' + fallbackDates.end.toLocaleDateString();
   const periodDefaulted = !project.simulation_start || !project.simulation_end;
 
+  // Deleting the project stays the owner rule it always was (no /profile right states it).
   const owns = canModify && (project.modeler_id === userId || role === 'admin');
+  // D219 — every other action is the right /profile lists for this person on this project:
+  // uploads, the item master, combining and generating the node list are "Edit Input Data";
+  // the settings form is "Edits project settings"; downloading the node list is "Export".
+  const rights = useProjectRights(project.id, { modelerId: project.modeler_id });
+  const editsInputs = rights.can('data_edit_inputs');
+  const editsSettings = rights.canEditProject;
+  const inputsRefusal = rights.refusal('data_edit_inputs') ?? 'You may not edit input data on this project.';
+  const settingsRefusal = 'Only the project’s owner or an app admin, working in its organization, can edit this project.';
+  const downloadNodeList = () => {
+    if (rights.can('export')) onDownloadNodeList(project);
+    else toast({ title: 'Export not permitted', description: rights.refusal('export') ?? undefined, variant: 'destructive' });
+  };
+  const generateNodeList = () => {
+    if (editsInputs) onGenerateNodeList(project);
+    else toast({ title: 'Not permitted', description: inputsRefusal, variant: 'destructive' });
+  };
+  const actionCount = 1 + (editsInputs ? 3 : 0) + (editsSettings ? 1 : 0) + (owns ? 1 : 0);
+  const actionList = ['data', ...(editsInputs ? ['upload', 'item master', 'combine'] : []),
+    ...(editsSettings ? ['edit'] : []), ...(owns ? ['delete'] : [])].join(', ');
   const isGlobal = globalSelectedProjectId === project.id;
   const hasBasicData = completion.bom && completion.inbound && completion.outbound;
 
@@ -426,8 +447,8 @@ export function ProjectCard({
 
           <MobileRow
             label="Project actions"
-            sub={owns ? 'data, item master, combine, edit, delete' : 'view data'}
-            value={owns ? '6' : '1'}
+            sub={actionCount > 1 ? actionList : 'view data'}
+            value={String(actionCount)}
             onClick={() => setSheet(true)}
           />
 
@@ -461,8 +482,8 @@ export function ProjectCard({
                 setSheet(false);
               },
               'the upload wizard',
-              !owns,
-              'Only the project’s modeller or an admin can upload.',
+              !editsInputs,
+              inputsRefusal,
             )}
             {action(
               'Edit item master',
@@ -471,14 +492,14 @@ export function ProjectCard({
                 setSheet(false);
               },
               'materials, products and suppliers',
-              !owns,
-              'Only the project’s modeller or an admin can edit the item master.',
+              !editsInputs,
+              inputsRefusal,
             )}
             {action(
               completion.nodeList && hasBasicData ? 'Download node list' : 'Generate node list',
               () => {
-                if (completion.nodeList && hasBasicData) onDownloadNodeList(project);
-                else onGenerateNodeList(project);
+                if (completion.nodeList && hasBasicData) downloadNodeList();
+                else generateNodeList();
                 setSheet(false);
               },
               'optional — enhance it with location data and re-upload',
@@ -492,10 +513,10 @@ export function ProjectCard({
                 setSheet(false);
               },
               project.combine_status ? getCombineStatusText(project.combine_status) : undefined,
-              !owns || project.combine_status === 'running',
+              !editsInputs || project.combine_status === 'running',
               project.combine_status === 'running'
                 ? 'A combine is already running for this project.'
-                : 'Only the project’s modeller or an admin can combine datasets.',
+                : inputsRefusal,
             )}
             {action(
               'Edit project',
@@ -504,8 +525,8 @@ export function ProjectCard({
                 setSheet(false);
               },
               'name, plant, model, BOM level, dates',
-              !owns,
-              'Only the project’s modeller or an admin can edit this project.',
+              !editsSettings,
+              settingsRefusal,
             )}
             {action(
               'Delete project',
@@ -668,9 +689,9 @@ export function ProjectCard({
                       e.stopPropagation();
                       const hasBasicData = completion.bom && completion.inbound && completion.outbound;
                       if (completion.nodeList && hasBasicData) {
-                        onDownloadNodeList(project);
+                        downloadNodeList();
                       } else if (hasBasicData) {
-                        onGenerateNodeList(project);
+                        generateNodeList();
                       }
                     }}
                   >
@@ -753,8 +774,9 @@ export function ProjectCard({
                 <Eye className="h-3.5 w-3.5" /> View data
               </Button>
 
-              {owns && (
+              {(editsInputs || editsSettings || owns) && (
                 <>
+                  {editsInputs && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -766,6 +788,7 @@ export function ProjectCard({
                   >
                     <Upload className="h-3.5 w-3.5" /> Upload
                   </Button>
+                  )}
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -774,21 +797,22 @@ export function ProjectCard({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuItem onClick={() => onEditItemMaster(project)}>
+                      <DropdownMenuItem disabled={!editsInputs} onClick={() => onEditItemMaster(project)}>
                         <Coins className="mr-2 h-4 w-4" /> Edit item master
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        disabled={project.combine_status === 'running'}
+                        disabled={!editsInputs || project.combine_status === 'running'}
                         onClick={() => onCombine(project)}
                       >
                         <Workflow className="mr-2 h-4 w-4" />
                         {project.combine_status === 'failed' ? 'Retry combine datasets' : 'Combine datasets'}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onEdit(project)}>
+                      <DropdownMenuItem disabled={!editsSettings} onClick={() => onEdit(project)}>
                         <Pencil className="mr-2 h-4 w-4" /> Edit project
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
+                        disabled={!owns}
                         className="text-[#bf2330] focus:text-[#bf2330]"
                         onClick={() => {
                           if (confirmProjectDeletion(project.name)) onDelete(project);

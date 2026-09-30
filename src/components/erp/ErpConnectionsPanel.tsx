@@ -14,6 +14,7 @@ import { RefreshCw, Unplug, Plug } from "lucide-react";
 import { useErpConnections } from "@/hooks/useErpConnections";
 import { MappingWarningsCard } from "@/components/sim/RunProgressPanel";
 import { startOrbitMrpConnect } from "@/lib/erp/orbitMrpOAuth";
+import { useProjectRights } from "@/hooks/useProjectRights";
 
 const ORBIT_MRP_BASE_URL = import.meta.env.VITE_ORBIT_MRP_BASE_URL as string | undefined;
 
@@ -22,6 +23,14 @@ const STATUS_META = {
   needs_attention: { dot: "bg-amber-500", label: "Needs attention" },
   revoked: { dot: "bg-red-500", label: "Disconnected" },
 } as const;
+
+/** D219 — connecting, syncing and applying write the project's inputs: shown to whoever
+ *  holds "Edit Input Data" there, as /profile lists it, and to nobody else. */
+export function ErpConnectionsPanelForEditors({ projectId, modelerId }: { projectId: string; modelerId: string | null }) {
+  const rights = useProjectRights(projectId, { modelerId });
+  if (!rights.can("data_edit_inputs")) return null;
+  return <ErpConnectionsPanel projectId={projectId} />;
+}
 
 export function ErpConnectionsPanel({ projectId }: { projectId: string }) {
   const { links, runsByLink, loading, triggerSync, applySync, revokeLink } = useErpConnections(projectId);

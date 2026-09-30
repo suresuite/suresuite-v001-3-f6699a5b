@@ -44,7 +44,7 @@ import ItemMasterEditor from '@/components/ItemMasterEditor';
 import { getDefaultSimulationDateRange, formatDateForDatabase } from '@/utils/dateHelpers';
 import UploadWizard from '@/components/UploadWizard';
 import { ProjectCard } from '@/components/ProjectCard';
-import { ErpConnectionsPanel } from '@/components/erp/ErpConnectionsPanel';
+import { ErpConnectionsPanelForEditors } from '@/components/erp/ErpConnectionsPanel';
 import { confirmProjectDeletion } from '@/lib/projects/projectDeletion';
 import { planRefusal } from '@/lib/auth/organizationPlan';
 
@@ -988,10 +988,8 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                      {/* Complementary to the Upload Wizard above, never a replacement —
                          docs/design/erp-mrp-integration-plan.md §2.0, §6c. Its
                          connect/sync/revoke/apply are writes, so it keeps the same
-                         owner gate as Upload now that View data is open to every role. */}
-                     {canModify && (project.modeler_id === user?.id || role === 'admin') && (
-                       <ErpConnectionsPanel projectId={project.id} />
-                     )}
+                         gate as Upload — "Edit Input Data" on this project (D219). */}
+                     <ErpConnectionsPanelForEditors projectId={project.id} modelerId={project.modeler_id} />
                   </div>
                 )}
                 {itemMasterProjectId === project.id && (

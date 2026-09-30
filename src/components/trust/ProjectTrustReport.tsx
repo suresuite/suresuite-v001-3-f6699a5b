@@ -51,7 +51,12 @@ const stateCls: Record<string, string> = {
   unknown: "text-slate-600",
 };
 
-export function ProjectTrustReport({ report }: { report: TrustReport }) {
+export function ProjectTrustReport({ report, canDownload = true, downloadRefusal = null }: {
+  report: TrustReport;
+  /** D219 — "Export" on this project; the download is off without it. */
+  canDownload?: boolean;
+  downloadRefusal?: string | null;
+}) {
   return (
     <div className="space-y-4">
       <Card>
@@ -73,13 +78,16 @@ export function ProjectTrustReport({ report }: { report: TrustReport }) {
             <button
               type="button"
               onClick={() => downloadJson(report)}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-sm border border-[--zinc-border] px-2 py-1 text-xs hover:bg-[#fafafa] md:min-h-0"
+              disabled={!canDownload}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-sm border border-[--zinc-border] px-2 py-1 text-xs hover:bg-[#fafafa] disabled:opacity-50 md:min-h-0"
             >
               <Download className="h-3.5 w-3.5" />
               Download JSON
             </button>
             <span className="text-[11px] text-muted-foreground">
-              {report.coverage.length === 0
+              {!canDownload
+                ? downloadRefusal ?? "Export isn't enabled for you on this project."
+                : report.coverage.length === 0
                 ? "This copy has no coverage section — ask for the “Data trust report” document to include it."
                 : "Includes every section and this report's own limits."}
             </span>

@@ -11,6 +11,7 @@
  * checked, which is the T1 breach the whole standard exists to prevent.
  */
 import { ingestHistoryFrom } from "@/lib/trust/exportTrustInputs";
+import { useProjectRights } from "@/hooks/useProjectRights";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -28,6 +29,10 @@ interface Props {
 
 export function TrustReportPanel({ projectId, projectName, findings }: Props) {
   const { freshness, error, loading } = useProjectFreshness(projectId);
+  // D219 — the JSON download is an export: "Export" on this project.
+  const rights = useProjectRights(projectId);
+  const canExport = rights.can("export");
+  const exportRefusal = rights.refusal("export");
   const [ingest, setIngest] = useState<IngestEvent[] | null>(null);
 
   useEffect(() => {
@@ -82,5 +87,5 @@ export function TrustReportPanel({ projectId, projectName, findings }: Props) {
     ingestHistory: ingest ?? [],
   });
 
-  return <ProjectTrustReport report={report} />;
+  return <ProjectTrustReport report={report} canDownload={canExport} downloadRefusal={exportRefusal} />;
 }

@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { ProjectRightRefused } from "@/lib/auth/projectRights";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,6 +24,7 @@ import type { FulfillmentStrategy, PolicyBundle, PolicyFamily } from "@/lib/poli
 import type { ProjectContext } from "@/lib/policies/resolvePreset";
 import { FIELD_LABELS, visibleFieldGroups } from "@/lib/policies/schemas";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { useProjectRights } from "@/hooks/useProjectRights";
 import {
   downloadWorkbook,
   exportStageWorkbook,
@@ -73,6 +75,10 @@ export function FocusedStage({
 }: Props) {
   const stage = getStage(stageKey);
   const isMobile = useIsMobile();
+  // D219 — "Export" and "Edit Policies" on this project, as /profile lists them.
+  const rights = useProjectRights(projectId);
+  const canExport = rights.can("export");
+  const canImport = rights.can("data_edit_policies");
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -87,6 +93,10 @@ export function FocusedStage({
     activePreset.startsWith(`${stageKey}:`);
 
   const handleExport = () => {
+    if (!canExport) {
+      toast.error(rights.refusal("export") ?? "Export isn't enabled for you on this project.");
+      return;
+    }
     const wb = exportStageWorkbook(stage.title, stage.families, defaults, stageOverrides);
     const ts = new Date().toISOString().slice(0, 10);
     downloadWorkbook(wb, `policies-${stage.key}-${ts}.xlsx`);
@@ -113,6 +123,8 @@ export function FocusedStage({
         `Imported: ${Object.keys(result.defaultsPatch).length} default(s), ${result.overrides.length} override(s)`,
       );
     } catch (err) {
+      // D219 — a refusal was already said by usePolicies.
+      if (err instanceof ProjectRightRefused) return;
       console.error(err);
       toast.error("Failed to read workbook");
     }
@@ -159,10 +171,10 @@ export function FocusedStage({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={handleExport} className="text-[12px]">
+          <DropdownMenuItem onClick={handleExport} disabled={!canExport} className="text-[12px]">
             Export
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => fileRef.current?.click()} className="text-[12px]">
+          <DropdownMenuItem onClick={() => fileRef.current?.click()} disabled={!canImport} className="text-[12px]">
             Import
           </DropdownMenuItem>
         </DropdownMenuContent>

@@ -1,7 +1,8 @@
 // /profile · "My organization" (PLAN.md §4 D217) — who else is in the account's active
 // organization and on its projects, and what each of them may do. Read-only: every role
 // and right here is the database's answer (`get_my_organization_access`,
-// `get_my_project_access` → `project_access_read`, the read /admin/projects shows).
+// `get_my_project_access` → `project_access_read`, the read /admin/projects shows; its rights
+// are `project_rights_for_user`'s, the answer the app's own gates read — D219).
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,7 @@ import {
   getMyOrganizationAccess, getMyProjectAccess, holdsProjectRole,
   type MyOrganizationAccess, type ProjectAccess, type ProjectPerson,
 } from '@/lib/auth/myOrganizationAccess';
+import { projectRightsNotes } from '@/lib/auth/projectRights';
 import { Ban, Check, Loader2 } from 'lucide-react';
 
 /** `super_admin` → "Super admin". */
@@ -228,7 +230,7 @@ function ProjectsCard({ orgId, orgName, projects, projectId, onProject, userId }
               )}
             </section>
             <RoleLegend matrix={access.role_matrix} caps={access.project_capabilities}
-              note="An administrator can override a person's rights on their account, and that takes precedence over the project role." />
+              note="An administrator can override a person's rights on their account, and that takes precedence over the project role. Edit Input Data also needs the upload gate: uploads are accepted only from the project's owner or an app admin." />
           </>
         ) : null}
       </CardContent>
@@ -276,7 +278,7 @@ function PersonRow({ p, orgId, orgName, caps }: {
           ))}
         </div>
       )}
-      {!p.visible && (
+      {!p.visible && p.account_active && (
         <div className="text-xs text-muted-foreground">
           {p.in_project_org
             ? `Sees the project after switching to ${orgName}.`
@@ -291,6 +293,7 @@ function PersonRow({ p, orgId, orgName, caps }: {
         <Right on={p.can_edit_project} label="Edits project settings" />
         {caps.map((c) => <Right key={c.key} on={!!p.capabilities[c.key]} label={c.label} />)}
       </div>
+      {projectRightsNotes(p).map((n) => <div key={n} className="text-xs text-muted-foreground">{n}</div>)}
     </li>
   );
 }

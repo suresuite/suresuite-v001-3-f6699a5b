@@ -2069,12 +2069,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:194"
+        "evidence": "src/hooks/useItemMasters.tsx:205"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:194"
+        "evidence": "src/hooks/useItemMasters.tsx:205"
       }
     ],
     "governance": {
@@ -5207,12 +5207,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:194"
+        "evidence": "src/hooks/useItemMasters.tsx:205"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:194"
+        "evidence": "src/hooks/useItemMasters.tsx:205"
       }
     ],
     "governance": {
@@ -5995,7 +5995,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/components/trust/TrustReportPanel.tsx:36"
+        "evidence": "src/components/trust/TrustReportPanel.tsx:41"
       }
     ],
     "governance": {
@@ -11801,12 +11801,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:194"
+        "evidence": "src/hooks/useItemMasters.tsx:205"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc ensure_item_masters",
-        "evidence": "src/hooks/useItemMasters.tsx:194"
+        "evidence": "src/hooks/useItemMasters.tsx:205"
       }
     ],
     "governance": {
@@ -12196,17 +12196,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectIntelligence.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:145"
+        "evidence": "src/hooks/usePolicies.tsx:167"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:145"
+        "evidence": "src/hooks/usePolicies.tsx:167"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:145"
+        "evidence": "src/hooks/usePolicies.tsx:167"
       }
     ],
     "governance": {
@@ -12619,17 +12619,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectIntelligence.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:146"
+        "evidence": "src/hooks/usePolicies.tsx:168"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:146"
+        "evidence": "src/hooks/usePolicies.tsx:168"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:146"
+        "evidence": "src/hooks/usePolicies.tsx:168"
       }
     ],
     "governance": {
@@ -13158,7 +13158,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:462"
+        "evidence": "src/hooks/usePolicies.tsx:496"
       }
     ],
     "governance": {
@@ -16236,7 +16236,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "useVerifiableExports → select * from run_replications",
-        "evidence": "src/hooks/useVerifiableExports.tsx:218"
+        "evidence": "src/hooks/useVerifiableExports.tsx:234"
       }
     ],
     "governance": {
@@ -17948,12 +17948,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc assign_material_supplier",
-        "evidence": "src/components/policies/StagePolicyTable.tsx:346"
+        "evidence": "src/components/policies/StagePolicyTable.tsx:355"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc assign_material_supplier",
-        "evidence": "src/components/sim/PreRunValidationPanel.tsx:70"
+        "evidence": "src/components/sim/PreRunValidationPanel.tsx:78"
       }
     ],
     "governance": {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ProjectRightRefused } from "@/lib/auth/projectRights";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -171,6 +172,8 @@ export function PolicyDefaultsCard({ family, value, onSave }: Props) {
       await onSave(validated as PolicyBundle[PolicyFamily]);
       toast.success(`${meta.title} saved`);
     } catch (err) {
+      // D219 — a refusal was already said by usePolicies; it is not a validation error.
+      if (err instanceof ProjectRightRefused) return;
       toast.error(`Invalid: ${String(err)}`);
     }
   };

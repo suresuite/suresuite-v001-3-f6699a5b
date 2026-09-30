@@ -207,10 +207,10 @@ surfaces:
   - page: "ProjectPolicies.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/usePolicies.tsx:462"
+    evidence: "src/hooks/usePolicies.tsx:496"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "table read"
     grain: column
-    evidence: "src/hooks/useVerifiableExports.tsx:226"
+    evidence: "src/hooks/useVerifiableExports.tsx:242"
     confirmed: true

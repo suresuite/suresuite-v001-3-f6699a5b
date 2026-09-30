@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 364,
-  "migrations_applied": 356,
+  "migrations_found": 365,
+  "migrations_applied": 357,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260930000012_organization_limit_options.sql",
+  "last_migration": "20260930000013_project_rights_one_answer.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 326,
+    "functions": 328,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -21527,8 +21527,8 @@
       "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "VOLATILE",
-      "comment": "D211, D216 — /admin/users/:userId's organization and project read. Active super admin only. ",
-      "defined_by": "20260930000009_account_default_organization.sql"
+      "comment": "D211, D216, D219 — /admin/users/:userId's organization and project read. Active super admin only. ",
+      "defined_by": "20260930000013_project_rights_one_answer.sql"
     },
     {
       "name": "admin_list_organizations",
@@ -23632,6 +23632,19 @@
       "defined_by": "20260930000011_my_organization_access.sql"
     },
     {
+      "name": "get_my_project_rights",
+      "signature": "get_my_project_rights(uuid, uuid)",
+      "args": [
+        "p_project_id uuid",
+        "p_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": "D219 — the signed-in account's rights on one project (project_rights_for_user), for the ",
+      "defined_by": "20260930000013_project_rights_one_answer.sql"
+    },
+    {
       "name": "get_network_edges_for_prominence",
       "signature": "get_network_edges_for_prominence(uuid)",
       "args": [
@@ -24635,8 +24648,8 @@
       "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
-      "comment": "D215, D217 — who is on a project and what each may do there: every account that owns it, ",
-      "defined_by": "20260930000011_my_organization_access.sql"
+      "comment": "D215, D217, D219 — who is on a project and what each may do there: every account that owns it, ",
+      "defined_by": "20260930000013_project_rights_one_answer.sql"
     },
     {
       "name": "project_freshness",
@@ -24659,6 +24672,19 @@
       "volatility": null,
       "comment": "Phase 3 / WP 3.4 (§4 D61) — makes a new project's modeler an owner in ",
       "defined_by": "20260917000001_diff_before_promotion.sql"
+    },
+    {
+      "name": "project_rights_for_user",
+      "signature": "project_rights_for_user(uuid, uuid)",
+      "args": [
+        "p_user_id uuid",
+        "p_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "D219 — one person's rights on one project, as the app applies them: visible, ",
+      "defined_by": "20260930000013_project_rights_one_answer.sql"
     },
     {
       "name": "project_role_rank",

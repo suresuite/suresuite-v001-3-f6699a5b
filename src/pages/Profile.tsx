@@ -474,6 +474,12 @@ function MyAccessTab() {
           {/* Features */}
           <section>
             <h3 className="mb-2 text-sm font-semibold">Features</h3>
+            {/* D219 — these are ACCOUNT-wide; on a project the role there decides the four
+                project rights, and that is what the app applies. */}
+            <p className="mb-2 text-xs text-muted-foreground">
+              Account-wide. On each project, Run Simulations, Edit Input Data, Edit Policies and Export
+              follow your role on that project — see My Organization for what you may do there.
+            </p>
             <div className="grid gap-1.5 sm:grid-cols-2">
               {FEATURE_CAPABILITIES.map((f) => {
                 const on = !!capabilities.features[f.key];

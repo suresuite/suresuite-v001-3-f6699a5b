@@ -56,7 +56,7 @@ Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the d
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `SimulationLab.tsx` | table read | `src/hooks/useScenarios.tsx:70` | yes |
-| `SimulationLab.tsx` | table read | `src/hooks/useVerifiableExports.tsx:213` | yes |
+| `SimulationLab.tsx` | table read | `src/hooks/useVerifiableExports.tsx:229` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -416,6 +416,6 @@ The validation run this scenario inherited its data-readiness verdict from, so a
 
 ---
 
-*Generated from data contract `1810759ef6a5`, engine `0.2.8`,
+*Generated from data contract `65bd230e1585`, engine `0.2.8`,
 sidecar `supabase/contract/scenarios.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

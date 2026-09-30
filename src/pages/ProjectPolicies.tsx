@@ -160,6 +160,8 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
     deleteVersion,
     deleteVersions,
     exportVersion,
+    canEditPolicies,
+    policyEditRefusal,
   } = usePolicies(projectId);
 
   const { ctx, hasData } = useProjectContext({ projectId, fulfillmentStrategy });
@@ -429,6 +431,14 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
               activeStage={activeStage}
               onStageChange={setActiveStage}
             />
+
+            {/* D219 — "Edit Policies" on this project, as /profile lists it. Every write
+                refuses without it (usePolicies); this says so before anyone types. */}
+            {!canEditPolicies && policyEditRefusal && (
+              <div className="rounded-sm border px-2.5 py-1.5 text-[11.5px] text-muted-foreground">
+                View only — {policyEditRefusal}
+              </div>
+            )}
 
             <FocusedStage
               projectId={projectId}
