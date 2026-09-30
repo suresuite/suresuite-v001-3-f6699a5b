@@ -167,6 +167,9 @@ export function roleFallbackCapabilities(
   // this repository has no `tsc` step in CI.
   const features: Record<FeatureKey, boolean> = {
     ai_chat: true,
+    // seeded FROM ai_chat by 20260930000010, so the launcher shows wherever
+    // the assistant is allowed until an admin switches it off.
+    ai_chat_launcher: true,
     project_intelligence: true,
     export: true,
     simulation_lab: powerRole,

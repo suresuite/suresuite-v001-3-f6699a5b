@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 361,
-      "migrations_applied": 353,
-      "last_migration": "20260930000009_account_default_organization.sql"
+      "migrations_found": 362,
+      "migrations_applied": 354,
+      "last_migration": "20260930000010_ai_chat_launcher_feature.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -31363,5 +31363,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "457063b3f667"
+  "contract_version": "1cc84e15372a"
 }

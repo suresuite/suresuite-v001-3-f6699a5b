@@ -25,9 +25,9 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "457063b3f667";
+export const CONTRACT_VERSION = "1cc84e15372a";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20260930000009_account_default_organization.sql";
+export const LAST_MIGRATION = "20260930000010_ai_chat_launcher_feature.sql";
 
 export const COUNTS = {
   "tablesInSchema": 81,

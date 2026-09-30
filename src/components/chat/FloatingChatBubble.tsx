@@ -128,7 +128,13 @@ export function FloatingChatBubble() {
     }
   }, [model, isModelAllowed]);
 
-  const hidden = !user || location.pathname.startsWith("/auth") || !canFeature("ai_chat");
+  // Two keys: `ai_chat` is the assistant itself; `ai_chat_launcher` is this
+  // floating button, switchable per role/org/user in /admin → Features.
+  const hidden =
+    !user ||
+    location.pathname.startsWith("/auth") ||
+    !canFeature("ai_chat") ||
+    !canFeature("ai_chat_launcher");
 
   useEffect(() => {
     if (open) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
