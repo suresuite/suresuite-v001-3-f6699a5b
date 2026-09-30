@@ -1,10 +1,13 @@
 // Platform Overview (/admin) — SuReSuite "Ledger" redesign.
-// Data flow unchanged from the original AdminDashboard.tsx: same KPI counts,
-// MTD spend rollups, and top-user/top-org aggregation. Only the presentation
-// changed — StatCard/Card grids became a single bordered KPI ledger with mono
-// kickers, and the two Top tables use the shared TH/TD treatment.
+// Every figure comes from ONE call, `admin_platform_overview` (PLAN.md §4 D205).
+// The page used to read `organizations`, `approved_users`, `ai_usage_logs` and
+// `v_admin_user_usage` directly; the browser calls as anon with no session, so each
+// was refused or filtered to nothing and the page showed zeros over a populated
+// platform. Month and day boundaries are the database's (UTC), the same window the
+// Users page's MTD uses — they used to come from the browser's local clock.
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { SURFACE, KX, TH, TD, ROW_HOVER, useTableSort } from '@/components/admin/adminUi';
 import { TableBlock } from '@/components/shared';
@@ -13,7 +16,7 @@ import { useIsMobile } from '@/hooks/use-is-mobile';
 import { useRowBudget } from '@/hooks/useViewport';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
-interface Kpis { orgs: number; projects: number; users: number; requests: number; costMtd: number; costToday: number; activeUsers7d: number; }
+interface Kpis { orgs: number; projects: number; users: number; usersSuspended: number; requests: number; requestsMtd: number; costMtd: number; costToday: number; activeUsers7d: number; }
 interface TopRow { label: string; requests: number; cost: number; }
 
 const db = supabase as any;
@@ -21,7 +24,9 @@ const db = supabase as any;
 export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
   const isMobile = useIsMobile();
   const topBudget = useRowBudget(4, 6, 10);
+  const { user: actor } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [topUsers, setTopUsers] = useState<TopRow[]>([]);
   const [topOrgs, setTopOrgs] = useState<TopRow[]>([]);
@@ -30,53 +35,38 @@ export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-        const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
-        const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000);
-        const [orgsRes, projRes, usersRes, reqRes, mtdRes, todayRes, activeRes, topUsersRes, topOrgsRes] = await Promise.all([
-          db.from('organizations').select('id', { count: 'exact', head: true }),
-          db.from('projects').select('id', { count: 'exact', head: true }),
-          db.from('approved_users').select('id', { count: 'exact', head: true }),
-          db.from('ai_usage_logs').select('id', { count: 'exact', head: true }),
-          db.from('ai_usage_logs').select('cost_usd').gte('created_at', monthStart.toISOString()),
-          db.from('ai_usage_logs').select('cost_usd').gte('created_at', dayStart.toISOString()),
-          db.from('ai_usage_logs').select('user_id').gte('created_at', weekAgo.toISOString()),
-          db.from('v_admin_user_usage').select('name,email,mtd_requests,mtd_cost_usd').order('mtd_cost_usd', { ascending: false }).limit(10),
-          db.from('ai_usage_logs').select('org_id,cost_usd,id').gte('created_at', monthStart.toISOString()),
-        ]);
+        const { data, error } = await db.rpc('admin_platform_overview', { p_actor_id: actor?.id, p_actor_email: actor?.email });
         if (cancelled) return;
-        const sumCost = (rows: any[] | null) => (rows ?? []).reduce((a, r: any) => a + Number(r.cost_usd || 0), 0);
-        const uniqueActive = new Set((activeRes.data ?? []).map((r: any) => r.user_id).filter(Boolean));
-        setKpis({
-          orgs: orgsRes.count ?? 0, projects: projRes.count ?? 0, users: usersRes.count ?? 0,
-          requests: reqRes.count ?? 0, costMtd: sumCost(mtdRes.data), costToday: sumCost(todayRes.data),
-          activeUsers7d: uniqueActive.size,
-        });
-        setTopUsers((topUsersRes.data ?? []).map((r: any) => ({ label: r.name || r.email || '—', requests: Number(r.mtd_requests || 0), cost: Number(r.mtd_cost_usd || 0) })));
-        const orgAgg = new Map<string, { requests: number; cost: number }>();
-        (topOrgsRes.data ?? []).forEach((r: any) => {
-          const k = r.org_id || 'unknown';
-          const prev = orgAgg.get(k) || { requests: 0, cost: 0 };
-          prev.requests += 1; prev.cost += Number(r.cost_usd || 0); orgAgg.set(k, prev);
-        });
-        const orgIds = Array.from(orgAgg.keys()).filter((k) => k !== 'unknown');
-        let orgNames: Record<string, string> = {};
-        if (orgIds.length) {
-          const { data: orgs } = await db.from('organizations').select('id,name').in('id', orgIds);
-          orgNames = Object.fromEntries((orgs ?? []).map((o: any) => [o.id, o.name]));
+        // A refused read is not an empty platform: say which it is (D205, D203).
+        if (error || !data) {
+          setLoadError(error?.message === 'forbidden'
+            ? 'Only an active super admin can read the platform overview.'
+            : `Could not load the overview: ${error?.message ?? 'no data returned'}`);
+          return;
         }
-        setTopOrgs(Array.from(orgAgg.entries()).map(([id, v]) => ({ label: orgNames[id] || 'Unassigned', ...v })).sort((a, b) => b.cost - a.cost).slice(0, 10));
+        const n = (v: unknown) => Number(v ?? 0);
+        setKpis({
+          orgs: n(data.organizations), projects: n(data.projects), users: n(data.users),
+          usersSuspended: n(data.users_suspended), requests: n(data.requests), requestsMtd: n(data.requests_mtd),
+          costMtd: n(data.cost_mtd), costToday: n(data.cost_today), activeUsers7d: n(data.active_users_7d),
+        });
+        const top = (rows: Array<{ label?: string; requests?: number; cost?: number }> | null | undefined): TopRow[] =>
+          (rows ?? []).map((r) => ({ label: String(r.label ?? '—'), requests: n(r.requests), cost: n(r.cost) }));
+        setTopUsers(top(data.top_users));
+        setTopOrgs(top(data.top_orgs));
       } finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [actor?.id, actor?.email]);
 
   const $ = (v: number) => `$${v.toFixed(2)}`;
   const n = (v: number) => v.toLocaleString();
-  const avg = kpis && kpis.requests ? kpis.costMtd / Math.max(1, kpis.requests) : 0;
+  // Month-to-date cost over month-to-date requests. It used to divide by ALL-TIME
+  // requests, which shrinks the average every month the platform ages.
+  const avg = kpis && kpis.requestsMtd ? kpis.costMtd / kpis.requestsMtd : 0;
 
-  const reach = kpis ? [['Organizations', n(kpis.orgs)], ['Projects', n(kpis.projects)], ['Users', n(kpis.users)], ['Active · 7d', n(kpis.activeUsers7d)]] : [];
-  const spend = kpis ? [['Requests', n(kpis.requests), 'all-time', false], ['Cost today', $(kpis.costToday), '', false], ['Cost MTD', $(kpis.costMtd), '', true], ['Avg $/req', $(avg), 'month-to-date', false]] : [];
+  const reach = kpis ? [['Organizations', n(kpis.orgs)], ['Projects', n(kpis.projects)], ['Users', kpis.usersSuspended ? `${n(kpis.users)} · ${n(kpis.usersSuspended)} suspended` : n(kpis.users)], ['AI-active · 7d', n(kpis.activeUsers7d)]] : [];
+  const spend = kpis ? [['Requests', n(kpis.requests), 'all-time', false], ['Cost today', $(kpis.costToday), 'UTC day', false], ['Cost MTD', $(kpis.costMtd), '', true], ['Avg $/req', $(avg), 'month-to-date · UTC', false]] : [];
 
   if (isMobile) {
     // §13.4 — the numbers band, as the skin's stat grid. Same eight figures in
@@ -85,7 +75,11 @@ export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
     // so `auto-fit` cannot orphan the fourth (§9.2).
     return (
       <AdminLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="Platform Overview">
-        {loading || !kpis ? (
+        {loadError ? (
+          <MobilePanel label="Platform overview">
+            <p className="px-3 py-8 text-center text-[13px] text-[#bf2330]">{loadError}</p>
+          </MobilePanel>
+        ) : loading || !kpis ? (
           <MobilePanel label="Platform overview">
             <p className="px-3 py-8 text-center text-[13px] text-[#525252]">Loading…</p>
           </MobilePanel>
@@ -155,7 +149,9 @@ export default function AdminDashboard({ isCollapsed, setIsCollapsed }: Props) {
 
   return (
     <AdminLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="Platform Overview">
-      {loading || !kpis ? (
+      {loadError ? (
+        <div className={`${SURFACE} px-4 py-3 text-[13px] text-[#bf2330]`}>{loadError}</div>
+      ) : loading || !kpis ? (
         <div className="grid h-40 place-items-center">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-[--zinc-border] border-t-foreground" />
         </div>

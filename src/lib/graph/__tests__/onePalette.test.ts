@@ -21,17 +21,23 @@ const COLOR_LITERAL = /#[0-9a-fA-F]{3,8}\b|hsl\(/g;
 
 /** Counted on the day the gate landed. Each must fall to 0 as its page migrates. */
 const BASELINE: Record<string, number> = {
-  // 11 → 10: WP 8.4 took the edge stroke from `GRAPH_INK` instead of a literal. The
-  // remaining ten are `GROUP_COLORS` and the selection highlight, which go when the
-  // page's A/B/C/D columns become echelons outright.
-  'src/pages/ProductLevelNetwork.tsx': 8,
+  // 11 → 10: WP 8.4 took the edge stroke from `GRAPH_INK` instead of a literal.
+  // 8 → 3: the network-lenses desktop redesign built `GROUP_COLORS` from
+  // `colorForEchelon` and moved the search highlight into the shared lens hook.
+  // The three left are header chrome (the mobile refresh ink, the disruption orange).
+  'src/pages/ProductLevelNetwork.tsx': 3,
   // UNCHANGED at 32 by WP 8.3, and that is the honest number: the two classifiers it
   // deleted held no colours. `getNodeColor` still holds all 32, because replacing it
   // is the same change as migrating the level tiles and the flow list — WP 8.4's.
   // Worth recording that the first attempt lowered this to 31 from a `grep -c`, which
   // counts LINES and not matches; the ratchet's own count is the one that decides.
-  'src/pages/ProcessLevelNetwork.tsx': 32,
-  'src/pages/FirmLevelNetwork.tsx': 13,
+  // 32 → 3: the network-lenses desktop redesign deleted `getNodeColor` and the node
+  // border variants; classes now colour from `colorForEchelon` and `DEPTH_SHADE`.
+  // The three left are header chrome, as on the product page.
+  'src/pages/ProcessLevelNetwork.tsx': 3,
+  // 13 → 7: the redesign moved the search highlight and edge ink into the shared
+  // lens. The four `TIER_COLORS` remain (a tier is not an echelon) plus header chrome.
+  'src/pages/FirmLevelNetwork.tsx': 7,
   // 16 → 2: audit F-09 replaced the level ramp and the type table with
   // `colorForEchelon`. The two left are the search highlight and the node border.
   'src/pages/InteractiveNetworkSpace.tsx': 2,

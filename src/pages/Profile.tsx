@@ -20,10 +20,21 @@ import { PAGE_CAPABILITIES, FEATURE_CAPABILITIES } from '@/lib/capabilities';
 import { AlertCircle, Ban, Check, Copy, Loader2 } from 'lucide-react';
 import { describeExpiry, formatDate, passwordStatus, relativeDay } from '@/lib/auth/passwordPolicy';
 import { AVATAR_COLORS, DEFAULT_AVATAR_CLASS, avatarClass, isAvatarColor } from '@/lib/avatarColors';
+import { formatPlanDate, periodLabel, usage } from '@/lib/auth/organizationPlan';
 
 /** `super_admin` → "Super admin". The stored value is an enum token, not a label. */
 const roleLabel = (role: string | undefined | null) =>
   role ? role.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : '';
+
+/**
+ * D207 — the organization's access period as one line: "1 month, from 3 Sep 2026".
+ * An account with no organization has no plan, and says so.
+ */
+function validityText(user: { organization?: string | null; users_used?: number | null; access_period?: string | null; access_valid_from?: string | null } | null) {
+  if (!user || user.users_used == null) return 'No organization';
+  if (!user.access_period) return periodLabel(null);
+  return `${periodLabel(user.access_period)}, from ${formatPlanDate(user.access_valid_from)}`;
+}
 
 /** The RPCs' refusals, in words (see PLAN.md §4 D206 for where each is raised). */
 function accountError(message: string | undefined): string {
@@ -31,7 +42,6 @@ function accountError(message: string | undefined): string {
   if (m.includes('invalid_current_password')) return 'Your current password is incorrect.';
   if (m.includes('password_too_short')) return 'New password must be at least 8 characters.';
   if (m.includes('password_unchanged')) return 'The new password must be different from your current one.';
-  if (m.includes('first_name_required')) return 'First name is required.';
   if (m.includes('account_inactive')) return 'Your account has been deactivated. Contact your administrator.';
   if (m.includes('not_authenticated')) return 'Your session could not be verified. Please sign out and sign in again.';
   return m || 'Unknown error.';
@@ -53,13 +63,9 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   const initialTab = locked || params.get('tab') === 'password' ? 'password' : 'profile';
 
   const [tab, setTab] = useState(initialTab);
-  // The two parts of the account name. Saving them rewrites `name` itself, which is
-  // what every other page shows — the database keeps the three equal (D207).
-  const [firstName, setFirstName] = useState(user?.first_name ?? '');
-  const [lastName, setLastName] = useState(user?.last_name ?? '');
   const [copiedId, setCopiedId] = useState(false);
-  // The stored display name only; the account name is the placeholder, not a value
-  // that "Save changes" would silently copy into display_name.
+  // The user name is the stored `display_name` only; the account name is the
+  // placeholder, not a value that "Save changes" would silently copy into it.
   const [displayName, setDisplayName] = useState(user?.display_name ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   // The avatar is the user's initial on a colour they choose; there is no image upload
@@ -73,34 +79,25 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   const [savingPw, setSavingPw] = useState(false);
 
   useEffect(() => {
-    setFirstName(user?.first_name ?? '');
-    setLastName(user?.last_name ?? '');
     setDisplayName(user?.display_name ?? '');
     setPhone(user?.phone ?? '');
     setAvatarColor(isAvatarColor(user?.avatar_color) ? user.avatar_color : '');
-  }, [user?.id, user?.first_name, user?.last_name, user?.display_name, user?.phone, user?.avatar_color]);
+  }, [user?.id, user?.display_name, user?.phone, user?.avatar_color]);
 
   useEffect(() => {
     if (locked) setTab('password');
   }, [locked]);
 
-  const nameChanged =
-    firstName.trim() !== (user?.first_name ?? '') || lastName.trim() !== (user?.last_name ?? '');
-
   const onSaveProfile = async () => {
-    if (nameChanged && !firstName.trim()) {
-      toast({ title: 'Could not save', description: accountError('first_name_required'), variant: 'destructive' });
-      return;
-    }
     setSavingProfile(true);
-    // A blank string CLEARS the field; NULL would leave it unchanged (D206). The name
-    // parts are sent only when edited, so an unchanged name never rewrites `name`.
+    // A blank string CLEARS the field; NULL would leave it unchanged (D206). The first
+    // and last name are not sent: they identify the account holder and only an
+    // administrator changes them (D209).
     const { error } = await supabase.rpc('update_own_profile', {
       p_display_name: displayName.trim(),
       p_phone: phone.trim(),
       p_avatar_color: avatarColor,
       p_user_id: user?.id,
-      ...(nameChanged ? { p_first_name: firstName.trim(), p_last_name: lastName.trim() } : {}),
     });
     setSavingProfile(false);
     if (error) {
@@ -195,7 +192,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
           <Card>
             <CardHeader>
               <CardTitle>Profile information</CardTitle>
-              <CardDescription>Your account ID, your name and the contact details visible to teammates.</CardDescription>
+              <CardDescription>Who this account belongs to, and the user name and contact details visible to teammates.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center gap-4">
@@ -243,13 +240,23 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                     API keys you create on the Developer API page are recorded as created by this ID.
                   </p>
                 </div>
+                {/* D209 — the account holder's identity, as an administrator recorded it. Read-only
+                    here so every action stays attributable to an identified person. */}
                 <div className="space-y-2">
                   <Label htmlFor="first_name">First name</Label>
-                  <Input id="first_name" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" required />
+                  <Input id="first_name" value={user?.first_name ?? ''} disabled />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="last_name">Last name</Label>
-                  <Input id="last_name" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" placeholder="Optional" />
+                  <Input id="last_name" value={user?.last_name ?? ''} placeholder="—" disabled />
+                </div>
+                <p className="-mt-2 text-xs text-muted-foreground sm:col-span-2">
+                  Your first and last name identify you as the account holder and can only be changed by an administrator.
+                </p>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="display_name">User name</Label>
+                  <Input id="display_name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={user?.name ?? ''} autoComplete="nickname" />
+                  <p className="text-xs text-muted-foreground">The name shown in the navigation bar and account menu. Leave blank to use your full name.</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
@@ -263,10 +270,27 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                   <Label>Organization</Label>
                   <Input value={user?.organization ?? ''} disabled />
                 </div>
+                {/* D207 — the organization's plan, set by an administrator; read here, never edited. */}
                 <div className="space-y-2">
-                  <Label htmlFor="display_name">Display name</Label>
-                  <Input id="display_name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={[firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || user?.name || ''} />
-                  <p className="text-xs text-muted-foreground">Optional. Shown instead of your full name in the navigation bar and account menu.</p>
+                  <Label>Valid for</Label>
+                  <Input value={validityText(user)} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label>Valid until</Label>
+                  <Input
+                    value={user?.access_valid_until
+                      ? `${formatPlanDate(user.access_valid_until)}${user.access_exempt ? ' (does not apply to super admins)' : ''}`
+                      : '—'}
+                    disabled
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Organization users</Label>
+                  <Input value={user?.users_used == null ? '—' : usage(user.users_used, user.user_limit)} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label>Organization projects</Label>
+                  <Input value={user?.projects_used == null ? '—' : usage(user.projects_used, user.project_limit)} disabled />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="phone">Phone</Label>

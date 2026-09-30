@@ -67,7 +67,7 @@ READ THE POLICIES BEFORE TRUSTING THIS ROW. The table carries two policies and t
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DeveloperApi.tsx` | rpc list_api_keys | `src/pages/DeveloperApi.tsx:261` | yes |
-| `Profile.tsx` | rpc change_own_password | `src/pages/Profile.tsx:139` | yes |
+| `Profile.tsx` | rpc change_own_password | `src/pages/Profile.tsx:136` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -77,19 +77,19 @@ unnoticed.
 
 <details><summary>13 app-shell read(s) — not lineage</summary>
 
-* `Auth.tsx` — `src/hooks/useAuth.tsx:125`
-* `DataManager.tsx` — `src/hooks/useAuth.tsx:125`
-* `FirmLevelNetwork.tsx` — `src/hooks/useAuth.tsx:125`
-* `Forbidden.tsx` — `src/hooks/useAuth.tsx:125`
-* `GettingStarted.tsx` — `src/hooks/useAuth.tsx:125`
-* `InteractiveNetworkSpace.tsx` — `src/hooks/useAuth.tsx:125`
-* `Landing.tsx` — `src/hooks/useAuth.tsx:125`
-* `NotFound.tsx` — `src/hooks/useAuth.tsx:125`
-* `ProcessLevelNetwork.tsx` — `src/hooks/useAuth.tsx:125`
-* `ProductLevelNetwork.tsx` — `src/hooks/useAuth.tsx:125`
-* `ProjectIntelligence.tsx` — `src/hooks/useAuth.tsx:125`
-* `ProjectPolicies.tsx` — `src/hooks/useAuth.tsx:125`
-* `SimulationLab.tsx` — `src/hooks/useAuth.tsx:125`
+* `Auth.tsx` — `src/hooks/useAuth.tsx:149`
+* `DataManager.tsx` — `src/hooks/useAuth.tsx:149`
+* `FirmLevelNetwork.tsx` — `src/hooks/useAuth.tsx:149`
+* `Forbidden.tsx` — `src/hooks/useAuth.tsx:149`
+* `GettingStarted.tsx` — `src/hooks/useAuth.tsx:149`
+* `InteractiveNetworkSpace.tsx` — `src/hooks/useAuth.tsx:149`
+* `Landing.tsx` — `src/hooks/useAuth.tsx:149`
+* `NotFound.tsx` — `src/hooks/useAuth.tsx:149`
+* `ProcessLevelNetwork.tsx` — `src/hooks/useAuth.tsx:149`
+* `ProductLevelNetwork.tsx` — `src/hooks/useAuth.tsx:149`
+* `ProjectIntelligence.tsx` — `src/hooks/useAuth.tsx:149`
+* `ProjectPolicies.tsx` — `src/hooks/useAuth.tsx:149`
+* `SimulationLab.tsx` — `src/hooks/useAuth.tsx:149`
 
 These reach the table only through modules the shell mounts on every page.
 Listing them as surfaces would be true about the imports and false about
@@ -105,24 +105,24 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | Column | CSV header | Type | Unit | Required in CSV | Meaning |
 |---|---|---|---|---|---|
 | `id` 🔑 | — | `uuid` | — | — | The user's identity, and the value every other governance table joins on — `organization_members.user_id`, `projects.modeler_id`, the `_user_id` argument of `capabilities_for_user()` and of `get_current_user_org_id()`. |
-| `name` | — | `text` | — | — | The person's full name — as entered when the account was approved, and editable since §4 D207 by its owner on /profile as a first and a last name. One fact with `first_name` / `last_name`: the `approved_users_sync_name` trigger rewrites it when a part changes and re-derives the parts when only it changes, whatever writes the row. |
+| `name` | — | `text` | — | — | The account holder's full name, as entered when the account was approved. Their identity for accountability: its owner cannot change it (§4 D209) — `update_own_profile` has no parameter for it — and only the administrator paths write it. `first_name` / `last_name` are a reading of it. |
 | `email` | — | `text` | — | — | The sign-in address, UNIQUE. Also a second identity path: the fallback branch of `get_current_user_org()` and `get_current_approved_user()` locate the row by `auth.jwt() ->> 'email'` when the session GUC is unset. |
 | `password_hash` | — | `text` | — | — | The bcrypt hash of the account's password. A credential, and the reason the contradiction recorded in `governance.note` above is a security finding rather than an untidiness. |
 | `role` | — | `public.app_role` | — | — | The account's global role — `admin`, `modeler`, `user` or `super_admin`. GLOBAL, not per-project and not per-organization: it is the left-most input to `capabilities_for_user()`'s role -> org -> user merge, and `super_admin` short-circuits that merge to grant everything. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the account was approved. Server-stamped. |
 | `updated_at` | — | `timestamp with time zone` | — | — | When the row was last modified. Server-stamped. |
 | `organization` | — | `text` | — | — | The user's tenant, as a string. This is the value `get_current_user_org()` returns, and it was the left-hand side of every access comparison in the schema until WP 2.1. |
-| `display_name` | — | `text` | — | — | The name the user chose for themselves, overriding `name` in the UI. Distinct from `first_name` / `last_name`, which edit `name` itself (§4 D207). |
+| `display_name` | — | `text` | — | — | The name the user chose for themselves, overriding `name` in the UI — labelled "User name" on /profile, and the one name its owner can change (§4 D209). It never replaces `name` as the account holder's identity. |
 | `avatar_url` | — | `text` | — | — | URL of a profile image uploaded to the `avatars` bucket. RETIRED by §4 D206: the upload was refused for every `anon` caller by its storage policies, and the owner chose an avatar colour instead, so no RPC reads or writes this column any more. Kept rather than dropped so nothing uploaded before is destroyed. |
 | `phone` | — | `text` | — | — | Contact number. Not used for authentication or for any second factor. |
 | `password_changed_at` | — | `timestamp with time zone` | — | — | When the password was last set. Server-stamped. |
 | `password_expires_at` | — | `timestamp with time zone` | — | — | When the current password expires — `now() + password_max_age()` (90 days) when the password was last set. Expiry does not refuse a sign-in: it sends the user to /profile and closes every other page until the password is changed (`RoleGuard`, reading `get_my_profile`'s server-computed `password_expired`; §4 D206). Rows that predate `20260527011429` were stamped by that migration's column default, not by a real password change. |
 | `force_password_change` | — | `boolean` | — | — | Whether the user must set a new password before continuing. Set when an administrator creates or resets an account; cleared by `change_own_password`. Enforced by `RoleGuard`, which could not see it until §4 D206. |
-| `is_active` | — | `boolean` | — | — | Whether the account may sign in. Checked at login through `get_my_profile` (which, until §4 D206, raised for every user and was ignored, so the check never ran) and on every reload; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`. |
-| `organization_id` | — | `uuid` | — | — | The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. |
+| `is_active` | — | `boolean` | — | — | Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. The browser also checks it through `get_my_profile` at login and on every reload — a check that, until §4 D206, raised for every user and was ignored, so before these two changes the column was set and never read. It is not consulted by any RLS policy, so between reloads a suspended user's open session is not revoked (D28's client-asserted identity). |
+| `organization_id` | — | `uuid` | — | — | The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it. |
 | `avatar_color` | — | `text` | — | — | The colour of the user's initial on their avatar — one token of a fixed palette, CHECK-constrained; the page maps each token to its fill (`src/lib/avatarColors.ts`, pinned to the CHECK by `avatarColors.test.ts`). §4 D206. |
-| `first_name` | — | `text` | — | — | The first part of `name` (§4 D207). Edited by its owner on /profile through `update_own_profile`; a blank first name is refused (`first_name_required`) because `name` is NOT NULL. |
-| `last_name` | — | `text` | — | — | The rest of `name` after the first name (§4 D207); NULL when the name is one word. Edited by its owner on /profile; a blank clears it. |
+| `first_name` | — | `text` | — | — | The first word of `name` (§4 D209), derived by the `approved_users_derive_name_parts` trigger on every write that names `name` or either part, so a value written into it directly is overwritten. Shown read-only on /profile; changed only by an administrator changing `name`. |
+| `last_name` | — | `text` | — | — | `name` after its first word (§4 D209); NULL when the name is one word. Derived with `first_name` by the same trigger, read-only on /profile. |
 
 ## Each column in full
 
@@ -142,7 +142,7 @@ The user's identity, and the value every other governance table joins on — `or
 
 ### `name`
 
-The person's full name — as entered when the account was approved, and editable since §4 D207 by its owner on /profile as a first and a last name. One fact with `first_name` / `last_name`: the `approved_users_sync_name` trigger rewrites it when a part changes and re-derives the parts when only it changes, whatever writes the row.
+The account holder's full name, as entered when the account was approved. Their identity for accountability: its owner cannot change it (§4 D209) — `update_own_profile` has no parameter for it — and only the administrator paths write it. `first_name` / `last_name` are a reading of it.
 
 | | |
 |---|---|
@@ -256,7 +256,7 @@ for one you did.
 
 ### `display_name`
 
-The name the user chose for themselves, overriding `name` in the UI. Distinct from `first_name` / `last_name`, which edit `name` itself (§4 D207).
+The name the user chose for themselves, overriding `name` in the UI — labelled "User name" on /profile, and the one name its owner can change (§4 D209). It never replaces `name` as the account holder's identity.
 
 | | |
 |---|---|
@@ -347,7 +347,7 @@ Whether the user must set a new password before continuing. Set when an administ
 
 ### `is_active`
 
-Whether the account may sign in. Checked at login through `get_my_profile` (which, until §4 D206, raised for every user and was ignored, so the check never ran) and on every reload; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.
+Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. The browser also checks it through `get_my_profile` at login and on every reload — a check that, until §4 D206, raised for every user and was ignored, so before these two changes the column was set and never read. It is not consulted by any RLS policy, so between reloads a suspended user's open session is not revoked (D28's client-asserted identity).
 
 | | |
 |---|---|
@@ -361,7 +361,7 @@ Whether the account may sign in. Checked at login through `get_my_profile` (whic
 
 ### `organization_id`
 
-The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns.
+The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it.
 
 | | |
 |---|---|
@@ -399,16 +399,16 @@ for one you did.
 
 ### `first_name`
 
-The first part of `name` (§4 D207). Edited by its owner on /profile through `update_own_profile`; a blank first name is refused (`first_name_required`) because `name` is NOT NULL.
+The first word of `name` (§4 D209), derived by the `approved_users_derive_name_parts` trigger on every write that names `name` or either part, so a value written into it directly is overwritten. Shown read-only on /profile; changed only by an administrator changing `name`.
 
 | | |
 |---|---|
 | Type | `text` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20260930000001_account_first_and_last_name.sql` |
+| Added by | `20260930000003_account_identity_name_parts.sql` |
 | Read by the engine | **not traced** |
-| Validated at ingest | non-empty |
+| Validated at ingest | never accepted from a client |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 **Substitutions** — every point where a value you did not supply can stand in
@@ -416,20 +416,20 @@ for one you did.
 
 | When | The value used | Shown as | Visible where |
 |---|---|---|---|
-| the name was written whole — by an administrator, or before D207 | the first word of `name` (`split_person_name`) | `default` | the First name field on /profile, which its owner can correct |
+| always — the column is derived, never authored | the first word of `name` (`split_person_name`) | `default` | the read-only First name field on /profile |
 
 ### `last_name`
 
-The rest of `name` after the first name (§4 D207); NULL when the name is one word. Edited by its owner on /profile; a blank clears it.
+`name` after its first word (§4 D209); NULL when the name is one word. Derived with `first_name` by the same trigger, read-only on /profile.
 
 | | |
 |---|---|
 | Type | `text` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20260930000001_account_first_and_last_name.sql` |
+| Added by | `20260930000003_account_identity_name_parts.sql` |
 | Read by the engine | **not traced** |
-| Validated at ingest | — |
+| Validated at ingest | never accepted from a client |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 **Substitutions** — every point where a value you did not supply can stand in
@@ -437,7 +437,7 @@ for one you did.
 
 | When | The value used | Shown as | Visible where |
 |---|---|---|---|
-| the name was written whole — by an administrator, or before D207 | everything in `name` after its first word (`split_person_name`) | `default` | the Last name field on /profile, which its owner can correct |
+| always — the column is derived, never authored | everything in `name` after its first word (`split_person_name`) | `default` | the read-only Last name field on /profile |
 
 ## Indexes
 
@@ -447,6 +447,6 @@ for one you did.
 
 ---
 
-*Generated from data contract `a3bea0bf01ea`, engine `0.2.8`,
+*Generated from data contract `614b11585d9a`, engine `0.2.8`,
 sidecar `supabase/contract/approved_users.contract.yaml`, table created by `20250815000000_approved_users_base.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

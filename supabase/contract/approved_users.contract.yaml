@@ -22,14 +22,14 @@ surfaces:
   - page: "Auth.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
   - page: "DataManager.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
@@ -41,82 +41,82 @@ surfaces:
   - page: "FirmLevelNetwork.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
   - page: "Forbidden.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
   - page: "GettingStarted.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
   - page: "InteractiveNetworkSpace.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
   - page: "Landing.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
   - page: "NotFound.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
   - page: "ProcessLevelNetwork.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
   - page: "ProductLevelNetwork.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
   - page: "Profile.tsx"
     via: "rpc change_own_password"
     grain: table
-    evidence: "src/pages/Profile.tsx:139"
+    evidence: "src/pages/Profile.tsx:136"
     confirmed: true
   - page: "ProjectIntelligence.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
   - page: "ProjectPolicies.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
   - page: "SimulationLab.tsx"
     via: "table read"
     grain: shell
-    evidence: "src/hooks/useAuth.tsx:125"
+    evidence: "src/hooks/useAuth.tsx:149"
     confirmed: true
     note: >-
       every module providing this read (src/hooks/useAuth.tsx) is reachable from ≥80% of pages — app-shell access (auth/session), not a place this table's data is rendered
@@ -161,11 +161,10 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The person's full name — as entered when the account was approved, and
-      editable since §4 D207 by its owner on /profile as a first and a last name.
-      One fact with `first_name` / `last_name`: the `approved_users_sync_name`
-      trigger rewrites it when a part changes and re-derives the parts when only
-      it changes, whatever writes the row.
+      The account holder's full name, as entered when the account was approved.
+      Their identity for accountability: its owner cannot change it (§4 D209) —
+      `update_own_profile` has no parameter for it — and only the administrator
+      paths write it. `first_name` / `last_name` are a reading of it.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
@@ -177,17 +176,18 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The first part of `name` (§4 D207). Edited by its owner on /profile through
-      `update_own_profile`; a blank first name is refused (`first_name_required`)
-      because `name` is NOT NULL.
+      The first word of `name` (§4 D209), derived by the
+      `approved_users_derive_name_parts` trigger on every write that names `name`
+      or either part, so a value written into it directly is overwritten. Shown
+      read-only on /profile; changed only by an administrator changing `name`.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions:
-      - when: the name was written whole — by an administrator, or before D207
+      - when: always — the column is derived, never authored
         value: the first word of `name` (`split_person_name`)
         provenance: default
-        visible_as: the First name field on /profile, which its owner can correct
-    ingest: {csv_header: null, required: false, validate: non-empty}
+        visible_as: the read-only First name field on /profile
+    ingest: {csv_header: null, required: false, validate: never accepted from a client}
     surfaces: []
     resolution: null
   last_name:
@@ -195,16 +195,16 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The rest of `name` after the first name (§4 D207); NULL when the name is one
-      word. Edited by its owner on /profile; a blank clears it.
+      `name` after its first word (§4 D209); NULL when the name is one word.
+      Derived with `first_name` by the same trigger, read-only on /profile.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions:
-      - when: the name was written whole — by an administrator, or before D207
+      - when: always — the column is derived, never authored
         value: everything in `name` after its first word (`split_person_name`)
         provenance: default
-        visible_as: the Last name field on /profile, which its owner can correct
-    ingest: {csv_header: null, required: false, validate: null}
+        visible_as: the read-only Last name field on /profile
+    ingest: {csv_header: null, required: false, validate: never accepted from a client}
     surfaces: []
     resolution: null
   email:
@@ -277,105 +277,105 @@ fields:
       - page: "Auth.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "DataManager.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "DeveloperApi.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "FirmLevelNetwork.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "Forbidden.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "GettingStarted.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "InteractiveNetworkSpace.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "Landing.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "NotFound.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "ProcessLevelNetwork.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "ProductLevelNetwork.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "Profile.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "ProjectIntelligence.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
       - page: "SimulationLab.tsx"
         via: "table read"
         grain: shell
-        evidence: "src/hooks/useAuth.tsx:125"
+        evidence: "src/hooks/useAuth.tsx:149"
         confirmed: true
         note: >-
           named in an explicit select list, but in src/hooks/useAuth.tsx, which is reachable from ≥80% of pages — app-shell access, not a place this column is rendered
@@ -394,7 +394,9 @@ fields:
     meaning: >-
       The user's tenant, by uuid — the same organization `organization` names, and
       the plane that survives a rename. What `get_current_user_org_id(_user_id)`
-      returns.
+      returns. THE one author of an account's organization (§4 D205): the admin pages
+      show the organization's name through it and count Members by it, and
+      `organization_members` follows it by trigger rather than being written beside it.
     grain: identifier
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
@@ -413,8 +415,9 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The name the user chose for themselves, overriding `name` in the UI. Distinct
-      from `first_name` / `last_name`, which edit `name` itself (§4 D207).
+      The name the user chose for themselves, overriding `name` in the UI — labelled
+      "User name" on /profile, and the one name its owner can change (§4 D209).
+      It never replaces `name` as the account holder's identity.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
@@ -516,11 +519,15 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      Whether the account may sign in. Checked at login through `get_my_profile`
-      (which, until §4 D206, raised for every user and was ignored, so the check
-      never ran) and on every reload; it is not consulted by
-      any RLS policy, so deactivating a user does not by itself revoke a session
-      already holding a set `app.current_user_id`.
+      Whether the account may sign in. Enforced by the SERVER since `20260929000002`
+      (§4 D205): `authenticate_approved_user` returns no row for a suspended account
+      and records `auth.sign_in_failed` with the reason, and `_assert_super_admin`
+      refuses a suspended super admin. The browser also checks it through
+      `get_my_profile` at login and on every reload — a check that, until §4 D206,
+      raised for every user and was ignored, so before these two changes the column
+      was set and never read. It is not consulted by any RLS policy, so between
+      reloads a suspended user's open session is not revoked (D28's client-asserted
+      identity).
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []

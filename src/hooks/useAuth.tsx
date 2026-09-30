@@ -6,7 +6,7 @@ import { mintAndVerifySession } from '@/lib/auth/sessionMint';
 interface User {
   id: string;
   name: string;
-  /** The parts of `name`; the database keeps the three equal (D207). */
+  /** The parts of `name`, derived by the database and read-only to the user (D209). */
   first_name?: string | null;
   last_name?: string | null;
   email: string;
@@ -24,6 +24,18 @@ interface User {
   password_expired?: boolean;
   /** The policy, `password_max_age()`, in days (D206). */
   password_max_age_days?: number | null;
+  /** D207 — the account's ORGANIZATION's plan, read through `get_my_profile`. */
+  access_period?: string | null;
+  access_valid_from?: string | null;
+  access_valid_until?: string | null;
+  /** The organization's period has ended FOR THIS ACCOUNT, on the database clock. */
+  access_expired?: boolean;
+  /** A super admin is not locked out by their organization's period. */
+  access_exempt?: boolean;
+  project_limit?: number | null;
+  projects_used?: number | null;
+  user_limit?: number | null;
+  users_used?: number | null;
 }
 
 /**
@@ -54,6 +66,15 @@ async function readProfile(userId: string) {
       password_changed_at: p.password_changed_at as string | null,
       password_expired: p.password_expired as boolean,
       password_max_age_days: p.password_max_age_days as number | null,
+      access_period: p.access_period as string | null,
+      access_valid_from: p.access_valid_from as string | null,
+      access_valid_until: p.access_valid_until as string | null,
+      access_expired: p.access_expired as boolean,
+      access_exempt: p.access_exempt as boolean,
+      project_limit: p.project_limit as number | null,
+      projects_used: p.projects_used == null ? null : Number(p.projects_used),
+      user_limit: p.user_limit as number | null,
+      users_used: p.users_used == null ? null : Number(p.users_used),
     },
     error: null,
   };
@@ -102,8 +123,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (!data || data.length === 0) {
+        // The server returns no row for a wrong password, a suspended account (PLAN.md
+        // §4 D205) and a member of an organization whose access period has ended (D207),
+        // and does not say which, so the message may not either.
         console.log('[AUTH] No user data returned from authentication');
-        return { success: false, error: 'Invalid email or password' };
+        return { success: false, error: 'Invalid email or password, or the account is suspended or its organization\'s access period has ended. Contact your administrator if this persists.' };
       }
 
       const userData = data[0];
@@ -151,6 +175,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       if (profile.is_active === false) {
         return { success: false, error: 'Your account has been deactivated. Contact your administrator.' };
+      }
+      if (profile.access_expired) {
+        return { success: false, error: 'Your organization\'s access period has ended. Contact your administrator to renew it.' };
       }
       Object.assign(userObj, profile, {
         name: profile.name || userObj.name,
@@ -214,7 +241,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.warn('[AUTH] Profile refresh failed; keeping the last known account state:', error);
       return;
     }
-    if (profile.is_active === false) {
+    // A session that outlived its account: suspended, or its organization's access
+    // period ended since sign-in (D207). The database refuses the next sign-in either way.
+    if (profile.is_active === false || profile.access_expired) {
       await logout();
       return;
     }

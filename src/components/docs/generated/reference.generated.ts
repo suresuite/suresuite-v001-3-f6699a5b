@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 690;
+export const REFERENCE_COLUMN_COUNT = 695;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -323,7 +323,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "SimulationLab.tsx",
@@ -772,7 +772,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "Profile.tsx",
         "via": "rpc change_own_password",
-        "evidence": "src/pages/Profile.tsx:139"
+        "evidence": "src/pages/Profile.tsx:136"
       }
     ],
     "governance": {
@@ -821,7 +821,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": "non-empty",
-        "meaning": "The person's full name — as entered when the account was approved, and editable since §4 D207 by its owner on /profile as a first and a last name. One fact with `first_name` / `last_name`: the `approved_users_sync_name` trigger rewrites it when a part changes and re-derives the parts when only it changes, whatever writes the row.",
+        "meaning": "The account holder's full name, as entered when the account was approved. Their identity for accountability: its owner cannot change it (§4 D209) — `update_own_profile` has no parameter for it — and only the administrator paths write it. `first_name` / `last_name` are a reading of it.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1003,7 +1003,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The name the user chose for themselves, overriding `name` in the UI. Distinct from `first_name` / `last_name`, which edit `name` itself (§4 D207).",
+        "meaning": "The name the user chose for themselves, overriding `name` in the UI — labelled \"User name\" on /profile, and the one name its owner can change (§4 D209). It never replaces `name` as the account holder's identity.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1154,7 +1154,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Whether the account may sign in. Checked at login through `get_my_profile` (which, until §4 D206, raised for every user and was ignored, so the check never ran) and on every reload; it is not consulted by any RLS policy, so deactivating a user does not by itself revoke a session already holding a set `app.current_user_id`.",
+        "meaning": "Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. The browser also checks it through `get_my_profile` at login and on every reload — a check that, until §4 D206, raised for every user and was ignored, so before these two changes the column was set and never read. It is not consulted by any RLS policy, so between reloads a suspended user's open session is not revoked (D28's client-asserted identity).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -1178,7 +1178,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns.",
+        "meaning": "The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it.",
         "primaryKey": false,
         "unique": false,
         "references": {
@@ -1239,17 +1239,17 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unit": null,
         "csvHeader": null,
         "required": false,
-        "validate": "non-empty",
-        "meaning": "The first part of `name` (§4 D207). Edited by its owner on /profile through `update_own_profile`; a blank first name is refused (`first_name_required`) because `name` is NOT NULL.",
+        "validate": "never accepted from a client",
+        "meaning": "The first word of `name` (§4 D209), derived by the `approved_users_derive_name_parts` trigger on every write that names `name` or either part, so a value written into it directly is overwritten. Shown read-only on /profile; changed only by an administrator changing `name`.",
         "primaryKey": false,
         "unique": false,
         "references": null,
         "substitutions": [
           {
-            "when": "the name was written whole — by an administrator, or before D207",
+            "when": "always — the column is derived, never authored",
             "value": "the first word of `name` (`split_person_name`)",
             "provenance": "default",
-            "visibleAs": "the First name field on /profile, which its owner can correct"
+            "visibleAs": "the read-only First name field on /profile"
           }
         ],
         "engineChain": null,
@@ -1270,17 +1270,17 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unit": null,
         "csvHeader": null,
         "required": false,
-        "validate": null,
-        "meaning": "The rest of `name` after the first name (§4 D207); NULL when the name is one word. Edited by its owner on /profile; a blank clears it.",
+        "validate": "never accepted from a client",
+        "meaning": "`name` after its first word (§4 D209); NULL when the name is one word. Derived with `first_name` by the same trigger, read-only on /profile.",
         "primaryKey": false,
         "unique": false,
         "references": null,
         "substitutions": [
           {
-            "when": "the name was written whole — by an administrator, or before D207",
+            "when": "always — the column is derived, never authored",
             "value": "everything in `name` after its first word (`split_person_name`)",
             "provenance": "default",
-            "visibleAs": "the Last name field on /profile, which its owner can correct"
+            "visibleAs": "the read-only Last name field on /profile"
           }
         ],
         "engineChain": null,
@@ -1708,7 +1708,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:415"
       },
       {
         "page": "InteractiveNetworkSpace.tsx",
@@ -1718,7 +1718,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProcessLevelNetwork.tsx",
         "via": "table read",
-        "evidence": "src/pages/ProcessLevelNetwork.tsx:359"
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:383"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -2071,7 +2071,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:415"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -2882,7 +2882,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -5209,7 +5209,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:415"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -8644,7 +8644,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc delete_project_dataset",
-        "evidence": "src/pages/DataManager.tsx:697"
+        "evidence": "src/pages/DataManager.tsx:699"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -8912,12 +8912,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:415"
       },
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc get_network_metrics_for_materials",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:241"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:284"
       }
     ],
     "governance": {
@@ -9317,12 +9317,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:415"
       },
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "SimulationLab.tsx",
@@ -10087,7 +10087,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "SimulationLab.tsx",
@@ -10453,7 +10453,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_node_list",
-        "evidence": "src/pages/DataManager.tsx:425"
+        "evidence": "src/pages/DataManager.tsx:427"
       },
       {
         "page": "FirmLevelNetwork.tsx",
@@ -10463,7 +10463,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "SimulationLab.tsx",
@@ -11378,6 +11378,22 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "organizations_status_check",
         "definition": "CHECK (status IN ('active','suspended'))"
+      },
+      {
+        "name": "organizations_access_period_check",
+        "definition": "CHECK (access_period IN ('week', 'month', 'quarter', 'year'))"
+      },
+      {
+        "name": "organizations_project_limit_check",
+        "definition": "CHECK (project_limit IN (1, 2, 3, 5))"
+      },
+      {
+        "name": "organizations_user_limit_check",
+        "definition": "CHECK (user_limit IN (1, 2, 3, 5))"
+      },
+      {
+        "name": "organizations_access_period_start_check",
+        "definition": "CHECK ((access_period IS NULL) = (access_valid_from IS NULL))"
       }
     ],
     "ingestDataset": null,
@@ -11513,7 +11529,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": "one of active / suspended",
-        "meaning": "Whether the tenant is live — `active` or `suspended`, CHECK-constrained to those two. Set through `admin_set_org_status`.",
+        "meaning": "Whether the tenant is live — `active` or `suspended`, CHECK-constrained to those two. Set through `admin_set_org_status`. Suspension is the REVERSIBLE verb; removing a tenant is `admin_delete_organization` (§4 D208), which deletes the row rather than setting a status.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -11600,6 +11616,126 @@ export const REFERENCE_TABLES: RefTable[] = [
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
         "computedBy": null
+      },
+      {
+        "name": "access_period",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "one of week / month / quarter / year, or NULL",
+        "meaning": "How long the organization may be used, counted from `access_valid_from`: `week`, `month`, `quarter` or `year`, CHECK-constrained to those four; NULL means it does not expire, which every organization that existed before D207 keeps. Set by `admin_set_org_access_period` (choosing a period again renews it from now) or `admin_create_organization`. The lengths are written once, in `org_access_period_interval()`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "access_valid_from",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the current access period started — the database clock at the moment an administrator set it, never the browser's. NULL exactly when `access_period` is NULL (a CHECK).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "access_valid_until",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the access period ends. DERIVED by `trg_organizations_access_valid_until` from the two columns above; a write that names it is overwritten. At or after this instant `authenticate_approved_user` refuses every member except a super admin, `get_my_profile` reports `access_expired`, and no project can be added to the organization (D207).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "project_limit",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "one of 1 / 2 / 3 / 5, or NULL",
+        "meaning": "The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "user_limit",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "one of 1 / 2 / 3 / 5, or NULL",
+        "meaning": "The most accounts the organization may have, counted by `approved_users.organization_id` (the authority since D205) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `approved_users`. Lowering it removes nobody; no account can be added until under it.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
       }
     ]
   },
@@ -11635,7 +11771,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc get_project_dataset_status",
-        "evidence": "src/pages/DataManager.tsx:413"
+        "evidence": "src/pages/DataManager.tsx:415"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -12453,7 +12589,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "ProjectIntelligence.tsx",
@@ -14775,7 +14911,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/DataManager.tsx:200"
+        "evidence": "src/pages/DataManager.tsx:201"
       },
       {
         "page": "DeveloperApi.tsx",
@@ -14785,7 +14921,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "FirmLevelNetwork.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/FirmLevelNetwork.tsx:244"
+        "evidence": "src/pages/FirmLevelNetwork.tsx:258"
       },
       {
         "page": "InteractiveNetworkSpace.tsx",
@@ -14795,12 +14931,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProcessLevelNetwork.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/ProcessLevelNetwork.tsx:253"
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:282"
       },
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:196"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:239"
       },
       {
         "page": "ProjectIntelligence.tsx",
@@ -15626,12 +15762,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "FirmLevelNetwork.tsx",
         "via": "table read",
-        "evidence": "src/pages/FirmLevelNetwork.tsx:303"
+        "evidence": "src/pages/FirmLevelNetwork.tsx:315"
       },
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "table read",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:518"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:559"
       }
     ],
     "governance": {
@@ -17767,7 +17903,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc combine_project_into_supply_chain",
-        "evidence": "src/pages/DataManager.tsx:640"
+        "evidence": "src/pages/DataManager.tsx:642"
       },
       {
         "page": "FirmLevelNetwork.tsx",
@@ -17782,7 +17918,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:227"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -18338,7 +18474,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc combine_project_into_supply_chain",
-        "evidence": "src/pages/DataManager.tsx:640"
+        "evidence": "src/pages/DataManager.tsx:642"
       },
       {
         "page": "InteractiveNetworkSpace.tsx",

@@ -387,8 +387,11 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D202** | **`Project AA - ver3`'s rows sit on a plant its project record does not name, so plant identity has two authors.** Every lane join and the natural key include `plant_name`; the landing, `assign_*` and the legacy lane function stamp `projects.plant_name`, while the seed inserts, `upload_node_list_data` and the network inserts take the payload's. **LIVE (F4 `36553935324`, F4b `36554690802`)**: `projects.plant_name` is `Plant AA` and the project's data is on `Plant AA Rocherfort` — all 396 BOM rows, 305 of 321 inbound lanes, the outbound lane, all 242 `node_list` rows and all 1 385 `network_nodes`. The other **16 inbound lanes are on `Plant AA`**: the Supplier grid's assignments, stamped with the project record's plant (they are D140's `inbound` level-1 rows). The lane writer joins on plant, so those 16 suppliers form an island with no demand, no BOM and no tree position, while the engine (`_flatten_multi_level_bom` and the arc loop ignore `plant_name`) simulates them as ordinary suppliers of the same materials. Symptom: a lane assigned from the Supplier grid lands under `Plant AA` and joins nothing the rest of the project's graph is on; `ProjectDataViewer` filters the node list by the project's plant with an exact compare | §15 `36553935324` F4, `36554690802` F4b; `src/components/policies/StagePolicyTable.tsx` (the fallback's plant resolution) | **OPEN** — owner to be decided |
 | **D203** | **Five more surfaces render a failed read or write as absence or success — the D178 / audit-WP-5 class, one layer over.** `useProjectContext`'s catch sets `hasData = false`, and `FocusedStage` then tells the owner "no supply-chain data — upload and combine datasets"; DataManager's manual combine ignores the `{ error }` of `combine_project_into_supply_chain` and `rebuild_node_list` (`supabase.rpc` does not throw) and toasts "You can now download the node list"; `MapView` logs a `get_node_list` error and renders an empty map; `FirmLevelNetwork` builds its top-20 "connections" chart from the `networkNodes` STATE set in the same tick, so the first load renders it from `[]`, and it computes its own prominence composite (0.6 × degree …) for any node with no stored value and mixes it into the stats unmarked — LATENT today: K2 finds 0 of 1 824 `network_nodes` without a stored prominence. Wrong statements shown; **rendered cells NOT observed** | `src/hooks/useProjectContext.tsx` (catch); `src/pages/DataManager.tsx` (the combine handler); `src/components/MapView.tsx`; `src/pages/FirmLevelNetwork.tsx` (`connectionData`, `calculateNodeImportance`); §15 `36555223774` K2 | **OPEN** — owner to be decided |
 | **D204** | **The policies page shows one policy and the run uses another, two ways: a project-default key never saved is filled with the UI's default on screen and with the ENGINE's default in the run, and most per-row inventory cells are stored, versioned and dropped.** (a) `policy_defaults` is seeded `{}` per family (`create_default_policy_defaults`); `usePolicies` parses each family through the Zod bundle, which fills every missing key, while `_build_policy_snapshot` copies the stored JSON raw and `project_map.py::_map_policies` reads a missing key with its own default: `backorder_allowed` UI **true** / engine **false (lost sales)**, `backorder_cost_per_day` 2 / 0, `allocation` "priority" / no rule, `coverage_weeks` 8 / the 8-10-12 strip that rises during disruptions. **Measured (§15 run `36629798467`, L1/L3, every project): the fulfillment family is empty in 9 of 10 projects and κ is saved in none**, and the last completed run of Aumovio, Example, TRON-ver1, Test_MTS and Test_Simulation was sent an empty fulfillment family — every one simulated lost sales while the Fulfillment card said backorders are allowed. (b) `_map_policies` applies supplier-row inventory overrides only for type, s, S, Q and κ; every other per-row inventory field, and every plant-row inventory field, is dropped with a run-log warning. **Stored and dropped (L2)**: `holding_cost_pct` 817, `safety_stock_days` 340, `basis` 495, `service_level_target` 2, plus `material_price` 452 and `primary_source` 866 + 12 that no reader has — all hashed into each policy version. (c) Since presets and the strategy selector were removed from /policies (`e86f875f`), only the Fulfillment card can save a default; the inventory, sourcing and recovery defaults have no control but Excel import and version restore | `src/hooks/usePolicies.tsx` (`parseFamily` on load); `_build_policy_snapshot` (`20260612000001_policy_version_snapshots.sql`); `scsim/scsim/io/project_map.py` (`_map_policies`); §15 run `36629798467` L1, L2, L3; the column-by-column account on /policies → Data map (`policyColumnCheck.ts`) | **OPEN** — owner to be decided |
+| **D205** | **`/admin/users` listed NOBODY over 14 accounts; the Overview showed zeros over 3 organizations, 9 projects and 101 AI-usage rows; "Suspend" suspended nothing; and an account's organization had three authors.** (a) The Users page and the Overview's "Top users" read `v_admin_user_usage`, whose D38 predicate `current_is_super_admin()` resolves the reader through `get_current_user_id()` — session, GUC, JWT email — and a PostgREST read from this browser carries none of them (D155): the view answers ZERO ROWS with no error, and the page says "No users yet." `rehearsal/030` passed because it set the GUC in the same transaction and ran as `authenticated`, a reader the product never has. The Overview's other figures read `approved_users` (REVOKEd from anon — refused, rendered 0), `organizations` and `ai_usage_logs` (same predicate — 0 rows), and `/admin/usage` did the same for its log and its names. D185's defect and D194's class, on the three pages that describe people. (b) `authenticate_approved_user` never read `is_active`; the only check was the browser's `get_my_profile()`, which raises `not_authenticated` for anon, and the login skips the check on error — so a suspended account signed in, and `session-mint` would mint it a session. `_assert_super_admin` did not read it either. With ONE active super admin in production, nothing stopped that admin suspending or demoting themselves and leaving the platform with no administrator. (c) "Which organization" was `approved_users.organization_id` (the authority, D13 — RLS and `capabilities_for_user` read it), the `organization` text copy the Users page DISPLAYED (never refreshed on a rename), and `organization_members` rows the Organizations page COUNTED as Members — which `admin_update_user` added on a move and never removed. (d) The Overview's "Avg $/req" divided month-to-date cost by ALL-TIME requests, and its month and day came from the browser's clock while the Users page's came from the database's. **Measured** (§15 run `36641092611`, every account): 14 accounts, `v_admin_user_usage` returns 0 to that reader; the three org facts AGREE today (8/3/3, zero contradictions), so (c) was latent; 0 suspended accounts, so (b) was latent; 1 active super admin. **NOT fixed, and named:** organization `status = 'suspended'` is enforced NOWHERE (`DMRG` is suspended and its 3 accounts sign in) — enforcing it locks 3 people out on deploy, which is the owner's decision; `admin_org_file_usage` (a caller-rights view over `user_files`) is still read by `/admin/usage` as anon; `AdminModels` still writes `ai_models` through PostgREST, where RLS matches zero rows and the page reports success (D203's class); and a suspended user's open browser session keeps working until its next reload, when D206's re-read of the account ends it — the identity between reloads is D28's client assertion. (D206, merged beside this row, also closed `/profile`'s organization, which this row had listed) | `AdminUsers.tsx`, `AdminDashboard.tsx`, `AdminUsage.tsx` (the direct reads, replaced) · `20260916000009` (the view's predicate) · `authenticate_approved_user` as of `20260929000001` · `admin_update_user` / `admin_list_organizations` in `20260711000003` / `20260712000002` · `useAuth.tsx`'s `get_my_profile` check | **CLOSED ✅** (a)–(d) by `20260929000002`: `admin_list_users`, `admin_platform_overview`, `admin_usage_log_read` take the reader as a parameter and require an ACTIVE super admin; the organization is shown by NAME through `organization_id`, with its status; Members are counted by `organization_id`; a trigger keeps exactly one `organization_members` row, in the account's organization, and a second refuses a row naming another; sign-in returns no row for a suspended account and records `auth.sign_in_failed` · `account suspended`; the role and suspend verbs refuse self-removal and the last active super admin under a row lock; one UTC window everywhere; a refused read renders as an error, never as "none". `rehearsal/400` §1 reproduces the zero-row read as anon; §2–§6 assert the list, the uuid-resolved name, both refusals, suspension at sign-in, the guards, the membership rule and the Overview's counts — mutation-tested three ways; the concurrent cross-suspension was run in two sessions and the second is refused. The "NOT fixed" list stays **OPEN — owner to be decided** |
 | **D206** | **/profile's three RPCs resolved nobody, so password expiry, forced password changes and account deactivation were never enforced, and nobody could change their own password.** `get_my_profile`, `update_own_profile` and `change_own_password` found their user through `get_current_user_id()` only. The browser calls as `anon` with no session (D155), and `set_current_user_context` sets `app.current_user_id` LOCAL to the login request's own transaction, so every later request resolves nobody and all three raised `not_authenticated` — D169's and D185's shape on the account page. The login enrichment ignored that error, so `force_password_change`, `password_expires_at` and `is_active` never reached the browser: `RoleGuard` redirected on a flag that was always undefined, `PasswordExpiryBanner` never rendered, an account created or reset with "must change on first login" could be used indefinitely on the administrator's password, and a deactivated account could sign in (`authenticate_approved_user` does not read `is_active`). "Update password" and "Save changes" failed for everyone. Nothing enforced EXPIRY even when the row was read: the guard checked only the forced flag. Secondary: the banner counted days as `Math.ceil(ms / 86 400 000)`, which disagrees with the printed date by one depending on the hour; "90 days" was authored in the column default, two SQL functions and twice in the page's copy; a new password equal to the old one was accepted, so a forced change could reset the clock and change nothing; `update_own_profile` COALESCEd every argument, so a saved phone could never be cleared; the Display name field showed the account `name` as if it were the stored display name. **Consequence once enforced**: the column default stamped every row that existed at `20260527011429` with that migration's time + 90 days, so an account whose password was never changed since reads as expired and will be sent to /profile at its next sign-in — the policy the page always stated, applied for the first time. The avatar upload's storage policies resolve the uploader through the same `get_current_user_id()`, so every upload as `anon` was refused too. **The owner accepted** the expiry consequence and a lock enforced by the page rather than the database (both below). Every identity on these RPCs is still D28's client assertion, except that a password change also requires the current password, which the database checks | `20260527011429` (the three RPCs, the column default); `src/hooks/useAuth.tsx` (login enrichment and `refreshProfile`, before this change); `src/components/RoleGuard.tsx`; `src/components/PasswordExpiryBanner.tsx`; `src/pages/Profile.tsx`; the storage policies at the end of `20260527011429`; reproduced as `anon` in `rehearsal/410` §1 | **CLOSED ✅ for the RPCs and the enforcement (`20260929000003`)** — each RPC takes the user as a trailing `p_user_id` (`ingest_run_review`'s shape), refuses one that contradicts a session, sets the GUC LOCAL; `password_max_age()` is the one statement of the policy for the default, the change and the page's copy; `get_my_profile` returns `password_expired` on the server clock; `password_unchanged` and `account_inactive` refusals; `auth.password_changed` on the access plane. The login fails CLOSED when the account row cannot be read, and re-reads it on every reload. `RoleGuard` closes every page but /profile when the password is forced OR expired; the lock is read from the account, not `?forced=1`. Days are counted by calendar date in the viewer's zone (`src/lib/auth/passwordPolicy.ts`, tested across five zones and two DST transitions). **The avatar upload is RETIRED, by the owner's decision**: a user picks the colour of their initial instead — `approved_users.avatar_color`, CHECK-constrained to a ten-token palette that `avatarColors.test.ts` pins to `src/lib/avatarColors.ts`; `avatar_url` and the `avatars` bucket are left in place, read and written by nothing. `rehearsal/410` §1–§6, mutation-tested five ways (same-password check, the parameter, the server-side expiry, blank-clears, the explicit grant) |
-| **D207** | **A user could not correct their own name, and the account page showed it only as a placeholder.** `approved_users.name` is the full name an administrator typed at approval. /profile rendered it as the Display name field's placeholder, and no RPC let its owner change it, so a misspelt or changed name waited on an administrator. The owner asked for the name to be editable on /profile and shown as a First and a Last name, and for the user ID — the identity API keys are recorded against (`api_keys.created_by`) — to be shown. The schema had no first or last name, and adding two columns beside `name` would author one person's name twice while every admin writer of `name` left the parts behind (`single-source`) | `20250815000000` (`name NOT NULL`, no parts); `20260929000003` (`update_own_profile` edits display name, phone and colour only); `src/pages/Profile.tsx` before this change | **CLOSED ✅ (`20260930000001`)** — `first_name` / `last_name` on `approved_users`, kept ONE fact with `name` by the `approved_users_sync_name` trigger whatever writes the row: a changed part rewrites `name` (parts joined by one space, a blank first name refused as `first_name_required`), a changed `name` alone re-derives the parts through `split_person_name` (first word / the rest). Existing rows are backfilled by the same function BEFORE the trigger exists, so no stored `name` is rewritten. `update_own_profile` takes `p_first_name` / `p_last_name` after `p_user_id`, so D206's positional calls still resolve; `get_my_profile` returns both. /profile shows the User ID with a copy button and First/Last name fields, sending the parts only when edited. `rehearsal/420` §1–§4, mutation-tested four ways (the compose, the refusal, the split, the grant) |
+| **D207** | **An organization had no term and no size: nothing said how long it may be used or how many users and projects it may have, so a trial, a paid quarter and an unlimited account were the same row.** The owner asked for each organization to carry a valid period of 1 week, 1 month, 1 quarter or 1 year, and limits of 1, 2, 3, 5 or unlimited on its users and on its projects — managed at the organization level (the first draft of this change put them on the account and was redirected before it was pushed) — and for every member to see the validity on /profile. Nothing in the schema could express it: `organizations` carried `status` (itself unenforced, per its sidecar) and nothing else about the tenant's allowance, and a project or an account reached its table through four writers (`create_project`, `admin_copy_project`, `admin_create_user`, `admin_update_user`) plus the D47 stamp, none of which counted anything | `organizations` (`supabase/contract/organizations.contract.yaml`, before this change); `create_project` (`20250923120308`), `admin_copy_project` (`20260712000002`), `admin_create_user` / `admin_update_user` (`20260711000003`); `authenticate_approved_user` (`20260929000002`); `get_my_profile` (`20260929000003`) | **CLOSED ✅ (`20260929000004`)** — `organizations.access_period` / `access_valid_from` / `project_limit` / `user_limit`, CHECK-constrained, NULL meaning no expiry / unlimited so every existing organization keeps its behaviour; `access_valid_until` DERIVED by a trigger through `org_access_period_interval()`, the one statement of each period's length. Enforced in the database, not the page: `authenticate_approved_user` returns no row for a member of an organization whose period has ended (`auth.sign_in_failed`, reason named) — **a super admin is exempt**, because the period ending would otherwise lock the platform out the way D205's last-super-admin guard exists to prevent, and `get_my_profile` says so (`access_exempt`); `trg_tenant_allowance` on `projects` and on `approved_users` refuses past a limit on EVERY writer and locks the organization row against a concurrent last place; the counts are the ones /admin/organizations already showed (`organization_id` on both). `admin_set_org_access_period` (setting a period renews it from now), `admin_set_org_limits`, and `admin_create_organization` taking all three (the 4-argument form dropped). /admin/organizations edits them inline; /profile shows the period, its end and both usages; the browser signs an expired session out on reload. `organizationPlan.test.ts` pins the page's lists to the CHECKs; `rehearsal/420` §1–§6, mutation-tested four ways (either trigger dropped, the derivation dropped, the sign-in check reverted). **Not enforced**: every other RPC still accepts an asserted `anon` caller (D28), so a client that ignores the sign-out is stopped at its next sign-in, not before; API keys follow the organization's `status`, not its period; an account with no organization has no plan |
+| **D208** | **An organization could be suspended and never deleted, and the schema would not have deleted one honestly if anybody had tried.** /admin/organizations offered Suspend/Reactivate only — a reversible label on `organizations.status` (which D205 records is still not enforced). A bare `DELETE FROM organizations` would have CASCADEd API keys, capabilities and memberships and SET NULL on `projects.organization_id` and `approved_users.organization_id`: every project of the tenant left with no organization, reachable by no admin, and every account left able to sign in. Separately, `admin_delete_project` — the super admin's project delete — is one `DELETE FROM projects`, so the six tables D170 sweeps by hand (no foreign key to `projects`) keep a super-admin-deleted project's rows: NOT fixed here, named so it is not rediscovered. | `supabase/migrations/20260711000003_admin_management_rpcs.sql` (`admin_set_org_status`, the only organization verb besides create/rename); the `ON DELETE SET NULL` keys in `build/schema.introspected.json`; `supabase/migrations/20260712000002_admin_project_management.sql` (`admin_delete_project`) | **CLOSED ✅ (`20260930000002`), by the owner's decision (2026-09-29): deleting an organization deletes its projects AND its accounts.** `admin_delete_organization(actor, email, org, confirm_slug)`: active super admin only; the slug must be typed back and the server checks it; refuses the actor's own organization, one holding a super admin (moved or demoted deliberately, never erased as a side effect), and an account recorded as the actor on a row OUTSIDE the deleted projects (`analysis_runs`, `supply_chain_data.uploaded_by`, `ingest_files.uploaded_by` — D161's shape, named in the refusal rather than surfacing as a foreign key on another table). It deletes every project of the organization, and every org-less project owned by one of its accounts, through `_delete_project_rows` — D170's sweep MOVED out of `delete_project` so there is one author of what a project delete reaches (`delete_project` is its gate plus that call; `chains.mjs` and `rehearsal/370` §6 read the helper) — then AI budgets scoped to it, its accounts, the organization; one transaction, logged as `org.delete` with what was removed. KEPT: the audit log and usage logs. NOT reached, stated: `chat_threads` and `user_files` rows of deleted accounts (no foreign key to `approved_users`) and the storage objects behind uploaded files. The page's "Delete permanently…" dialog states the counts and that it cannot be undone. `rehearsal/430` §1–§5 |
+| **D209** | **/profile never said, in plain view, whose account it is, and gave no ID a user could quote.** `approved_users.name` — the full name an administrator typed at approval — appeared on /profile only as the Display name field's placeholder; the schema had no first or last name, and the page did not show the account's id, the identity API keys record their creator by (`api_keys.created_by`). The owner asked for the page to show the account holder's First and Last name and user ID, and for the user to change ONLY their user name: the first and last name must stay as recorded, for identification and accountability. Adding editable parts beside `name` would have authored one person's name twice (`single-source`) and handed its owner the identity the owner wants fixed — the first draft of this change did exactly that and was corrected on review | `20250815000000` (`name NOT NULL`, no parts); `20260929000003` (`update_own_profile` writes display name, phone and colour, never `name`); `src/pages/Profile.tsx` before this change | **CLOSED ✅ (`20260930000003`)** — `first_name` / `last_name` on `approved_users`, DERIVED from `name` by the `approved_users_derive_name_parts` trigger on every write that names any of the three (a part written directly is overwritten), through `split_person_name` (first word / the rest), the one statement of the split. Existing rows are backfilled by the same function BEFORE the trigger exists, so no stored `name` is rewritten. `update_own_profile` is unchanged and has no parameter that reaches the identity; `get_my_profile` returns both parts. /profile shows the User ID with a copy button and First/Last name read-only, and labels `display_name` "User name" — the one name its owner edits. `rehearsal/440` §1–§4, mutation-tested |
 
 ### 4.1 Code map — the data layer
 
@@ -19717,28 +19720,143 @@ tested (`passwordPolicy.test.ts`) and the database half is rehearsed (`rehearsal
 No later package changes because of these findings.
 
 
-### Account · a user edits their own first and last name · 2026-09-30 · `20260930000001`
+### Admin · /admin/users lists the people who exist, and suspension means something · 2026-09-29 · `20260929000002`
 
-**Asked for.** The owner asked that /profile let a user edit their name, show it as a
-First and a Last name, and show the user ID, which the API is keyed on.
+**Asked for.** The owner saw users around `/admin` but none on `/admin/users`, and
+asked for the whole logic and the data model of this part to be checked and made
+accurate.
 
-**Promised versus found.** D206's entry promised nothing about the name; the page
-showed `name` only as a placeholder and nothing could change it but an administrator
-(D207). The schema had no first or last name at all.
+**Promised versus found.** D38 (WP 3.0) promised that `v_admin_user_usage`'s own
+predicate "refuses exactly what the table refuses", and `rehearsal/030` proved it —
+for a reader that sets the GUC in its own transaction and runs as `authenticated`.
+The browser does neither, so the view refused EVERYONE and the page it exists for
+has listed nobody since that migration. The same package's rehearsal shape is why
+D185 went unseen too: a rehearsal that stages the reader proves the predicate, not
+the product. The gap check went on to the model behind the list and found the
+Suspend button changed a column nothing enforced, the only super admin able to
+suspend themselves, and three authors of an account's organization (D205).
 
-**What shipped.** `20260930000001` and the page that calls it — see D207's "Closed by";
+**What shipped.** `20260929000002` and the three pages, per D205's closing column.
+The membership backfill was measured FIRST (§15 run `36641092611`, probe pushed on
+its own): zero contradicting rows and zero missing ones, so it moves nothing in
+production today and exists so the trigger starts from a state it can keep.
+
+**Gap check.** (1) D205's "NOT fixed" list — organization suspension (an owner's
+decision, because it locks out three live accounts), `admin_org_file_usage`,
+`AdminModels`' writes, and a suspended user's open session until its next reload.
+`/profile`'s organization was on this list and D206 (merged from `main`) closed it.
+(2) `v_admin_user_usage` has no reader now; it stays, still asserted by `030`, and
+dropping it is a separate change. (3) Every new read authorizes through
+`_assert_super_admin`, so its identity is still D28's client assertion. No later
+package changes because of these findings.
+
+**Measured locally.** `contract:rehearse` against PostgreSQL 16: 39 of 39 files
+pass, `400` included; three mutations of the migration each turn `400` red at the
+assertion written for it. `contract:check` holds at the 7 R12 failures `main` already
+carries (`usePolicies.tsx` citations), and adds none. Nothing reaches production
+until merge; the after-reading belongs in the push after it (D153).
+
+### Organizations · a valid period, a user limit and a project limit per organization · 2026-09-29 · `20260929000004`
+
+**Asked for.** The owner asked for each account to carry a valid period (1 week,
+1 month, 1 quarter, 1 year) and a number of projects (1, 2, 3, 5, unlimited), then —
+while the first draft was being written — redirected it: the details belong to the
+ORGANIZATION, which also gets a number of users, and the validity is shown to each
+member on their profile.
+
+**Promised versus found.** No earlier package promised a plan. What the change found
+is that the organization's allowance had no author at all and the rows it would
+govern had five: four writers of `projects` / `approved_users` plus the D47 stamp.
+A limit checked in `create_project` would have been D150's shape — true of one
+writer and false of the others — so both limits are triggers, named to fire after
+the triggers that stamp `organization_id` (D207).
+
+**What shipped.** `20260929000004`, /admin/organizations, /profile, the sign-in and
+reload paths in `useAuth`, and readable refusals on the project and user create
+paths — see D207's closing column; it is not restated here.
+
+**Gap check.** (1) A super admin is exempt from their organization's period and the
+exemption is shown, not silent (T2). The alternative — refusing a period on any
+organization that holds a super admin — would make the plan unusable for the
+organization the platform's own administrators sit in. (2) The user limit counts
+every account in the organization, super admins included, because that is the
+Members figure /admin/organizations already showed; a limit measured by a different
+count than the one on screen would be D205's three-authors defect again. (3) The
+user-limit options mirror the project list (1, 2, 3, 5, unlimited) because the owner
+named no other; they are one CHECK and one array (`organizationPlan.ts`) apart, and
+the test fails if the two disagree. (4) Sessions are D28's: an expired member keeps
+a signed-in tab until its next reload. No later package changes because of these.
+
+**Measured locally.** `contract:rehearse -- --since origin/main` against PostgreSQL
+16: every file passes, `420` included; four mutations (either `trg_tenant_allowance`
+dropped, the `access_valid_until` derivation dropped, sign-in reverted to
+`20260929000002`'s body) each turn `420` red at the assertion written for it.
+`contract:check` holds. Nothing reaches production until merge; a §15 reading of how
+many organizations carry a plan belongs in the push after it (D153).
+
+### Admin · an organization can be deleted, and deleting is not suspending · 2026-09-29 · `20260930000002`
+
+**Asked for.** "For an organization, one could delete it. Once deleted, it is deleted
+forever — different from suspended." The owner chose the scope when asked: the
+organization's projects AND its user accounts go with it.
+
+**Promised versus found.** D205's gap check listed organization suspension as the
+open organization question and said nothing about deletion, because there was no
+deletion to check. Writing one found that the schema's foreign keys would have
+orphaned rather than deleted (D208), and that the only author of "what a project
+delete reaches" was inside `delete_project`, whose gate deliberately refuses a super
+admin — so the organization delete could either call nothing or copy D170's list.
+It copies nothing: the sweep became `_delete_project_rows`, and `delete_project`
+keeps its signature, gate and grants.
+
+**What shipped.** `20260930000002`, `/admin/organizations`' "Delete permanently…"
+(desktop menu and mobile row), `organizations.contract.yaml`'s governance note, and
+`chains.mjs` / `rehearsal/370` reading the sweep from its new home — see D208.
+
+**Gap check.** (1) `admin_delete_project` still leaves six tables' rows behind
+(D208); routing it through `_delete_project_rows` is one line and is its own change.
+(2) A deleted account's `chat_threads`, `user_files` and storage objects remain.
+(3) The actor is `_assert_super_admin`'s, so it is still D28's client assertion.
+(4) Suspension is still not enforced (D205). No later package changes.
+
+**Measured locally.** `contract:rehearse` against PostgreSQL 16, all three ways
+(plain, `--fixtures`, `--since HEAD`): 41 of 41 files pass, `370` and `430` included.
+Two mutations each turn `430` red: dropping the per-project sweep (the account delete
+then hits D161's write-once `ingest_files` — the order is load-bearing) and dropping
+the slug check. `contract:check` holds; `npm test` 1245 pass; eslint adds no error.
+Nothing reaches production until merge; the after-reading belongs in the push after
+it (D153).
+
+### Account · /profile shows who the account belongs to; the user edits only their user name · 2026-09-30 · `20260930000003`
+
+**Asked for.** The owner asked that /profile show the account holder's First and Last
+name and user ID, and let the user change only their user name: the first and last
+name must stay as recorded, for identification and accountability.
+
+**Promised versus found.** The page showed `name` only as a placeholder and no ID at all
+(D209). The first draft of this change read the request as "let the user edit their
+first and last name" and shipped exactly the opposite of what was asked; the owner
+corrected it on review. That draft never reached production — a branch's migrations
+deploy on merge — and was rewritten, not reverted, so nothing in the database ever
+carried an editable identity.
+
+**What shipped.** `20260930000003` and the page that reads it — see D209's "Closed by";
 it is not restated here.
 
-**Gap check.** (1) The split of an administrator-written name is a derivation, not a
-fact about the person: "Mary Ann Smith" reads as first "Mary", last "Ann Smith" until
-its owner corrects it, and the sidecar declares it as a substitution visible on /profile.
-(2) `authenticate_approved_user` still returns `name` whole and the admin pages still
-edit it whole; both stay correct because the trigger re-derives the parts, and neither
-needed to change. (3) How many existing names split into more than two words is a §15
-question; it was not measured, and changes nothing but what a user first sees in the two
-fields. (4) The user ID's copy says what the schema shows — API keys record their creator
-by it — and claims nothing more: the API's own principal is still the key, not a person
-(D28, D71). No later package changes because of these findings.
+**Gap check.** (1) The split of `name` is a reading, not a claim about the person:
+"Mary Ann Smith" reads as first "Mary", last "Ann Smith"; an administrator who needs
+it otherwise edits `name`, the only authored fact. (2) The parts are read-only by
+construction — derived on every write — rather than by a GENERATED column, because the
+contract's introspector records no generation expression (D52's class); that is a
+tooling gap, not this change's. (3) The user name is `display_name`, renamed on the page
+rather than added in the schema: a second self-chosen name column would author one fact
+twice. It is not unique and not a sign-in handle — sign-in stays by email. (4) The user
+ID's copy claims only what the schema shows — API keys record their creator by it — the
+API's principal is still the key, not a person (D28, D71). (5) Merging `main` moved this
+change off D207, `20260930000001` and `rehearsal/420`, all claimed by #301/#303 while it
+was open, and onto `main`'s `get_my_profile` (`20260929000004`), which it redefines
+with the two parts added and nothing removed. No later package changes because of these
+findings.
 
 ## 17. Sequencing
 
