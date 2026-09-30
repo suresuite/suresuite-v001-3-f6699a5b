@@ -15,10 +15,14 @@ import {
   SlidersHorizontal,
   Shield,
   Code2,
+  Building2,
+  Check,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useMyOrganizations } from "@/hooks/useMyOrganizations";
+import { toast } from "sonner";
 import { useCapabilities } from "@/hooks/useCapabilities";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { avatarClass } from "@/lib/avatarColors";
@@ -145,6 +149,12 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
   const { canAccessPage } = useCapabilities();
 
   const handleLogout = () => logout();
+  // D210 — an account in several organizations switches between them here.
+  const { organizations, switching, switchTo } = useMyOrganizations();
+  const onSwitch = async (orgId: string) => {
+    const refusal = await switchTo(orgId);
+    if (refusal) toast.error(refusal);
+  };
 
   const visibleSections = filterVisibleSections(NAV_SECTIONS, canAccessPage);
 
@@ -291,6 +301,26 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
                 </span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {organizations.length > 1 && (
+                <>
+                  <DropdownMenuLabel className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                    Organization
+                  </DropdownMenuLabel>
+                  {organizations.map((o) => (
+                    <DropdownMenuItem
+                      key={o.org_id}
+                      disabled={o.is_current || o.access_expired || switching !== null}
+                      onClick={() => onSwitch(o.org_id)}
+                      title={o.access_expired ? `${o.name}: access period ended` : o.is_current ? `${o.name} (current)` : `Switch to ${o.name}`}
+                    >
+                      {o.is_current ? <Check className="mr-2 h-4 w-4" /> : <Building2 className="mr-2 h-4 w-4" />}
+                      <span className="truncate">{o.name}</span>
+                      {o.access_expired && <span className="ml-auto pl-2 text-[10px] text-muted-foreground">ended</span>}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem asChild>
                 <Link to="/profile">
                   <User className="mr-2 h-4 w-4" /> My Profile

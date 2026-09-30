@@ -772,7 +772,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "Profile.tsx",
         "via": "rpc change_own_password",
-        "evidence": "src/pages/Profile.tsx:136"
+        "evidence": "src/pages/Profile.tsx:143"
       }
     ],
     "governance": {
@@ -1178,7 +1178,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it.",
+        "meaning": "The account's ACTIVE organization, by uuid — the one it is working in now, the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns, and therefore what every org-scoped RLS policy reads and what a new project is stamped with. Since §4 D210 an account may BELONG to several organizations (`organization_members`, the authority for membership) and this column is always one of them — NULL exactly when it belongs to none. Setting it adds the membership if missing; the account changes it itself through `switch_my_organization`, and sign-in moves it to a current membership when the active one's access period has ended. The `organization` text copy follows it (`trg_approved_users_track_active_org`).",
         "primaryKey": false,
         "unique": false,
         "references": {
@@ -11191,7 +11191,7 @@ export const REFERENCE_TABLES: RefTable[] = [
     "tier": "G",
     "tierName": "governance — identity, capability, delegation, audit",
     "owner": "platform",
-    "grain": "One user's membership of one organization, and the role they hold IN that organization. Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for.",
+    "grain": "One user's membership of one organization, and the role they hold IN that organization. An account may hold several — one per organization it belongs to (§4 D210). Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for.",
     "naturalKey": [
       "org_id",
       "user_id",
@@ -11721,7 +11721,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": "one of 1 / 2 / 3 / 5, or NULL",
-        "meaning": "The most accounts the organization may have, counted by `approved_users.organization_id` (the authority since D205) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `approved_users`. Lowering it removes nobody; no account can be added until under it.",
+        "meaning": "The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it.",
         "primaryKey": false,
         "unique": false,
         "references": null,

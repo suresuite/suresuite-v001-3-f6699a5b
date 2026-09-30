@@ -16,10 +16,10 @@
 --    with one active super admin left, nobody who passes the gate can remove it. (The
 --    count guard's other job — two admins suspending EACH OTHER concurrently — needs two
 --    sessions and is held by the row lock in `_lock_active_super_admins`, not asserted.)
--- §5 membership follows `organization_id`: a move leaves exactly one row, in the new
---    organization, with the backfill's role mapping; a row naming another organization
---    is refused; clearing the organization removes the row; `admin_list_organizations`
---    counts Members by the uuid, equal to the rows §2 lists.
+-- §5 membership follows `organization_id`: setting it adds the row, with the backfill's
+--    role mapping, and (since D210) keeps the account's other memberships; removing the
+--    last membership leaves no organization; `admin_list_organizations` counts Members
+--    as membership rows, equal to the accounts §2 lists in that organization.
 -- §6 the Overview's figures are the tables' own counts, and its top users come from
 --    this month's usage; `admin_usage_log_read` names each row's person.
 
@@ -197,15 +197,20 @@ BEGIN
   PERFORM public.admin_set_user_active(v_super2, 'a400s2@example.invalid', v_super, true);
 
   -- ══ §5 · membership follows organization_id ══
+  -- Since D210 an account may belong to several organizations and `organization_id` is
+  -- the ACTIVE one: setting it ADDS its membership and keeps the others. `rehearsal/450`
+  -- owns that rule; this section keeps what D205 made true and D210 did not change.
   UPDATE public.approved_users SET organization_id = v_org_b WHERE id = v_user;
-  SELECT count(*) INTO v_n FROM public.organization_members WHERE user_id = v_user;
-  IF v_n <> 1 OR NOT EXISTS (SELECT 1 FROM public.organization_members
-                              WHERE user_id = v_user AND org_id = v_org_b AND org_role = 'member') THEN
-    RAISE EXCEPTION 'A400 §5: after a move the account has % membership row(s), expected one in the new org', v_n;
+  IF NOT EXISTS (SELECT 1 FROM public.organization_members
+                  WHERE user_id = v_user AND org_id = v_org_b AND org_role = 'member')
+     OR NOT EXISTS (SELECT 1 FROM public.organization_members
+                     WHERE user_id = v_user AND org_id = v_org_a) THEN
+    RAISE EXCEPTION 'A400 §5: after a switch the account lacks a membership in the new org, or lost the old one (D210)';
   END IF;
 
-  -- The backfill's role mapping on a move: an app `admin` is an org `admin`.
+  -- The backfill's role mapping on a switch: an app `admin` is an org `admin`.
   UPDATE public.approved_users SET role = 'admin' WHERE id = v_user;
+  DELETE FROM public.organization_members WHERE user_id = v_user AND org_id = v_org_a;
   UPDATE public.approved_users SET organization_id = v_org_a WHERE id = v_user;
   IF NOT EXISTS (SELECT 1 FROM public.organization_members
                   WHERE user_id = v_user AND org_id = v_org_a AND org_role = 'admin') THEN
@@ -213,38 +218,25 @@ BEGIN
   END IF;
   UPDATE public.approved_users SET role = 'user' WHERE id = v_user;
 
-  -- A membership naming another organization is refused.
-  v_code := NULL;
-  BEGIN
-    INSERT INTO public.organization_members (org_id, user_id) VALUES (v_org_b, v_user);
-  EXCEPTION WHEN check_violation THEN v_code := SQLSTATE; END;
-  IF v_code IS DISTINCT FROM '23514' THEN
-    RAISE EXCEPTION 'A400 §5: a membership row in an org the account is not in was accepted';
-  END IF;
-
   -- The admin RPCs still work through the rule (they insert the row that already exists).
   PERFORM public.admin_update_user(v_super2, 'a400s2@example.invalid', v_user, 'A400 user', v_org_b);
   SELECT count(*) INTO v_n FROM public.organization_members WHERE user_id = v_user;
-  IF v_n <> 1 THEN
-    RAISE EXCEPTION 'A400 §5: admin_update_user left % membership rows', v_n;
+  IF v_n <> 2 THEN
+    RAISE EXCEPTION 'A400 §5: admin_update_user left % membership rows, expected A and B once each', v_n;
   END IF;
 
-  -- Members counted by the uuid equal what the list shows under that org.
+  -- Members are the membership rows, and equal the accounts the list shows in that org.
   SELECT members INTO v_n FROM public.admin_list_organizations(v_super2, 'a400s2@example.invalid') WHERE id = v_org_b;
-  SELECT count(*) INTO v_rows FROM public.admin_list_users(v_super2, 'a400s2@example.invalid') WHERE organization_id = v_org_b;
+  SELECT count(*) INTO v_rows FROM public.admin_list_users(v_super2, 'a400s2@example.invalid')
+   WHERE memberships @> jsonb_build_array(jsonb_build_object('org_id', v_org_b));
   IF v_n <> v_rows OR v_n <> 1 THEN
     RAISE EXCEPTION 'A400 §5: Organizations says % member(s), Users lists %', v_n, v_rows;
   END IF;
 
-  -- Clearing the organization removes the row.
-  -- `organization` is NOT NULL with the `'default_org'` sentinel, which names no
-  -- organization, so the stamping trigger leaves the uuid NULL.
-  UPDATE public.approved_users SET organization = 'default_org', organization_id = NULL WHERE id = v_user;
+  -- An account with no membership has no organization, and the reverse.
+  DELETE FROM public.organization_members WHERE user_id = v_user;
   IF (SELECT organization_id FROM public.approved_users WHERE id = v_user) IS NOT NULL THEN
-    RAISE EXCEPTION 'A400 §5: the organization could not be cleared';
-  END IF;
-  IF EXISTS (SELECT 1 FROM public.organization_members WHERE user_id = v_user) THEN
-    RAISE EXCEPTION 'A400 §5: an account with no organization still holds a membership row';
+    RAISE EXCEPTION 'A400 §5: an account with no membership still has an organization';
   END IF;
 
   -- ══ §6 · the Overview and the usage log ══
