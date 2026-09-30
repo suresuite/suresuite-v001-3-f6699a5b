@@ -61,7 +61,7 @@ import type { StageRow } from "@/hooks/useStageRows";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
-import { useScenarios } from "@/hooks/useScenarios";
+import { fetchValidationBaseline, useScenarios } from "@/hooks/useScenarios";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
 import {
   fetchScenarioFingerprintHash,
@@ -103,13 +103,15 @@ import { M, MobileChip, MobileGroup, MobilePanel, MobileRow } from '@/components
 import { formatMoney, MONEY_SYMBOL } from "@/lib/sim/money";
 import { WeeksInput } from "@/components/sim/WeeksInput";
 import { formatDuration } from "@/lib/sim/planningTime";
+import { VALIDATION_SCENARIO_NAME, findValidationBaseline } from "@/lib/sim/validationBaseline";
 
 /** The planning-unit inputs, sized like the seed input beside them. */
 const WEEKS_FIELD = "h-6 w-[94px] text-right font-mono text-[11.5px] md:min-h-0";
 
 // Runs launched from the policies stage all reuse this single auto-managed
-// scenario so the Lab's scenario list doesn't fill up with validation runs.
-const VALIDATION_SCENARIO_NAME = "Policy validation (auto)";
+// scenario — the project's validated baseline, found by `scenarios.role`
+// rather than by its name (§4 D225). The Lab pins it read-only and reuses its
+// run; every new Lab scenario is seeded from it.
 
 interface Props {
   projectId: string | null | undefined;
@@ -403,7 +405,7 @@ export function RunValidateStage({
   // run panel only appeared after dispatching a fresh run in this session.
   useEffect(() => {
     if (validationScenarioId) return;
-    const scen = scenarios.find((s) => s.name === VALIDATION_SCENARIO_NAME);
+    const scen = findValidationBaseline(scenarios);
     if (scen) setValidationScenarioId(scen.id);
   }, [scenarios, validationScenarioId]);
 
@@ -725,8 +727,17 @@ export function RunValidateStage({
     patch: { replications: number; seed: number; horizon_days: number; primary_kpi: string },
   ): Promise<string | null> => {
     if (!projectId) return null;
-    let scen = scenarios.find((s) => s.name === VALIDATION_SCENARIO_NAME);
-    if (!scen) scen = await createScenario(VALIDATION_SCENARIO_NAME);
+    let scen = findValidationBaseline(scenarios);
+    if (!scen) {
+      try {
+        scen = await createScenario(VALIDATION_SCENARIO_NAME, { role: "validation_baseline" });
+      } catch (e) {
+        // 23505: another tab or session created the baseline first — the partial
+        // unique index allows one per project. Use that one.
+        if ((e as { code?: string }).code !== "23505") throw e;
+        scen = await fetchValidationBaseline(projectId);
+      }
+    }
     if (!scen) return null;
     // Skip the write when nothing changes: a no-op UPDATE still bumps
     // updated_at, which would defeat the §9.2 reuse-or-rerun check (run

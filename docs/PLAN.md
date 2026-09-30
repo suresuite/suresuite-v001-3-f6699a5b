@@ -407,7 +407,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D222** | **The phone Lab never showed what capacity a run would use.** `CapacityReadinessPanel` — §4 D167's pre-run disclosure that an assumed capacity cannot bind — is mounted on the desktop Run pane and on Run & Validate, and on no mobile surface | `src/components/sim/MobileSimulationLab.tsx` | **CLOSED ✅ — WP 9.4 slice 2.** The page builds one compact `CapacityReadinessPanel` and hands the same node to the desktop Run card and the phone's Run pane; collapsed, its line still states how many products run on an assumed capacity that cannot bind (T2) |
 | **D223** | **A second days-per-month constant, dormant.** `DAYS_PER_UNIT.month = 30` in the planning-unit hook disagrees with the one unit table's 30.4375 (`UNIT_DAYS`, the table `contract:units` gates). Unreachable while the unit is fixed to week — and it becomes a wrong conversion the day month is selectable again | `src/hooks/useTimeUnit.ts` (`DAYS_PER_UNIT`) against `supabase/functions/_shared/grading.ts` (`UNIT_DAYS`) | **OPEN — WP 9.4** *(slice 1: derived from the table)* |
 | **D224** | **The browser restates the engine's event bounds as literals.** `disruptionWeeks` clamps a duration to `1..52` weeks, and the mapper's own comment says nothing in `src/` may restate 52. The cap of five events and the supported target kinds are restated nowhere at all, so no pre-run surface could say an event would be dropped | `src/lib/sim/runWindow.ts` (`disruptionWeeks`); `scsim/scsim/io/project_map.py` (`_map_events`) | **OPEN — WP 9.4** *(slice 6: the mapper exports `disruption_rule` beside `run_window`)* |
-| **D225** | **The validated baseline was a scenario keyed by its display name.** Run & Validate finds "its" scenario with `scenarios.find(s => s.name === "Policy validation (auto)")`, and the Lab listed that row as an ordinary editable, deletable scenario. A rename orphaned the validation run from its scenario and the next validation created a second one; a Lab edit to it was overwritten by the next validation run without a word | `src/components/policies/RunValidateStage.tsx` (`VALIDATION_SCENARIO_NAME`, `ensureValidationScenario`) | **OPEN — WP 9.4** *(slice 4: `scenarios.role`, one baseline per project)* |
+| **D225** | **The validated baseline was a scenario keyed by its display name.** Run & Validate finds "its" scenario with `scenarios.find(s => s.name === "Policy validation (auto)")`, and the Lab listed that row as an ordinary editable, deletable scenario. A rename orphaned the validation run from its scenario and the next validation created a second one; a Lab edit to it was overwritten by the next validation run without a word | `src/components/policies/RunValidateStage.tsx` (`VALIDATION_SCENARIO_NAME`, `ensureValidationScenario`) | **CLOSED ✅ (`20261001000001`) — WP 9.4 slice 4.** `scenarios.role` (`experiment` / `validation_baseline`, CHECK-constrained), at most one baseline per project by the partial unique index `scenarios_one_validation_baseline`, backfilled by `scenarios_assign_validation_baseline` (an active card's evidence scenario first, then the newest run, then the oldest; never granted to the API roles). Run & Validate selects and inserts by role and re-selects on 23505; the Lab pins the row read-only and never dispatches it. `supabase/rehearsal/510` proves all four, mutation-tested twice. The name survives only as a fallback while the column has not deployed |
 | **D226** | **"Add disruption" on the network pages wrote five things wrong and two tables nothing reads.** The shared dialog (a) wrote `create_disruption_scenario_v2`'s four legacy tables, which no run reads (§4 D48); (b) discarded the user's scenario name — every scenario was `Disruption: node/<id>`; (c) wrote an edge as a node target; (d) stored a time-delay amount as `magnitude_pct`, which the engine reads as a capacity cut; (e) counted `start_day` from TODAY rather than from the run's week 1; (f) never set `from_network`, so the Lab's "from network map" chip could not appear; and it skipped validation inheritance. It offered targets the engine skips (anything but a supplier or the plant) without saying so | `src/components/DisruptionDialog.tsx`; `src/hooks/useScenarios.tsx` (`createFromNode`) | **OPEN — WP 9.4** *(slice 7: one dialog on all three pages, writing only the schedule the engine runs; the legacy write stops — a §16 decision)* |
 
 ### 4.1 Code map — the data layer
@@ -20201,6 +20201,35 @@ manual's preset count are untouched. (3) The blueprint names the product term: �
 carries the reconciliation with `MLPrediction`.
 
 **Gap check.** No later package changes; Phase D owns the feature.
+
+### WP 9.4 slice 4 · the validated baseline gets an identity · 2026-09-30 · `20261001000001`
+
+**Asked for.** "Reuse the simulation run and validation in the prior stage."
+
+**Promised versus found.** The opening entry promised the Lab would build on Run &
+Validate's scenario. It found that scenario identified by its display name (§4 D225): the
+Lab listed it as an ordinary row that could be renamed — orphaning the validation, after
+which the next validation silently created a second one — deleted, or edited, with every
+edit overwritten by the next validation run.
+
+**Decisions.** (1) A column, not a helper constant: `role` with two values. The door a
+scenario came through stays `from_network`; a third value for it would author that fact
+twice (`single-source`). (2) No SECURITY DEFINER writer: Run & Validate selects by role and
+inserts with it through the RLS path every scenario write already takes, and the partial
+unique index makes "one per project" structural; the `audit-actor` list does not grow.
+(3) The backfill rule is a SECURITY INVOKER function the API roles cannot execute, so the
+rehearsal runs the same rule the migration ran. (4) Nothing is deleted: a renamed duplicate
+stays an experiment. (5) The Lab shows the baseline read-only through a native
+`<fieldset disabled>`, so no editor grew a read-only branch; its copy button starts a new
+scenario from it, and the gate reads `baseline`. (6) Protection is in the UI, not a trigger:
+a BEFORE DELETE trigger would also block the cascade that deletes a project.
+
+**Gap check.** Until the migration deploys on merge, `insertScenario` retries without
+`role` on PGRST204/42703 and `isValidationBaseline` falls back to the name — the window is
+the deploy, not a release. The `agent-apply` experiment-spec path still writes scenarios
+without a role guard; it creates experiments only, so it cannot create a second baseline,
+and touching it needs a function deploy this package does not otherwise make. The §15 probe
+(`wp94ScenarioRole`) travels in its own push; the after-read is the push after the merge.
 
 ## 17. Sequencing
 

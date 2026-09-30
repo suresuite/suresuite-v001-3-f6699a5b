@@ -37,6 +37,8 @@ import { PreRunValidationPanel } from "@/components/sim/PreRunValidationPanel";
 import { CapacityReadinessPanel } from "@/components/sim/CapacityReadiness";
 import { RunCard } from "@/components/sim/RunCard";
 import { SurrogateCard } from "@/components/sim/SurrogateCard";
+import { ReadOnlyFrame } from "@/components/sim/ReadOnlyFrame";
+import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/validationBaseline";
 import { runGateState } from "@/lib/sim/runGate";
 import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
 import {
@@ -102,6 +104,10 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     [scenarios, selectedId],
   );
   const { latestRun, reps, runExperiment, cancelRun, addReps } = useSimulationRun(selectedId);
+  // The validated baseline is Run & Validate's: the Lab shows it and reuses its
+  // run, and never edits or dispatches it (§4 D225).
+  const baselineSelected = isValidationBaseline(selected);
+  const readOnlyReason = baselineSelected ? BASELINE_READONLY_REASON : null;
 
   // ── §8.1 required-data gate, surfaced PRE-dispatch (Phase B0 / G6) ────────
   // Grade the same manifest the sim-command gate grades, client-side through
@@ -160,6 +166,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   // readout, the stage label, the button and its reason are fields of it.
   const runGate = runGateState({
     permitted: canRunSimulations,
+    isBaseline: baselineSelected,
     blocks: gateBlocks,
     warns: gateWarns,
     acknowledged: ackWarnings,
@@ -176,6 +183,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const inheritTried = useRef(new Set<string>());
   useEffect(() => {
     if (!selected || !policyVersionId || policyDirty) return;
+    if (baselineSelected) return; // Run & Validate owns its settings
     if (selected.inherited_validation_id) return;
     if (selected.warmup_mode !== "auto") return; // hand-set → never override
     if (inheritTried.current.has(selected.id)) return;
@@ -183,7 +191,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     void cred.applyIfValidated(selected, policyVersionId).then((cardId) => {
       if (cardId) toast.message("Warm-up & replications inherited from the model validation.");
     });
-  }, [selected, policyVersionId, policyDirty, cred]);
+  }, [selected, policyVersionId, policyDirty, cred, baselineSelected]);
 
   const dispatchRun = async (versionId: string, forceRerun = false) => {
     if (!projectId || !selected) return;
@@ -419,7 +427,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           onLaunchStress={launchStress}
           pane={pane}
           onPane={setPane}
-          onSaveScenario={(patch) => selected && update(selected.id, patch)}
+          onSaveScenario={(patch) => selected && !baselineSelected && update(selected.id, patch)}
           projectRecovery={projectRecovery}
           effectiveRecovery={effectiveRecovery}
           policyVersionLabel={currentVersionLabel}
@@ -434,6 +442,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           runBlockedReason={runBlockedReason}
           runGate={runGate}
           capacity={capacityLine}
+          readOnlyReason={readOnlyReason}
           findingsSource={serverFindings ? "gate rejection" : "pre-run check"}
           supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
           latestRun={latestRun}
@@ -537,17 +546,21 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                     No scenario selected
                   </div>
                 ) : pane === "setup" ? (
-                  <ScenarioSetupForm
-                    scenario={selected}
-                    projectId={projectId}
-                    onSave={(patch) => update(selected.id, patch)}
-                  />
+                  <ReadOnlyFrame reason={readOnlyReason}>
+                    <ScenarioSetupForm
+                      scenario={selected}
+                      projectId={projectId}
+                      onSave={(patch) => update(selected.id, patch)}
+                    />
+                  </ReadOnlyFrame>
                 ) : pane === "recovery" ? (
-                  <DisruptionRecoveryPane
-                    scenario={selected}
-                    projectRecovery={projectRecovery}
-                    onSave={(patch) => update(selected.id, patch)}
-                  />
+                  <ReadOnlyFrame reason={readOnlyReason}>
+                    <DisruptionRecoveryPane
+                      scenario={selected}
+                      projectRecovery={projectRecovery}
+                      onSave={(patch) => update(selected.id, patch)}
+                    />
+                  </ReadOnlyFrame>
                 ) : pane === "run" ? (
                   <RunCard
                     versionText={versionText}

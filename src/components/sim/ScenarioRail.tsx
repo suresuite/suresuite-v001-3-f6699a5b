@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import type { Scenario } from "@/hooks/useScenarios";
 import type { Credibility } from "@/hooks/useModelValidation";
 import { formatDuration } from "@/lib/sim/planningTime";
+import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/validationBaseline";
 
 /**
  * Left column, top to bottom:
@@ -9,7 +10,9 @@ import { formatDuration } from "@/lib/sim/planningTime";
  *      start a new stress test is impossible to miss.
  *   2. ScenarioList — one row per scenario, credibility dot, duplicate + delete
  *      always visible (they used to appear only on the selected row, which is
- *      why nobody could find delete).
+ *      why nobody could find delete). The validated baseline is pinned first,
+ *      cannot be deleted from here, and its copy button starts a new scenario
+ *      from it (WP 9.4 slice 4, §4 D225).
  *
  * The library is a SOURCE of scenarios, not a scenario — hence a separate
  * surface, a different colour, and a drawer for its detail.
@@ -118,8 +121,11 @@ export function ScenarioList({
             No scenarios yet — create one, or launch a stress test above.
           </div>
         ) : null}
-        {scenarios.map((s) => {
+        {[...scenarios]
+          .sort((a, b) => Number(isValidationBaseline(b)) - Number(isValidationBaseline(a)))
+          .map((s) => {
           const on = s.id === selectedId;
+          const baseline = isValidationBaseline(s);
           const cred = credibilityFor?.(s) ?? null;
           const events = s.disruption_schedule?.length ?? 0;
           return (
@@ -145,6 +151,11 @@ export function ScenarioList({
                 >
                   {s.name || "Untitled scenario"}
                 </span>
+                {baseline ? (
+                  <span className="w-fit rounded-sm bg-[rgba(20,184,196,0.12)] px-1.5 py-px text-[10.5px] text-[#0e7f88]">
+                    validated baseline
+                  </span>
+                ) : null}
                 <span className="truncate text-[12.5px] tabular-nums text-[#52525b]">
                   {s.replications} reps · {formatDuration(s.horizon_days)} ·{" "}
                   {events > 0 ? `${events} event${events > 1 ? "s" : ""}` : "steady state"}
@@ -155,7 +166,7 @@ export function ScenarioList({
               <div className="mt-px flex shrink-0 items-center gap-[2px]">
                 <button
                   type="button"
-                  title="Duplicate scenario"
+                  title={baseline ? "New scenario from this baseline" : "Duplicate scenario"}
                   onClick={(e) => {
                     e.stopPropagation();
                     onDuplicate(s);
@@ -166,12 +177,13 @@ export function ScenarioList({
                 </button>
                 <button
                   type="button"
-                  title="Delete scenario"
+                  title={baseline ? BASELINE_READONLY_REASON : "Delete scenario"}
+                  disabled={baseline}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (confirm(`Delete scenario "${s.name}"?`)) onDelete(s.id);
                   }}
-                  className="h-6 min-h-11 w-6 min-w-11 rounded-sm border border-transparent text-[13px] leading-none text-[#a1a1aa] hover:border-[--hair-rule] hover:bg-white hover:text-[#BF2330] md:min-h-0 md:min-w-0"
+                  className="h-6 min-h-11 w-6 min-w-11 rounded-sm border border-transparent text-[13px] leading-none text-[#a1a1aa] hover:border-[--hair-rule] hover:bg-white hover:text-[#BF2330] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:text-[#a1a1aa] md:min-h-0 md:min-w-0"
                 >
                   ✕
                 </button>

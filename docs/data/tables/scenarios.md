@@ -16,6 +16,16 @@
 | Columns | Source | Constraint |
 |---|---|---|
 | `id` | column PRIMARY KEY | `scenarios_pkey` |
+| `project_id` | partial UNIQUE index | `scenarios_one_validation_baseline` |
+
+## Constraints
+
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `scenarios_role_check` | `CHECK (role IN ('experiment', 'validation_baseline'))` | `20261001000001_scenario_role.sql` |
 
 ## Governance
 
@@ -55,7 +65,7 @@ Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the d
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `SimulationLab.tsx` | table read | `src/hooks/useScenarios.tsx:70` | yes |
+| `SimulationLab.tsx` | table read | `src/hooks/useScenarios.tsx:109` | yes |
 | `SimulationLab.tsx` | table read | `src/hooks/useVerifiableExports.tsx:213` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
@@ -93,6 +103,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `recovery_playbook_id` | — | `uuid` | — | — | The playbook this scenario applies, by id. The one place a playbook is referenced by key rather than by name, which is what `scenario_templates.suggested_playbook_name` is not. |
 | `from_network` | — | `boolean` | — | — | TRUE when the scenario was created from a network screen rather than from the simulation lab. It records the door a decision came through, which nothing else does. |
 | `inherited_validation_id` | — | `uuid` | — | — | The model card (`model_validations.id`) whose adopted warm-up and recommended replication count `apply_validation_to_scenario` wrote into this scenario. NULL where nothing was inherited, or where a person hand-edited either value afterwards — divergence from the validated settings is explicit, never silent. A credibility provenance, not a data-readiness grade, which is what this line said until §4 D220. |
+| `role` | — | `text` | — | — | What the scenario is for — `experiment`, a what-if a person set up in the Lab (the default), or `validation_baseline`, the one scenario per project that Run & Validate on /policies runs its validation into (a partial unique index keeps it to one). The Lab pins the baseline, shows it read-only and reuses its run, and every new scenario is seeded from it. It replaced finding that scenario by its display name, which a rename broke (§4 D225). The door a scenario came through is `from_network`, a different fact. |
 
 ## Each column in full
 
@@ -408,14 +419,29 @@ The model card (`model_validations.id`) whose adopted warm-up and recommended re
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `role`
+
+What the scenario is for — `experiment`, a what-if a person set up in the Lab (the default), or `validation_baseline`, the one scenario per project that Run & Validate on /policies runs its validation into (a partial unique index keeps it to one). The Lab pins the baseline, shows it read-only and reuses its run, and every new scenario is seeded from it. It replaced finding that scenario by its display name, which a rename broke (§4 D225). The door a scenario came through is `from_network`, a different fact.
+
+| | |
+|---|---|
+| Type | `text`, `NOT NULL`, default `'experiment'` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000001_scenario_role.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
 |---|---|---|---|
 | `scenarios_project_idx` | `project_id` | no | `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql` |
+| `scenarios_one_validation_baseline` | `project_id` | yes | `20261001000001_scenario_role.sql` |
 
 ---
 
-*Generated from data contract `5f244e8738ea`, engine `0.2.8`,
+*Generated from data contract `788adb9e0ad7`, engine `0.2.8`,
 sidecar `supabase/contract/scenarios.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

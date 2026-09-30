@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 362,
-      "migrations_applied": 354,
-      "last_migration": "20260930000010_ai_chat_launcher_feature.sql"
+      "migrations_found": 363,
+      "migrations_applied": 355,
+      "last_migration": "20261001000001_scenario_role.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -18,8 +18,8 @@
   "counts": {
     "tables_in_schema": 81,
     "tables_covered": 55,
-    "columns_covered": 696,
-    "check_constraints": 54,
+    "columns_covered": 697,
+    "check_constraints": 55,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -26376,6 +26376,14 @@
             "id"
           ],
           "name": "scenarios_pkey"
+        },
+        {
+          "source": "partial UNIQUE index",
+          "columns": [
+            "project_id"
+          ],
+          "name": "scenarios_one_validation_baseline",
+          "predicate": "role = 'validation_baseline'"
         }
       ],
       "natural_key_intended": null,
@@ -26385,7 +26393,7 @@
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/useScenarios.tsx:70",
+          "evidence": "src/hooks/useScenarios.tsx:109",
           "confirmed": true
         },
         {
@@ -26442,6 +26450,13 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        },
+        {
+          "name": "scenarios_role_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (role IN ('experiment', 'validation_baseline'))",
+          "added_by": "20261001000001_scenario_role.sql"
         }
       ],
       "indexes": [
@@ -26455,6 +26470,17 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        },
+        {
+          "name": "scenarios_one_validation_baseline",
+          "unique": true,
+          "columns": [
+            "project_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "role = 'validation_baseline'",
+          "partial": true,
+          "added_by": "20261001000001_scenario_role.sql"
         }
       ],
       "columns": [
@@ -27173,6 +27199,38 @@
           "normalize_at_promotion": null,
           "meaning": "The model card (`model_validations.id`) whose adopted warm-up and recommended replication count `apply_validation_to_scenario` wrote into this scenario. NULL where nothing was inherited, or where a person hand-edited either value afterwards — divergence from the validated settings is explicit, never silent. A credibility provenance, not a data-readiness grade, which is what this line said until §4 D220.",
           "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": false,
+          "default": "'experiment'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000001_scenario_role.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What the scenario is for — `experiment`, a what-if a person set up in the Lab (the default), or `validation_baseline`, the one scenario per project that Run & Validate on /policies runs its validation into (a partial unique index keeps it to one). The Lab pins the baseline, shows it read-only and reuses its run, and every new scenario is seeded from it. It replaced finding that scenario by its display name, which a rename broke (§4 D225). The door a scenario came through is `from_network`, a different fact.",
+          "grain": "metadata",
           "computed_by": null,
           "engine": {
             "consumed_by": null,
@@ -31363,5 +31421,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "5f244e8738ea"
+  "contract_version": "788adb9e0ad7"
 }

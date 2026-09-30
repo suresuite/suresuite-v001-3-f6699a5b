@@ -218,6 +218,6 @@ When the row was last written. Server-stamped by trigger.
 
 ---
 
-*Generated from data contract `5f244e8738ea`, engine `0.2.8`,
+*Generated from data contract `788adb9e0ad7`, engine `0.2.8`,
 sidecar `supabase/contract/multi_tier_supply_chain.contract.yaml`, table created by `20250820145837_5a2d95f1-7a5f-4bbb-8ac8-995d53011bce.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

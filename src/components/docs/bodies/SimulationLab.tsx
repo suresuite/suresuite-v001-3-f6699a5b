@@ -248,6 +248,15 @@ export default function SimulationLab() {
           The left column holds your scenarios, and above them two ways of not starting from blank.
         </P>
         <P>
+          <strong>The validated baseline is pinned first.</strong> It is the scenario Run &amp;
+          Validate on the policies page runs its validation into, marked{" "}
+          <Term>validated baseline</Term>. The Lab shows its settings and its latest results but does
+          not edit or run it — its settings are what the validation certified, and they change
+          where the validation happens. Its copy button starts a new scenario from it, which is the
+          way to test a change against a model you have validated. Below the stress tests, a
+          surrogate-model card marks the criticality ranking that is coming and does nothing yet.
+        </P>
+        <P>
           <strong>The stress-test drawer</strong> creates a scenario with a disruption already
           written into it. Read <DocLink to="stress-tests">Stress tests</DocLink> before you rely on
           one: most of the presets name a target the engine cannot resolve as shipped.

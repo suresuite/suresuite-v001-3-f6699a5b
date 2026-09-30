@@ -84,6 +84,7 @@ import { CompareScenariosPanel } from "./CompareScenariosPanel";
 import { ExperimentLibraryBox, ScenarioList } from "./ScenarioRail";
 import { StressTestDrawer, type StressTestPreset } from "./StressTestCard";
 import { SurrogateCard } from "./SurrogateCard";
+import { ReadOnlyFrame } from "./ReadOnlyFrame";
 import { RESPONSE_LABELS, type RecoveryConfig, type RecoveryResponseKey } from "@/lib/sim/recoveryScore";
 import { kpiDisplay } from "@/lib/sim/kpiDisplay";
 import { useTimeUnit, UNIT_LABEL_PLURAL } from "@/hooks/useTimeUnit";
@@ -178,6 +179,8 @@ export interface MobileSimulationLabProps {
   runGate: RunGateState;
   /** the capacity line the desktop Run pane shows (§4 D167 / D222) */
   capacity?: React.ReactNode;
+  /** non-null when the selected scenario is the validated baseline (§4 D225) */
+  readOnlyReason?: string | null;
   findingsSource: "pre-run check" | "gate rejection";
   supplierIds: string[];
   latestRun: SimulationRun | null;
@@ -228,6 +231,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
     runBlockedReason,
     runGate,
     capacity,
+    readOnlyReason = null,
     findingsSource,
     supplierIds,
     latestRun,
@@ -926,45 +930,53 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
         <>
           <MobileSheet open={sheet === "scenario"} title="Scenario" onClose={close}>
             <div className="p-3.5">
-              <ScenarioSetupForm
-                section="identity"
-                scenario={selected}
-                projectId={projectId}
-                onSave={onSaveScenario}
-              />
+              <ReadOnlyFrame reason={readOnlyReason}>
+                <ScenarioSetupForm
+                  section="identity"
+                  scenario={selected}
+                  projectId={projectId}
+                  onSave={onSaveScenario}
+                />
+              </ReadOnlyFrame>
             </div>
           </MobileSheet>
 
           <MobileSheet open={sheet === "runWindow"} title="Run window" onClose={close}>
             <div className="p-3.5">
-              <ScenarioSetupForm
-                section="runWindow"
-                scenario={selected}
-                projectId={projectId}
-                onSave={onSaveScenario}
-              />
+              <ReadOnlyFrame reason={readOnlyReason}>
+                <ScenarioSetupForm
+                  section="runWindow"
+                  scenario={selected}
+                  projectId={projectId}
+                  onSave={onSaveScenario}
+                />
+              </ReadOnlyFrame>
             </div>
           </MobileSheet>
 
           <MobileSheet open={sheet === "precision"} title="Precision" onClose={close}>
             <div className="p-3.5">
-              <ScenarioSetupForm
-                section="precision"
-                scenario={selected}
-                projectId={projectId}
-                onSave={onSaveScenario}
-              />
+              <ReadOnlyFrame reason={readOnlyReason}>
+                <ScenarioSetupForm
+                  section="precision"
+                  scenario={selected}
+                  projectId={projectId}
+                  onSave={onSaveScenario}
+                />
+              </ReadOnlyFrame>
             </div>
           </MobileSheet>
 
           <MobileSheet open={sheet === "objective"} title="Objective" onClose={close}>
             <div className="p-3.5">
-              <ScenarioSetupForm
-                section="objective"
-                scenario={selected}
-                projectId={projectId}
-                onSave={onSaveScenario}
-              />
+              <ReadOnlyFrame reason={readOnlyReason}>
+                <ScenarioSetupForm
+                  section="objective"
+                  scenario={selected}
+                  projectId={projectId}
+                  onSave={onSaveScenario}
+                />
+              </ReadOnlyFrame>
             </div>
           </MobileSheet>
 
@@ -975,23 +987,27 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
             onClose={close}
           >
             <div className="p-3.5">
-              <DisruptionScheduleEditor
-                value={selected.disruption_schedule}
-                onChange={(v) => onSaveScenario({ disruption_schedule: v })}
-                projectId={projectId}
-                warmup={{ days: selected.warmup_days, mode: selected.warmup_mode, horizonDays: selected.horizon_days }}
-              />
+              <ReadOnlyFrame reason={readOnlyReason}>
+                <DisruptionScheduleEditor
+                  value={selected.disruption_schedule}
+                  onChange={(v) => onSaveScenario({ disruption_schedule: v })}
+                  projectId={projectId}
+                  warmup={{ days: selected.warmup_days, mode: selected.warmup_mode, horizonDays: selected.horizon_days }}
+                />
+              </ReadOnlyFrame>
             </div>
           </MobileSheet>
 
           <MobileSheet open={sheet === "playbook"} title="Recovery playbook" onClose={close}>
             <div className="p-3.5">
-              <DisruptionRecoveryPane
-                sections="playbook"
-                scenario={selected}
-                projectRecovery={projectRecovery}
-                onSave={onSaveScenario}
-              />
+              <ReadOnlyFrame reason={readOnlyReason}>
+                <DisruptionRecoveryPane
+                  sections="playbook"
+                  scenario={selected}
+                  projectRecovery={projectRecovery}
+                  onSave={onSaveScenario}
+                />
+              </ReadOnlyFrame>
             </div>
           </MobileSheet>
         </>

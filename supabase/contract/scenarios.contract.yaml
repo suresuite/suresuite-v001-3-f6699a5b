@@ -12,6 +12,13 @@ natural_key_unique:
   - source: PRIMARY KEY constraint
     columns: [id]
     name: scenarios_pkey
+  - source: partial UNIQUE index
+    columns: [project_id]
+    name: scenarios_one_validation_baseline
+    predicate: role = 'validation_baseline'
+# `scenarios_one_validation_baseline` is not a key of the row: it says a project has
+# at most ONE validated baseline (§4 D225), over the rows whose role says so. Every
+# other scenario is an experiment and a project may hold any number of them.
 
 governance:
   read: null
@@ -308,6 +315,23 @@ fields:
     ingest: {csv_header: null, required: false, validate: null}
     surfaces: []
     resolution: null
+  role:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      What the scenario is for — `experiment`, a what-if a person set up in the Lab (the default),
+      or `validation_baseline`, the one scenario per project that Run & Validate on /policies runs
+      its validation into (a partial unique index keeps it to one). The Lab pins the baseline,
+      shows it read-only and reuses its run, and every new scenario is seeded from it. It replaced
+      finding that scenario by its display name, which a rename broke (§4 D225). The door a
+      scenario came through is `from_network`, a different fact.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
   inherited_validation_id:
     type: uuid
     unit: null
@@ -329,7 +353,7 @@ surfaces:
   - page: "SimulationLab.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/useScenarios.tsx:70"
+    evidence: "src/hooks/useScenarios.tsx:109"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "table read"

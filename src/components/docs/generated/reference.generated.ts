@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 696;
+export const REFERENCE_COLUMN_COUNT = 697;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -16969,16 +16969,22 @@ export const REFERENCE_TABLES: RefTable[] = [
     "owner": "engine",
     "grain": "One what-if a person set up and can run: the horizon, the warm-up, the replications, the seed, the demand model, the disruption schedule and the recovery overrides. The scenario half of `result-binding` (I8) — a run cites one of these rows, and the export reads it back whole.",
     "naturalKey": [
-      "id"
+      "id",
+      "project_id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "scenarios_role_check",
+        "definition": "CHECK (role IN ('experiment', 'validation_baseline'))"
+      }
+    ],
     "ingestDataset": null,
     "surfaces": [
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/useScenarios.tsx:70"
+        "evidence": "src/hooks/useScenarios.tsx:109"
       }
     ],
     "governance": {
@@ -17549,6 +17555,30 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "role",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "What the scenario is for — `experiment`, a what-if a person set up in the Lab (the default), or `validation_baseline`, the one scenario per project that Run & Validate on /policies runs its validation into (a partial unique index keeps it to one). The Lab pins the baseline, shows it read-only and reuses its run, and every new scenario is seeded from it. It replaced finding that scenario by its display name, which a rename broke (§4 D225). The door a scenario came through is `from_network`, a different fact.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
         "computedBy": null
       }
     ]
