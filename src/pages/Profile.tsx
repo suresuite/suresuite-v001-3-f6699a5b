@@ -21,6 +21,7 @@ import { AlertCircle, Ban, Check, Copy, Loader2 } from 'lucide-react';
 import { describeExpiry, formatDate, passwordStatus, relativeDay } from '@/lib/auth/passwordPolicy';
 import { AVATAR_COLORS, DEFAULT_AVATAR_CLASS, avatarClass, isAvatarColor } from '@/lib/avatarColors';
 import { formatPlanDate, periodLabel, usage } from '@/lib/auth/organizationPlan';
+import { useMyOrganizations } from '@/hooks/useMyOrganizations';
 
 /** `super_admin` → "Super admin". The stored value is an enum token, not a label. */
 const roleLabel = (role: string | undefined | null) =>
@@ -55,6 +56,12 @@ interface ProfileProps {
 const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
   const { user, refreshProfile } = useAuth();
   const { toast } = useToast();
+  // D210 — every organization this account belongs to; the plan fields below are the ACTIVE one's.
+  const { organizations, switching, switchTo } = useMyOrganizations();
+  const onSwitch = async (orgId: string) => {
+    const refusal = await switchTo(orgId);
+    if (refusal) toast({ title: 'Could not switch organization', description: refusal, variant: 'destructive' });
+  };
   const [params, setParams] = useSearchParams();
   // A required change is read from the ACCOUNT, not from the URL: `?forced=1` is only
   // where RoleGuard sends you, and editing it away must not unlock the other tabs.
@@ -267,9 +274,36 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                   <Input value={roleLabel(user?.role)} disabled />
                 </div>
                 <div className="space-y-2">
-                  <Label>Organization</Label>
+                  <Label>{organizations.length > 1 ? 'Current organization' : 'Organization'}</Label>
                   <Input value={user?.organization ?? ''} disabled />
                 </div>
+                {/* D210 — an account may belong to several organizations and works in one at a time. */}
+                {organizations.length > 1 && (
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Your organizations</Label>
+                    <ul className="divide-y rounded-md border">
+                      {organizations.map((o) => (
+                        <li key={o.org_id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+                          <span className="min-w-0 flex-1 truncate font-medium">{o.name}</span>
+                          <span className="text-xs text-muted-foreground">{roleLabel(o.org_role)}</span>
+                          {o.access_expired ? (
+                            <Badge variant="outline" className="text-muted-foreground">Access ended</Badge>
+                          ) : o.is_current ? (
+                            <Badge variant="secondary"><Check className="mr-1 h-3 w-3" />Current</Badge>
+                          ) : (
+                            <Button size="sm" variant="outline" className="min-h-11 md:min-h-0" disabled={switching !== null} onClick={() => onSwitch(o.org_id)}>
+                              {switching === o.org_id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                              Switch
+                            </Button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-muted-foreground">
+                      You work in one organization at a time: the projects you see and create are the current organization&rsquo;s. The plan below is the current organization&rsquo;s. Switching reloads the app.
+                    </p>
+                  </div>
+                )}
                 {/* D207 — the organization's plan, set by an administrator; read here, never edited. */}
                 <div className="space-y-2">
                   <Label>Valid for</Label>

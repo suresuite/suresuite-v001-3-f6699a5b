@@ -67,7 +67,7 @@ READ THE POLICIES BEFORE TRUSTING THIS ROW. The table carries two policies and t
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DeveloperApi.tsx` | rpc list_api_keys | `src/pages/DeveloperApi.tsx:261` | yes |
-| `Profile.tsx` | rpc change_own_password | `src/pages/Profile.tsx:136` | yes |
+| `Profile.tsx` | rpc change_own_password | `src/pages/Profile.tsx:143` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -119,7 +119,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `password_expires_at` | — | `timestamp with time zone` | — | — | When the current password expires — `now() + password_max_age()` (90 days) when the password was last set. Expiry does not refuse a sign-in: it sends the user to /profile and closes every other page until the password is changed (`RoleGuard`, reading `get_my_profile`'s server-computed `password_expired`; §4 D206). Rows that predate `20260527011429` were stamped by that migration's column default, not by a real password change. |
 | `force_password_change` | — | `boolean` | — | — | Whether the user must set a new password before continuing. Set when an administrator creates or resets an account; cleared by `change_own_password`. Enforced by `RoleGuard`, which could not see it until §4 D206. |
 | `is_active` | — | `boolean` | — | — | Whether the account may sign in. Enforced by the SERVER since `20260929000002` (§4 D205): `authenticate_approved_user` returns no row for a suspended account and records `auth.sign_in_failed` with the reason, and `_assert_super_admin` refuses a suspended super admin. The browser also checks it through `get_my_profile` at login and on every reload — a check that, until §4 D206, raised for every user and was ignored, so before these two changes the column was set and never read. It is not consulted by any RLS policy, so between reloads a suspended user's open session is not revoked (D28's client-asserted identity). |
-| `organization_id` | — | `uuid` | — | — | The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it. |
+| `organization_id` | — | `uuid` | — | — | The account's ACTIVE organization, by uuid — the one it is working in now, the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns, and therefore what every org-scoped RLS policy reads and what a new project is stamped with. Since §4 D210 an account may BELONG to several organizations (`organization_members`, the authority for membership) and this column is always one of them — NULL exactly when it belongs to none. Setting it adds the membership if missing; the account changes it itself through `switch_my_organization`, and sign-in moves it to a current membership when the active one's access period has ended. The `organization` text copy follows it (`trg_approved_users_track_active_org`). |
 | `avatar_color` | — | `text` | — | — | The colour of the user's initial on their avatar — one token of a fixed palette, CHECK-constrained; the page maps each token to its fill (`src/lib/avatarColors.ts`, pinned to the CHECK by `avatarColors.test.ts`). §4 D206. |
 | `first_name` | — | `text` | — | — | The first word of `name` (§4 D209), derived by the `approved_users_derive_name_parts` trigger on every write that names `name` or either part, so a value written into it directly is overwritten. Shown read-only on /profile; changed only by an administrator changing `name`. |
 | `last_name` | — | `text` | — | — | `name` after its first word (§4 D209); NULL when the name is one word. Derived with `first_name` by the same trigger, read-only on /profile. |
@@ -361,7 +361,7 @@ Whether the account may sign in. Enforced by the SERVER since `20260929000002` (
 
 ### `organization_id`
 
-The user's tenant, by uuid — the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns. THE one author of an account's organization (§4 D205): the admin pages show the organization's name through it and count Members by it, and `organization_members` follows it by trigger rather than being written beside it.
+The account's ACTIVE organization, by uuid — the one it is working in now, the same organization `organization` names, and the plane that survives a rename. What `get_current_user_org_id(_user_id)` returns, and therefore what every org-scoped RLS policy reads and what a new project is stamped with. Since §4 D210 an account may BELONG to several organizations (`organization_members`, the authority for membership) and this column is always one of them — NULL exactly when it belongs to none. Setting it adds the membership if missing; the account changes it itself through `switch_my_organization`, and sign-in moves it to a current membership when the active one's access period has ended. The `organization` text copy follows it (`trg_approved_users_track_active_org`).
 
 | | |
 |---|---|
@@ -447,6 +447,6 @@ for one you did.
 
 ---
 
-*Generated from data contract `614b11585d9a`, engine `0.2.8`,
+*Generated from data contract `74959801714d`, engine `0.2.8`,
 sidecar `supabase/contract/approved_users.contract.yaml`, table created by `20250815000000_approved_users_base.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
