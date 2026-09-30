@@ -308,7 +308,7 @@ export default function Landing() {
   if (user) return <Navigate to={homePath} replace />;
 
   return (
-    <div className="min-h-dvh flex flex-col overflow-x-hidden bg-background text-foreground">
+    <div className="min-h-dvh flex flex-col overflow-x-clip bg-background text-foreground">
       {/* Top bar */}
       <header className="sticky top-0 z-40 border-b border-[--hair-rule] bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] items-center justify-between px-5 md:h-16 md:px-6">
