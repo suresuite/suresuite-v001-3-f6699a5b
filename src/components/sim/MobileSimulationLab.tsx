@@ -49,6 +49,7 @@
  * report.
  */
 import { replicationLabel } from "@/lib/sim/replicationLabel";
+import type { RunGateState } from "@/lib/sim/runGate";
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Truck } from "lucide-react";
@@ -172,6 +173,10 @@ export interface MobileSimulationLabProps {
   ackWarnings: boolean;
   onAckWarnings: (v: boolean) => void;
   runBlockedReason: string | null;
+  /** the one gate state the desktop rail and Run card read (runGate.ts) */
+  runGate: RunGateState;
+  /** the capacity line the desktop Run pane shows (§4 D167 / D222) */
+  capacity?: React.ReactNode;
   findingsSource: "pre-run check" | "gate rejection";
   supplierIds: string[];
   latestRun: SimulationRun | null;
@@ -220,6 +225,8 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
     ackWarnings,
     onAckWarnings,
     runBlockedReason,
+    runGate,
+    capacity,
     findingsSource,
     supplierIds,
     latestRun,
@@ -553,6 +560,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
 
   const runPane = (
     <>
+      {capacity ? <div className="px-3 pt-1">{capacity}</div> : null}
       <MobileGroup label="Progress">
         <MobilePanel tone={paneTone} label="Run" counter={runStatus ?? "not started"}>
         <div className="flex flex-col gap-2.5 p-3">
@@ -772,20 +780,24 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
     );
 
   /* ── the action bar — the honest gate ─────────────────────────────────── */
-  const canRun = !runBlockedReason;
-  const runLabel = policyDirty
-    ? "Save version & run"
-    : gateBlocks > 0
+  // One gate state, the same one the desktop rail reads (§4 D147).
+  const canRun = runGate.canRun;
+  const runLabel =
+    runGate.kind === "blocked"
       ? `Blocked by ${gateBlocks} ${gateBlocks === 1 ? "finding" : "findings"}`
-      : gateWarns > 0 && !ackWarnings
+      : runGate.kind === "ack_required"
         ? "Acknowledge to run"
-        : !canRun
-          ? "Run unavailable"
-          : active
-            ? "Running…"
-            : done
-              ? "Run again"
-              : "Run simulation";
+        : runGate.kind === "baseline"
+          ? "Runs in Policies"
+          : runGate.kind === "capability"
+            ? "Run unavailable"
+            : policyDirty
+              ? "Save version & run"
+              : active
+                ? "Running…"
+                : done
+                  ? "Run again"
+                  : "Run simulation";
 
   // §8: a control that cannot be used is shown, disabled and explained in one
   // line underneath. The policy-binding state is that line whether or not it

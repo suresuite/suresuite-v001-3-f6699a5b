@@ -13,6 +13,8 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { KX_TIGHT, LAYER } from "@/components/intelligence/piUi";
 import { formatDuration } from "@/lib/sim/planningTime";
+import type { RunGateState } from "@/lib/sim/runGate";
+import { KPI_OPTIONS } from "./ScenarioSetupForm";
 
 /* ── shared rail rule set ────────────────────────────────────────────────
  * Resolved values of the product tokens: --brand-ink, --zinc-quiet,
@@ -353,7 +355,7 @@ export function StageRail({ stages, active, onSelect, gate }: StageRailProps) {
   return (
     <section className={RAIL_SHELL}>
       <div className={RAIL_EYEBROW_ROW}>
-        <span className={RAIL_EYEBROW}>Scenario run sequence</span>
+        <span className={RAIL_EYEBROW}>Run sequence</span>
         <span className="h-px flex-1" style={{ background: RAIL.rule }} />
         <RailReadout dot={gate.dot} label={gate.label} value={gate.value} tail={gate.tail} />
       </div>
@@ -380,36 +382,35 @@ export function StageRail({ stages, active, onSelect, gate }: StageRailProps) {
 /**
  * Build the stage list from the page's real state. Keep this next to the page so
  * the sub-labels stay honest — every one of them is a fact, never a hint. Copy
- * grammar is `value · value · value`: lowercase, spaced units, never a sentence.
+ * grammar is `value · value`: lowercase, terse, never a sentence (WP 9.4 slice 2).
+ *
+ * The gate arrives as ONE `RunGateState` (runGate.ts): stage 3's sub-label and
+ * the readout are fields of it, never re-derived here from the counts — the
+ * re-derivation is what read "clear" beside a disabled button (§4 D147).
  */
 export function buildStages(args: {
   scenario: { horizon_days: number; replications: number; primary_kpi: string };
   eventCount: number;
   leverCount: number;
   recoveryEnabled: boolean;
-  gate: { blocks: number; warns: number; reason: string | null };
+  gate: RunGateState;
   run: { status: string; rep_count_done: number; rep_count_target: number; current: boolean } | null;
   scenariosWithResults: number;
 }): { stages: StageDef[]; gate: GateReadout } {
   const { scenario, eventCount, leverCount, recoveryEnabled, gate, run, scenariosWithResults } = args;
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-  const blockText = plural(gate.blocks, "blocking finding", "blocking findings");
-  const warnText = plural(gate.warns, "warning", "warnings");
+  const runSub = !run
+    ? "no run"
+    : run.status === "running" || run.status === "queued"
+      ? `${run.status} ${run.rep_count_done}/${run.rep_count_target}`
+      : run.status === "done"
+        ? run.current
+          ? "done"
+          : "older version"
+        : run.status;
 
-  const runSub = run
-    ? run.status === "running" || run.status === "queued"
-      ? `${run.status} · ${run.rep_count_done}/${run.rep_count_target} reps`
-      : `${run.status} · ${plural(run.rep_count_done, "rep", "reps")}`
-    : "no run yet";
-
-  const runStageSub = gate.reason
-    ? gate.blocks > 0
-      ? blockText
-      : `${warnText} — ack required`
-    : run?.status === "running"
-      ? "running"
-      : "ready to run";
+  const kpi = KPI_OPTIONS.find((k) => k.value === scenario.primary_kpi)?.label ?? scenario.primary_kpi;
 
   const stage = (
     id: PaneId,
@@ -424,35 +425,41 @@ export function buildStages(args: {
       "setup",
       "1",
       "Setup",
-      `${formatDuration(scenario.horizon_days)} · ${plural(scenario.replications, "rep", "reps")} · ${scenario.primary_kpi}`,
+      `${formatDuration(scenario.horizon_days)} · ${plural(scenario.replications, "rep", "reps")} · ${kpi}`,
       !!scenario.primary_kpi,
     ),
     stage(
       "recovery",
       "2",
       "Recovery playbook",
-      `${plural(eventCount, "event", "events")} · ${plural(leverCount, "lever", "levers")}`,
+      eventCount === 0
+        ? "no events"
+        : leverCount > 0 && recoveryEnabled
+          ? `${plural(eventCount, "event", "events")} · ${plural(leverCount, "lever", "levers")}`
+          : plural(eventCount, "event", "events"),
       // never tick a stage that has nothing scheduled
       eventCount > 0 && recoveryEnabled && leverCount > 0,
     ),
-    // a completed run with an open gate is not "done"
-    stage("run", "3", "Run", runStageSub, run?.status === "done" && !gate.reason),
+    // a completed run with a closed gate is not "done"
+    stage("run", "3", "Run", gate.stageSub, run?.status === "done" && gate.canRun),
     stage("results", "4", "Results", runSub, run?.status === "done" && !!run.current),
     stage(
       "compare",
       "5",
       "Compare",
-      plural(scenariosWithResults, "scenario with results", "scenarios with results"),
+      plural(scenariosWithResults, "scenario", "scenarios"),
       scenariosWithResults >= 2,
     ),
   ];
 
-  const gateReadout: GateReadout =
-    gate.blocks > 0
-      ? { dot: LAYER.brand, label: "gate", value: blockText, tail: "— run gated" }
-      : gate.warns > 0 && gate.reason
-        ? { dot: RAIL.amber, label: "gate", value: warnText, tail: "— acknowledge to run" }
-        : { dot: RAIL.teal, label: "gate", value: "clear", tail: "— run allowed" };
+  const dot =
+    gate.readout.tone === "block"
+      ? LAYER.brand
+      : gate.readout.tone === "warn"
+        ? RAIL.amber
+        : gate.readout.tone === "clear"
+          ? RAIL.teal
+          : RAIL.quiet;
 
-  return { stages, gate: gateReadout };
+  return { stages, gate: { dot, label: "gate", value: gate.readout.value } };
 }

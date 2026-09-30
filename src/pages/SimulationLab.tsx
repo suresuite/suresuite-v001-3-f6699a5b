@@ -35,8 +35,8 @@ import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import { useAuth } from "@/hooks/useAuth";
 import { PreRunValidationPanel } from "@/components/sim/PreRunValidationPanel";
 import { CapacityReadinessPanel } from "@/components/sim/CapacityReadiness";
-import { GateBar } from "@/components/sim/RunGate";
-import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
+import { RunCard } from "@/components/sim/RunCard";
+import { runGateState } from "@/lib/sim/runGate";
 import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
 import {
   compileGateFindings,
@@ -155,13 +155,17 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const gateFindings = serverFindings ?? clientFindings;
   const gateBlocks = (gateFindings ?? []).filter((f) => f.severity === "block").length;
   const gateWarns = (gateFindings ?? []).filter((f) => f.severity === "warn").length;
-  const runBlockedReason = !canRunSimulations
-    ? "Running simulations isn't enabled for your account. Contact an administrator."
-    : gateBlocks > 0
-      ? "Blocking findings below must be fixed before the run can dispatch"
-      : gateWarns > 0 && !ackWarnings
-      ? "Acknowledge the warnings below to run with engine defaults"
-      : null;
+  // ONE gate state for the rail, the Run card and the phone (§4 D147): the
+  // readout, the stage label, the button and its reason are fields of it.
+  const runGate = runGateState({
+    permitted: canRunSimulations,
+    blocks: gateBlocks,
+    warns: gateWarns,
+    acknowledged: ackWarnings,
+    needsSave: policyDirty || !policyVersionId,
+    running: latestRun?.status === "running" || latestRun?.status === "queued",
+  });
+  const runBlockedReason = runGate.reason;
 
   // ── B0b credibility (Phase B0 / G13 / §9.5) ───────────────────────────────
   const cred = useModelValidation(projectId);
@@ -277,7 +281,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     eventCount: selected?.disruption_schedule?.length ?? 0,
     leverCount: effectiveRecovery.response?.length ?? 0,
     recoveryEnabled: !!effectiveRecovery.enabled,
-    gate: { blocks: gateBlocks, warns: gateWarns, reason: runBlockedReason },
+    gate: runGate,
     run: latestRun && {
       status: latestRun.status,
       rep_count_done: latestRun.rep_count_done,
@@ -364,6 +368,27 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const currentVersionLabel = policyVersionId
     ? (policyVersions.find((v) => v.id === policyVersionId)?.label ?? policyVersionId.slice(0, 8))
     : null;
+  const versionText = !policyVersionId
+    ? "No saved model version"
+    : policyDirty
+      ? `Changed since ${currentVersionLabel}`
+      : `Model ${currentVersionLabel}`;
+
+  // What capacity this run will use, and whether it is real (§4 D167) — one
+  // line with details on demand; the same node on desktop and phone (D222).
+  // Beside the gate rather than inside it: a product with no capacity figure is
+  // not a finding, but the number it resolves to is max(2·demand, 1000), chosen
+  // so capacity never binds, and the run has to say so before it is dispatched.
+  const capacityLine = (
+    <CapacityReadinessPanel
+      compact
+      products={itemMasters.products}
+      suppliers={itemMasters.suppliers}
+      outbound={itemMasters.lanes.outbound}
+      defaults={policyDefaults}
+      overrides={policyOverrides}
+    />
+  );
 
   // Below md the desktop rail + aside + pane grid is not reflowed, it is
   // replaced: MobileSimulationLab is the phone composition (PAGES.md 14 · 15).
@@ -406,6 +431,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           ackWarnings={ackWarnings}
           onAckWarnings={setAckWarnings}
           runBlockedReason={runBlockedReason}
+          runGate={runGate}
+          capacity={capacityLine}
           findingsSource={serverFindings ? "gate rejection" : "pre-run check"}
           supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
           latestRun={latestRun}
@@ -520,66 +547,38 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                     onSave={(patch) => update(selected.id, patch)}
                   />
                 ) : pane === "run" ? (
-                  <div className="flex flex-col gap-3">
-                    {/* Model version + the gate, with the blocked reason as
-                        visible text instead of a title attribute. */}
-                    <section className="overflow-hidden rounded-sm border border-[--hair-rule] bg-white">
-                      <div className="flex flex-wrap items-center gap-2 px-3 py-[9px] text-[12.5px] text-[#18181b]">
-                        {policyDirty
-                          ? policyVersionId
-                            ? `Policy settings changed since version "${
-                                policyVersions.find((v) => v.id === policyVersionId)?.label ??
-                                policyVersionId.slice(0, 8)
-                              }"`
-                            : "No saved model version — runs require a saved policy version"
-                          : `Model version: ${
-                              policyVersions.find((v) => v.id === policyVersionId)?.label ??
-                              policyVersionId?.slice(0, 8)
-                            }`}
-                        <CredibilityBadge credibility={credibility} />
-                      </div>
-                      <GateBar
-                        blocks={gateBlocks}
-                        warns={gateWarns}
+                  <RunCard
+                    versionText={versionText}
+                    credibility={credibility}
+                    gate={runGate}
+                    warns={gateWarns}
+                    acknowledged={ackWarnings}
+                    onAcknowledgedChange={setAckWarnings}
+                    findingsCount={gateFindings ? gateFindings.length : null}
+                    needsSave={policyDirty || !policyVersionId}
+                    onRun={handleRun}
+                    onSaveVersionAndRun={handleSaveVersionAndRun}
+                    findings={
+                      <PreRunValidationPanel
+                        projectId={projectId}
+                        findings={gateFindings}
+                        source={serverFindings ? "gate rejection" : "pre-run check"}
                         acknowledged={ackWarnings}
-                        reason={runBlockedReason}
-                        dirty={policyDirty}
-                        onRun={handleRun}
-                        onSaveVersionAndRun={handleSaveVersionAndRun}
-                        onShowFindings={() => setPane("run")}
+                        supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
                       />
-                    </section>
-                    {/* What capacity this run will use, and whether it is real
-                        (§4 D167). Beside the gate rather than inside it: a
-                        product with no capacity figure is not a finding — the
-                        engine resolves it — but the number it resolves to is
-                        max(2·demand, 1000), chosen so capacity never binds, and
-                        a run that answers "could we have made it" with an
-                        assumed yes has to say so BEFORE it is dispatched. */}
-                    <CapacityReadinessPanel
-                      products={itemMasters.products}
-                      suppliers={itemMasters.suppliers}
-                      outbound={itemMasters.lanes.outbound}
-                      defaults={policyDefaults}
-                      overrides={policyOverrides}
-                    />
-                    <PreRunValidationPanel
-                      projectId={projectId}
-                      findings={gateFindings}
-                      source={serverFindings ? "gate rejection" : "pre-run check"}
-                      acknowledged={ackWarnings}
-                      onAcknowledgedChange={setAckWarnings}
-                      supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
-                    />
-                    <RunProgressPanel
-                      run={latestRun}
-                      reps={reps}
-                      versionLabel={runVersionLabel}
-                      credibility={cred.resolveRun(latestRun)}
-                      onCancel={handleCancel}
-                      onAddReps={handleAddReps}
-                    />
-                  </div>
+                    }
+                    capacity={capacityLine}
+                    progress={
+                      <RunProgressPanel
+                        run={latestRun}
+                        reps={reps}
+                        versionLabel={runVersionLabel}
+                        credibility={cred.resolveRun(latestRun)}
+                        onCancel={handleCancel}
+                        onAddReps={handleAddReps}
+                      />
+                    }
+                  />
                 ) : pane === "results" ? (
                   <ResultsDashboard
                     run={latestRun}

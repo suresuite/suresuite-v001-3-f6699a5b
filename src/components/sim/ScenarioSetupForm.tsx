@@ -21,7 +21,7 @@ interface Props {
   section?: "all" | "identity" | "runWindow" | "precision" | "objective";
 }
 
-const KPI_OPTIONS = [
+export const KPI_OPTIONS = [
   { value: "fill_rate", label: "Fill rate" },
   { value: "otif", label: "OTIF" },
   { value: "lead_time_days", label: "Lead time" },

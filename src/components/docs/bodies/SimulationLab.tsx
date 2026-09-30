@@ -100,12 +100,14 @@ export default function SimulationLab() {
         <DocFigure id="run-sequence" />
         <P>
           To the right of the rail's heading is a single readout: a coloured dot, the word{" "}
-          <Term>gate</Term>, and a count. It is the most useful thing on the screen and it has
-          exactly three states.
+          <Term>gate</Term>, and a count. It is the most useful thing on the screen. It, the Run
+          stage's label, the Run button and the reason printed beside the button are read from
+          one state, so none of them can say something the others do not. It has three states a
+          run can pass through, and two in which the Lab does not run at all.
         </P>
         <div className="space-y-3">
           <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
-            <p className="text-[13px] font-semibold text-foreground">clear — run allowed</p>
+            <p className="text-[13px] font-semibold text-foreground">clear</p>
             <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
               Nothing found that would make the run meaningless. It does not mean your model is
               right; it means nothing is obviously missing.
@@ -113,21 +115,31 @@ export default function SimulationLab() {
           </div>
           <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
             <p className="text-[13px] font-semibold text-foreground">
-              N warnings — acknowledge to run
+              N warnings
             </p>
             <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              The run will produce numbers and something about the model is worth knowing first. You
-              tick an acknowledgement and the run proceeds. <strong>Read the findings before you
+              The run will produce numbers and something about the model is worth knowing first. The
+              findings open on their own, and a tick beside the Run button reads “run with engine
+              defaults for N warnings”; tick it and the run proceeds. <strong>Read the findings before you
               tick.</strong> This is the product asking whether you meant it, and the tick is
               recorded against your run.
             </p>
           </div>
           <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
-            <p className="text-[13px] font-semibold text-foreground">N blocking findings — run gated</p>
+            <p className="text-[13px] font-semibold text-foreground">N blocking</p>
             <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
               There is no acknowledgement for these. Something the run requires is absent, and the
               reason is printed as text beside the button rather than hidden in a tooltip. Fix the
               finding and the dot clears on its own.
+            </p>
+          </div>
+          <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
+            <p className="text-[13px] font-semibold text-foreground">not permitted · baseline</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+              An account that may open the Lab but not run simulations reads{" "}
+              <Term>not permitted</Term> — never clear. The validated baseline reads{" "}
+              <Term>baseline</Term>: it is run from the policies page, where it is validated, and
+              the Lab reuses its results rather than running it again.
             </p>
           </div>
         </div>
