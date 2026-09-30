@@ -87,9 +87,12 @@ same name.
 
 ## Copyright and licensing
 
-Copyright © 2023–2026 Phu Nguyen. SuReSuite is part of the PhD thesis of Phu Nguyen
-(HWR Berlin) and all rights are reserved. The simulation library and stress-test
-framework in [`scsim/`](scsim/NOTICE.md) are results of the Horizon Europe project
-ACCURATE (GA 101138269) and are being prepared for open-access release — see
+Copyright © 2023–2026 Phu Nguyen. SuReSuite is a research prototype and part of the
+PhD thesis of Phu Nguyen (cooperative doctorate, HWR Berlin & TU Berlin); all rights
+are reserved. Its core algorithms — supply chain network analysis, the simulation
+library and stress-test framework in [`scsim/`](scsim/NOTICE.md), and surrogate models
+for stress testing — are results of the Horizon Europe project ACCURATE
+(GA 101138269) and will be published as open access: source code under an OSI-approved
+open-source licence, publications and documentation under CC BY 4.0. See
 [`COPYRIGHT.md`](COPYRIGHT.md) and the
 [release plan](docs/design/open-access-release-plan.md).

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { DOCS_PUBLIC_ENTRY_POINTS } from '@/lib/ui/docsVisibility';
+import ResearchNotice from '@/components/shared/ResearchNotice';
 
 // three.js + drei are ~1.5 MB of the bundle and this is the only thing on the
 // public landing page that needs them. Eager, they were downloaded and parsed
@@ -909,9 +910,9 @@ export default function Landing() {
       <footer className="border-t border-[--hair-rule]">
         {/* v2 §5.6: no tab bar here, but the home indicator is still there —
             the last band adds the inset to its padding. */}
-        <div className="pb-safe mx-auto flex min-h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3 text-xs text-muted-foreground md:px-6 md:py-0">
-          <span>© {new Date().getFullYear()} SuReSuite</span>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="pb-safe mx-auto flex min-h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] flex-col gap-3 px-5 py-4 text-xs text-muted-foreground md:flex-row md:items-start md:justify-between md:gap-x-8 md:px-6">
+          <ResearchNotice />
+          <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
             <a href="#video" className="hover:text-foreground md:hidden">Demo</a>
             {DOCS_PUBLIC_ENTRY_POINTS && (
               <Link to="/docs" className="hover:text-foreground">Docs</Link>

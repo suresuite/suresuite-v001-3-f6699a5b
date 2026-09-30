@@ -14,12 +14,18 @@ in the SuReSuite repository.
 rights are reserved. The open-access licence will be added here, and in the header of
 every source file, as one change on the day of the first public release.
 
+Intended licensing: the source code under an OSI-approved open-source licence
+(Apache-2.0 or EUPL-1.2, decision L1 of the release plan); publications, documentation
+and synthetic benchmark data under CC BY 4.0. Each release is archived on Zenodo with a
+DOI.
+
 ## Relationship to SuReSuite
 
 SCSIM is the simulation engine of the SuReSuite platform. The public library and the
 engine the platform runs are one codebase: the public release is cut from this
 directory, and the platform pins the released version. Both are part of the PhD
-thesis of Phu Nguyen (HWR Berlin; supervisor Prof. Dr. Dr. habil. Dmitry Ivanov).
+thesis of Phu Nguyen (cooperative doctorate, HWR Berlin & TU Berlin; supervisor
+Prof. Dr. Dr. habil. Dmitry Ivanov).
 
 ## Citation
 
@@ -27,7 +33,8 @@ If you use SCSIM in academic work, please cite:
 
 - Nguyen, P. & Ivanov, D. *Synergistic Effects of Combining Resilience Strategies in
   Supply Chains.* (the methodology SCSIM operationalizes)
-- The PhD thesis of Phu Nguyen, HWR Berlin (full reference to be added on publication).
+- The PhD thesis of Phu Nguyen, HWR Berlin & TU Berlin (full reference to be added on
+  publication).
 - The released software version (a DOI will be minted per release).
 
 ## Funding acknowledgement

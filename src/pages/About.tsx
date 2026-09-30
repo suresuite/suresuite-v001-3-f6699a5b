@@ -21,6 +21,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import HeroLattice from '@/components/about/HeroLattice';
 import { DOCS_PUBLIC_ENTRY_POINTS } from '@/lib/ui/docsVisibility';
+import ResearchNotice from '@/components/shared/ResearchNotice';
 
 const ACCENT = '#BF2330';
 const KICKER = 'font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground';
@@ -422,9 +423,9 @@ export default function About() {
 
       {/* Slim footer — same as Landing */}
       <footer className="border-t border-[--hair-rule]">
-        <div className="pb-safe mx-auto flex min-h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] flex-wrap items-center justify-between gap-x-4 gap-y-2 whitespace-nowrap px-6 py-3.5 text-xs text-muted-foreground">
-          <span>© {new Date().getFullYear()} SuReSuite</span>
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="pb-safe mx-auto flex min-h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] flex-col gap-3 px-6 py-4 text-xs text-muted-foreground md:flex-row md:items-start md:justify-between md:gap-x-8">
+          <ResearchNotice />
+          <div className="flex shrink-0 flex-wrap items-center gap-4 whitespace-nowrap">
             <Link to="/#video" className="hover:text-foreground md:hidden">
               Demo
             </Link>
