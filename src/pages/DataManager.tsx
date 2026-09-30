@@ -988,7 +988,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
                      {/* Complementary to the Upload Wizard above, never a replacement —
                          docs/design/erp-mrp-integration-plan.md §2.0, §6c. Its
                          connect/sync/revoke/apply are writes, so it keeps the same
-                         gate as Upload — "Edit Input Data" on this project (D219). */}
+                         gate as Upload — "Edit Input Data" on this project (D230). */}
                      <ErpConnectionsPanelForEditors projectId={project.id} modelerId={project.modeler_id} />
                   </div>
                 )}

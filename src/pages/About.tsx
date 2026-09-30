@@ -20,7 +20,8 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import HeroLattice from '@/components/about/HeroLattice';
-import { DOCS_PUBLIC_ENTRY_POINTS } from '@/lib/ui/docsVisibility';
+import { useCapabilities } from '@/hooks/useCapabilities';
+import ResearchNotice from '@/components/shared/ResearchNotice';
 
 const ACCENT = '#BF2330';
 const KICKER = 'font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground';
@@ -247,6 +248,9 @@ function Portrait({ p }: { p: Person }) {
 }
 
 export default function About() {
+  // Docs links follow the manual's release: shown once any section is public.
+  const { docs } = useCapabilities();
+  const docsPublic = docs.anyPublic;
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       {/* Top bar — same as Landing */}
@@ -269,8 +273,8 @@ export default function About() {
               <Link to="/about">About</Link>
             </Button>
             {/* Same row as About on every public page — see Landing.tsx, and
-                hidden with it while `DOCS_PUBLIC_ENTRY_POINTS` is off. */}
-            {DOCS_PUBLIC_ENTRY_POINTS && (
+                hidden with it while no section of the manual is public. */}
+            {docsPublic && (
               <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
                 <Link to="/docs">Docs</Link>
               </Button>
@@ -422,13 +426,13 @@ export default function About() {
 
       {/* Slim footer — same as Landing */}
       <footer className="border-t border-[--hair-rule]">
-        <div className="pb-safe mx-auto flex min-h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] flex-wrap items-center justify-between gap-x-4 gap-y-2 whitespace-nowrap px-6 py-3.5 text-xs text-muted-foreground">
-          <span>© {new Date().getFullYear()} SuReSuite</span>
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="pb-safe mx-auto flex min-h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] flex-col gap-3 px-6 py-4 text-xs text-muted-foreground md:flex-row md:items-start md:justify-between md:gap-x-8">
+          <ResearchNotice />
+          <div className="flex shrink-0 md:ml-auto flex-wrap items-center gap-4 whitespace-nowrap">
             <Link to="/#video" className="hover:text-foreground md:hidden">
               Demo
             </Link>
-            {DOCS_PUBLIC_ENTRY_POINTS && (
+            {docsPublic && (
               <Link to="/docs" className="hover:text-foreground">
                 Docs
               </Link>

@@ -30,7 +30,7 @@ import {
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { cn } from '@/lib/utils';
 import MLPrediction from '@/components/MLPrediction';
-import { DisruptionDialog } from '@/components/DisruptionDialog';
+import { NetworkDisruptionDialog } from '@/components/network/NetworkDisruptionDialog';
 // mapbox-gl and its CSS are ~200 kB gzipped and only reachable from here and
 // /network/product-level — and then only once the user switches to map view.
 // Lazy keeps it out of this page's chunk entirely for anyone who never does.
@@ -1726,15 +1726,17 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
 
         </div>
 
-      <DisruptionDialog
+      <NetworkDisruptionDialog
         open={disruptionDialogOpen}
         onOpenChange={setDisruptionDialogOpen}
-        nodeId={selectedNode?.id || null}
-        projectId={globalSelectedProjectId}
-        plantName={projects.find(p => p.id === globalSelectedProjectId)?.plant_name || 'Unknown Plant'}
-        connectedEdges={selectedNode ? allEdges.filter(edge => 
-          edge.source === selectedNode.id || edge.target === selectedNode.id
-        ) : []}
+        nodeId={selectedNode?.id ?? null}
+        projectId={globalSelectedProjectId ?? null}
+        plantName={projects.find((p) => p.id === globalSelectedProjectId)?.plant_name ?? null}
+        connectedEdges={
+          selectedNode
+            ? allEdges.filter((edge) => edge.source === selectedNode.id || edge.target === selectedNode.id)
+            : []
+        }
         onSuccess={fetchData}
       />
     </PageLayout>

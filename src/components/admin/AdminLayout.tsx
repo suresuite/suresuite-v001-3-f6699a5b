@@ -14,6 +14,7 @@ import {
   ScrollText,
   ShieldCheck,
   RotateCw,
+  BookText,
 } from 'lucide-react';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { HeaderRefreshButton, PageHeader } from '@/components/shared/PageHeader';
@@ -55,6 +56,7 @@ const ADMIN_NAV = [
   { to: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { to: '/admin/models', label: 'AI Models', icon: Cpu },
   { to: '/admin/usage', label: 'AI Usage', icon: Activity },
+  { to: '/admin/docs', label: 'Documentation', icon: BookText },
   { to: '/admin/audit', label: 'Audit Log', icon: ScrollText },
 ];
 

@@ -344,7 +344,7 @@ export function StagePolicyTable({
   const [newSupplierId, setNewSupplierId] = useState("");
   const assignSupplier = async (materialId: string, supplierId: string) => {
     if (!projectId || !user) return;
-    // D219 — assigning a supplier writes the input lanes: "Edit Input Data".
+    // D230 — assigning a supplier writes the input lanes: "Edit Input Data".
     if (!canEditInputs) {
       toast.error(inputEditRefusal ?? "You may not edit input data on this project.", TOAST);
       return;
@@ -1162,7 +1162,7 @@ export function StagePolicyTable({
       if (toUpsert.length > 0) await bulkUpsertOverrides(toUpsert);
     } catch (e) {
       // Surface RPC failures (e.g. bulk_upsert_* missing in this DB) instead
-      // of swallowing them — the click handler has no other catch. A D219
+      // of swallowing them — the click handler has no other catch. A D230
       // refusal was already said by the hook that refused it.
       if (!(e instanceof ProjectRightRefused)) {
         toast.error(errMsg(e, "Failed to save changes"), TOAST);
@@ -1278,7 +1278,7 @@ export function StagePolicyTable({
   };
 
   const runPrefill = async ({ silent = false }: { silent?: boolean }) => {
-    // D219 — the prefill writes policy overrides: "Edit Policies" on this project.
+    // D230 — the prefill writes policy overrides: "Edit Policies" on this project.
     if (!canSeedPolicies) {
       if (!silent) toast.error(policyRights.refusal("data_edit_policies") ?? "You may not change policies on this project.", TOAST);
       return;
@@ -1362,7 +1362,7 @@ export function StagePolicyTable({
   useEffect(() => {
     const marker = `${projectId}::${stageKey}`;
     if (autoSeededRef.current.has(marker)) return;
-    // D219 — wait for the rights before marking: a seed skipped while they load would
+    // D230 — wait for the rights before marking: a seed skipped while they load would
     // never be retried, and one the person may not write is not attempted at all.
     if (!canSeedPolicies) return;
     if (loading || applying || dataRows.length === 0) return;

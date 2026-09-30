@@ -1,0 +1,142 @@
+// The disruption-event rule, read from the engine and graded ONCE (WP 9.4 slice 6).
+//
+// `scsim/scsim/io/project_map.py::_map_events` is the only place a schedule becomes
+// engine events. It keeps at most `event_cap` events, disrupts a supplier id of the
+// project or the plant and skips every other target with a warning, rounds start and
+// duration to weeks, and reads `magnitude_pct < 100` as a capacity cut BY that share.
+// None of that was visible before a run: the Lab's editor offered free-text targets,
+// the network pages offered any node, and the first a user heard of a skipped event
+// was a mapping warning after the run had spent its compute.
+//
+// The numbers come from `registry.generated.json`'s `disruption` block — exported by
+// `registry_export.disruption_rule()`, never restated here — and the caller passes
+// that block in, so this module stays dependency-free and runs unchanged in Deno
+// (`validationGate.ts`, the sim-command gate) and in the browser
+// (`validationService.compileGateFindings`, the Lab's pre-run check, the event editor
+// and the network pages' dialog). One rule, one wording, both sides of the dispatch.
+//
+// `engineTargetOf` mirrors the mapper's rule for ONE target. It is not a node-type
+// classifier (oneClassifier.test.ts): it answers only "will the engine keep this
+// event", by the engine's own test — a supplier id in the project, or the plant.
+
+import { num, type GradedFinding, type Row } from "./grading.ts";
+
+/** The `disruption` block of registry.generated.json. */
+export interface DisruptionRule {
+  event_cap: number;
+  start_week_min: number;
+  duration_weeks_min: number;
+  duration_weeks_max: number;
+  supported_target_kinds: string[];
+  unsupported_target_kinds: string[];
+  full_outage_pct: number;
+  partial_cut_needs_finite_supplier_capacity: boolean;
+}
+
+export type EngineTarget =
+  | { kind: "supplier"; id: string }
+  | { kind: "plant"; id: "plant" }
+  | { kind: "unsupported"; id: string; targetKind: string }
+  | { kind: "unknown"; id: string };
+
+/** `_is_plant_target`: `plant:X`, `node:plant`, or bare `plant`. */
+function isPlantTarget(raw: string, stripped: string): boolean {
+  return raw.toLowerCase().startsWith("plant:") || stripped.toLowerCase() === "plant";
+}
+
+/** What `_map_events` does with one target, by the engine's own test. */
+export function engineTargetOf(
+  rawTarget: string,
+  supplierIds: ReadonlySet<string> | readonly string[],
+  rule: Pick<DisruptionRule, "unsupported_target_kinds">,
+): EngineTarget {
+  const ids = supplierIds instanceof Set ? supplierIds : new Set(supplierIds as readonly string[]);
+  const raw = String(rawTarget ?? "");
+  const id = raw.includes(":") ? raw.slice(raw.lastIndexOf(":") + 1) : raw;
+  if (ids.has(id)) return { kind: "supplier", id };
+  if (isPlantTarget(raw, id)) return { kind: "plant", id: "plant" };
+  const prefix = raw.includes(":") ? raw.split(":", 1)[0].toLowerCase() : "";
+  if (rule.unsupported_target_kinds.includes(prefix)) return { kind: "unsupported", id, targetKind: prefix };
+  return { kind: "unknown", id };
+}
+
+/** One sentence for why an event will not reach the engine, or null when it will. */
+export function engineTargetReason(t: EngineTarget): string | null {
+  if (t.kind === "unsupported") return `The engine cannot disrupt ${t.targetKind} targets yet — this event is skipped.`;
+  if (t.kind === "unknown") {
+    return t.id
+      ? `No supplier or plant named "${t.id}" in this project's data — this event is skipped.`
+      : "No target — this event is skipped.";
+  }
+  return null;
+}
+
+/**
+ * Every finding a schedule earns before dispatch: events past the cap, targets the
+ * engine skips, and partial cuts on a supplier with no finite capacity (moved here
+ * from `grading.scenarioCapacityFindings`, and reworded: the engine cuts BY the
+ * share, `capacity_factor = (100 − magnitude) / 100` — §4 D223).
+ */
+export function scheduleFindings(
+  suppliers: Row[],
+  schedule: Row[],
+  rule: DisruptionRule,
+): GradedFinding[] {
+  const events = schedule ?? [];
+  const out: GradedFinding[] = [];
+  const capBySupplier = new Map(
+    (suppliers ?? []).map((s) => [String(s.supplier_id ?? ""), num(s.capacity_per_week)]),
+  );
+  const ids = new Set([...capBySupplier.keys()].filter(Boolean));
+
+  if (events.length > rule.event_cap) {
+    out.push({
+      severity: "warn",
+      field: "scenarios.disruption_schedule",
+      policy: "engine",
+      rows: [],
+      message:
+        `The scenario has ${events.length} disruption events; the engine runs the first ` +
+        `${rule.event_cap} and drops ${events.length - rule.event_cap}.`,
+      reason: `The mapper keeps at most ${rule.event_cap} events per scenario.`,
+    });
+  }
+
+  events.slice(0, rule.event_cap).forEach((ev) => {
+    const raw = String(ev.target ?? ev.target_id ?? "");
+    const t = engineTargetOf(raw, ids, rule);
+    const why = engineTargetReason(t);
+    if (why) {
+      out.push({
+        severity: "warn",
+        field: "scenarios.disruption_schedule",
+        policy: "engine",
+        rows: [raw],
+        message: `Disruption on "${raw || "(no target)"}": ${why}`,
+        reason: "The engine disrupts a supplier of this project or the plant; every other target is skipped with a mapping warning.",
+      });
+      return;
+    }
+    const magnitude = num(ev.magnitude_pct ?? ev.magnitude ?? rule.full_outage_pct);
+    if (
+      t.kind === "supplier" &&
+      rule.partial_cut_needs_finite_supplier_capacity &&
+      magnitude < rule.full_outage_pct &&
+      (capBySupplier.get(t.id) ?? 0) <= 0
+    ) {
+      out.push({
+        severity: "warn",
+        field: "suppliers.capacity_per_week",
+        policy: "engine",
+        rows: [t.id],
+        message:
+          `Scenario cuts supplier "${t.id}" by ${magnitude}%, but the supplier has no ` +
+          `capacity_per_week — the engine will run this as a full outage.`,
+        reason:
+          "A partial cut throttles a finite weekly capacity; without one the mapper " +
+          "runs the event as a full outage.",
+      });
+    }
+  });
+  return out;
+}

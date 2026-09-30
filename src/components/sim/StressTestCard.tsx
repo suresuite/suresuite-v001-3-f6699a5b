@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { stressPresetUnavailableReason } from "@/lib/sim/stressTargets";
+import { formatDuration, formatWeek } from "@/lib/sim/planningTime";
 
 export type StressTestPreset = {
   name: string;
@@ -121,7 +122,7 @@ export const STRESS_TESTS: StressTest[] = [
  *  The prose blurb is gone — the schedule itself is the description. */
 function scheduleLine(preset: StressTestPreset): string {
   return preset.disruption_schedule
-    .map((e) => `${e.target} · d${e.start_day}+${e.duration_days}d · ${e.magnitude_pct}%`)
+    .map((e) => `${e.target} · ${formatWeek(e.start_day)} + ${formatDuration(e.duration_days)} · ${e.magnitude_pct}%`)
     .join("   ");
 }
 

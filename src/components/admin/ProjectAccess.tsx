@@ -2,7 +2,7 @@
 //
 // Reads `admin_get_project_access`: every account that owns the project, holds a
 // membership or a live delegation on it, or belongs to its organization, each with WHERE
-// the access comes from and the rights it holds there (`project_rights_for_user`, D219 —
+// the access comes from and the rights it holds there (`project_rights_for_user`, D230 —
 // the resolver plus the upload gate and suspension, the same answer /admin/users/:userId,
 // /profile and the app's own gates read, never computed here). Memberships are granted, changed and removed through D211's
 // `admin_set_project_member` / `admin_remove_project_member`; the database refuses
@@ -34,7 +34,7 @@ interface Person {
   role: string; is_super_admin: boolean; is_modeler: boolean;
   org_role: string | null; in_project_org: boolean; active_in_project_org: boolean;
   visible: boolean; can_edit_project: boolean;
-  /** D219 — the upload gate, and the role's answer before it and suspension. */
+  /** D230 — the upload gate, and the role's answer before it and suspension. */
   may_land_uploads?: boolean; resolved_capabilities?: Record<string, boolean>;
   member: Member | null; delegations: Delegation[];
   effective_role: string | null; capabilities: Record<string, boolean>;

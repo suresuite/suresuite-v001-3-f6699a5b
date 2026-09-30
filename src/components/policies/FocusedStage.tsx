@@ -75,7 +75,7 @@ export function FocusedStage({
 }: Props) {
   const stage = getStage(stageKey);
   const isMobile = useIsMobile();
-  // D219 — "Export" and "Edit Policies" on this project, as /profile lists them.
+  // D230 — "Export" and "Edit Policies" on this project, as /profile lists them.
   const rights = useProjectRights(projectId);
   const canExport = rights.can("export");
   const canImport = rights.can("data_edit_policies");
@@ -123,7 +123,7 @@ export function FocusedStage({
         `Imported: ${Object.keys(result.defaultsPatch).length} default(s), ${result.overrides.length} override(s)`,
       );
     } catch (err) {
-      // D219 — a refusal was already said by usePolicies.
+      // D230 — a refusal was already said by usePolicies.
       if (err instanceof ProjectRightRefused) return;
       console.error(err);
       toast.error("Failed to read workbook");

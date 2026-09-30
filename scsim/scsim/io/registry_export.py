@@ -1,7 +1,7 @@
 # SCSIM — supply chain simulation library and stress-test framework.
 # Copyright (c) 2023-2026 Phu Nguyen. All rights reserved until the open-access
 # release; see scsim/NOTICE.md for licensing, funding and citation.
-# Developed within the ACCURATE project (Horizon Europe, GA 101138269).
+# Developed in part within the ACCURATE project (Horizon Europe, GA 101138269).
 
 """The ``/scsim/registry`` payload — Part IX §9.6.
 
@@ -145,6 +145,28 @@ def run_window_rule() -> dict[str, Any]:
     }
 
 
+def disruption_rule() -> dict[str, Any]:
+    """What ``project_map._map_events`` keeps, verbatim (WP 9.4, PLAN.md §4 D226).
+
+    The Lab's event editor, the network pages' disruption dialog and the pre-run
+    gate read this instead of restating the cap, the week bounds or the target
+    kinds; ``disruptionEvents.test.ts`` checks the browser's reading of it.
+    """
+    return {
+        "event_cap": pm.EVENT_CAP,
+        "start_week_min": pm.EVENT_START_WEEK_MIN,
+        "duration_weeks_min": pm.EVENT_DURATION_WEEKS_MIN,
+        "duration_weeks_max": pm.EVENT_DURATION_WEEKS_MAX,
+        # A supplier id of the project, or the plant (`plant`, `plant:<x>`, `node:plant`).
+        "supported_target_kinds": ["supplier", "plant"],
+        "unsupported_target_kinds": list(pm.UNSUPPORTED_EVENT_KINDS),
+        # magnitude_pct < 100 is a capacity cut BY that share; 100 is a full outage.
+        # A partial cut on a supplier with no finite capacity becomes a full outage.
+        "full_outage_pct": 100,
+        "partial_cut_needs_finite_supplier_capacity": True,
+    }
+
+
 def build_registry() -> dict[str, Any]:
     policies = []
     for entry in catalog():
@@ -197,6 +219,7 @@ def build_registry() -> dict[str, Any]:
         # engine measured a fixed window; the card now reads this, so the rule
         # has one author (`project_map.analysis_window_weeks`).
         "run_window": run_window_rule(),
+        "disruption": disruption_rule(),
         "pipeline": pipeline_schema(),
         "kpis": [
             {"name": k.name, "symbol": k.symbol, "definition": k.definition, "unit": k.unit}

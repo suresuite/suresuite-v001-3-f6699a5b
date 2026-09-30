@@ -1,4 +1,4 @@
-# Open-access release plan — SCSIM simulation library and stress-test framework
+# Open-access release plan — SCSIM network analysis, simulation, stress-test and surrogate methods
 
 > **Status: AUTHORED — draft, decisions open.** Companion to
 > [`next-gen-platform-design.md`](next-gen-platform-design.md) (§3 one engine, §11
@@ -9,15 +9,21 @@
 
 ## 1. What is being released, and why
 
-Two results of the Horizon Europe project ACCURATE (GA 101138269) are to be released
+The core algorithms of SuReSuite — developed in part within the Horizon Europe project
+ACCURATE (GA 101138269) and in part within the PhD research — are to be released
 publicly as open access:
 
-1. **The supply chain simulation library** — `scsim`.
-2. **The supply chain stress-test framework** — `scsim.stress` with the disruption
+1. **The supply chain network-analysis methods** — network-science metrics, node
+   centrality and prominence, critical-node identification (to be extracted into the
+   library; §3).
+2. **The supply chain simulation library** — `scsim`.
+3. **The supply chain stress-test framework** — `scsim.stress` with the disruption
    injector (`scsim.disruption`) and the resilience KPIs (`scsim.kpi`).
+4. **The surrogate models for stress testing** — once built (§6).
 
-The full SuReSuite software remains part of the PhD thesis of Phu Nguyen and is not
-released. The release must satisfy the project's open-science and dissemination
+The full SuReSuite software is a research prototype and remains part of the PhD thesis
+of Phu Nguyen (cooperative doctorate, HWR Berlin & TU Berlin); the platform itself is
+not released. The release must satisfy the project's open-science and dissemination
 obligations (to be confirmed against the Grant Agreement and the ACCURATE Consortium
 Agreement — see §6).
 
@@ -42,6 +48,7 @@ thesis, the papers and the platform would each describe a different engine. So:
 | Area | In the public release | Note |
 |---|---|---|
 | `scsim/core`, `entities`, `policies`, `stats`, `synergy` | yes | the engine proper |
+| Network-analysis methods | yes, once extracted | today they run inside the platform's analysis edge functions (`calculate-network-science-metrics`, `calculate-node-prominence`, `predict-critical-nodes`). The **methods** move into the library (e.g. `scsim.network` or a sibling package under the same licence) with synthetic test networks; the edge functions stay private and call the released method, by the same one-codebase rule as §2 |
 | `scsim/disruption`, `kpi`, `stress` | yes | the stress-test framework |
 | `scsim/io/registry_export.py`, `traces.py`, `snapshots.py` | yes | generic I/O |
 | `scsim/io/project_map.py` | **decide** | maps a SuReSuite project to a `Scenario`; imports nothing from the platform, but its semantics follow the platform's data contract. Either keep it as a documented "SuReSuite adapter" or move it to `sim-worker/` |
@@ -55,8 +62,8 @@ thesis, the papers and the platform would each describe a different engine. So:
 
 | # | Decision | Owner | Recommendation / note |
 |---|---|---|---|
-| L1 | **Open-access licence** | Phu Nguyen with HWR Berlin and the ACCURATE coordinator | A permissive licence with a patent grant (Apache-2.0) is the common choice for EU research software and allows reuse by consortium partners and industry; a copyleft licence (GPL-3.0 / EUPL-1.2) keeps derivatives open. Must be compatible with the Consortium Agreement's rules on results |
-| L2 | **Rights holder** | HWR Berlin (legal / tech transfer) | Software written in employment can carry exploitation rights for the employer; confirm who grants the licence and whether the copyright line needs "and HWR Berlin" |
+| L1 | **Open-access licence** | Phu Nguyen with HWR Berlin, TU Berlin and the ACCURATE coordinator | **Decided in principle (2026-09-30):** source code under an OSI-approved open-source licence; publications, documentation and synthetic benchmark data under CC BY 4.0 (Creative Commons advises against CC licences for software). **Still open: which code licence.** A permissive licence with a patent grant (Apache-2.0) is the common choice for EU research software and allows reuse by consortium partners and industry; a copyleft licence (EUPL-1.2, the EU's own) keeps derivatives open. Must be compatible with the Consortium Agreement's rules on results |
+| L2 | **Rights holder** | HWR Berlin and TU Berlin (legal / tech transfer) | Software written in employment can carry exploitation rights for the employer, and the thesis is a cooperative doctorate of both universities; confirm who grants the licence and whether the copyright line needs "and HWR Berlin" / "and TU Berlin" |
 | L3 | **Consortium clearance** | ACCURATE coordinator | Confirm no partner background IP or partner data is inside `scsim/` and that dissemination of these results is notified as the Consortium Agreement requires |
 | L4 | Public name and home | Phu Nguyen | e.g. `scsim` on GitHub under a lab / project organisation, PyPI package name availability |
 | L5 | Boundary rows marked **decide** in §3 | Phu Nguyen | — |
@@ -90,7 +97,8 @@ thesis, the papers and the platform would each describe a different engine. So:
 ## 6. Later: the surrogate model
 
 After the library is public and stable, the adaptive simulation–surrogate framework
-(blueprint §11, gap G12) is built. The same rule applies: the **method** — surrogate
+(blueprint §11, gap G12) is built. The surrogate models for supply chain stress testing
+are part of the open-access commitment. The same rule applies: the **method** — surrogate
 training, uncertainty calibration, adaptive sampling against the stress batteries —
 belongs in the library (as `scsim.surrogate` or a sibling package released under the
 same licence), so the public stress-test framework and the platform share it. **Trained

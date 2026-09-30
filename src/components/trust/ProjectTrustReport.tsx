@@ -53,7 +53,7 @@ const stateCls: Record<string, string> = {
 
 export function ProjectTrustReport({ report, canDownload = true, downloadRefusal = null }: {
   report: TrustReport;
-  /** D219 — "Export" on this project; the download is off without it. */
+  /** D230 — "Export" on this project; the download is off without it. */
   canDownload?: boolean;
   downloadRefusal?: string | null;
 }) {

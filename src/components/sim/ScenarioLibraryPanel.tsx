@@ -11,12 +11,18 @@ import {
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useScenarioTemplates, type ScenarioTemplate } from "@/hooks/useScenarioTemplates";
+import { formatDuration } from "@/lib/sim/planningTime";
+import type { SeedWorld } from "@/lib/sim/scenarioSeed";
+import type { Scenario } from "@/hooks/useScenarios";
 
 interface Props {
   open: boolean;
   projectId: string;
   onClose: () => void;
   onCloned: (scenarioId: string) => void;
+  /** the validated baseline's world — a template runs in it when there is one (§4 D219) */
+  world?: SeedWorld;
+  baseline?: Pick<Scenario, "seed" | "crn"> | null;
 }
 
 const CATEGORIES = [
@@ -64,7 +70,7 @@ function TemplateCard({
           {template.severity}
         </span>
         <span className="text-[10px] text-muted-foreground ml-auto">
-          {Math.round(template.horizon_days / 7)}w · {template.replications} reps
+          {formatDuration(template.horizon_days)} · {template.replications} reps
         </span>
       </div>
       {template.suggested_playbook_name && (
@@ -85,7 +91,7 @@ function TemplateCard({
   );
 }
 
-export function ScenarioLibraryPanel({ open, projectId, onClose, onCloned }: Props) {
+export function ScenarioLibraryPanel({ open, projectId, onClose, onCloned, world, baseline }: Props) {
   const { templates, loading, cloneToProject } = useScenarioTemplates();
   const [filter, setFilter] = useState<string>("all");
   const [cloningId, setCloningId] = useState<string | null>(null);
@@ -96,7 +102,7 @@ export function ScenarioLibraryPanel({ open, projectId, onClose, onCloned }: Pro
 
   const handleUse = async (template: ScenarioTemplate) => {
     setCloningId(template.id);
-    const newId = await cloneToProject(template, projectId);
+    const newId = await cloneToProject(template, projectId, { world, baseline });
     setCloningId(null);
     if (!newId) {
       toast.error("Failed to create scenario from template");

@@ -300,7 +300,7 @@ export function ProjectCard({
 
   // Deleting the project stays the owner rule it always was (no /profile right states it).
   const owns = canModify && (project.modeler_id === userId || role === 'admin');
-  // D219 — every other action is the right /profile lists for this person on this project:
+  // D230 — every other action is the right /profile lists for this person on this project:
   // uploads, the item master, combining and generating the node list are "Edit Input Data";
   // the settings form is "Edits project settings"; downloading the node list is "Export".
   const rights = useProjectRights(project.id, { modelerId: project.modeler_id });

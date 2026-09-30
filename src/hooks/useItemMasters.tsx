@@ -124,7 +124,7 @@ interface UseItemMastersResult {
     table: ItemMasterTable,
     rows: Array<MaterialRow | ProductRow | SupplierRow>,
   ) => Promise<void>;
-  /** D219 — "Edit Input Data" on this project, as /profile lists it; `saveRows` refuses without it. */
+  /** D230 — "Edit Input Data" on this project, as /profile lists it; `saveRows` refuses without it. */
   canEditInputs: boolean;
   inputEditRefusal: string | null;
 }

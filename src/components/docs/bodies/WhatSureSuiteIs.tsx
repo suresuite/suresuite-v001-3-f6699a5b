@@ -102,7 +102,7 @@ export default function WhatSureSuiteIs() {
           <Badge variant="secondary">ACCURATE</Badge>
         </div>
         <P>
-          SuReSuite is developed as part of the ACCURATE project, funded under Horizon Europe. Three
+          SuReSuite is developed in part within the ACCURATE project, funded under Horizon Europe. Three
           industrial pilots — in aerospace, automotive and electronics — ground the stress-test
           scenarios and keep the architecture honest against chains nobody on the project team gets
           to simplify.

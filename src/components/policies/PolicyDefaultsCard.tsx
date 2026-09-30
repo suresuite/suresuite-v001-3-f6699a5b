@@ -172,7 +172,7 @@ export function PolicyDefaultsCard({ family, value, onSave }: Props) {
       await onSave(validated as PolicyBundle[PolicyFamily]);
       toast.success(`${meta.title} saved`);
     } catch (err) {
-      // D219 — a refusal was already said by usePolicies; it is not a validation error.
+      // D230 — a refusal was already said by usePolicies; it is not a validation error.
       if (err instanceof ProjectRightRefused) return;
       toast.error(`Invalid: ${String(err)}`);
     }

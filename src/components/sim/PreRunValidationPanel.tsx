@@ -30,7 +30,8 @@ interface Props {
   /** Where the findings came from — the server copy wins after a 422. */
   source: "pre-run check" | "gate rejection";
   acknowledged: boolean;
-  onAcknowledgedChange: (v: boolean) => void;
+  /** Omit when the acknowledgement lives beside the Run button (RunCard). */
+  onAcknowledgedChange?: (v: boolean) => void;
   /** Known supplier ids — options for the assign-supplier one-click fix. */
   supplierIds: string[];
   /** Display name for the trust report's heading; falls back to the id. */
@@ -50,7 +51,7 @@ function SupplierLinkFix({
   supplierIds: string[];
 }) {
   const { user } = useAuth();
-  // D219 — assigning a supplier writes the input lanes: "Edit Input Data".
+  // D230 — assigning a supplier writes the input lanes: "Edit Input Data".
   const rights = useProjectRights(projectId);
   const canEditInputs = rights.can("data_edit_inputs");
   const [chosen, setChosen] = useState<Record<string, string>>({});
@@ -184,7 +185,7 @@ export function PreRunValidationPanel({
       source={source}
       warns={warns}
       acknowledged={acknowledged}
-      onAcknowledge={() => onAcknowledgedChange(!acknowledged)}
+      onAcknowledge={onAcknowledgedChange ? () => onAcknowledgedChange(!acknowledged) : undefined}
       renderFix={(finding) => {
         const route = finding.field ? fieldWalkToRoute(finding.field, projectId) : null;
         const supplierFix =

@@ -2862,7 +2862,7 @@ export const SCENARIO_SETUP: ScenarioSetupGroup[] = [
         "label": "Planning horizon",
         "unit": "the project's planning unit",
         "key": "horizon_days",
-        "default": "90"
+        "default": "364"
       },
       {
         "label": "Steady state starts at",
@@ -2875,12 +2875,6 @@ export const SCENARIO_SETUP: ScenarioSetupGroup[] = [
         "unit": null,
         "key": "warmup_mode",
         "default": "\"auto\""
-      },
-      {
-        "label": "Time step",
-        "unit": null,
-        "key": "time_step",
-        "default": "\"day\""
       }
     ]
   },
@@ -3663,6 +3657,11 @@ export const ADMIN_SCREENS: AdminScreens = {
       "gate": "/admin"
     },
     {
+      "path": "/admin/docs",
+      "component": "AdminDocs",
+      "gate": "/admin"
+    },
+    {
       "path": "/admin/audit",
       "component": "AdminAudit",
       "gate": "/admin"
@@ -3689,7 +3688,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 55,
+  "described": 57,
   "open": [
     {
       "table": "approved_users",
@@ -3726,6 +3725,13 @@ export const READ_EXPOSURE: ReadExposure = {
     },
     {
       "table": "dataset_versions",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "docs_section_releases",
       "roles": [
         "anon",
         "authenticated"
@@ -3848,6 +3854,7 @@ export const READ_EXPOSURE: ReadExposure = {
     "capabilities",
     "customers",
     "dataset_versions",
+    "docs_section_releases",
     "external_evidence",
     "inbound_logistics",
     "materials",

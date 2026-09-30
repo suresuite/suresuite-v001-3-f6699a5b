@@ -2,7 +2,7 @@
 // organization and on its projects, and what each of them may do. Read-only: every role
 // and right here is the database's answer (`get_my_organization_access`,
 // `get_my_project_access` → `project_access_read`, the read /admin/projects shows; its rights
-// are `project_rights_for_user`'s, the answer the app's own gates read — D219).
+// are `project_rights_for_user`'s, the answer the app's own gates read — D230).
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

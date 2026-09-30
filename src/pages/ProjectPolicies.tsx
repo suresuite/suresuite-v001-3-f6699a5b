@@ -432,7 +432,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
               onStageChange={setActiveStage}
             />
 
-            {/* D219 — "Edit Policies" on this project, as /profile lists it. Every write
+            {/* D230 — "Edit Policies" on this project, as /profile lists it. Every write
                 refuses without it (usePolicies); this says so before anyone types. */}
             {!canEditPolicies && policyEditRefusal && (
               <div className="rounded-sm border px-2.5 py-1.5 text-[11.5px] text-muted-foreground">

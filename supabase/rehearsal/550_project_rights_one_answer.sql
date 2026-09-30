@@ -1,6 +1,6 @@
--- §4 D219 · A PERSON'S RIGHTS ON A PROJECT ARE ONE ANSWER, AND IT IS THE ONE THE APP ACTS ON.
+-- §4 D230 · A PERSON'S RIGHTS ON A PROJECT ARE ONE ANSWER, AND IT IS THE ONE THE APP ACTS ON.
 --
--- `20260930000013` adds `project_rights_for_user` and reads /profile's, /admin/projects' and
+-- `20261001000003` adds `project_rights_for_user` and reads /profile's, /admin/projects' and
 -- /admin/users/:userId's rights from it, and `get_my_project_rights` gives the signed-in
 -- account the same answer for the browser's gates. What only a running database can settle,
 -- every self-service call made AS anon — the browser's role (D155):
@@ -39,18 +39,18 @@ DECLARE
   k         text;
 BEGIN
   INSERT INTO public.organizations (id, name, slug) VALUES
-    (v_org_a, 'D219 Org A', 'd219-a-' || substr(v_org_a::text, 1, 8)),
-    (v_org_b, 'D219 Org B', 'd219-b-' || substr(v_org_b::text, 1, 8));
+    (v_org_a, 'D230 Org A', 'd219-a-' || substr(v_org_a::text, 1, 8)),
+    (v_org_b, 'D230 Org B', 'd219-b-' || substr(v_org_b::text, 1, 8));
   INSERT INTO public.approved_users (id, email, name, password_hash, role, organization, organization_id, is_active) VALUES
-    (v_super,  'd219s@example.invalid', 'D219 Super',  'x', 'super_admin', 'D219 Org B', v_org_b, true),
-    (v_owner,  'd219o@example.invalid', 'D219 Owner',  'x', 'modeler',     'D219 Org A', v_org_a, true),
-    (v_editor, 'd219e@example.invalid', 'D219 Editor', 'x', 'modeler',     'D219 Org A', v_org_a, true),
-    (v_admin,  'd219a@example.invalid', 'D219 Admin',  'x', 'admin',       'D219 Org A', v_org_a, true),
-    (v_viewer, 'd219v@example.invalid', 'D219 Viewer', 'x', 'modeler',     'D219 Org A', v_org_a, true),
-    (v_off,    'd219f@example.invalid', 'D219 Off',    'x', 'modeler',     'D219 Org A', v_org_a, true),
-    (v_out_b,  'd219x@example.invalid', 'D219 OutB',   'x', 'modeler',     'D219 Org B', v_org_b, true);
+    (v_super,  'd219s@example.invalid', 'D230 Super',  'x', 'super_admin', 'D230 Org B', v_org_b, true),
+    (v_owner,  'd219o@example.invalid', 'D230 Owner',  'x', 'modeler',     'D230 Org A', v_org_a, true),
+    (v_editor, 'd219e@example.invalid', 'D230 Editor', 'x', 'modeler',     'D230 Org A', v_org_a, true),
+    (v_admin,  'd219a@example.invalid', 'D230 Admin',  'x', 'admin',       'D230 Org A', v_org_a, true),
+    (v_viewer, 'd219v@example.invalid', 'D230 Viewer', 'x', 'modeler',     'D230 Org A', v_org_a, true),
+    (v_off,    'd219f@example.invalid', 'D230 Off',    'x', 'modeler',     'D230 Org A', v_org_a, true),
+    (v_out_b,  'd219x@example.invalid', 'D230 OutB',   'x', 'modeler',     'D230 Org B', v_org_b, true);
   INSERT INTO public.projects (id, name, modeler_id, plant_name, organization, organization_id, bom_level) VALUES
-    (v_p, 'D219 p', v_owner, 'D219P', 'D219 Org A', v_org_a, 'single');
+    (v_p, 'D230 p', v_owner, 'D230P', 'D230 Org A', v_org_a, 'single');
 
   -- The rehearsal base is schema, not seed: plant WP 2.2's project layer where it is
   -- missing, verbatim from `20260915000005` (as `460`, `490` and `510` do).
@@ -72,10 +72,10 @@ BEGIN
   ON CONFLICT (project_role, capability_key) DO NOTHING;
 
   SET LOCAL ROLE anon;
-  PERFORM public.admin_set_project_member(v_super, 'd219s@example.invalid', v_editor, v_p, 'editor', NULL, 'D219 editor');
-  PERFORM public.admin_set_project_member(v_super, 'd219s@example.invalid', v_admin,  v_p, 'editor', NULL, 'D219 admin editor');
-  PERFORM public.admin_set_project_member(v_super, 'd219s@example.invalid', v_viewer, v_p, 'viewer', NULL, 'D219 viewer');
-  PERFORM public.admin_set_project_member(v_super, 'd219s@example.invalid', v_off,    v_p, 'owner',  NULL, 'D219 suspended owner');
+  PERFORM public.admin_set_project_member(v_super, 'd219s@example.invalid', v_editor, v_p, 'editor', NULL, 'D230 editor');
+  PERFORM public.admin_set_project_member(v_super, 'd219s@example.invalid', v_admin,  v_p, 'editor', NULL, 'D230 admin editor');
+  PERFORM public.admin_set_project_member(v_super, 'd219s@example.invalid', v_viewer, v_p, 'viewer', NULL, 'D230 viewer');
+  PERFORM public.admin_set_project_member(v_super, 'd219s@example.invalid', v_off,    v_p, 'owner',  NULL, 'D230 suspended owner');
   RESET ROLE;
   PERFORM set_config('app.current_user_id', '', true);
   -- Suspended AFTER its membership, so the membership is the one the page lists.
@@ -93,7 +93,7 @@ BEGIN
      OR (v_pers -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT FALSE
      OR (v_pers -> 'capabilities' ->> 'data_edit_policies')::boolean IS NOT FALSE
      OR (v_pers -> 'capabilities' ->> 'export')::boolean IS NOT FALSE THEN
-    RAISE EXCEPTION 'D219/530 §1: a Viewer member with a modeler account read as %', v_pers;
+    RAISE EXCEPTION 'D230/550 §1: a Viewer member with a modeler account read as %', v_pers;
   END IF;
   SELECT p INTO v_pers FROM jsonb_array_elements(v_people) p WHERE p ->> 'user_id' = v_owner::text;
   IF (v_pers ->> 'can_edit_project')::boolean IS NOT TRUE OR (v_pers ->> 'may_land_uploads')::boolean IS NOT TRUE
@@ -101,7 +101,7 @@ BEGIN
      OR (v_pers -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT TRUE
      OR (v_pers -> 'capabilities' ->> 'data_edit_policies')::boolean IS NOT TRUE
      OR (v_pers -> 'capabilities' ->> 'export')::boolean IS NOT TRUE THEN
-    RAISE EXCEPTION 'D219/530 §1: the owner read as %', v_pers;
+    RAISE EXCEPTION 'D230/550 §1: the owner read as %', v_pers;
   END IF;
 
   -- ══ §2 · the upload gate is part of "Edit Input Data" ══
@@ -111,13 +111,13 @@ BEGIN
      OR (v_pers -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT FALSE
      OR (v_pers -> 'capabilities' ->> 'data_edit_policies')::boolean IS NOT TRUE
      OR (v_pers -> 'capabilities' ->> 'simulation_lab')::boolean IS NOT TRUE THEN
-    RAISE EXCEPTION 'D219/530 §2: an Editor who neither owns the project nor is an app admin read as %', v_pers;
+    RAISE EXCEPTION 'D230/550 §2: an Editor who neither owns the project nor is an app admin read as %', v_pers;
   END IF;
   SELECT p INTO v_pers FROM jsonb_array_elements(v_people) p WHERE p ->> 'user_id' = v_admin::text;
   IF (v_pers ->> 'may_land_uploads')::boolean IS NOT TRUE
      OR (v_pers -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT TRUE
      OR (v_pers ->> 'can_edit_project')::boolean IS NOT TRUE THEN
-    RAISE EXCEPTION 'D219/530 §2: an Editor who is an app admin read as %', v_pers;
+    RAISE EXCEPTION 'D230/550 §2: an Editor who is an app admin read as %', v_pers;
   END IF;
 
   -- ══ §3 · a suspended account holds nothing ══
@@ -127,7 +127,7 @@ BEGIN
      OR (v_pers ->> 'may_land_uploads')::boolean IS NOT FALSE
      OR EXISTS (SELECT 1 FROM jsonb_each(v_pers -> 'capabilities') c WHERE (c.value #>> '{}')::boolean)
      OR (v_pers -> 'resolved_capabilities' ->> 'data_edit_policies')::boolean IS NOT TRUE THEN
-    RAISE EXCEPTION 'D219/530 §3: a suspended owner member read as %', v_pers;
+    RAISE EXCEPTION 'D230/550 §3: a suspended owner member read as %', v_pers;
   END IF;
 
   -- ══ §4 · one answer: the gate, /profile and /admin/users/:userId ══
@@ -145,7 +145,7 @@ BEGIN
     PERFORM set_config('app.current_user_id', '', true);
     FOREACH k IN ARRAY ARRAY['visible', 'can_edit_project', 'may_land_uploads', 'capabilities', 'resolved_capabilities', 'effective_role'] LOOP
       IF v_mine -> k IS DISTINCT FROM v_pers -> k OR v_adm -> k IS DISTINCT FROM v_pers -> k THEN
-        RAISE EXCEPTION 'D219/530 §4: % reads % three ways — gate %, /profile %, /admin/users %',
+        RAISE EXCEPTION 'D230/550 §4: % reads % three ways — gate %, /profile %, /admin/users %',
           v_pers ->> 'name', k, v_mine -> k, v_pers -> k, v_adm -> k;
       END IF;
     END LOOP;
@@ -164,7 +164,7 @@ BEGIN
     END;
     PERFORM set_config('app.current_user_id', '', true);
     IF v_code IS DISTINCT FROM 'forbidden' THEN
-      RAISE EXCEPTION 'D219/530 §5: another tenant''s account reading % got %, expected forbidden',
+      RAISE EXCEPTION 'D230/550 §5: another tenant''s account reading % got %, expected forbidden',
         CASE WHEN v_uid = v_p THEN 'a project it holds nothing on' ELSE 'an unknown project' END,
         COALESCE(v_code, 'success');
     END IF;
@@ -182,7 +182,7 @@ BEGIN
   END;
   PERFORM set_config('app.current_user_id', '', true);
   IF v_code IS NULL OR v_code NOT LIKE 'not_authenticated%' THEN
-    RAISE EXCEPTION 'D219/530 §5: a session naming another user got %, expected not_authenticated', COALESCE(v_code, 'success');
+    RAISE EXCEPTION 'D230/550 §5: a session naming another user got %, expected not_authenticated', COALESCE(v_code, 'success');
   END IF;
 
   v_code := NULL;
@@ -196,8 +196,8 @@ BEGIN
   END;
   PERFORM set_config('app.current_user_id', '', true);
   IF v_code IS DISTINCT FROM 'account_inactive' THEN
-    RAISE EXCEPTION 'D219/530 §5: a suspended account got %, expected account_inactive', COALESCE(v_code, 'success');
+    RAISE EXCEPTION 'D230/550 §5: a suspended account got %, expected account_inactive', COALESCE(v_code, 'success');
   END IF;
 
-  RAISE NOTICE 'D219/530: one answer for a person''s rights on a project — the gate, /profile and /admin agree, and it is what the app applies';
+  RAISE NOTICE 'D230/550: one answer for a person''s rights on a project — the gate, /profile and /admin agree, and it is what the app applies';
 END $d219$;

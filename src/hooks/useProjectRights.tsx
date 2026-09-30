@@ -1,4 +1,4 @@
-// D219 — the signed-in account's rights on one project, for the app's gates.
+// D230 — the signed-in account's rights on one project, for the app's gates.
 //
 // Every gate that /profile's "My organization" tab describes reads THIS: Run Simulations
 // (/simulation-lab, /policies' Run & Validate), Edit Input Data (uploads, item masters,
@@ -8,7 +8,7 @@
 // lists cannot disagree.
 //
 // ONE declared fallback: when the read is UNAVAILABLE (the function not deployed yet, a
-// network failure) the gates apply the account-wide rule they applied before D219 —
+// network failure) the gates apply the account-wide rule they applied before D230 —
 // `useCapabilities` plus, for input edits and settings, the owner-or-admin rule — and
 // `usingFallback` says so. A REFUSAL (`forbidden`, `account_inactive`) is not a failure to
 // read: it grants nothing.
@@ -42,7 +42,7 @@ export function invalidateProjectRights() {
 export interface ProjectRightsGate {
   rights: ProjectRights | null;
   loading: boolean;
-  /** The read failed and the gates apply the pre-D219 account-wide rule. */
+  /** The read failed and the gates apply the pre-D230 account-wide rule. */
   usingFallback: boolean;
   can: (right: ProjectRight) => boolean;
   canEditProject: boolean;

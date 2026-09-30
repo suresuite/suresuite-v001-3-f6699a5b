@@ -44,7 +44,7 @@ import { cn } from '@/lib/utils';
 import MLPrediction from '@/components/MLPrediction';
 import SupplierVolumeChart, { SupplierVolumeDatum, aggregateSupplierVolumes } from '@/components/SupplierVolumeChart';
 import SupplierMaterialChart from '@/components/SupplierMaterialChart';
-import { DisruptionDialog } from '@/components/DisruptionDialog';
+import { NetworkDisruptionDialog } from '@/components/network/NetworkDisruptionDialog';
 // See the note in FirmLevelNetwork.tsx — mapbox-gl loads only when the user
 // actually switches this card to map view.
 const MapView = lazy(() => import('@/components/MapView'));
@@ -1293,15 +1293,17 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
 
         </div>
 
-      <DisruptionDialog
+      <NetworkDisruptionDialog
         open={disruptionDialogOpen}
         onOpenChange={setDisruptionDialogOpen}
-        nodeId={selectedNode?.id || null}
-        projectId={globalSelectedProjectId}
-        plantName={projects.find(p => p.id === globalSelectedProjectId)?.plant_name || 'Unknown Plant'}
-        connectedEdges={selectedNode ? allEdges.filter(edge =>
-          edge.source === selectedNode.id || edge.target === selectedNode.id
-        ) : []}
+        nodeId={selectedNode?.id ?? null}
+        projectId={globalSelectedProjectId ?? null}
+        plantName={projects.find((p) => p.id === globalSelectedProjectId)?.plant_name ?? null}
+        connectedEdges={
+          selectedNode
+            ? allEdges.filter((edge) => edge.source === selectedNode.id || edge.target === selectedNode.id)
+            : []
+        }
         onSuccess={fetchData}
       />
     </PageLayout>

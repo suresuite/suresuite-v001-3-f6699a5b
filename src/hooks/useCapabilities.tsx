@@ -22,7 +22,33 @@ import {
   type FeatureKey,
   type ModelGateResult,
 } from '@/lib/capabilities';
-import { canReadDocs, isDocsPath } from '@/lib/ui/docsVisibility';
+import {
+  canReadAnySection,
+  canReadDocsPath,
+  canReadSection,
+  docsReaderLevel,
+  hasPublicSection,
+  isDocsPath,
+  type DocsAudience,
+  type DocsReleases,
+} from '@/lib/ui/docsVisibility';
+import { fetchDocsReleases } from '@/lib/docs/docsReleasesApi';
+
+/** Who may read which part of the manual — see `docsVisibility.ts`. */
+export interface DocsAccess {
+  /** section key → audience; null until read, and while unreadable (fail closed). */
+  releases: DocsReleases | null;
+  /** True until the first read of the releases resolves (or fails). */
+  loading: boolean;
+  /** The highest audience this reader may see. */
+  level: DocsAudience;
+  canReadSection: (sectionKey: string) => boolean;
+  /** At least one section is open to this reader — the manual's front door. */
+  anyReadable: boolean;
+  /** At least one section is public — the public site's Docs links follow it. */
+  anyPublic: boolean;
+  refresh: () => Promise<void>;
+}
 
 interface CapabilitiesContextValue {
   /** Resolved set — server-provided when available, role fallback otherwise. */
@@ -42,6 +68,7 @@ interface CapabilitiesContextValue {
   checkBudget: () => ModelGateResult;
   allowedModelCodes: string[];
   allModelsAllowed: boolean;
+  docs: DocsAccess;
 }
 
 const CapabilitiesContext = createContext<CapabilitiesContextValue | undefined>(undefined);
@@ -51,6 +78,25 @@ export const CapabilitiesProvider = ({ children }: { children: ReactNode }) => {
   const [serverCaps, setServerCaps] = useState<EffectiveCapabilities | null>(null);
   const [loading, setLoading] = useState(false);
   const lastUserId = useRef<string | null>(null);
+  const [docsReleases, setDocsReleases] = useState<DocsReleases | null>(null);
+  const [docsLoading, setDocsLoading] = useState(true);
+
+  // Read for everyone, signed in or not: a public section must render before
+  // sign-in. A failed read leaves `null`, which every rule reads as
+  // confidential — the manual closes rather than opens.
+  const refreshDocs = useCallback(async () => {
+    try {
+      setDocsReleases(await fetchDocsReleases());
+    } catch (e) {
+      console.warn('[docs] section releases could not be read; every section is confidential:', e);
+      setDocsReleases(null);
+    } finally {
+      setDocsLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    refreshDocs();
+  }, [refreshDocs]);
 
   const load = useCallback(async (userId: string) => {
     setLoading(true);
@@ -100,11 +146,26 @@ export const CapabilitiesProvider = ({ children }: { children: ReactNode }) => {
       if (key in capabilities.pages) return capabilities.pages[key];
       return capabilities.features[key] ?? capabilities.is_super_admin;
     };
+    const docsLevel = docsReaderLevel({
+      signedIn: Boolean(user),
+      isSuperAdmin: capabilities?.is_super_admin ?? false,
+      hasConfidentialGrant: capabilities ? canFeature('docs_confidential') : false,
+    });
+    const docs: DocsAccess = {
+      releases: docsReleases,
+      loading: docsLoading,
+      level: docsLevel,
+      canReadSection: (sectionKey: string) => canReadSection(docsReleases, sectionKey, docsLevel),
+      anyReadable: canReadAnySection(docsReleases, docsLevel),
+      anyPublic: hasPublicSection(docsReleases),
+      refresh: refreshDocs,
+    };
     const canAccessPage = (pathname: string): boolean => {
+      // The manual has no page capability of its own: each SECTION has an
+      // audience a super admin sets (docsVisibility.ts). Decided before the
+      // signed-in check, because a public section is open to nobody-in-particular.
+      if (isDocsPath(pathname)) return canReadDocsPath(pathname, docsReleases, docsLevel);
       if (!capabilities) return false;
-      // The manual has no page capability of its own; who reads it is one
-      // flag in docsVisibility.ts (super admins only, for now).
-      if (isDocsPath(pathname)) return canReadDocs(capabilities.is_super_admin);
       const key = pageKeyForPath(pathname);
       if (!key) return true; // unmanaged route (e.g. /help) — open
       return capabilities.pages[key] ?? false;
@@ -123,8 +184,9 @@ export const CapabilitiesProvider = ({ children }: { children: ReactNode }) => {
       checkBudget: () => (capabilities ? checkBudgetPure(capabilities) : { ok: true }),
       allowedModelCodes: capabilities?.models.allowed_codes ?? [],
       allModelsAllowed: capabilities?.models.all_allowed ?? true,
+      docs,
     };
-  }, [capabilities, loading, serverCaps, refresh]);
+  }, [capabilities, loading, serverCaps, refresh, user, docsReleases, docsLoading, refreshDocs]);
 
   return <CapabilitiesContext.Provider value={value}>{children}</CapabilitiesContext.Provider>;
 };

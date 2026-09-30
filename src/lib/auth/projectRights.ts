@@ -1,5 +1,5 @@
 /**
- * D219 — the signed-in account's rights on ONE project, as the app applies them.
+ * D230 — the signed-in account's rights on ONE project, as the app applies them.
  *
  * `get_my_project_rights` returns `project_rights_for_user`, the same answer /profile's
  * "My organization" tab and both admin pages list for every person — so a button this
@@ -58,7 +58,7 @@ export async function getMyProjectRights(
   return { data: data as ProjectRights, failure: null, error: null };
 }
 
-/** A write this account may not make on this project (D219). The hook that refused it
+/** A write this account may not make on this project (D230). The hook that refused it
  *  has already said why, so a caller's catch should not say it again. */
 export class ProjectRightRefused extends Error {}
 
@@ -84,7 +84,7 @@ export function projectRightRefusal(right: ProjectRight, rights: ProjectRights |
 
 /**
  * The sentences a row listing someone's rights owes its reader when the ticks alone would
- * mislead (D219): a suspended account holds none of them, and a role's "Edit Input Data"
+ * mislead (D230): a suspended account holds none of them, and a role's "Edit Input Data"
  * does not hold where the upload gate refuses the person. /profile, /admin/projects and
  * /admin/users/:userId all say these, from the same read.
  */

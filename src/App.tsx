@@ -1,8 +1,8 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense, lazy, useState, type ReactNode } from 'react';
-import { AuthProvider } from '@/hooks/useAuth';
-import { CapabilitiesProvider } from '@/hooks/useCapabilities';
+import { AuthProvider, useAuth } from '@/hooks/useAuth';
+import { CapabilitiesProvider, useCapabilities } from '@/hooks/useCapabilities';
 import { GlobalProjectProvider } from '@/hooks/useGlobalProject';
 import { ViewportProvider } from '@/hooks/useViewport';
 import { ThemeProvider } from 'next-themes';
@@ -11,7 +11,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import RoleGuard from '@/components/RoleGuard';
 import RouteErrorBoundary from '@/components/RouteErrorBoundary';
 import { PageLayout } from '@/components/shared/PageLayout';
-import { DOCS_SUPER_ADMIN_ONLY } from '@/lib/ui/docsVisibility';
+import { passwordStatus } from '@/lib/auth/passwordPolicy';
 
 // Renders on every route, but never in the first frame that matters — so the
 // chat tree and its dependencies come after the page, not with it.
@@ -58,6 +58,7 @@ const AdminProjects = lazy(() => import('./pages/admin/AdminProjects'));
 const AdminModels = lazy(() => import('./pages/admin/AdminModels'));
 const AdminUsage = lazy(() => import('./pages/admin/AdminUsage'));
 const AdminAudit = lazy(() => import('./pages/admin/AdminAudit'));
+const AdminDocs = lazy(() => import('./pages/admin/AdminDocs'));
 
 /** Shown while a route chunk arrives. Deliberately the same spinner
  *  `ProtectedRoute` shows while it resolves the session — from the user's side
@@ -74,17 +75,24 @@ function RouteFallback() {
   );
 }
 
-/** The manual's door. While `DOCS_SUPER_ADMIN_ONLY` is on it is an ordinary
- *  guarded page — sign-in first, then RoleGuard, whose `canAccessPage` admits
- *  only a super admin to a docs path. Off, it renders for anyone, signed in or
- *  not. */
+/** The manual's door. Each SECTION has an audience a super admin sets from
+ *  /admin/docs (public · internal · confidential — `docsVisibility.ts`), so the
+ *  door opens when the reader may read at least one section, and DocPage
+ *  answers a page in a closed section itself. Nothing open: a signed-out
+ *  visitor is sent to sign in, a signed-in one to /forbidden. The one rule is
+ *  `canAccessPage`, the same call the sidebar and phone drawer make. */
 function DocsGate({ children }: { children: ReactNode }) {
-  if (!DOCS_SUPER_ADMIN_ONLY) return <>{children}</>;
-  return (
-    <ProtectedRoute>
-      <RoleGuard>{children}</RoleGuard>
-    </ProtectedRoute>
-  );
+  const { user, loading } = useAuth();
+  const { canAccessPage, docs } = useCapabilities();
+  const location = useLocation();
+  if (loading || docs.loading) return <RouteFallback />;
+  // RoleGuard's rule, kept here because a signed-in reader does not pass through it.
+  if (user && passwordStatus(user).mustChange) {
+    return <Navigate to="/profile?tab=password&forced=1" replace />;
+  }
+  if (canAccessPage('/docs')) return <>{children}</>;
+  if (!user) return <Navigate to="/auth" replace state={{ from: location }} />;
+  return <Navigate to="/forbidden" replace />;
 }
 
 const queryClient = new QueryClient();
@@ -230,9 +238,10 @@ function App() {
                 {/* The manual (PLAN.md §6). Meant to be public: §6.5's argument for
                     publishing the architecture is that a prospective customer, a
                     researcher and a new modeller all ask the same opening question,
-                    and answering it should not require an account. For now it is
-                    not — `DOCS_SUPER_ADMIN_ONLY` (src/lib/ui/docsVisibility.ts)
-                    puts it behind sign-in and super admin, and DocsGate reads it.
+                    and answering it should not require an account. Whether it does
+                    is now a per-SECTION setting a super admin changes at /admin/docs
+                    (`docs_section_releases`, src/lib/ui/docsVisibility.ts); every
+                    section starts confidential, and DocsGate reads the answer.
 
                     /docs is the address §6 names throughout. /help is what the
                     archived site used and what anything older links to, so it
@@ -266,6 +275,7 @@ function App() {
                 <Route path="/admin/projects" element={<ProtectedRoute><RoleGuard><AdminProjects isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
                 <Route path="/admin/models" element={<ProtectedRoute><RoleGuard><AdminModels isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
                 <Route path="/admin/usage" element={<ProtectedRoute><RoleGuard><AdminUsage isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
+                <Route path="/admin/docs" element={<ProtectedRoute><RoleGuard><AdminDocs isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
                 <Route path="/admin/audit" element={<ProtectedRoute><RoleGuard><AdminAudit isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} /></RoleGuard></ProtectedRoute>} />
 
                 {/* Unknown URL — the host rewrites every path to index.html so the

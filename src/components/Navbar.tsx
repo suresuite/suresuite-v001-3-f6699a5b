@@ -129,8 +129,9 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "About",
         tooltip: "About",
       },
-      // Filtered like every other item, through canAccessPage — which reads
-      // DOCS_SUPER_ADMIN_ONLY, so only a super admin sees it for now.
+      // Filtered like every other item, through canAccessPage — which shows it
+      // to anyone who may read at least one section of the manual (each
+      // section's audience is set at /admin/docs).
       {
         to: "/docs",
         icon: BookText,
@@ -196,11 +197,11 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
             <>
               <div className="absolute left-2 right-10 top-0 h-full flex items-center justify-center">
                 <img
-                  src="/logo.png"
+                  src="/logo-mark.png"
                   alt="SuReSuite"
-                  className="object-contain h-6"
-                  width={144}
-                  height={80}
+                  className="object-contain h-6 w-auto"
+                  width={129}
+                  height={24}
                 />
               </div>
               <div className="absolute right-2 top-0 h-full flex items-center">
@@ -223,7 +224,7 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
                 className="group relative p-2 rounded-md hover:bg-muted hover:text-foreground"
               >
                 <img
-                  src="/logo1.png"
+                  src="/logo-icon.png"
                   alt="SuReSuite compact"
                   className="h-6 w-6 object-contain transition-opacity group-hover:opacity-0"
                 />

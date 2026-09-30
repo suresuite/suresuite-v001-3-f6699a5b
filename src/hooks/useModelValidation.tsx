@@ -162,7 +162,7 @@ export function deriveCredibility(
     : { state: "stale", card, drift };
 }
 
-interface UseModelValidationResult {
+export interface UseModelValidationResult {
   /** ACTIVE cards for the project, newest first (the Run & Validate surface). */
   cards: ModelValidationCard[];
   /** Every card regardless of status — run badges need superseded ones too. */

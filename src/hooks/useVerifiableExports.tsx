@@ -61,7 +61,7 @@ interface UseVerifiableExportsResult {
   /** Download one run's metadata + per-seed KPIs + weekly series. */
   exportRunResults: (runId: string) => Promise<void>;
   busy: "dataset" | "results" | null;
-  /** D219 — "Export" on this project; both exports refuse without it. */
+  /** D230 — "Export" on this project; both exports refuse without it. */
   canExport: boolean;
   exportRefusal: string | null;
 }
@@ -78,7 +78,7 @@ export function useVerifiableExports(
   projectName?: string | null,
 ): UseVerifiableExportsResult {
   const { user } = useAuth();
-  // D219 — "Export" on this project, as /profile lists it.
+  // D230 — "Export" on this project, as /profile lists it.
   const rights = useProjectRights(projectId);
   const canExport = rights.can("export");
   const exportRefusal = rights.loading ? "Checking your rights on this project…" : rights.refusal("export");

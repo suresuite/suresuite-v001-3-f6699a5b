@@ -213,7 +213,7 @@ const ItemMasterEditor = ({ projectId, initialTab, onClose }: ItemMasterEditorPr
       setDrafts((prev) => ({ ...prev, [table]: {} }));
       toast.success(`Saved ${dirtyRows.length} ${table} row${dirtyRows.length === 1 ? "" : "s"}.`);
     } catch (e) {
-      // D219 — a refusal was already said by useItemMasters.
+      // D230 — a refusal was already said by useItemMasters.
       if (!(e instanceof ProjectRightRefused)) {
         toast.error(e instanceof Error ? e.message : `Failed to save ${table}`);
       }

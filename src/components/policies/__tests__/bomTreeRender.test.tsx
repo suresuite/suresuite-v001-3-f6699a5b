@@ -35,7 +35,7 @@ vi.mock("@/hooks/useItemMasters", () => ({
     inputEditRefusal: null,
   }),
 }));
-// D219 — the grid's writes follow the project rights; this renders an editor's grid.
+// D230 — the grid's writes follow the project rights; this renders an editor's grid.
 vi.mock("@/hooks/useProjectRights", () => ({
   useProjectRights: () => ({
     rights: null, loading: false, usingFallback: false,

@@ -68,7 +68,7 @@ interface UsePoliciesResult {
   deleteVersions: (versionIds: string[]) => Promise<string[]>;
   /** 6.D — download a saved version's policy bundle as an .xlsx workbook. */
   exportVersion: (version: PolicyVersion) => Promise<void>;
-  /** D219 — "Edit Policies" on this project, as /profile lists it. Every write above
+  /** D230 — "Edit Policies" on this project, as /profile lists it. Every write above
    *  refuses without it; the page shows `policyEditRefusal` instead of letting a cell
    *  look saved. */
   canEditPolicies: boolean;
@@ -108,7 +108,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
   const [versions, setVersions] = useState<PolicyVersion[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [currentHash, setCurrentHash] = useState<string | null>(null);
-  // D219 — one gate for every write below: the project role decides, not the account.
+  // D230 — one gate for every write below: the project role decides, not the account.
   const rights = useProjectRights(projectId);
   const canEditPolicies = rights.can("data_edit_policies");
   const policyEditRefusal = rights.loading

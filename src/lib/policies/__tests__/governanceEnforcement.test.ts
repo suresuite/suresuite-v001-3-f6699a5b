@@ -120,10 +120,16 @@ describe("D28 — the truth table of what is actually unconditional", () => {
    * and nothing yet compares it against `pg_policies`. That comparison is stage 5's,
    * which is the stage that deletes these policies and therefore has to know which
    * ones the repository believes in (D158).
+   *
+   * ONE NAME WAS ADDED ON PURPOSE, and it is not tenant data — §4 D229:
+   * `docs_section_releases` says which sections of the manual are public, internal
+   * or confidential. The /docs gate must read it BEFORE sign-in to know whether a
+   * public section may render, and its rows name sections whose titles are already
+   * in the bundle. Its sibling `docs_faq` has RLS on and no policy at all.
    */
   const EXPECTED_UNCONDITIONAL = [
     "ai_models", "ai_providers", "approved_users", "bom_multi_level", "bom_single_level",
-    "capabilities", "chat_plans", "customers", "dataset_versions", "experiments",
+    "capabilities", "chat_plans", "customers", "dataset_versions", "docs_section_releases", "experiments",
     "external_evidence", "inbound_logistics", "materials", "model_validations",
     "outbound_logistics", "policy_defaults", "policy_overrides", "policy_presets",
     "policy_versions", "products", "project_memory", "project_role_capabilities",

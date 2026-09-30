@@ -26,11 +26,11 @@ describe("runWindow reproduces the engine mapper", () => {
 });
 
 describe("the Run-window footer states the engine's window (F-02)", () => {
-  it("at the shipped defaults it says 364 d measured, not 987", () => {
+  it("at the shipped defaults it says 52 wk measured, not 987 days", () => {
     const f = runWindowFooter({ horizon_days: 1092, warmup_days: 105, warmup_mode: "manual" });
-    expect(f).toContain("52 wk (364 d)");
+    expect(f).toContain("measures 52 wk after a 15 wk warm-up");
     expect(f).not.toContain("987");
-    expect(f).toContain("623 d simulated, not measured");
+    expect(f).toContain("89 wk run, not measured");
   });
   it("under auto warm-up it does not invent a warm-up length", () => {
     const f = runWindowFooter({ horizon_days: 1092, warmup_days: 105, warmup_mode: "auto" });

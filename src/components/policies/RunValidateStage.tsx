@@ -62,7 +62,8 @@ import type { StageRow } from "@/hooks/useStageRows";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
-import { useScenarios } from "@/hooks/useScenarios";
+import { fetchValidationBaseline, useScenarios } from "@/hooks/useScenarios";
+import { dispatchExperiment, reusePromptText } from "@/lib/sim/dispatch";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
 import {
   fetchScenarioFingerprintHash,
@@ -102,10 +103,17 @@ import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { M, MobileChip, MobileGroup, MobilePanel, MobileRow } from '@/components/mobile';
 import { formatMoney, MONEY_SYMBOL } from "@/lib/sim/money";
+import { WeeksInput } from "@/components/sim/WeeksInput";
+import { formatDuration } from "@/lib/sim/planningTime";
+import { VALIDATION_SCENARIO_NAME, findValidationBaseline } from "@/lib/sim/validationBaseline";
+
+/** The planning-unit inputs, sized like the seed input beside them. */
+const WEEKS_FIELD = "h-6 w-[94px] text-right font-mono text-[11.5px] md:min-h-0";
 
 // Runs launched from the policies stage all reuse this single auto-managed
-// scenario so the Lab's scenario list doesn't fill up with validation runs.
-const VALIDATION_SCENARIO_NAME = "Policy validation (auto)";
+// scenario — the project's validated baseline, found by `scenarios.role`
+// rather than by its name (§4 D227). The Lab pins it read-only and reuses its
+// run; every new Lab scenario is seeded from it.
 
 interface Props {
   projectId: string | null | undefined;
@@ -288,7 +296,7 @@ export function RunValidateStage({
   const { unit: timeUnit } = useTimeUnit(projectId);
   const { user } = useAuth();
   const modelValidation = useModelValidation(projectId);
-  // D219 — running here is "Run Simulations" on this project, as /profile lists it.
+  // D230 — running here is "Run Simulations" on this project, as /profile lists it.
   const projectRights = useProjectRights(projectId);
   const canRun = projectRights.can("simulation_lab");
   const runRefusal = projectRights.loading
@@ -410,7 +418,7 @@ export function RunValidateStage({
   // run panel only appeared after dispatching a fresh run in this session.
   useEffect(() => {
     if (validationScenarioId) return;
-    const scen = scenarios.find((s) => s.name === VALIDATION_SCENARIO_NAME);
+    const scen = findValidationBaseline(scenarios);
     if (scen) setValidationScenarioId(scen.id);
   }, [scenarios, validationScenarioId]);
 
@@ -732,8 +740,17 @@ export function RunValidateStage({
     patch: { replications: number; seed: number; horizon_days: number; primary_kpi: string },
   ): Promise<string | null> => {
     if (!projectId) return null;
-    let scen = scenarios.find((s) => s.name === VALIDATION_SCENARIO_NAME);
-    if (!scen) scen = await createScenario(VALIDATION_SCENARIO_NAME);
+    let scen = findValidationBaseline(scenarios);
+    if (!scen) {
+      try {
+        scen = await createScenario(VALIDATION_SCENARIO_NAME, { role: "validation_baseline" });
+      } catch (e) {
+        // 23505: another tab or session created the baseline first — the partial
+        // unique index allows one per project. Use that one.
+        if ((e as { code?: string }).code !== "23505") throw e;
+        scen = await fetchValidationBaseline(projectId);
+      }
+    }
     if (!scen) return null;
     // Skip the write when nothing changes: a no-op UPDATE still bumps
     // updated_at, which would defeat the §9.2 reuse-or-rerun check (run
@@ -769,95 +786,40 @@ export function RunValidateStage({
     inspection = false,
     forceRerun = false,
   ): Promise<{ runId: string; reused: boolean }> => {
-    const { data, error } = await supabase.functions.invoke("sim-command", {
-      body: {
-        project_id: projectId,
-        scenario_id: scenarioId,
-        kind: "experiment.run",
-        // Runs from this stage always follow a verification pass in which any
-        // warn-level manifest findings were displayed — that is the §8.1
-        // acknowledgment the sim-command gate requires for `recommended` gaps.
-        payload: {
-          policy_version_id: policyVersionId,
-          acknowledge_warnings: true,
-          ...(computeClient ? { compute: "client" } : {}),
-          ...(inspection ? { inspection: true } : {}),
-          ...(forceRerun ? { force_rerun: true } : {}),
-        },
-        client_ts: Date.now(),
-      },
+    if (!projectId) throw new Error("no project selected");
+    const result = await dispatchExperiment({
+      projectId,
+      scenarioId,
+      policyVersionId,
+      // Runs from this stage always follow a verification pass in which any
+      // warn-level manifest findings were displayed — that is the §8.1
+      // acknowledgment the sim-command gate requires for `recommended` gaps.
+      // The Lab asks for the tick instead; the client is shared, the decision is not.
+      acknowledgeWarnings: true,
+      compute: computeClient ? "client" : undefined,
+      inspection,
+      forceRerun,
     });
-    if (!error) {
-      const runId = (data as { run_id?: string } | null)?.run_id;
-      if (!runId) throw new Error("sim-command did not return a run_id");
-      return { runId, reused: false };
+    if (result.queued) {
+      if (!result.runId) throw new Error("sim-command did not return a run_id");
+      return { runId: result.runId, reused: false };
     }
     // Reuse-or-rerun (G17 / §9.2 read-path slice): the dispatcher found a
     // completed run with the identical (policy_hash, graph_hash, scenario
     // fingerprint, seed spec) and answers 409 instead of recomputing. Reuse
     // is ALWAYS the user's choice — never silent.
-    const reuseCtx = (error as { context?: Response }).context;
-    if (reuseCtx?.status === 409 && typeof reuseCtx.json === "function") {
-      let reuseBody: {
-        reuse_candidate?: {
-          run_id: string;
-          ended_at?: string | null;
-          code_version?: string | null;
-          rep_count_done?: number;
-        };
-      } | null = null;
-      try {
-        reuseBody = await reuseCtx.clone().json();
-      } catch {
-        /* fall through to normal error handling */
+    if (result.status === "reuse_available" && result.reuseCandidate) {
+      if (window.confirm(reusePromptText(result.reuseCandidate))) {
+        toast.success("Reusing the stored run — no recompute needed.");
+        return { runId: result.reuseCandidate.run_id, reused: true };
       }
-      const cand = reuseBody?.reuse_candidate;
-      if (cand?.run_id) {
-        const when = cand.ended_at ? new Date(cand.ended_at).toLocaleString() : "earlier";
-        const reuse = window.confirm(
-          `Identical results already exist from ${when} ` +
-            `(${cand.rep_count_done ?? "?"} replication(s), engine ${cand.code_version || "unknown"}).\n\n` +
-            `OK — reuse the stored results (no recompute).\n` +
-            `Cancel — re-run the simulation from scratch.`,
-        );
-        if (reuse) {
-          toast.success("Reusing the stored run — no recompute needed.");
-          return { runId: cand.run_id, reused: true };
-        }
-        return dispatchRun(scenarioId, policyVersionId, computeClient, inspection, true);
-      }
+      return dispatchRun(scenarioId, policyVersionId, computeClient, inspection, true);
     }
-    // Surface the server's actual response instead of supabase-js's generic
-    // "non-2xx" message — a §8.1 gate rejection carries typed findings, and
-    // operational failures carry an error string worth reading.
-    const ctx = (error as { context?: Response }).context;
-    if (ctx && typeof ctx.json === "function") {
-      let body: {
-        error?: unknown;
-        validation?: string;
-        findings?: Array<{ message: string }>;
-      } | null = null;
-      try {
-        body = await ctx.json();
-      } catch {
-        /* non-JSON body — fall through to the status line */
-      }
-      if (body?.validation) {
-        const lines = (body.findings ?? []).slice(0, 4).map((f) => f.message).join(" · ");
-        throw new Error(
-          `run rejected by the required-data gate (${body.validation}): ${lines || "see verification step"}`,
-        );
-      }
-      if (body?.error) {
-        const msg = typeof body.error === "string" ? body.error : JSON.stringify(body.error);
-        throw new Error(`sim-command HTTP ${ctx.status}: ${msg.slice(0, 300)}`);
-      }
-      throw new Error(
-        `sim-command HTTP ${ctx.status} — check the function logs in the Supabase dashboard ` +
-        `(a 503 boot error means a stale/broken function version is deployed)`,
-      );
-    }
-    throw error;
+    // A §8.1 gate rejection carries typed findings; name the first few.
+    const lines = (result.findings ?? []).slice(0, 4).map((f) => f.message).join(" · ");
+    throw new Error(
+      `run rejected by the required-data gate (${result.status}): ${lines || "see verification step"}`,
+    );
   };
 
   /** The dataset the serverless engine needs — exactly the rows the hooks
@@ -1176,7 +1138,7 @@ export function RunValidateStage({
     const days = Math.round(weeks * 7);
     setWarmCfg((c) => ({ ...c, warmup_days: days }));
     setWarmupComputed(true);
-    toast.success(`Warm-up via ${label}: week ${weeks} (${days} days) — from ${doneReps.length} replication(s).`);
+    toast.success(`Warm-up via ${label}: week ${weeks} — from ${doneReps.length} replication(s).`);
   };
 
   const onIndicatorFile = async (id: KpiId, file: File | null) => {
@@ -1336,7 +1298,7 @@ export function RunValidateStage({
         : { text: "no run yet" };
     if (i === 2)
       return warmupComputed && warmCfg.warmup_days > 0
-        ? { text: `${warmCfg.warmup_days} days · ${warmCfg.method}` }
+        ? { text: `${formatDuration(warmCfg.warmup_days)} · ${warmCfg.method}` }
         : { text: "not detected", blocked: hasRealData };
     if (i === 3)
       return validationResult
@@ -1596,12 +1558,13 @@ export function RunValidateStage({
                       onChange={(e) => setSingleCfg((c) => ({ ...c, seed: parseInt(e.target.value, 10) || 1 }))}
                     />
                   </Field>
-                  <Field label="Horizon (days)">
-                    <Input
-                      type="number"
-                      className="h-6 w-[94px] text-right font-mono text-[11.5px] tabular-nums"
-                      value={singleCfg.horizon_days}
-                      onChange={(e) => setSingleCfg((c) => ({ ...c, horizon_days: parseInt(e.target.value, 10) || 1 }))}
+                  <Field label="Horizon (weeks)">
+                    <WeeksInput
+                      ariaLabel="Horizon in weeks"
+                      className={WEEKS_FIELD}
+                      days={singleCfg.horizon_days}
+                      min={1}
+                      onDays={(d) => setSingleCfg((c) => ({ ...c, horizon_days: d }))}
                     />
                   </Field>
                   {/* Inspection mode (G17/§9.5.1 — W3): opt-in per-item evidence
@@ -1660,12 +1623,13 @@ export function RunValidateStage({
                         )}
                       </div>
                     </Field>
-                    <Field label="Simulation time (days)">
-                      <Input
-                        type="number"
-                        className="h-6 w-[94px] text-right font-mono text-[11.5px] tabular-nums"
-                        value={multiCfg.horizon_days}
-                        onChange={(e) => setMultiCfg((c) => ({ ...c, horizon_days: parseInt(e.target.value, 10) || 1 }))}
+                    <Field label="Simulation time (weeks)">
+                      <WeeksInput
+                        ariaLabel="Simulation time in weeks"
+                        className={WEEKS_FIELD}
+                        days={multiCfg.horizon_days}
+                        min={1}
+                        onDays={(d) => setMultiCfg((c) => ({ ...c, horizon_days: d }))}
                       />
                     </Field>
                     <Field label="Confidence">
@@ -1887,12 +1851,12 @@ export function RunValidateStage({
                       ]}
                     />
                   </Field>
-                  <Field label="Warm-up (days)">
-                    <Input
-                      type="number"
-                      className="h-6 w-[94px] text-right font-mono text-[11.5px] tabular-nums"
-                      value={warmCfg.warmup_days}
-                      onChange={(e) => setWarmCfg((c) => ({ ...c, warmup_days: parseInt(e.target.value, 10) || 0 }))}
+                  <Field label="Warm-up (weeks)">
+                    <WeeksInput
+                      ariaLabel="Warm-up in weeks"
+                      className={WEEKS_FIELD}
+                      days={warmCfg.warmup_days}
+                      onDays={(d) => setWarmCfg((c) => ({ ...c, warmup_days: d }))}
                     />
                   </Field>
                   <Button
@@ -1908,7 +1872,7 @@ export function RunValidateStage({
                   <div className="mt-1 flex flex-col gap-2.5">
                     <div className={cn(SURFACE, "flex flex-wrap items-center gap-2.5 px-2.5 py-1.5")}>
                       <span className={KX_TIGHT}>Detected warm-up</span>
-                      <span className="font-mono text-[11.5px] font-medium">{warmCfg.warmup_days} days</span>
+                      <span className="font-mono text-[11.5px] font-medium">{formatDuration(warmCfg.warmup_days)}</span>
                       <span className="font-mono text-[11px] text-muted-foreground">
                         method <b className="font-medium text-foreground">{warmCfg.method}</b> · reps{" "}
                         <b className="font-medium text-foreground">{doneReps.length}</b>
@@ -1945,7 +1909,7 @@ export function RunValidateStage({
           <StepShell
             index={3}
             title="Validation"
-            sub={`t > ${warmCfg.warmup_days}d · KS + Welch t`}
+            sub={`t > ${formatDuration(warmCfg.warmup_days)} · KS + Welch t`}
             action={
               <Button
                 size="sm"
@@ -2293,7 +2257,7 @@ function AdoptStep({
             label="Warm-up"
             detail={
               warmupComputed && warmCfg.warmup_days > 0
-                ? `${warmCfg.warmup_days} days (${warmCfg.method})`
+                ? `${formatDuration(warmCfg.warmup_days)} (${warmCfg.method})`
                 : "detect the warm-up first (step 3)"
             }
           />

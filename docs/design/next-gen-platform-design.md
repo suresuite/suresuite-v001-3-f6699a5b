@@ -32,7 +32,7 @@ Section map against the design brief:
 
 Companion descriptive document: `docs/design/platform-architecture-report.md` — the platform described *as built* from technical and supply-chain-management viewpoints, framed as a scientific report skeleton. This blueprint stays normative (what to build and why); the report is descriptive (what exists and how to present it).
 
-Companion documents: `docs/data-simulation-mapping.md` (current field-mapping contract), `docs/simulation-data-lifecycle.md` (current state tiers), `docs/design/ai-agents.md` (authoritative AI-agent design — supersedes the §12 roster sketch), `scsim/docs/architecture.md`, `scsim/docs/roadmap.md`, `scsim/docs/stress-tests.md`, `scsim/docs/synergy.md`, `scsim/docs/adr/0001-mts-fulfillment-mode.md`, `docs/design/open-access-release-plan.md` (open-access release of the scsim library and stress-test framework — ACCURATE result).
+Companion documents: `docs/data-simulation-mapping.md` (current field-mapping contract), `docs/simulation-data-lifecycle.md` (current state tiers), `docs/design/ai-agents.md` (authoritative AI-agent design — supersedes the §12 roster sketch), `scsim/docs/architecture.md`, `scsim/docs/roadmap.md`, `scsim/docs/stress-tests.md`, `scsim/docs/synergy.md`, `scsim/docs/adr/0001-mts-fulfillment-mode.md`, `docs/design/open-access-release-plan.md` (open-access release of the network-analysis, simulation, stress-test and surrogate methods — developed in part within ACCURATE).
 
 **Working agreement.** This document governs all platform work: before starting a task, locate it in the gap catalog (§2.3) and roadmap (§13); commits and PRs reference the section, gap, and phase they serve (e.g. `Phase A / G4 / §8.3`). If implementation must deviate from this blueprint, the blueprint is updated **in the same PR** — the document and the code move together and this file is never allowed to go stale. The same rules are stated for tooling sessions in the repository-root `CLAUDE.md`.
 
@@ -690,6 +690,14 @@ Two runs are *comparable* iff they are CRN-paired (same seed spec) and their Run
 > engine versions each block the table and name the reason instead. The paired *statistics* remain
 > Phase C: the pane reports the stored aggregates, their 95% CI half-widths, and whether the
 > intervals separate — not yet a paired-t over the CRN-matched replication pairs.
+>
+> **WP 9.4 (2026-09-30): the disruption-impact component was missing.** The predicate compared
+> `policy_version_id` and the stamped `scenario_hash` only — and that hash is the card's baseline
+> fingerprint, which EXCLUDES the disruption schedule (B0 §2.3). So the one comparison a stress
+> test exists for — the validated baseline against the same model under a disruption — read
+> "nothing to compare". The rule (`src/lib/sim/comparability.ts`) now has three components —
+> policies, world, and the run's stamped disruption schedule — reads the seed from the run rather
+> than the live scenario, and the pane picks the validated baseline as A by default (PLAN.md §4 D221).
 
 ### 9.4 Worker orchestration
 
@@ -892,6 +900,8 @@ rank_criticality job
 
 Triggers: on-demand (analyst), scheduled (quarterly stress review, annual supplier-panel refresh), event-driven (new `dataset_version`). Every stage is idempotent and resumable because every intermediate is content-addressed — a crashed job re-runs only missing cells.
 
+**Where it surfaces (placeholder shipped, WP 9.4).** In the product this job is named **"Surrogate model: nexus node detection"** — the nodes it ranks highest are the network's nexus nodes, the ones whose loss hurts most. Its entry point sits in the Simulation Lab's left column, directly below *Stress-test experiments*, because a stress test is the question and the ranking is what decides which stress tests are worth simulating. Until Phase D lands it is a non-interactive "coming soon" card (`src/components/sim/SurrogateCard.tsx`) that prints no figure, per the A3 honest-catalog rule: a placeholder ranking would be an invented number on the surface that chooses what to simulate. It is distinct from the network pages' existing "Nexus node prediction" panel (`MLPrediction.tsx`, the `predict-critical-nodes` function), which is not this job and carries none of §11.4's validity scoping; reconciling the two is part of Phase D.
+
 ### 11.6 Storage concepts (summary)
 
 New conceptual stores introduced by §§8–11, all following the established immutable-snapshot-plus-hash pattern (A5) — concept-level only, no DDL here:
@@ -1088,7 +1098,7 @@ first slice of G10/§9.2.
 - **Exit:** a full ST-1 battery over a reference network runs sharded, cache-aware, and a repeat run costs near-zero compute. **Closes:** G8, G9, G10; G11 substantially.
 
 ### Phase D — AI-native
-- Surrogate pipeline + `surrogate_models` registry + `rank_criticality` analysis job with dual-gate fallback (§11).
+- Surrogate pipeline + `surrogate_models` registry + `rank_criticality` analysis job with dual-gate fallback (§11). Surfaces as "Surrogate model: nexus node detection" in the Simulation Lab, where a placeholder card already stands (§11.5).
 - Drift-triggered retraining; provenance-labeled rankings in the UI.
 - LLM assist (flagged): the five-agent roster completed (§12, per `docs/design/ai-agents.md` Stages 4–5) — B4 Experiment Designer and B5 Explainer join B1–B3 landed with their rooms in Phases B/C; golden agent-task suites in CI.
 - Legacy engine removal (gate E4).
@@ -1143,7 +1153,7 @@ value; experiment/surrogate endpoints follow their capabilities (Phases C/D).
 3. **Warehouse echelon math:** how does the DC echelon interact with the single-plant Part-III formulation — extension or second model class?
 4. **Surrogate sharing:** are surrogates strictly per-project, or shareable across projects with compatible feature specs (data governance implications)?
 5. **Sub-weekly tick:** is there ever a business case that justifies breaking the weekly fidelity boundary, or do sub-weekly questions belong to a different tool class?
-6. **Open-access release of the engine:** `scsim` (simulation library + stress-test framework) is an ACCURATE result to be published as open access, while the full platform stays part of the PhD thesis and all rights reserved. Governing rule: the public library is cut from `scsim/` and the platform pins the released version — one engine, never a fork (§3). Licence, rights holder and release boundary are open decisions L1–L6 in `docs/design/open-access-release-plan.md`; the surrogate method (§11) follows the same rule once built.
+6. **Open-access release of the engine:** the core algorithms — supply chain network analysis, `scsim` (simulation library + stress-test framework) and the surrogate models for stress testing — were developed in part within ACCURATE and are to be published as open access (code under an OSI-approved licence, publications and documentation under CC BY 4.0), while the full platform stays part of the PhD thesis (cooperative doctorate, HWR Berlin & TU Berlin) and all rights reserved. Governing rule: the public library is cut from `scsim/` and the platform pins the released version — one engine, never a fork (§3). Licence, rights holder and release boundary are open decisions L1–L6 in `docs/design/open-access-release-plan.md`; the surrogate method (§11) follows the same rule once built.
 
 ---
 

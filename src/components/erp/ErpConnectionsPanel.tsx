@@ -24,7 +24,7 @@ const STATUS_META = {
   revoked: { dot: "bg-red-500", label: "Disconnected" },
 } as const;
 
-/** D219 — connecting, syncing and applying write the project's inputs: shown to whoever
+/** D230 — connecting, syncing and applying write the project's inputs: shown to whoever
  *  holds "Edit Input Data" there, as /profile lists it, and to nobody else. */
 export function ErpConnectionsPanelForEditors({ projectId, modelerId }: { projectId: string; modelerId: string | null }) {
   const rights = useProjectRights(projectId, { modelerId });

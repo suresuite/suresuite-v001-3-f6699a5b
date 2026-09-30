@@ -1,6 +1,6 @@
 /**
- * D219 — a person's rights on a project, as the app applies them. The database states
- * them once (`project_rights_for_user`, `rehearsal/530`); this pins the two things the
+ * D230 — a person's rights on a project, as the app applies them. The database states
+ * them once (`project_rights_for_user`, `rehearsal/550`); this pins the two things the
  * browser authors about them: the keys the gates ask for are the keys the function
  * returns, and the words a refused button or a misleading tick owes its reader.
  */
@@ -16,7 +16,7 @@ import {
 } from '../projectRights';
 
 const root = path.resolve(__dirname, '../../../..');
-const sql = readFileSync(path.join(root, 'supabase/migrations/20260930000013_project_rights_one_answer.sql'), 'utf8');
+const sql = readFileSync(path.join(root, 'supabase/migrations/20261001000003_project_rights_one_answer.sql'), 'utf8');
 const seed = readFileSync(path.join(root, 'supabase/migrations/20260915000005_project_membership_and_delegation.sql'), 'utf8');
 
 const rights = (over: Partial<ProjectRights> = {}): ProjectRights => ({
@@ -25,7 +25,7 @@ const rights = (over: Partial<ProjectRights> = {}): ProjectRights => ({
   ...over,
 });
 
-describe('D219 · the keys', () => {
+describe('D230 · the keys', () => {
   it('names exactly the capabilities the project layer seeds', () => {
     const seeded = new Set([...seed.matchAll(/\('viewer',\s*'([a-z_]+)'/g)].map((m) => m[1]));
     expect([...seeded].sort()).toEqual(Object.keys(PROJECT_RIGHT_LABELS).sort());
@@ -39,7 +39,7 @@ describe('D219 · the keys', () => {
   });
 });
 
-describe('D219 · why a right is not held', () => {
+describe('D230 · why a right is not held', () => {
   it('is silent when it is held', () => {
     expect(projectRightRefusal('export', rights({ capabilities: { export: true } }))).toBeNull();
   });
@@ -59,7 +59,7 @@ describe('D219 · why a right is not held', () => {
   });
 });
 
-describe('D219 · what a row of ticks owes its reader', () => {
+describe('D230 · what a row of ticks owes its reader', () => {
   it('says a suspended account holds nothing, and nothing else', () => {
     expect(projectRightsNotes({ account_active: false, capabilities: {}, resolved_capabilities: { data_edit_inputs: true } }))
       .toEqual(['Suspended: cannot sign in, so holds none of these rights until reactivated.']);

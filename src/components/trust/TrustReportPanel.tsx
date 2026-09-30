@@ -29,7 +29,7 @@ interface Props {
 
 export function TrustReportPanel({ projectId, projectName, findings }: Props) {
   const { freshness, error, loading } = useProjectFreshness(projectId);
-  // D219 — the JSON download is an export: "Export" on this project.
+  // D230 — the JSON download is an export: "Export" on this project.
   const rights = useProjectRights(projectId);
   const canExport = rights.can("export");
   const exportRefusal = rights.refusal("export");

@@ -1,0 +1,80 @@
+# AUTHORED — the data contract's sidecar for `docs_section_releases`.
+table: docs_section_releases
+tier: G
+schema_name: public
+grain: >-
+  One section of the /docs manual and who may read it. A row per registry section
+  KEY; a section with no row is read as confidential by the database and the client
+  alike, so a section added later is closed until a super admin opens it.
+owner: platform
+
+natural_key_unique:
+  - source: column PRIMARY KEY
+    columns: [section_key]
+    name: docs_section_releases_pkey
+
+governance:
+  read: null
+  write: super_admin
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    Read is open to anon and authenticated — the /docs gate needs it BEFORE sign-in
+    to know whether a public section may render, and a row says only which sections
+    are open, whose titles are already in the bundle. There is no write policy; the
+    one writer is `admin_set_docs_section_audience`, which asserts an active super
+    admin and writes an `admin_audit_logs` row naming them. `audited: false` means no
+    data-plane trigger, which this tier-G table does not carry; the admin audit row
+    is the record. What an audience protects is presentation, not secrecy: page
+    bodies are compiled into the app bundle (PLAN.md §6.5).
+
+fields:
+  section_key:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      The registry's stable section key (`DocGroup.key` in `src/components/docs/registry.ts`), not §6.3's section number, so renumbering a section cannot hand its audience to another. CHECK-constrained to a lowercase slug shape; the key SET is the registry's, and `docsRelease.test.ts` compares the seed against it.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: lowercase slug}
+    surfaces: []
+    resolution: null
+  audience:
+    type: text
+    unit: null
+    unit_source: none
+    meaning: >-
+      `public` (anyone, signed in or not), `internal` (any signed-in account) or `confidential` (super admins and accounts holding the `docs_confidential` capability). CHECK-constrained; no DEFAULT, so a row always states its audience.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "public, internal or confidential"}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: timestamp with time zone
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the audience last changed. Server-stamped by the writer.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_by:
+    type: uuid
+    unit: null
+    unit_source: none
+    meaning: >-
+      The super admin who last changed it. NULL for the seeded rows and after that account is deleted.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

@@ -35,8 +35,19 @@ import { fetchProjectLanes } from "@/lib/policies/projectLanes";
 import { useAuth } from "@/hooks/useAuth";
 import { PreRunValidationPanel } from "@/components/sim/PreRunValidationPanel";
 import { CapacityReadinessPanel } from "@/components/sim/CapacityReadiness";
-import { GateBar } from "@/components/sim/RunGate";
-import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
+import { RunCard } from "@/components/sim/RunCard";
+import { SurrogateCard } from "@/components/sim/SurrogateCard";
+import { ReadOnlyFrame } from "@/components/sim/ReadOnlyFrame";
+import {
+  NewScenarioDialog,
+  type NewScenarioRequest,
+  type NewScenarioStart,
+} from "@/components/sim/NewScenarioDialog";
+import { buildScenarioSeed, uniqueName, worldOf } from "@/lib/sim/scenarioSeed";
+import { useValidatedBaseline } from "@/hooks/useValidatedBaseline";
+import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/validationBaseline";
+import { runGateState } from "@/lib/sim/runGate";
+import { reusePromptText } from "@/lib/sim/dispatch";
 import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
 import {
   compileGateFindings,
@@ -101,6 +112,10 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     [scenarios, selectedId],
   );
   const { latestRun, reps, runExperiment, cancelRun, addReps } = useSimulationRun(selectedId);
+  // The validated baseline is Run & Validate's: the Lab shows it and reuses its
+  // run, and never edits or dispatches it (§4 D227).
+  const baselineSelected = isValidationBaseline(selected);
+  const readOnlyReason = baselineSelected ? BASELINE_READONLY_REASON : null;
 
   // ── §8.1 required-data gate, surfaced PRE-dispatch (Phase B0 / G6) ────────
   // Grade the same manifest the sim-command gate grades, client-side through
@@ -150,31 +165,45 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     setAckWarnings(false);
   }, [selectedId, clientFindings]);
 
-  // D219 — the project role decides, as /profile shows it: a Viewer member runs nothing
+  // D230 — the project role decides, as /profile shows it: a Viewer member runs nothing
   // here whatever the account role.
   const projectRights = useProjectRights(projectId);
   const canRunSimulations = projectRights.can("simulation_lab");
   const gateFindings = serverFindings ?? clientFindings;
   const gateBlocks = (gateFindings ?? []).filter((f) => f.severity === "block").length;
   const gateWarns = (gateFindings ?? []).filter((f) => f.severity === "warn").length;
-  const runBlockedReason = !canRunSimulations
-    ? projectRights.loading
+  // ONE gate state for the rail, the Run card and the phone (§4 D147): the
+  // readout, the stage label, the button and its reason are fields of it.
+  const runGate = runGateState({
+    permitted: canRunSimulations,
+    refusal: projectRights.loading
       ? "Checking your rights on this project…"
-      : projectRights.refusal("simulation_lab") ?? "Running simulations isn't enabled for your account. Contact an administrator."
-    : gateBlocks > 0
-      ? "Blocking findings below must be fixed before the run can dispatch"
-      : gateWarns > 0 && !ackWarnings
-      ? "Acknowledge the warnings below to run with engine defaults"
-      : null;
+      : projectRights.refusal("simulation_lab"),
+    isBaseline: baselineSelected,
+    blocks: gateBlocks,
+    warns: gateWarns,
+    acknowledged: ackWarnings,
+    needsSave: policyDirty || !policyVersionId,
+    running: latestRun?.status === "running" || latestRun?.status === "queued",
+  });
+  const runBlockedReason = runGate.reason;
 
   // ── B0b credibility (Phase B0 / G13 / §9.5) ───────────────────────────────
   const cred = useModelValidation(projectId);
   const credibility = cred.resolveScenario(policyVersionId, selected, { dirty: policyDirty });
+  const validated = useValidatedBaseline({ scenarios, cred, policyVersionId, dirty: policyDirty });
+  const [newOpen, setNewOpen] = useState(false);
+  const [newStart, setNewStart] = useState<NewScenarioStart>("baseline");
+  const newName = uniqueName(
+    `Scenario ${scenarios.filter((x) => !isValidationBaseline(x)).length + 1}`,
+    scenarios.map((x) => x.name),
+  );
   // Inheritance on first render of a never-touched scenario under a validated
   // triple (§2.6) — creation-time inheritance happens in onCreate below.
   const inheritTried = useRef(new Set<string>());
   useEffect(() => {
     if (!selected || !policyVersionId || policyDirty) return;
+    if (baselineSelected) return; // Run & Validate owns its settings
     if (selected.inherited_validation_id) return;
     if (selected.warmup_mode !== "auto") return; // hand-set → never override
     if (inheritTried.current.has(selected.id)) return;
@@ -182,7 +211,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     void cred.applyIfValidated(selected, policyVersionId).then((cardId) => {
       if (cardId) toast.message("Warm-up & replications inherited from the model validation.");
     });
-  }, [selected, policyVersionId, policyDirty, cred]);
+  }, [selected, policyVersionId, policyDirty, cred, baselineSelected]);
 
   const dispatchRun = async (versionId: string, forceRerun = false) => {
     if (!projectId || !selected) return;
@@ -202,14 +231,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       // the stored run is surfaced (it is this scenario's newest completed
       // run), on re-run we dispatch again with force_rerun.
       if (result.status === "reuse_available" && result.reuseCandidate) {
-        const c = result.reuseCandidate;
-        const when = c.ended_at ? new Date(c.ended_at).toLocaleString() : "earlier";
-        const reuse = window.confirm(
-          `Identical results already exist from ${when} ` +
-            `(${c.rep_count_done ?? "?"} replication(s), engine ${c.code_version || "unknown"}).\n\n` +
-            `OK — reuse the stored results (no recompute).\n` +
-            `Cancel — re-run the simulation from scratch.`,
-        );
+        const reuse = window.confirm(reusePromptText(result.reuseCandidate));
         if (reuse) {
           toast.success("Reusing the stored run — no recompute needed.");
           setPane("results");
@@ -285,7 +307,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     eventCount: selected?.disruption_schedule?.length ?? 0,
     leverCount: effectiveRecovery.response?.length ?? 0,
     recoveryEnabled: !!effectiveRecovery.enabled,
-    gate: { blocks: gateBlocks, warns: gateWarns, reason: runBlockedReason },
+    gate: runGate,
     run: latestRun && {
       status: latestRun.status,
       rep_count_done: latestRun.rep_count_done,
@@ -295,21 +317,48 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     scenariosWithResults: scenarios.filter((s) => runsByScenario[s.id]).length,
   });
 
-  // The five scenario mutations the aside owns, lifted so both trees dispatch
-  // the identical call. Nothing here is new behaviour — it is the desktop
-  // aside's own handlers, named.
-  const createScenario = async () => {
-    // §2.6: scenarios created under a validated triple inherit the adopted
-    // warm-up + replication count at birth.
-    const s = await create(`Scenario ${scenarios.length + 1}`);
-    if (!s) return;
+  // The scenario mutations the aside owns, lifted so both trees dispatch the
+  // identical call. Every new scenario is seeded from the validated baseline's
+  // world (scenarioSeed.ts, §4 D219), so inheritance can match its card.
+  const inherit = (s: (typeof scenarios)[number]) => {
     inheritTried.current.add(s.id);
     void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty }).then((cardId) => {
       if (cardId) toast.message("Warm-up & replications inherited from the model validation.");
     });
+  };
+  // "+" asks first (WP 9.4 slice 5) instead of creating "Scenario N" on the spot.
+  const createScenario = () => {
+    setNewStart("baseline");
+    setNewOpen(true);
+  };
+  const createFromRequest = async (req: NewScenarioRequest) => {
+    if (req.start === "stress") {
+      const t = STRESS_TESTS.find((p) => p.id === req.presetId);
+      if (t) await launchStress(t.scenario, req);
+      return;
+    }
+    const fromBaseline = req.start === "baseline";
+    const seed = buildScenarioSeed({
+      name: req.name,
+      world: fromBaseline ? validated.world : worldOf(null, null),
+      baseline: fromBaseline ? validated.baseline : null,
+      primary_kpi: req.primary_kpi,
+      horizon_days: req.horizon_days,
+    });
+    const s = await create(req.name, seed);
+    if (!s) return;
+    if (fromBaseline) inherit(s);
     setSelectedId(s.id);
+    setPane("setup");
   };
   const duplicateScenario = async (s: (typeof scenarios)[number]) => {
+    // The baseline's copy button starts a new scenario FROM it — through the
+    // dialog, so the new one is an experiment in the baseline's world.
+    if (isValidationBaseline(s)) {
+      setNewStart("baseline");
+      setNewOpen(true);
+      return;
+    }
     const d = await duplicate(s);
     if (d) setSelectedId(d.id);
   };
@@ -317,7 +366,10 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     await remove(id);
     if (selectedId === id) setSelectedId(null);
   };
-  const launchStress = async (preset: StressTestPreset) => {
+  const launchStress = async (
+    preset: StressTestPreset,
+    opts?: { name?: string; primary_kpi?: string; horizon_days?: number },
+  ) => {
     // §4 D172 — a placeholder target never reaches a scenario. `supplier:primary`
     // is resolved here to the project's top-volume supplier (the same weekly
     // normalization the lane ETL applies), and a project that cannot name one
@@ -350,16 +402,23 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       schedule = resolved.schedule;
       if (resolved.note) description = `${description} ${resolved.note}`;
     }
-    const s = await create(preset.name);
+    const name = opts?.name ?? preset.name;
+    const s = await create(
+      name,
+      buildScenarioSeed({
+        name,
+        world: validated.world,
+        baseline: validated.baseline,
+        description,
+        disruption_schedule: schedule,
+        primary_kpi: opts?.primary_kpi,
+        horizon_days: opts?.horizon_days,
+      }),
+    );
     if (!s) return;
-    await update(s.id, {
-      description,
-      disruption_schedule: schedule,
-    });
     // Stress scenarios share the baseline world (events are excluded from the
     // fingerprint, §2.3) — they inherit too.
-    inheritTried.current.add(s.id);
-    void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty });
+    inherit(s);
     setSelectedId(s.id);
     setPane("recovery");
     toast.success(`Stress test ready: ${preset.name.replace(/^\[Stress\]\s*/, "")}`);
@@ -372,6 +431,39 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const currentVersionLabel = policyVersionId
     ? (policyVersions.find((v) => v.id === policyVersionId)?.label ?? policyVersionId.slice(0, 8))
     : null;
+  const versionText = !policyVersionId
+    ? "No saved model version"
+    : policyDirty
+      ? `Changed since ${currentVersionLabel}`
+      : `Model ${currentVersionLabel}`;
+
+  // What capacity this run will use, and whether it is real (§4 D167) — one
+  // line with details on demand; the same node on desktop and phone (D224).
+  // Beside the gate rather than inside it: a product with no capacity figure is
+  // not a finding, but the number it resolves to is max(2·demand, 1000), chosen
+  // so capacity never binds, and the run has to say so before it is dispatched.
+  // The targets the engine can disrupt besides the plant (disruptionEvents.ts).
+  const supplierIds = useMemo(
+    () => itemMasters.suppliers.map((s) => s.supplier_id).filter(Boolean),
+    [itemMasters.suppliers],
+  );
+  const uncapacitated = useMemo(
+    () =>
+      itemMasters.suppliers
+        .filter((s) => !(Number(s.capacity_per_week) > 0))
+        .map((s) => s.supplier_id),
+    [itemMasters.suppliers],
+  );
+  const capacityLine = (
+    <CapacityReadinessPanel
+      compact
+      products={itemMasters.products}
+      suppliers={itemMasters.suppliers}
+      outbound={itemMasters.lanes.outbound}
+      defaults={policyDefaults}
+      overrides={policyOverrides}
+    />
+  );
 
   // Below md the desktop rail + aside + pane grid is not reflowed, it is
   // replaced: MobileSimulationLab is the phone composition (PAGES.md 14 · 15).
@@ -401,7 +493,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           onLaunchStress={launchStress}
           pane={pane}
           onPane={setPane}
-          onSaveScenario={(patch) => selected && update(selected.id, patch)}
+          onSaveScenario={(patch) => selected && !baselineSelected && update(selected.id, patch)}
           projectRecovery={projectRecovery}
           effectiveRecovery={effectiveRecovery}
           policyVersionLabel={currentVersionLabel}
@@ -414,6 +506,9 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           ackWarnings={ackWarnings}
           onAckWarnings={setAckWarnings}
           runBlockedReason={runBlockedReason}
+          runGate={runGate}
+          capacity={capacityLine}
+          readOnlyReason={readOnlyReason}
           findingsSource={serverFindings ? "gate rejection" : "pre-run check"}
           supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
           latestRun={latestRun}
@@ -425,10 +520,23 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           onAddReps={handleAddReps}
           runsByScenario={runsByScenario}
         />
+        <NewScenarioDialog
+          open={newOpen}
+          onOpenChange={setNewOpen}
+          defaultName={newName}
+          initialStart={newStart}
+          hasBaseline={!!validated.baseline || !!validated.card}
+          world={validated.world}
+          card={validated.card}
+          onCreate={createFromRequest}
+          onBrowseLibrary={() => setLibraryOpen(true)}
+        />
         {projectId && (
           <ScenarioLibraryPanel
             open={libraryOpen}
             projectId={projectId}
+            world={validated.world}
+            baseline={validated.baseline}
             onClose={() => setLibraryOpen(false)}
             onCloned={(id) => {
               setSelectedId(id);
@@ -491,6 +599,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   onToggle={() => setStressOpen((v) => !v)}
                 />
                 {stressOpen ? <StressTestDrawer onLaunch={launchStress} /> : null}
+                <SurrogateCard />
                 <ScenarioList
                   scenarios={scenarios}
                   selectedId={selectedId}
@@ -516,78 +625,56 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                     No scenario selected
                   </div>
                 ) : pane === "setup" ? (
-                  <ScenarioSetupForm
-                    scenario={selected}
-                    projectId={projectId}
-                    onSave={(patch) => update(selected.id, patch)}
-                  />
-                ) : pane === "recovery" ? (
-                  <DisruptionRecoveryPane
-                    scenario={selected}
-                    projectRecovery={projectRecovery}
-                    onSave={(patch) => update(selected.id, patch)}
-                  />
-                ) : pane === "run" ? (
-                  <div className="flex flex-col gap-3">
-                    {/* Model version + the gate, with the blocked reason as
-                        visible text instead of a title attribute. */}
-                    <section className="overflow-hidden rounded-sm border border-[--hair-rule] bg-white">
-                      <div className="flex flex-wrap items-center gap-2 px-3 py-[9px] text-[12.5px] text-[#18181b]">
-                        {policyDirty
-                          ? policyVersionId
-                            ? `Policy settings changed since version "${
-                                policyVersions.find((v) => v.id === policyVersionId)?.label ??
-                                policyVersionId.slice(0, 8)
-                              }"`
-                            : "No saved model version — runs require a saved policy version"
-                          : `Model version: ${
-                              policyVersions.find((v) => v.id === policyVersionId)?.label ??
-                              policyVersionId?.slice(0, 8)
-                            }`}
-                        <CredibilityBadge credibility={credibility} />
-                      </div>
-                      <GateBar
-                        blocks={gateBlocks}
-                        warns={gateWarns}
-                        acknowledged={ackWarnings}
-                        reason={runBlockedReason}
-                        dirty={policyDirty}
-                        onRun={handleRun}
-                        onSaveVersionAndRun={handleSaveVersionAndRun}
-                        onShowFindings={() => setPane("run")}
-                      />
-                    </section>
-                    {/* What capacity this run will use, and whether it is real
-                        (§4 D167). Beside the gate rather than inside it: a
-                        product with no capacity figure is not a finding — the
-                        engine resolves it — but the number it resolves to is
-                        max(2·demand, 1000), chosen so capacity never binds, and
-                        a run that answers "could we have made it" with an
-                        assumed yes has to say so BEFORE it is dispatched. */}
-                    <CapacityReadinessPanel
-                      products={itemMasters.products}
-                      suppliers={itemMasters.suppliers}
-                      outbound={itemMasters.lanes.outbound}
-                      defaults={policyDefaults}
-                      overrides={policyOverrides}
-                    />
-                    <PreRunValidationPanel
+                  <ReadOnlyFrame reason={readOnlyReason}>
+                    <ScenarioSetupForm
+                      scenario={selected}
                       projectId={projectId}
-                      findings={gateFindings}
-                      source={serverFindings ? "gate rejection" : "pre-run check"}
-                      acknowledged={ackWarnings}
-                      onAcknowledgedChange={setAckWarnings}
-                      supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
+                      onSave={(patch) => update(selected.id, patch)}
                     />
-                    <RunProgressPanel
-                      run={latestRun}
-                      reps={reps}
-                      versionLabel={runVersionLabel}
-                      credibility={cred.resolveRun(latestRun)}
-                      onCancel={handleCancel}
-                      onAddReps={handleAddReps}
+                  </ReadOnlyFrame>
+                ) : pane === "recovery" ? (
+                  <ReadOnlyFrame reason={readOnlyReason}>
+                    <DisruptionRecoveryPane
+                      scenario={selected}
+                      projectRecovery={projectRecovery}
+                      onSave={(patch) => update(selected.id, patch)}
+                      supplierIds={supplierIds}
+                      uncapacitated={uncapacitated}
                     />
-                  </div>
+                  </ReadOnlyFrame>
+                ) : pane === "run" ? (
+                  <RunCard
+                    versionText={versionText}
+                    credibility={credibility}
+                    gate={runGate}
+                    warns={gateWarns}
+                    acknowledged={ackWarnings}
+                    onAcknowledgedChange={setAckWarnings}
+                    findingsCount={gateFindings ? gateFindings.length : null}
+                    needsSave={policyDirty || !policyVersionId}
+                    onRun={handleRun}
+                    onSaveVersionAndRun={handleSaveVersionAndRun}
+                    findings={
+                      <PreRunValidationPanel
+                        projectId={projectId}
+                        findings={gateFindings}
+                        source={serverFindings ? "gate rejection" : "pre-run check"}
+                        acknowledged={ackWarnings}
+                        supplierIds={itemMasters.suppliers.map((s) => s.supplier_id)}
+                      />
+                    }
+                    capacity={capacityLine}
+                    progress={
+                      <RunProgressPanel
+                        run={latestRun}
+                        reps={reps}
+                        versionLabel={runVersionLabel}
+                        credibility={cred.resolveRun(latestRun)}
+                        onCancel={handleCancel}
+                        onAddReps={handleAddReps}
+                      />
+                    }
+                  />
                 ) : pane === "results" ? (
                   <ResultsDashboard
                     run={latestRun}
@@ -605,10 +692,23 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
         )}
       </div>
 
+      <NewScenarioDialog
+        open={newOpen}
+        onOpenChange={setNewOpen}
+        defaultName={newName}
+        initialStart={newStart}
+        hasBaseline={!!validated.baseline || !!validated.card}
+        world={validated.world}
+        card={validated.card}
+        onCreate={createFromRequest}
+        onBrowseLibrary={() => setLibraryOpen(true)}
+      />
       {projectId && (
         <ScenarioLibraryPanel
           open={libraryOpen}
           projectId={projectId}
+          world={validated.world}
+          baseline={validated.baseline}
           onClose={() => setLibraryOpen(false)}
           onCloned={(id) => {
             setSelectedId(id);

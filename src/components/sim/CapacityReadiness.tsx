@@ -19,7 +19,7 @@
 // steps from `fallback_spec`, the meaning of a blank from `empty_means`. No
 // order and no threshold is restated on this side.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Gauge } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { reducerLabel } from "@/lib/policies/effectiveEconomics";
@@ -66,6 +66,7 @@ export function CapacityReadinessPanel({
   defaults,
   overrides,
   className,
+  compact = false,
 }: {
   products: ProductRow[];
   suppliers: SupplierRow[];
@@ -73,13 +74,46 @@ export function CapacityReadinessPanel({
   defaults: PolicyBundle;
   overrides: OverrideRow[];
   className?: string;
+  /**
+   * One line, details on demand (WP 9.4 slice 2). The line ALWAYS states how
+   * many products run on an assumed, non-binding capacity — a substitution is
+   * shown at the point of display (T2), collapsed or not.
+   */
+  compact?: boolean;
 }) {
   const r = useMemo(
     () => capacityReadiness({ products, suppliers, outbound, defaults, overrides }),
     [products, suppliers, outbound, defaults, overrides],
   );
+  const [open, setOpen] = useState(false);
   const supplierBlank = emptyMeansFor("suppliers.capacity_per_week");
   if (products.length === 0 && suppliers.length === 0) return null;
+
+  if (compact && !open) {
+    const real = r.fromMaster.length + r.fromPolicy.length;
+    return (
+      <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 rounded-sm border border-[--hair-rule] bg-white px-3 py-2 text-[12px] text-[#52525b]", className)}>
+        <Gauge className="h-3.5 w-3.5 shrink-0 text-[#71717a]" />
+        <span className="font-medium text-[#18181b]">Capacity</span>
+        <span className="tabular-nums">{real} set</span>
+        {r.nonBinding.length > 0 ? (
+          <span className="tabular-nums text-[#9a6206]">
+            {r.nonBinding.length} assumed, cannot bind
+          </span>
+        ) : null}
+        <span className="tabular-nums">
+          {r.finiteSuppliers.length} finite · {r.unlimitedSuppliers.length} unlimited suppliers
+        </span>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="ml-auto inline-flex min-h-11 items-center underline-offset-2 hover:text-[#18181b] hover:underline md:min-h-0"
+        >
+          details
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("rounded-md border bg-card", className)}>
@@ -87,6 +121,15 @@ export function CapacityReadinessPanel({
         <Gauge className="h-3.5 w-3.5 text-primary" />
         <span className="text-xs font-semibold">Capacity this run will use</span>
         <span className="text-[10px] text-muted-foreground">before dispatch</span>
+        {compact ? (
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="ml-auto inline-flex min-h-11 items-center text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline md:min-h-0"
+          >
+            hide
+          </button>
+        ) : null}
       </div>
       <div className="px-3 py-2">
         <Line

@@ -23,7 +23,8 @@
 // an entry with no reason, and on an entry for a page that is no longer short,
 // so the list cannot quietly become a place where thin pages go to be forgiven.
 //
-// It is empty today. That is the strongest statement the list can make.
+// It held nothing until the Q&A page, whose words are rows in `docs_faq` and so
+// never reach a static render — the only kind this test can make.
 
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
@@ -40,7 +41,10 @@ const FLOOR = 500;
  * An entry whose page is ABOVE the floor fails — a stale excuse is worse than
  * none, because it reads as a standing permission.
  */
-const SHORT_BY_SUBJECT: Record<string, string> = {};
+const SHORT_BY_SUBJECT: Record<string, string> = {
+  questions:
+    "Its content is the Q&A list, served from the database by docs_list_faq after mount and filtered by who is reading; a static render sees only the frame around it.",
+};
 
 function words(slug: string): number {
   const html = renderToStaticMarkup(

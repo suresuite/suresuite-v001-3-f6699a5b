@@ -1,4 +1,4 @@
--- Profile / §4 D219 — a person's rights on a project are ONE answer, and it is the answer the
+-- Profile / §4 D230 — a person's rights on a project are ONE answer, and it is the answer the
 -- app acts on.
 --
 -- ── WHAT WAS WRONG ───────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ BEGIN
     'resolved_capabilities', v_resolved);
 END; $$;
 COMMENT ON FUNCTION public.project_rights_for_user(uuid, uuid) IS
-  'D219 — one person''s rights on one project, as the app applies them: visible, '
+  'D230 — one person''s rights on one project, as the app applies them: visible, '
   'can_edit_project, may_land_uploads, capabilities (the resolver''s project answer, refused '
   'to a suspended account, and data_edit_inputs also requiring the upload gate) and '
   'resolved_capabilities (the resolver before those gates). Internal: project_access_read, '
@@ -140,7 +140,7 @@ BEGIN
                                       WHERE p.id = p_project_id AND p.modeler_id = v_uid));
 END; $$;
 COMMENT ON FUNCTION public.get_my_project_rights(uuid, uuid) IS
-  'D219 — the signed-in account''s rights on one project (project_rights_for_user), for the '
+  'D230 — the signed-in account''s rights on one project (project_rights_for_user), for the '
   'browser''s gates on /simulation-lab, /policies, /project-manager and the export buttons. '
   'Authorized as get_my_project_access: its active organization''s project, one it holds an '
   'effective role on, or any for a super admin. The user is a parameter because the browser '
@@ -217,7 +217,7 @@ BEGIN
       -- D217 — the account's DEFAULT organization (D216), wherever it is; NULL when none.
       'default_org_id',      dm.org_id,
       'default_org_name',    dmo.name,
-      -- D219 — the rights are `project_rights_for_user`'s, the answer the app's gates read.
+      -- D230 — the rights are `project_rights_for_user`'s, the answer the app's gates read.
       'visible',             (u.rights ->> 'visible')::boolean,
       'can_edit_project',    (u.rights ->> 'can_edit_project')::boolean,
       'may_land_uploads',    (u.rights ->> 'may_land_uploads')::boolean,
@@ -238,7 +238,7 @@ BEGIN
            WHERE dg.grantee_user_id = u.id AND dg.project_id = v_project.id
              AND dg.revoked_at IS NULL AND dg.expires_at > now()), '[]'::jsonb),
       'effective_role',      u.eff,
-      -- What the person may do (D219), and what the resolver's four layers alone would say.
+      -- What the person may do (D230), and what the resolver's four layers alone would say.
       'capabilities',          u.rights -> 'capabilities',
       'resolved_capabilities', u.rights -> 'resolved_capabilities'
     ) AS j
@@ -262,9 +262,9 @@ BEGIN
     'role_matrix',         v_matrix);
 END; $$;
 COMMENT ON FUNCTION public.project_access_read(uuid) IS
-  'D215, D217, D219 — who is on a project and what each may do there: every account that owns it, '
+  'D215, D217, D230 — who is on a project and what each may do there: every account that owns it, '
   'holds a membership or live delegation on it, or belongs to its organization, with where the '
-  'access comes from, the effective project role, the rights project_rights_for_user gives (D219) and the '
+  'access comes from, the effective project role, the rights project_rights_for_user gives (D230) and the '
   'account''s default organization. Internal and unauthorized: admin_get_project_access and '
   'get_my_project_access decide who may read it; no role may call it directly.';
 REVOKE ALL ON FUNCTION public.project_access_read(uuid) FROM PUBLIC, anon, authenticated;
@@ -346,7 +346,7 @@ BEGIN
       'in_member_org',     p.organization_id IN (SELECT org_id FROM my_orgs),
       'is_modeler',        p.modeler_id = v_user.id,
       'owner_name',        COALESCE(ow.name, ow.email),
-      -- D219 — the rights are `project_rights_for_user`'s, the answer the app's gates read.
+      -- D230 — the rights are `project_rights_for_user`'s, the answer the app's gates read.
       'visible',           (r.rights ->> 'visible')::boolean,
       'can_edit_project',  (r.rights ->> 'can_edit_project')::boolean,
       'may_land_uploads',  (r.rights ->> 'may_land_uploads')::boolean,
@@ -367,7 +367,7 @@ BEGIN
            WHERE dg.grantee_user_id = v_user.id AND dg.project_id = p.id
              AND dg.revoked_at IS NULL AND dg.expires_at > now()), '[]'::jsonb),
       'effective_role',    public.effective_project_role(v_user.id, p.id),
-      -- What the account may do (D219), and what the resolver's four layers alone would say.
+      -- What the account may do (D230), and what the resolver's four layers alone would say.
       'capabilities',          r.rights -> 'capabilities',
       'resolved_capabilities', r.rights -> 'resolved_capabilities'
     ) AS j
@@ -392,9 +392,9 @@ BEGIN
     'role_matrix', v_matrix);
 END; $$;
 COMMENT ON FUNCTION public.admin_get_user_memberships(uuid, text, uuid) IS
-  'D211, D216, D219 — /admin/users/:userId''s organization and project read. Active super admin only. '
+  'D211, D216, D230 — /admin/users/:userId''s organization and project read. Active super admin only. '
   'Every organization (which is active, which is the default) and, per project, where access '
   'comes from (active organization, another organization, ownership, membership, delegation), '
-  'the effective project role and the rights project_rights_for_user gives (D219).';
+  'the effective project role and the rights project_rights_for_user gives (D230).';
 
 SELECT pg_notify('pgrst', 'reload schema');

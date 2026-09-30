@@ -4,7 +4,7 @@
 // with its role in each and which one is ACTIVE, and every project it can reach or is
 // recorded on, each with WHERE the access comes from (active organization, another of
 // its organizations, ownership, membership, delegation) and the rights it holds there
-// (`project_rights_for_user`, D219 — the answer the app's own gates read, never computed
+// (`project_rights_for_user`, D230 — the answer the app's own gates read, never computed
 // here a second time). Organization memberships are added and removed through D210's
 // `admin_add_org_member` / `admin_remove_org_member`; the org role and project
 // memberships through D211's verbs. The database refuses changing the project
@@ -42,7 +42,7 @@ interface ProjectAccess {
   organization_id: string | null; organization_name: string | null;
   in_active_org: boolean; in_member_org: boolean; is_modeler: boolean; owner_name: string | null;
   visible: boolean; can_edit_project: boolean;
-  /** D219 — the upload gate, and the role's answer before it and suspension. */
+  /** D230 — the upload gate, and the role's answer before it and suspension. */
   may_land_uploads?: boolean; resolved_capabilities?: Record<string, boolean>;
   member: Member | null; delegations: Delegation[];
   effective_role: string | null; capabilities: Record<string, boolean>;
