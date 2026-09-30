@@ -428,7 +428,7 @@ export default function About() {
       <footer className="border-t border-[--hair-rule]">
         <div className="pb-safe mx-auto flex min-h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] flex-col gap-3 px-6 py-4 text-xs text-muted-foreground md:flex-row md:items-start md:justify-between md:gap-x-8">
           <ResearchNotice />
-          <div className="flex shrink-0 flex-wrap items-center gap-4 whitespace-nowrap">
+          <div className="flex shrink-0 md:ml-auto flex-wrap items-center gap-4 whitespace-nowrap">
             <Link to="/#video" className="hover:text-foreground md:hidden">
               Demo
             </Link>
