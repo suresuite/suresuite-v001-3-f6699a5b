@@ -22,7 +22,7 @@ interface Props {
 }
 
 export function VerifiableExportsSection({ projectId, projectName }: Props) {
-  const { runs, exportDataset, exportRunResults, busy } = useVerifiableExports(
+  const { runs, exportDataset, exportRunResults, busy, canExport, exportRefusal } = useVerifiableExports(
     projectId,
     projectName,
   );
@@ -40,12 +40,15 @@ export function VerifiableExportsSection({ projectId, projectName }: Props) {
         <b>run's results</b> (metadata, per-seed KPIs, weekly series) — together they make a
         model and its results checkable outside the app.
       </p>
+      {!canExport && exportRefusal && (
+        <p className="text-[11px] text-muted-foreground">{exportRefusal}</p>
+      )}
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
           size="sm"
           className="h-7 text-[11px] gap-1"
-          disabled={busy !== null}
+          disabled={busy !== null || !canExport}
           onClick={() => void exportDataset()}
         >
           <Database className="h-3 w-3" />
@@ -71,7 +74,7 @@ export function VerifiableExportsSection({ projectId, projectName }: Props) {
           variant="outline"
           size="sm"
           className="h-7 text-[11px] gap-1"
-          disabled={!runId || busy !== null}
+          disabled={!runId || busy !== null || !canExport}
           onClick={() => void exportRunResults(runId)}
         >
           <FileSpreadsheet className="h-3 w-3" />

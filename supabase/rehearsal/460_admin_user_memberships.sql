@@ -9,7 +9,8 @@
 --   §2 THE READ: the one organization is named, active, with its org role; the projects
 --      are exactly the organization's, the owned one and the cross-organization
 --      membership — no other — each with where access comes from, and the rights are
---      the RESOLVER's (an editor edits inputs, an analyst does not, the owner does).
+--      the RESOLVER's (an editor's role grants inputs and the upload gate refuses them unless it owns
+--      the project or is an app admin — D230; an analyst does not, the owner does).
 --   §3 THE MODELER STAYS AN OWNER: demoting, expiring or removing the modeler's own
 --      membership is refused, and the row is unchanged.
 --   §4 EXPIRY: a past end date is refused; a lapsed membership is listed as expired and
@@ -119,7 +120,10 @@ BEGIN
   IF v_proj -> 'member' ->> 'project_role' IS DISTINCT FROM 'editor' OR v_proj ->> 'effective_role' IS DISTINCT FROM 'editor'
      OR v_proj -> 'member' ->> 'granted_by' IS DISTINCT FROM 'D211 Super'
      OR (v_proj ->> 'visible')::boolean IS NOT TRUE OR (v_proj ->> 'can_edit_project')::boolean IS NOT FALSE
-     OR (v_proj -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT TRUE THEN
+     -- D230: the role grants inputs, the upload gate (owner or app admin) refuses them.
+     OR (v_proj -> 'resolved_capabilities' ->> 'data_edit_inputs')::boolean IS NOT TRUE
+     OR (v_proj ->> 'may_land_uploads')::boolean IS NOT FALSE
+     OR (v_proj -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT FALSE THEN
     RAISE EXCEPTION 'D211/460 §2: the editor membership read as %', v_proj;
   END IF;
 

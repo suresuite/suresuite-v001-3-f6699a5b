@@ -8,7 +8,7 @@ import { HDR_PROJECT_SELECT } from "@/components/shared/headerControls";
 import { cn } from "@/lib/utils";
 import { PAGE_GUTTER } from "@/components/shared/PageBody";
 import { toast } from "sonner";
-import { useCapabilities } from "@/hooks/useCapabilities";
+import { useProjectRights } from "@/hooks/useProjectRights";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
 import { useProjects } from "@/hooks/useProjects";
 import { useScenarios } from "@/hooks/useScenarios";
@@ -165,8 +165,10 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     setAckWarnings(false);
   }, [selectedId, clientFindings]);
 
-  const { canFeature } = useCapabilities();
-  const canRunSimulations = canFeature("simulation_lab");
+  // D230 — the project role decides, as /profile shows it: a Viewer member runs nothing
+  // here whatever the account role.
+  const projectRights = useProjectRights(projectId);
+  const canRunSimulations = projectRights.can("simulation_lab");
   const gateFindings = serverFindings ?? clientFindings;
   const gateBlocks = (gateFindings ?? []).filter((f) => f.severity === "block").length;
   const gateWarns = (gateFindings ?? []).filter((f) => f.severity === "warn").length;
@@ -174,6 +176,9 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   // readout, the stage label, the button and its reason are fields of it.
   const runGate = runGateState({
     permitted: canRunSimulations,
+    refusal: projectRights.loading
+      ? "Checking your rights on this project…"
+      : projectRights.refusal("simulation_lab"),
     isBaseline: baselineSelected,
     blocks: gateBlocks,
     warns: gateWarns,
@@ -211,7 +216,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const dispatchRun = async (versionId: string, forceRerun = false) => {
     if (!projectId || !selected) return;
     if (!canRunSimulations) {
-      toast.error("Running simulations isn't enabled for your account.");
+      toast.error(projectRights.refusal("simulation_lab") ?? "Running simulations isn't enabled for your account.");
       return;
     }
     try {
@@ -274,6 +279,10 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
   const handleAddReps = async (n: number) => {
     if (!projectId || !latestRun) return;
+    if (!canRunSimulations) {
+      toast.error(projectRights.refusal("simulation_lab") ?? "Running simulations isn't enabled for your account.");
+      return;
+    }
     try {
       await addReps(projectId, latestRun.id, n);
       toast.success(`Queued +${n} replications`);

@@ -412,6 +412,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D227** | **The validated baseline was a scenario keyed by its display name.** Run & Validate finds "its" scenario with `scenarios.find(s => s.name === "Policy validation (auto)")`, and the Lab listed that row as an ordinary editable, deletable scenario. A rename orphaned the validation run from its scenario and the next validation created a second one; a Lab edit to it was overwritten by the next validation run without a word | `src/components/policies/RunValidateStage.tsx` (`VALIDATION_SCENARIO_NAME`, `ensureValidationScenario`) | **CLOSED ✅ (`20261001000001`) — WP 9.4 slice 4.** `scenarios.role` (`experiment` / `validation_baseline`, CHECK-constrained), at most one baseline per project by the partial unique index `scenarios_one_validation_baseline`, backfilled by `scenarios_assign_validation_baseline` (an active card's evidence scenario first, then the newest run, then the oldest; never granted to the API roles). Run & Validate selects and inserts by role and re-selects on 23505; the Lab pins the row read-only and never dispatches it. `supabase/rehearsal/530` proves all four, mutation-tested twice. The name survives only as a fallback while the column has not deployed |
 | **D228** | **"Add disruption" on the network pages wrote five things wrong and two tables nothing reads.** The shared dialog (a) wrote `create_disruption_scenario_v2`'s four legacy tables, which no run reads (§4 D48); (b) discarded the user's scenario name — every scenario was `Disruption: node/<id>`; (c) wrote an edge as a node target; (d) stored a time-delay amount as `magnitude_pct`, which the engine reads as a capacity cut; (e) counted `start_day` from TODAY rather than from the run's week 1; (f) never set `from_network`, so the Lab's "from network map" chip could not appear; and it skipped validation inheritance. It offered targets the engine skips (anything but a supplier or the plant) without saying so | `src/components/DisruptionDialog.tsx`; `src/hooks/useScenarios.tsx` (`createFromNode`) | **CLOSED ✅ — WP 9.4 slice 7.** One dialog, `src/components/network/NetworkDisruptionDialog.tsx`, on all three pages: it maps the selected node to the engine's target (a supplier of the project, or the plant by the project's `plant_name`), states the reason when the engine cannot disrupt it and offers the connected suppliers, authors run weeks and "Outage" / "Cut by N%" through `disruptionEvents.ts`, checks the result with the gate's own `scheduleFindings`, and writes ONLY `scenarios.disruption_schedule` — to a new scenario seeded from the validated baseline (`from_network = true`, then inheritance) or to an existing one below the cap. `DisruptionDialog.tsx` (a `@ts-nocheck` file) and `createFromNode` are deleted; `introspectorRejectedStatements.test.ts` now pins that no `src/` file calls `create_disruption_scenario_v2`. Stopping that write is a §16 decision |
 | **D229** | **Who could read the manual was one compile-time flag, and it had two answers: super admins, or everybody.** `DOCS_SUPER_ADMIN_ONLY` put all of /docs behind sign-in and super admin; turning it off opened all eighty pages to anyone, and either change was a deploy. There was no way to release the manual part by part, and no page for common questions. Asked for by the owner: "release phase by phase, part by part, a super admin could use UI to update it … select the category of the section: public — anyone can see it; internal — only signed-in users; confidential — only approved users; section by section", and "a list of questions and prepared answers readers could leverage". | `src/lib/ui/docsVisibility.ts` (`DOCS_SUPER_ADMIN_ONLY`, `DOCS_PUBLIC_ENTRY_POINTS`, `canReadDocs`); `src/hooks/useCapabilities.tsx` (`canAccessPage` → `canReadDocs(is_super_admin)`); `src/App.tsx` (`DocsGate`) | **CLOSED ✅ (`20261001000002`).** `docs_section_releases` holds one audience per registry section KEY (`DocGroup.key`, never the §6.3 number, so a renumbering cannot hand an audience to another section): `public`, `internal` (any signed-in account) or `confidential`. Every account that can sign in is an approved user, so "approved" is not a separate set — CONFIDENTIAL is the `docs_confidential` feature capability, seeded super_admin-only and grantable per role, organization or user on the existing capability screens. Every section is seeded confidential and a missing row reads as confidential on both sides, so the deploy changes nothing. The one writer is `admin_set_docs_section_audience` (active super admin, `docs.section_audience` audit row, a no-op writes nothing). The client rule is ONE function, `canReadDocsPath`, reached through `canAccessPage` before the signed-in check, so the route gate, the sidebar, the drawer and the manual's nav, search, pager, related links and front door agree; a page in a closed section says so and names what to do, and unreadable releases fail closed. The public site's Docs links follow "any section is public" (`docs.anyPublic`) instead of `DOCS_PUBLIC_ENTRY_POINTS`. Section 16, **Questions & answers** (`/docs/questions`): `docs_faq`, RLS on and NO policy, read only through `docs_list_faq(p_user_id)`, which applies the Q&A section's audience AND that of the section each answer is about, and hides drafts; written from /admin/docs through `admin_save_docs_faq` / `admin_delete_docs_faq`, each audited. Fourteen prepared answers are seeded, each linking to the page that owns its fact rather than restating it. `rehearsal/540` §1–§6; mutation-tested (the audience rank flattened turns §4 red). NOT closed, stated: page bodies are compiled into the bundle, so an audience controls what is SHOWN, not what can be downloaded — only the Q&A answers are withheld by the database; the reader id is D28's client assertion; `check:docs` cannot see an answer's text, so an answer that restates a fact can drift — the admin screen says to link instead; `docs_section_releases` joins the pinned unconditional-policy list on purpose (its rows name sections, not tenant data) |
+| **D230** | **/profile, /admin/projects and /admin/users/:userId showed each person's rights on a project, and four of the six were not the rights the app applied.** The four capability ticks were the two-argument resolver's answer (`capabilities_for_user(user, project)`, the project role layer), and nothing the app does read that answer except `record_export` behind one button: the browser's gates read `get_my_capabilities(user)` — the one-argument resolver, no project layer — so /simulation-lab's run button followed the ACCOUNT role and a Viewer member whose account is a modeler could run; `data_edit_inputs` and `data_edit_policies` were read by nothing, so every /policies write and every item-master save was open to anyone who could open the page; six other export buttons checked nothing; uploads land through `ingest_land_file`, whose gate is `has_project_access` (the project's owner or an app `admin`), so an Editor member who is neither was shown "Edit Input Data" and could not upload; and a suspended account, which cannot sign in (D205), was shown every right its role carries. Reported by the owner on /profile for Project TRON's Viewer members: "please carefully check and ensure that the rights are correctly reflected and align with the real right of the user" | `supabase/migrations/20260930000011_my_organization_access.sql` (`project_access_read`: `capabilities_for_user(u.id, project)`); `supabase/migrations/20260930000009_account_default_organization.sql` (`admin_get_user_memberships`, the same); `supabase/migrations/20260711000002_unified_access_control.sql` (`get_my_capabilities`, one argument); `src/hooks/useCapabilities.tsx`; `src/pages/SimulationLab.tsx` (`canFeature("simulation_lab")`) | **CLOSED ✅ (`20261001000003`), browser-side, by the owner's choice to make the app obey what the pages show.** `project_rights_for_user(user, project)` is the ONE statement of a person's rights on a project: `visible` and `can_edit_project` as D211 computed them; `capabilities` = the resolver's project answer, refused to a suspended account, with `data_edit_inputs` ALSO requiring the upload gate (`may_land_uploads`, `has_project_access`'s predicate); and `resolved_capabilities`, the resolver before those gates, so a page can say WHY a role's right does not hold. `project_access_read` and `admin_get_user_memberships` read it, and `get_my_project_rights(project, user)` (authorized as `get_my_project_access`) gives the signed-in account the same answer for `useProjectRights`, which every gate now reads: Run Simulations on /simulation-lab (run, add replications) and /policies' Run & Validate (run single, run replications, add replications); Edit Policies on every `usePolicies` write (a policy version may also be saved with Run Simulations, because a run binds to one) and the stage workbook import, with a "View only" line on /policies; Edit Input Data on item-master saves, supplier assignment, and /project-manager's upload, item master, combine, node-list generation and ERP panel; Export on the stage workbook, the policy-version, dataset and run-results workbooks, the trust-report JSON and the node-list CSV; "Edits project settings" on /project-manager's Edit project. The rows say why where a tick would mislead (`projectRightsNotes`: suspended; role allows inputs, upload gate refuses) and /profile's account-wide Features list says the four follow the project role. `rehearsal/550` §1–§5, and §4 asserts the gate, /profile and /admin/users read the same six values for every active person; `460` §2 and `490` §3 now expect an Editor who neither owns the project nor is an app admin to hold `data_edit_inputs` = false with `resolved_capabilities` true. NOT closed, stated: the SERVER gates are unchanged — `sim-command`, the policy RPCs, the item-master RPCs and `assign_material_supplier` still check no project role (D28's asserted actor, D66's two predicates), so this binds the product, not a client that ignores it; the upload gate is still owner-or-admin, so the Editor role grants input editing only to an owner or app admin, which the pages now say instead of hiding; scenario editing, report-file downloads and deleting a project are not among the six rights and are unchanged; an organization whose access period has ended is not folded in (its members are switched away at sign-in, D210); when `get_my_project_rights` cannot be READ (not deployed yet, network) the gates fall back, declared in `useProjectRights`, to the account-wide rule they applied before — a refusal is never a fallback |
 
 ### 4.1 Code map — the data layer
 
@@ -20495,6 +20496,75 @@ Flattening the audience rank (`internal` ranked as `public`) turns `540` red at 
 1 319 of 1 319; `contract:check` clean; `typecheck` 17 of 17 held; `audit:ui` 0 new; eslint 407
 problems before and after, none in the files this entry adds. Nothing reaches production until
 merge; any §15 reading belongs in the push after it (D153).
+
+### Profile · a person's rights on a project are one answer, and the app applies it · 2026-10-01 · `20261001000003`
+
+**Asked for.** "Please carefully check and ensure that the rights are correctly reflected and
+align with the real right of the user" — on /profile's My organization tab, where Project
+TRON's Viewer members showed every right refused.
+
+**Promised versus found.** D217 said every right on the tab is "the database's answer" and
+D215 that /admin/projects shows "the RESOLVER's project capabilities". Both were true of the
+READ and false of the product: the resolver's project layer (WP 2.2) was read by the pages and
+by `record_export`, and by nothing else — the browser's gates read the one-argument resolver,
+two of the four capabilities were read by nothing, and the upload gate is a third predicate the
+pages never showed (D230). The ticks for a Viewer member were right about the ROLE and wrong
+about the app, in the direction of claiming less than the app allowed.
+
+**Decisions.** (1) Asked, the owner chose to make the app obey the pages rather than the pages
+describe the app, browser-side, leaving the server gates as they are. (2) ONE function states
+the rights and every reader takes it — the pages AND the gates — so "the page says X, the button
+does Y" cannot recur without changing the one answer. (3) The upload gate is folded into "Edit
+Input Data" rather than widened to Editors: widening `has_project_access` touches RLS on the
+ingest and ERP tables, which is D66's question, not this one; the pages instead say where a
+role's right does not hold. (4) A suspended account holds nothing; the role it would have is
+kept in `resolved_capabilities` so an administrator still sees it. (5) Saving a policy version
+is allowed with Run Simulations as well as Edit Policies, because a run binds to a version and
+refusing it would refuse the run. (6) Seeding overrides from project data is refused SILENTLY
+without Edit Policies — nobody asked for that write, so a Viewer opening /policies is not shown
+an error for it — and the automatic seed WAITS for the rights before marking its stage done:
+the first draft marked it while the rights were still loading, so an owner's grid would never
+have seeded that session, and a manual "Apply prefill" by a Viewer reported success for a write
+that never happened. Found by re-reading the diff, not by a test. (7) One declared fallback: a read that FAILS falls back to the pre-D230
+account-wide rule, so deploy order (the frontend before the migration) does not lock every
+account out; a read that REFUSES grants nothing.
+
+**Gap check.** (1) `460` §2 and `490` §3 asserted an Editor who is not the owner holds
+`data_edit_inputs`; the upload gate refused that Editor all along, so the assertions encoded the
+resolver's claim, not the right — they now expect false, with `resolved_capabilities` true and
+`may_land_uploads` false. (2) Nothing reads `get_my_capabilities` for the four project keys any
+more; it still gates pages, AI and agent features, which have no project layer. (3) `agent-apply`
+still resolves `simulation_lab` / `data_editing` without a project — server-side, unchanged,
+named here. (4) The server gates are D28/D66's (WP 7.1); this package binds the product only.
+No later package changes.
+
+**Measured locally.** `contract:rehearse` against PostgreSQL 16, all three ways (fresh,
+`--fixtures`, `--since HEAD`): every file passes, `550` new; `projectRights.test.ts` pins the
+keys to the migration and the words to the refusals; eslint's 407 findings are the base's,
+file for file and rule for rule.
+Two mutations each turn a rehearsal red — the upload gate dropped from `data_edit_inputs`
+(`460` §2, `490` §3), suspension ignored (`550` §3). Nothing reaches production until merge;
+any §15 reading belongs in the push after it (D153).
+
+**Merging `main`.** WP 9.4 merged first holding D219–D229 and `rehearsal/530`, and its run gate
+became one state (`runGateState`, D147). `main`'s numbers stand: this package's row is **D230**
+everywhere this branch wrote it (commit `093cbf8` says D219 — history is not rewritten; this
+paragraph is the key), the rehearsal is `550`, and the migration, never deployed, is renamed
+`20261001000003` so it sorts after `main`'s last rather than depending on `--include-all`. The
+Lab's conflict resolves to `main`'s single gate fed by the project rights: `permitted` is
+`useProjectRights`' `simulation_lab`, and `runGateState` gained an optional `refusal` so the
+button still says WHICH role refuses it.
+
+**And `main`'s `rehearsal/540` failed on this branch, for a reason that is not this branch's.**
+It read rows `20261001000002` SEEDS (the `docs_confidential` capability, sixteen section releases,
+the prepared answers). On the branch that added the migration those rows exist because the
+migration runs inside the rehearsal; on every branch after it merged, the migration is in the
+BASE, which is schema and not seed, and `540` §1 raised "no prepared answers were seeded" — D50's
+class, which `supabase/rehearsal/fixtures/README.md` names. Fixed in `540` itself: the rows are
+planted where missing (the capability, role rows and releases verbatim; one published answer per
+audience §4 reads) and nothing is planted when the migration seeded them. Proven both ways — the
+base with the migration (this branch) and `--since` the commit before it, where the migration
+runs and seeds.
 
 ## 17. Sequencing
 

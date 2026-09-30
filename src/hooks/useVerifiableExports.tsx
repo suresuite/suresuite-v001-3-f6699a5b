@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProjectRights } from "@/hooks/useProjectRights";
 import { fetchProjectLanes, laneTruncationNotice } from "@/lib/policies/projectLanes";
 import { downloadWorkbook } from "@/lib/policies/excel";
 import {
@@ -60,6 +61,9 @@ interface UseVerifiableExportsResult {
   /** Download one run's metadata + per-seed KPIs + weekly series. */
   exportRunResults: (runId: string) => Promise<void>;
   busy: "dataset" | "results" | null;
+  /** D230 — "Export" on this project; both exports refuse without it. */
+  canExport: boolean;
+  exportRefusal: string | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,6 +78,10 @@ export function useVerifiableExports(
   projectName?: string | null,
 ): UseVerifiableExportsResult {
   const { user } = useAuth();
+  // D230 — "Export" on this project, as /profile lists it.
+  const rights = useProjectRights(projectId);
+  const canExport = rights.can("export");
+  const exportRefusal = rights.loading ? "Checking your rights on this project…" : rights.refusal("export");
   const [runs, setRuns] = useState<ExportableRun[]>([]);
   const [busy, setBusy] = useState<"dataset" | "results" | null>(null);
 
@@ -112,6 +120,10 @@ export function useVerifiableExports(
 
   const exportDataset = useCallback(async () => {
     if (!projectId) return;
+    if (!canExport) {
+      toast.error(exportRefusal ?? "Export isn't enabled for you on this project.");
+      return;
+    }
     setBusy("dataset");
     try {
       // Snapshot-or-reuse (the RPC dedupes an unchanged dataset), then read
@@ -198,11 +210,15 @@ export function useVerifiableExports(
     } finally {
       setBusy(null);
     }
-  }, [projectId, projectName, user]);
+  }, [projectId, projectName, user, canExport, exportRefusal]);
 
   const exportRunResults = useCallback(
     async (runId: string) => {
       if (!projectId) return;
+      if (!canExport) {
+        toast.error(exportRefusal ?? "Export isn't enabled for you on this project.");
+        return;
+      }
       setBusy("results");
       try {
         const { data: run, error: runErr } = await sb
@@ -346,8 +362,8 @@ export function useVerifiableExports(
         setBusy(null);
       }
     },
-    [projectId],
+    [projectId, canExport, exportRefusal],
   );
 
-  return { runs, refreshRuns, exportDataset, exportRunResults, busy };
+  return { runs, refreshRuns, exportDataset, exportRunResults, busy, canExport, exportRefusal };
 }

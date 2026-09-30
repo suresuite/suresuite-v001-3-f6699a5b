@@ -44,12 +44,12 @@ surfaces:
   - page: "ProjectPolicies.tsx"
     via: "rpc ensure_item_masters"
     grain: table
-    evidence: "src/hooks/useItemMasters.tsx:194"
+    evidence: "src/hooks/useItemMasters.tsx:205"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "rpc ensure_item_masters"
     grain: table
-    evidence: "src/hooks/useItemMasters.tsx:194"
+    evidence: "src/hooks/useItemMasters.tsx:205"
     confirmed: true
 
 governance:

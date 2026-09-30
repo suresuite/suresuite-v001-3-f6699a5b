@@ -2,9 +2,9 @@
 //
 // Reads `admin_get_project_access`: every account that owns the project, holds a
 // membership or a live delegation on it, or belongs to its organization, each with WHERE
-// the access comes from and the rights the resolver gives it there
-// (`capabilities_for_user(user, project)` — the same answer /admin/users/:userId shows,
-// never computed here). Memberships are granted, changed and removed through D211's
+// the access comes from and the rights it holds there (`project_rights_for_user`, D230 —
+// the resolver plus the upload gate and suspension, the same answer /admin/users/:userId,
+// /profile and the app's own gates read, never computed here). Memberships are granted, changed and removed through D211's
 // `admin_set_project_member` / `admin_remove_project_member`; the database refuses
 // changing the modeler's own membership, which the dialog only mirrors — ownership moves
 // with "Transfer or change owner" (D212).
@@ -22,6 +22,7 @@ import { DIALOG_AS_SHEET } from '@/components/shared';
 import { cn } from '@/lib/utils';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { projectRightsNotes } from '@/lib/auth/projectRights';
 
 interface Member {
   project_role: string; expires_at: string | null; expired: boolean;
@@ -33,6 +34,8 @@ interface Person {
   role: string; is_super_admin: boolean; is_modeler: boolean;
   org_role: string | null; in_project_org: boolean; active_in_project_org: boolean;
   visible: boolean; can_edit_project: boolean;
+  /** D230 — the upload gate, and the role's answer before it and suspension. */
+  may_land_uploads?: boolean; resolved_capabilities?: Record<string, boolean>;
   member: Member | null; delegations: Delegation[];
   effective_role: string | null; capabilities: Record<string, boolean>;
 }
@@ -168,7 +171,7 @@ export function ProjectAccessDialog({ projectId, projectName, users, actorId, ac
               </section>
 
               <RoleLegend matrix={data.role_matrix} caps={data.project_capabilities}
-                note="A person's own overrides on their user page take precedence over the project role." />
+                note="A person's own overrides on their user page take precedence over the project role. Edit Input Data also needs the upload gate: uploads are accepted only from the project's owner or an app admin." />
             </div>
           )}
         </div>
@@ -244,7 +247,7 @@ function PersonRow({ p, orgName, caps, onRole, onExpiry, onRemove }: {
           {m.rationale && ` · "${m.rationale}"`}
         </div>
       )}
-      {!p.visible && (
+      {!p.visible && p.account_active && (
         <div className={`mt-1.5 text-[11px] ${p.in_project_org ? 'text-muted-foreground' : 'text-[#bf2330]'}`}>
           {p.in_project_org
             ? `Sees the project after switching to ${orgName}: visibility follows the organization they are working in.`
@@ -260,6 +263,7 @@ function PersonRow({ p, orgName, caps, onRole, onExpiry, onRemove }: {
           <StatusDot key={c.key} tone={p.capabilities[c.key] ? 'active' : 'neutral'} label={c.label} />
         ))}
       </div>
+      {projectRightsNotes(p).map((n) => <div key={n} className="mt-1 text-[11px] text-muted-foreground">{n}</div>)}
     </div>
   );
 }

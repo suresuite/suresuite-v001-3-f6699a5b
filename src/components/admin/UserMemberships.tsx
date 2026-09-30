@@ -3,9 +3,9 @@
 // Reads `admin_get_user_memberships`: every organization the account belongs to (D210)
 // with its role in each and which one is ACTIVE, and every project it can reach or is
 // recorded on, each with WHERE the access comes from (active organization, another of
-// its organizations, ownership, membership, delegation) and the rights the resolver
-// gives it there (`capabilities_for_user(user, project)` — never computed here a second
-// time). Organization memberships are added and removed through D210's
+// its organizations, ownership, membership, delegation) and the rights it holds there
+// (`project_rights_for_user`, D230 — the answer the app's own gates read, never computed
+// here a second time). Organization memberships are added and removed through D210's
 // `admin_add_org_member` / `admin_remove_org_member`; the org role and project
 // memberships through D211's verbs. The database refuses changing the project
 // modeler's own membership, which the page only mirrors. Which organization is active
@@ -23,6 +23,7 @@ import { FROZEN_CELL } from '@/components/shared';
 import { cn } from '@/lib/utils';
 import { Loader2, Plus, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { projectRightsNotes } from '@/lib/auth/projectRights';
 import { planRefusal } from '@/lib/auth/organizationPlan';
 import { PROJECT_ROLES, cap, day, endOfDay, toDateInput } from '@/components/admin/projectRoles';
 
@@ -41,6 +42,8 @@ interface ProjectAccess {
   organization_id: string | null; organization_name: string | null;
   in_active_org: boolean; in_member_org: boolean; is_modeler: boolean; owner_name: string | null;
   visible: boolean; can_edit_project: boolean;
+  /** D230 — the upload gate, and the role's answer before it and suspension. */
+  may_land_uploads?: boolean; resolved_capabilities?: Record<string, boolean>;
   member: Member | null; delegations: Delegation[];
   effective_role: string | null; capabilities: Record<string, boolean>;
 }
@@ -211,7 +214,8 @@ export function UserMemberships({ actor, userId, userLabel, onOrganizationChange
             run('admin_set_project_member', { p_project_id: projectId, p_project_role: role, p_expires_at: expiresAt, p_rationale: rationale || null },
               `Added as ${role}`)}
         />
-        <RoleLegend matrix={data.role_matrix} caps={data.project_capabilities} />
+        <RoleLegend matrix={data.role_matrix} caps={data.project_capabilities}
+          note="A user's own overrides in Features above take precedence over the project role. Edit Input Data also needs the upload gate: uploads are accepted only from the project's owner or an app admin." />
       </AdminSection>
     </>
   );
@@ -301,6 +305,7 @@ function ProjectRow({ p, caps, onRole, onExpiry, onRemove }: {
           <StatusDot key={c.key} tone={p.capabilities[c.key] ? 'active' : 'neutral'} label={c.label} />
         ))}
       </div>
+      {projectRightsNotes(p).map((n) => <div key={n} className="mt-1 text-[11px] text-muted-foreground">{n}</div>)}
     </div>
   );
 }

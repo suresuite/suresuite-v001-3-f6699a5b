@@ -37,6 +37,36 @@ BEGIN
     (v_admin,   'docs-a@example.invalid', 'Docs Admin',   'x', 'admin',       'DOCS Org', v_org, true),
     (v_cleared, 'docs-c@example.invalid', 'Docs Cleared', 'x', 'user',        'DOCS Org', v_org, true),
     (v_gone,    'docs-g@example.invalid', 'Docs Gone',    'x', 'user',        'DOCS Org', v_org, false);
+  -- The rehearsal base is schema, not seed. On the branch that ADDS `20261001000002` the
+  -- migration runs here and seeds its rows; on every branch after it merged, it is in the
+  -- base and its rows are not, and §1/§4 read those rows. So plant them where they are
+  -- missing — the capability, the role rows and the sixteen releases verbatim from the
+  -- migration, and one published answer for each audience §4 reads (general, overview,
+  -- getting-started, access) — and plant nothing when the migration seeded them (D50's rule:
+  -- a planted row must no-op once its migration is in the base).
+  INSERT INTO public.capabilities (key, kind, label, description, sort_order) VALUES
+    ('docs_confidential', 'feature', 'Confidential Documentation',
+     'Read the documentation sections marked Confidential', 400)
+  ON CONFLICT (key) DO NOTHING;
+  INSERT INTO public.role_capabilities (role, capability_key, allowed)
+  SELECT r.role, 'docs_confidential', r.role = 'super_admin'
+    FROM (VALUES ('super_admin'),('admin'),('modeler'),('user')) AS r(role)
+  ON CONFLICT (role, capability_key) DO NOTHING;
+  INSERT INTO public.docs_section_releases (section_key, audience)
+  SELECT k, 'confidential'
+    FROM unnest(ARRAY[
+      'overview', 'getting-started', 'input-tables', 'computed-tables', 'policies',
+      'verification', 'experiments', 'networks', 'project-intelligence', 'connectors',
+      'results', 'exports', 'access', 'developer-api', 'reference', 'questions'
+    ]) AS k
+  ON CONFLICT (section_key) DO NOTHING;
+  IF NOT EXISTS (SELECT 1 FROM public.docs_faq) THEN
+    INSERT INTO public.docs_faq (question, answer, section_key, related_slugs, sort_order, is_published) VALUES
+      ('DOCS/540 general?',         'Planted.', NULL,              '{}', 10, true),
+      ('DOCS/540 overview?',        'Planted.', 'overview',        '{}', 20, true),
+      ('DOCS/540 getting started?', 'Planted.', 'getting-started', '{}', 30, true),
+      ('DOCS/540 access?',          'Planted.', 'access',          '{}', 40, true);
+  END IF;
   INSERT INTO public.user_capabilities (user_id, capability_key, allowed)
   VALUES (v_cleared, 'docs_confidential', true);
 

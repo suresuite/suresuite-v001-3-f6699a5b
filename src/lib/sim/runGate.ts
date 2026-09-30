@@ -13,8 +13,10 @@
 export type RunGateKind = "capability" | "baseline" | "blocked" | "ack_required" | "clear";
 
 export interface RunGateInput {
-  /** the account holds the `simulation_lab` feature */
+  /** the account holds `simulation_lab` on this project (D219: the project role decides) */
   permitted: boolean;
+  /** why it does not, in words — the project role's refusal (D219); a generic line when absent */
+  refusal?: string | null;
   /** the selected scenario is the validated baseline, which Run & Validate owns */
   isBaseline?: boolean;
   blocks: number;
@@ -49,7 +51,7 @@ export function runGateState(g: RunGateInput): RunGateState {
     return {
       kind: "capability",
       canRun: false,
-      reason: "Running simulations isn't enabled for your account.",
+      reason: g.refusal ?? "Running simulations isn't enabled for your account.",
       button,
       stageSub: "not permitted",
       readout: { tone: "off", value: "not permitted" },

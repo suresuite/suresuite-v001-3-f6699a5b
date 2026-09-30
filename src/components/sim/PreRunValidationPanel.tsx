@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProjectRights } from "@/hooks/useProjectRights";
 import { FindingsPanel } from "./RunGate";
 import { fieldWalkToRoute } from "@/lib/policies/dataMap";
 import type { Finding } from "@/lib/policies/validationService";
@@ -50,6 +51,9 @@ function SupplierLinkFix({
   supplierIds: string[];
 }) {
   const { user } = useAuth();
+  // D230 — assigning a supplier writes the input lanes: "Edit Input Data".
+  const rights = useProjectRights(projectId);
+  const canEditInputs = rights.can("data_edit_inputs");
   const [chosen, setChosen] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState<string | null>(null);
   const [fixed, setFixed] = useState<Set<string>>(new Set());
@@ -65,6 +69,10 @@ function SupplierLinkFix({
   const apply = async (materialId: string) => {
     const supplierId = chosen[materialId];
     if (!supplierId) return;
+    if (!canEditInputs) {
+      toast.error(rights.refusal("data_edit_inputs") ?? "You may not edit input data on this project.");
+      return;
+    }
     setApplying(materialId);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

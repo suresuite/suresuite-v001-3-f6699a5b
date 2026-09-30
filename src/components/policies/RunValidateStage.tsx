@@ -57,6 +57,7 @@ import {
 } from "@/components/sim/StageRail";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProjectRights } from "@/hooks/useProjectRights";
 import type { StageRow } from "@/hooks/useStageRows";
 import { useItemMasters } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
@@ -295,6 +296,17 @@ export function RunValidateStage({
   const { unit: timeUnit } = useTimeUnit(projectId);
   const { user } = useAuth();
   const modelValidation = useModelValidation(projectId);
+  // D230 — running here is "Run Simulations" on this project, as /profile lists it.
+  const projectRights = useProjectRights(projectId);
+  const canRun = projectRights.can("simulation_lab");
+  const runRefusal = projectRights.loading
+    ? "Checking your rights on this project…"
+    : projectRights.refusal("simulation_lab");
+  const refuseRun = () => {
+    if (canRun) return false;
+    toast.error(runRefusal ?? "Running simulations isn't enabled for your account.");
+    return true;
+  };
 
   // Reuse the working experiment.run pipeline (same as Simulation Lab): a saved
   // policy version + a scenario bound to the run, dispatched to the Fly worker.
@@ -1016,6 +1028,7 @@ export function RunValidateStage({
   };
 
   const onRunSingle = async () => {
+    if (refuseRun()) return;
     if (!projectId || findings === null || blockCount > 0) {
       toast.warning("Run verification with no blockers first.");
       return;
@@ -1053,6 +1066,7 @@ export function RunValidateStage({
   };
 
   const onRunMulti = async () => {
+    if (refuseRun()) return;
     if (!projectId || findings === null || blockCount > 0) {
       toast.warning("Run verification with no blockers first.");
       return;
@@ -1566,10 +1580,11 @@ export function RunValidateStage({
                     size="sm"
                     className="h-[26px] min-h-11 px-2.5 text-[11.5px] md:min-h-0"
                     onClick={onRunSingle}
-                    disabled={submitting === "single"}
+                    disabled={submitting === "single" || !canRun}
                   >
                     {submitting === "single" ? "Queueing…" : singleQueuedAt ? "Re-run single" : "Run single"}
                   </Button>
+                  {!canRun && runRefusal && <p className="text-[11px] text-muted-foreground">{runRefusal}</p>}
                 </div>
               </TabsContent>
 
@@ -1660,10 +1675,11 @@ export function RunValidateStage({
                       size="sm"
                       className="mt-auto h-[26px] min-h-11 px-2.5 text-[11.5px] md:min-h-0"
                       onClick={onRunMulti}
-                      disabled={submitting === "multi"}
-                    >
+                      disabled={submitting === "multi" || !canRun}
+                      >
                       {submitting === "multi" ? "Queueing…" : multiQueuedAt ? "Re-run replications" : "Run replications"}
                     </Button>
+                    {!canRun && runRefusal && <p className="text-[11px] text-muted-foreground">{runRefusal}</p>}
                   </div>
 
                   {/* Results panel: persisted run data only — weekly traces,
@@ -1743,6 +1759,7 @@ export function RunValidateStage({
                   confidence={multiCfg.confidence}
                   target={warmCfg.target_precision}
                   onAddReps={(extra) => {
+                    if (refuseRun()) return;
                     if (projectId && latestRun) {
                       void addReps(projectId, latestRun.id, extra);
                       toast.success(`Queued +${extra} replications on the real run.`);

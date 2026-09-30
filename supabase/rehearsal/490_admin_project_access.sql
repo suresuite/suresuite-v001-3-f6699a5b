@@ -8,8 +8,8 @@
 --   §2 WHO: exactly the owner, the members (of any organization), and the members of the
 --      project's organization without a role — nobody from another organization who
 --      holds nothing on it — the owner first.
---   §3 WHAT: each person's source and rights — the owner edits, an editor edits inputs
---      but not the project's settings, a cross-organization viewer is recorded but does
+--   §3 WHAT: each person's source and rights — the owner edits, an editor's role grants
+--      inputs that the upload gate refuses it (D230) and not the project's settings, a cross-organization viewer is recorded but does
 --      not see it, an organization member with no role sees it and holds no role.
 --   §4 ONE ANSWER: for every person listed, the effective role, visibility, settings
 --      right and capabilities equal what /admin/users/:userId reads for the same project.
@@ -119,7 +119,10 @@ BEGIN
      OR v_pers -> 'member' ->> 'granted_by' IS DISTINCT FROM 'D215 Super'
      OR v_pers -> 'member' ->> 'rationale' IS DISTINCT FROM 'D215 editor'
      OR (v_pers ->> 'visible')::boolean IS NOT TRUE OR (v_pers ->> 'can_edit_project')::boolean IS NOT FALSE
-     OR (v_pers -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT TRUE THEN
+     -- D230: the role grants inputs, the upload gate (owner or app admin) refuses them.
+     OR (v_pers -> 'resolved_capabilities' ->> 'data_edit_inputs')::boolean IS NOT TRUE
+     OR (v_pers ->> 'may_land_uploads')::boolean IS NOT FALSE
+     OR (v_pers -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT FALSE THEN
     RAISE EXCEPTION 'D215/490 §3: the editor read as %', v_pers;
   END IF;
 

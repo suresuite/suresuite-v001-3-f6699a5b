@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { ProjectRightRefused } from "@/lib/auth/projectRights";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -136,8 +137,10 @@ const derivedLookup = (
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const ItemMasterEditor = ({ projectId, initialTab, onClose }: ItemMasterEditorProps) => {
-  const { materials, products, suppliers, loading, error, missingCounts, derived, saveRows } =
-    useItemMasters(projectId);
+  const {
+    materials, products, suppliers, loading, error, missingCounts, derived, saveRows,
+    canEditInputs, inputEditRefusal,
+  } = useItemMasters(projectId);
   const [activeTab, setActiveTab] = useState<ItemMasterTable>(initialTab ?? "materials");
   // drafts[table] = { [rowId]: { [field]: raw input value } }
   const [drafts, setDrafts] = useState<Record<ItemMasterTable, Drafts>>({
@@ -210,7 +213,10 @@ const ItemMasterEditor = ({ projectId, initialTab, onClose }: ItemMasterEditorPr
       setDrafts((prev) => ({ ...prev, [table]: {} }));
       toast.success(`Saved ${dirtyRows.length} ${table} row${dirtyRows.length === 1 ? "" : "s"}.`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : `Failed to save ${table}`);
+      // D230 — a refusal was already said by useItemMasters.
+      if (!(e instanceof ProjectRightRefused)) {
+        toast.error(e instanceof Error ? e.message : `Failed to save ${table}`);
+      }
     } finally {
       setSaving(false);
     }
@@ -376,7 +382,7 @@ const ItemMasterEditor = ({ projectId, initialTab, onClose }: ItemMasterEditorPr
               </TabsList>
               <Button
                 size="sm"
-                disabled={saving || dirtyCount(activeTab) === 0}
+                disabled={saving || dirtyCount(activeTab) === 0 || !canEditInputs}
                 onClick={() => void handleSave(activeTab)}
               >
                 {saving ? (
@@ -387,6 +393,9 @@ const ItemMasterEditor = ({ projectId, initialTab, onClose }: ItemMasterEditorPr
                 Save changes{dirtyCount(activeTab) > 0 ? ` (${dirtyCount(activeTab)})` : ""}
               </Button>
             </div>
+            {!canEditInputs && inputEditRefusal && (
+              <p className="mt-2 text-xs text-muted-foreground">View only — {inputEditRefusal}</p>
+            )}
             {(["materials", "products", "suppliers"] as ItemMasterTable[]).map((table) => (
               <TabsContent key={table} value={table} className="mt-3">
                 {renderGrid(table)}

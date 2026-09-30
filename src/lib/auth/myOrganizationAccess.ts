@@ -5,7 +5,8 @@
  * `get_my_organization_access` lists the organization's members and projects;
  * `get_my_project_access` reads ONE project through `project_access_read`, the same read
  * /admin/projects shows (D215), so the two pages cannot disagree about one person on one
- * project. Every right in it is the database's answer — nothing here recomputes one.
+ * project. Every right in it is the database's answer — nothing here recomputes one — and
+ * it is the answer the app's gates read (`project_rights_for_user`, D230).
  *
  * The user is NAMED on both calls: the browser calls as `anon` (PLAN.md §4 D155).
  */
@@ -62,13 +63,18 @@ export interface ProjectPerson {
   default_org_name: string | null;
   visible: boolean;
   can_edit_project: boolean;
+  /** D230 — the upload gate: the project's owner or an app admin. */
+  may_land_uploads?: boolean;
   member: {
     project_role: string; expires_at: string | null; expired: boolean;
     rationale: string | null; granted_by: string | null; updated_at: string;
   } | null;
   delegations: { id: string; project_role: string; expires_at: string; rationale: string; grantor: string | null }[];
   effective_role: string | null;
+  /** D230 — what the person may do here, as the app's gates apply it. */
   capabilities: Record<string, boolean>;
+  /** D230 — what the role alone would give, before the upload gate and suspension. */
+  resolved_capabilities?: Record<string, boolean>;
 }
 
 export interface ProjectAccess {

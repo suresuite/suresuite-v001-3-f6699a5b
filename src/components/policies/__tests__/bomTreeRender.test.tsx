@@ -31,6 +31,15 @@ vi.mock("@/hooks/useItemMasters", () => ({
     lanes: { inbound: [], outbound: [], bom: [], loaded: true },
     saveRows: async () => {},
     error: null,
+    canEditInputs: true,
+    inputEditRefusal: null,
+  }),
+}));
+// D230 — the grid's writes follow the project rights; this renders an editor's grid.
+vi.mock("@/hooks/useProjectRights", () => ({
+  useProjectRights: () => ({
+    rights: null, loading: false, usingFallback: false,
+    can: () => true, canEditProject: true, refusal: () => null,
   }),
 }));
 

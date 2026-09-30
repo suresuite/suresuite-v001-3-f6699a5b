@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProjectRights } from "@/hooks/useProjectRights";
+import { ProjectRightRefused } from "@/lib/auth/projectRights";
 import {
   DEFAULT_BUNDLE,
   parseFamily,
@@ -66,6 +68,11 @@ interface UsePoliciesResult {
   deleteVersions: (versionIds: string[]) => Promise<string[]>;
   /** 6.D — download a saved version's policy bundle as an .xlsx workbook. */
   exportVersion: (version: PolicyVersion) => Promise<void>;
+  /** D230 — "Edit Policies" on this project, as /profile lists it. Every write above
+   *  refuses without it; the page shows `policyEditRefusal` instead of letting a cell
+   *  look saved. */
+  canEditPolicies: boolean;
+  policyEditRefusal: string | null;
 }
 
 /**
@@ -101,6 +108,21 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
   const [versions, setVersions] = useState<PolicyVersion[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [currentHash, setCurrentHash] = useState<string | null>(null);
+  // D230 — one gate for every write below: the project role decides, not the account.
+  const rights = useProjectRights(projectId);
+  const canEditPolicies = rights.can("data_edit_policies");
+  const policyEditRefusal = rights.loading
+    ? "Checking your rights on this project…"
+    : rights.refusal("data_edit_policies");
+  // A version records the policy set a run is bound to, so running also allows it.
+  const canSnapshot = canEditPolicies || rights.can("simulation_lab");
+  const canExport = rights.can("export");
+  /** Toast the reason and report the refusal; `quiet` for writes nobody asked for. */
+  const refused = useCallback((allowed: boolean, reason: string | null, quiet = false) => {
+    if (allowed) return false;
+    if (!quiet) toast.error(reason ?? "You may not change policies on this project.");
+    return true;
+  }, []);
 
   const refreshCurrentHash = useCallback(async () => {
     if (!projectId) return;
@@ -235,6 +257,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
   const saveDefault = useCallback(
     async <F extends PolicyFamily>(family: F, value: PolicyBundle[F]) => {
       if (!projectId) return;
+      if (refused(canEditPolicies, policyEditRefusal)) throw new ProjectRightRefused(policyEditRefusal ?? "refused");
       // optimistic
       setDefaults((prev) => ({ ...prev, [family]: value }));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -256,12 +279,13 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       await dispatchSim({ family, scope: "default", patch: value });
       void refreshCurrentHash();
     },
-    [projectId, dispatchSim, refreshCurrentHash, user?.id],
+    [projectId, dispatchSim, refreshCurrentHash, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
   const upsertOverride = useCallback(
     async (row: OverrideRow) => {
       if (!projectId) return;
+      if (refused(canEditPolicies, policyEditRefusal)) throw new ProjectRightRefused(policyEditRefusal ?? "refused");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
       const { error } = await sb.rpc("bulk_upsert_policy_overrides", {
@@ -285,12 +309,18 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       });
       void refreshCurrentHash();
     },
-    [projectId, dispatchSim, refreshCurrentHash, user?.id],
+    [projectId, dispatchSim, refreshCurrentHash, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
   const bulkUpsertOverrides = useCallback(
     async (rows: OverrideRow[], opts?: { seeded?: boolean }) => {
       if (!projectId || rows.length === 0) return;
+      // Seeding copies project data nobody typed: refused quietly, so a Viewer opening the
+      // page is not shown an error for a write it never asked for.
+      if (refused(canEditPolicies, policyEditRefusal, !!opts?.seeded)) {
+        if (opts?.seeded) return;
+        throw new ProjectRightRefused(policyEditRefusal ?? "refused");
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
       // WP 4.4 · `seeded` says these values were COPIED from project data rather
@@ -336,12 +366,13 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       );
       void refreshCurrentHash();
     },
-    [projectId, dispatchSim, refreshCurrentHash, user?.id],
+    [projectId, dispatchSim, refreshCurrentHash, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
   const deleteOverride = useCallback(
     async (scope: "node" | "edge", targetKey: string, family: PolicyFamily) => {
       if (!projectId) return;
+      if (refused(canEditPolicies, policyEditRefusal)) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
       const { error } = await sb.rpc("delete_policy_override", {
@@ -358,12 +389,13 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       await dispatchSim({ family, scope, target_key: targetKey, patch: {} });
       void refreshCurrentHash();
     },
-    [projectId, dispatchSim, refreshCurrentHash, user?.id],
+    [projectId, dispatchSim, refreshCurrentHash, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
   const saveStrategy = useCallback(
     async (strategy: FulfillmentStrategy) => {
       if (!projectId) return;
+      if (refused(canEditPolicies, policyEditRefusal)) return;
       setFulfillmentStrategy(strategy);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
@@ -381,12 +413,13 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       await dispatchSim({ family: "fulfillment", scope: "strategy", patch: { strategy } });
       void refreshCurrentHash();
     },
-    [projectId, defaults.fulfillment, dispatchSim, refreshCurrentHash, user?.id],
+    [projectId, defaults.fulfillment, dispatchSim, refreshCurrentHash, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
   const applyResolvedPreset = useCallback(
     async (slug: string, families: PolicyFamily[], bundle: PolicyBundle) => {
       if (!projectId) return;
+      if (refused(canEditPolicies, policyEditRefusal)) return;
       const appliedAt = new Date();
       setDefaults((prev) => {
         const next = { ...prev };
@@ -433,18 +466,19 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       );
       void refreshCurrentHash();
     },
-    [projectId, dispatchSim, refreshCurrentHash, user?.id],
+    [projectId, dispatchSim, refreshCurrentHash, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
   const clearActivePreset = useCallback(async () => {
     if (!projectId) return;
+    if (refused(canEditPolicies, policyEditRefusal)) return;
     setActivePreset(null);
     setPresetAppliedAt(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
     const { error } = await sb.rpc("clear_policy_preset", { p_project_id: projectId, _actor_user_id: user?.id ?? null });   // D71
     if (error) console.error("clearActivePreset failed", error);
-  }, [projectId, user?.id]);
+  }, [projectId, user?.id, canEditPolicies, policyEditRefusal, refused]);
 
   const refreshVersions = useCallback(async () => {
     if (!projectId) return;
@@ -477,6 +511,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
   const saveSnapshot = useCallback(
     async (label?: string, notes?: string): Promise<string | null> => {
       if (!projectId) return null;
+      if (refused(canSnapshot, policyEditRefusal)) return null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
       const baseArgs = {
@@ -508,12 +543,13 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       void refreshCurrentHash();
       return newId;
     },
-    [projectId, user, selectedVersionId, refreshVersions, refreshCurrentHash],
+    [projectId, user, selectedVersionId, refreshVersions, refreshCurrentHash, canSnapshot, policyEditRefusal, refused],
   );
 
   const restoreVersion = useCallback(
     async (versionId: string) => {
       if (!projectId) return;
+      if (refused(canEditPolicies, policyEditRefusal)) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
       const { error } = await sb.rpc("restore_policy_version", { p_version_id: versionId, _actor_user_id: user?.id ?? null });   // D71
@@ -548,13 +584,14 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       setOverrides((ovData ?? []) as OverrideRow[]);
       void refreshCurrentHash();
     },
-    [projectId, refreshCurrentHash, user?.id],
+    [projectId, refreshCurrentHash, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
   // 6.D — edit a version's free-text notes (a description of the model),
   // persisted on the version record and distinct from the short label.
   const updateVersionNotes = useCallback(
     async (versionId: string, notes: string) => {
+      if (refused(canEditPolicies, policyEditRefusal)) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
       const { error } = await sb.rpc("update_policy_version_notes", {
@@ -573,7 +610,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     // `user?.id` and not `user`: without it the callback closes over whoever was
     // signed in at first render, so a session change would attribute this write to
     // the previous person (WP 6.2 slice 12's lesson, ten arrays over).
-    [refreshVersions, user?.id],
+    [refreshVersions, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
   // 6.D — delete a saved version. The RPC refuses (foreign_key_violation) when
@@ -582,6 +619,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
   // delete happened.
   const deleteVersion = useCallback(
     async (versionId: string): Promise<boolean> => {
+      if (refused(canEditPolicies, policyEditRefusal)) return false;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
       const { error } = await sb.rpc("delete_policy_version", {
@@ -598,11 +636,12 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       void refreshVersions();
       return true;
     },
-    [selectedVersionId, refreshVersions, user?.id],
+    [selectedVersionId, refreshVersions, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
   const deleteVersions = useCallback(
     async (versionIds: string[]): Promise<string[]> => {
+      if (refused(canEditPolicies, policyEditRefusal)) return [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
       const deleted: string[] = [];
@@ -633,7 +672,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       void refreshVersions();
       return deleted;
     },
-    [selectedVersionId, refreshVersions, user?.id],
+    [selectedVersionId, refreshVersions, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
   // 6.D + W2/G17 — download a saved version's policy bundle as an .xlsx
@@ -643,6 +682,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
   // Reads the stored v2 snapshot { defaults, fulfillment_strategy, overrides };
   // v1 snapshots (a flat family map, no `defaults` key) are handled too.
   const exportVersion = useCallback(async (version: PolicyVersion) => {
+    if (refused(canExport, rights.refusal("export"))) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any;
     const { data, error } = await sb.rpc("get_policy_version_snapshot", {
@@ -678,7 +718,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     const safe = name.replace(/[^a-z0-9._-]+/gi, "-").slice(0, 48);
     downloadWorkbook(wb, `policy-${safe}.xlsx`);
     toast.success("Version exported (policy snapshot only — with provenance)");
-  }, []);
+  }, [canExport, rights, refused]);
 
   const selectedVersion = versions.find((v) => v.id === selectedVersionId) ?? null;
   const isDirty =
@@ -713,5 +753,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     deleteVersion,
     deleteVersions,
     exportVersion,
+    canEditPolicies,
+    policyEditRefusal,
   };
 }
