@@ -77,6 +77,14 @@ export default function OrganizationsAndMembers() {
           takes you to the valid one.
         </P>
         <P>
+          Each membership carries its own role &mdash; Owner, Admin or Member &mdash; which an
+          administrator changes in place without moving your current organization. Your{" "}
+          <em>account tier</em> does not vary by organization: an account with the Admin tier edits
+          every project of each organization it belongs to, whatever its role there. Where the two
+          disagree, your profile and the administrator&rsquo;s screen say so;{" "}
+          <DocLink to="roles-and-capabilities">Roles and capabilities</DocLink> has all three levels.
+        </P>
+        <P>
           Deleting an organization deletes only the accounts that belong to no other organization.
           An account that also belongs elsewhere is removed from the deleted one and keeps the rest.
         </P>

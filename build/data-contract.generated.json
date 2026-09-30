@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 356,
-      "migrations_applied": 348,
-      "last_migration": "20260930000004_account_in_several_organizations.sql"
+      "migrations_found": 357,
+      "migrations_applied": 349,
+      "last_migration": "20260930000005_three_access_levels.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -17566,7 +17566,7 @@
           },
           "surfaces": [],
           "resolution": null,
-          "note": "NOT READ BY THE ACCESS LAYER TODAY. `capabilities_for_user()` resolves role -> org -> user through `approved_users.role` and the capability tables; no policy and no RPC consults `org_role`. An organization `admin` therefore holds no more than a `member` does, which is the gap WP 2.2 closes when it extends the resolver. Recorded rather than implied, per §5 T1.",
+          "note": "READ BY ONE RULE: the API-key verbs (`_api_key_management_org`) let an organization `owner` or `admin` manage that organization's keys whatever the account tier. No policy and no other RPC consults it — `capabilities_for_user()` resolves through `approved_users.role`, the ACCOUNT TIER, which applies in every organization the account belongs to. So an organization `admin` holds no more than a `member` does anywhere else, and an account with the `admin` tier edits every project of an organization where this column says `member`. /admin/users and /profile flag that disagreement (§4 D211) rather than hide it; the owner's decision is that an organization admin is an owner of every project in its organization, which WP 7.1 makes the rule. Recorded rather than implied, per §5 T1.",
           "engine_requirement": null
         },
         {
@@ -22550,11 +22550,11 @@
       "surfaces": [],
       "governance": {
         "read": null,
-        "write": null,
+        "write": "super_admin",
         "min_project_role": "owner",
         "audited": false,
         "rls_enabled": true,
-        "note": "`write: null` is LITERAL and load-bearing. The table has a SELECT policy and NO insert/update/delete policy, so RLS denies writes by default and the SECURITY DEFINER RPCs are the only way in. That is not an oversight to be tidied up later: D28 says every policy here is PERMISSIVE and permissive policies OR, so a \"deny writes\" policy added beside anything else would deny nothing. The ABSENCE of a policy is the enforcement. `audited: false` — a membership change writes no audit row; WP 2.3 is where that becomes true, and this table is one of the reasons it matters."
+        "note": "There is still NO insert/update/delete POLICY, and that absence is load-bearing: D28 says every policy here is PERMISSIVE and permissive policies OR, so a \"deny writes\" policy added beside anything else would deny nothing. The ABSENCE of a policy is the enforcement, and the SECURITY DEFINER functions are the only way in. Since `20260930000005` (§4 D211) one of them is user-facing — `admin_set_project_member` / `admin_remove_project_member`, a super admin on /admin/projects › Access, logged through `log_admin_action` — hence `write: super_admin`. The other writers are the creator triggers (`projects_owner_membership` at INSERT, `projects_new_modeler_is_owner` when the modeler changes) and the backfills. `audited: false` — the triggers and backfills write no audit row, so the general claim fails; WP 2.3 is where that becomes true."
       },
       "rls": {
         "enabled": true,
@@ -22880,7 +22880,7 @@
           "engine_requirement": null
         }
       ],
-      "note": "Backfilled from `projects.modeler_id` — every project's modeler becomes its owner. That records a fact that already held rather than granting anything new: every write policy in the schema already reads `modeler_id` as the project's owner. `modeler_id` is NOT a declared foreign key to `approved_users`, so the backfill filters on the user existing; a project whose modeler row is gone gets no owner and is visible only to the organization, which is the honest outcome and a §15 question worth asking.",
+      "note": "Backfilled from `projects.modeler_id` — every project's modeler becomes its owner. That records a fact that already held rather than granting anything new: every write policy in the schema already reads `modeler_id` as the project's owner. `modeler_id` is NOT a declared foreign key to `approved_users`, so the backfill filters on the user existing; a project whose modeler row is gone gets no owner and is visible only to the organization, which is the honest outcome and a §15 question worth asking. THE PROJECT LEVEL OF THREE (§4 D211): a row here is the project role; `approved_users.role` is the platform level and the account tier, `organization_members.org_role` the role inside an organization. The rules that read a row here are the promotion (`ingest_apply_run`, editor or higher) and the export decision (`capabilities_for_user(user, project)`); NO row-level policy does (D66), so an editor who did not create the project still cannot write its data. `admin_set_project_member` refuses an account outside the project's organization, demoting the creator, and removing the last owner; a row held by an account that has since left the organization is kept and reported (`admin_project_access.in_project_org = false`), not deleted.",
       "analysis_kinds": null
     },
     "project_role_capabilities": {
@@ -31300,5 +31300,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "74959801714d"
+  "contract_version": "995735d1046b"
 }

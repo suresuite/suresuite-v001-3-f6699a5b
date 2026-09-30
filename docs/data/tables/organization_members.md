@@ -135,7 +135,7 @@ for one you did.
 |---|---|---|---|
 | a member row is inserted without a role | 'member' — the least of the three | `default` | the column default, and the admin member list renders the resulting role verbatim |
 
-> NOT READ BY THE ACCESS LAYER TODAY. `capabilities_for_user()` resolves role -> org -> user through `approved_users.role` and the capability tables; no policy and no RPC consults `org_role`. An organization `admin` therefore holds no more than a `member` does, which is the gap WP 2.2 closes when it extends the resolver. Recorded rather than implied, per §5 T1.
+> READ BY ONE RULE: the API-key verbs (`_api_key_management_org`) let an organization `owner` or `admin` manage that organization's keys whatever the account tier. No policy and no other RPC consults it — `capabilities_for_user()` resolves through `approved_users.role`, the ACCOUNT TIER, which applies in every organization the account belongs to. So an organization `admin` holds no more than a `member` does anywhere else, and an account with the `admin` tier edits every project of an organization where this column says `member`. /admin/users and /profile flag that disagreement (§4 D211) rather than hide it; the owner's decision is that an organization admin is an owner of every project in its organization, which WP 7.1 makes the rule. Recorded rather than implied, per §5 T1.
 
 ### `joined_at`
 
@@ -153,6 +153,6 @@ When the membership was created. Server-stamped.
 
 ---
 
-*Generated from data contract `74959801714d`, engine `0.2.8`,
+*Generated from data contract `995735d1046b`, engine `0.2.8`,
 sidecar `supabase/contract/organization_members.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

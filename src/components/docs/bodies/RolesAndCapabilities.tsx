@@ -4,11 +4,12 @@
 // in the contract and read by almost nothing. The count is computed from the
 // generated module so the sentence cannot go stale in either direction.
 //
-// The three role vocabularies and the project-role matrix are DERIVED, not
-// authored here: the matrix and the rank ladder come from
+// The three access levels and the project-role matrix are DERIVED, not
+// authored here: the levels and what each role allows come from
+// `src/lib/auth/accessLevels.ts` (§4 D211, the one place the product says them,
+// tested against the policies it restates), the matrix and the rank ladder from
 // `capabilities.generated.ts` (read out of the migration seeds — I1, D101),
-// and the screen table comes from the route guard itself. The only
-// hand-written facts on this page are glosses.
+// and the screen table from the route guard itself.
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
 import { DocFigure } from "@/components/docs/DocFigure";
@@ -23,33 +24,10 @@ import {
 import { ROUTE_PERMISSIONS } from "@/lib/permissions";
 import type { UserRole } from "@/hooks/useUserRole";
 import { FROZEN_CELL } from "@/components/shared/frozenCell";
+import { AccessLevelsGuide } from "@/components/access/AccessLevelsGuide";
 
 /** Display order for the global vocabulary: widest first, like PROJECT_ROLES. */
 const GLOBAL_ROLES: UserRole[] = ["super_admin", "admin", "modeler", "user"];
-
-const GLOBAL_GLOSS: Record<UserRole, string> = {
-  super_admin:
-    "Everything, everywhere — the checks below are skipped entirely, and this is the only role that opens the administration area.",
-  admin:
-    "The full working surface: every workspace, the Project Manager and the Developer API, with every feature on by default.",
-  modeler:
-    "The builder's role. The same default surface as admin — the two differ by what older row rules name and by convention, not by their default grants.",
-  user:
-    "Read and analyse. Every workspace opens, but creating projects, editing data and running simulations are off by default.",
-};
-
-const ORG_ROLES: { role: string; gloss: string }[] = [
-  { role: "owner", gloss: "The organization's principal. Together with admin, may issue and revoke the organization's API keys." },
-  { role: "admin", gloss: "Manages the organization. The same API-key right as owner." },
-  { role: "member", gloss: "Belongs. Sees their own membership row and nothing about who else is in the organization." },
-];
-
-const PROJECT_GLOSS: Record<string, string> = {
-  owner: "The project's principal — a project's creator holds this automatically.",
-  editor: "May rewrite the measured inputs and the decisions alike.",
-  analyst: "May retune decisions, and may not rewrite the measured data those decisions are judged against.",
-  viewer: "May look.",
-};
 
 /** The four grid rows, in the order the split is best explained in. */
 const MATRIX_KEYS = ["data_edit_inputs", "data_edit_policies", "simulation_lab", "export"];
@@ -81,70 +59,20 @@ export default function RolesAndCapabilities() {
         Roles and capabilities
       </PageTitle>
 
-      <Section id="three-vocabularies" title="Three vocabularies, one person">
+      <Section id="three-vocabularies" title="Three levels, one person">
         <Key>
-          You hold up to three roles at once: one on the platform, one in your organization, and
-          one on each project. They are separate vocabularies, deliberately — a grant in one never
-          silently becomes a grant in another.
+          Your access has three levels: the platform, your organization, and each project. The
+          same summary is on your profile under My Access, with your own roles marked and what
+          they let you do on each project of your current organization.
         </Key>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Platform
-            </div>
-            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              One per account, set by an administrator. A new account starts as{" "}
-              <Term>user</Term>, the least of the four.
-            </p>
-            <ul className="mt-3 space-y-2">
-              {GLOBAL_ROLES.map((r) => (
-                <li key={r}>
-                  <Term>{r}</Term>
-                  <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
-                    {GLOBAL_GLOSS[r]}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Organization
-            </div>
-            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              Your standing inside the tenant wall —{" "}
-              <DocLink to="organizations-and-members">the boundary itself</DocLink> is drawn by
-              which organization you are in, not by this role.
-            </p>
-            <ul className="mt-3 space-y-2">
-              {ORG_ROLES.map(({ role, gloss }) => (
-                <li key={role}>
-                  <Term>{role}</Term>
-                  <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{gloss}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Project
-            </div>
-            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              Which rooms, inside the wall. Four levels, strictly ordered — the ladder below and
-              the matrix under it.
-            </p>
-            <ul className="mt-3 space-y-2">
-              {PROJECT_ROLES.map((r) => (
-                <li key={r}>
-                  <Term>{r}</Term>
-                  <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
-                    {PROJECT_GLOSS[r]}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        <P>
+          The organization level has two parts today, and that is the part most worth knowing.
+          Your <Term>account tier</Term> (Admin, Modeler or User) is one per account and applies in
+          every organization you belong to; it is what the database reads when you create or edit a
+          project. Your <Term>role in the organization</Term> (Owner, Admin or Member) is one per
+          membership and adds only the right to manage that organization&rsquo;s API keys.
+        </P>
+        <AccessLevelsGuide />
         <Callout title="The word owner appears twice and means two things">
           <p>
             An organization <Term>owner</Term> and a project <Term>owner</Term> are different
@@ -155,7 +83,7 @@ export default function RolesAndCapabilities() {
         </Callout>
       </Section>
 
-      <Section id="global-roles" title="What each platform role opens">
+      <Section id="global-roles" title="What each account role opens">
         <P>
           The screens, from the route guard the application actually runs. A super administrator
           passes every check, so the first column is uniform by construction.
@@ -348,7 +276,7 @@ export default function RolesAndCapabilities() {
           those decisions are judged against. Roles can also be lent for a time — a delegation
           only <em>subtracts</em> (never more than the grantor holds) and always expires.{" "}
           <DocLink to="project-access">Project access</DocLink> has the two rules, the columns of
-          both tables, and the honest note that there is no screen for any of it yet.
+          both tables, and where a super administrator sets them (Projects &rarr; Access). Delegation has no screen yet.
         </P>
         <Callout title="One gate reads the ladder today">
           <p>

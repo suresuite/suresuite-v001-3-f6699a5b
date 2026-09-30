@@ -26,9 +26,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { DIALOG_AS_SHEET, HDR_PRIMARY_BUTTON, HDR_SEARCH_INPUT } from '@/components/shared';
-import { Ban, Building2, Loader2, Plus, SlidersHorizontal, Undo2, X } from 'lucide-react';
+import { AlertTriangle, Ban, Building2, Loader2, Plus, SlidersHorizontal, Undo2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { planRefusal } from '@/lib/auth/organizationPlan';
+import { ACCOUNT_TIERS, ALIGNMENT_HINT, ORG_ROLES, ORG_ROLE_INFO, accountTier, orgRoleLabel, platformRole, projectRoleLabel, roleSource, tierLabel, tierOrgMismatch } from '@/lib/auth/accessLevels';
+import { adminSetOrgMemberRole, adminUserProjectRoles, type UserProjectRoleRow } from '@/lib/auth/projectRoles';
+import { AccessLevelsGuide } from '@/components/access/AccessLevelsGuide';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface OrgOption { id: string; name: string; }
@@ -53,7 +56,13 @@ const orgLabel = (r: Row) => {
 /** Every organization the account belongs to, for search and the cell's tooltip. */
 const allOrgNames = (r: Row) => (r.memberships ?? []).map((m) => m.name).join(', ');
 
-const ORG_ROLES = ['member', 'admin', 'owner'];
+/**
+ * D211 — the memberships where the account tier and the role in the organization say
+ * different things (the tier is what the rules read, in every organization).
+ */
+const mismatches = (r: Row) => (r.memberships ?? [])
+  .map((m) => ({ org: m.name, text: tierOrgMismatch(r.role, m.org_role) }))
+  .filter((m): m is { org: string; text: string } => !!m.text);
 
 const db = supabase as any;
 const ROLES = ['user', 'modeler', 'admin', 'super_admin'];
@@ -157,6 +166,21 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
       }
       actions={<AddUserDialog orgs={orgs} actorArgs={actorArgs} onCreated={load} />}
     >
+      {/* D211 — the three levels this page sets, and what each role allows today. */}
+      <details className={`${SURFACE} mb-3 px-4 py-2`}>
+        <summary className="flex min-h-11 cursor-pointer items-center text-[13px] font-medium md:min-h-0">
+          How roles work &mdash; platform, organization, project
+        </summary>
+        <div className="pb-2 pt-3">
+          <p className="mb-3 text-[12.5px] text-muted-foreground">
+            The <span className="font-medium text-foreground">Account tier</span> column is the platform level (Super admin) or the tier
+            that applies in every organization the account belongs to. Roles inside each organization, and the account&rsquo;s project
+            roles, are under <Building2 className="inline h-3.5 w-3.5" aria-label="Roles & organizations" />. Project roles are set on
+            Projects &rarr; Access.
+          </p>
+          <AccessLevelsGuide />
+        </div>
+      </details>
       {isMobile ? (
         <AdminMobileList
           label="Users"
@@ -180,7 +204,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                 key={r.user_id}
                 label={r.name || '—'}
                 dot={active ? M.process : M.blocking}
-                sub={`${r.email || '—'} · ${orgLabel(r) || '—'} · ${r.role} · ${Number(
+                sub={`${r.email || '—'} · ${orgLabel(r) || '—'} · ${tierLabel(r.role)}${mismatches(r).length ? ' · tier and org role disagree' : ''} · ${Number(
                   r.mtd_requests,
                 ).toLocaleString()} req MTD · budget ${budget != null ? `$${budget.toFixed(2)}` : '—'}${
                   remaining != null && remaining < 0 ? ' · over budget' : ''
@@ -195,7 +219,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                     onClick: () => navigate(`/admin/users/${r.user_id}`),
                   },
                   {
-                    label: 'Organizations',
+                    label: 'Roles & organizations',
                     sub: `${(r.memberships ?? []).length} membership(s)`,
                     onClick: () => setMembershipsOf(r),
                   },
@@ -207,7 +231,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                         onClick: () => toggleActive(r),
                       }]),
                   ...ROLES.filter((role) => role !== r.role).map((role) => ({
-                    label: `Change role to ${role}`,
+                    label: `Change account tier to ${tierLabel(role)}`,
                     onClick: () => changeRole(r, role),
                   })),
                 ]}
@@ -221,7 +245,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
           <table className="w-full border-collapse">
             <thead><tr>
               <SortTH sortKey="org">Organization</SortTH><SortTH sortKey="name">Name</SortTH><SortTH sortKey="email">Email</SortTH>
-              <SortTH sortKey="role">Role</SortTH><SortTH sortKey="status">Status</SortTH>
+              <SortTH sortKey="role">Account tier</SortTH><SortTH sortKey="status">Status</SortTH>
               <SortTH sortKey="req" align="right">Req MTD</SortTH><SortTH sortKey="cost" align="right">Cost MTD</SortTH>
               <SortTH sortKey="budget" align="right">Budget</SortTH><th className={`${TH} w-[1%]`} />
             </tr>
@@ -243,7 +267,17 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                 const remaining = budget != null ? budget - Number(r.mtd_cost_usd) : null;
                 return (
                   <tr key={r.user_id} className={ROW_HOVER}>
-                    <td className={`${TD} text-[13px]`} title={allOrgNames(r) || undefined}>{orgLabel(r) || '—'}</td>
+                    <td className={`${TD} text-[13px]`} title={allOrgNames(r) || undefined}>
+                      <span className="inline-flex items-center gap-1.5">
+                        {orgLabel(r) || '—'}
+                        {mismatches(r).length > 0 && (
+                          <button title={mismatches(r).map((m) => `${m.org}: ${m.text}`).join('\n')} onClick={() => setMembershipsOf(r)}
+                            className="text-amber-600 hover:text-amber-700" aria-label="Account tier and organization role disagree">
+                            <AlertTriangle className="h-[14px] w-[14px]" />
+                          </button>
+                        )}
+                      </span>
+                    </td>
                     <td className={`${TD} whitespace-nowrap`}>
                       <button onClick={() => navigate(`/admin/users/${r.user_id}`)}
                         className="max-w-[260px] truncate text-left text-[13px] font-medium text-[#bf2330] underline-offset-2 hover:underline">
@@ -254,7 +288,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                     <td className={TD}>
                       <Select value={r.role} onValueChange={(v) => changeRole(r, v)}>
                         <SelectTrigger className="h-7 w-32 rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role} className="min-h-11 md:min-h-0">{role}</SelectItem>)}</SelectContent>
+                        <SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role} className="min-h-11 md:min-h-0">{tierLabel(role)}</SelectItem>)}</SelectContent>
                       </Select>
                     </td>
                     <td className={TD}><StatusDot tone={active ? 'active' : 'error'} label={active ? 'Active' : 'Suspended'} /></td>
@@ -270,7 +304,7 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                         <button title="Manage access" className="hover:text-foreground" onClick={() => navigate(`/admin/users/${r.user_id}`)}>
                           <SlidersHorizontal className="h-[15px] w-[15px]" />
                         </button>
-                        <button title="Organizations" className="hover:text-foreground" onClick={() => setMembershipsOf(r)}>
+                        <button title="Roles & organizations" className="hover:text-foreground" onClick={() => setMembershipsOf(r)}>
                           <Building2 className="h-[15px] w-[15px]" />
                         </button>
                         {r.user_id !== actor?.id && (
@@ -297,10 +331,12 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
 }
 
 /**
- * D210 — the organizations one account belongs to. Adding counts against the
- * organization's user limit (D207); removing the account's CURRENT organization moves
- * it to its earliest remaining one, or to none. The account itself chooses which of
- * its organizations is current, from its account menu or /profile.
+ * D210/D211 — one account's roles at all three levels. The platform level and the account
+ * tier are set in the table; this dialog sets the account's ORGANIZATIONS and its role in
+ * each (in place: remove-and-re-add would move its active organization), and lists its
+ * PROJECT roles, which are set per project on /admin/projects. Adding counts against the
+ * organization's user limit (D207); removing the account's CURRENT organization moves it
+ * to its earliest remaining one, or to none.
  */
 function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
   row: Row; orgs: OrgOption[]; actorArgs: () => { p_actor_id?: string; p_actor_email?: string };
@@ -308,9 +344,26 @@ function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
 }) {
   const [busy, setBusy] = useState(false);
   const [addOrg, setAddOrg] = useState<string>('');
-  const [addRole, setAddRole] = useState<string>('member');
+  const [addRole, setAddRole] = useState<string>(row.role === 'admin' ? 'admin' : 'member');
+  const [projects, setProjects] = useState<UserProjectRoleRow[] | null>(null);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const memberships = row.memberships ?? [];
   const available = orgs.filter((o) => !memberships.some((m) => m.org_id === o.id));
+  const actor = () => { const a = actorArgs(); return { id: a.p_actor_id, email: a.p_actor_email }; };
+  const tier = accountTier(row.role);
+  const platform = platformRole(row.role);
+
+  useEffect(() => {
+    let live = true;
+    adminUserProjectRoles(actor(), row.user_id).then((res) => {
+      if (!live) return;
+      setProjects(res.data);
+      setProjectsError(res.error);
+    });
+    return () => { live = false; };
+    // The account's project roles do not change from this dialog.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.user_id]);
 
   const add = async () => {
     if (!addOrg) return;
@@ -321,7 +374,17 @@ function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
     setBusy(false);
     if (error) return toast.error(planRefusal(error.message) ?? error.message.replace(/^already_a_member:\s*/, ''));
     toast.success(`${row.email} added to ${orgs.find((o) => o.id === addOrg)?.name ?? 'the organization'}`);
-    setAddOrg(''); setAddRole('member'); onChanged();
+    setAddOrg(''); setAddRole(row.role === 'admin' ? 'admin' : 'member'); onChanged();
+  };
+
+  const changeOrgRole = async (m: Membership, next: string) => {
+    if (next === m.org_role) return;
+    setBusy(true);
+    const { error } = await adminSetOrgMemberRole(actor(), row.user_id, m.org_id, next);
+    setBusy(false);
+    if (error) return toast.error(error);
+    toast.success(`${row.email} is now ${orgRoleLabel(next)} in ${m.name}`);
+    onChanged();
   };
 
   const remove = async (m: Membership) => {
@@ -333,56 +396,117 @@ function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
     onChanged();
   };
 
+  const levelHead = 'mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground';
+
   return (
     <Dialog open onOpenChange={(v) => !v && !busy && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Organizations — {row.name || row.email}</DialogTitle></DialogHeader>
-        <div className="grid gap-3 text-[13px]">
-          {memberships.length === 0 ? (
-            <p className="text-muted-foreground">This account belongs to no organization, so it can see no organization&rsquo;s projects.</p>
-          ) : (
-            <ul className="divide-y rounded-sm border">
-              {memberships.map((m) => (
-                <li key={m.org_id} className="flex items-center gap-2 px-3 py-2">
-                  <span className="min-w-0 flex-1 truncate font-medium">
-                    {m.name}{m.status === 'suspended' ? ' (suspended org)' : ''}
-                  </span>
-                  <span className="text-[12px] text-muted-foreground">{m.org_role}</span>
-                  {m.is_current && <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[11px]">current</span>}
-                  <button title={`Remove from ${m.name}`} disabled={busy}
-                    className="grid h-11 w-11 place-items-center text-[#a3a3a3] hover:text-[#bf2330] disabled:opacity-50 md:h-7 md:w-7"
-                    onClick={() => remove(m)}>
-                    <X className="h-[15px] w-[15px]" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="text-xs text-muted-foreground">
-            The account works in its <em>current</em> organization and switches between its organizations itself.
-            Removing the current one moves it to its next organization.
-          </p>
-          {available.length > 0 && (
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_120px_auto] md:items-end">
-              <div className="min-w-0">
-                <Label className="text-xs">Add to organization</Label>
-                <Select value={addOrg} onValueChange={setAddOrg}>
-                  <SelectTrigger className="mt-1 rounded-sm"><SelectValue placeholder="Choose…" /></SelectTrigger>
-                  <SelectContent>{available.map((o) => <SelectItem key={o.id} value={o.id} className="min-h-11 md:min-h-0">{o.name}</SelectItem>)}</SelectContent>
-                </Select>
+      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-2xl md:rounded-sm')}>
+        <DialogHeader><DialogTitle>Roles — {row.name || row.email}</DialogTitle></DialogHeader>
+        <div className="grid gap-5 text-[13px]">
+          <section>
+            <div className={levelHead}>Level 1 &middot; Platform &nbsp;/&nbsp; Level 2 &middot; Account tier</div>
+            <p>
+              <span className="font-medium">{tier ? `${platform.label} \u00b7 ${ACCOUNT_TIERS[tier].label} tier` : platform.label}</span>
+              <span className="text-muted-foreground"> &mdash; {tier ? ACCOUNT_TIERS[tier].summary : platform.summary}</span>
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Changed in the Account tier column. The tier applies in every organization below.</p>
+          </section>
+
+          <section>
+            <div className={levelHead}>Level 2 &middot; Organizations and the role in each</div>
+            {memberships.length === 0 ? (
+              <p className="text-muted-foreground">This account belongs to no organization, so it can see no organization&rsquo;s projects.</p>
+            ) : (
+              <ul className="divide-y rounded-sm border">
+                {memberships.map((m) => {
+                  const mismatch = tierOrgMismatch(row.role, m.org_role);
+                  return (
+                    <li key={m.org_id} className="px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate font-medium">
+                          {m.name}{m.status === 'suspended' ? ' (suspended org)' : ''}
+                        </span>
+                        {m.is_current && <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[11px]">current</span>}
+                        <Select value={m.org_role} onValueChange={(v) => changeOrgRole(m, v)} disabled={busy}>
+                          <SelectTrigger className="h-7 w-28 rounded-sm text-[12px]" aria-label={`Role in ${m.name}`}><SelectValue /></SelectTrigger>
+                          <SelectContent>{ORG_ROLES.map((r) => <SelectItem key={r} value={r} className="min-h-11 md:min-h-0">{ORG_ROLE_INFO[r].label}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <button title={`Remove from ${m.name}`} disabled={busy}
+                          className="grid h-11 w-11 place-items-center text-[#a3a3a3] hover:text-[#bf2330] disabled:opacity-50 md:h-7 md:w-7"
+                          onClick={() => remove(m)}>
+                          <X className="h-[15px] w-[15px]" />
+                        </button>
+                      </div>
+                      {mismatch && (
+                        <p className="mt-1 flex gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                          <span className="min-w-0">{mismatch}</span>
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              The account works in its <em>current</em> organization and switches between its organizations itself.
+              Removing the current one moves it to its next organization. {ALIGNMENT_HINT}
+            </p>
+            {available.length > 0 && (
+              <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_120px_auto] md:items-end">
+                <div className="min-w-0">
+                  <Label className="text-xs">Add to organization</Label>
+                  <Select value={addOrg} onValueChange={setAddOrg}>
+                    <SelectTrigger className="mt-1 rounded-sm"><SelectValue placeholder="Choose…" /></SelectTrigger>
+                    <SelectContent>{available.map((o) => <SelectItem key={o.id} value={o.id} className="min-h-11 md:min-h-0">{o.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="min-w-0">
+                  <Label className="text-xs">Role there</Label>
+                  <Select value={addRole} onValueChange={setAddRole}>
+                    <SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>{ORG_ROLES.map((r) => <SelectItem key={r} value={r} className="min-h-11 md:min-h-0">{ORG_ROLE_INFO[r].label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <Button className="rounded-sm" onClick={add} disabled={!addOrg || busy}>
+                  {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add
+                </Button>
               </div>
-              <div className="min-w-0">
-                <Label className="text-xs">Role there</Label>
-                <Select value={addRole} onValueChange={setAddRole}>
-                  <SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>{ORG_ROLES.map((r) => <SelectItem key={r} value={r} className="min-h-11 md:min-h-0">{r}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <Button className="rounded-sm" onClick={add} disabled={!addOrg || busy}>
-                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add
-              </Button>
-            </div>
-          )}
+            )}
+          </section>
+
+          <section>
+            <div className={levelHead}>Level 3 &middot; Project roles</div>
+            {projects === null ? (
+              <div className="flex h-10 items-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+            ) : projectsError ? (
+              <p className="text-[#bf2330]">Could not load project roles: {projectsError}</p>
+            ) : projects.length === 0 ? (
+              <p className="text-muted-foreground">No project role on any project.</p>
+            ) : (
+              <ul className="divide-y rounded-sm border">
+                {projects.map((p) => {
+                  const source = roleSource({ isCreator: p.is_creator, memberRole: p.member_role, delegatedRole: p.delegated_role, accountRole: row.role, effectiveRole: p.effective_role });
+                  return (
+                    <li key={p.project_id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className="font-medium">{p.project_name}</span>
+                        <span className="text-muted-foreground"> &middot; {p.organization || 'no organization'}</span>
+                      </span>
+                      <span className="text-[12px]">{projectRoleLabel(p.effective_role)}{source ? ` \u00b7 ${source}` : ''}</span>
+                      {!p.in_project_org && (
+                        <span className="rounded-sm border border-amber-500/40 px-1.5 py-0.5 text-[11px] text-amber-700 dark:text-amber-400"
+                          title="The account no longer belongs to this project's organization. Remove the role on Projects → Access.">
+                          outside its organization
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">Set on Projects &rarr; Access. A project&rsquo;s creator is always its Owner.</p>
+          </section>
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={busy}>Done</Button>
@@ -437,10 +561,10 @@ function AddUserDialog({ orgs, actorArgs, onCreated }: {
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))]">
             <div className="min-w-0">
-              <Label className="text-xs">Role</Label>
+              <Label className="text-xs">Account tier</Label>
               <Select value={role} onValueChange={setRole}>
                 <SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r} className="min-h-11 md:min-h-0">{r}</SelectItem>)}</SelectContent>
+                <SelectContent>{ROLES.map((r) => <SelectItem key={r} value={r} className="min-h-11 md:min-h-0">{tierLabel(r)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="min-w-0">
@@ -454,6 +578,10 @@ function AddUserDialog({ orgs, actorArgs, onCreated }: {
               </Select>
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            {role === 'super_admin' ? platformRole(role).summary : ACCOUNT_TIERS[accountTier(role) ?? 'user'].summary}
+            {role === 'admin' ? ' Their role in the organization will be Admin; everyone else joins as Member.' : ''}
+          </p>
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>

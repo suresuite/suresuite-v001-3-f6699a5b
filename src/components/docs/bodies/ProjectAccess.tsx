@@ -1,6 +1,6 @@
 // §6.3 section 13 — project access.
 
-import { PageTitle, Section, P, Key, Callout, Term, DocLink, Provenance } from "@/components/docs/prose";
+import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
 import { refTable } from "@/components/docs/tableFacts";
 import { SuppliedAndComputed, DatabaseRules } from "@/components/docs/tableRef";
 
@@ -55,22 +55,21 @@ export default function ProjectAccess() {
         <SuppliedAndComputed table={grants} />
       </Section>
 
-      <Callout tone="limit" title="Read this first: there is no screen for any of this">
+      <Callout title="Where project roles are set">
         <p>
-          <strong>Nothing in the application adds a member to a project, and nothing delegates a
-          role.</strong> There is no menu item, no dialog and no button — no part of the product
-          reads or writes either table. What exists is the database design above and one automatic
-          rule: creating a project makes you its owner.
+          <strong>A super administrator sets project roles</strong>, on{" "}
+          <AppLink to="/admin/projects">/admin/projects</AppLink> &rarr; Access &amp; roles. That
+          dialog lists everyone in the project&rsquo;s organization with their roles at all three
+          levels and what they may do on the project today, and it refuses three things: a role
+          for someone outside the project&rsquo;s organization, taking the Owner role from the
+          project&rsquo;s creator, and removing a project&rsquo;s last owner. You can see your own
+          project roles on your profile, under My Access.
         </p>
         <p>
-          So the consultant in the paragraph above is a case this is <em>designed</em> for and not
-          one you can set up today. Adding somebody to a project is a request to whoever operates
-          this deployment, not something a project owner can do.
-        </p>
-        <p>
-          We are saying it here because a reference page describing two tables, their columns and
-          their rules reads as a description of a feature, and a reader would reasonably go looking
-          for the screen.
+          <strong>Nothing delegates a role yet.</strong> The delegation rules below are the
+          database&rsquo;s; there is no screen that lends a role, so the consultant who should see
+          one study for a month is set up today as a member of the organization with a project
+          role, removed by hand when the month is over.
         </p>
       </Callout>
 
@@ -90,23 +89,19 @@ export default function ProjectAccess() {
 
       <Callout title="The write path is a function, not a table rule">
         <p>
-          Neither table carries a write rule, so any change goes through a function that enforces
-          subtraction and expiry rather than through a direct write. That is the right design — it
-          means the two rules above cannot be bypassed by writing the row another way — and it is
-          why there is nothing to add a member <em>with</em> until something calls it.
+          Neither table carries a write rule, so any change goes through a function rather than
+          through a direct write. That is the right design — it means the rules above cannot be
+          bypassed by writing the row another way — and it is why the Access dialog is the only
+          place a project role changes.
         </p>
       </Callout>
 
-      <Callout tone="limit" title="A project created before membership existed may have no members">
+      <Callout title="A project's creator is always an Owner">
         <p>
-          Membership had one writer in its life and it ran once, so projects created in a window
-          afterwards had no members — including no role for their own creator. That is fixed going
-          forward by a trigger that adds the creator; a project from that window may still need a
-          member added by hand.
-        </p>
-        <p>
-          It went unnoticed because nothing had ever <em>asked</em> for a project role until the
-          promotion gate started checking one. A rule nothing reads cannot report that it is empty.
+          Creating a project makes you its Owner, and so does becoming its creator when an
+          administrator transfers a project to you. Projects created in the window before that
+          rule existed, or handed over before the transfer did the same, were given their missing
+          owner once, and the Access dialog will not take the role away from a creator.
         </p>
       </Callout>
 
@@ -118,7 +113,7 @@ export default function ProjectAccess() {
         </P>
       </Section>
 
-      <Provenance from="the project_members and delegation_grants sidecars joined to the schema; the absence of a surface is an import scan over src/, where neither table appears outside this manual" />
+      <Provenance from="the project_members and delegation_grants sidecars joined to the schema; the Access dialog's refusals are the admin_set_project_member and admin_remove_project_member functions, and no screen writes delegation_grants" />
     </>
   );
 }

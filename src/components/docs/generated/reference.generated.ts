@@ -14477,7 +14477,7 @@ export const REFERENCE_TABLES: RefTable[] = [
     "surfaces": [],
     "governance": {
       "read": null,
-      "write": null,
+      "write": "super_admin",
       "minProjectRole": "owner",
       "audited": false,
       "rlsEnabled": true

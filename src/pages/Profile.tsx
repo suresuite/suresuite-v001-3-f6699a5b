@@ -22,10 +22,8 @@ import { describeExpiry, formatDate, passwordStatus, relativeDay } from '@/lib/a
 import { AVATAR_COLORS, DEFAULT_AVATAR_CLASS, avatarClass, isAvatarColor } from '@/lib/avatarColors';
 import { formatPlanDate, periodLabel, usage } from '@/lib/auth/organizationPlan';
 import { useMyOrganizations } from '@/hooks/useMyOrganizations';
-
-/** `super_admin` → "Super admin". The stored value is an enum token, not a label. */
-const roleLabel = (role: string | undefined | null) =>
-  role ? role.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : '';
+import { MyRolesCard } from '@/components/access/MyRolesCard';
+import { orgRoleLabel, tierLabel } from '@/lib/auth/accessLevels';
 
 /**
  * D207 — the organization's access period as one line: "1 month, from 3 Sep 2026".
@@ -269,9 +267,14 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                   <Label>Email</Label>
                   <Input value={user?.email ?? ''} disabled />
                 </div>
+                {/* D211 — the stored role is the PLATFORM level (super admin) or the account
+                    TIER (admin | modeler | user); My Access shows all three levels. */}
                 <div className="space-y-2">
-                  <Label>Role</Label>
-                  <Input value={roleLabel(user?.role)} disabled />
+                  <Label>{user?.role === 'super_admin' ? 'Platform role' : 'Account tier'}</Label>
+                  <Input value={tierLabel(user?.role)} disabled />
+                  <button type="button" className="min-h-11 text-left text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground md:min-h-0" onClick={() => { setTab('access'); setParams({}, { replace: true }); }}>
+                    See your roles at all three levels
+                  </button>
                 </div>
                 <div className="space-y-2">
                   <Label>{organizations.length > 1 ? 'Current organization' : 'Organization'}</Label>
@@ -285,7 +288,7 @@ const Profile = ({ isCollapsed, setIsCollapsed }: ProfileProps) => {
                       {organizations.map((o) => (
                         <li key={o.org_id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
                           <span className="min-w-0 flex-1 truncate font-medium">{o.name}</span>
-                          <span className="text-xs text-muted-foreground">{roleLabel(o.org_role)}</span>
+                          <span className="text-xs text-muted-foreground">{orgRoleLabel(o.org_role)}</span>
                           {o.access_expired ? (
                             <Badge variant="outline" className="text-muted-foreground">Access ended</Badge>
                           ) : o.is_current ? (
@@ -432,11 +435,12 @@ function MyAccessTab() {
 
   return (
     <div className="max-w-3xl space-y-4">
+      <MyRolesCard />
       <Card>
         <CardHeader>
-          <CardTitle>What you can access</CardTitle>
+          <CardTitle>Pages and features</CardTitle>
           <CardDescription>
-            A read-only summary of your current access. To request changes, contact your administrator.
+            What your roles open for you today, including any override an administrator set for your organization or for you.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

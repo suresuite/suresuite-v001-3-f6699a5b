@@ -16,16 +16,17 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ArrowRightLeft, Copy, Loader2, MoreHorizontal, Pencil, Settings2, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Copy, Loader2, MoreHorizontal, Pencil, Settings2, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { DIALOG_AS_SHEET, HDR_SEARCH_INPUT } from '@/components/shared';
 import { cn } from '@/lib/utils';
+import { ProjectAccessDialog } from '@/components/access/ProjectAccessDialog';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface ProjectRow { id: string; name: string; organization_id: string | null; organization: string | null; modeler_id: string; owner_name: string | null; owner_email: string | null; plant_name: string; supply_chain_model: string; bom_level: string; data_type: string; completed: boolean; simulation_start: string | null; simulation_end: string | null; created_at: string; updated_at: string; }
 interface OrgOption { id: string; name: string; }
 interface UserOption { id: string; name: string | null; email: string | null; organization_id: string | null; is_active: boolean | null; }
-type DialogKind = 'copy' | 'rename' | 'meta' | 'transfer' | null;
+type DialogKind = 'access' | 'copy' | 'rename' | 'meta' | 'transfer' | null;
 
 const db = supabase as any;
 const NONE = '__none__';
@@ -129,6 +130,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
               } · ${p.data_type} · updated ${new Date(p.updated_at).toLocaleDateString()}`}
               value={p.completed ? 'done' : 'draft'}
               actions={[
+                { label: 'Access & roles…', sub: 'who may do what on this project', onClick: () => openDialog('access', p) },
                 { label: 'Copy…', onClick: () => openDialog('copy', p) },
                 { label: 'Rename…', onClick: () => openDialog('rename', p) },
                 { label: 'Edit metadata…', onClick: () => openDialog('meta', p) },
@@ -143,7 +145,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead><tr>
-              <SortTH sortKey="name">Name</SortTH><SortTH sortKey="org">Organization</SortTH><SortTH sortKey="owner">Owner</SortTH>
+              <SortTH sortKey="name">Name</SortTH><SortTH sortKey="org">Organization</SortTH><SortTH sortKey="owner">Creator</SortTH>
               <SortTH sortKey="plant">Plant</SortTH><SortTH sortKey="model">Model</SortTH><SortTH sortKey="status">Status</SortTH>
               <SortTH sortKey="updated">Last activity</SortTH><th className={`${TH} w-[1%]`} />
             </tr>
@@ -176,6 +178,8 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('access', p)}><Users className="mr-2 h-4 w-4" /> Access &amp; roles…</DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('copy', p)}><Copy className="mr-2 h-4 w-4" /> Copy…</DropdownMenuItem>
                         <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('rename', p)}><Pencil className="mr-2 h-4 w-4" /> Rename…</DropdownMenuItem>
                         <DropdownMenuItem className="min-h-11 md:min-h-0" onClick={() => openDialog('meta', p)}><Settings2 className="mr-2 h-4 w-4" /> Edit metadata…</DropdownMenuItem>
@@ -193,6 +197,7 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
       </div>
       )}
 
+      {target && dialog === 'access' && <ProjectAccessDialog project={target} actor={{ id: actor?.id, email: actor?.email }} onClose={closeDialog} />}
       {target && dialog === 'copy' && <CopyDialog project={target} orgs={orgs} users={users} actorArgs={actorArgs} onClose={closeDialog} onDone={load} />}
       {target && dialog === 'rename' && <RenameDialog project={target} actorArgs={actorArgs} onClose={closeDialog} onDone={load} />}
       {target && dialog === 'meta' && <MetaDialog project={target} actorArgs={actorArgs} onClose={closeDialog} onDone={load} />}
@@ -225,7 +230,7 @@ function CopyDialog({ project, orgs, users, actorArgs, onClose, onDone }: { proj
           <div><Label className="text-xs">Organization</Label>
             <Select value={orgId} onValueChange={setOrgId}><SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value={NONE}>Keep current ({project.organization || '—'})</SelectItem>{orgs.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent></Select></div>
-          <div><Label className="text-xs">Owner</Label>
+          <div><Label className="text-xs">Creator</Label>
             <Select value={ownerId} onValueChange={setOwnerId}><SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value={NONE}>Keep current ({project.owner_name || project.owner_email || '—'})</SelectItem>{users.map((u) => <SelectItem key={u.id} value={u.id}>{userLabel(u)}</SelectItem>)}</SelectContent></Select></div>
         </div>
@@ -327,14 +332,14 @@ function TransferDialog({ project, orgs, users, actorArgs, onClose, onDone }: { 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Transfer “{project.name}”</DialogTitle><DialogDescription>Moves the project (and all its data) from <span className="font-medium">{project.organization || 'no organization'}</span> to another organization. Optionally hand ownership to a user there.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Transfer “{project.name}”</DialogTitle><DialogDescription>Moves the project (and all its data) from <span className="font-medium">{project.organization || 'no organization'}</span> to another organization. Optionally make a user there its creator, who becomes an Owner of it; the previous creator keeps their project role until you change it under Access.</DialogDescription></DialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Target organization</Label>
             <Select value={orgId} onValueChange={setOrgId}><SelectTrigger className="mt-1 rounded-sm"><SelectValue placeholder="Select organization…" /></SelectTrigger>
               <SelectContent>{orgs.filter((o) => o.id !== project.organization_id).map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent></Select></div>
-          <div><Label className="text-xs">New owner (optional)</Label>
+          <div><Label className="text-xs">New creator (optional)</Label>
             <Select value={ownerId} onValueChange={setOwnerId}><SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value={NONE}>Keep current owner ({project.owner_name || project.owner_email || '—'})</SelectItem>{sortedUsers.map((u) => <SelectItem key={u.id} value={u.id}>{userLabel(u)}{orgId && u.organization_id === orgId ? ' · target org' : ''}</SelectItem>)}</SelectContent></Select></div>
+              <SelectContent><SelectItem value={NONE}>Keep current creator ({project.owner_name || project.owner_email || '—'})</SelectItem>{sortedUsers.map((u) => <SelectItem key={u.id} value={u.id}>{userLabel(u)}{orgId && u.organization_id === orgId ? ' · target org' : ''}</SelectItem>)}</SelectContent></Select></div>
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
