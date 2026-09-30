@@ -13,8 +13,9 @@
 // dialog states both counts (`members_only_here`).
 //
 // The plan (PLAN.md §4 D207): each organization is valid for 1 week, 1 month, 1 quarter
-// or 1 year (or has no expiry), and may have 1, 2, 3 or 5 users and projects (or
-// unlimited). Choosing a period — even the same one — renews it from now. The database
+// or 1 year (or has no expiry), and may have 1, 2, 3, 5, 10, 20, 50 or 100 users and
+// projects (or unlimited; the list is `COUNT_LIMITS`, widened by D218). Choosing a
+// period — even the same one — renews it from now. The database
 // enforces all three: members cannot sign in once the period ends (super admins
 // excepted), and a user or project past a limit is refused by a trigger. The Members
 // and Projects figures are the counts the limits are measured by.
@@ -57,7 +58,7 @@ const statusLabel = (o: OrgRow) => (o.status !== 'active' ? o.status : o.access_
 /** Past its limit after the limit was lowered: nothing is removed, nothing can be added. */
 const overLimit = (used: number, limit: number | null) => limit != null && used > limit;
 
-/** One Select for a count limit — 1, 2, 3, 5 or unlimited. */
+/** One Select for a count limit — one of `COUNT_LIMITS`, or unlimited. */
 function LimitSelect({ value, noun, onChange, className }: {
   value: number | null; noun: 'project' | 'user'; onChange: (v: string) => void; className?: string;
 }) {
@@ -94,6 +95,7 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
   const [accessOrg, setAccessOrg] = useState<OrgRow | null>(null);
   const [renameOrg, setRenameOrg] = useState<OrgRow | null>(null);
   const [deleteOrg, setDeleteOrg] = useState<OrgRow | null>(null);
+  const [limitsOrg, setLimitsOrg] = useState<OrgRow | null>(null);
   const actorArgs = () => ({ p_actor_id: actor?.id, p_actor_email: actor?.email });
 
   const load = async () => {
@@ -186,14 +188,7 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
                   onClick: () => changePeriod(o, p.value),
                 })),
                 ...(o.access_period ? [{ label: 'Remove expiry', onClick: () => changePeriod(o, NONE) }] : []),
-                ...[...COUNT_LIMITS, null].filter((l) => l !== o.user_limit).map((l) => ({
-                  label: `User limit: ${l ?? UNLIMITED_LABEL}`,
-                  onClick: () => changeLimits(o, { user_limit: l }),
-                })),
-                ...[...COUNT_LIMITS, null].filter((l) => l !== o.project_limit).map((l) => ({
-                  label: `Project limit: ${l ?? UNLIMITED_LABEL}`,
-                  onClick: () => changeLimits(o, { project_limit: l }),
-                })),
+                { label: 'Limits…', onClick: () => setLimitsOrg(o) },
                 {
                   label: o.status === 'active' ? 'Suspend' : 'Reactivate',
                   tone: o.status === 'active' ? 'danger' : 'default',
@@ -283,6 +278,7 @@ export default function AdminOrganizations({ isCollapsed, setIsCollapsed }: Prop
 
       {accessOrg && <OrgAccessDrawer orgId={accessOrg.id} orgName={accessOrg.name} open={!!accessOrg} onClose={() => setAccessOrg(null)} />}
       {renameOrg && <RenameOrgDialog org={renameOrg} actorArgs={actorArgs} onClose={() => setRenameOrg(null)} onDone={load} />}
+      {limitsOrg && <LimitsDialog org={limitsOrg} onClose={() => setLimitsOrg(null)} onSave={changeLimits} />}
       {deleteOrg && <DeleteOrgDialog org={deleteOrg} actorArgs={actorArgs} onClose={() => setDeleteOrg(null)} onDone={load} />}
     </AdminLayout>
   );
@@ -307,6 +303,47 @@ function RenameOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
         <DialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={save} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Rename</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// The two limits on a phone (D218): one action instead of one per choice, which at
+// nine choices each would bury the rest of the row's actions.
+function LimitsDialog({ org, onClose, onSave }: {
+  org: OrgRow; onClose: () => void;
+  onSave: (row: OrgRow, next: { project_limit: number | null; user_limit: number | null }) => Promise<unknown>;
+}) {
+  const [userLimit, setUserLimit] = useState(limitToSelect(org.user_limit));
+  const [projectLimit, setProjectLimit] = useState(limitToSelect(org.project_limit));
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    setSaving(true);
+    await onSave(org, { user_limit: limitFromSelect(userLimit), project_limit: limitFromSelect(projectLimit) });
+    setSaving(false);
+    onClose();
+  };
+  return (
+    <Dialog open onOpenChange={(v) => !v && !saving && onClose()}>
+      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <DialogHeader>
+          <DialogTitle>Limits for “{org.name}”</DialogTitle>
+          <DialogDescription>Lowering a limit removes nothing; nothing can be added until the organization is under it.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div>
+            <Label className="text-xs">Users · {usage(org.members, org.user_limit)} now</Label>
+            <LimitSelect value={limitFromSelect(userLimit)} noun="user" onChange={setUserLimit} className="mt-1 rounded-sm" />
+          </div>
+          <div>
+            <Label className="text-xs">Projects · {usage(org.projects, org.project_limit)} now</Label>
+            <LimitSelect value={limitFromSelect(projectLimit)} noun="project" onChange={setProjectLimit} className="mt-1 rounded-sm" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button className="rounded-sm" onClick={save} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save limits</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

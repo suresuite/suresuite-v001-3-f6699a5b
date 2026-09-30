@@ -4,8 +4,9 @@
  *
  * The database is the authority: the CHECKs on `organizations.access_period`,
  * `project_limit` and `user_limit`, and `org_access_period_interval()` for what each
- * period means (`20260929000004`). These lists cannot import that migration, so
- * `organizationPlan.test.ts` compares them with it — a choice offered here and refused
+ * period means (`20260929000004`; the limit list widened by `20260930000012`, D218).
+ * These lists cannot import the migrations, so `organizationPlan.test.ts` compares
+ * them with the latest migration that states each one — a choice offered here and refused
  * there fails on save, and one allowed there and missing here could not be shown.
  *
  * `null` is a real choice in every list: no expiry, unlimited. Every organization that
@@ -21,8 +22,8 @@ export const ACCESS_PERIODS: ReadonlyArray<{ value: AccessPeriod; label: string 
   { value: 'year', label: '1 year' },
 ];
 
-/** The same list for projects and for users. */
-export const COUNT_LIMITS: ReadonlyArray<number> = [1, 2, 3, 5];
+/** The same list for projects and for users (D207; 10–100 added by D218). */
+export const COUNT_LIMITS: ReadonlyArray<number> = [1, 2, 3, 5, 10, 20, 50, 100];
 
 /** A Select cannot carry `null`, so "no expiry" / "unlimited" travel as this token. */
 export const NONE = 'none';

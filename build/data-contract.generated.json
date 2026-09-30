@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 363,
-      "migrations_applied": 355,
-      "last_migration": "20260930000011_my_organization_access.sql"
+      "migrations_found": 364,
+      "migrations_applied": 356,
+      "last_migration": "20260930000012_organization_limit_options.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -17775,31 +17775,25 @@
           "added_by": "20260929000004_organization_plan.sql"
         },
         {
-          "name": "organizations_project_limit_check",
-          "kind": "CHECK",
-          "columns": [
-            "project_limit"
-          ],
-          "definition": "CHECK (project_limit IN (1, 2, 3, 5))",
-          "implicit": true,
-          "added_by": "20260929000004_organization_plan.sql"
-        },
-        {
-          "name": "organizations_user_limit_check",
-          "kind": "CHECK",
-          "columns": [
-            "user_limit"
-          ],
-          "definition": "CHECK (user_limit IN (1, 2, 3, 5))",
-          "implicit": true,
-          "added_by": "20260929000004_organization_plan.sql"
-        },
-        {
           "name": "organizations_access_period_start_check",
           "kind": "CHECK",
           "columns": [],
           "definition": "CHECK ((access_period IS NULL) = (access_valid_from IS NULL))",
           "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "organizations_project_limit_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (project_limit IN (1, 2, 3, 5, 10, 20, 50, 100))",
+          "added_by": "20260930000012_organization_limit_options.sql"
+        },
+        {
+          "name": "organizations_user_limit_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (user_limit IN (1, 2, 3, 5, 10, 20, 50, 100))",
+          "added_by": "20260930000012_organization_limit_options.sql"
         }
       ],
       "indexes": [],
@@ -18176,7 +18170,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it.",
+          "meaning": "The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four added by §4 D218), CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -18188,7 +18182,7 @@
           "ingest": {
             "csv_header": null,
             "required": false,
-            "validate": "one of 1 / 2 / 3 / 5, or NULL"
+            "validate": "one of 1 / 2 / 3 / 5 / 10 / 20 / 50 / 100, or NULL"
           },
           "surfaces": [],
           "resolution": null,
@@ -18208,7 +18202,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3 or 5, CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it.",
+          "meaning": "The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four added by §4 D218), CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -18220,7 +18214,7 @@
           "ingest": {
             "csv_header": null,
             "required": false,
-            "validate": "one of 1 / 2 / 3 / 5, or NULL"
+            "validate": "one of 1 / 2 / 3 / 5 / 10 / 20 / 50 / 100, or NULL"
           },
           "surfaces": [],
           "resolution": null,
@@ -31363,5 +31357,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "8e55e321d029"
+  "contract_version": "1810759ef6a5"
 }
