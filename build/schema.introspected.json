@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 359,
-  "migrations_applied": 351,
+  "migrations_found": 360,
+  "migrations_applied": 352,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260930000007_admin_delete_user.sql",
+  "last_migration": "20260930000008_admin_project_access.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 321,
+    "functions": 322,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -21475,6 +21475,20 @@
       "volatility": null,
       "comment": "WP 7.2 (a), §4 D161/D213 — PERMANENTLY deletes one account. Active super admin only; ",
       "defined_by": "20260930000007_admin_delete_user.sql"
+    },
+    {
+      "name": "admin_get_project_access",
+      "signature": "admin_get_project_access(uuid, text, uuid)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": "D215 — /admin/projects' members read. Active super admin only. Every account that owns ",
+      "defined_by": "20260930000008_admin_project_access.sql"
     },
     {
       "name": "admin_get_user_memberships",
