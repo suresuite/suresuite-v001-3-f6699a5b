@@ -5,7 +5,7 @@
 // `npm run contract:capabilities`. `contract:check` fails when this file and
 // the migrations disagree (PLAN.md §4 D33).
 //
-// 33 capabilities: 12 page, 21 feature.
+// 34 capabilities: 12 page, 22 feature.
 
 export type CapabilityKind = 'page' | 'feature';
 
@@ -20,6 +20,7 @@ export interface CapabilityMeta {
 /** Every feature key the database knows. A key absent here can never be granted. */
 export type FeatureKey =
   | 'ai_chat'
+  | 'ai_chat_launcher'
   | 'simulation_lab'
   | 'project_intelligence'
   | 'data_editing'
@@ -58,6 +59,7 @@ export const PAGE_CAPABILITIES: CapabilityMeta[] = [
 
 export const FEATURE_CAPABILITIES: CapabilityMeta[] = [
   { key: 'ai_chat', kind: 'feature', label: 'AI Assistant', description: 'Use the AI chat assistant', sortOrder: 210 },  // 20260711000002_unified_access_control.sql
+  { key: 'ai_chat_launcher', kind: 'feature', label: 'AI Assistant Button', description: 'Show the floating AI assistant button on every page', sortOrder: 211 },  // 20260930000008_ai_chat_launcher_feature.sql
   { key: 'simulation_lab', kind: 'feature', label: 'Run Simulations', description: 'Configure and run simulation experiments', sortOrder: 220 },  // 20260711000002_unified_access_control.sql
   { key: 'project_intelligence', kind: 'feature', label: 'Project Intelligence', description: 'Generate AI project insights and analysis', sortOrder: 230 },  // 20260711000002_unified_access_control.sql
   { key: 'data_editing', kind: 'feature', label: 'Data Editing', description: 'Create and edit project data (item master, BOM, logistics)', sortOrder: 240 },  // 20260711000002_unified_access_control.sql
