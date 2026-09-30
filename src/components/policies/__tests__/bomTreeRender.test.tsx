@@ -156,3 +156,20 @@ describe("a single-level BOM shows Qty / assy in the flat grid", () => {
     for (const r of rows) expect(html).toContain(r.supplier_id);
   });
 });
+
+describe("the grid keeps its layers to itself", () => {
+  // The frozen key heads are z-40, the same as the sticky PageHeader, and the
+  // frozen body cells z-20, the same as the toolbar. Without a stacking context
+  // on the scroll box, a page scroll painted the Material/Qty/Supplier heads over
+  // the page title and the frozen cells over the toolbar, while the value heads
+  // (z-30) slid underneath — the header split in two.
+  it.each(["compact", "outline", "tabular"])("%s: the table's scroll box isolates its z-indices", (layout) => {
+    withPrefs({ layout, repeat: false, level: 1 });
+    const aa = aaShape();
+    const html = render({ bomLevel: "multi", rows: aa.supplierRows, bomRows: aa.bomRows, deepRows: aa.deepRows });
+    const box = html.match(/<div class="([^"]*)"[^>]*><table/);
+    expect(box).not.toBeNull();
+    expect(box![1].split(/\s+/)).toContain("isolate");
+    expect(html).toContain("sticky top-[23px] z-40");
+  });
+});
