@@ -19,8 +19,9 @@ phu.nguyen@hwr-berlin.de.
 
 ## 2. Parts that will be released as open access
 
-The core algorithms of SuReSuite are research results of the EU Horizon Europe project
-**ACCURATE** and are intended to be published as **open access**, so that other
+The core algorithms of SuReSuite — developed in part within the EU Horizon Europe
+project **ACCURATE** and in part within the PhD research described above — are intended
+to be published as **open access**, so that other
 researchers, consortium partners, public bodies and industry can inspect, reproduce and
 reuse them:
 
@@ -57,6 +58,9 @@ simulation worker, the platform's data contract, trained models built on custome
 project networks, and any project data — is not part of the open-access release.
 
 ## 3. Funding acknowledgement
+
+Parts of this work were carried out within the ACCURATE project; the rest was carried
+out within the PhD research at HWR Berlin and TU Berlin.
 
 The ACCURATE project is funded by the European Union, under Grant Agreement number
 101138269. Views and opinions expressed are however those of the author(s) only and do

@@ -5,7 +5,7 @@ Copyright © 2023–2026 Phu Nguyen.
 
 ## Status: open-access release in preparation
 
-SCSIM is a result of the EU Horizon Europe project **ACCURATE** and will be released
+SCSIM was developed in part within the EU Horizon Europe project **ACCURATE** and will be released
 publicly as open access. The release is prepared under
 [`docs/design/open-access-release-plan.md`](../docs/design/open-access-release-plan.md)
 in the SuReSuite repository.
