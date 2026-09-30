@@ -113,7 +113,7 @@ not contain `src/main.tsx`, and ratchets against `scripts/typecheck-baseline.jso
 — 15 pre-existing errors in eight files as of WP 9.4 (the audit read 21 in nine; audit WP 8 paid four, WP 9.4 two), each with a named owner; the list may
 shrink and may not grow, and one FEWER than the baseline also fails. It runs in
 `npm run lint` and in `data-contract.yml`. **It cannot see an `@ts-nocheck` file,
-and eighteen files in `src/` carry one** (§16 · WP 5.2e), so "15 of 15 held"
+and seventeen files in `src/` carry one** (§16 · WP 5.2e; WP 9.4 deleted the eighteenth), so "15 of 15 held"
 describes the files it can see (it prints that count on every run), not all of `src/`.
 
 And one more EXECUTES the migrations a branch adds, which no static gate can (D31):

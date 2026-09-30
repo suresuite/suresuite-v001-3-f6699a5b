@@ -274,14 +274,14 @@ export default function SimulationLab() {
         </P>
       </Section>
 
-      <Callout tone="limit" title="Arriving from the network map is not the same as arriving here">
+      <Callout title="Arriving from the network map">
         <p>
           A scenario created from a network screen carries a “from network map” marker and opens on
-          stage 2 with its disruption already set. The rest of the sequence is unchanged and the
-          gate still applies — but the objective and the run window are whatever the defaults are,
-          because that path never asked you.
+          stage 2 with its disruption already set. It starts in the validated baseline's world —
+          the same horizon, and the validation's warm-up and replications — exactly as one created
+          here would. The objective is fill rate, because that path does not ask; change it on
+          stage 1 if you are measuring something else.
         </p>
-        <p>Check stage 1 before you run one of those.</p>
       </Callout>
 
       <Section id="reads" title="What this screen reads">

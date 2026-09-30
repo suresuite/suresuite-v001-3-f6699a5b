@@ -108,13 +108,16 @@ export default function ProcessLevelNetwork() {
 
       <Section id="disruption" title="Aiming a disruption at a stage">
         <P>
-          A node here can be turned into a disruption directly. That is the payoff of keeping the
-          depth: in the collapsed view there is no sub-assembly to disrupt, because the modelling
-          has already folded it away.
+          Select a node and <strong>Add disruption</strong> writes an event into a scenario — a
+          new one started from the validated baseline, or one you already have — in run weeks, as
+          a full outage or a cut by a share. The engine disrupts a supplier of this project or
+          the plant. A material or sub-assembly node is shown with that reason, and its connected
+          suppliers are offered instead: at this depth you can see which supplier feeds the stage
+          you meant.
         </P>
         <P>
-          <DocLink to="disruptions">Disruptions</DocLink> covers what a disruption records — and
-          the fact that this product currently holds them in two unrelated shapes.
+          <DocLink to="disruptions">Disruptions</DocLink> covers what a disruption records, and the
+          two older tables no screen writes any more.
         </P>
       </Section>
 

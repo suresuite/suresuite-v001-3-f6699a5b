@@ -23801,26 +23801,26 @@
               "page": "FirmLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/DisruptionDialog.tsx:254",
+              "evidence": "src/components/network/NetworkDisruptionDialog.tsx:353",
               "confirmed": true
             },
             {
               "page": "ProcessLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/DisruptionDialog.tsx:254",
+              "evidence": "src/components/network/NetworkDisruptionDialog.tsx:353",
               "confirmed": true
             },
             {
               "page": "ProductLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/DisruptionDialog.tsx:254",
+              "evidence": "src/components/network/NetworkDisruptionDialog.tsx:353",
               "confirmed": true
             }
           ],
           "resolution": null,
-          "note": "NOT TRACED into `scsim` from this column: the worker takes the horizon from the run request, not from the project row. The two can disagree, and nothing today reconciles them — recorded rather than implied (§5 T1).",
+          "note": "NOT TRACED into `scsim` from this column: the worker takes the horizon from the run request, not from the project row. The two can disagree, and nothing today reconciles them — recorded rather than implied (§5 T1). Since WP 9.4 the network pages' disruption dialog reads it for ONE thing: an approximate calendar date beside a run week, labelled as such and never stored — the event itself is authored in run weeks.",
           "engine_requirement": null
         },
         {
@@ -23850,31 +23850,9 @@
             "required": false,
             "validate": null
           },
-          "surfaces": [
-            {
-              "page": "FirmLevelNetwork.tsx",
-              "via": "table read",
-              "grain": "column",
-              "evidence": "src/components/DisruptionDialog.tsx:254",
-              "confirmed": true
-            },
-            {
-              "page": "ProcessLevelNetwork.tsx",
-              "via": "table read",
-              "grain": "column",
-              "evidence": "src/components/DisruptionDialog.tsx:254",
-              "confirmed": true
-            },
-            {
-              "page": "ProductLevelNetwork.tsx",
-              "via": "table read",
-              "grain": "column",
-              "evidence": "src/components/DisruptionDialog.tsx:254",
-              "confirmed": true
-            }
-          ],
+          "surfaces": [],
           "resolution": null,
-          "note": "As `simulation_start` — the run request is what the engine actually reads.",
+          "note": "As `simulation_start` — the run request is what the engine actually reads. No screen reads it since WP 9.4: the network pages' disruption dialog used it to bound a date picker, and the dialog now authors run weeks (§4 D226).",
           "engine_requirement": null
         },
         {
@@ -31421,5 +31399,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "8a8d9bde1d6c"
+  "contract_version": "2a7a9dc5ba8e"
 }

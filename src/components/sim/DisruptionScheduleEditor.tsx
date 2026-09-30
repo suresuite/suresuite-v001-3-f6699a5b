@@ -160,7 +160,7 @@ export function DisruptionScheduleEditor({
 }
 
 /** Full outage, or a cut BY a share — the engine's reading of `magnitude_pct`. */
-function EffectControl({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+export function EffectControl({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const full = DISRUPTION_RULE.full_outage_pct;
   const partial = value < full;
   const [text, setText] = useState(String(partial ? value : 50));

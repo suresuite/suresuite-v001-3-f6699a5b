@@ -165,45 +165,5 @@ export function useScenarios(projectId: string | null | undefined) {
     [projectId],
   );
 
-  /**
-   * Create a new scenario pre-configured with a single-node disruption.
-   * Called from network pages (ProductLevelNetwork etc.) to let the user jump
-   * straight into SimulationLab with the disruption already set up.
-   */
-  const createFromNode = useCallback(
-    async (
-      targetProjectId: string,
-      nodeId: string,
-      nodeType: "supplier" | "material" | "product" | "customer" | string,
-      magnitudePct = 80,
-      durationDays = 42,
-      startDay = 7,
-    ): Promise<Scenario | null> => {
-      const disruption_schedule = [
-        {
-          target: nodeId,
-          target_type: "node" as const,
-          start_day: startDay,
-          duration_days: durationDays,
-          magnitude_pct: magnitudePct,
-        },
-      ];
-      const name = `Disruption: ${nodeType}/${nodeId}`;
-      const { data, error } = await sb
-        .from("scenarios")
-        .insert({
-          ...SCENARIO_DEFAULTS(targetProjectId, name),
-          disruption_schedule,
-          horizon_days: 182,
-          replications: 30,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data as Scenario;
-    },
-    [],
-  );
-
-  return { scenarios, loading, create, update, remove, duplicate, refresh, createFromNode };
+  return { scenarios, loading, create, update, remove, duplicate, refresh };
 }

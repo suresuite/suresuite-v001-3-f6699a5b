@@ -236,6 +236,6 @@ The tier-1 staged row this was promoted from (WP 6.2). Its `source_row_number` i
 
 ---
 
-*Generated from data contract `8a8d9bde1d6c`, engine `0.2.8`,
+*Generated from data contract `2a7a9dc5ba8e`, engine `0.2.8`,
 sidecar `supabase/contract/customers.contract.yaml`, table created by `20260916000003_adopt_customers_drop_product_code_map.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
