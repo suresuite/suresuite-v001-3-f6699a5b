@@ -70,6 +70,7 @@ export const NAV_LABELS = {
   developerApi: L('Developer API', 'API'),
   superAdmin: L('Super Admin', 'Admin'),
   aboutHelp: L('About & Help', 'Help'),
+  documentation: L('Documentation', 'Docs'),
 } satisfies Record<string, Label>;
 
 /**

@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useState, type ReactNode } from 'react';
 import { AuthProvider } from '@/hooks/useAuth';
 import { CapabilitiesProvider } from '@/hooks/useCapabilities';
 import { GlobalProjectProvider } from '@/hooks/useGlobalProject';
@@ -11,6 +11,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import RoleGuard from '@/components/RoleGuard';
 import RouteErrorBoundary from '@/components/RouteErrorBoundary';
 import { PageLayout } from '@/components/shared/PageLayout';
+import { DOCS_SUPER_ADMIN_ONLY } from '@/lib/ui/docsVisibility';
 
 // Renders on every route, but never in the first frame that matters — so the
 // chat tree and its dependencies come after the page, not with it.
@@ -70,6 +71,19 @@ function RouteFallback() {
         <p className="mt-2 text-muted-foreground">Loading...</p>
       </div>
     </div>
+  );
+}
+
+/** The manual's door. While `DOCS_SUPER_ADMIN_ONLY` is on it is an ordinary
+ *  guarded page — sign-in first, then RoleGuard, whose `canAccessPage` admits
+ *  only a super admin to a docs path. Off, it renders for anyone, signed in or
+ *  not. */
+function DocsGate({ children }: { children: ReactNode }) {
+  if (!DOCS_SUPER_ADMIN_ONLY) return <>{children}</>;
+  return (
+    <ProtectedRoute>
+      <RoleGuard>{children}</RoleGuard>
+    </ProtectedRoute>
   );
 }
 
@@ -213,10 +227,12 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-                {/* The manual (PLAN.md §6). Public on purpose: §6.5's argument for
+                {/* The manual (PLAN.md §6). Meant to be public: §6.5's argument for
                     publishing the architecture is that a prospective customer, a
                     researcher and a new modeller all ask the same opening question,
-                    and answering it should not require an account.
+                    and answering it should not require an account. For now it is
+                    not — `DOCS_SUPER_ADMIN_ONLY` (src/lib/ui/docsVisibility.ts)
+                    puts it behind sign-in and super admin, and DocsGate reads it.
 
                     /docs is the address §6 names throughout. /help is what the
                     archived site used and what anything older links to, so it
@@ -228,7 +244,7 @@ function App() {
                     and every one of them ends in `.md` while no slug does — but a
                     slug ending `.md` would be shadowed by that directory. The
                     registry test asserts none is. */}
-                <Route path="/docs" element={<DocsLayout />}>
+                <Route path="/docs" element={<DocsGate><DocsLayout /></DocsGate>}>
                   {/* The index is the manual's front door, not its first
                       article: /docs is linked from the public top bar next to
                       /about, so it is reached by people deciding whether to
@@ -237,8 +253,8 @@ function App() {
                   <Route index element={<DocsHome />} />
                   <Route path=":slug" element={<DocPage />} />
                 </Route>
-                <Route path="/help" element={<Navigate to="/docs" replace />} />
-                <Route path="/help/:slug" element={<HelpSlugRedirect />} />
+                <Route path="/help" element={<DocsGate><Navigate to="/docs" replace /></DocsGate>} />
+                <Route path="/help/:slug" element={<DocsGate><HelpSlugRedirect /></DocsGate>} />
                 <Route path="/about" element={<About />} />
 
                 {/* Super Admin routes */}
