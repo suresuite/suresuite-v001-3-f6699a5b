@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 304 304">
+<style>.ink{fill:#201E1D}@media (prefers-color-scheme:dark){.ink{fill:#E7E5E4}}</style>
+<circle cx="27.2" cy="27.2" r="27.2" fill="#EC3013"/>
+<rect x="62.4" y="0" width="54.4" height="54.4" fill="#EC3013"/>
+<rect x="124.8" y="0" width="54.4" height="54.4" fill="#E5451F"/>
+<rect x="187.2" y="0" width="54.4" height="54.4" fill="#CF3F1E"/>
+<rect x="249.6" y="0" width="54.4" height="54.4" fill="#A83A20"/>
+<rect x="0" y="62.4" width="54.4" height="54.4" fill="#EC3013"/>
+<rect x="0" y="124.8" width="54.4" height="54.4" fill="#E5451F"/>
+<rect x="62.4" y="124.8" width="54.4" height="54.4" fill="#CF3F1E"/>
+<rect x="124.8" y="124.8" width="54.4" height="54.4" fill="#A83A20"/>
+<rect x="187.2" y="124.8" width="54.4" height="54.4" fill="#7C3420"/>
+<rect x="249.6" y="124.8" width="54.4" height="54.4" fill="#5C2A1E"/>
+<rect class="ink" x="249.6" y="187.2" width="54.4" height="54.4"/>
+<rect class="ink" x="0" y="249.6" width="54.4" height="54.4"/>
+<rect class="ink" x="62.4" y="249.6" width="54.4" height="54.4"/>
+<rect class="ink" x="124.8" y="249.6" width="54.4" height="54.4"/>
+<rect class="ink" x="187.2" y="249.6" width="54.4" height="54.4"/>
+<rect class="ink" x="249.6" y="249.6" width="54.4" height="54.4"/>
+</svg>

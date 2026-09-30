@@ -199,9 +199,9 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
                 <img
                   src="/logo-mark.png"
                   alt="SuReSuite"
-                  className="object-contain h-6 w-auto"
-                  width={129}
-                  height={24}
+                  className="object-contain h-5 w-auto"
+                  width={108}
+                  height={20}
                 />
               </div>
               <div className="absolute right-2 top-0 h-full flex items-center">
@@ -226,7 +226,7 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
                 <img
                   src="/logo-icon.png"
                   alt="SuReSuite compact"
-                  className="h-6 w-6 object-contain transition-opacity group-hover:opacity-0"
+                  className="h-5 w-5 object-contain transition-opacity group-hover:opacity-0"
                 />
                 <ChevronRight
                   size={14}
