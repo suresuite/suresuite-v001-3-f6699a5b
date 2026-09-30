@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 356,
-      "migrations_applied": 348,
-      "last_migration": "20260930000004_account_in_several_organizations.sql"
+      "migrations_found": 357,
+      "migrations_applied": 349,
+      "last_migration": "20260930000005_admin_user_memberships.sql"
     },
     "sidecars": 55,
     "registry": {
@@ -17361,7 +17361,7 @@
         "min_project_role": "viewer",
         "audited": false,
         "rls_enabled": true,
-        "note": "A member may read only their OWN membership row (`user_id = get_current_user_id()`); there is no policy letting a member enumerate who else is in their organization, and the admin pages that do so run through super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member` and friends log through `log_admin_action`, but membership rows are also written by the `20260709000002` backfill and by nothing else that audits, so the general claim fails. WP 2.3 is where it becomes true."
+        "note": "A member may read only their OWN membership row (`user_id = get_current_user_id()`); there is no policy letting a member enumerate who else is in their organization, and the admin pages that do so run through super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member` and friends log through `log_admin_action`, but membership rows are also written by the `20260709000002` backfill and by nothing else that audits, so the general claim fails. WP 2.3 is where it becomes true. Since D211 an account's `org_role` in each of its organizations is also set by `admin_set_user_org_role` (active super admin, /admin/users/:userId), logged to `admin_audit_logs`."
       },
       "rls": {
         "enabled": true,
@@ -22554,7 +22554,7 @@
         "min_project_role": "owner",
         "audited": false,
         "rls_enabled": true,
-        "note": "`write: null` is LITERAL and load-bearing. The table has a SELECT policy and NO insert/update/delete policy, so RLS denies writes by default and the SECURITY DEFINER RPCs are the only way in. That is not an oversight to be tidied up later: D28 says every policy here is PERMISSIVE and permissive policies OR, so a \"deny writes\" policy added beside anything else would deny nothing. The ABSENCE of a policy is the enforcement. `audited: false` — a membership change writes no audit row; WP 2.3 is where that becomes true, and this table is one of the reasons it matters."
+        "note": "`write: null` is LITERAL and load-bearing. The table has a SELECT policy and NO insert/update/delete policy, so RLS denies writes by default and the SECURITY DEFINER RPCs are the only way in. That is not an oversight to be tidied up later: D28 says every policy here is PERMISSIVE and permissive policies OR, so a \"deny writes\" policy added beside anything else would deny nothing. The ABSENCE of a policy is the enforcement. `audited: false` — a membership change writes no audit row; WP 2.3 is where that becomes true, and this table is one of the reasons it matters. Since D211 the writers are the WP 3.4 owner trigger and `admin_set_project_member` / `admin_remove_project_member` (active super admin, /admin/users/:userId), which log to `admin_audit_logs` and refuse to change the project modeler's own row."
       },
       "rls": {
         "enabled": true,
@@ -31300,5 +31300,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "74959801714d"
+  "contract_version": "8fdc41952a3f"
 }

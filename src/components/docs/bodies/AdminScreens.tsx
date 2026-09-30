@@ -16,8 +16,8 @@ const WHAT: Record<string, { what: string; care?: string }> = {
     care: "The entitlements themselves are on the per-user page below, not here.",
   },
   "/admin/users/:userId": {
-    what: "One person's access: their role, their capability grants and denials, and their permitted AI models.",
-    care: "This is where the AI allow-list lives, and clearing it grants every model rather than revoking them.",
+    what: "One person's access: the organizations they belong to and their role in each, every project they can reach with their role and rights on each, their capability grants and denials, and their permitted AI models.",
+    care: "Project visibility follows the organization the person is working in, so another organization's projects appear only after they switch, and a membership on a project outside all their organizations is recorded but never visible. The project's owner stays its owner until the project is transferred. Clearing the AI allow-list grants every model rather than revoking them.",
   },
   "/admin/roles": {
     what: "Roles and the capabilities each one carries.",

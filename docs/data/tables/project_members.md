@@ -43,7 +43,7 @@ partially or get corrected — the write fails.
 | Row-level security | enabled |
 | Policies on the table | 1 — all carry a predicate |
 
-`write: null` is LITERAL and load-bearing. The table has a SELECT policy and NO insert/update/delete policy, so RLS denies writes by default and the SECURITY DEFINER RPCs are the only way in. That is not an oversight to be tidied up later: D28 says every policy here is PERMISSIVE and permissive policies OR, so a "deny writes" policy added beside anything else would deny nothing. The ABSENCE of a policy is the enforcement. `audited: false` — a membership change writes no audit row; WP 2.3 is where that becomes true, and this table is one of the reasons it matters.
+`write: null` is LITERAL and load-bearing. The table has a SELECT policy and NO insert/update/delete policy, so RLS denies writes by default and the SECURITY DEFINER RPCs are the only way in. That is not an oversight to be tidied up later: D28 says every policy here is PERMISSIVE and permissive policies OR, so a "deny writes" policy added beside anything else would deny nothing. The ABSENCE of a policy is the enforcement. `audited: false` — a membership change writes no audit row; WP 2.3 is where that becomes true, and this table is one of the reasons it matters. Since D211 the writers are the WP 3.4 owner trigger and `admin_set_project_member` / `admin_remove_project_member` (active super admin, /admin/users/:userId), which log to `admin_audit_logs` and refuse to change the project modeler's own row.
 
 <details><summary>1 RLS policy</summary>
 
@@ -195,6 +195,6 @@ When it was last changed. Server-stamped by DEFAULT only; no trigger maintains i
 
 ---
 
-*Generated from data contract `74959801714d`, engine `0.2.8`,
+*Generated from data contract `8fdc41952a3f`, engine `0.2.8`,
 sidecar `supabase/contract/project_members.contract.yaml`, table created by `20260915000005_project_membership_and_delegation.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

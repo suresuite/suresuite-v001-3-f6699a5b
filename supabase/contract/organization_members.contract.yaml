@@ -35,7 +35,10 @@ governance:
     super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member`
     and friends log through `log_admin_action`, but membership rows are also
     written by the `20260709000002` backfill and by nothing else that audits, so
-    the general claim fails. WP 2.3 is where it becomes true.
+    the general claim fails. WP 2.3 is where it becomes true. Since D211 an
+    account's `org_role` in each of its organizations is also set by
+    `admin_set_user_org_role` (active super
+    admin, /admin/users/:userId), logged to `admin_audit_logs`.
 
 fields:
   id:

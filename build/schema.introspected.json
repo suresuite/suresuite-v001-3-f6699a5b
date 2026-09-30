@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 356,
-  "migrations_applied": 348,
+  "migrations_found": 357,
+  "migrations_applied": 349,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20260930000004_account_in_several_organizations.sql",
+  "last_migration": "20260930000005_admin_user_memberships.sql",
   "counts": {
     "tables": 81,
     "views": 7,
     "enums": 4,
-    "functions": 315,
+    "functions": 319,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -21458,6 +21458,20 @@
       "defined_by": "20260712000002_admin_project_management.sql"
     },
     {
+      "name": "admin_get_user_memberships",
+      "signature": "admin_get_user_memberships(uuid, text, uuid)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_target_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": "D211 — /admin/users/:userId's organization and project read. Active super admin only. ",
+      "defined_by": "20260930000005_admin_user_memberships.sql"
+    },
+    {
       "name": "admin_list_organizations",
       "signature": "admin_list_organizations(uuid, text)",
       "args": [
@@ -21536,6 +21550,21 @@
       "volatility": null,
       "comment": "D210 — a super admin removes an account from one organization. If it was the account's ",
       "defined_by": "20260930000004_account_in_several_organizations.sql"
+    },
+    {
+      "name": "admin_remove_project_member",
+      "signature": "admin_remove_project_member(uuid, text, uuid, uuid)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_target_user_id uuid",
+        "p_project_id uuid"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260930000005_admin_user_memberships.sql"
     },
     {
       "name": "admin_rename_project",
@@ -21631,6 +21660,24 @@
       "defined_by": "20260711000003_admin_management_rpcs.sql"
     },
     {
+      "name": "admin_set_project_member",
+      "signature": "admin_set_project_member(uuid, text, uuid, uuid, text, timestamptz, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_target_user_id uuid",
+        "p_project_id uuid",
+        "p_project_role text",
+        "p_expires_at timestamptz DEFAULT NULL",
+        "p_rationale text DEFAULT NULL"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260930000005_admin_user_memberships.sql"
+    },
+    {
       "name": "admin_set_user_active",
       "signature": "admin_set_user_active(uuid, text, uuid, boolean)",
       "args": [
@@ -21680,6 +21727,22 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260711000002_unified_access_control.sql"
+    },
+    {
+      "name": "admin_set_user_org_role",
+      "signature": "admin_set_user_org_role(uuid, text, uuid, uuid, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_target_user_id uuid",
+        "p_org_id uuid",
+        "p_org_role text"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20260930000005_admin_user_memberships.sql"
     },
     {
       "name": "admin_set_user_role",
