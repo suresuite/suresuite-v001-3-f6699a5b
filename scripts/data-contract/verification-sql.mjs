@@ -5108,6 +5108,65 @@ async function d170DeleteStillFails() {
   });
 }
 
+// ── Phase 10 · WP 10.2 + WP 10.1 — versions by content, the stored graph state ──
+//
+// Readings, not gates. Taken BEFORE the merge they measure production WITHOUT
+// `20261001000006`/`…07` (the new columns and tables read as "QUERY FAILED", which
+// is the expected shape, not a finding); taken in the push AFTER the merge (D153)
+// they are the after-reading §16 owes. Every project, never one (D42).
+async function phase10Versions() {
+  section("Phase 10 · WP 10.2 / 10.1 — policy and graph versions by content, the stored graph state");
+
+  report("(1) D241 — policy versions vs distinct contents, every project",
+    await tryQ(`
+      select count(*) as versions,
+             count(distinct (project_id, policy_hash)) as distinct_contents,
+             count(*) - count(distinct (project_id, policy_hash)) as same_content_duplicates,
+             count(*) filter (where policy_hash is null) as no_hash
+        from public.policy_versions`),
+    (rows) => { out("**(1) D241 — policy versions vs the contents they hold:**"); out(...table(rows)); });
+
+  report("(2) D242 — active cards sharing one content triple (the new unique index refuses >1)",
+    await tryQ(`
+      select count(*) as active_cards,
+             count(distinct (project_id, policy_hash, graph_hash, scenario_hash)) as distinct_triples
+        from public.model_validations where status = 'active'`),
+    (rows) => { out("**(2) D242 — active model cards and the content triples they cover:**"); out(...table(rows)); });
+
+  report("(3) WP 10.2 — policy_versions.version_no assigned",
+    await tryQ(`
+      select count(*) as versions, count(version_no) as numbered,
+             count(distinct (project_id, version_no)) as distinct_numbers
+        from public.policy_versions`),
+    (rows) => { out("**(3) policy version numbers (after the merge):**"); out(...table(rows)); });
+
+  report("(4) D234 — graph versions vs distinct contents, numbering and level hashes",
+    await tryQ(`
+      select count(*) as versions,
+             count(distinct (project_id, graph_hash)) as distinct_contents,
+             count(version_no) as numbered,
+             count(hash_firm) as with_firm_level,
+             count(hash_process) as with_process_level
+        from public.dataset_versions`),
+    (rows) => { out("**(4) graph versions (after the merge: every row numbered, levels where the snapshot supports them):**"); out(...table(rows)); });
+
+  report("(5) D233 — project_graph_state rows, by dirtiness",
+    await tryQ(`
+      select count(*) as projects_with_state,
+             count(*) filter (where dirty) as dirty,
+             count(*) filter (where not dirty and graph_hash is not null) as stored_clean,
+             (select count(*) from public.projects) as projects
+        from public.project_graph_state`),
+    (rows) => { out("**(5) the stored graph state:**"); out(...table(rows)); });
+
+  report("(6) D235 — analysis runs by the level they keyed on",
+    await tryQ(`
+      select analysis_kind, input_scope, status, count(*) as runs,
+             count(dataset_version_id) as with_graph_version
+        from public.analysis_runs group by 1, 2, 3 order by 1, 2, 3`),
+    (rows) => { out("**(6) analysis runs by kind and level:**"); out(...table(rows)); });
+}
+
 async function main() {
   out(`# PLAN.md §15 — verification SQL, executed`);
   out("");
@@ -5121,6 +5180,7 @@ async function main() {
   await rqScenarioDiagnostic();
   await d205AdminUsers();
   await wp94ScenarioRole();
+  await phase10Versions();
 
   await schemaProbe();
   await viewSecurity();
