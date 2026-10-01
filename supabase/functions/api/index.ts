@@ -829,11 +829,37 @@ const getRunReplications: Handler = async (ctx) => {
   if (error) throw new ApiError(503, "read_failed", "replications read failed");
   const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
   const page = rows.slice(0, limit);
+  // WP 10.6 · §4 D246 — a worker run since WP 10.6 keeps its weekly series in ONE
+  // Parquet object, and its rows' `time_series` is `{}`. Asked for series, the
+  // API says where they are: a short-lived signed URL to the object, or that they
+  // expired and which RunKey reproduces them — never empty arrays passed off as
+  // the measurement. A separate read, so a database without `20261001000010`
+  // answers exactly as before.
+  let series: Record<string, unknown> | undefined;
+  if (includeSeries) {
+    const { data: s } = await svc
+      .from("simulation_runs")
+      .select("series_object,series_expired_at,run_key")
+      .eq("id", run.id)
+      .maybeSingle();
+    if (s?.series_object) {
+      const { data: signed } = await svc.storage.from("run-results").createSignedUrl(s.series_object, 600);
+      series = {
+        location: "object",
+        format: "parquet (zstd), long form: rep_index, model_rep, event_rep, week, one column per series",
+        url: signed?.signedUrl ?? null,
+        expires_in_seconds: 600,
+      };
+    } else if (s?.series_expired_at) {
+      series = { location: "expired", run_key: s.run_key ?? null, note: "re-running the run's RunKey reproduces them" };
+    }
+  }
   return {
     status: 200,
     body: {
       data: page,
       next_cursor: rows.length > limit ? String(page[page.length - 1]?.rep_index ?? "") : null,
+      ...(series ? { series } : {}),
     },
   };
 };

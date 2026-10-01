@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { compareRows } from "@/lib/sim/pairedCompare";
 import { comparabilityFailures } from "@/lib/sim/comparability";
 import { isValidationBaseline } from "@/lib/sim/validationBaseline";
+import { compareScope, type CompareCandidate } from "@/lib/sim/labModel";
 import { CompareTable, type CompareRow } from "./resultTables";
 import { TableBlock } from "@/components/shared";
 import { M, MobileNote, MobilePanel, MobileRow } from "@/components/mobile";
@@ -36,6 +37,17 @@ interface Props {
    * list. The comparison itself, and every number in it, is the same.
    */
   skin?: boolean;
+  /**
+   * WP 10.5 — the Validated Model the comparison defaults to: only scenarios
+   * whose newest completed run followed it are offered, until "include other
+   * models" is ticked, and then every other run is LABELLED. Null = no model
+   * chosen (an exploratory session): every run is offered.
+   */
+  modelId?: string | null;
+  /** run id → the model whose EVIDENCE it is (`model_validations.evidence_run_id`).
+   *  An evidence run is dispatched before its model exists, so its own row names
+   *  no model; it belongs to the model it validated. */
+  evidenceModelOf?: Record<string, string>;
 }
 
 // §2.4: with no comparable scenarios both selects have no options, so they
@@ -45,19 +57,50 @@ interface Props {
 const SELECT =
   "h-7 min-h-11 min-w-11 max-w-full rounded-sm border border-[#d4d4d8] bg-white px-2 text-[12.5px] text-[#18181b] focus:border-foreground focus:outline-none md:min-h-0 md:min-w-0";
 
-export function CompareScenariosPanel({ scenarios, runsByScenario, skin = false }: Props) {
+export function CompareScenariosPanel({
+  scenarios,
+  runsByScenario,
+  skin = false,
+  modelId = null,
+  evidenceModelOf = {},
+}: Props) {
+  const [includeOthers, setIncludeOthers] = useState(false);
+  const scope = useMemo(() => {
+    const cands: CompareCandidate[] = scenarios
+      .filter((s) => runsByScenario[s.id])
+      .map((s) => {
+        const run = runsByScenario[s.id];
+        const evidenceOf = evidenceModelOf[run.id] ?? null;
+        return {
+          scenarioId: s.id,
+          modelId: run.model_validation_id ?? evidenceOf,
+          exploratory: evidenceOf ? false : run.exploratory ?? !run.model_validation_id,
+        };
+      });
+    return compareScope(cands, modelId, includeOthers);
+  }, [scenarios, runsByScenario, evidenceModelOf, modelId, includeOthers]);
   const withResults = useMemo(
-    () => scenarios.filter((s) => runsByScenario[s.id]),
-    [scenarios, runsByScenario],
+    () => scenarios.filter((s) => scope.offered.some((c) => c.scenarioId === s.id)),
+    [scenarios, scope],
   );
+  // An exploratory run is never the baseline side (WP 10.5).
+  const aOptions = useMemo(
+    () => withResults.filter((s) => scope.baselineEligible.some((c) => c.scenarioId === s.id)),
+    [withResults, scope],
+  );
+  const tagOf = (id: string): string => {
+    const c = scope.offered.find((x) => x.scenarioId === id);
+    const label = c ? scope.labelOf(c) : null;
+    return label ? ` — ${label}` : "";
+  };
   const [aId, setAId] = useState<string | null>(null);
   const [bId, setBId] = useState<string | null>(null);
 
   // The validated baseline is the natural A: every experiment is a change to it.
   const a =
-    withResults.find((s) => s.id === aId) ??
-    withResults.find((s) => isValidationBaseline(s)) ??
-    withResults[0] ??
+    aOptions.find((s) => s.id === aId) ??
+    aOptions.find((s) => isValidationBaseline(s)) ??
+    aOptions[0] ??
     null;
   const b =
     withResults.find((s) => s.id === bId) ?? withResults.find((s) => s.id !== a?.id) ?? null;
@@ -138,9 +181,9 @@ export function CompareScenariosPanel({ scenarios, runsByScenario, skin = false 
             disabled={disabled}
             aria-label={`Scenario ${label}`}
           >
-            {withResults.map((sc) => (
+            {(label === "A" ? aOptions : withResults).map((sc) => (
               <option key={sc.id} value={sc.id}>
-                {sc.name || "Untitled scenario"}
+                {(sc.name || "Untitled scenario") + tagOf(sc.id)}
               </option>
             ))}
           </select>
@@ -151,8 +194,24 @@ export function CompareScenariosPanel({ scenarios, runsByScenario, skin = false 
     return (
       <>
         <MobilePanel label="Paired comparison" counter={`${withResults.length} with results`}>
-          {picker("A", a?.id ?? "", setAId, withResults.length === 0)}
+          {picker("A", a?.id ?? "", setAId, aOptions.length === 0)}
           {picker("B", b?.id ?? "", setBId, withResults.length < 2)}
+          {modelId ? (
+            <MobileRow
+              chevron={false}
+              label="Include other models"
+              sub="runs of another model, or of none, are labelled"
+              trailing={
+                <input
+                  type="checkbox"
+                  aria-label="Include other models"
+                  checked={includeOthers}
+                  onChange={(e) => setIncludeOthers(e.target.checked)}
+                  className="h-5 w-5 accent-foreground"
+                />
+              }
+            />
+          ) : null}
           {shortfall ? (
             <MobileRow chevron={false} label={shortfall} />
           ) : failures.length > 0 ? (
@@ -191,11 +250,11 @@ export function CompareScenariosPanel({ scenarios, runsByScenario, skin = false 
             className={SELECT}
             value={a?.id ?? ""}
             onChange={(e) => setAId(e.target.value)}
-            disabled={withResults.length === 0}
+            disabled={aOptions.length === 0}
           >
-            {withResults.map((s) => (
+            {aOptions.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name || "Untitled scenario"}
+                {(s.name || "Untitled scenario") + tagOf(s.id)}
               </option>
             ))}
           </select>
@@ -208,10 +267,21 @@ export function CompareScenariosPanel({ scenarios, runsByScenario, skin = false 
           >
             {withResults.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name || "Untitled scenario"}
+                {(s.name || "Untitled scenario") + tagOf(s.id)}
               </option>
             ))}
           </select>
+          {modelId ? (
+            <label className="flex items-center gap-1.5 text-[11.5px] text-[#52525b]">
+              <input
+                type="checkbox"
+                checked={includeOthers}
+                onChange={(e) => setIncludeOthers(e.target.checked)}
+                className="h-[13px] w-[13px] accent-foreground"
+              />
+              include other models (labelled)
+            </label>
+          ) : null}
         </span>
       }
     >

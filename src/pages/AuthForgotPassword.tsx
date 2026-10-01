@@ -1,4 +1,4 @@
-// "Forgot password?" on the sign-in page (PLAN.md §4 D233) — part of /auth, so it
+// "Forgot password?" on the sign-in page (PLAN.md §4 D251) — part of /auth, so it
 // lives beside `Auth.tsx` and shares its skin (§C6 allows /auth its black button).
 //
 // The person types their email and a super admin is told; nothing about the account

@@ -1,4 +1,4 @@
--- Forgotten passwords: the person ASKS, a super admin RESETS (PLAN.md §4 D233).
+-- Forgotten passwords: the person ASKS, a super admin RESETS (PLAN.md §4 D251).
 --
 -- Until now "Forgot password?" on the sign-in page was a link to `#`, and a person who
 -- forgot their password had to know to email somebody. `admin_reset_user_password`
@@ -89,7 +89,7 @@ BEGIN
   END IF;
 END; $$;
 COMMENT ON FUNCTION public.request_password_reset(text) IS
-  'D233 — the sign-in page''s "Forgot password?". Records one open request for an active '
+  'D251 — the sign-in page''s "Forgot password?". Records one open request for an active '
   'account and returns nothing in every case, so the caller cannot tell which emails exist.';
 REVOKE ALL ON FUNCTION public.request_password_reset(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.request_password_reset(text) TO anon, authenticated;

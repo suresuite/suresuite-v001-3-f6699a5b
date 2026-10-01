@@ -35,6 +35,9 @@ export interface RunDispatchResult {
   queued: boolean;
   /** Set when queued — the run row sim-command created. */
   runId?: string;
+  /** WP 10.4 — true when an identical run was already queued or running, and
+   *  this submission was attached to it rather than duplicated. */
+  attached?: boolean;
   /** Set when queued=false — the rejection class. */
   status?: "blocked" | "ack_required" | "reuse_available";
   /** Set when queued=false — the gate's typed findings. */
@@ -63,6 +66,15 @@ export interface DispatchArgs {
   compute?: "client";
   /** one replication with per-item evidence (G17) */
   inspection?: boolean;
+  // ── WP 10.4 · §4 D245 — what the run row binds beyond the content hashes ──
+  /** the registered engine; omitted = the single active one (dispatch refuses a retired one) */
+  engineId?: string | null;
+  /** the Validated Model the run follows; omitted = the model in force by content */
+  validatedModelId?: string | null;
+  /** deviations from that model's protocol, recorded on the run and in its RunKey */
+  protocolOverrides?: Record<string, unknown>;
+  /** an explicitly exploratory run — badged, never a comparison baseline (WP 10.5, 10.8) */
+  exploratory?: boolean;
 }
 
 export async function dispatchExperiment(a: DispatchArgs): Promise<RunDispatchResult> {
@@ -77,12 +89,19 @@ export async function dispatchExperiment(a: DispatchArgs): Promise<RunDispatchRe
         ...(a.compute ? { compute: a.compute } : {}),
         ...(a.inspection ? { inspection: true } : {}),
         ...(a.forceRerun ? { force_rerun: true } : {}),
+        ...(a.engineId ? { engine_id: a.engineId } : {}),
+        ...(a.validatedModelId ? { validated_model_id: a.validatedModelId } : {}),
+        ...(a.protocolOverrides && Object.keys(a.protocolOverrides).length > 0
+          ? { protocol_overrides: a.protocolOverrides }
+          : {}),
+        ...(a.exploratory ? { exploratory: true } : {}),
       },
       client_ts: Date.now(),
     },
   });
   if (!error) {
-    return { queued: true, runId: (data as { run_id?: string } | null)?.run_id };
+    const d = data as { run_id?: string; attached?: boolean } | null;
+    return { queued: true, runId: d?.run_id, ...(d?.attached ? { attached: true } : {}) };
   }
 
   const ctx = (error as { context?: Response }).context;

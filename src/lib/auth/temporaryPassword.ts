@@ -1,5 +1,5 @@
 /**
- * The temporary password a super admin hands to somebody who forgot theirs (PLAN.md §4 D233).
+ * The temporary password a super admin hands to somebody who forgot theirs (PLAN.md §4 D251).
  *
  * Generated in the super admin's browser so nobody has to invent one — an invented one is
  * usually the same easy word for everybody, which makes every account mid-reset guessable.

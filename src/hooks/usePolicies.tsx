@@ -15,6 +15,7 @@ import {
 import type { OverrideRow } from "@/lib/policies/resolve";
 import { downloadWorkbook } from "@/lib/policies/excel";
 import { buildPolicyVersionWorkbook } from "@/lib/policies/verifiableExports";
+import { currentPolicyVersion } from "@/lib/policies/currentPolicyVersion";
 
 export interface PolicyVersion {
   id: string;
@@ -26,6 +27,9 @@ export interface PolicyVersion {
   parent_version_id: string | null;
   policy_hash: string | null;
   created_at: string;
+  /** "Policy v4" — one number per content per project (WP 10.2). Absent until the
+   *  migration lands and on the direct-select fallback. */
+  version_no?: number | null;
   /** How many simulation runs / model cards reference this version — a
    *  version with either is delete-guarded (6.D). Absent on the RLS fallback. */
   run_count?: number;
@@ -41,9 +45,12 @@ interface UsePoliciesResult {
   presetAppliedAt: Date | null;
   versions: PolicyVersion[];
   currentHash: string | null;
+  /** True when the live policies match NO saved version ("unsaved edits"). */
   isDirty: boolean;
+  /** The saved version whose content IS the live policies (WP 10.2, §4 D242) —
+   *  derived from `policy_hash`, never remembered per page — or null. */
   selectedVersionId: string | null;
-  setSelectedVersionId: (id: string | null) => void;
+  currentVersion: PolicyVersion | null;
   refreshVersions: () => Promise<void>;
   restoreVersion: (versionId: string) => Promise<void>;
   saveDefault: <F extends PolicyFamily>(family: F, value: PolicyBundle[F]) => Promise<void>;
@@ -57,7 +64,11 @@ interface UsePoliciesResult {
   upsertOverride: (row: OverrideRow) => Promise<void>;
   bulkUpsertOverrides: (rows: OverrideRow[], opts?: { seeded?: boolean }) => Promise<void>;
   deleteOverride: (scope: "node" | "edge", targetKey: string, family: PolicyFamily) => Promise<void>;
-  saveSnapshot: (label?: string, notes?: string) => Promise<string | null>;
+  /** Save the live policies as a version. Deduplicated server-side by content
+   *  (WP 10.2): when the content is already saved, its existing id comes back and
+   *  nothing new is created. `quiet` suppresses the toast for saves nobody asked
+   *  for (a run binding to the version in force). */
+  saveSnapshot: (label?: string, notes?: string, opts?: { quiet?: boolean }) => Promise<string | null>;
   /** 6.D — edit a version's free-text notes (distinct from its label). */
   updateVersionNotes: (versionId: string, notes: string) => Promise<void>;
   /** 6.D — delete a version; refused server-side if bound to a run/model card. */
@@ -106,7 +117,10 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [presetAppliedAt, setPresetAppliedAt] = useState<Date | null>(null);
   const [versions, setVersions] = useState<PolicyVersion[]>([]);
-  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  // The version the live policies were last saved as or loaded from, on THIS page —
+  // used only as the lineage parent of the next save. It is NOT the version in force:
+  // that is derived from content below (§4 D242).
+  const [baseVersionId, setBaseVersionId] = useState<string | null>(null);
   const [currentHash, setCurrentHash] = useState<string | null>(null);
   // D230 — one gate for every write below: the project role decides, not the account.
   const rights = useProjectRights(projectId);
@@ -509,7 +523,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
   }, [refreshVersions]);
 
   const saveSnapshot = useCallback(
-    async (label?: string, notes?: string): Promise<string | null> => {
+    async (label?: string, notes?: string, opts?: { quiet?: boolean }): Promise<string | null> => {
       if (!projectId) return null;
       if (refused(canSnapshot, policyEditRefusal)) return null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -520,7 +534,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         p_user_id: user?.id ?? null,
         p_user_email: user?.email ?? null,
         p_user_name: user?.display_name ?? user?.name ?? null,
-        p_parent_version_id: selectedVersionId,
+        p_parent_version_id: baseVersionId,
       };
       // p_notes (6.D) ships in migration 20260711000001. If that migration is
       // not deployed yet, PostgREST can't resolve the 7-arg overload — fall back
@@ -536,14 +550,27 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         toast.error(`Snapshot failed: ${error.message ?? error}`);
         return null;
       }
-      toast.success("Simulation model version saved");
       const newId = data as string;
-      setSelectedVersionId(newId);
+      // §4 D241: the server returns the EXISTING version when this content is already
+      // saved. Saying "saved" then would report a version that was not created.
+      const existing = versions.find((v) => v.id === newId) ?? null;
+      if (!opts?.quiet) {
+        if (existing) {
+          toast.message(
+            existing.version_no != null
+              ? `These policies are already saved as policy v${existing.version_no} — no new version.`
+              : "These policies are already saved — no new version.",
+          );
+        } else {
+          toast.success("Simulation model version saved");
+        }
+      }
+      setBaseVersionId(newId);
       void refreshVersions();
       void refreshCurrentHash();
       return newId;
     },
-    [projectId, user, selectedVersionId, refreshVersions, refreshCurrentHash, canSnapshot, policyEditRefusal, refused],
+    [projectId, user, baseVersionId, versions, refreshVersions, refreshCurrentHash, canSnapshot, policyEditRefusal, refused],
   );
 
   const restoreVersion = useCallback(
@@ -558,7 +585,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         toast.error(`Load failed: ${error.message ?? error}`);
         return;
       }
-      setSelectedVersionId(versionId);
+      setBaseVersionId(versionId);
       toast.success("Model version loaded");
       // Trigger a reload of defaults via the existing realtime channel; also refetch immediately.
       const { data } = await sb
@@ -631,12 +658,12 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
         toast.error(error.message ?? "Could not delete this version");
         return false;
       }
-      if (selectedVersionId === versionId) setSelectedVersionId(null);
+      if (baseVersionId === versionId) setBaseVersionId(null);
       toast.success("Version deleted");
       void refreshVersions();
       return true;
     },
-    [selectedVersionId, refreshVersions, user?.id, canEditPolicies, policyEditRefusal, refused],
+    [baseVersionId, refreshVersions, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
   const deleteVersions = useCallback(
@@ -660,7 +687,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
           deleted.push(versionId);
         }
       }
-      if (selectedVersionId && deleted.includes(selectedVersionId)) setSelectedVersionId(null);
+      if (baseVersionId && deleted.includes(baseVersionId)) setBaseVersionId(null);
       if (deleted.length > 0) {
         toast.success(`${deleted.length} version${deleted.length === 1 ? "" : "s"} deleted`);
       }
@@ -672,7 +699,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
       void refreshVersions();
       return deleted;
     },
-    [selectedVersionId, refreshVersions, user?.id, canEditPolicies, policyEditRefusal, refused],
+    [baseVersionId, refreshVersions, user?.id, canEditPolicies, policyEditRefusal, refused],
   );
 
   // 6.D + W2/G17 — download a saved version's policy bundle as an .xlsx
@@ -720,12 +747,10 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     toast.success("Version exported (policy snapshot only — with provenance)");
   }, [canExport, rights, refused]);
 
-  const selectedVersion = versions.find((v) => v.id === selectedVersionId) ?? null;
-  const isDirty =
-    !selectedVersion ||
-    !selectedVersion.policy_hash ||
-    !currentHash ||
-    selectedVersion.policy_hash !== currentHash;
+  // ONE answer for every page (§4 D242): the version whose content is live.
+  const currentVersion = currentPolicyVersion(versions, currentHash);
+  const selectedVersionId = currentVersion?.id ?? null;
+  const isDirty = currentVersion === null;
 
   return {
     defaults,
@@ -738,7 +763,7 @@ export function usePolicies(projectId: string | null | undefined): UsePoliciesRe
     currentHash,
     isDirty,
     selectedVersionId,
-    setSelectedVersionId,
+    currentVersion,
     refreshVersions,
     restoreVersion,
     saveDefault,

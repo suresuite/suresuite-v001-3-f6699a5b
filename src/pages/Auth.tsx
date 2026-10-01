@@ -25,7 +25,7 @@ const Auth = () => {
   const [rememberMe, setRememberMe] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
-  // "Forgot password?" swaps the form for a request to a super admin (§4 D233).
+  // "Forgot password?" swaps the form for a request to a super admin (§4 D251).
   const [forgot, setForgot] = useState(false);
   const { login, user } = useAuth();
   const navigate = useNavigate();

@@ -584,7 +584,7 @@ BEGIN
     FROM public.supply_chain_data d WHERE d.project_id = v_project;
 
   PERFORM set_config('app.current_user_id', v_analyst::text, true);
-  v_res := public.analysis_mark_critical_nodes(v_editor, v_scores);
+  v_res := public.analysis_mark_critical_nodes(v_editor, v_scores, NULL::uuid);  -- WP 10.1: the two-argument shim is dropped (D240)
   IF (v_res ->> 'rows_updated')::int <> 2 THEN
     RAISE EXCEPTION 'WP 4.1: the critical-node write updated % row(s), expected 2 (%).',
       COALESCE(v_res ->> 'rows_updated','(null)'), v_res;
@@ -620,7 +620,8 @@ BEGIN
     PERFORM public.analysis_mark_critical_nodes(
       v_editor,
       v_scores || jsonb_build_array(jsonb_build_object(
-        'id','00000000-0000-4000-8000-000000041208','is_critical',false,'score',0.1)));
+        'id','00000000-0000-4000-8000-000000041208','is_critical',false,'score',0.1)),
+      NULL::uuid);
     RAISE EXCEPTION 'WP 4.1: a cross-project score set was accepted.';
   EXCEPTION WHEN invalid_parameter_value THEN
     NULL;

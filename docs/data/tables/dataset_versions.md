@@ -55,11 +55,11 @@ Written by the `_build_dataset_snapshot` database function, never by a page — 
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DataManager.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:406` | yes |
+| `DataManager.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:464` | yes |
 | `DeveloperApi.tsx` | rpc list_dataset_versions | `src/pages/DeveloperApi.tsx:311` | yes |
-| `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:270` | yes |
-| `ProjectPolicies.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:406` | yes |
-| `SimulationLab.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:406` | yes |
+| `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:24` | yes |
+| `ProjectPolicies.tsx` | rpc record_validated_model (Save Validated Model, WP 10.3) | `src/hooks/useModelValidation.tsx:492` | yes |
+| `SimulationLab.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:464` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -84,6 +84,10 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `created_at` | — | `timestamp with time zone` | — | — | When the version was frozen. Server-set. |
 | `hash_inputs` | — | `text` | — | — | SHA-256 over the `inputs` domain of the snapshot — the tier-2 tables a SIMULATION reads. When this moves, a run stamped with the old composite cannot be reproduced. |
 | `hash_network` | — | `text` | — | — | SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers`, `multi_tier_supply_chain`, and since `schema_version` 3 the deep-tier topology itself: the six columns the two prominence RPCs return from `network_nodes` and `network_edges`. When this moves a multi-tier or deep-tier ANALYSIS is stale; no simulation changes. |
+| `hash_product` | — | `text` | — | — | SHA-256 over the PRODUCT level (WP 10.1, §4 D235): suppliers, materials, products, customers, the single-level BOM and the inbound / outbound lanes — every column the `inputs` domain hashes except the multi-level BOM. A projection of facts already hashed; the composite does not include it, so adding it moved no `graph_hash`. NULL never — computed for every snapshot that has `inputs`. |
+| `hash_process` | — | `text` | — | — | SHA-256 over the PROCESS level (WP 10.1): `bom_multi_level` and `multi_tier_supply_chain` whole, plus the endpoints and quantities — not the prices — of the single-level BOM and the lanes, and the product ids. Exactly what `rebuild_supply_chain_lanes` builds the two lane graphs from, so the derived lane tables never enter an identity. NULL on a pre-v2 snapshot, which has no `network` domain. |
+| `hash_firm` | — | `text` | — | — | SHA-256 over the FIRM level (WP 10.1): the deep-tier topology (`network_nodes(uid, revenue)`, `network_edges(src_uid, dst_uid, relative_revenue)`) and the tier-2 / tier-3 supplier tables. NULL on a snapshot older than `schema_version` 3, which did not hash the deep tier — a level computed from it would hash an absence, which is not a fact. |
+| `version_no` | — | `integer` | — | — | "Graph v7" — one number per CONTENT (`graph_hash`) per project, in order of first appearance, assigned by a BEFORE INSERT trigger (WP 10.1, §4 D234). Since WP 10.1 `snapshot_dataset` returns the OLDEST version of a content, so a reverted edit is the earlier number again; rows that predate that and share a hash share the number. |
 
 ## Each column in full
 
@@ -101,7 +105,7 @@ Surrogate identifier for the version. Referenced by runs.
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -135,7 +139,7 @@ A human-chosen name for this version, so a user can say which one they mean.
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -156,7 +160,7 @@ The frozen tier-2 rows themselves, as JSON. What the run actually ran against, n
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -177,7 +181,7 @@ The fingerprint of the snapshot. Two runs with the same graph_hash saw the same 
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -229,7 +233,7 @@ When the version was frozen. Server-set.
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -248,7 +252,7 @@ SHA-256 over the `inputs` domain of the snapshot — the tier-2 tables a SIMULAT
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -269,20 +273,77 @@ SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers`, `mul
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
 > THIS TEXT SAID THREE TABLES UNTIL WP 5.2f, AND `20260917000009` HAD ADDED TWO MORE. WP 5.3 folded the deep-tier topology in to close §4 D75 — a re-uploaded network was being served the previous graph's centralities as a cache hit, because the anchor could not see the tables the two centrality analyzers read. The sidecar was not updated with the migration, and the manual renders this sentence, so the drift would have been published. The original three source tables hold ZERO rows in production (§15); the two deep-tier tables do not, so the domain is no longer the digest of an empty set on every project. NULL before WP 4.1, and not backfillable, for the same reason as `hash_inputs`.
+
+### `hash_product`
+
+SHA-256 over the PRODUCT level (WP 10.1, §4 D235): suppliers, materials, products, customers, the single-level BOM and the inbound / outbound lanes — every column the `inputs` domain hashes except the multi-level BOM. A projection of facts already hashed; the composite does not include it, so adding it moved no `graph_hash`. NULL never — computed for every snapshot that has `inputs`.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000007_graph_levels_compute_once.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `hash_process`
+
+SHA-256 over the PROCESS level (WP 10.1): `bom_multi_level` and `multi_tier_supply_chain` whole, plus the endpoints and quantities — not the prices — of the single-level BOM and the lanes, and the product ids. Exactly what `rebuild_supply_chain_lanes` builds the two lane graphs from, so the derived lane tables never enter an identity. NULL on a pre-v2 snapshot, which has no `network` domain.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000007_graph_levels_compute_once.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `hash_firm`
+
+SHA-256 over the FIRM level (WP 10.1): the deep-tier topology (`network_nodes(uid, revenue)`, `network_edges(src_uid, dst_uid, relative_revenue)`) and the tier-2 / tier-3 supplier tables. NULL on a snapshot older than `schema_version` 3, which did not hash the deep tier — a level computed from it would hash an absence, which is not a fact.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000007_graph_levels_compute_once.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `version_no`
+
+"Graph v7" — one number per CONTENT (`graph_hash`) per project, in order of first appearance, assigned by a BEFORE INSERT trigger (WP 10.1, §4 D234). Since WP 10.1 `snapshot_dataset` returns the OLDEST version of a content, so a reverted edit is the earlier number again; rows that predate that and share a hash share the number.
+
+| | |
+|---|---|
+| Type | `integer` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000007_graph_levels_compute_once.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
 
 ## Indexes
 
 | Index | Columns | Unique | Added by |
 |---|---|---|---|
 | `dataset_versions_project_created` | `project_id`, `created_at DESC` | no | `20260703000001_dataset_versions.sql` |
+| `dataset_versions_project_hash` | `project_id`, `graph_hash`, `created_at` | no | `20261001000007_graph_levels_compute_once.sql` |
 
 ---
 
-*Generated from data contract `237475f05d3e`, engine `0.2.8`,
+*Generated from data contract `79fc096780a7`, engine `0.2.8`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

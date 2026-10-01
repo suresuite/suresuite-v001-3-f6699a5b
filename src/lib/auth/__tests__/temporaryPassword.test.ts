@@ -1,5 +1,5 @@
 /**
- * D233 — the temporary password a super admin hands out. It must meet the database's
+ * D251 — the temporary password a super admin hands out. It must meet the database's
  * minimum (`admin_reset_user_password` refuses fewer than 8 characters), avoid symbols
  * that read alike, and draw every symbol with equal probability.
  */

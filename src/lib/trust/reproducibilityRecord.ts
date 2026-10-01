@@ -121,6 +121,20 @@ export interface ReproducibilityRecordInput {
    * string until WP 6.2 made a failed version lookup fatal.
    */
   browserEngineVersion: string | null;
+  // ── WP 10.4 · §4 D245 — the binding ON THE ROW. All optional so a caller
+  //    that predates them still compiles; absent = unbound, said with its reason.
+  /** `simulation_runs.scenario_hash` — the scenario world's fingerprint hash. */
+  scenarioHash?: string | null;
+  /** `simulation_runs.model_validation_id` — the Validated Model the run followed. */
+  validatedModelId?: string | null;
+  /** The registered engine, as "slug@code_version" or its id (`simulation_runs.engine_id`). */
+  engineId?: string | null;
+  /** `simulation_runs.run_key` — sha256 of `run_spec`. */
+  runKey?: string | null;
+  /** `simulation_runs.protocol_overrides`; undefined = the run predates the column. */
+  protocolOverrides?: Record<string, unknown> | null;
+  /** `simulation_runs.exploratory`. */
+  exploratory?: boolean | null;
   /** Every analysis whose output this project's screens display. */
   analyses: AnalysisBinding[];
   /** The Trust Report's own limits, verbatim — T3 rather than a second list. */
@@ -167,6 +181,18 @@ const bind = (
  * which snapshot builder produced it. A record with the hash and not the version
  * says "here is a number you cannot check".
  */
+/** Key-sorted JSON, so one set of overrides always prints one way. */
+function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
+  if (v !== null && typeof v === "object") {
+    return `{${Object.keys(v as Record<string, unknown>)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonical((v as Record<string, unknown>)[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(v);
+}
+
 export function bindingsOf(input: ReproducibilityRecordInput): Binding[] {
   return [
     bind(
@@ -239,6 +265,57 @@ export function bindingsOf(input: ReproducibilityRecordInput): Binding[] {
       input.scenarioSeedReason ??
         "the disruptions this run simulated are unrecorded, so its figures cannot be " +
           "attributed to a schedule",
+    ),
+    bind(
+      "scenario.hash",
+      "Scenario world (fingerprint hash)",
+      input.scenarioHash ?? null,
+      "simulation_runs.scenario_hash",
+      "recommended",
+      "the run was dispatched before the scenario fingerprint was stamped, so its " +
+        "horizon, time step and demand model are bound only through the scenario id",
+    ),
+    bind(
+      "model.validated_model",
+      "Validated Model",
+      input.validatedModelId ?? null,
+      "simulation_runs.model_validation_id",
+      "recommended",
+      input.exploratory
+        ? "an EXPLORATORY run — it followed no Validated Model, is badged as such, and is " +
+            "excluded from surrogate training"
+        : "no Validated Model was in force for this policy, graph and scenario when it was dispatched",
+    ),
+    bind(
+      "run.protocol_overrides",
+      "Protocol deviations",
+      input.protocolOverrides === undefined || input.protocolOverrides === null
+        ? null
+        : Object.keys(input.protocolOverrides).length === 0
+          ? "none — faithful to the Validated Model's protocol"
+          : canonical(input.protocolOverrides),
+      "simulation_runs.protocol_overrides",
+      "recommended",
+      "the run predates recorded deviations (WP 10.4), so whether it followed its model's " +
+        "protocol exactly is not stated",
+    ),
+    bind(
+      "run.key",
+      "RunKey",
+      input.runKey ?? null,
+      "simulation_runs.run_key (sha256 of simulation_runs.run_spec)",
+      "recommended",
+      "the run predates the RunKey (WP 10.4): identity rests on the three hashes, the seed " +
+        "and the schedule above, and the engine build is bound only by its code version",
+    ),
+    bind(
+      "engine.id",
+      "Engine (registry)",
+      input.engineId ?? null,
+      "simulation_runs.engine_id → sim_engines",
+      "recommended",
+      "the run predates the engine registry (WP 10.4) and recorded no code version to " +
+        "derive it from",
     ),
     bind(
       "engine.worker_code_version",

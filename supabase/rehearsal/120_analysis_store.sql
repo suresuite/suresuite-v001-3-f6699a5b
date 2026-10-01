@@ -158,17 +158,25 @@ BEGIN
 
   -- ── 2 · a CHANGED input is a MISS, not a stale hit ───────────────────────
   --
-  -- The half that makes the cache safe rather than merely fast. `unit_price` is
-  -- a value column of a tier-2 input table, so WP 4.1's rule puts it inside
+  -- The half that makes the cache safe rather than merely fast. `volume` is a
+  -- value column of a tier-2 input table, so WP 4.1's rule puts it inside
   -- `hash_inputs` and editing it must move the key.
+  --
+  -- WP 10.1 (§4 D235): this section edited `unit_price`, and since WP 10.1 a
+  -- PRICE edit is correctly a HIT for a network analysis — a centrality does not
+  -- read prices, and invalidating it on one was the defect. A lane QUANTITY is in
+  -- the process level this kind reads (it falls back to the lane graph here: the
+  -- project has no deep tier), so the miss this section exists for is asserted on
+  -- an edit the analysis can actually see. `rehearsal/570` §5 asserts the price
+  -- edit's hit.
 
-  UPDATE public.inbound_logistics SET unit_price = 11
+  UPDATE public.inbound_logistics SET volume = 110
    WHERE project_id = v_project AND supplier_id = 'S1' AND material_id = 'M1';
 
   v_hash1 := public.current_graph_hash(v_project);
   IF v_hash1 IS NOT DISTINCT FROM v_hash0 THEN
     RAISE EXCEPTION
-      'WP 4.2 §2 — editing `unit_price` did not move `current_graph_hash`, so the '
+      'WP 4.2 §2 — editing `volume` did not move `current_graph_hash`, so the '
       'store cannot tell a changed project from an unchanged one and every hit '
       'below is meaningless. This is `graph_hash` failing, not the store.';
   END IF;
@@ -188,11 +196,12 @@ BEGIN
     RAISE EXCEPTION 'WP 4.2 §2 — the miss reused the original run id.';
   END IF;
   v_run2 := (v_r3 ->> 'run_id')::uuid;
-  IF (v_r3 ->> 'input_hash') IS DISTINCT FROM v_hash1 THEN
+  -- The run names the hash of the LEVEL it read (WP 10.1), not the composite.
+  IF (v_r3 ->> 'input_hash') IS DISTINCT FROM public.current_level_hash(v_project, v_r3 ->> 'input_scope') THEN
     RAISE EXCEPTION
-      'WP 4.2 §2 — the new run recorded input_hash % but the project hashes %; a '
+      'WP 4.2 §2 — the new run recorded input_hash % but the project''s % level hashes %; a '
       'run that does not name the world it ran against cannot be reproduced (I5).',
-      v_r3 ->> 'input_hash', v_hash1;
+      v_r3 ->> 'input_hash', v_r3 ->> 'input_scope', public.current_level_hash(v_project, v_r3 ->> 'input_scope');
   END IF;
 
   PERFORM public.analysis_complete_run(
@@ -205,7 +214,7 @@ BEGIN
   -- the row back and the original answer must come back with it — not a third
   -- run, and not the run computed from the edited value.
 
-  UPDATE public.inbound_logistics SET unit_price = 10
+  UPDATE public.inbound_logistics SET volume = 100
    WHERE project_id = v_project AND supplier_id = 'S1' AND material_id = 'M1';
 
   IF public.current_graph_hash(v_project) IS DISTINCT FROM v_hash0 THEN
@@ -413,27 +422,23 @@ BEGIN
       'exists to prevent.';
   END IF;
 
-  -- ── 8 · `should_recalculate_network_metrics` is DEPRECATED IN PLACE ──────
+  -- ── 8 · `should_recalculate_network_metrics` is GONE, and nothing called it ─
   --
-  -- §11 says deprecate it with a comment naming D12. In PLACE: it is still
-  -- called by `auto_calculate_network_metrics_on_completion` on every completion
-  -- flip, so dropping it here would break a live trigger. The assertion is that
-  -- it still exists AND that it now says what replaces it.
+  -- WP 4.2 deprecated it IN PLACE because `auto_calculate_network_metrics_on_completion`
+  -- called it on every completion flip. WP 4.4 rewrote that trigger to ask the one
+  -- rule instead, which left the function with no caller, and WP 10.1 dropped it
+  -- (§4 D240). The assertion that replaces "it still exists" is the one that makes
+  -- a drop safe: no function body in this database names it.
 
-  IF to_regproc('public.should_recalculate_network_metrics') IS NULL THEN
-    RAISE EXCEPTION
-      'WP 4.2 §8 — `should_recalculate_network_metrics` was DROPPED, not '
-      'deprecated in place. `auto_calculate_network_metrics_on_completion` still '
-      'calls it inside every projects-row UPDATE that flips completed=true.';
+  IF to_regproc('public.should_recalculate_network_metrics') IS NOT NULL THEN
+    RAISE EXCEPTION 'WP 10.1 §8 — `should_recalculate_network_metrics` still exists (D240).';
   END IF;
-
-  SELECT obj_description(to_regproc('public.should_recalculate_network_metrics')::oid, 'pg_proc')
-    INTO v_txt;
-  IF v_txt IS NULL OR position('D12' in v_txt) = 0 THEN
-    RAISE EXCEPTION
-      'WP 4.2 §8 — the deprecation carries no comment naming D12. A function '
-      'deprecated without a pointer to what replaces it is a function the next '
-      'reader extends. Comment is: %', COALESCE(v_txt, '(none)');
+  SELECT string_agg(p.proname, ', ') INTO v_txt
+    FROM pg_proc p JOIN pg_namespace ns ON ns.oid = p.pronamespace
+   WHERE ns.nspname = 'public'
+     AND position('should_recalculate_network_metrics' in p.prosrc) > 0;
+  IF v_txt IS NOT NULL THEN
+    RAISE EXCEPTION 'WP 10.1 §8 — these functions still call the dropped function: %', v_txt;
   END IF;
 
   -- ── 9 · A FAILED RUN RELEASES THE KEY AND IS KEPT AS A ROW ──────────────

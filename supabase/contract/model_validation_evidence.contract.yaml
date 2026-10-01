@@ -1,0 +1,153 @@
+# AUTHORED — the data contract's sidecar for `model_validation_evidence`.
+table: model_validation_evidence
+tier: "4"
+schema_name: public
+grain: >-
+  The evidence one Validated Model rests on, kept beside it rather than summarised into
+  it: per-KPI warm-up series and detector outputs, the replication analysis, the per-KPI
+  tests, the face-validation statement and the evidence runs. One row per model, written
+  with it, never edited (WP 10.3, §4 D243).
+owner: policy-ui
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "model_validation_evidence_pkey"
+  - source: "column UNIQUE"
+    columns: [validation_id]
+    name: "model_validation_evidence_validation_id_key"
+
+governance:
+  read: null
+  write: simulation_lab
+  min_project_role: analyst
+  audited: true
+  rls_enabled: true
+  note: >-
+    Written only by `_insert_validated_model`, inside the same transaction as its model;
+    a BEFORE UPDATE trigger refuses every edit. Read through `has_project_access`, and by
+    the browser through `get_validated_model_evidence`, which is no wider than the model
+    row it belongs to (readable by every API role). Audited at statement grain.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  validation_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The model this is the evidence of. One row per model.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The model's project.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  warmup:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The warm-up evidence: the method, each selected KPI's detected week (and the series it
+      was detected on where one exists), and the adopted week — the MAXIMUM over them.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  replication_analysis:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The replication analysis: confidence, target precision, per-KPI mean ± Student-t half-width and n*, the recommendation.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  kpi_tests:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The KS / Welch tests per selected KPI with their samples' provenance.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  face_validation:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The face-validation statement, who made it and when; NULL for a statistical model.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  evidence_run_ids:
+    type: "uuid[]"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The runs whose replications are the evidence.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  author_user_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Who saved the model.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When it was written.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

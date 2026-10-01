@@ -67,6 +67,7 @@ import {
 } from '@/components/network/lens';
 import { NetworkDisruptionDialog } from '@/components/network/NetworkDisruptionDialog';
 import MLPrediction from '@/components/MLPrediction';
+import { GraphVersionChip } from '@/components/trust/GraphVersionChip';
 import { BarChart } from 'lucide-react';
 
 interface MultiTierData {
@@ -345,8 +346,6 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
         dataSources: [...new Set(multiTierData.map(d => d.data_source))]
       });
 
-      // Cache multiTierData for reachability algorithm
-      setMultiTierDataCache(multiTierData);
 
       // ── WP 8.3 · §4 D127, D140 — TYPE AND DEPTH COME FROM THE DATA NOW ────
       //
@@ -712,147 +711,71 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
     setReachableNodes(new Set());
   }, [globalSelectedProjectId]);
 
-  // Store multiTierData in state for reachability algorithm
-  const [multiTierDataCache, setMultiTierDataCache] = useState<MultiTierNetworkData[]>([]);
+  // ── WP 10.1 · §4 D239 — REACHABILITY IS READ, NOT RECOMPUTED ──────────────
+  //
+  // A level-hopping walk ran here in the browser on every Level-1 selection: it
+  // depended on the order rows arrived in (a node's level was whichever row set it
+  // last) and stopped at level 5. It is now a STORED analysis, `process_structure`,
+  // computed where the data is and keyed on the PROCESS level hash — so it is
+  // computed once per process graph, and every later load is a read. For each
+  // Level-1 node it holds the nodes reachable downstream (following arcs) and
+  // upstream (against them), transitively.
+  const [structure, setStructure] = useState<{
+    reachable: Record<string, { downstream?: string[]; upstream?: string[] }>;
+    cacheHit: boolean;
+    computedAt: string | null;
+  } | null>(null);
 
-  // Reachability algorithm for Level 1 node filtering
-  const findReachableNodes = useCallback((startNodeId: string, allNodes: Node<NodeData>[], allEdges: Edge[], multiTierData: MultiTierNetworkData[]): Set<string> => {
-    console.log(`🎯 Starting Level 1 reachability analysis for node: ${startNodeId}`);
-    console.log(`📊 MultiTierData records available: ${multiTierData.length}`);
-    
-    // Debug: Check actual data structure and find our node
-    if (multiTierData.length > 0) {
-      console.log(`🔍 Sample multiTierData record:`, multiTierData[0]);
-      console.log(`🔍 Available fields:`, Object.keys(multiTierData[0]));
-      
-      // Find records containing our start node
-      const startNodeRecords = multiTierData.filter(r => 
-        r.from_location === startNodeId || r.to_location === startNodeId
-      );
-      console.log(`🔍 Records containing ${startNodeId}:`, startNodeRecords.length);
-      if (startNodeRecords.length > 0) {
-        console.log(`🔍 Sample record with ${startNodeId}:`, startNodeRecords[0]);
+  useEffect(() => {
+    let alive = true;
+    setStructure(null);
+    if (!user?.id || !globalSelectedProjectId) return;
+    (async () => {
+      const { data, error } = await supabase.rpc('process_structure', {
+        p_project_id: globalSelectedProjectId,
+        _actor_user_id: user.id,
+      });
+      if (!alive) return;
+      if (error) {
+        console.error('[ProcessLevelNetwork] process_structure failed:', error.message);
+        return;
       }
-    }
-    
-    // Create node-level mapping from multiTierData for quick lookup
-    const nodeLevelMap = new Map<string, number>();
-    multiTierData.forEach(record => {
-      // Map both from_location and to_location nodes to their levels
-      if (record.from_location) {
-        const fromLevel = record.level;
-        nodeLevelMap.set(record.from_location, fromLevel);
-      }
-      if (record.to_location) {
-        // Level -1 for customers (to_location in outbound records)
-        if (record.level === 0 && record.data_source === 'outbound') {
-          nodeLevelMap.set(record.to_location, -1);
-        } else {
-          nodeLevelMap.set(record.to_location, record.level);
-        }
-      }
-    });
-    
-    console.log(`📊 Created node-level map with ${nodeLevelMap.size} entries`);
-    console.log(`📊 Selected node ${startNodeId} is at level:`, nodeLevelMap.get(startNodeId));
-    
-    const reachable = new Set<string>([startNodeId]);
-    
-    // Node-first reachability algorithm using multiTierData
-    const findNodesInGroup = (sourceNodes: string[], targetLevel: number, relationship: 'from_to' | 'to_from') => {
-      const foundNodes: string[] = [];
-      console.log(`🎯 Finding Level ${targetLevel} nodes via ${relationship} from:`, sourceNodes);
-      
-      sourceNodes.forEach(sourceId => {
-        console.log(`  🔍 Checking relationships for: ${sourceId}`);
-        let connectionsFound = 0;
-        
-        multiTierData.forEach(record => {
-          if (relationship === 'from_to') {
-            // Find records where sourceId is from_location
-            if (record.from_location === sourceId && record.to_location) {
-              const candidateLevel = nodeLevelMap.get(record.to_location);
-              if (candidateLevel === targetLevel) {
-                foundNodes.push(record.to_location);
-                connectionsFound++;
-                console.log(`    ✅ Found Level ${targetLevel} node: ${record.to_location} (from→to)`);
-              }
-            }
-          } else {
-            // Find records where sourceId is to_location  
-            if (record.to_location === sourceId && record.from_location) {
-              const candidateLevel = nodeLevelMap.get(record.from_location);
-              if (candidateLevel === targetLevel) {
-                foundNodes.push(record.from_location);
-                connectionsFound++;
-                console.log(`    ✅ Found Level ${targetLevel} node: ${record.from_location} (to←from)`);
-              }
-            }
-          }
-        });
-        
-        console.log(`  📊 Found ${connectionsFound} connections from ${sourceId}`);
-      }); 
-      
-      const uniqueNodes = [...new Set(foundNodes)];
-      console.log(`📊 Group result - Level ${targetLevel}:`, uniqueNodes);
-      return uniqueNodes;
+      const d = (data ?? {}) as { reachable?: Record<string, { downstream?: string[]; upstream?: string[] }>; cache_hit?: boolean; finished_at?: string | null; started_at?: string | null };
+      setStructure({
+        reachable: d.reachable ?? {},
+        cacheHit: Boolean(d.cache_hit),
+        computedAt: d.finished_at ?? d.started_at ?? null,
+      });
+    })();
+    return () => {
+      alive = false;
     };
-    
-    // Apply the node-first reachability algorithm
-    const group0A = findNodesInGroup([startNodeId], 0, 'from_to');
-    console.log(`📊 Group 0A (Level 0 via from→to from Level 1):`, group0A);
-    
-    const group2A = findNodesInGroup([startNodeId], 2, 'to_from');
-    console.log(`📊 Group 2A (Level 2 via to←from from Level 1):`, group2A);
-    
-    const groupNeg1A = findNodesInGroup(group0A, -1, 'from_to');
-    console.log(`📊 Group -1A (Level -1 via from→to from Group 0A):`, groupNeg1A);
-    
-    const group3A = findNodesInGroup(group2A, 3, 'to_from');
-    console.log(`📊 Group 3A (Level 3 via to←from from Group 2A):`, group3A);
-    
-    const group4A = findNodesInGroup(group3A, 4, 'to_from');
-    console.log(`📊 Group 4A (Level 4 via to←from from Group 3A):`, group4A);
-    
-    const group5A = findNodesInGroup(group4A, 5, 'to_from');
-    console.log(`📊 Group 5A (Level 5 via to←from from Group 4A):`, group5A);
-    
-    // Add all found nodes to reachable set
-    [...group0A, ...group2A, ...groupNeg1A, ...group3A, ...group4A, ...group5A].forEach(nodeId => {
-      reachable.add(nodeId);
-    });
-    
-    console.log('🎯 Reachability groups summary:', {
-      level1: [startNodeId],
-      group0A,
-      group2A,
-      groupNeg1A,
-      group3A,
-      group4A,
-      group5A,
-      totalReachable: Array.from(reachable)
-    });
-    
-    return reachable;
-  }, []);
+  }, [user?.id, globalSelectedProjectId]);
 
   // Handle Level 1 node selection
   const handleLevel1NodeSelect = useCallback((nodeId: string | null) => {
     // Treat 'all' as null (clear filter)
     const actualNodeId = nodeId === 'all' ? null : nodeId;
     setSelectedLevel1Node(actualNodeId);
-    
+
     if (actualNodeId) {
-      const reachableNodeSet = findReachableNodes(actualNodeId, allNodes, allEdges, multiTierDataCache);
-      setReachableNodes(reachableNodeSet);
+      const entry = structure?.reachable?.[actualNodeId];
+      if (!entry) {
+        toast.info(structure
+          ? `No stored reachability for ${actualNodeId} — it is not a Level 1 node of this process network.`
+          : 'Reachability is still being computed for this graph; try again in a moment.');
+        setReachableNodes(new Set());
+        setIsLevel1FilterActive(false);
+        return;
+      }
+      setReachableNodes(new Set([actualNodeId, ...(entry.downstream ?? []), ...(entry.upstream ?? [])]));
       setIsLevel1FilterActive(true);
       toast.success(`Filtered to show nodes reachable from Level 1 node: ${actualNodeId}`);
     } else {
       setReachableNodes(new Set());
       setIsLevel1FilterActive(false);
     }
-  }, [allNodes, allEdges, multiTierDataCache, findReachableNodes]);
+  }, [structure]);
 
   // Audit 2026-09-22 · F-10: "Resilience" was `0.4 + 0.6(1 - HHI)`, floored at 0.4
   // with a red alert on `< 0.4` that no input could reach, and "Bottlenecks" counted
@@ -1160,6 +1083,15 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
         {/* ── Desktop workspace (network-lenses handoff §1) ──────────────
              Graph card + right rail, then the analytics when toggled. The rail
              stacks under the graph below `lg`, the sanctioned multi-pane step. */}
+        {globalSelectedProjectId && (
+          <div className="mb-3 hidden md:flex">
+            <GraphVersionChip
+              projectId={globalSelectedProjectId}
+              metricsComputedAt={structure?.computedAt ?? null}
+              outcome={structure ? (structure.cacheHit ? 'reused' : 'computed') : null}
+            />
+          </div>
+        )}
         <div className="hidden md:grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
           <GraphCard
             ref={graphRef}

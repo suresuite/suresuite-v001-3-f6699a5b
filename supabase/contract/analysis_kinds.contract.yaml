@@ -1,0 +1,107 @@
+# AUTHORED — the data contract's sidecar for `analysis_kinds`.
+# WP 10.1 · §4 D235. Edit this file; docs/data/tables/*.md is generated from it.
+table: analysis_kinds
+tier: reference
+schema_name: public
+grain: >-
+  One row per analysis kind: which LEVEL of the graph it reads. The one place that
+  is stated — `analysis_get_or_start` reads it to choose the hash a run is keyed on,
+  so a price edit does not invalidate a centrality. What each kind's parameters mean
+  is stated in `analysis_runs.contract.yaml`'s catalog; `analysisKindsParity.test.ts`
+  fails when the two disagree about which kinds exist.
+owner: analysis
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [kind]
+    name: "analysis_kinds_pkey"
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    Reference data authored in a migration and read by everyone; no API role writes
+    it. Not project-scoped. Not audited: a change to a kind's scope is a migration,
+    and the migration is the record.
+
+fields:
+  kind:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The analysis kind, as `analysis_runs.analysis_kind` names it.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  input_scope:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The level whose hash keys a run of this kind: `product`, `process`, `firm`, or
+      `all` (the composite).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  fallback_scope:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The level used instead when `fallback_rule` holds — today only `network_metrics`,
+      which reads the lane graph (process level) when the deep tier is incomplete. NULL
+      for a kind with no fallback.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  fallback_rule:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the fallback applies. `deep_tier_incomplete`: the project has no
+      `network_nodes` or no `network_edges` — the same condition the analyzer used to test
+      itself, now stated once and returned to it as `input_scope`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  description:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      What the kind computes, over which table.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was first written.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

@@ -1,11 +1,11 @@
 /**
- * "Forgot password?" — the person asks, a super admin resets (PLAN.md §4 D233).
+ * "Forgot password?" — the person asks, a super admin resets (PLAN.md §4 D251).
  *
  * Sign-in here is against `approved_users`, not Supabase Auth, so there is no reset
  * e-mail. A request is a note for a super admin and changes nothing about the account;
  * the reset is `admin_reset_user_password`, which forces a change at the next sign-in
  * and closes the request. Every function here is a call to an RPC in
- * `20261001000006_password_reset_requests.sql`.
+ * `20261001000011_password_reset_requests.sql`.
  */
 import { supabase } from '@/integrations/supabase/client';
 

@@ -1,8 +1,9 @@
 /**
  * How a replication is named on screen — audit F-23.
  *
- * `run_replications.seed_used` is `project_seed * 1000 + model_rep`, computed by
- * the bridge as a display key. It is NOT a seed: the engine draws from
+ * `run_replications.seed_used` is the run's ROOT seed since WP 10.6 (§4 D246).
+ * Before that it was `project_seed * 1000 + model_rep`, a display key, and NOT a
+ * seed: the engine draws from
  * `SeedSequence(entropy=project_seed, spawn_key=(realm, model_rep, stream))`, so
  * typing "42003" in as a project seed reproduces nothing. And it collides: every
  * event draw of one model replication shares it. A replication is identified by

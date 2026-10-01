@@ -407,10 +407,12 @@ async function resolveRunComparison(
       `the cited scenario run ${scenarioId} no longer exists as a completed run in this project — ask for a fresh report draft`,
     );
   }
+  // Underscore keys are the run's own metadata (`_meta`, and `_range` since WP
+  // 10.6), not KPIs — a row of "[object Object]" is what printing them gave.
   const keys = [...new Set([
     ...Object.keys(baseline.aggregate_kpis ?? {}),
     ...Object.keys(scenario.aggregate_kpis ?? {}),
-  ])].sort();
+  ])].filter((k) => !k.startsWith("_")).sort();
   const rows: Array<Array<string | number | null>> = keys.map((k) => {
     const b = (baseline.aggregate_kpis ?? {})[k];
     const s = (scenario.aggregate_kpis ?? {})[k];

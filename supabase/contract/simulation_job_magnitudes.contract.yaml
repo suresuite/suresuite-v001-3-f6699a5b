@@ -1,0 +1,227 @@
+# AUTHORED — the data contract's sidecar for `simulation_job_magnitudes`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md.
+#
+# WP 10.4 · `result-binding`. A DORMANT table of the retired batch pipeline,
+# described so the contract can see it (§4 D54) — see `note`.
+table: simulation_job_magnitudes
+tier: "5"
+schema_name: public
+grain: >-
+  One disruption effect as one legacy job actually applied it: the job, the
+  legacy disruption profile, the effect type, and the magnitude and unit used —
+  with whether that magnitude came from the stored profile or from a slider the
+  user had moved. It was the legacy pipeline's record of "what was this run
+  told", written beside each `simulation_jobs` row. Tier 5 — run bookkeeping,
+  input to nothing. DORMANT IN THE REPOSITORY: no code in `src/`,
+  `supabase/functions/`, `sim-worker/` or `scsim/` reads or writes it.
+owner: engine
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "simulation_job_magnitudes_pkey"
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    Two policies through the project's organization
+    (`org_is_current_user_org(p.organization_id, p.organization)`): SELECT for any
+    member of that organization, ALL for the project's modeler or an organization
+    admin. Neither is predicate-less, so `write: null` agrees with
+    `governanceEnforcement.test.ts`, and no user-facing write path exists in the
+    repository. A BEFORE INSERT trigger (`set_simulation_job_magnitudes_defaults`)
+    still fires on any insert.
+    Deleting a project removes these rows through
+    `simulation_job_magnitudes_project_fk … ON DELETE CASCADE`, which WP 6.2 added
+    (`20260919000005`, §4 D117) — and the before-reading for that migration is the
+    one production measurement this table has: 35 rows whose project had already
+    been deleted, removed so the key could be added. So production HELD rows; how
+    many remain is not measured.
+    NOT IN PRODUCTION'S CASE: §4 D168 found the legacy writer
+    (`simulation-runner`) and readers (`simulation-availability-checker`,
+    `delete-simulation-job`) still LIVE in production with no source here.
+    NOT AUDITED: tier 5, and `audit-actor` covers tiers 2–4.
+
+note: >-
+  A RETIRED PIPELINE'S TABLE, LEFT IN PLACE ON PURPOSE by the 2026-07-02 commit
+  that removed the legacy batch stack. A drop needs a current production row
+  count first. Its intent — record the magnitudes a run actually used — is what
+  the current product does by snapshotting the scenario and policy a run binds
+  (`result-binding`); this table did it for a run identity nothing else carries,
+  so it is not a precedent to revive, only a description of what is there.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: "Surrogate key. One row per effect per job; nothing enforces that grain."
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  job_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The `simulation_jobs.id` this magnitude was recorded for — a UUID, NOT the
+      job's text `simulation_jobs.job_id`, despite the name. No foreign key, so
+      deleting a job did not delete these rows; the legacy job-deletion function
+      removed them by hand.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The owning project. Foreign key with ON DELETE CASCADE since `20260919000005`.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  scenario_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The legacy disruption profile (`disruption_scenario_profiles.id`) the
+      effect belongs to. Not a `scenarios` id. No foreign key.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  magnitude:
+    type: "numeric"
+    unit: "the unit named by `unit`"
+    unit_source: column
+    unit_column: unit
+    meaning: >-
+      How large the effect was, as the job applied it — a capacity reduction, a
+      delay, a demand change, in whatever unit `unit` names.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED to scsim: the consumer was the retired `ml-service`, and the
+      strategic engine reads disruptions from the scenario a run binds, never
+      from here.
+  magnitude_source:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Where `magnitude` came from: 'database' (DEFAULT — the stored profile's
+      effect) or 'ui_current' (a value the user had set on a slider for that run
+      and that the profile did not hold). A legacy provenance flag, and the only
+      record that a run used a number no table stored.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  effect_type:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The kind of effect, as the legacy profile's effect named it (for example
+      'capacity_reduction', 'time_delay'). No CHECK constraint.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  unit:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The unit `magnitude` is stated in, copied from the effect. Free text, not
+      a token `unit_days()` knows — this table predates the one unit table.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  recorded_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: "When the magnitude was recorded — at job creation. DEFAULT now()."
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  organization:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The organization's NAME at write time, DEFAULT 'default_org'. Legacy
+      tenancy text; the policies read the project's organization instead.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_by:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: "The approved user who queued the job. No foreign key."
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: "When the row was inserted."
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was last changed. The legacy writer only inserted; no
+      trigger re-stamps it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

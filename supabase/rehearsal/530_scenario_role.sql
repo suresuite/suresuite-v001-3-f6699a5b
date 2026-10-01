@@ -32,6 +32,7 @@ DECLARE
   v_run2   uuid := gen_random_uuid();
   v_run3   uuid := gen_random_uuid();
   v_pv     uuid := gen_random_uuid();
+  v_ds     uuid := gen_random_uuid();
   v_n      integer;
   v_state  text;
   v_role   text;
@@ -69,10 +70,14 @@ BEGIN
     (v_run1, v_p1, v_s_new,  'done', now()),                      -- the NEWEST run
     (v_run2, v_p1, v_s_card, 'done', now() - interval '1 hour');  -- the evidence run
   INSERT INTO public.policy_versions (id, project_id, snapshot) VALUES (v_pv, v_p1, '{}'::jsonb);
+  -- WP 10.3: a new card names its graph version and states its protocol.
+  INSERT INTO public.dataset_versions (id, project_id, snapshot, graph_hash) VALUES (v_ds, v_p1, '{}'::jsonb, 'gh');
   INSERT INTO public.model_validations (
-    project_id, policy_version_id, policy_hash, graph_hash, scenario_hash, scenario_fingerprint,
-    adopted_warmup_days, recommended_replications, verdict, evidence_run_id, status)
-  VALUES (v_p1, v_pv, 'ph', 'gh', 'sh', '{}'::jsonb, 105, 30, 'validated', v_run2, 'active');
+    project_id, policy_version_id, policy_hash, dataset_version_id, graph_hash, scenario_hash, scenario_fingerprint,
+    adopted_warmup_days, recommended_replications, verdict, evidence_run_id, status, protocol)
+  VALUES (v_p1, v_pv, 'ph', v_ds, 'gh', 'sh', '{}'::jsonb, 105, 30, 'validated', v_run2, 'active',
+          '{"replications":30,"root_seed":1,"crn":true,"warmup_week":15,"horizon_weeks":52,
+            "analysis_window_weeks":37,"ci_level":0.95,"ci_halfwidth_target":0.05,"stopping_rule":"fixed_horizon"}'::jsonb);
 
   -- p2: two named candidates, one with a run.
   INSERT INTO public.scenarios (id, project_id, name, created_at) VALUES

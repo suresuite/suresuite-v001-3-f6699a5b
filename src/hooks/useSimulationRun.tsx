@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { withRunSeries, type RunSeriesState } from "@/lib/sim/runSeries";
 import { dispatchExperiment, type RunDispatchResult } from "@/lib/sim/dispatch";
 
 /** Engine fallback report (scsim MappingWarning, written by the worker). */
@@ -42,6 +43,27 @@ export interface SimulationRun {
   /** The pre-run gate could not load its data and dispatch proceeded unchecked
    *  (`20260707000001_run_gate_skipped.sql`). Rendered by `gateNotice` (F-19a). */
   gate_skipped?: boolean | null;
+  // ── WP 10.6 · §4 D246 — the result tiers (`20261001000010`) ──
+  /** The run's weekly series object in the private `run-results` bucket; when
+   *  set, its replication rows hold `time_series = {}` (`runSeries.ts` hydrates). */
+  series_object?: string | null;
+  series_bytes?: number | null;
+  retention?: "standard" | "pinned" | "evidence" | null;
+  series_expires_at?: string | null;
+  /** When the sweep removed the series; the KPIs and aggregates are kept. */
+  series_expired_at?: string | null;
+  // ── WP 10.4 · §4 D245 — the binding on the row (`20261001000009`) ──
+  /** The registered engine the run was dispatched to (`sim_engines.id`). */
+  engine_id?: string | null;
+  /** sha256 of `run_spec` — the run's identity; identical submissions share it. */
+  run_key?: string | null;
+  /** Everything the RunKey hashes, as data: engine, hashes, the scenario's run
+   *  spec, overrides. Every binding resolves from here without a live read. */
+  run_spec?: Record<string, unknown> | null;
+  /** Deviations from the Validated Model's protocol; `{}` = faithful. */
+  protocol_overrides?: Record<string, unknown> | null;
+  /** Ran under no Validated Model, or explicitly as an exploratory model. */
+  exploratory?: boolean | null;
 }
 
 // The dispatch types and client live in lib/sim/dispatch.ts (WP 9.4 slice 8),
@@ -68,6 +90,9 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
   const [latestRun, setLatestRun] = useState<SimulationRun | null>(null);
   const [reps, setReps] = useState<Replication[]>([]);
   const [history, setHistory] = useState<SimulationRun[]>([]);
+  // WP 10.6 — where the latest run's weekly series are: in its rows, in its
+  // Parquet object (hydrated into the rows), or expired (said, with the RunKey).
+  const [seriesState, setSeriesState] = useState<RunSeriesState>({ state: "inline" });
 
   const loadLatest = useCallback(async () => {
     if (!scenarioId) return;
@@ -86,9 +111,20 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
         .select("*")
         .eq("run_id", list[0].id)
         .order("rep_index", { ascending: true });
-      setReps((rs ?? []) as Replication[]);
+      const rows = (rs ?? []) as Replication[];
+      // A running run has no object yet (its rows stream KPIs only); the object
+      // is read once the run is done, and cached for the page's life.
+      if (list[0].status === "done") {
+        const { reps: hydrated, series } = await withRunSeries(list[0], rows);
+        setReps(hydrated);
+        setSeriesState(series);
+      } else {
+        setReps(rows);
+        setSeriesState({ state: "inline" });
+      }
     } else {
       setReps([]);
+      setSeriesState({ state: "inline" });
     }
   }, [scenarioId]);
 
@@ -185,12 +221,13 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
   // "View" (6.E), which inspects a historical run other than the latest (the
   // realtime path only keeps the latest run's reps hot). Read-only.
   const loadReps = useCallback(async (runId: string): Promise<Replication[]> => {
-    const { data } = await sb
-      .from("run_replications")
-      .select("*")
-      .eq("run_id", runId)
-      .order("rep_index", { ascending: true });
-    return (data ?? []) as Replication[];
+    const [{ data }, { data: run }] = await Promise.all([
+      sb.from("run_replications").select("*").eq("run_id", runId).order("rep_index", { ascending: true }),
+      sb.from("simulation_runs").select("id,project_id,status,series_object,series_expired_at,run_key")
+        .eq("id", runId).maybeSingle(),
+    ]);
+    const rows = (data ?? []) as Replication[];
+    return run && run.status === "done" ? (await withRunSeries(run, rows)).reps : rows;
   }, []);
 
   const addReps = useCallback(async (projectId: string, runId: string, n: number) => {
@@ -205,5 +242,5 @@ export function useSimulationRun(scenarioId: string | null | undefined) {
     if (error) throw error;
   }, []);
 
-  return { latestRun, reps, history, runExperiment, cancelRun, addReps, loadReps, refresh: loadLatest };
+  return { latestRun, reps, history, seriesState, runExperiment, cancelRun, addReps, loadReps, refresh: loadLatest };
 }

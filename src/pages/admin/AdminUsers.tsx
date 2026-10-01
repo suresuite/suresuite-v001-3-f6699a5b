@@ -16,7 +16,7 @@
 // (Access / Suspend-Enable) instead of ghost buttons, and the primary
 // "Add user" lives in the PageHeader actions.
 //
-// §4 D233 — "Forgot password?" on the sign-in page records a request; open requests are
+// §4 D251 — "Forgot password?" on the sign-in page records a request; open requests are
 // listed above the table, and "Reset password…" (from a request or from a row) sets a
 // temporary password generated in this browser, which the person must change at their
 // next sign-in. The request changes nothing by itself: anyone can type an email, so the
@@ -663,7 +663,7 @@ function AddUserDialog({ orgs, actorArgs, onCreated }: {
 }
 
 /**
- * §4 D233 — open "Forgot password?" requests. A request only says that somebody typed this
+ * §4 D251 — open "Forgot password?" requests. A request only says that somebody typed this
  * email; it is the super admin who decides, after confirming with the person.
  */
 function ResetRequestsPanel({ requests, onReset, onDismiss }: {
@@ -703,7 +703,7 @@ function ResetRequestsPanel({ requests, onReset, onDismiss }: {
 }
 
 /**
- * §4 D233 — set a temporary password. It is generated here, shown to the super admin to
+ * §4 D251 — set a temporary password. It is generated here, shown to the super admin to
  * pass on, and stored only as a hash; `admin_reset_user_password` forces a change at the
  * next sign-in and closes the person's open request.
  */

@@ -33,7 +33,9 @@ export function formatVersionWhen(iso: string) {
 }
 
 export function versionDisplayName(v: PolicyVersion) {
-  return v.label || `Version ${v.id.slice(0, 8)}`;
+  const name = v.label || `Version ${v.id.slice(0, 8)}`;
+  // "v4 · name" — the per-project content number (WP 10.2), when the row carries it.
+  return typeof v.version_no === "number" ? `v${v.version_no} · ${name}` : name;
 }
 
 /** Save a snapshot of the current bundle — opened from row A's black button. */
@@ -114,7 +116,6 @@ export function PolicyHistorySheet({
   onOpenChange,
   versions,
   selectedVersionId,
-  onSelect,
   onRestore,
   onExport,
   onDelete,
@@ -125,8 +126,10 @@ export function PolicyHistorySheet({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   versions: PolicyVersion[];
+  /** The version whose content IS the live policies (WP 10.2) — shown, not chosen:
+   *  a version a page could "select" without loading it is how /policies and the Lab
+   *  came to disagree about which model was in force (§4 D242). */
   selectedVersionId: string | null;
-  onSelect: (id: string | null) => void;
   onRestore: (id: string) => Promise<void>;
   onExport?: (version: PolicyVersion) => Promise<void>;
   onDelete?: (versionId: string) => Promise<boolean>;
@@ -221,21 +224,21 @@ export function PolicyHistorySheet({
         <div className="mt-4 flex flex-col gap-2">
           {exportsSection}
 
-          <button
-            type="button"
-            onClick={() => {
-              onSelect(null);
-              onOpenChange(false);
-            }}
+          <div
             className={cn(
               SURFACE,
               "flex items-center gap-2 px-2.5 py-1.5 text-left",
-              selectedVersionId === null ? "border-foreground" : "hover:border-foreground",
+              selectedVersionId === null && "border-foreground",
             )}
           >
             <span className="text-[12.5px] font-medium">Current (live working copy)</span>
             <MonoChip>Live</MonoChip>
-          </button>
+            <span className="ml-auto font-mono text-[11px] text-muted-foreground">
+              {selectedVersionId === null
+                ? "unsaved edits"
+                : `saved as ${versionDisplayName(versions.find((v) => v.id === selectedVersionId) ?? versions[0])}`}
+            </span>
+          </div>
 
           {onDeleteMany && deletable.length > 0 && (
             <div
@@ -343,7 +346,7 @@ export function PolicyHistorySheet({
                         </span>
                       </MonoChip>
                     )}
-                    {isSelected && <MonoChip color="#111111">selected</MonoChip>}
+                    {isSelected && <MonoChip color="#111111">in force</MonoChip>}
                   </div>
                 </div>
                 <span className={meta}>
@@ -422,17 +425,6 @@ export function PolicyHistorySheet({
                     "[&_button]:min-h-11 md:[&_button]:min-h-0",
                   )}
                 >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-[26px] px-2.5 text-[11.5px]"
-                    onClick={() => {
-                      onSelect(v.id);
-                      onOpenChange(false);
-                    }}
-                  >
-                    Select
-                  </Button>
                   <Button
                     size="sm"
                     className="h-[26px] px-2.5 text-[11.5px]"

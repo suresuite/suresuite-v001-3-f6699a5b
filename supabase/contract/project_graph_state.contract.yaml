@@ -1,0 +1,196 @@
+# AUTHORED — the data contract's sidecar for `project_graph_state`.
+# WP 10.1 · §4 D233. Edit this file; docs/data/tables/*.md is generated from it.
+table: project_graph_state
+tier: "3"
+schema_name: public
+grain: >-
+  One row per project: every hash of the project's LIVE data — the composite
+  `graph_hash`, its two domains and the three levels — stored, so a page that asks
+  "has this project's graph changed?" reads a row instead of rebuilding a snapshot
+  of thirteen tables. A CACHE of a pure function of tier 2, safe to drop: the next
+  read rebuilds it.
+owner: analysis
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [project_id]
+    name: "project_graph_state_pkey"
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: true
+  rls_enabled: true
+  note: >-
+    No page and no API role writes it. Two writers, both SECURITY DEFINER and both
+    inside somebody else's statement: the statement triggers on the thirteen hashed
+    tables (`_graph_state_touch_*`) raise `dirty`, and `project_graph_hashes` stores
+    a recomputed set — only when `generation` has not moved since it read the row,
+    so a reader that started before a write cannot store the pre-write hash over the
+    flag the write raised. Read through `has_project_access`. Audited at statement
+    grain like every tier-3 table; its audit rows name whoever made the edit that
+    dirtied it.
+
+fields:
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project these hashes describe. Cascades with the project.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  schema_version:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The snapshot rule the stored hashes were computed under (3 since WP 5.3; WP 10.1
+      did not bump it — the levels are projections, not new facts).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  level_spec:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The level rule the three level hashes were computed under (1 since WP 10.1). A
+      stored row on another spec is recomputed on read rather than trusted.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  graph_hash:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The composite — identical to `current_graph_hash` and to a `dataset_versions` row of the same content.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  hash_inputs:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The `inputs` domain hash (WP 4.1).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  hash_network:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The `network` domain hash (WP 4.1, deep tier since WP 5.3).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  hash_product:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The PRODUCT level — see `dataset_versions.hash_product`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  hash_process:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The PROCESS level — see `dataset_versions.hash_process`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  hash_firm:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The FIRM level — see `dataset_versions.hash_firm`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  dirty:
+    type: "boolean"
+    unit: null
+    unit_source: none
+    meaning: >-
+      True when a hashed table changed since the stored hashes were computed. It means
+      "recompute before answering", NEVER "stale": a write of a row's own value back raises
+      it and the recomputed hash is unchanged (`rehearsal/140` §6 holds that line).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  generation:
+    type: "bigint"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Incremented by every touch. The store step updates only if it still matches the
+      value read before computing — the race guard a boolean alone cannot be.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  computed_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the stored hashes were last computed. NULL while a row has only ever been dirtied.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row last changed for any reason.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

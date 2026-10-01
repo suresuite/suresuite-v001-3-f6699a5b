@@ -182,6 +182,9 @@ export interface MobileSimulationLabProps {
   capacity?: React.ReactNode;
   /** non-null when the selected scenario is the validated baseline (§4 D227) */
   readOnlyReason?: string | null;
+  /** WP 10.5 — the settings are locked to the Validated Model's protocol until
+   *  "Advanced" is open; the disruption schedule never is. */
+  settingsLockReason?: string | null;
   findingsSource: "pre-run check" | "gate rejection";
   supplierIds: string[];
   latestRun: SimulationRun | null;
@@ -194,6 +197,13 @@ export interface MobileSimulationLabProps {
 
   /* compare */
   runsByScenario: Record<string, SimulationRun>;
+  /** WP 10.5 — compare defaults to this model's runs (null = every run). */
+  compareModelId?: string | null;
+
+  /* WP 10.5 — the Model and Engine steps (the same node the desktop renders) */
+  modelStep?: React.ReactNode;
+  /** replication-weeks and expected storage, with its basis */
+  runEstimate?: string | null;
 }
 
 export function MobileSimulationLab(props: MobileSimulationLabProps) {
@@ -230,9 +240,13 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
     ackWarnings,
     onAckWarnings,
     runBlockedReason,
+    modelStep,
+    runEstimate,
+    compareModelId,
     runGate,
     capacity,
     readOnlyReason = null,
+    settingsLockReason = null,
     findingsSource,
     supplierIds,
     latestRun,
@@ -567,6 +581,11 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
   const runPane = (
     <>
       {capacity ? <div className="px-3 pt-1">{capacity}</div> : null}
+      {runEstimate ? (
+        <p className="px-3 font-mono text-[11.5px] text-[#525252] [text-wrap:pretty]" data-testid="run-estimate">
+          {runEstimate}
+        </p>
+      ) : null}
       <MobileGroup label="Progress">
         <MobilePanel tone={paneTone} label="Run" counter={runStatus ?? "not started"}>
         <div className="flex flex-col gap-2.5 p-3">
@@ -842,6 +861,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
     </MobilePanel>
   ) : (
     <>
+      {modelStep ? <MobileGroup>{modelStep}</MobileGroup> : null}
       <MobileGroup>
         {gatePanel}
         {scenarioPanel}
@@ -859,6 +879,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
                   <CompareScenariosPanel
                     scenarios={scenarios}
                     runsByScenario={runsByScenario}
+                    modelId={compareModelId ?? null}
                     skin
                   />
                 </MobileGroup>
@@ -931,7 +952,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
         <>
           <MobileSheet open={sheet === "scenario"} title="Scenario" onClose={close}>
             <div className="p-3.5">
-              <ReadOnlyFrame reason={readOnlyReason}>
+              <ReadOnlyFrame reason={settingsLockReason ?? readOnlyReason}>
                 <ScenarioSetupForm
                   section="identity"
                   scenario={selected}
@@ -944,7 +965,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
 
           <MobileSheet open={sheet === "runWindow"} title="Run window" onClose={close}>
             <div className="p-3.5">
-              <ReadOnlyFrame reason={readOnlyReason}>
+              <ReadOnlyFrame reason={settingsLockReason ?? readOnlyReason}>
                 <ScenarioSetupForm
                   section="runWindow"
                   scenario={selected}
@@ -957,7 +978,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
 
           <MobileSheet open={sheet === "precision"} title="Precision" onClose={close}>
             <div className="p-3.5">
-              <ReadOnlyFrame reason={readOnlyReason}>
+              <ReadOnlyFrame reason={settingsLockReason ?? readOnlyReason}>
                 <ScenarioSetupForm
                   section="precision"
                   scenario={selected}
@@ -970,7 +991,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
 
           <MobileSheet open={sheet === "objective"} title="Objective" onClose={close}>
             <div className="p-3.5">
-              <ReadOnlyFrame reason={readOnlyReason}>
+              <ReadOnlyFrame reason={settingsLockReason ?? readOnlyReason}>
                 <ScenarioSetupForm
                   section="objective"
                   scenario={selected}

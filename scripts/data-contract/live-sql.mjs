@@ -89,6 +89,13 @@ export function liveDefinitions() {
   // `dataPlaneAudit.test.ts`'s writer scan included. That is D78's shape on a
   // different axis: the scan could not see what it was not looking at.
   const functions = new Map();
+  // Every live OVERLOAD per name, keyed by its argument types, in CREATE order —
+  // so a DROP of the overload `functions` holds falls back to the one that
+  // survives instead of losing the name (WP 10.1: dropping the two-argument
+  // `analysis_mark_critical_nodes` shim made the three-argument writer vanish
+  // from every rule scoped to this map, which `dataPlaneAudit.test.ts` caught).
+  const overloads = new Map();  // name -> Map(argTypes -> record)
+  const sigOf = (name, sql) => argTypesOf(sql.slice(sql.toLowerCase().indexOf(name) + name.length));
   // TRIGGERS are replayed here and NOWHERE ELSE. `introspect.mjs` has
   // `CREATE TRIGGER` on its ignore list by design — it builds a COLUMN schema —
   // so "does this table have an audit trigger?" had no source in the contract at
@@ -114,7 +121,12 @@ export function liveDefinitions() {
         policies.delete(`${bare(m[2])}::${unquote(m[1])}`);
       } else if ((m = /^CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([a-zA-Z0-9_."]+)/i.exec(head))) {
         const name = bare(m[1]);
-        functions.set(name, { name, migration: file, sql: raw });
+        const rec = { name, migration: file, sql: raw };
+        functions.set(name, rec);
+        if (!overloads.has(name)) overloads.set(name, new Map());
+        const sig = sigOf(name, head);
+        overloads.get(name).delete(sig);   // re-insert so CREATE order is kept
+        overloads.get(name).set(sig, rec);
       } else if ((m = /^DROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_."]+)/i.exec(head))) {
         // A DROP that names an argument list removes ONE overload. Deleting the
         // whole name here is what made five live functions invisible (D100), so
@@ -125,8 +137,16 @@ export function liveDefinitions() {
         const name = bare(m[1]);
         const held = functions.get(name);
         const dropArgs = argTypesOf(head.slice(m[0].length));
-        if (!held || dropArgs === null || argTypesOf(held.sql.slice(held.sql.toLowerCase().indexOf(name) + name.length)) === dropArgs) {
+        if (dropArgs === null) {
           functions.delete(name);
+          overloads.delete(name);
+        } else {
+          overloads.get(name)?.delete(dropArgs);
+          if (!held || sigOf(name, squash(held.sql)) === dropArgs) {
+            const left = [...(overloads.get(name)?.values() ?? [])];
+            if (left.length) functions.set(name, left[left.length - 1]);
+            else functions.delete(name);
+          }
         }
       } else if ((m = /^CREATE\s+(?:OR\s+REPLACE\s+)?(?:CONSTRAINT\s+)?TRIGGER\s+("[^"]*"|[a-zA-Z0-9_]+)\s+(?:BEFORE|AFTER|INSTEAD\s+OF)\s+[\s\S]*?\sON\s+([a-zA-Z0-9_."]+)/i.exec(head))) {
         const table = bare(m[2]), name = unquote(m[1]);

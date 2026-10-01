@@ -20,7 +20,7 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc record_model_validation"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:406"
+    evidence: "src/hooks/useModelValidation.tsx:464"
     confirmed: true
   - page: "DeveloperApi.tsx"
     via: "rpc list_dataset_versions"
@@ -28,19 +28,19 @@ surfaces:
     evidence: "src/pages/DeveloperApi.tsx:311"
     confirmed: true
   - page: "ProductLevelNetwork.tsx"
-    via: "rpc project_freshness"
+    via: "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)"
     grain: table
-    evidence: "src/pages/ProductLevelNetwork.tsx:270"
+    evidence: "src/components/trust/useProjectFreshness.ts:24"
     confirmed: true
   - page: "ProjectPolicies.tsx"
-    via: "rpc record_model_validation"
+    via: "rpc record_validated_model (Save Validated Model, WP 10.3)"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:406"
+    evidence: "src/hooks/useModelValidation.tsx:492"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "rpc record_model_validation"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:406"
+    evidence: "src/hooks/useModelValidation.tsx:464"
     confirmed: true
 
 governance:
@@ -87,7 +87,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:129"
+        evidence: "src/hooks/useVerifiableExports.tsx:145"
         confirmed: true
     resolution: null
   project_id:
@@ -128,7 +128,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:129"
+        evidence: "src/hooks/useVerifiableExports.tsx:145"
         confirmed: true
     resolution: null
     note: >-
@@ -155,7 +155,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:129"
+        evidence: "src/hooks/useVerifiableExports.tsx:145"
         confirmed: true
     resolution: null
     note: >-
@@ -193,7 +193,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:129"
+        evidence: "src/hooks/useVerifiableExports.tsx:145"
         confirmed: true
     resolution: null
     note: >-
@@ -233,7 +233,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:129"
+        evidence: "src/hooks/useVerifiableExports.tsx:145"
         confirmed: true
     resolution: null
     note: >-
@@ -266,7 +266,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:129"
+        evidence: "src/hooks/useVerifiableExports.tsx:145"
         confirmed: true
     resolution: null
     note: >-
@@ -343,6 +343,71 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:129"
+        evidence: "src/hooks/useVerifiableExports.tsx:145"
         confirmed: true
+    resolution: null
+  hash_product:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      SHA-256 over the PRODUCT level (WP 10.1, §4 D235): suppliers, materials,
+      products, customers, the single-level BOM and the inbound / outbound lanes —
+      every column the `inputs` domain hashes except the multi-level BOM. A projection
+      of facts already hashed; the composite does not include it, so adding it moved
+      no `graph_hash`. NULL never — computed for every snapshot that has `inputs`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  hash_process:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      SHA-256 over the PROCESS level (WP 10.1): `bom_multi_level` and
+      `multi_tier_supply_chain` whole, plus the endpoints and quantities — not the
+      prices — of the single-level BOM and the lanes, and the product ids. Exactly
+      what `rebuild_supply_chain_lanes` builds the two lane graphs from, so the
+      derived lane tables never enter an identity. NULL on a pre-v2 snapshot, which
+      has no `network` domain.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  hash_firm:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      SHA-256 over the FIRM level (WP 10.1): the deep-tier topology
+      (`network_nodes(uid, revenue)`, `network_edges(src_uid, dst_uid,
+      relative_revenue)`) and the tier-2 / tier-3 supplier tables. NULL on a snapshot
+      older than `schema_version` 3, which did not hash the deep tier — a level
+      computed from it would hash an absence, which is not a fact.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  version_no:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: >-
+      "Graph v7" — one number per CONTENT (`graph_hash`) per project, in order of
+      first appearance, assigned by a BEFORE INSERT trigger (WP 10.1, §4 D234). Since
+      WP 10.1 `snapshot_dataset` returns the OLDEST version of a content, so a reverted
+      edit is the earlier number again; rows that predate that and share a hash share
+      the number.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
     resolution: null

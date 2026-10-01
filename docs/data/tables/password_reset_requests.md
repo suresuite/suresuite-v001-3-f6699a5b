@@ -9,7 +9,7 @@
 
 **Tier G** — governance — identity, capability, delegation, audit · owned by `platform` · `public.password_reset_requests`
 
-**One row is** One "Forgot password?" request for one account, from the moment the person asks until a super admin resets the password or dismisses the request (PLAN.md §4 D233).
+**One row is** One "Forgot password?" request for one account, from the moment the person asks until a super admin resets the password or dismisses the request (PLAN.md §4 D251).
 
 ## Uniqueness
 
@@ -25,8 +25,8 @@ partially or get corrected — the write fails.
 
 | Constraint | Rule | Added by |
 |---|---|---|
-| `password_reset_requests_closed_shape` | `CHECK ((status = 'open') = (closed_at IS NULL))` | `20261001000006_password_reset_requests.sql` |
-| `password_reset_requests_status` | `CHECK (status IN ('open', 'resolved', 'dismissed'))` | `20261001000006_password_reset_requests.sql` |
+| `password_reset_requests_closed_shape` | `CHECK ((status = 'open') = (closed_at IS NULL))` | `20261001000011_password_reset_requests.sql` |
+| `password_reset_requests_status` | `CHECK (status IN ('open', 'resolved', 'dismissed'))` | `20261001000011_password_reset_requests.sql` |
 
 ## Governance
 
@@ -70,7 +70,7 @@ Surrogate id, `gen_random_uuid()`.
 | Type | `uuid`, `NOT NULL`, default `gen_random_uuid()` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000006_password_reset_requests.sql` |
+| Added by | `20261001000011_password_reset_requests.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -84,7 +84,7 @@ The account the request is for — the active `approved_users` row whose email w
 | Type | `uuid`, `NOT NULL` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000006_password_reset_requests.sql` |
+| Added by | `20261001000011_password_reset_requests.sql` |
 | References | `public.approved_users(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -99,7 +99,7 @@ The account the request is for — the active `approved_users` row whose email w
 | Type | `text`, `NOT NULL` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000006_password_reset_requests.sql` |
+| Added by | `20261001000011_password_reset_requests.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | open \| resolved \| dismissed |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -113,7 +113,7 @@ When the person asked. Server-stamped.
 | Type | `timestamp with time zone`, `NOT NULL`, default `now()` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000006_password_reset_requests.sql` |
+| Added by | `20261001000011_password_reset_requests.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -127,7 +127,7 @@ When a super admin resolved or dismissed the request; NULL while it is open.
 | Type | `timestamp with time zone` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000006_password_reset_requests.sql` |
+| Added by | `20261001000011_password_reset_requests.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -141,7 +141,7 @@ The super admin who closed it; NULL while open, or once that account is deleted 
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000006_password_reset_requests.sql` |
+| Added by | `20261001000011_password_reset_requests.sql` |
 | References | `public.approved_users(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -151,10 +151,10 @@ The super admin who closed it; NULL while open, or once that account is deleted 
 
 | Index | Columns | Unique | Added by |
 |---|---|---|---|
-| `password_reset_requests_one_open` | `user_id` | yes | `20261001000006_password_reset_requests.sql` |
+| `password_reset_requests_one_open` | `user_id` | yes | `20261001000011_password_reset_requests.sql` |
 
 ---
 
-*Generated from data contract `237475f05d3e`, engine `0.2.8`,
-sidecar `supabase/contract/password_reset_requests.contract.yaml`, table created by `20261001000006_password_reset_requests.sql`. No wall-clock date: a generated
+*Generated from data contract `79fc096780a7`, engine `0.2.8`,
+sidecar `supabase/contract/password_reset_requests.contract.yaml`, table created by `20261001000011_password_reset_requests.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

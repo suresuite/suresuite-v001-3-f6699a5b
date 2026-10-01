@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import type { ValidatedModelProtocol } from "@/lib/sim/validatedModel";
 
 // Model-validation cards — Phase B0 / G13 / §9.5.
 // Loads the project's model_validations rows (the persisted V&V credibility
@@ -55,6 +56,20 @@ export interface ModelValidationCard {
   validated_at: string;
   author_email: string | null;
   created_at: string;
+  // ── WP 10.3 · §4 D243 — the Validated Model's own identity ──────────────
+  /** Display name; numbered per project by `version_no`. */
+  name?: string | null;
+  version_no?: number | null;
+  /** How the model is run — `validated_model_protocol_problems` says what is complete. */
+  protocol?: ValidatedModelProtocol | null;
+  protocol_hash?: string | null;
+  /** policy · graph · scenario world · protocol · engine — one hash, one model. */
+  model_hash?: string | null;
+  engine_id?: string | null;
+  /** The recorded statement a face-validated model rests on. */
+  face_validation?: string | null;
+  revoked_at?: string | null;
+  revoke_reason?: string | null;
 }
 
 export type DriftComponent = "policy" | "data" | "scenario" | "engine";
@@ -64,11 +79,20 @@ export type Credibility =
   | { state: "validated"; card: ModelValidationCard }
   | { state: "stale"; card: ModelValidationCard; drift: DriftComponent[] };
 
-/** The current context a card is compared against (all hashes read live). */
+/** The current context a card is compared against (all hashes read live).
+ *
+ *  WP 10.2 · §4 D242 — a card is matched by CONTENT: `policyHash`, not
+ *  `policyVersionId`. Two version rows with one hash are one model, and matching
+ *  by id is what made a freshly opened Lab read every validated model as
+ *  unvalidated. */
 export interface CredibilityContext {
-  policyVersionId: string | null;
-  /** live policy edits diverge from the selected version (usePolicies.isDirty) */
-  policyDirty: boolean;
+  /** current_policy_hash of the policies in context; null = not loaded yet. When
+   *  omitted, the hook's own `currentPolicyHash` is used. */
+  policyHash?: string | null;
+  /** For display only — never compared. */
+  policyVersionId?: string | null;
+  /** Kept for callers; the policy component is decided by `policyHash` alone. */
+  policyDirty?: boolean;
   /** current_graph_hash (useDatasetVersion.currentHash) */
   graphHash: string | null;
   /** scenario_fingerprint_hash of the scenario in context; null = unknown */
@@ -107,6 +131,27 @@ export interface RecordValidationArgs {
   userEmail?: string | null;
 }
 
+/** Save Validated Model (WP 10.3): `record_validated_model`, which enforces the
+ *  adoption rule and a complete protocol server-side as well. */
+export interface RecordValidatedModelArgs {
+  projectId: string;
+  policyVersionId: string;
+  datasetVersionId: string;
+  scenarioId: string;
+  name: string;
+  protocol: ValidatedModelProtocol;
+  warmupMethod: "engine" | "welch" | "mser5";
+  replicationBasis: Record<string, unknown>;
+  validationTests: unknown[];
+  findings: unknown[];
+  basis: "statistical" | "face";
+  faceValidation: string | null;
+  evidenceRunId: string | null;
+  /** warm-up series + detector outputs, replication analysis, run ids. */
+  evidence: Record<string, unknown>;
+  userEmail?: string | null;
+}
+
 /** Fetch the baseline fingerprint hash of a scenario (single canonicalization
  *  point: the scenario_fingerprint_hash RPC — never hashed client-side). */
 export async function fetchScenarioFingerprintHash(
@@ -124,26 +169,37 @@ export async function fetchScenarioFingerprintHash(
   return (data as string | null) ?? null;
 }
 
-/** Badge derivation (§2.4): one stored fact, three derived states. */
+/** Badge derivation (§2.4): one stored fact, three derived states.
+ *
+ *  By content (WP 10.2): the cards whose `policy_hash` IS the live policy hash
+ *  are this model's; among them the one matching the most of graph and scenario
+ *  wins. When the live policies match NO card, the newest validated card is
+ *  still reported — as STALE with `policy` drift, which is what "you changed the
+ *  policies since validating" means — so an edit reads stale, not unvalidated. */
 export function deriveCredibility(
   cards: ModelValidationCard[],
   ctx: CredibilityContext,
 ): Credibility {
-  if (!ctx.policyVersionId) return { state: "unvalidated" };
-  // Cards are looked up by the exact version (or the version dirty edits
-  // branch from — same id, dirty just adds policy drift).
-  const card = cards.find(
-    (c) =>
-      c.status === "active" &&
-      c.verdict === "validated" &&
-      c.policy_version_id === ctx.policyVersionId,
-  );
-  if (!card) return { state: "unvalidated" };
+  const policyHash = ctx.policyHash ?? null;
+  // Null means "not loaded yet": no badge rather than a flash of a wrong one.
+  if (!policyHash) return { state: "unvalidated" };
+  const validated = cards
+    .filter((c) => c.status === "active" && c.verdict === "validated")
+    .sort((a, b) => (a.validated_at < b.validated_at ? 1 : a.validated_at > b.validated_at ? -1 : 0));
+  if (validated.length === 0) return { state: "unvalidated" };
+
+  const exact = validated.filter((c) => c.policy_hash === policyHash);
+  const pool = exact.length > 0 ? exact : validated;
+  const score = (c: ModelValidationCard) =>
+    (ctx.graphHash !== null && c.graph_hash === ctx.graphHash ? 2 : 0) +
+    (ctx.scenarioHash !== null && c.scenario_hash === ctx.scenarioHash ? 1 : 0);
+  // Stable: `pool` is newest-first, so equal scores keep the newest card.
+  const card = pool.reduce((best, c) => (score(c) > score(best) ? c : best), pool[0]);
 
   // null current hashes mean "not loaded yet", not drift — skip those
   // comparisons rather than flashing a false stale state while loading.
   const drift: DriftComponent[] = [];
-  if (ctx.policyDirty) drift.push("policy");
+  if (exact.length === 0) drift.push("policy");
   if (ctx.graphHash !== null && ctx.graphHash !== card.graph_hash) {
     drift.push("data");
   }
@@ -174,15 +230,15 @@ export interface UseModelValidationResult {
   /** Derive the badge for a caller-supplied context (Run & Validate). */
   resolve: (ctx: CredibilityContext) => Credibility;
   /**
-   * Lab-side badge derivation (§2.4): exact active-card triple match and not
-   * dirty → validated; a card on this policy version with any component
-   * mismatched → stale (drift names which); no card → unvalidated. Scenario
-   * fingerprints are fetched lazily and cached so this stays synchronous.
+   * Lab-side badge derivation (§2.4), by content (WP 10.2): the live policy
+   * hash, the current graph hash and this scenario's fingerprint against the
+   * project's cards — `deriveCredibility`, with the scenario fingerprint fetched
+   * lazily and cached so this stays synchronous. `policyHash` undefined = use
+   * the hook's own `currentPolicyHash`.
    */
   resolveScenario: (
-    policyVersionId: string | null | undefined,
+    policyHash: string | null | undefined,
     scenario: ScenarioFingerprintInput | null | undefined,
-    opts?: { dirty?: boolean },
   ) => Credibility;
   /** Immutable-history badge for a completed run (stamped card + engine check). */
   resolveRun: (run: {
@@ -190,20 +246,21 @@ export interface UseModelValidationResult {
     code_version?: string | null;
   } | null | undefined) => Credibility;
   /**
-   * Inheritance (§2.6): if the exact active triple (policy version ×
-   * current graph × this scenario's baseline fingerprint) is validated and
-   * the policy is not dirty, apply the card to the scenario via the ONE
-   * server-side inheritance RPC. Returns the applied card id, or null.
+   * Inheritance (§2.6): if the exact active CONTENT triple (live policy hash ×
+   * current graph × this scenario's baseline fingerprint) is validated, apply
+   * the card to the scenario via the ONE server-side inheritance RPC, which
+   * re-checks the same triple. Returns the applied card id, or null.
    */
   applyIfValidated: (
     scenario: ScenarioFingerprintInput,
-    policyVersionId: string | null | undefined,
-    opts?: { dirty?: boolean },
+    policyHash: string | null | undefined,
   ) => Promise<string | null>;
   /** record_model_validation RPC — supersedes the same-triple active card. */
   record: (args: RecordValidationArgs) => Promise<string>;
+  /** record_validated_model RPC — Save Validated Model (WP 10.3). */
+  recordValidatedModel: (args: RecordValidatedModelArgs) => Promise<string>;
   /** revoke_model_validation RPC — status flip, never a delete. */
-  revoke: (validationId: string) => Promise<void>;
+  revoke: (validationId: string, reason?: string) => Promise<void>;
 }
 
 export function useModelValidation(
@@ -286,6 +343,18 @@ export function useModelValidation(
         },
         () => void refresh(),
       )
+      // Overrides are half of the policy content the card is matched on (WP 10.2):
+      // without this, a node-level edit left the badge on the old hash.
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "policy_overrides",
+          filter: `project_id=eq.${projectId}`,
+        },
+        () => void refresh(),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -298,8 +367,12 @@ export function useModelValidation(
   );
 
   const resolve = useCallback(
-    (ctx: CredibilityContext) => deriveCredibility(allCards, ctx),
-    [allCards],
+    (ctx: CredibilityContext) =>
+      deriveCredibility(allCards, {
+        ...ctx,
+        policyHash: ctx.policyHash === undefined ? currentPolicyHash : ctx.policyHash,
+      }),
+    [allCards, currentPolicyHash],
   );
 
   const ensureFingerprint = useCallback(
@@ -317,35 +390,19 @@ export function useModelValidation(
   );
 
   const resolveScenario = useCallback<UseModelValidationResult["resolveScenario"]>(
-    (policyVersionId, scenario, opts) => {
-      if (!policyVersionId) return { state: "unvalidated" };
-      const active = cards.filter(
-        (c) => c.verdict === "validated" && c.policy_version_id === policyVersionId,
-      );
-      if (active.length === 0) return { state: "unvalidated" };
-
+    (policyHash, scenario) => {
       let scenarioHash: string | null = null;
       if (scenario) {
         scenarioHash = fingerprints[fingerprintKey(scenario)] ?? null;
         if (scenarioHash === null) ensureFingerprint(scenario);
       }
-
-      const dirty = opts?.dirty === true;
-      // Prefer the card matching the most components (exact triple first).
-      const score = (c: ModelValidationCard) =>
-        (currentGraphHash !== null && c.graph_hash === currentGraphHash ? 2 : 0) +
-        (scenarioHash !== null && c.scenario_hash === scenarioHash ? 1 : 0);
-      const card = [...active].sort((a, b) => score(b) - score(a))[0];
-
-      const drift: DriftComponent[] = [];
-      if (dirty) drift.push("policy");
-      if (currentGraphHash !== null && card.graph_hash !== currentGraphHash) drift.push("data");
-      if (scenarioHash !== null && card.scenario_hash !== scenarioHash) drift.push("scenario");
-
-      if (drift.length === 0) return { state: "validated", card };
-      return { state: "stale", card, drift };
+      return deriveCredibility(allCards, {
+        policyHash: policyHash === undefined ? currentPolicyHash : policyHash,
+        graphHash: currentGraphHash,
+        scenarioHash,
+      });
     },
-    [cards, currentGraphHash, fingerprints, ensureFingerprint],
+    [allCards, currentPolicyHash, currentGraphHash, fingerprints, ensureFingerprint],
   );
 
   const resolveRun = useCallback<UseModelValidationResult["resolveRun"]>(
@@ -366,12 +423,13 @@ export function useModelValidation(
   );
 
   const applyIfValidated = useCallback<UseModelValidationResult["applyIfValidated"]>(
-    async (scenario, policyVersionId, opts) => {
-      if (!policyVersionId || opts?.dirty === true || currentGraphHash === null) return null;
+    async (scenario, policyHashArg) => {
+      const policyHash = policyHashArg === undefined ? currentPolicyHash : policyHashArg;
+      if (!policyHash || currentGraphHash === null) return null;
       const candidates = cards.filter(
         (c) =>
           c.verdict === "validated" &&
-          c.policy_version_id === policyVersionId &&
+          c.policy_hash === policyHash &&
           c.graph_hash === currentGraphHash,
       );
       if (candidates.length === 0) return null;
@@ -396,7 +454,7 @@ export function useModelValidation(
     // `user?.id` and not `user`: without it the callback closes over the person who
     // was signed in at first render, so a session change would attribute this write
     // to the previous one (WP 6.2 slice 12's lesson, ten arrays over).
-    [cards, currentGraphHash, user?.id],
+    [cards, currentPolicyHash, currentGraphHash, user?.id],
   );
 
   const record = useCallback(
@@ -427,17 +485,48 @@ export function useModelValidation(
     [refresh],
   );
 
+  const recordValidatedModel = useCallback(
+    async (args: RecordValidatedModelArgs): Promise<string> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+      const { data, error } = await sb.rpc("record_validated_model", {
+        p_project_id: args.projectId,
+        p_policy_version_id: args.policyVersionId,
+        p_dataset_version_id: args.datasetVersionId,
+        p_scenario_id: args.scenarioId,
+        p_name: args.name,
+        p_protocol: args.protocol,
+        p_warmup_method: args.warmupMethod,
+        p_replication_basis: args.replicationBasis,
+        p_validation_tests: args.validationTests,
+        p_findings: args.findings,
+        p_basis: args.basis,
+        p_face_validation: args.faceValidation,
+        p_evidence_run_id: args.evidenceRunId,
+        p_evidence: args.evidence,
+        _actor_user_id: user?.id ?? null,
+        p_user_email: args.userEmail ?? null,
+      });
+      if (error) throw new Error(error.message ?? String(error));
+      await refresh();
+      return data as string;
+    },
+    [refresh, user?.id],
+  );
+
   const revoke = useCallback(
-    async (validationId: string): Promise<void> => {
+    async (validationId: string, reason?: string): Promise<void> => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
       const { error } = await sb.rpc("revoke_model_validation", {
         p_validation_id: validationId,
+        _actor_user_id: user?.id ?? null,
+        p_reason: reason ?? null,
       });
       if (error) throw new Error(error.message ?? String(error));
       await refresh();
     },
-    [refresh],
+    [refresh, user?.id],
   );
 
   return useMemo(
@@ -453,6 +542,7 @@ export function useModelValidation(
       resolveRun,
       applyIfValidated,
       record,
+      recordValidatedModel,
       revoke,
     }),
     [
@@ -467,6 +557,7 @@ export function useModelValidation(
       resolveRun,
       applyIfValidated,
       record,
+      recordValidatedModel,
       revoke,
     ],
   );

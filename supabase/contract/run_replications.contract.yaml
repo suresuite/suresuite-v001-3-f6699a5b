@@ -81,7 +81,7 @@ surfaces:
   - page: "ProjectPolicies.tsx"
     via: "hook useSimulationRun → select * from run_replications"
     grain: table
-    evidence: "src/hooks/useSimulationRun.tsx:85"
+    evidence: "src/hooks/useSimulationRun.tsx:110"
     confirmed: true
     note: >-
       Both result surfaces reach this table through the SAME hook, so the
@@ -92,17 +92,17 @@ surfaces:
   - page: "SimulationLab.tsx"
     via: "hook useSimulationRun::loadReps → select * from run_replications"
     grain: table
-    evidence: "src/hooks/useSimulationRun.tsx:189"
+    evidence: "src/hooks/useSimulationRun.tsx:225"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "useVerifiableExports → select * from run_replications"
     grain: table
-    evidence: "src/hooks/useVerifiableExports.tsx:234"
+    evidence: "src/hooks/useVerifiableExports.tsx:245"
     confirmed: true
     note: >-
       The run-results workbook. This is the path by which a replication row
       leaves the system, so it is the one A5's Reproducibility Record has to
-      bind (`result-binding`, still owed — WP 9.2).
+      bind (`result-binding`, still owed — WP 10.4, which absorbed WP 9.2).
 
 fields:
   id:
@@ -190,10 +190,14 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The random seed this replication actually ran with, derived as
-      `project_seed * 1000 + model_rep`. It is recorded rather than recomputed
-      so a single replication can be reproduced exactly — the per-seed explorer
-      addresses rows by it.
+      The run's ROOT seed since WP 10.6 (§4 D246). The engine draws every
+      stream from a keyed SeedSequence tree on (root seed, `model_rep`,
+      `event_rep`), so a replication is reproduced by re-running with this root
+      seed and is identified by `rep_index` and its cell (`kpis.model_rep`,
+      `kpis.event_rep`). Before WP 10.6 the bridge wrote `project_seed * 1000 +
+      model_rep` here — not a seed (typing it in reproduced nothing) and shared
+      by every event draw of one world — and this description called it "the
+      seed this replication actually ran with", which it never was.
     grain: identifier
     engine:
       consumed_by: "scsim_bridge.py::compute_run_from_project -> replications[].seed_used"
@@ -277,7 +281,13 @@ fields:
     unit_source: derived
     meaning: >-
       This replication's weekly series, one array per key, each as long as the
-      horizon in weeks. The keys are scsim's PUBLISHED weekly series and are
+      horizon in weeks — OR `{}` when they are kept elsewhere: since WP 10.6 a
+      worker run writes them to ONE Parquet object per run
+      (`simulation_runs.series_object`, private `run-results` bucket) and
+      `runSeries.ts` hydrates the rows from it, and the retention sweep empties
+      them when a standard run's series expire (`series_expired_at`). `{}` and
+      not NULL because the column is NOT NULL DEFAULT `{}`, the value every
+      reader already treats as "no series". The keys are scsim's PUBLISHED weekly series and are
       declared in ONE place — `WEEKLY_SERIES` in scsim/scsim/core/context.py —
       which also fixes each series' unit and how it may be aggregated across
       weeks (`level` = a stock, average it; `flow` = a weekly quantity, sum it;

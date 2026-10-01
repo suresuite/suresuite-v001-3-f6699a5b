@@ -104,10 +104,10 @@ function Body({
 }) {
   const navigate = useNavigate();
   const { scenarios, create, update } = useScenarios(projectId);
-  const { selectedVersionId: policyVersionId, isDirty } = usePolicies(projectId);
+  const { currentHash: policyHash } = usePolicies(projectId);
   const { suppliers } = useItemMasters(projectId);
   const cred = useModelValidation(projectId);
-  const validated = useValidatedBaseline({ scenarios, cred, policyVersionId, dirty: isDirty });
+  const validated = useValidatedBaseline({ scenarios, cred, policyHash });
 
   const supplierIds = useMemo(() => suppliers.map((s) => s.supplier_id).filter(Boolean), [suppliers]);
 
@@ -185,7 +185,7 @@ function Body({
           }),
         );
         // Born in the validated world, so it can inherit the validation (§4 D219).
-        if (saved) void cred.applyIfValidated(saved, policyVersionId, { dirty: isDirty });
+        if (saved) void cred.applyIfValidated(saved, policyHash);
       } else if (existing) {
         await update(existing.id, { disruption_schedule: [...(existing.disruption_schedule ?? []), ev] });
         saved = existing;

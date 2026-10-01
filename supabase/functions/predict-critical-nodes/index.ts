@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
 import { completeRun, failRun, getOrStart } from "../_shared/analysisStore.ts";
 
 /** WP 4.3 · part of the store's key. Bump when the prediction changes. */
-const CODE_VERSION = 'critical_nodes@wp43.1';
+const CODE_VERSION = 'critical_nodes@wp101.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,64 +23,12 @@ serve(async (req) => {
     );
 
     const body = await req.json().catch(() => ({}));
+    const project_id: string | undefined = body.project_id;
     const plant_name = body.plant_name || body.plant;
     const uploaded_by = body.uploaded_by;
 
-    console.log('Starting critical node prediction process...', { plant_name, uploaded_by });
+    console.log('Starting critical node prediction process...', { project_id, plant_name, uploaded_by });
 
-    let query = supabase.from('supply_chain_data').select('*');
-    if (plant_name) query = query.eq('plant_name', plant_name);
-    // if (uploaded_by) query = query.eq('uploaded_by', uploaded_by);
-    query = query.neq('data_source', 'multi_tier');
-
-    const { data: supplyChainData, error: fetchError } = await query;
-
-    if (fetchError) {
-      console.error('Error fetching supply chain data:', fetchError);
-      throw new Error(`Failed to fetch data: ${fetchError.message}`);
-    }
-
-    console.log(`Processing ${supplyChainData.length} records for prediction`);
-
-    // ── WP 4.3 · WHICH PROJECT IS THIS? ──────────────────────────────────
-    //
-    // This function filters by `plant_name`, which is NOT scoped to a project —
-    // `20260917000003` says so in its own header, which is why
-    // `analysis_mark_critical_nodes` derives the project from the SCORED ROWS
-    // and refuses a set spanning two. A run has to name a project before the
-    // scoring happens, so the same question is answered here, from the rows
-    // actually loaded, and answered the same way: one project or nothing.
-    const projectIds = [...new Set(
-      (supplyChainData ?? []).map((r: { project_id?: string }) => r.project_id).filter(Boolean),
-    )];
-    if (projectIds.length > 1) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: `plant_name '${plant_name}' spans ${projectIds.length} projects. One call `
-             + `scores under one project's authority or it scores nothing.`,
-        projects: projectIds.length,
-      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-    const project_id = projectIds[0] as string | undefined;
-
-    // ── Process ALL data at once (no batching) so graph metrics are global ──
-    const predictions = await predictCriticalNodes(supplyChainData);
-
-    // WP 4.1 — D36 CLOSED, AND THE AUDIT LOG STOPS BEING UNREADABLE.
-    //
-    // What stood here was ONE UPDATE PER PREDICTION, fired in parallel. Since
-    // WP 2.3 every one of those statements writes its own audit row, so a single
-    // analysis of the largest project in this database produced ~1 800 rows in
-    // the log the statement grain exists to keep readable — each saying
-    // `actor_known: false`, because a service-role PostgREST call cannot set the
-    // GUC the trigger reads.
-    //
-    // `analysis_mark_critical_nodes` takes the actor as a parameter, sets
-    // `app.current_user_id` LOCAL, and writes every score in ONE statement. It
-    // also derives the project from the SCORED ROWS and refuses a set spanning
-    // two — this function filters by `plant_name`, which is not scoped to a
-    // project, so "which project am I writing" had no answer here at all.
-    // `supabase/rehearsal/110` §7d reads the audit row back.
     if (!uploaded_by) {
       return new Response(JSON.stringify({
         success: false,
@@ -88,31 +36,70 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // ── WP 4.3 · the run, so the scores can say which world produced them ─
-    //
-    // NO TOPOLOGY DIGEST HERE, and the absence is a statement rather than an
-    // omission: this analyzer reads `supply_chain_data`, which is
-    // `combine-project`'s ETL output over the eleven tier-2 tables
-    // `current_graph_hash` already covers. Its inputs ARE in the anchor. The two
-    // centrality analyzers read `network_nodes`/`network_edges`, which are not —
-    // see `20260917000007`'s header.
-    const run = project_id
-      ? await getOrStart(supabase, {
-          projectId: project_id,
-          analysisKind: 'critical_nodes',
-          params: { plant_name: plant_name ?? null },
-          codeVersion: CODE_VERSION,
-          actorUserId: uploaded_by,
-        })
-      : null;
+    // WP 10.1 · §4 D236 — ONE PROJECT, NAMED BY THE CALLER. This read used to be
+    // `supply_chain_data` filtered by `plant_name` alone, which is not scoped to a
+    // project: it loaded every project's rows for that plant name and then refused
+    // the set if it spanned two. The project is part of the request now, and the
+    // read is filtered by it.
+    if (!project_id) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'project_id is required: a prediction is computed for one project',
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
-    if (run?.cacheHit) {
+    // WP 10.1 · §4 D236 — THE CACHE IS ASKED FIRST. The prediction used to run
+    // before the lookup, so a hit still paid for the whole computation. The kind
+    // is keyed on the PROCESS level (`analysis_kinds`): the lane graph is rebuilt
+    // from it, so a price edit is a hit and a lane change is a miss.
+    const run = await getOrStart(supabase, {
+      projectId: project_id,
+      analysisKind: 'critical_nodes',
+      params: { plant_name: plant_name ?? null },
+      codeVersion: CODE_VERSION,
+      actorUserId: uploaded_by,
+    });
+
+    if (run.cacheHit) {
       console.log(`critical_nodes: cache hit on run ${run.runId}`);
       return new Response(JSON.stringify({
         success: true, cache_hit: true, run_id: run.runId,
-        input_hash: run.inputHash, code_version: run.codeVersion,
+        input_hash: run.inputHash, input_scope: run.inputScope,
+        dataset_version_id: run.datasetVersionId, code_version: run.codeVersion,
         rows_updated: (run.rowCounts as { rows?: number } | undefined)?.rows ?? 0,
+        predictions: (run.rowCounts as { scored?: number } | undefined)?.scored ?? 0,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    if (run.claimedByOther && run.status === 'running') {
+      return new Response(JSON.stringify({
+        success: true, cache_hit: false, in_progress: true, run_id: run.runId,
+        message: 'another request is already computing this exact analysis',
+      }), { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    let query = supabase.from('supply_chain_data').select('*').eq('project_id', project_id);
+    if (plant_name) query = query.eq('plant_name', plant_name);
+    query = query.neq('data_source', 'multi_tier');
+
+    const { data: supplyChainData, error: fetchError } = await query;
+
+    if (fetchError) {
+      console.error('Error fetching supply chain data:', fetchError);
+      await failRun(supabase, run.runId, uploaded_by,
+        [{ code: 'read_failed', message: fetchError.message ?? String(fetchError) }]);
+      throw new Error(`Failed to fetch data: ${fetchError.message}`);
+    }
+
+    console.log(`Processing ${supplyChainData.length} records for prediction`);
+
+    // ── Process ALL data at once (no batching) so graph metrics are global ──
+    let predictions: Array<{ id: string; is_critical: boolean; score: number }>;
+    try {
+      predictions = await predictCriticalNodes(supplyChainData);
+    } catch (computeError) {
+      await failRun(supabase, run.runId, uploaded_by,
+        [{ code: 'compute_failed', message: String(computeError) }]);
+      throw computeError;
     }
 
     let rowsUpdated = 0;
@@ -120,7 +107,7 @@ serve(async (req) => {
       const { data: marked, error: markError } = await supabase.rpc('analysis_mark_critical_nodes', {
         _actor_user_id: uploaded_by,
         _scores: predictions.map((p) => ({ id: p.id, is_critical: p.is_critical, score: p.score })),
-        _run_id: run?.runId ?? null,
+        _run_id: run.runId,
       });
       if (markError) {
         console.error('analysis_mark_critical_nodes failed', markError);
@@ -128,7 +115,7 @@ serve(async (req) => {
       }
       rowsUpdated = Number((marked as { rows_updated?: number } | null)?.rows_updated ?? 0);
 
-      if (run) {
+      {
         await completeRun(
           supabase, run.runId, uploaded_by,
           predictions.map((p) => ({
@@ -149,10 +136,8 @@ serve(async (req) => {
         );
       }
     } catch (writeError) {
-      if (run) {
-        await failRun(supabase, run.runId, uploaded_by,
-          [{ code: 'write_failed', message: String(writeError) }]);
-      }
+      await failRun(supabase, run.runId, uploaded_by,
+        [{ code: 'write_failed', message: String(writeError) }]);
       throw writeError;
     }
 
@@ -166,9 +151,11 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         cache_hit: false,
-        run_id: run?.runId ?? null,
-        input_hash: run?.inputHash ?? null,
-        code_version: run?.codeVersion ?? CODE_VERSION,
+        run_id: run.runId,
+        input_hash: run.inputHash,
+        input_scope: run.inputScope,
+        dataset_version_id: run.datasetVersionId,
+        code_version: run.codeVersion,
         message: `Predicted ${predictions.length} records and updated ${rowsUpdated}`,
         predictions: predictions.length,
         rows_updated: rowsUpdated

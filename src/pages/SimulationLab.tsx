@@ -45,10 +45,24 @@ import {
 } from "@/components/sim/NewScenarioDialog";
 import { buildScenarioSeed, uniqueName, worldOf } from "@/lib/sim/scenarioSeed";
 import { useValidatedBaseline } from "@/hooks/useValidatedBaseline";
+import { LabModelStep } from "@/components/sim/LabModelStep";
+import { useSimEngines } from "@/hooks/useSimEngines";
+import { dispatchExperiment } from "@/lib/sim/dispatch";
+import {
+  defaultModel,
+  formatBytes,
+  modelChoices,
+  modelOptionLabel,
+  overridesOf,
+  protocolDeviations,
+  replicationWeeks,
+  storageEstimate,
+} from "@/lib/sim/labModel";
 import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/validationBaseline";
 import { runGateState } from "@/lib/sim/runGate";
 import { reusePromptText } from "@/lib/sim/dispatch";
 import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
+import { versionDisplayName } from "@/components/policies/PolicyVersionSheets";
 import {
   compileGateFindings,
   gateFindingsToFindings,
@@ -77,6 +91,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     overrides: policyOverrides,
     versions: policyVersions,
     selectedVersionId: policyVersionId,
+    currentVersion: currentPolicyVersion,
+    currentHash: policyHash,
     isDirty: policyDirty,
     saveSnapshot: savePolicySnapshot,
   } = usePolicies(projectId);
@@ -97,6 +113,12 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     }
   }, [searchParams]);
 
+  // `?project=` (the Validated Model deep link carries it): open that project.
+  const projectParam = searchParams.get("project");
+  useEffect(() => {
+    if (projectParam) setGlobalSelectedProjectId(projectParam);
+  }, [projectParam, setGlobalSelectedProjectId]);
+
   // Auto-select first scenario when list loads (if nothing pre-selected from URL)
   useEffect(() => {
     const paramId = searchParams.get("scenario_id");
@@ -111,7 +133,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     () => scenarios.find((s) => s.id === selectedId) ?? null,
     [scenarios, selectedId],
   );
-  const { latestRun, reps, runExperiment, cancelRun, addReps } = useSimulationRun(selectedId);
+  const { latestRun, reps, cancelRun, addReps } = useSimulationRun(selectedId);
   // The validated baseline is Run & Validate's: the Lab shows it and reuses its
   // run, and never edits or dispatches it (§4 D227).
   const baselineSelected = isValidationBaseline(selected);
@@ -172,6 +194,58 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const gateFindings = serverFindings ?? clientFindings;
   const gateBlocks = (gateFindings ?? []).filter((f) => f.severity === "block").length;
   const gateWarns = (gateFindings ?? []).filter((f) => f.severity === "warn").length;
+
+  // ── B0b credibility (Phase B0 / G13 / §9.5) ───────────────────────────────
+  const cred = useModelValidation(projectId);
+  const credibility = cred.resolveScenario(policyHash, selected);
+
+  // ── WP 10.5 — Model → Engine → Scenario → Settings → Run ────────────────
+  // The Lab starts from a CHOICE of Validated Model (`labModel.ts`): the one a
+  // `?model=` link names (WP 10.3's "Open in Simulation Lab" — it also selects
+  // the validated baseline, the scenario the model was validated on), else the
+  // newest active one. A run follows the chosen model: its policy VERSION (not
+  // the live policies), its protocol (deviations recorded), and its engine
+  // choice. An editor may instead run an exploratory, unvalidated model, which is
+  // badged everywhere and never a comparison baseline.
+  const modelParam = searchParams.get("model");
+  const [chosenModelId, setChosenModelId] = useState<string | null>(null);
+  const chosenModel =
+    (chosenModelId ? cred.allCards.find((c) => c.id === chosenModelId) : null) ??
+    defaultModel(cred.allCards, modelParam);
+  const models = modelChoices(cred.allCards);
+  const canExplore = canRunSimulations && projectRights.can("data_edit_policies");
+  const [exploratoryRun, setExploratoryRun] = useState(false);
+  const usingModel = !!chosenModel && !exploratoryRun;
+  const [advanced, setAdvanced] = useState(false);
+  const { engines, loading: enginesLoading } = useSimEngines();
+  const [engineId, setEngineId] = useState<string | null>(null);
+  const chosenEngineId = engineId ?? engines[0]?.id ?? null;
+  const baselineScenario = scenarios.find((s) => isValidationBaseline(s)) ?? null;
+  // The model's own credibility: judged with ITS policy hash, because a run of
+  // it uses its policy version — so only a newer graph or a changed world makes
+  // it stale here, which is exactly when running it would not be faithful.
+  const modelCredibility = chosenModel
+    ? cred.resolveScenario(chosenModel.policy_hash, baselineScenario)
+    : null;
+  const openedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!modelParam || openedFor.current === modelParam || searchParams.get("scenario_id")) return;
+    if (!baselineScenario) return;
+    openedFor.current = modelParam;
+    setChosenModelId(modelParam);
+    setSelectedId(baselineScenario.id);
+  }, [modelParam, baselineScenario, searchParams]);
+  const deviations =
+    usingModel && selected && !baselineSelected ? protocolDeviations(chosenModel!.protocol, selected) : [];
+  const runModelReason = !chosenModel
+    ? "There is no Validated Model to run."
+    : chosenModel.status !== "active"
+      ? "This model is no longer in force — choose the one that is."
+      : modelCredibility?.state === "stale"
+        ? "A newer graph or a changed world makes this model stale — re-validate it in Policies first."
+        : !canRunSimulations
+          ? projectRights.refusal("simulation_lab") ?? "Running simulations isn't enabled for your account."
+          : null;
   // ONE gate state for the rail, the Run card and the phone (§4 D147): the
   // readout, the stage label, the button and its reason are fields of it.
   const runGate = runGateState({
@@ -183,15 +257,14 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     blocks: gateBlocks,
     warns: gateWarns,
     acknowledged: ackWarnings,
-    needsSave: policyDirty || !policyVersionId,
+    // A run of a Validated Model uses the model's own policy version, so there is
+    // nothing to save first; an exploratory run binds the live policies.
+    needsSave: !usingModel && (policyDirty || !policyVersionId),
     running: latestRun?.status === "running" || latestRun?.status === "queued",
   });
   const runBlockedReason = runGate.reason;
 
-  // ── B0b credibility (Phase B0 / G13 / §9.5) ───────────────────────────────
-  const cred = useModelValidation(projectId);
-  const credibility = cred.resolveScenario(policyVersionId, selected, { dirty: policyDirty });
-  const validated = useValidatedBaseline({ scenarios, cred, policyVersionId, dirty: policyDirty });
+  const validated = useValidatedBaseline({ scenarios, cred, policyHash });
   const [newOpen, setNewOpen] = useState(false);
   const [newStart, setNewStart] = useState<NewScenarioStart>("baseline");
   const newName = uniqueName(
@@ -208,21 +281,47 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     if (selected.warmup_mode !== "auto") return; // hand-set → never override
     if (inheritTried.current.has(selected.id)) return;
     inheritTried.current.add(selected.id);
-    void cred.applyIfValidated(selected, policyVersionId).then((cardId) => {
+    void cred.applyIfValidated(selected, policyHash).then((cardId) => {
       if (cardId) toast.message("Warm-up & replications inherited from the model validation.");
     });
-  }, [selected, policyVersionId, policyDirty, cred, baselineSelected]);
+  }, [selected, policyVersionId, policyHash, policyDirty, cred, baselineSelected]);
 
-  const dispatchRun = async (versionId: string, forceRerun = false) => {
-    if (!projectId || !selected) return;
+  // WP 10.5 — what a run is bound to. A run of a Validated Model dispatches the
+  // model's own policy version, names the model and the engine, and records its
+  // deviations from the model's protocol (WP 10.4's `protocol_overrides`, part of
+  // the RunKey). An exploratory run binds the live policy version and says so.
+  const dispatchRun = async (
+    versionId: string,
+    forceRerun = false,
+    target: { id: string; name: string } & Parameters<typeof protocolDeviations>[1] = selected!,
+  ) => {
+    if (!projectId || !target) return;
     if (!canRunSimulations) {
       toast.error(projectRights.refusal("simulation_lab") ?? "Running simulations isn't enabled for your account.");
       return;
     }
     try {
-      const result = await runExperiment(projectId, versionId, ackWarnings, forceRerun);
+      const followModel = usingModel && chosenModel;
+      const result = await dispatchExperiment({
+        projectId,
+        scenarioId: target.id,
+        policyVersionId: followModel ? chosenModel!.policy_version_id : versionId,
+        acknowledgeWarnings: ackWarnings,
+        forceRerun,
+        engineId: chosenEngineId,
+        ...(followModel
+          ? {
+              validatedModelId: chosenModel!.id,
+              protocolOverrides: overridesOf(protocolDeviations(chosenModel!.protocol, target)),
+            }
+          : { exploratory: true }),
+      });
       if (result.queued) {
-        toast.success(`Queued: ${selected.name}`);
+        toast.success(
+          result.attached
+            ? `${target.name} is already running with identical inputs — showing that run`
+            : `Queued: ${target.name}`,
+        );
         setPane("run");
         return;
       }
@@ -237,7 +336,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           setPane("results");
           return;
         }
-        await dispatchRun(versionId, true);
+        await dispatchRun(versionId, true, target);
         return;
       }
       // Typed 422: render the gate's findings structurally in the run pane.
@@ -254,8 +353,40 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   };
 
   const handleRun = async () => {
-    if (!projectId || !selected || !policyVersionId || policyDirty) return;
+    if (!projectId || !selected) return;
+    if (usingModel && chosenModel) {
+      await dispatchRun(chosenModel.policy_version_id);
+      return;
+    }
+    if (!policyVersionId || policyDirty) return;
     await dispatchRun(policyVersionId);
+  };
+
+  // "Run this model" from the read-only validated baseline: the scenario a run
+  // of the model uses is SEEDED FROM THE MODEL (`buildScenarioSeed` with its
+  // protocol), found by name if it already exists, so running a model twice does
+  // not litter the list — and the second run is then a RunKey reuse.
+  const runChosenModel = async () => {
+    if (!projectId || !chosenModel || runModelReason) return;
+    const name = `${chosenModel.name ?? "Validated model"}${
+      chosenModel.version_no != null ? ` v${chosenModel.version_no}` : ""
+    } — run`;
+    let target = scenarios.find((s) => s.name === name && !isValidationBaseline(s)) ?? null;
+    if (!target) {
+      target = await create(
+        name,
+        buildScenarioSeed({
+          name,
+          world: validated.world,
+          baseline: validated.baseline,
+          description: `A faithful run of ${modelOptionLabel(chosenModel)}.`,
+          protocol: chosenModel.protocol,
+        }),
+      );
+      if (!target) return;
+    }
+    setSelectedId(target.id);
+    await dispatchRun(chosenModel.policy_version_id, false, target);
   };
 
   const handleSaveVersionAndRun = async () => {
@@ -322,7 +453,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   // world (scenarioSeed.ts, §4 D219), so inheritance can match its card.
   const inherit = (s: (typeof scenarios)[number]) => {
     inheritTried.current.add(s.id);
-    void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty }).then((cardId) => {
+    void cred.applyIfValidated(s, policyHash).then((cardId) => {
       if (cardId) toast.message("Warm-up & replications inherited from the model validation.");
     });
   };
@@ -424,18 +555,81 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     toast.success(`Stress test ready: ${preset.name.replace(/^\[Stress\]\s*/, "")}`);
   };
 
+  const runVersion = latestRun?.policy_version_id
+    ? policyVersions.find((v) => v.id === latestRun.policy_version_id) ?? null
+    : null;
   const runVersionLabel = latestRun?.policy_version_id
-    ? (policyVersions.find((v) => v.id === latestRun.policy_version_id)?.label ??
-      latestRun.policy_version_id.slice(0, 8))
+    ? (runVersion ? versionDisplayName(runVersion) : latestRun.policy_version_id.slice(0, 8))
     : null;
-  const currentVersionLabel = policyVersionId
-    ? (policyVersions.find((v) => v.id === policyVersionId)?.label ?? policyVersionId.slice(0, 8))
+  // The version in force is the one whose CONTENT is live (WP 10.2, §4 D242) —
+  // the same answer /policies gives, so a validated model never reads as missing
+  // here just because this page has not saved anything yet.
+  const versionText = usingModel && chosenModel
+    ? `Validated Model ${modelOptionLabel(chosenModel)}`
+    : (!currentPolicyVersion
+        ? "Exploratory · unsaved policy edits — they match no saved version"
+        : `Exploratory · policy ${versionDisplayName(currentPolicyVersion)}`);
+
+  // WP 10.5 — the run's size before it is dispatched: replication-weeks (what
+  // WP 10.7 will meter) and the storage its replications take, with the basis.
+  const runSize = selected
+    ? (() => {
+        const est = storageEstimate(selected.replications, selected.horizon_days);
+        return {
+          line:
+            `${selected.replications} replication(s) × ${Math.ceil(selected.horizon_days / 7)} weeks = ` +
+            `${replicationWeeks(selected.replications, selected.horizon_days).toLocaleString()} replication-weeks · ` +
+            `expected storage ≈ ${formatBytes(est.bytes)} · remaining quota is shown from WP 10.7`,
+          basis: est.basis,
+        };
+      })()
     : null;
-  const versionText = !policyVersionId
-    ? "No saved model version"
-    : policyDirty
-      ? `Changed since ${currentVersionLabel}`
-      : `Model ${currentVersionLabel}`;
+  const runEstimate = runSize ? (
+    <p
+      className="rounded-sm border border-[--hair-rule] bg-white px-3 py-[7px] font-mono text-[11.5px] text-[#52525b]"
+      title={`storage estimate: ${runSize.basis}`}
+      data-testid="run-estimate"
+    >
+      {runSize.line}
+    </p>
+  ) : null;
+  // The Settings pane is LOCKED to the model's protocol until "Advanced" is open
+  // (the recovery pane — the experiment's own events — never is).
+  const settingsLockReason =
+    readOnlyReason ??
+    (usingModel && !advanced
+      ? "Locked to the Validated Model's protocol — open Advanced in the Model step to deviate; a deviation is recorded on the run."
+      : null);
+  const evidenceModelOf = useMemo(
+    () =>
+      Object.fromEntries(
+        cred.allCards.filter((c) => c.evidence_run_id).map((c) => [c.evidence_run_id as string, c.id]),
+      ),
+    [cred.allCards],
+  );
+  const modelStep = projectId ? (
+    <LabModelStep
+      models={models}
+      chosen={chosenModel}
+      onChoose={(id) => {
+        setChosenModelId(id);
+        setAdvanced(false);
+      }}
+      credibility={modelCredibility}
+      exploratory={exploratoryRun}
+      onExploratory={setExploratoryRun}
+      canExplore={canExplore}
+      engines={engines}
+      enginesLoading={enginesLoading}
+      engineId={chosenEngineId}
+      onEngine={setEngineId}
+      deviations={deviations}
+      advanced={advanced}
+      onAdvanced={setAdvanced}
+      onRunModel={baselineSelected && usingModel ? runChosenModel : undefined}
+      runModelReason={runModelReason}
+    />
+  ) : null;
 
   // What capacity this run will use, and whether it is real (§4 D167) — one
   // line with details on demand; the same node on desktop and phone (D224).
@@ -481,7 +675,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           scenariosLoading={loading}
           selected={selected}
           selectedId={selectedId}
-          credibilityFor={(s) => cred.resolveScenario(policyVersionId, s, { dirty: policyDirty })}
+          credibilityFor={(s) => cred.resolveScenario(policyHash, s)}
           onSelectScenario={setSelectedId}
           onCreateScenario={createScenario}
           onDuplicateScenario={duplicateScenario}
@@ -496,8 +690,14 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           onSaveScenario={(patch) => selected && !baselineSelected && update(selected.id, patch)}
           projectRecovery={projectRecovery}
           effectiveRecovery={effectiveRecovery}
-          policyVersionLabel={currentVersionLabel}
-          policyDirty={policyDirty}
+          policyVersionLabel={
+            usingModel && chosenModel
+              ? modelOptionLabel(chosenModel)
+              : currentPolicyVersion
+                ? versionDisplayName(currentPolicyVersion)
+                : null
+          }
+          policyDirty={!usingModel && policyDirty}
           credibility={credibility}
           runCredibility={cred.resolveRun(latestRun)}
           gateFindings={gateFindings}
@@ -519,6 +719,10 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           onCancel={handleCancel}
           onAddReps={handleAddReps}
           runsByScenario={runsByScenario}
+          compareModelId={usingModel ? chosenModel?.id ?? null : null}
+          settingsLockReason={settingsLockReason}
+          modelStep={modelStep}
+          runEstimate={runSize?.line ?? null}
         />
         <NewScenarioDialog
           open={newOpen}
@@ -604,7 +808,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   scenarios={scenarios}
                   selectedId={selectedId}
                   loading={loading}
-                  credibilityFor={(s) => cred.resolveScenario(policyVersionId, s, { dirty: policyDirty })}
+                  credibilityFor={(s) => cred.resolveScenario(policyHash, s)}
                   onSelect={setSelectedId}
                   onBrowseSaved={() => setLibraryOpen(true)}
                   onCreate={createScenario}
@@ -614,6 +818,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
               </aside>
 
               <div className="flex-1 min-w-0 flex flex-col gap-3">
+                {modelStep}
                 {fromNetwork && (
                   <span className="w-fit rounded-sm bg-[#f0f0f2] px-[7px] py-px text-[11px] text-[#52525b]">
                     from network map
@@ -625,7 +830,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                     No scenario selected
                   </div>
                 ) : pane === "setup" ? (
-                  <ReadOnlyFrame reason={readOnlyReason}>
+                  <ReadOnlyFrame reason={settingsLockReason}>
                     <ScenarioSetupForm
                       scenario={selected}
                       projectId={projectId}
@@ -651,8 +856,9 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                     acknowledged={ackWarnings}
                     onAcknowledgedChange={setAckWarnings}
                     findingsCount={gateFindings ? gateFindings.length : null}
-                    needsSave={policyDirty || !policyVersionId}
+                    needsSave={!usingModel && (policyDirty || !policyVersionId)}
                     onRun={handleRun}
+                    estimate={runEstimate}
                     onSaveVersionAndRun={handleSaveVersionAndRun}
                     findings={
                       <PreRunValidationPanel
@@ -684,7 +890,12 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                     credibility={cred.resolveRun(latestRun)}
                   />
                 ) : (
-                  <CompareScenariosPanel scenarios={scenarios} runsByScenario={runsByScenario} />
+                  <CompareScenariosPanel
+                    scenarios={scenarios}
+                    runsByScenario={runsByScenario}
+                    modelId={usingModel ? chosenModel?.id ?? null : null}
+                    evidenceModelOf={evidenceModelOf}
+                  />
                 )}
               </div>
             </div>

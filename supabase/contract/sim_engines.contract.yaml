@@ -1,0 +1,161 @@
+# AUTHORED — the data contract's sidecar for `sim_engines`.
+# WP 10.4 · §4 D245. Edit this file; docs/data/tables/*.md is generated from it.
+table: sim_engines
+tier: reference
+schema_name: public
+grain: >-
+  One row per simulation engine the platform knows: whether dispatch may use it
+  (`status`) and which build the worker last reported running. scsim is the one
+  active engine; the legacy worker engine is registered RETIRED — it stays frozen
+  (CLAUDE.md's standing law) and is never offered. A run row names its engine
+  (`simulation_runs.engine_id`) and the build is part of its RunKey.
+owner: engine
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "sim_engines_pkey"
+  - source: "table constraint 20261001000009_engines_runkey.sql"
+    columns: [slug]
+    name: "sim_engines_slug_key"
+
+natural_key_intended: [slug]
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    A registry, not project data: read by everyone through `sim_engines_read`
+    (`USING (true)`, select only), written by no API role. Rows are seeded by the
+    migration; the one runtime writer is `sim_engine_report`, executable by the
+    service role alone (the worker, at boot), which updates the row the worker
+    runs and never creates one. Not audited: a reference table whose rows change
+    by migration, and whose one runtime write is a build report stamped with
+    `reported_at`.
+
+surfaces:
+  - page: "SimulationLab.tsx"
+    via: "hook useSimEngines → select active rows from sim_engines (the Engine step, WP 10.5)"
+    grain: table
+    evidence: "src/hooks/useSimEngines.ts:25"
+    confirmed: true
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The engine's id — what `simulation_runs.engine_id` and
+      `model_validations.engine_id` reference.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  slug:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The engine's stable name: `scsim`, `legacy-worker`. The worker reports
+      under it; `_engine_for_code_version` maps a recorded code version to it.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  name:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The display name the Lab's engine selector shows (WP 10.5).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  version:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The engine's version as the worker last reported it (scsim's
+      `ENGINE_VERSION`). NULL until a worker has reported — the registry does
+      not restate a version the engine's own code authors.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  code_version:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The build string, spelled exactly as a run's `code_version` is stamped
+      (`scsim-0.2.8`). Part of every RunKey: a new build makes a new key, so a
+      run on another build is never offered as identical (§4 D245).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  status:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      `active` (dispatch may use it) or `retired` (dispatch refuses it).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  capabilities:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      What the engine can do — where it computes (`worker`, `browser`) and its
+      replication limit. Declared at seed; a report may refresh it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  reported_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When a worker last reported this engine's build. NULL = never reported.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was seeded.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

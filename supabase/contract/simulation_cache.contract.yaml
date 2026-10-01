@@ -1,0 +1,238 @@
+# AUTHORED — the data contract's sidecar for `simulation_cache`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md.
+#
+# WP 10.4 · `result-binding`. A DORMANT table of the retired batch pipeline,
+# described so the contract can see it (§4 D54) — see `note`.
+table: simulation_cache
+tier: "5"
+schema_name: public
+grain: >-
+  One cached payload of the RETIRED batch pipeline, per project and cache key:
+  baseline data, scenario data, network analysis or risk factors that the legacy
+  `simulation-cache-manager` stored with a time-to-live so the next legacy run
+  could skip recomputing it. Tier 5 — derived, disposable, input to nothing that
+  still runs. DORMANT IN THE REPOSITORY: no code in `src/`,
+  `supabase/functions/`, `sim-worker/` or `scsim/` reads or writes it. The
+  current product's cache is a different mechanism entirely —
+  `analysis_get_or_start` keyed on the graph hash, and the run reuse that
+  `simulation_runs` performs.
+owner: engine
+
+natural_key_unique:
+  # The constraint is UNNAMED in its migration (`UNIQUE(project_id, cache_key)`
+  # inside the CREATE TABLE), so the introspector records `name: null`;
+  # PostgreSQL will have given it its default name in production. Copied as
+  # recorded rather than guessed.
+  - source: "UNIQUE constraint 20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql"
+    columns: [project_id, cache_key]
+    name: null
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "simulation_cache_pkey"
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    Two policies through the project's organization
+    (`org_is_current_user_org(p.organization_id, p.organization)`): SELECT for any
+    member of that organization, ALL for the project's modeler or an organization
+    admin. Neither is predicate-less, so `write: null` agrees with
+    `governanceEnforcement.test.ts`, and no user-facing write path exists in the
+    repository. `cleanup_simulation_cache()` (SECURITY DEFINER, deletes expired
+    rows) still exists and has no caller; nothing schedules it, so expired rows
+    are not removed — `expires_at` is a statement of intent, not a guarantee.
+    Deleting a project removes its rows through the inline
+    `REFERENCES projects ON DELETE CASCADE`.
+    NOT IN PRODUCTION'S CASE: §4 D168 found `simulation-cache-manager` and
+    `simulation-availability-checker`, the legacy functions that wrote and read
+    this table, still LIVE in production with no source here.
+    NOT AUDITED: tier 5, and `audit-actor` covers tiers 2–4.
+
+note: >-
+  A RETIRED PIPELINE'S CACHE, LEFT IN PLACE ON PURPOSE by the 2026-07-02 commit
+  that removed the legacy batch stack. A drop needs a production row count first,
+  which no §15 run has taken. A cache whose writer is gone holds nothing anyone
+  should trust: `data_hash` is a hash of the PAYLOAD, not of the inputs that
+  produced it, so a hit could never say whether the project had changed since —
+  which is the defect the graph-hash-keyed analysis store exists to avoid
+  (`input-hash`, I5).
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: "Surrogate key. The row's identity is (project_id, cache_key)."
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The owning project; half of the unique key. `REFERENCES projects ON
+      DELETE CASCADE`, inline.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  cache_key:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The legacy caller's name for the cached thing, unique within a project.
+      Its composition was the caller's convention and is not recoverable from
+      the schema.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  cache_type:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      What kind of payload `data` is: 'baseline_data' (DEFAULT),
+      'scenario_data', 'network_analysis' or 'risk_factors' (CHECK
+      `simulation_cache_cache_type_check`).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  data:
+    type: "jsonb"
+    unit: null
+    unit_source: derived
+    meaning: >-
+      The cached payload itself, shaped by whichever legacy computation
+      produced it. NOT NULL.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED to scsim: produced and consumed by the retired pipeline only.
+  data_hash:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      A hash of `data` as stored, computed by the writer. It identifies the
+      payload, NOT the inputs the payload was computed from, so it cannot tell a
+      reader whether the cache is stale.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: "When the row was inserted."
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  expires_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the entry stops being valid — DEFAULT 24 hours after insert; the
+      legacy manager set it from a per-call TTL and read only unexpired rows.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  access_count:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: >-
+      How many times the legacy manager served this entry; it incremented the
+      count on every hit.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED to the engine: an operational counter, read by nothing that
+      still runs.
+  last_accessed_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the entry was last served. The defaults trigger also re-stamps it on
+      every insert and update, so it is a write time as much as a read time.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  data_version:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: >-
+      A version number for the payload format, DEFAULT 1; the legacy manager
+      always wrote 1.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  dependencies:
+    type: "text[]"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Names of what the entry depended on, for invalidation by the caller.
+      Free text, DEFAULT empty; nothing ever invalidated by it in the schema.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  organization:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The organization's NAME at write time, DEFAULT 'default_org'. Legacy
+      tenancy text; the policies read the project's organization instead.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
