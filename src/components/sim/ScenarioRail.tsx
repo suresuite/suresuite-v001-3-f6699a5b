@@ -3,6 +3,7 @@ import type { Scenario } from "@/hooks/useScenarios";
 import type { Credibility } from "@/hooks/useModelValidation";
 import { formatDuration } from "@/lib/sim/planningTime";
 import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/validationBaseline";
+import { useConfirm } from "@/components/shared/confirm/useConfirm";
 
 /**
  * Left column, top to bottom:
@@ -87,6 +88,7 @@ export function ScenarioList({
   /** Opens the saved-experiment library (scenario templates). */
   onBrowseSaved: () => void;
 }) {
+  const confirm = useConfirm();
   return (
     <aside className="overflow-hidden rounded-sm border border-[--hair-rule] bg-white">
       <div className="flex items-center justify-between gap-2 border-b border-[--hair-rule] px-[14px] py-[11px]">
@@ -181,7 +183,10 @@ export function ScenarioList({
                   disabled={baseline}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (confirm(`Delete scenario "${s.name}"?`)) onDelete(s.id);
+                    const message = `Delete scenario "${s.name}"?`;
+                    void confirm({ message, title: message, actionLabel: 'Delete scenario' }).then(
+                      (ok) => ok && onDelete(s.id),
+                    );
                   }}
                   className="h-6 min-h-11 w-6 min-w-11 rounded-sm border border-transparent text-[13px] leading-none text-[#a1a1aa] hover:border-[--hair-rule] hover:bg-white hover:text-[#BF2330] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:text-[#a1a1aa] md:min-h-0 md:min-w-0"
                 >

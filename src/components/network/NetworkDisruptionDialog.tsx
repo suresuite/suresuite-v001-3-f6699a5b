@@ -6,14 +6,7 @@ import { cn } from "@/lib/utils";
 import { DIALOG_AS_SHEET } from "@/components/shared";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogFooter, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/shared/ResponsiveDialog";
 import { useScenarios, type Scenario } from "@/hooks/useScenarios";
 import { usePolicies } from "@/hooks/usePolicies";
 import { useItemMasters } from "@/hooks/useItemMasters";
@@ -77,11 +70,11 @@ export function NetworkDisruptionDialog(props: {
 }) {
   // The data hooks load only while the dialog is open.
   return (
-    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, "sm:max-w-xl md:max-w-xl")}>
+    <ResponsiveDialog open={props.open} onOpenChange={props.onOpenChange}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, "sm:max-w-xl md:max-w-xl")}>
         {props.open && props.projectId ? <Body {...props} projectId={props.projectId} /> : null}
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -214,13 +207,13 @@ function Body({
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle className="text-base">Add disruption event</DialogTitle>
-        <DialogDescription>
+      <ResponsiveDialogHeader>
+        <ResponsiveDialogTitle className="text-base">Add disruption event</ResponsiveDialogTitle>
+        <ResponsiveDialogDescription>
           Choose what fails, how hard, when and for how long. The event is saved to a scenario's
           disruption schedule, which the Simulation Lab runs.
-        </DialogDescription>
-      </DialogHeader>
+        </ResponsiveDialogDescription>
+      </ResponsiveDialogHeader>
 
       <div className="flex flex-col gap-4 text-[12.5px]">
         <div
@@ -393,14 +386,14 @@ function Body({
         </div>
       </div>
 
-      <DialogFooter className="gap-2">
+      <ResponsiveDialogFooter className="gap-2">
         <Button variant="outline" onClick={() => onOpenChange(false)} className={cn(FIELD_H, "px-4")}>
           Cancel
         </Button>
         <Button onClick={() => void submit()} disabled={!!blocker || busy} className={cn(FIELD_H, "px-4")}>
           {busy ? "Saving…" : dest === "new" ? "Create scenario with event" : "Add event to scenario"}
         </Button>
-      </DialogFooter>
+      </ResponsiveDialogFooter>
     </>
   );
 }

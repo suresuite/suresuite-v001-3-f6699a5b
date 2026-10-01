@@ -5,14 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogFooter, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/shared/ResponsiveDialog";
 
 interface Props {
   open: boolean;
@@ -27,17 +20,17 @@ export function PlaybookSaveDialog({ open, onOpenChange, defaultName = "", onSav
   const [saving, setSaving] = useState(false);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       {/* §2.6/§4.4 — a centred dialog is the wrong container on a phone.
           DIALOG_AS_SHEET gates its own height cap and scroll behind `md:` so
           the desktop dialog keeps the primitive's geometry exactly. */}
-      <DialogContent className={cn(DIALOG_AS_SHEET, "sm:max-w-md md:max-w-md")}>
-        <DialogHeader>
-          <DialogTitle className="text-base">Save recovery playbook</DialogTitle>
-          <DialogDescription>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, "sm:max-w-md md:max-w-md")}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="text-base">Save recovery playbook</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             Saves the current recovery settings as a reusable playbook for this project.
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label className="text-xs">Name</Label>
@@ -58,7 +51,7 @@ export function PlaybookSaveDialog({ open, onOpenChange, defaultName = "", onSav
             />
           </div>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
@@ -78,8 +71,8 @@ export function PlaybookSaveDialog({ open, onOpenChange, defaultName = "", onSav
           >
             {saving ? "Saving…" : "Save playbook"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

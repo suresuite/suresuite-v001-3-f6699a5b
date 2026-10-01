@@ -63,7 +63,8 @@ import {
 } from "@/lib/sim/labModel";
 import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/validationBaseline";
 import { runGateState } from "@/lib/sim/runGate";
-import { reusePromptText } from "@/lib/sim/dispatch";
+import { reuseConfirmRequest } from "@/lib/sim/dispatch";
+import { useConfirm } from "@/components/shared/confirm/useConfirm";
 import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
 import { versionDisplayName } from "@/components/policies/PolicyVersionSheets";
 import {
@@ -83,6 +84,7 @@ type Pane = PaneId;
 export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const confirm = useConfirm();
   const { globalSelectedProjectId, setGlobalSelectedProjectId } = useGlobalProject();
   const { user } = useAuth();
   const projectId = globalSelectedProjectId;
@@ -337,7 +339,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       // the stored run is surfaced (it is this scenario's newest completed
       // run), on re-run we dispatch again with force_rerun.
       if (result.status === "reuse_available" && result.reuseCandidate) {
-        const reuse = window.confirm(reusePromptText(result.reuseCandidate));
+        const reuse = await confirm(reuseConfirmRequest(result.reuseCandidate));
         if (reuse) {
           toast.success("Reusing the stored run — no recompute needed.");
           setPane("results");

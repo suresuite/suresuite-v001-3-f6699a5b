@@ -26,6 +26,7 @@ import { toast } from 'sonner';
 import { projectRightsNotes } from '@/lib/auth/projectRights';
 import { planRefusal } from '@/lib/auth/organizationPlan';
 import { PROJECT_ROLES, cap, day, endOfDay, toDateInput } from '@/components/admin/projectRoles';
+import { useConfirm } from '@/components/shared/confirm/useConfirm';
 
 interface Actor { id: string; email?: string | null }
 interface OrgInfo {
@@ -64,6 +65,7 @@ const NONE = '__none__';
 export function UserMemberships({ actor, userId, userLabel, onOrganizationChanged }: {
   actor: Actor; userId: string; userLabel: string; onOrganizationChanged?: () => void;
 }) {
+  const confirm = useConfirm();
   const [data, setData] = useState<MembershipData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,7 +111,8 @@ export function UserMemberships({ actor, userId, userLabel, onOrganizationChange
     const next = (o.is_active
       ? `\n\nIt is their active organization, so they move to ${home ? `their default, ${home.name}` : 'their earliest remaining one, or to none'}.`
       : '') + (o.is_default ? '\n\nIt is their default organization; they will have none until another is set.' : '');
-    if (!confirm(`Remove ${userLabel} from ${o.name}? They stop seeing its projects. Project memberships are kept.${next}`)) return;
+    const title = `Remove ${userLabel} from ${o.name}?`;
+    if (!(await confirm({ message: `${title} They stop seeing its projects. Project memberships are kept.${next}`, title, actionLabel: 'Remove' }))) return;
     if (await run('admin_remove_org_member', { p_org_id: o.id }, `Removed from ${o.name}`)) onOrganizationChanged?.();
   };
 
@@ -121,8 +124,9 @@ export function UserMemberships({ actor, userId, userLabel, onOrganizationChange
     run('admin_set_project_member', { p_project_id: p.project_id, p_project_role: role, p_expires_at: expiresAt, p_rationale: null },
       `${p.name}: ${role}${expiresAt ? ` until ${day(expiresAt)}` : ''}`);
 
-  const removeMember = (p: ProjectAccess) => {
-    if (!confirm(`Remove ${userLabel}'s ${p.member?.project_role} membership on "${p.name}"?`)) return;
+  const removeMember = async (p: ProjectAccess) => {
+    const message = `Remove ${userLabel}'s ${p.member?.project_role} membership on "${p.name}"?`;
+    if (!(await confirm({ message, title: message, actionLabel: 'Remove' }))) return;
     run('admin_remove_project_member', { p_project_id: p.project_id }, `${p.name}: membership removed`);
   };
 

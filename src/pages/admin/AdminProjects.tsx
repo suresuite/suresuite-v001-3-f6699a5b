@@ -15,9 +15,10 @@ import { useIsMobile } from '@/hooks/use-is-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useConfirm } from '@/components/shared/confirm/useConfirm';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogFooter, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/shared/ResponsiveDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ArrowRightLeft, Copy, Loader2, MoreHorizontal, Pencil, Settings2, Trash2, Users } from 'lucide-react';
 import { ProjectAccessDialog } from '@/components/admin/ProjectAccess';
@@ -85,8 +86,10 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
   const openDialog = (kind: DialogKind, row: ProjectRow) => { setTarget(row); setDialog(kind); };
   const closeDialog = () => { setDialog(null); setTarget(null); };
 
+  const confirm = useConfirm();
   const remove = async (row: ProjectRow) => {
-    if (!confirm(`Delete project "${row.name}"? All its data will be removed. This cannot be undone.`)) return;
+    const title = `Delete project "${row.name}"?`;
+    if (!(await confirm({ message: `${title} All its data will be removed. This cannot be undone.`, title, actionLabel: 'Delete project' }))) return;
     const { error } = await db.rpc('admin_delete_project', { ...actorArgs(), p_project_id: row.id });
     if (error) return toast.error(error.message);
     toast.success(`Project "${row.name}" deleted`); load();
@@ -226,9 +229,9 @@ function CopyDialog({ project, orgs, users, actorArgs, onClose, onDone }: { proj
     toast.success(`Project copied as "${name.trim()}"`); onClose(); onDone();
   };
   return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Copy “{project.name}”</DialogTitle><DialogDescription>Copies the project and its model data (item master, logistics, BOM, network, policies). Simulation runs and version history are not copied.</DialogDescription></DialogHeader>
+    <ResponsiveDialog open onOpenChange={(v) => !v && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader><ResponsiveDialogTitle>Copy “{project.name}”</ResponsiveDialogTitle><ResponsiveDialogDescription>Copies the project and its model data (item master, logistics, BOM, network, policies). Simulation runs and version history are not copied.</ResponsiveDialogDescription></ResponsiveDialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">New name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-sm" /></div>
           <div><Label className="text-xs">Organization</Label>
@@ -238,12 +241,12 @@ function CopyDialog({ project, orgs, users, actorArgs, onClose, onDone }: { proj
             <Select value={ownerId} onValueChange={setOwnerId}><SelectTrigger className="mt-1 rounded-sm"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value={NONE}>Keep current ({project.owner_name || project.owner_email || '—'})</SelectItem>{users.map((u) => <SelectItem key={u.id} value={u.id}>{userLabel(u)}</SelectItem>)}</SelectContent></Select></div>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={save} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Copy project</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -259,16 +262,16 @@ function RenameDialog({ project, actorArgs, onClose, onDone }: { project: Projec
     toast.success(`Renamed to "${name.trim()}"`); onClose(); onDone();
   };
   return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Rename “{project.name}”</DialogTitle></DialogHeader>
+    <ResponsiveDialog open onOpenChange={(v) => !v && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader><ResponsiveDialogTitle>Rename “{project.name}”</ResponsiveDialogTitle></ResponsiveDialogHeader>
         <div><Label className="text-xs">New name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-sm" autoFocus /></div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={save} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Rename</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -289,9 +292,9 @@ function MetaDialog({ project, actorArgs, onClose, onDone }: { project: ProjectR
     toast.success(`Metadata updated for "${project.name}"`); onClose(); onDone();
   };
   return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Edit metadata — “{project.name}”</DialogTitle><DialogDescription>Model settings of the project itself.</DialogDescription></DialogHeader>
+    <ResponsiveDialog open onOpenChange={(v) => !v && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader><ResponsiveDialogTitle>Edit metadata — “{project.name}”</ResponsiveDialogTitle><ResponsiveDialogDescription>Model settings of the project itself.</ResponsiveDialogDescription></ResponsiveDialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Plant</Label><Input value={plant} onChange={(e) => setPlant(e.target.value)} className="mt-1 rounded-sm" /></div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))] [&>*]:min-w-0">
@@ -311,12 +314,12 @@ function MetaDialog({ project, actorArgs, onClose, onDone }: { project: ProjectR
             <div><Label className="text-xs">Simulation end</Label><Input type="date" value={simEnd} onChange={(e) => setSimEnd(e.target.value)} className="mt-1 rounded-sm" /></div>
           </div>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={save} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save changes</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -357,9 +360,9 @@ function TransferDialog({ project, orgs, users, actorArgs, onClose, onDone }: { 
     onClose(); onDone();
   };
   return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Transfer or change owner — “{project.name}”</DialogTitle><DialogDescription>Moves the project (and all its data) from <span className="font-medium">{project.organization || 'no organization'}</span> to another organization, hands it to a new owner, or both.</DialogDescription></DialogHeader>
+    <ResponsiveDialog open onOpenChange={(v) => !v && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader><ResponsiveDialogTitle>Transfer or change owner — “{project.name}”</ResponsiveDialogTitle><ResponsiveDialogDescription>Moves the project (and all its data) from <span className="font-medium">{project.organization || 'no organization'}</span> to another organization, hands it to a new owner, or both.</ResponsiveDialogDescription></ResponsiveDialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Organization</Label>
             <Select value={orgId} onValueChange={(v) => { setOrgId(v); setOwnerId(NONE); }}><SelectTrigger className="mt-1 rounded-sm"><SelectValue placeholder="Select organization…" /></SelectTrigger>
@@ -381,11 +384,11 @@ function TransferDialog({ project, orgs, users, actorArgs, onClose, onDone }: { 
             {mustSwitch ? ` ${chosenOwner ? userLabel(chosenOwner) : 'The owner'} is working in another organization and will see the project after switching to ${orgName}.` : ''}
           </div>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={save} disabled={saving || !orgId || !effectiveOwnerId || nothingToChange}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{sameOrg ? 'Change owner' : 'Transfer project'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

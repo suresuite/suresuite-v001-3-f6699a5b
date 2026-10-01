@@ -2,14 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { DIALOG_AS_SHEET } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogFooter, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/shared/ResponsiveDialog";
 import { FIELD_BOX, FIELD_H, WeeksStepper, choiceChip } from "./DisruptionFields";
 import { KPI_OPTIONS } from "./ScenarioSetupForm";
 import { STRESS_TESTS, scheduleLine } from "./StressTestCard";
@@ -114,12 +107,12 @@ export function NewScenarioDialog({
   ];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, "sm:max-w-lg md:max-w-lg")}>
-        <DialogHeader>
-          <DialogTitle className="text-base">New scenario</DialogTitle>
-          <DialogDescription>Start from the model you validated, then change one thing.</DialogDescription>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, "sm:max-w-lg md:max-w-lg")}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="text-base">New scenario</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>Start from the model you validated, then change one thing.</ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         <div className="flex flex-col gap-4 text-[12.5px]">
           <Row label="Name">
@@ -161,7 +154,7 @@ export function NewScenarioDialog({
 
           {start === "stress" ? (
             <Row label="Stress test">
-              <div className="max-h-56 overflow-y-auto rounded-sm border border-input">
+              <div className="rounded-sm border border-input md:max-h-56 md:overflow-y-auto">
                 {presets.map(({ t, reason }) => (
                   <button
                     key={t.id}
@@ -240,16 +233,16 @@ export function NewScenarioDialog({
           </Row>
         </div>
 
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} className={cn(FIELD_H, "px-4")}>
             Cancel
           </Button>
           <Button onClick={() => void submit()} disabled={!canCreate} className={cn(FIELD_H, "px-4")}>
             {busy ? "Creating…" : "Create"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 

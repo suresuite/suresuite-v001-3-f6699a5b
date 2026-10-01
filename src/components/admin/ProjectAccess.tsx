@@ -16,8 +16,9 @@ import { RoleLegend } from '@/components/admin/UserMemberships';
 import { PROJECT_ROLES, cap, day, endOfDay, toDateInput } from '@/components/admin/projectRoles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useConfirm } from '@/components/shared/confirm/useConfirm';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/shared/ResponsiveDialog';
 import { DIALOG_AS_SHEET } from '@/components/shared';
 import { cn } from '@/lib/utils';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
@@ -89,8 +90,10 @@ export function ProjectAccessDialog({ projectId, projectName, users, actorId, ac
     run('admin_set_project_member', { p_target_user_id: p.user_id, p_project_role: role, p_expires_at: expiresAt, p_rationale: rationale },
       `${personLabel(p)}: ${role}${expiresAt ? ` until ${day(expiresAt)}` : ''}`);
 
-  const removeMember = (p: Person) => {
-    if (!confirm(`Remove ${personLabel(p)}'s ${p.member?.project_role} membership on "${projectName}"?`)) return;
+  const confirm = useConfirm();
+  const removeMember = async (p: Person) => {
+    const message = `Remove ${personLabel(p)}'s ${p.member?.project_role} membership on "${projectName}"?`;
+    if (!(await confirm({ message, title: message, actionLabel: 'Remove' }))) return;
     run('admin_remove_project_member', { p_target_user_id: p.user_id }, `${personLabel(p)}: membership removed`);
   };
 
@@ -103,24 +106,24 @@ export function ProjectAccessDialog({ projectId, projectName, users, actorId, ac
   const orgName = data?.organization_name ?? 'its organization';
 
   return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent
+    <ResponsiveDialog open onOpenChange={(v) => !v && onClose()}>
+      <ResponsiveDialogContent
         className={cn(
           DIALOG_AS_SHEET,
           'gap-0 p-0 md:max-w-3xl md:rounded-sm',
         )}
       >
-        <DialogHeader className="border-b border-[--hair-border] px-4 pb-3 pr-12 pt-4 md:px-6 md:pr-12 md:pt-6">
-          <DialogTitle>Members &amp; access — “{projectName}”</DialogTitle>
-          <DialogDescription>
+        <ResponsiveDialogHeader className="border-b border-[--hair-border] px-4 pb-3 pr-12 pt-4 md:px-6 md:pr-12 md:pt-6">
+          <ResponsiveDialogTitle>Members &amp; access — “{projectName}”</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             Who can see and work on this project, where their access comes from, and what they may do.
             Super admins are owner on every project and are listed only when they are recorded here.
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         {/* The body caps its own height, so scrolling doesn't depend on how
-            DialogContent or DIALOG_AS_SHEET lay out their children. */}
-        <div className="max-h-[calc(90dvh-9rem)] overflow-y-auto overscroll-contain px-4 py-4 md:max-h-[calc(85vh-9rem)] md:px-6 md:pb-6">
+            ResponsiveDialogContent or DIALOG_AS_SHEET lay out their children. */}
+        <div className="md:max-h-[calc(85vh-9rem)] md:overflow-y-auto md:overscroll-contain md:px-6 md:pb-6 md:pt-4">
           {loading ? (
             <div className="grid h-24 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : error || !data ? (
@@ -175,8 +178,8 @@ export function ProjectAccessDialog({ projectId, projectName, users, actorId, ac
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 
 function PersonRow({ p, orgName, caps, onRole, onExpiry, onRemove }: {

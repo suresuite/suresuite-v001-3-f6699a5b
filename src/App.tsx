@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { CapabilitiesProvider, useCapabilities } from '@/hooks/useCapabilities';
 import { GlobalProjectProvider } from '@/hooks/useGlobalProject';
 import { ViewportProvider } from '@/hooks/useViewport';
+import { ConfirmProvider } from '@/components/shared/confirm/ConfirmProvider';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -119,6 +120,10 @@ function App() {
           <CapabilitiesProvider>
           <GlobalProjectProvider>
             <Router>
+              {/* useConfirm(): window.confirm on desktop, the ConfirmSheet on a
+                  phone (mobile redesign §2.3). Inside the router — the sheet
+                  reads the route to know whether a tab bar sits under it. */}
+              <ConfirmProvider>
               <RouteErrorBoundary>
               <Suspense fallback={<RouteFallback />}>
               <Routes>
@@ -294,6 +299,7 @@ function App() {
                   <FloatingChatBubble />
                 </Suspense>
               </RouteErrorBoundary>
+              </ConfirmProvider>
             </Router>
           </GlobalProjectProvider>
           </CapabilitiesProvider>

@@ -39,7 +39,12 @@ making it. A UI-only diff must be reviewable by reading the JSX alone.
 **B. Every change ships for desktop AND mobile, in the same commit.**
 
 The product has **one** breakpoint: **768px** (`useIsMobile`, Tailwind `md:`). Do not
-introduce a second. A PR that improves one layout and leaves the other unstated is
+introduce a second. It carries one exception, made in both places at once: a touch
+phone held sideways (`(pointer: coarse) and (max-height: 500px)`) is mobile even
+though it is 768px+ wide. `useIsMobile()` includes it, and `postcss/desktop-md.js`
+switches every `md:` rule off for it at build time, so a mouse desktop is unchanged
+and a landscape phone gets the mobile shell rather than the sidebar
+(`useIsMobile.test.ts` pins the two together). A PR that improves one layout and leaves the other unstated is
 incomplete — the PR body must say what happens to both (template in §8).
 
 ### 0.2 Which dialect am I in?
@@ -675,7 +680,7 @@ guessing:
 - `src/components/intelligence/piUi.tsx` — sharp dialect
 - `src/components/policies/policyGridUi.tsx` — policy-grid micro-headers (`0.14em`)
 - `src/pages/DeveloperApi.tsx` — the locked table reference
-- `src/hooks/use-mobile.tsx` — `useIsMobile`, the single 768px breakpoint
+- `src/hooks/use-is-mobile.ts` — `useIsMobile`, the single 768px breakpoint (plus the landscape-phone exception, mirrored in `postcss/desktop-md.js`)
 - `github.md` (project root) — sync point and screen map
 
 

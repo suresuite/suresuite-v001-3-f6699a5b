@@ -355,6 +355,6 @@ How long a standard run keeps its weekly series after it completes, read by `run
 
 ---
 
-*Generated from data contract `f09bff5c700d`, engine `0.2.8`,
+*Generated from data contract `5801850de943`, engine `0.2.8`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
