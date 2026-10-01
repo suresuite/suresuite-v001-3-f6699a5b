@@ -3577,8 +3577,8 @@ export type ProjectDeletion = {
 };
 
 export const PROJECT_DELETION: ProjectDeletion = {
-  "projectScoped": 50,
-  "cascade": 40,
+  "projectScoped": 51,
+  "cascade": 41,
   "detached": [
     "chat_threads",
     "user_files"
@@ -3684,7 +3684,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 59,
+  "described": 61,
   "open": [
     {
       "table": "analysis_kinds",
@@ -3755,6 +3755,13 @@ export const READ_EXPOSURE: ReadExposure = {
     },
     {
       "table": "materials",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "model_validations",
       "roles": [
         "anon",
         "authenticated"
@@ -3861,6 +3868,7 @@ export const READ_EXPOSURE: ReadExposure = {
     "external_evidence",
     "inbound_logistics",
     "materials",
+    "model_validations",
     "outbound_logistics",
     "policy_defaults",
     "policy_overrides",

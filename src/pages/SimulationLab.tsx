@@ -45,6 +45,7 @@ import {
 } from "@/components/sim/NewScenarioDialog";
 import { buildScenarioSeed, uniqueName, worldOf } from "@/lib/sim/scenarioSeed";
 import { useValidatedBaseline } from "@/hooks/useValidatedBaseline";
+import { openedModelLine } from "@/lib/sim/validatedModel";
 import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/validationBaseline";
 import { runGateState } from "@/lib/sim/runGate";
 import { reusePromptText } from "@/lib/sim/dispatch";
@@ -99,6 +100,12 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       if (paramPane) setPane(paramPane);
     }
   }, [searchParams]);
+
+  // `?project=` (the Validated Model deep link carries it): open that project.
+  const projectParam = searchParams.get("project");
+  useEffect(() => {
+    if (projectParam) setGlobalSelectedProjectId(projectParam);
+  }, [projectParam, setGlobalSelectedProjectId]);
 
   // Auto-select first scenario when list loads (if nothing pre-selected from URL)
   useEffect(() => {
@@ -194,6 +201,32 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   // ── B0b credibility (Phase B0 / G13 / §9.5) ───────────────────────────────
   const cred = useModelValidation(projectId);
   const credibility = cred.resolveScenario(policyHash, selected);
+
+  // WP 10.3 — `?model=<id>`, the link Save Validated Model's "Open in Simulation
+  // Lab" makes. The Lab opens on the project's validated baseline — the scenario
+  // the model was validated on — and names the model above the panes. It is read
+  // by id from ALL the project's models, so an old link to a superseded model
+  // still says what it opened and that it is no longer the model in force.
+  const modelParam = searchParams.get("model");
+  const openedModel = modelParam ? cred.allCards.find((c) => c.id === modelParam) ?? null : null;
+  const openedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!modelParam || openedFor.current === modelParam || searchParams.get("scenario_id")) return;
+    const base = scenarios.find((s) => isValidationBaseline(s));
+    if (!base) return;
+    openedFor.current = modelParam;
+    setSelectedId(base.id);
+  }, [modelParam, scenarios, searchParams]);
+  const openedModelText = !modelParam
+    ? null
+    : openedModel
+      ? openedModelLine(
+          openedModel,
+          cred.resolveScenario(policyHash, scenarios.find((s) => isValidationBaseline(s)) ?? null),
+        )
+      : cred.loading
+        ? "Loading the model…"
+        : "That Validated Model is not in this project.";
   const validated = useValidatedBaseline({ scenarios, cred, policyHash });
   const [newOpen, setNewOpen] = useState(false);
   const [newStart, setNewStart] = useState<NewScenarioStart>("baseline");
@@ -617,6 +650,14 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
               </aside>
 
               <div className="flex-1 min-w-0 flex flex-col gap-3">
+                {openedModelText && (
+                  <div
+                    data-testid="opened-model"
+                    className="rounded-sm border border-[--hair-rule] bg-white px-3 py-[7px] font-mono text-[11.5px] text-[#18181b]"
+                  >
+                    {openedModelText}
+                  </div>
+                )}
                 {fromNetwork && (
                   <span className="w-fit rounded-sm bg-[#f0f0f2] px-[7px] py-px text-[11px] text-[#52525b]">
                     from network map

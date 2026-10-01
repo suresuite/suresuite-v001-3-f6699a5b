@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import type { ValidatedModelProtocol } from "@/lib/sim/validatedModel";
 
 // Model-validation cards — Phase B0 / G13 / §9.5.
 // Loads the project's model_validations rows (the persisted V&V credibility
@@ -55,6 +56,20 @@ export interface ModelValidationCard {
   validated_at: string;
   author_email: string | null;
   created_at: string;
+  // ── WP 10.3 · §4 D243 — the Validated Model's own identity ──────────────
+  /** Display name; numbered per project by `version_no`. */
+  name?: string | null;
+  version_no?: number | null;
+  /** How the model is run — `validated_model_protocol_problems` says what is complete. */
+  protocol?: ValidatedModelProtocol | null;
+  protocol_hash?: string | null;
+  /** policy · graph · scenario world · protocol · engine — one hash, one model. */
+  model_hash?: string | null;
+  engine_id?: string | null;
+  /** The recorded statement a face-validated model rests on. */
+  face_validation?: string | null;
+  revoked_at?: string | null;
+  revoke_reason?: string | null;
 }
 
 export type DriftComponent = "policy" | "data" | "scenario" | "engine";
@@ -113,6 +128,27 @@ export interface RecordValidationArgs {
   basis: "statistical" | "face";
   evidenceRunId: string | null;
   userId?: string | null;
+  userEmail?: string | null;
+}
+
+/** Save Validated Model (WP 10.3): `record_validated_model`, which enforces the
+ *  adoption rule and a complete protocol server-side as well. */
+export interface RecordValidatedModelArgs {
+  projectId: string;
+  policyVersionId: string;
+  datasetVersionId: string;
+  scenarioId: string;
+  name: string;
+  protocol: ValidatedModelProtocol;
+  warmupMethod: "engine" | "welch" | "mser5";
+  replicationBasis: Record<string, unknown>;
+  validationTests: unknown[];
+  findings: unknown[];
+  basis: "statistical" | "face";
+  faceValidation: string | null;
+  evidenceRunId: string | null;
+  /** warm-up series + detector outputs, replication analysis, run ids. */
+  evidence: Record<string, unknown>;
   userEmail?: string | null;
 }
 
@@ -221,8 +257,10 @@ export interface UseModelValidationResult {
   ) => Promise<string | null>;
   /** record_model_validation RPC — supersedes the same-triple active card. */
   record: (args: RecordValidationArgs) => Promise<string>;
+  /** record_validated_model RPC — Save Validated Model (WP 10.3). */
+  recordValidatedModel: (args: RecordValidatedModelArgs) => Promise<string>;
   /** revoke_model_validation RPC — status flip, never a delete. */
-  revoke: (validationId: string) => Promise<void>;
+  revoke: (validationId: string, reason?: string) => Promise<void>;
 }
 
 export function useModelValidation(
@@ -447,17 +485,48 @@ export function useModelValidation(
     [refresh],
   );
 
+  const recordValidatedModel = useCallback(
+    async (args: RecordValidatedModelArgs): Promise<string> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any;
+      const { data, error } = await sb.rpc("record_validated_model", {
+        p_project_id: args.projectId,
+        p_policy_version_id: args.policyVersionId,
+        p_dataset_version_id: args.datasetVersionId,
+        p_scenario_id: args.scenarioId,
+        p_name: args.name,
+        p_protocol: args.protocol,
+        p_warmup_method: args.warmupMethod,
+        p_replication_basis: args.replicationBasis,
+        p_validation_tests: args.validationTests,
+        p_findings: args.findings,
+        p_basis: args.basis,
+        p_face_validation: args.faceValidation,
+        p_evidence_run_id: args.evidenceRunId,
+        p_evidence: args.evidence,
+        _actor_user_id: user?.id ?? null,
+        p_user_email: args.userEmail ?? null,
+      });
+      if (error) throw new Error(error.message ?? String(error));
+      await refresh();
+      return data as string;
+    },
+    [refresh, user?.id],
+  );
+
   const revoke = useCallback(
-    async (validationId: string): Promise<void> => {
+    async (validationId: string, reason?: string): Promise<void> => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any;
       const { error } = await sb.rpc("revoke_model_validation", {
         p_validation_id: validationId,
+        _actor_user_id: user?.id ?? null,
+        p_reason: reason ?? null,
       });
       if (error) throw new Error(error.message ?? String(error));
       await refresh();
     },
-    [refresh],
+    [refresh, user?.id],
   );
 
   return useMemo(
@@ -473,6 +542,7 @@ export function useModelValidation(
       resolveRun,
       applyIfValidated,
       record,
+      recordValidatedModel,
       revoke,
     }),
     [
@@ -487,6 +557,7 @@ export function useModelValidation(
       resolveRun,
       applyIfValidated,
       record,
+      recordValidatedModel,
       revoke,
     ],
   );

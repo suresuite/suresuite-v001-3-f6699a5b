@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 371,
-  "migrations_applied": 363,
+  "migrations_found": 372,
+  "migrations_applied": 364,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000007_graph_levels_compute_once.sql",
+  "last_migration": "20261001000008_validated_model.sql",
   "counts": {
-    "tables": 85,
+    "tables": 86,
     "views": 7,
     "enums": 4,
-    "functions": 355,
+    "functions": 363,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -9957,6 +9957,203 @@
       ]
     },
     {
+      "name": "model_validation_evidence",
+      "schema": "public",
+      "created_by": "20261001000008_validated_model.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "validation_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": true,
+          "references": {
+            "schema": "public",
+            "table": "model_validations",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "project_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "warmup",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "replication_analysis",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "kpi_tests",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "face_validation",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "evidence_run_ids",
+          "quoted": false,
+          "type": "uuid[]",
+          "type_raw": "uuid[]",
+          "nullable": false,
+          "default": "'{}'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "author_user_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "model_validation_evidence_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "model_validation_evidence_validation_id_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "validation_id"
+          ],
+          "definition": "UNIQUE (validation_id)",
+          "implicit": true,
+          "added_by": "20261001000008_validated_model.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "model_validation_evidence_select",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.has_project_access(project_id)",
+            "with_check": "public.has_project_access(project_id)",
+            "added_by": "20261001000008_validated_model.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "WP 10.3 · §4 D243. What a Validated Model rests on, kept beside it rather than ",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "model_validation_evidence_pkey"
+        },
+        {
+          "source": "column UNIQUE",
+          "columns": [
+            "validation_id"
+          ],
+          "name": "model_validation_evidence_validation_id_key"
+        }
+      ]
+    },
+    {
       "name": "model_validations",
       "schema": "public",
       "created_by": "20260710000001_model_validations.sql",
@@ -10283,6 +10480,126 @@
           "unique": false,
           "references": null,
           "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "version_no",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "protocol",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "protocol_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "model_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "engine_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "face_validation",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "revoked_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "revoked_by",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "revoke_reason",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
         }
       ],
       "constraints": [
@@ -10355,6 +10672,13 @@
           "definition": "CHECK (status IN ('active', 'superseded', 'revoked'))",
           "implicit": true,
           "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "model_validations_protocol_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (protocol IS NULL OR cardinality(public.validated_model_protocol_problems(protocol)) = 0)",
+          "added_by": "20261001000008_validated_model.sql"
         }
       ],
       "indexes": [
@@ -22295,6 +22619,34 @@
       "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
+      "name": "_insert_validated_model",
+      "signature": "_insert_validated_model(uuid, uuid, uuid, uuid, text, jsonb, text, jsonb, jsonb, jsonb, text, text, text, uuid, jsonb, uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_policy_version_id uuid",
+        "p_dataset_version_id uuid",
+        "p_scenario_id uuid",
+        "p_name text",
+        "p_protocol jsonb",
+        "p_warmup_method text",
+        "p_replication_basis jsonb",
+        "p_validation_tests jsonb",
+        "p_findings jsonb",
+        "p_verdict text",
+        "p_basis text",
+        "p_face_validation text",
+        "p_evidence_run_id uuid",
+        "p_evidence jsonb",
+        "p_actor uuid",
+        "p_actor_email text"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
+    },
+    {
       "name": "_jsonb_project",
       "signature": "_jsonb_project(jsonb, text[])",
       "args": [
@@ -22338,6 +22690,52 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260715000001_agent_proposals.sql"
+    },
+    {
+      "name": "_validated_model_evidence_immutable",
+      "signature": "_validated_model_evidence_immutable()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
+    },
+    {
+      "name": "_validated_model_hash",
+      "signature": "_validated_model_hash(text, text, text, jsonb, text)",
+      "args": [
+        "p_policy_hash text",
+        "p_graph_hash text",
+        "p_scenario_hash text",
+        "p_protocol jsonb",
+        "p_engine text"
+      ],
+      "returns": "text LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
+    },
+    {
+      "name": "_validated_model_immutable",
+      "signature": "_validated_model_immutable()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
+    },
+    {
+      "name": "_validated_model_number",
+      "signature": "_validated_model_number()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
     },
     {
       "name": "account_self_resolve",
@@ -25169,6 +25567,18 @@
       "defined_by": "20260711000002_unified_access_control.sql"
     },
     {
+      "name": "get_validated_model_evidence",
+      "signature": "get_validated_model_evidence(uuid)",
+      "args": [
+        "p_validation_id uuid"
+      ],
+      "returns": "SETOF",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
+    },
+    {
       "name": "grant_project_delegation",
       "signature": "grant_project_delegation(uuid, uuid, uuid, text, timestamptz, text)",
       "args": [
@@ -26088,7 +26498,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000006_policy_versions_by_content.sql"
+      "defined_by": "20261001000008_validated_model.sql"
     },
     {
       "name": "record_proposal_viewed",
@@ -26102,6 +26512,33 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260715000002_agent_telemetry.sql"
+    },
+    {
+      "name": "record_validated_model",
+      "signature": "record_validated_model(uuid, uuid, uuid, uuid, text, jsonb, text, jsonb, jsonb, jsonb, text, text, uuid, jsonb, uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_policy_version_id uuid",
+        "p_dataset_version_id uuid",
+        "p_scenario_id uuid",
+        "p_name text",
+        "p_protocol jsonb",
+        "p_warmup_method text",
+        "p_replication_basis jsonb",
+        "p_validation_tests jsonb",
+        "p_findings jsonb",
+        "p_basis text",
+        "p_face_validation text",
+        "p_evidence_run_id uuid",
+        "p_evidence jsonb",
+        "_actor_user_id uuid",
+        "p_user_email text DEFAULT NULL"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
     },
     {
       "name": "refresh_node_list_for_project",
@@ -26173,15 +26610,17 @@
     },
     {
       "name": "revoke_model_validation",
-      "signature": "revoke_model_validation(uuid)",
+      "signature": "revoke_model_validation(uuid, uuid, text)",
       "args": [
-        "p_validation_id uuid"
+        "p_validation_id uuid",
+        "_actor_user_id uuid DEFAULT NULL",
+        "p_reason text DEFAULT NULL"
       ],
-      "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260710000001_model_validations.sql"
+      "defined_by": "20261001000008_validated_model.sql"
     },
     {
       "name": "revoke_project_delegation",
@@ -26828,6 +27267,18 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+    },
+    {
+      "name": "validated_model_protocol_problems",
+      "signature": "validated_model_protocol_problems(jsonb)",
+      "args": [
+        "p jsonb"
+      ],
+      "returns": "text[] LANGUAGE plpgsql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
     },
     {
       "name": "verify_user_exists",

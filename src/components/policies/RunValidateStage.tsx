@@ -1,15 +1,18 @@
-// Stage 4 — Run & Validate. 5 ordered sub-steps (§9.5):
+// Stage 4 — Run & Validate. 4 ordered sub-steps (§9.5):
 //   1. Verification  →  2. Run simulation  →  3. Warm-up detection  →
-//   4. Validation  →  5. Adopt
+//   4. Validation (which ends in Save Validated Model — there is no fifth step)
 //
 // Run-simulation has two tabs (single run / multi-run). Warm-up detection
-// has two sub-steps (replication adequacy + warm-up estimation). Validation
-// is a CSV upload + KS/Welch comparison panel. Adopt persists the pipeline
-// outcome as a model card (model_validations, Phase B0 / G13 / §9.5(6)) bound
-// to the provenance triple — the card, not localStorage, is the source of
-// truth for the adopted warm-up / target precision; localStorage remains a
-// draft cache only. Card content is computed, never asserted — adoption is a
-// user action (A3 guardrail, §12).
+// has two sub-steps (replication adequacy + warm-up estimation); the adopted
+// warm-up is the MAXIMUM detected week over the selected KPIs, each KPI's own
+// week shown beside it. Validation is an empirical CSV upload + KS/Welch-t
+// comparison. Save Validated Model persists the outcome as an immutable
+// Validated Model (model_validations + model_validation_evidence, WP 10.3 /
+// §9.5 / G13) with its run PROTOCOL — the model, not localStorage, is the
+// source of truth for the adopted warm-up / replications; localStorage remains
+// a draft cache only. Adoption requires EVERY selected KPI to pass, or a
+// recorded face-validation statement (§4 D244). Card content is computed,
+// never asserted — adoption is a user action (A3 guardrail, §12).
 //
 // §9.5.1 law for this surface: everything rendered is persisted engine output
 // (run_replications / simulation_runs) — synthetic or illustrative data is
@@ -29,8 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronDown, ChevronRight, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -87,7 +89,21 @@ import {
   type EngineResult,
   type LoadPhase,
 } from "@/lib/sim/pyodideEngine";
-import { ksStatistic, welchTTest, welchWarmup, mser5 } from "@/lib/sim/validationStats";
+import {
+  ksStatistic,
+  meanCI as studentMeanCI,
+  studentTQuantile,
+  welchTTest,
+} from "@/lib/sim/validationStats";
+import {
+  adoptionDecision,
+  buildProtocol,
+  MAX_REPLICATIONS,
+  protocolProblems,
+  warmupAcrossKpis,
+  type AdoptionDecision,
+} from "@/lib/sim/validatedModel";
+import { ValidatedModelSummary } from "@/components/sim/ValidatedModelSummary";
 import { ConvergencePlot } from "@/components/sim/ConvergencePlot";
 import { InventoryOverTime } from "@/components/sim/InventoryOverTime";
 import { CapacityOverTime, type CapacityBinding } from "@/components/sim/CapacityOverTime";
@@ -241,12 +257,6 @@ interface WarmupCfg {
   target_precision: number; // CI half-width as fraction of mean
 }
 
-interface IndicatorUpload {
-  id: KpiId;
-  fileName?: string;
-  points?: number;
-}
-
 const DEFAULT_SINGLE: SingleRunCfg = { seed: 1, horizon_days: 365, inspection: false };
 const DEFAULT_MULTI: MultiRunCfg = {
   seeds_mode: "auto",
@@ -265,15 +275,12 @@ const STEPS = [
   { id: "validate", label: "Validation" },
 ];
 
+/** The shared Student-t CI plus the sample SD the adequacy math needs. It was a
+ *  local z-approximation until WP 10.3 (§4 D244): at n = 5 that understated
+ *  every half-width on this screen by 29 %. */
 function meanCI(values: number[], confidence: number) {
-  const n = values.length;
-  if (n === 0) return { mean: 0, std: 0, half: 0, n: 0 };
-  const mean = values.reduce((a, b) => a + b, 0) / n;
-  const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, n - 1);
-  const std = Math.sqrt(variance);
-  // z-approximation
-  const z = confidence >= 0.99 ? 2.576 : confidence >= 0.95 ? 1.96 : 1.645;
-  const half = (z * std) / Math.sqrt(n);
+  const { mean, half, n } = studentMeanCI(values, confidence);
+  const std = n > 1 ? Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)) : 0;
   return { mean, std, half, n };
 }
 
@@ -430,14 +437,6 @@ export function RunValidateStage({
   );
   /** Per-rep weekly series for a KPI (empty when the worker didn't persist one). */
   const seriesFor = (kpi: KpiId): number[][] => repsSeries(doneReps, kpi);
-  /** Fill-rate weekly series — the warm-up estimation basis (engine's too). */
-  const frSeries = useMemo(
-    () =>
-      doneReps
-        .map((r) => r.time_series?.fill_rate)
-        .filter((s): s is number[] => Array.isArray(s) && s.length > 0),
-    [doneReps],
-  );
   /** Per-rep scalar sample for a KPI. */
   const scalarSample = (kpi: KpiId): number[] =>
     doneReps.map((r) => Number(r.kpis[kpi])).filter((n) => Number.isFinite(n));
@@ -565,9 +564,18 @@ export function RunValidateStage({
   const [runTab, setRunTab] = useState<"single" | "multi">("single");
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
-  // Warm-up
-  const [indicators, setIndicators] = useState<IndicatorUpload[]>([]);
+  // Warm-up — the adopted week is the MAXIMUM over the selected KPIs (§4 D244);
+  // `warmupDetail` keeps each KPI's own week so the screen and the model's
+  // evidence both show what the maximum was taken over.
   const [warmupComputed, setWarmupComputed] = useState(false);
+  const [warmupDetail, setWarmupDetail] = useState<{
+    detector: "welch" | "mser5";
+    perKpi: Record<string, number | null>;
+    withoutSeries: string[];
+    /** The engine's own detected week, when the method is "engine". */
+    engineWeek: number | null;
+    adoptedWeek: number;
+  } | null>(null);
 
   // The adopted warm-up cut in weeks — the user-adopted estimate once one is
   // computed, else the engine's detected week. Drawn on every weekly chart.
@@ -591,7 +599,10 @@ export function RunValidateStage({
   >(null);
 
   // ── Adopt (§9.5 step 6): persist the pipeline outcome as a model card ────
-  const [faceAck, setFaceAck] = useState(false);
+  // The face-validation STATEMENT a model without tests rests on — recorded on
+  // the model and its evidence, not a checkbox nobody can read back (D244).
+  const [faceStatement, setFaceStatement] = useState("");
+  const [modelName, setModelName] = useState("");
   const [adopting, setAdopting] = useState(false);
 
   // The scenario leg of the provenance triple: the validation scenario's
@@ -655,20 +666,22 @@ export function RunValidateStage({
   const warnCount = useMemo(() => (findings ?? []).filter((f) => f.severity === "warn").length, [findings]);
 
   // Replication adequacy math for the card content (§9.5 step 3): per focal
-  // KPI mean ± CI at the chosen confidence and n* = (z·s/(ε·x̄))² — the
-  // recommendation Lab scenarios inherit. Computed from real replications.
+  // KPI mean ± CI at the chosen confidence and n* = (t·s/(ε·x̄))², t at the
+  // pilot's n − 1 degrees of freedom (Law & Kelton's approximate rule; it was z
+  // until WP 10.3, §4 D244) — the recommendation Lab scenarios inherit.
+  // Computed from real replications.
   const adequacy = useMemo(() => {
     if (doneReps.length === 0 || multiCfg.kpis.length === 0) return null;
-    const z = multiCfg.confidence >= 0.99 ? 2.576 : multiCfg.confidence >= 0.95 ? 1.96 : 1.645;
     const perKpi: Record<string, { mean: number; half: number; rel: number; n: number; n_star: number }> = {};
     for (const kpi of multiCfg.kpis) {
       const values = doneReps.map((r) => Number(r.kpis[kpi])).filter((n) => Number.isFinite(n));
       if (values.length === 0) continue;
       const { mean, std, half, n } = meanCI(values, multiCfg.confidence);
       const rel = mean !== 0 ? half / Math.abs(mean) : 0;
+      const t = studentTQuantile(1 - (1 - multiCfg.confidence) / 2, Math.max(1, n - 1));
       const nStar =
         mean !== 0 && warmCfg.target_precision > 0
-          ? Math.max(1, Math.ceil(((z * std) / (warmCfg.target_precision * Math.abs(mean))) ** 2))
+          ? Math.max(1, Math.ceil(((t * std) / (warmCfg.target_precision * Math.abs(mean))) ** 2))
           : n;
       perKpi[kpi] = { mean, half, rel, n, n_star: nStar };
     }
@@ -677,12 +690,18 @@ export function RunValidateStage({
     return { perKpi, recommended };
   }, [doneReps, multiCfg.kpis, multiCfg.confidence, warmCfg.target_precision]);
 
-  // Basis (§2.5): statistical when empirical tests actually ran; face
-  // validation (explicitly acknowledged) is the Sargent-style fallback when
-  // no empirical series exist.
+  // The adoption rule (§2.5, §4 D244): statistical when empirical tests ran,
+  // and then EVERY selected KPI must have run and passed — it used to be any
+  // one. Face validation, with a recorded statement, is the Sargent-style
+  // outcome when no test could run; it never overrides a failing test.
+  // `record_validated_model` enforces the same rule server-side.
   const testsRan = (validationResult ?? []).filter((r) => r.n > 0);
-  const statisticalPass = testsRan.some((r) => r.pass);
-  const adoptBasis: "statistical" | "face" = testsRan.length > 0 ? "statistical" : "face";
+  const adoption = adoptionDecision({
+    selectedKpis: multiCfg.kpis,
+    tests: validationResult ?? [],
+    faceStatement,
+  });
+  const adoptBasis = adoption.basis;
 
   const completed = useMemo(() => {
     const s = new Set<number>();
@@ -1114,50 +1133,40 @@ export function RunValidateStage({
     }
   };
 
-  // Warm-up from REAL run output: the engine's adopted week, or Welch/MSER-5
-  // computed client-side from the persisted weekly fill-rate series.
+  // Warm-up from REAL run output, over EVERY selected KPI (§4 D244): each KPI's
+  // persisted weekly series goes through Welch or MSER-5, and the adopted week is
+  // the latest of them — a model steady for fill rate while its backlog is still
+  // filling is not steady. "engine" adds the engine's own detected week to the
+  // maximum and uses MSER-5 (the engine's detector) per KPI. It used to read the
+  // fill-rate series only, whatever KPIs were selected.
   const detectWarmup = () => {
     if (!hasRealData) {
       toast.warning("Run replications first — warm-up is detected from real run output.");
       return;
     }
-    let weeks: number | null = null;
-    let label = warmCfg.method;
-    if (warmCfg.method === "engine") {
-      weeks = latestRun?.warmup_detected_at ?? null;
-      if (weeks == null && frSeries.length > 0) {
-        weeks = welchWarmup(frSeries);
-        label = "welch";
-        toast.message("Engine warm-up not recorded on this run — used Welch instead.");
-      }
-    } else if (frSeries.length > 0) {
-      weeks = warmCfg.method === "welch" ? welchWarmup(frSeries) : mser5(frSeries);
-    }
-    if (weeks == null) {
-      toast.warning("No weekly series on this run — cannot estimate warm-up.");
+    const detector = warmCfg.method === "welch" ? "welch" : "mser5";
+    const across = warmupAcrossKpis(
+      Object.fromEntries(multiCfg.kpis.map((k) => [k, seriesFor(k)])),
+      detector,
+    );
+    const engineWeek = warmCfg.method === "engine" ? latestRun?.warmup_detected_at ?? null : null;
+    const candidates = [across.adoptedWeek, engineWeek].filter((w): w is number => w != null);
+    if (candidates.length === 0) {
+      toast.warning("No weekly series for any selected KPI on this run — cannot estimate warm-up.");
       return;
     }
-    const days = Math.round(weeks * 7);
-    setWarmCfg((c) => ({ ...c, warmup_days: days }));
+    const weeks = Math.max(...candidates);
+    setWarmupDetail({ detector, perKpi: across.perKpi, withoutSeries: across.withoutSeries, engineWeek, adoptedWeek: weeks });
+    setWarmCfg((c) => ({ ...c, warmup_days: Math.round(weeks * 7) }));
     setWarmupComputed(true);
-    toast.success(`Warm-up via ${label}: week ${weeks} — from ${doneReps.length} replication(s).`);
-  };
-
-  const onIndicatorFile = async (id: KpiId, file: File | null) => {
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-      const points = lines.length > 0 && /[a-z]/i.test(lines[0]) ? lines.length - 1 : lines.length;
-      setIndicators((cur) => {
-        const found = cur.find((x) => x.id === id);
-        if (found) return cur.map((x) => (x.id === id ? { ...x, fileName: file.name, points } : x));
-        return [...cur, { id, fileName: file.name, points }];
-      });
-      toast.success(`Loaded ${points} points for ${id}`);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to read file");
+    const measured = Object.keys(across.perKpi).length - across.withoutSeries.length;
+    toast.success(
+      `Warm-up: week ${weeks} — the latest over ${measured} KPI(s)` +
+        (engineWeek != null ? " and the engine's own estimate" : "") +
+        ` from ${doneReps.length} replication(s).`,
+    );
+    if (across.withoutSeries.length > 0) {
+      toast.message(`No weekly series for ${across.withoutSeries.join(", ")} — not part of the maximum.`);
     }
   };
 
@@ -1223,37 +1232,60 @@ export function RunValidateStage({
     warmupComputed &&
     warmCfg.warmup_days > 0 &&
     !!validationScenarioId &&
-    (statisticalPass || (testsRan.length === 0 && faceAck));
+    adoption.ready;
 
-  // "Mark model valid" (§2.5): snapshot the exact policy + dataset, then
-  // persist the card through record_model_validation. Everything on the card
-  // is computed above from persisted run output — nothing is asserted (A3).
+  // Save Validated Model (§9.5, WP 10.3): snapshot the exact policy + graph,
+  // then persist the model through record_validated_model with its run
+  // PROTOCOL and its evidence. Everything on it is computed above from
+  // persisted run output — nothing is asserted (A3). The model is immutable;
+  // re-saving makes a new one and supersedes this one.
   const onMarkValid = async () => {
     if (!projectId || !validationScenarioId || !adequacy) return;
+    const horizonWeeks = Math.max(1, Math.ceil(multiCfg.horizon_days / 7));
+    const protocol = buildProtocol({
+      replications: Math.min(MAX_REPLICATIONS, adequacy.recommended),
+      rootSeed: Math.max(0, validationScenario?.seed ?? 0),
+      crn: validationScenario?.crn ?? true,
+      warmupWeek: Math.min(Math.round(warmCfg.warmup_days / 7), horizonWeeks - 1),
+      horizonWeeks,
+      ciLevel: multiCfg.confidence,
+      ciHalfwidthTarget: warmCfg.target_precision > 0 ? warmCfg.target_precision : null,
+      stoppingRule:
+        validationScenario?.stopping_rule?.kind === "ci_halfwidth" && warmCfg.target_precision > 0
+          ? "ci_halfwidth"
+          : "fixed_horizon",
+    });
+    const problems = protocolProblems(protocol);
+    if (problems.length > 0) {
+      toast.error(`The run protocol is incomplete: ${problems.join("; ")}`);
+      return;
+    }
     setAdopting(true);
     try {
-      // 1 — the exact policy snapshot (save first if live edits drifted)
+      // 1 — the exact policy snapshot (deduped by content since WP 10.2)
       const versionId =
         policyDirty || !selectedVersionId
-          ? await saveSnapshot("Validated model")
+          ? await saveSnapshot("Validated model", undefined, { quiet: true })
           : selectedVersionId;
       if (!versionId) throw new Error("could not save the policy snapshot");
-      // 2 — the exact world (dedup-or-insert dataset snapshot, §8.4)
+      // 2 — the exact graph version (dedup-or-insert, §8.4)
       const datasetVersionId = await dataset.snapshot();
       if (!datasetVersionId) throw new Error("could not snapshot the dataset");
-      // 3 — the card (supersedes the same-triple active card server-side)
-      await modelValidation.record({
+      // 3 — the model (supersedes the same-content active model server-side)
+      await modelValidation.recordValidatedModel({
         projectId,
         policyVersionId: versionId,
         datasetVersionId,
         scenarioId: validationScenarioId,
-        adoptedWarmupDays: warmCfg.warmup_days,
+        name: modelName.trim() || "Validated model",
+        protocol,
         warmupMethod: warmCfg.method,
-        recommendedReplications: adequacy.recommended,
         replicationBasis: {
           confidence: multiCfg.confidence,
           target_precision: warmCfg.target_precision,
           per_kpi: adequacy.perKpi,
+          rule: "n* = (t·s / (ε·x̄))², t at n − 1 df",
+          ...(adequacy.recommended > MAX_REPLICATIONS ? { clamped_from: adequacy.recommended } : {}),
         },
         validationTests: testsRan.map((r) => ({
           kpi: r.kpi,
@@ -1266,21 +1298,42 @@ export function RunValidateStage({
           pass: r.pass,
         })),
         findings: findings ?? [],
-        verdict: "validated",
         basis: adoptBasis,
+        faceValidation: adoptBasis === "face" ? faceStatement.trim() : null,
         // Evidence must be drillable: only a run row that exists in the DB
         // qualifies (an unpersisted browser run would break the FK).
         evidenceRunId: dbRun?.id ?? null,
-        userId: user?.id ?? null,
+        evidence: {
+          warmup: {
+            method: warmCfg.method,
+            adopted_week: protocol.warmup_week,
+            ...(warmupDetail
+              ? {
+                  detector: warmupDetail.detector,
+                  per_kpi: warmupDetail.perKpi,
+                  without_series: warmupDetail.withoutSeries,
+                  engine_week: warmupDetail.engineWeek,
+                }
+              : { per_kpi: null, note: "warm-up seeded from an earlier model, not re-detected" }),
+          },
+          replication_analysis: {
+            confidence: multiCfg.confidence,
+            target_precision: warmCfg.target_precision,
+            per_kpi: adequacy.perKpi,
+            recommended: adequacy.recommended,
+            replications_run: doneReps.length,
+          },
+          run_ids: dbRun?.id ? [dbRun.id] : [],
+        },
         userEmail: user?.email ?? null,
       });
       // Re-read the scenario fingerprint so the badge flips without waiting
       // on the next realtime tick.
       void fetchScenarioFingerprintHash(validationScenarioId).then(setScenarioHash);
-      toast.success("Model card recorded — Lab scenarios can now inherit this validation.");
+      toast.success("Validated Model saved — open it in the Simulation Lab.");
     } catch (err) {
       console.error(err);
-      toast.error(`Adoption failed: ${(err as Error).message ?? err}`);
+      toast.error(`Save failed: ${(err as Error).message ?? err}`);
     } finally {
       setAdopting(false);
     }
@@ -1774,72 +1827,14 @@ export function RunValidateStage({
               {/* (b) warm-up estimation */}
               <section className="flex flex-col gap-2 border-t border-[--hair-border] pt-3">
                 <span className={KX_TIGHT}>b · Warm-up estimation</span>
-                <Field label="Indicators">
-                  <div className="flex flex-wrap gap-1">
-                    {KPI_OPTIONS.map((ind) => {
-                      const selected = indicators.some((x) => x.id === ind.id);
-                      return (
-                        <button
-                          key={ind.id}
-                          type="button"
-                          onClick={() =>
-                            setIndicators((cur) =>
-                              selected ? cur.filter((x) => x.id !== ind.id) : [...cur, { id: ind.id }],
-                            )
-                          }
-                          className={cn(
-                            "rounded-sm border px-[7px] py-px font-mono text-[10px] transition-colors",
-                            selected
-                              ? "border-foreground bg-foreground text-background"
-                              : "border-[--hair-border] bg-background text-[--hair-quiet] hover:border-foreground hover:text-foreground",
-                          )}
-                        >
-                          {ind.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </Field>
-                {indicators.length > 0 && (
-                  <Field label="Empirical time-series (optional)">
-                    <div className="flex w-full flex-col gap-1">
-                      {indicators.map((ind) => {
-                        const meta = KPI_OPTIONS.find((x) => x.id === ind.id)!;
-                        return (
-                          <div key={ind.id} className={cn(SURFACE, "flex items-center gap-2 p-1.5")}>
-                            <span className="w-40 shrink-0 text-[12px]">{meta.label}</span>
-                            <label className="flex-1 cursor-pointer">
-                              <input
-                                type="file"
-                                accept=".csv,text/csv"
-                                className="hidden"
-                                onChange={(e) => onIndicatorFile(ind.id, e.target.files?.[0] ?? null)}
-                              />
-                              <div className="flex h-6 items-center gap-1.5 rounded-sm border border-dashed border-[--zinc-border] px-2 font-mono text-[11px] text-muted-foreground hover:border-foreground">
-                                <Upload className="h-3 w-3" />
-                                {ind.fileName ? (
-                                  <span className="truncate">
-                                    {ind.fileName} · {ind.points} pts
-                                  </span>
-                                ) : (
-                                  <span>CSV (t,value)</span>
-                                )}
-                              </div>
-                            </label>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => setIndicators((cur) => cur.filter((x) => x.id !== ind.id))}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </Field>
-                )}
+                {/* The KPIs the warm-up is taken over are the focal KPIs chosen in
+                    step 2 — the same ones adoption requires to pass. The old
+                    per-indicator CSV upload here was read for its line count and
+                    used for nothing (§4 D244), so it is gone rather than implied. */}
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  over {multiCfg.kpis.length} selected KPI(s):{" "}
+                  {multiCfg.kpis.map((k) => KPI_OPTIONS.find((x) => x.id === k)?.label ?? k).join(", ") || "none"}
+                </span>
                 <div className="flex flex-wrap items-end gap-[18px] pt-1">
                   <Field label="Method">
                     <Segmented<WarmupCfg["method"]>
@@ -1889,8 +1884,49 @@ export function RunValidateStage({
                         Apply to validation
                       </Button>
                     </div>
+                    {warmupDetail && (
+                      <div className={cn(SURFACE, "overflow-x-auto")}>
+                        <table className="w-full" data-testid="warmup-per-kpi">
+                          <thead>
+                            <tr>
+                              <th className={cn(TH, FROZEN_CELL_ON_TINT)}>KPI</th>
+                              <th className={cn(TH, "text-right")}>Detected week</th>
+                              <th className={TH}>Detector</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Object.entries(warmupDetail.perKpi).map(([kpi, week]) => (
+                              <tr key={kpi}>
+                                <td className={cn(TD, FROZEN_CELL)}>
+                                  {KPI_OPTIONS.find((x) => x.id === kpi)?.label ?? kpi}
+                                </td>
+                                <td className={cn(TD, "text-right font-mono tabular-nums")}>
+                                  {week == null ? "no weekly series" : week}
+                                  {week != null && week === warmupDetail.adoptedWeek ? " · adopted" : ""}
+                                </td>
+                                <td className={cn(TD, "font-mono text-[11px] text-muted-foreground")}>
+                                  {week == null ? "not part of the maximum" : warmupDetail.detector}
+                                </td>
+                              </tr>
+                            ))}
+                            {warmupDetail.engineWeek != null && (
+                              <tr>
+                                <td className={cn(TD, FROZEN_CELL)}>Engine estimate</td>
+                                <td className={cn(TD, "text-right font-mono tabular-nums")}>
+                                  {warmupDetail.engineWeek}
+                                  {warmupDetail.engineWeek === warmupDetail.adoptedWeek ? " · adopted" : ""}
+                                </td>
+                                <td className={cn(TD, "font-mono text-[11px] text-muted-foreground")}>
+                                  simulation_runs.warmup_detected_at
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {(indicators.length > 0 ? indicators.map((i) => i.id) : multiCfg.kpis).map((kpi) => (
+                      {multiCfg.kpis.map((kpi) => (
                         <KpiWeeklyChart
                           key={kpi}
                           kpi={kpi}
@@ -2033,11 +2069,13 @@ export function RunValidateStage({
                 confidence={multiCfg.confidence}
                 adequacy={adequacy}
                 validationResult={validationResult}
-                basis={adoptBasis}
-                statisticalPass={statisticalPass}
-                faceAck={faceAck}
-                onFaceAck={setFaceAck}
+                adoption={adoption}
+                faceStatement={faceStatement}
+                onFaceStatement={setFaceStatement}
+                modelName={modelName}
+                onModelName={setModelName}
                 credibility={liveCredibility}
+                projectId={projectId ?? null}
                 triple={{
                   versionId: selectedVersionId,
                   policyDirty,
@@ -2175,11 +2213,13 @@ interface AdoptStepProps {
   confidence: number;
   adequacy: AdequacyStats | null;
   validationResult: Array<{ kpi: KpiId; ks: number; ksP: number; t: number; tP: number; n: number; source: string; pass: boolean }> | null;
-  basis: "statistical" | "face";
-  statisticalPass: boolean;
-  faceAck: boolean;
-  onFaceAck: (v: boolean) => void;
+  adoption: AdoptionDecision;
+  faceStatement: string;
+  onFaceStatement: (v: string) => void;
+  modelName: string;
+  onModelName: (v: string) => void;
   credibility: Credibility;
+  projectId: string | null;
   triple: {
     versionId: string | null;
     policyDirty: boolean;
@@ -2215,11 +2255,13 @@ function AdoptStep({
   confidence,
   adequacy,
   validationResult,
-  basis,
-  statisticalPass,
-  faceAck,
-  onFaceAck,
+  adoption,
+  faceStatement,
+  onFaceStatement,
+  modelName,
+  onModelName,
   credibility,
+  projectId,
   triple,
   ready,
   adopting,
@@ -2273,12 +2315,14 @@ function AdoptStep({
             }
           />
           <AdoptChecklistRow
-            ok={testsRan.length > 0 ? statisticalPass : faceAck}
+            ok={adoption.ready}
             label="Validation"
             detail={
-              testsRan.length > 0
-                ? `${passing}/${testsRan.length} KPI(s) passed KS + Welch-t (statistical basis)`
-                : "no empirical series — face validation requires the acknowledgment below"
+              adoption.ready
+                ? adoption.basis === "statistical"
+                  ? `all ${passing} selected KPI(s) passed KS + Welch-t (statistical basis)`
+                  : "face validation — the recorded statement below (basis: face)"
+                : adoption.reason ?? "not ready"
             }
           />
         </tbody></table>
@@ -2316,29 +2360,47 @@ function AdoptStep({
             </tbody>
           </table>
           <div className="border-t border-[--hair-border] px-2.5 py-1 font-mono text-[10px] text-muted-foreground">
-            n* = (z·s / (ε·x̄))² · card recommends {adequacy.recommended}
+            n* = (t·s / (ε·x̄))², t at n − 1 df · the model runs{" "}
+            {Math.min(MAX_REPLICATIONS, adequacy.recommended)}
+            {adequacy.recommended > MAX_REPLICATIONS ? ` (clamped from ${adequacy.recommended})` : ""}
           </div>
         </div>
       )}
 
-      {/* face-validation acknowledgment (legitimate Sargent-style outcome for
-          greenfield models — the badge tooltip discloses the basis) */}
+      {/* face validation (a legitimate Sargent-style outcome for greenfield
+          models) is a recorded STATEMENT, stored on the model and its evidence
+          — the badge tooltip discloses the basis. Offered only when no test
+          ran: a statement never overrides a failing test (D244). */}
       {testsRan.length === 0 && (
-        <label
-          className="flex cursor-pointer items-start gap-2 rounded-sm border p-2.5 text-[12px]"
+        <div
+          className="flex flex-col gap-1.5 rounded-sm border p-2.5 text-[12px]"
           style={{ borderColor: tint(LAYER.firm, 0.4), background: tint(LAYER.firm, 0.06) }}
         >
-          <Checkbox
-            checked={faceAck}
-            onCheckedChange={(v) => onFaceAck(v === true)}
-            className="mt-0.5"
-          />
           <span>
-            <b>Face validation</b> — no empirical series, no statistical tests. I judge the
-            model's behavior plausible for its purpose. The card records <b>basis: face</b>.
+            <b>Face validation</b> — no empirical series, no statistical tests. State why the
+            model's behaviour is plausible for its purpose; the model records it with{" "}
+            <b>basis: face</b>.
           </span>
-        </label>
+          <textarea
+            aria-label="Face-validation statement"
+            value={faceStatement}
+            onChange={(e) => onFaceStatement(e.target.value)}
+            rows={2}
+            placeholder="e.g. Reviewed fill rate and backlog against Q3 operations with the planning lead."
+            className="w-full rounded-sm border border-[--hair-border] bg-background px-2 py-1 text-[12px]"
+          />
+        </div>
       )}
+
+      <Field label="Model name">
+        <Input
+          aria-label="Validated Model name"
+          value={modelName}
+          onChange={(e) => onModelName(e.target.value)}
+          placeholder="Validated model"
+          className="h-6 w-64 text-[12px]"
+        />
+      </Field>
 
       {/* the provenance triple the card binds to (§9.5 identity) */}
       <div className={cn(SURFACE, "flex flex-wrap gap-x-4 gap-y-1 bg-[#fafafa] px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground")}>
@@ -2361,23 +2423,21 @@ function AdoptStep({
         </span>
       </div>
 
-      {credibility.state === "validated" && (
-        <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-          <StatusDot ok />
-          active card {new Date(credibility.card.validated_at).toLocaleString()}
-          {credibility.card.author_email ? ` · ${credibility.card.author_email}` : ""} · basis{" "}
-          {credibility.card.basis} · re-adopting supersedes it
-        </div>
-      )}
-
       <Button
         className="h-[26px] min-h-11 self-start px-2.5 text-[11.5px] md:min-h-0"
         size="sm"
         onClick={onMarkValid}
         disabled={!ready || adopting}
       >
-        {adopting ? "Recording…" : "Mark model valid"}
+        {adopting ? "Saving…" : "Save Validated Model"}
       </Button>
+
+      {/* The model in force for this policy × graph × scenario — what the Lab
+          will open. Every line resolves to a column of the model or is said to
+          be unrecorded (T1). Re-saving supersedes it. */}
+      {credibility.state !== "unvalidated" && projectId && (
+        <ValidatedModelSummary card={credibility.card} credibility={credibility} projectId={projectId} />
+      )}
     </div>
   );
 }

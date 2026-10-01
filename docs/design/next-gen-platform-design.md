@@ -779,8 +779,14 @@ This subsection is numbered inside §9 but **logically precedes §9.1**: experim
 > replications ("run N seeds"), root seed and CRN, the week steady state begins, horizon,
 > analysis window, CI level and half-width target, and stopping rule — next to the graph
 > version, policy version and engine it was established on, and who validated it when. The
-> baseline fingerprint's hash is widened to include that protocol, so two cards that would
-> instruct different experiments can no longer share an identity (D243). (3) **The Lab consumes
+> model's own hash covers policy, graph, scenario world, protocol and engine, so two models
+> that would instruct different experiments can no longer share an identity (D243). The
+> baseline fingerprint is deliberately NOT widened: it is what a new scenario is matched on to
+> inherit a model, and a scenario has not inherited the protocol at the moment it is matched —
+> a protocol in the fingerprint would stop inheritance from ever matching (PLAN.md §16 · WP
+> 10.3). The model is immutable; newer data or policy make it stale, never different, and
+> adoption needs every selected KPI to pass or a recorded face-validation statement (D244).
+> (3) **The Lab consumes
 > it as a choice**: *select a Validated Model → select an engine → pick a scenario → run*; a
 > deviation from the protocol is allowed, shown and recorded on the run (`protocol_overrides`),
 > and an editor may run an explicitly *exploratory* model that is badged everywhere and never

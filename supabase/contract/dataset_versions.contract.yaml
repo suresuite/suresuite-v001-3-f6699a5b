@@ -20,7 +20,7 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc record_model_validation"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:406"
+    evidence: "src/hooks/useModelValidation.tsx:464"
     confirmed: true
   - page: "DeveloperApi.tsx"
     via: "rpc list_dataset_versions"
@@ -33,14 +33,14 @@ surfaces:
     evidence: "src/components/trust/useProjectFreshness.ts:24"
     confirmed: true
   - page: "ProjectPolicies.tsx"
-    via: "rpc record_model_validation"
+    via: "rpc record_validated_model (Save Validated Model, WP 10.3)"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:406"
+    evidence: "src/hooks/useModelValidation.tsx:492"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "rpc record_model_validation"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:406"
+    evidence: "src/hooks/useModelValidation.tsx:464"
     confirmed: true
 
 governance:

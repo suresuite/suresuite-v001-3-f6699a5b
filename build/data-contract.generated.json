@@ -5,21 +5,21 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 371,
-      "migrations_applied": 363,
-      "last_migration": "20261001000007_graph_levels_compute_once.sql"
+      "migrations_found": 372,
+      "migrations_applied": 364,
+      "last_migration": "20261001000008_validated_model.sql"
     },
-    "sidecars": 59,
+    "sidecars": 61,
     "registry": {
       "engine_version": "0.2.8",
       "policies": 23
     }
   },
   "counts": {
-    "tables_in_schema": 85,
-    "tables_covered": 59,
-    "columns_covered": 738,
-    "check_constraints": 66,
+    "tables_in_schema": 86,
+    "tables_covered": 61,
+    "columns_covered": 782,
+    "check_constraints": 73,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -4994,7 +4994,7 @@
           "page": "DataManager.tsx",
           "via": "rpc record_model_validation",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:406",
+          "evidence": "src/hooks/useModelValidation.tsx:464",
           "confirmed": true
         },
         {
@@ -5013,16 +5013,16 @@
         },
         {
           "page": "ProjectPolicies.tsx",
-          "via": "rpc record_model_validation",
+          "via": "rpc record_validated_model (Save Validated Model, WP 10.3)",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:406",
+          "evidence": "src/hooks/useModelValidation.tsx:492",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc record_model_validation",
           "grain": "table",
-          "evidence": "src/hooks/useModelValidation.tsx:406",
+          "evidence": "src/hooks/useModelValidation.tsx:464",
           "confirmed": true
         }
       ],
@@ -14669,6 +14669,1727 @@
           "normalize_at_promotion": null,
           "meaning": "The tier-1 staged row this was promoted from (WP 3.3, D55). Its `source_row_number` is the physical line of the uploaded file, header = line 1. `ON DELETE SET NULL` and DEFERRABLE, because staging dies with its run and an item master belongs to the project rather than to the run.",
           "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
+      "analysis_kinds": null
+    },
+    "model_validation_evidence": {
+      "table": "model_validation_evidence",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "The evidence one Validated Model rests on, kept beside it rather than summarised into it: per-KPI warm-up series and detector outputs, the replication analysis, the per-KPI tests, the face-validation statement and the evidence runs. One row per model, written with it, never edited (WP 10.3, §4 D243).",
+      "owner": "policy-ui",
+      "created_by": "20261001000008_validated_model.sql",
+      "sidecar": "supabase/contract/model_validation_evidence.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "model_validation_evidence_pkey"
+        },
+        {
+          "source": "column UNIQUE",
+          "columns": [
+            "validation_id"
+          ],
+          "name": "model_validation_evidence_validation_id_key"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": null,
+        "write": "simulation_lab",
+        "min_project_role": "analyst",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Written only by `_insert_validated_model`, inside the same transaction as its model; a BEFORE UPDATE trigger refuses every edit. Read through `has_project_access`, and by the browser through `get_validated_model_evidence`, which is no wider than the model row it belongs to (readable by every API role). Audited at statement grain."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "model_validation_evidence_select",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.has_project_access(project_id)",
+            "with_check": "public.has_project_access(project_id)",
+            "added_by": "20261001000008_validated_model.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "model_validation_evidence_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "model_validation_evidence_validation_id_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "validation_id"
+          ],
+          "definition": "UNIQUE (validation_id)",
+          "implicit": true,
+          "added_by": "20261001000008_validated_model.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate key.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "validation_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": true,
+          "references": {
+            "schema": "public",
+            "table": "model_validations",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The model this is the evidence of. One row per model.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The model's project.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "warmup",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The warm-up evidence: the method, each selected KPI's detected week (and the series it was detected on where one exists), and the adopted week — the MAXIMUM over them.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "replication_analysis",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The replication analysis: confidence, target precision, per-KPI mean ± Student-t half-width and n*, the recommendation.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "kpi_tests",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The KS / Welch tests per selected KPI with their samples' provenance.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "face_validation",
+          "type": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The face-validation statement, who made it and when; NULL for a statistical model.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "evidence_run_ids",
+          "type": "uuid[]",
+          "nullable": false,
+          "default": "'{}'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The runs whose replications are the evidence.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "author_user_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Who saved the model.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was written.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
+      "analysis_kinds": null
+    },
+    "model_validations": {
+      "table": "model_validations",
+      "schema_name": "public",
+      "tier": "4",
+      "tier_name": "decisions — policies, overrides, scenarios",
+      "grain": "One VALIDATED MODEL: a decision about how a project's model may be used, bound to the exact policy content, graph version and scenario world it was established on and stating the run protocol every decision-grade run must follow — how many seeds, the week steady state begins, horizon, analysis window, CI level and stopping rule — with who validated it and when. Immutable: only its lifecycle (status, supersession, revocation) changes. Matched by CONTENT, never by id (WP 10.2).",
+      "owner": "policy-ui",
+      "created_by": "20260710000001_model_validations.sql",
+      "sidecar": "supabase/contract/model_validations.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "model_validations_pkey"
+        },
+        {
+          "source": "partial UNIQUE index",
+          "columns": [
+            "project_id",
+            "policy_hash",
+            "graph_hash",
+            "scenario_hash"
+          ],
+          "name": "model_validations_active_content_uq",
+          "predicate": "status = 'active'"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [
+        {
+          "page": "SimulationLab.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/useModelValidation.tsx:290",
+          "confirmed": true
+        },
+        {
+          "page": "ProjectPolicies.tsx",
+          "via": "table read",
+          "grain": "table",
+          "evidence": "src/hooks/useModelValidation.tsx:290",
+          "confirmed": true
+        }
+      ],
+      "governance": {
+        "read": null,
+        "write": "simulation_lab",
+        "min_project_role": "analyst",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "Tier 4 — a DECISION. Readable by every API role (`model_validations_read_all`, D28's pinned list); written only through SECURITY DEFINER functions: `record_validated_model` (Save Validated Model — authenticates the actor through the shared preamble and enforces the adoption rule: every selected KPI passed, or a recorded face-validation statement), the legacy `record_model_validation` (its agent caller), and `revoke_model_validation`; all three reach one insert path. Audited at statement grain since WP 10.3. A BEFORE UPDATE trigger refuses every change but the lifecycle."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "model_validations_read_all",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20260710000001_model_validations.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "model_validations_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "model_validations_adopted_warmup_days_check",
+          "kind": "CHECK",
+          "columns": [
+            "adopted_warmup_days"
+          ],
+          "definition": "CHECK (adopted_warmup_days >= 0)",
+          "implicit": true,
+          "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "model_validations_warmup_method_check",
+          "kind": "CHECK",
+          "columns": [
+            "warmup_method"
+          ],
+          "definition": "CHECK (warmup_method IN ('engine', 'welch', 'mser5'))",
+          "implicit": true,
+          "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "model_validations_recommended_replications_check",
+          "kind": "CHECK",
+          "columns": [
+            "recommended_replications"
+          ],
+          "definition": "CHECK (recommended_replications >= 1)",
+          "implicit": true,
+          "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "model_validations_verdict_check",
+          "kind": "CHECK",
+          "columns": [
+            "verdict"
+          ],
+          "definition": "CHECK (verdict IN ('validated', 'rejected'))",
+          "implicit": true,
+          "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "model_validations_basis_check",
+          "kind": "CHECK",
+          "columns": [
+            "basis"
+          ],
+          "definition": "CHECK (basis IN ('statistical', 'face'))",
+          "implicit": true,
+          "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "model_validations_status_check",
+          "kind": "CHECK",
+          "columns": [
+            "status"
+          ],
+          "definition": "CHECK (status IN ('active', 'superseded', 'revoked'))",
+          "implicit": true,
+          "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "model_validations_protocol_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (protocol IS NULL OR cardinality(public.validated_model_protocol_problems(protocol)) = 0)",
+          "added_by": "20261001000008_validated_model.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "model_validations_project_created",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "created_at DESC"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "model_validations_active_content_uq",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "policy_hash",
+            "graph_hash",
+            "scenario_hash"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "status = 'active'",
+          "partial": true,
+          "added_by": "20261001000006_policy_versions_by_content.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The model. Runs stamp it (`simulation_runs.model_validation_id`); a person sees `name` and `version_no`.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project it validates.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "policy_version_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "policy_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The policy version row it was recorded under — for display and the foreign key only. Matching is by `policy_hash` (WP 10.2, §4 D242).",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "policy_hash",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The policy CONTENT it was validated on — the policy half of its identity.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "dataset_version_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "dataset_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The graph version (\"Graph vN\") it was validated on. Required on every model written since WP 10.3 (a BEFORE INSERT trigger); NULL only on cards older than that.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "graph_hash",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The graph content it was validated on — the data half of its identity.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "scenario_hash",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The baseline scenario fingerprint's hash (horizon, time step, demand model). NOT widened with the protocol: a new stress scenario is matched on it BEFORE it inherits the protocol, so widening it would end inheritance (§16 · WP 10.3). The protocol is in `model_hash` instead.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "scenario_fingerprint",
+          "type": "jsonb",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The fingerprint itself, so the world a model was validated in can be read without a hash.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "engine_fingerprint",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The evidence run's engine `code_version`, when it had one. Advisory until the engine registry lands (WP 10.4).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "adopted_warmup_days",
+          "type": "integer",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The adopted warm-up in days — `protocol.warmup_week × 7` for a model written since WP 10.3. Kept because Lab scenarios inherit it (`apply_validation_to_scenario`).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "warmup_method",
+          "type": "text",
+          "nullable": false,
+          "default": "'engine'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Which detector the adopted warm-up came from: engine, welch or mser5.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "recommended_replications",
+          "type": "integer",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The replications a run should use — `protocol.replications` for a model written since WP 10.3; inherited by Lab scenarios.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "replication_basis",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The replication analysis summary (confidence, target precision, per-KPI mean, half-width, n*).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "validation_tests",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The per-KPI KS / Welch results the verdict rests on; empty for a face-validated model.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "findings_snapshot",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The verification findings at the moment of adoption.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "verdict",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "validated or rejected.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "basis",
+          "type": "text",
+          "nullable": false,
+          "default": "'statistical'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "statistical (every selected KPI passed) or face (a recorded statement).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "evidence_run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "simulation_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The run whose replications are the evidence; its series never expire (WP 10.6).",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false,
+          "default": "'active'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "active, superseded or revoked — the lifecycle, the one part a model may change.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "superseded_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "model_validations",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The model that replaced this one on the same content triple.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "validated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was validated.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "author_user_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Who validated it.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "author_email",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Their email at the time, kept because a model outlives an account.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20260710000001_model_validations.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row was written.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What the person who validated it called it.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "version_no",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "\"Model v3\" — one number per model per project, assigned on insert.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "protocol",
+          "type": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "THE RUN PROTOCOL — `replications`, `root_seed`, `crn`, `warmup_week`, `horizon_weeks`, `analysis_window_weeks`, `ci_level`, `ci_halfwidth_target`, `stopping_rule` (`fixed_horizon` | `ci_halfwidth`). `validated_model_protocol_problems` is its one statement and a CHECK holds it. Cards older than WP 10.3 carry a BACKFILLED protocol (`\"backfilled\": true`) whose `unknown` list names what no column recorded — CRN and the stopping rule always, the seed where no evidence run stamped one.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "protocol_hash",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "SHA-256 of `protocol`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "model_hash",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The Validated Model's identity: policy content, graph, scenario world, protocol hash and engine — what makes two models that would instruct different experiments two models.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "engine_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The engine it was validated on; its foreign key lands with the engine registry (WP 10.4).",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "face_validation",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The statement a face-validated model rests on; required for basis `face` since WP 10.3.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When it was revoked.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "revoked_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Who revoked it.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "revoke_reason",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Why, in their words.",
+          "grain": "metadata",
           "computed_by": null,
           "engine": {
             "consumed_by": null,
@@ -33124,5 +34845,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "423c10335cf8"
+  "contract_version": "e45cd87ffb80"
 }

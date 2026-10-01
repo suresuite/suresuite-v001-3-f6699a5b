@@ -66,36 +66,6 @@ pages_without_project_data:
                              # and deliberately does not guess at (see §16).
 
 deferred:
-  - wp: "10.3"
-    why: >-
-      RE-HOMED FROM WP 6.3 BY WP 10.0 (2026-10-01). WP 10.3 EXTENDS this
-      table into the Validated Model (protocol, version number, immutability,
-      evidence) and is the package that has to say what every column means —
-      describing it anywhere else would describe a table about to change.
-      MOVED FROM WP 4.4 BY WP 4.4 ITSELF, and the reason is a correction rather
-      than a deferral. This row said the table's subject is "whether a card has
-      gone stale, which is the one staleness rule WP 4.4 lands" — and WP 4.4
-      landed that rule without needing to DESCRIBE the table, because the rule is
-      a function over a hash column and `model_validations` already carries four
-      of them. What the table actually needs is the thing WP 6.3 builds: it binds
-      a verdict to a dataset, a policy, a scenario and an engine fingerprint,
-      which IS invariant `result-binding` (I8) and IS the A5 Reproducibility
-      Record. Describing it in a staleness package would have put it in the
-      contract under a package that had no reason to think about what its columns
-      mean. §15 measured 0 active cards, so nothing is waiting on it.
-      Original note follows.
-      `model_validations` is a VALIDATION CARD, not analysis output — it already
-      carries `graph_hash`, `policy_hash`, `scenario_hash` and `engine_fingerprint`
-      and its whole subject is whether a card has gone stale, which is the one
-      staleness rule WP 4.4 lands ("stale iff `computed_from_hash <>
-      current_graph_hash()`") and the Trust Report that reads it. It was grouped
-      with the network tables by WP 1.4 on the strength of the word "validation";
-      WP 4.2 moved it when the D56 decision made the network group specific.
-      §15 measured 0 active cards, so nothing is waiting on it.
-    tables: [model_validations]
-    audited:
-      model_validations: false
-
   - wp: "10.4"
     why: >-
       Runs and results (tier 5).

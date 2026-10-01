@@ -25,15 +25,15 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "423c10335cf8";
+export const CONTRACT_VERSION = "e45cd87ffb80";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261001000007_graph_levels_compute_once.sql";
+export const LAST_MIGRATION = "20261001000008_validated_model.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 85,
-  "tablesDescribed": 59,
-  "columnsDescribed": 738,
-  "tablesUndescribed": 26
+  "tablesInSchema": 86,
+  "tablesDescribed": 61,
+  "columnsDescribed": 782,
+  "tablesUndescribed": 25
 } as const;
 
 /** Described tables, grouped by the tier their data sits in. */
@@ -263,6 +263,18 @@ export const TIERS: GlanceTier[] = [
         "grain": "One retrieved external claim about a supply chain, as a subject–predicate–object triple with the source it came from, the confidence attached to it and the hash of the content it was read from. The network cartographer's evidence store: what an agent FOUND, kept apart from what a person entered.",
         "columns": 9,
         "owner": "platform"
+      },
+      {
+        "table": "model_validation_evidence",
+        "grain": "The evidence one Validated Model rests on, kept beside it rather than summarised into it: per-KPI warm-up series and detector outputs, the replication analysis, the per-KPI tests, the face-validation statement and the evidence runs. One row per model, written with it, never edited (WP 10.3, §4 D243).",
+        "columns": 10,
+        "owner": "policy-ui"
+      },
+      {
+        "table": "model_validations",
+        "grain": "One VALIDATED MODEL: a decision about how a project's model may be used, bound to the exact policy content, graph version and scenario world it was established on and stating the run protocol every decision-grade run must follow — how many seeds, the week steady state begins, horizon, analysis window, CI level and stopping rule — with who validated it and when. Immutable: only its lifecycle (status, supersession, revocation) changes. Matched by CONTENT, never by id (WP 10.2).",
+        "columns": 34,
+        "owner": "policy-ui"
       },
       {
         "table": "policy_defaults",
@@ -515,16 +527,6 @@ export const UNDESCRIBED: UndescribedGroup[] = [
       {
         "table": "user_files",
         "columns": 12
-      }
-    ]
-  },
-  {
-    "wp": "10.3",
-    "why": "RE-HOMED FROM WP 6.3 BY WP 10.0 (2026-10-01). WP 10.3 EXTENDS this table into the Validated Model (protocol, version number, immutability, evidence) and is the package that has to say what every column means — describing it anywhere else would describe a table about to change. MOVED FROM WP 4.4 BY WP 4.4 ITSELF, and the reason is a correction rather than a deferral. This row said the table's subject is \"whether a card has gone stale, which is the one staleness rule WP 4.4 lands\" — and WP 4.4 landed that rule without needing to DESCRIBE the table, because the rule is a function over a hash column and `model_validations` already carries four of them. What the table actually needs is the thing WP 6.3 builds: it binds a verdict to a dataset, a policy, a scenario and an engine fingerprint, which IS invariant `result-binding` (I8) and IS the A5 Reproducibility Record. Describing it in a staleness package would have put it in the contract under a package that had no reason to think about what its columns mean. §15 measured 0 active cards, so nothing is waiting on it. Original note follows. `model_validations` is a VALIDATION CARD, not analysis output — it already carries `graph_hash`, `policy_hash`, `scenario_hash` and `engine_fingerprint` and its whole subject is whether a card has gone stale, which is the one staleness rule WP 4.4 lands (\"stale iff `computed_from_hash <> current_graph_hash()`\") and the Trust Report that reads it. It was grouped with the network tables by WP 1.4 on the strength of the word \"validation\"; WP 4.2 moved it when the D56 decision made the network group specific. §15 measured 0 active cards, so nothing is waiting on it.",
-    "tables": [
-      {
-        "table": "model_validations",
-        "columns": 24
       }
     ]
   },

@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-59 of 85 tables are covered,
-738 columns in all. A table that is not here is listed
+61 of 86 tables are covered,
+782 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -39,6 +39,8 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`ingest_staged_products`](ingest_staged_products.md) | 1 | `data-ingestion` | 19 | One item-master row as one source sent it, inside one run. The source's own shape plus provenance — not the project's shape, which it takes on at promotion. |
 | [`ingest_staged_rows`](ingest_staged_rows.md) | 1 | `data-ingestion` | 11 | One row of one uploaded file, in one run: the cells as received beside what validation made of them, and the findings that explain the difference. The unit a reviewer reads when a number looks wrong — and the only place in the system where the left-hand side of a parse survives. |
 | [`materials`](materials.md) | 2 | `data-ingestion` | 16 | One material in one project: the economics the simulation reads for it. The precision path — the CSV lanes carry prices too, and where this row is silent the engine derives the value from them rather than treating it as missing. |
+| [`model_validation_evidence`](model_validation_evidence.md) | 4 | `policy-ui` | 10 | The evidence one Validated Model rests on, kept beside it rather than summarised into it: per-KPI warm-up series and detector outputs, the replication analysis, the per-KPI tests, the face-validation statement and the evidence runs. One row per model, written with it, never edited (WP 10.3, §4 D243). |
+| [`model_validations`](model_validations.md) | 4 | `policy-ui` | 34 | One VALIDATED MODEL: a decision about how a project's model may be used, bound to the exact policy content, graph version and scenario world it was established on and stating the run protocol every decision-grade run must follow — how many seeds, the week steady state begins, horizon, analysis window, CI level and stopping rule — with who validated it and when. Immutable: only its lifecycle (status, supersession, revocation) changes. Matched by CONTENT, never by id (WP 10.2). |
 | [`multi_tier_supply_chain`](multi_tier_supply_chain.md) | 2 | `data-ingestion` | 9 | One directed firm-to-firm relationship in a project's multi-tier network: who supplies whom, at what depth, and in what capacity. An EDGE between two firm identifiers — not a party, and not a material flow: nothing here says what moves along it or how much. |
 | [`network_edges`](network_edges.md) | 3 | `analysis` | 15 | One directed relationship between two firms in one project's deep-tier graph. EVERY column is uploaded — nothing computes this table, which is why it gains no `computed_from_hash` in WP 4.3 although it sits in `graphHashCoverage.test.ts`'s DERIVED_AND_OUT list by name. |
 | [`network_nodes`](network_nodes.md) | 3 | `analysis` | 30 | One firm in one project's deep-tier network graph, identified by `uid`. THE TABLE IS TWO THINGS AND THAT IS §4 D56: nine columns a user uploaded and eight an analysis wrote. WP 4.3 gives the computed half a second home in `analysis_results`; WP 5.3 drops it from here, and what is left is a tier-2 input table. |
@@ -74,4 +76,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `423c10335cf8`, engine `0.2.8`.*
+*Generated from data contract `e45cd87ffb80`, engine `0.2.8`.*
