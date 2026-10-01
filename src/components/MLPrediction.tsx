@@ -7,6 +7,7 @@ import { Brain, Loader2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useGlobalProject } from '@/hooks/useGlobalProject';
 import {
   M,
   MobileButton,
@@ -43,6 +44,7 @@ export default function MLPrediction({ selectedPlant, skin = false }: MLPredicti
   const [progress, setProgress] = useState(0);
   const [stats, setStats] = useState<PredictionStats | null>(null);
   const { user } = useAuth();
+  const { globalSelectedProjectId } = useGlobalProject();
 
   const fetchPredictionStats = async () => {
     if (!selectedPlant || !user?.id || !user?.email) {
@@ -99,7 +101,9 @@ export default function MLPrediction({ selectedPlant, skin = false }: MLPredicti
       }, 1000);
 
       const { data, error } = await supabase.functions.invoke('predict-critical-nodes', {
-        body: { plant_name: selectedPlant, uploaded_by: user.id },
+        // WP 10.1 · §4 D236 — the project travels with the request: the function's
+        // read used to be filtered by plant name alone, which no project owns.
+        body: { project_id: globalSelectedProjectId, plant_name: selectedPlant, uploaded_by: user.id },
       });
 
       clearInterval(progressInterval);

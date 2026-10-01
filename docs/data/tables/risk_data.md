@@ -74,8 +74,8 @@ partially or get corrected — the write fails.
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `FirmLevelNetwork.tsx` | table read | `src/pages/FirmLevelNetwork.tsx:315` | yes |
-| `ProductLevelNetwork.tsx` | table read | `src/pages/ProductLevelNetwork.tsx:559` | yes |
+| `FirmLevelNetwork.tsx` | table read | `src/pages/FirmLevelNetwork.tsx:328` | yes |
+| `ProductLevelNetwork.tsx` | table read | `src/pages/ProductLevelNetwork.tsx:363` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -130,7 +130,7 @@ The country the risk class applies to, spelled as the network pages spell it —
 | Validated at ingest | must equal upper(btrim(country)) — CHECK risk_data_country_normalized |
 | Rendered at | `[object Object]`, `[object Object]` |
 
-**Rendered on** `FirmLevelNetwork.tsx` (`src/pages/FirmLevelNetwork.tsx:315`), `ProductLevelNetwork.tsx` (`src/pages/ProductLevelNetwork.tsx:559`) —
+**Rendered on** `FirmLevelNetwork.tsx` (`src/pages/FirmLevelNetwork.tsx:328`), `ProductLevelNetwork.tsx` (`src/pages/ProductLevelNetwork.tsx:363`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -155,7 +155,7 @@ for one you did.
 |---|---|---|---|
 | no row exists for the node's country | the map renders the node grey and labels it "Unknown" | `default` | RiskDataNotice — the page says the dimension is missing rather than shading it away |
 
-**Rendered on** `FirmLevelNetwork.tsx` (`src/pages/FirmLevelNetwork.tsx:315`), `ProductLevelNetwork.tsx` (`src/pages/ProductLevelNetwork.tsx:559`) —
+**Rendered on** `FirmLevelNetwork.tsx` (`src/pages/FirmLevelNetwork.tsx:328`), `ProductLevelNetwork.tsx` (`src/pages/ProductLevelNetwork.tsx:363`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -253,6 +253,6 @@ When the row was last modified. Server-stamped.
 
 ---
 
-*Generated from data contract `20a2eadf01bb`, engine `0.2.8`,
+*Generated from data contract `c7120de73956`, engine `0.2.8`,
 sidecar `supabase/contract/risk_data.contract.yaml`, table created by `20260915000003_risk_data.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

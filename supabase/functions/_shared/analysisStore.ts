@@ -23,6 +23,12 @@ export interface RunHandle {
   cacheHit: boolean;
   status: "running" | "succeeded" | "failed";
   inputHash: string;
+  /** The level `inputHash` is the hash of — `product`, `process`, `firm` or `all`
+   *  — resolved by the store from `analysis_kinds` (WP 10.1). An analyzer with a
+   *  declared fallback reads the graph this names; it does not decide for itself. */
+  inputScope: "product" | "process" | "firm" | "all";
+  /** The graph version the run computes over ("Graph vN"). */
+  datasetVersionId: string | null;
   paramsHash: string;
   codeVersion: string;
   /** Present on a hit; the stored answer's shape, not the answer itself. */
@@ -48,32 +54,13 @@ function asRecord(data: unknown): Record<string, unknown> {
 }
 
 /**
- * The digest of what the two centrality analyzers actually read.
- *
- * It is a SEPARATE ROUND TRIP rather than something the store computes inside
- * `analysis_get_or_start`, and that is deliberate: `predict-critical-nodes`
- * reads `supply_chain_data` and has no topology to digest, so folding it into
- * the store would make every analysis pay for one analyzer's blind spot.
- *
- * See `20260917000007`'s header for why this travels in `params` and not in
- * `graph_hash`: it belongs in `hash_network`, moving it there is a
- * `schema_version` bump, and a bump is unsafe until D70 lands in WP 4.4.
+ * `topologyDigest` STOOD HERE (WP 4.3) and is gone (WP 10.1, §4 D240). It carried
+ * the deep-tier topology in `params` because the anchor could not see it; the
+ * anchor has seen it since WP 5.3, and since WP 10.1 a run is keyed on the LEVEL
+ * its kind reads — the firm level for the two centrality kinds — so the digest only
+ * split the cache. Which level a kind reads is stated once, in `analysis_kinds`,
+ * and comes back on the handle as `inputScope`.
  */
-export async function topologyDigest(
-  client: StoreClient,
-  projectId: string,
-): Promise<string> {
-  const { data, error } = await client.rpc("network_topology_hash", { p_project_id: projectId });
-  if (error) {
-    throw new Error(
-      `network_topology_hash failed for project ${projectId}: ${error.message ?? error}. ` +
-        `Without it the analysis cannot state which graph it ran against, and a ` +
-        `cached answer keyed on graph_hash alone would be served for a graph that ` +
-        `has changed (WP 4.3).`,
-    );
-  }
-  return String(data);
-}
 
 /** Claim the key, or learn that somebody already answered it. */
 export async function getOrStart(
@@ -107,6 +94,8 @@ export async function getOrStart(
     cacheHit: Boolean(row.cache_hit),
     status: row.status as RunHandle["status"],
     inputHash: row.input_hash as string,
+    inputScope: ((row.input_scope as string) ?? "all") as RunHandle["inputScope"],
+    datasetVersionId: (row.dataset_version_id as string | null) ?? null,
     paramsHash: row.params_hash as string,
     codeVersion: row.code_version as string,
     rowCounts: (row.row_counts as Record<string, unknown>) ?? undefined,

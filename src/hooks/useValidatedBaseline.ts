@@ -15,8 +15,9 @@ import { worldOf, type SeedWorld } from "@/lib/sim/scenarioSeed";
 export function useValidatedBaseline(args: {
   scenarios: Scenario[];
   cred: Pick<UseModelValidationResult, "cards" | "resolveScenario">;
-  policyVersionId: string | null | undefined;
-  dirty?: boolean;
+  /** The live policy hash (usePolicies.currentHash) — cards are matched by
+   *  content, not by version id (WP 10.2, §4 D242). */
+  policyHash: string | null | undefined;
 }): {
   baseline: Scenario | null;
   /** the card whose world new scenarios take, or null */
@@ -24,20 +25,20 @@ export function useValidatedBaseline(args: {
   world: SeedWorld;
   credibility: Credibility;
 } {
-  const { scenarios, cred, policyVersionId, dirty } = args;
+  const { scenarios, cred, policyHash } = args;
   const baseline = useMemo(() => findValidationBaseline(scenarios), [scenarios]);
 
   const card = useMemo(() => {
     const validated = cred.cards
       .filter((c) => c.verdict === "validated" && c.status === "active")
       .sort((a, b) => (a.validated_at < b.validated_at ? 1 : -1));
-    // The card on the policy version in force first; otherwise the newest — its
+    // The card on the policy CONTENT in force first; otherwise the newest — its
     // world is still the one that was certified, and the badge says the rest.
-    return validated.find((c) => c.policy_version_id === policyVersionId) ?? validated[0] ?? null;
-  }, [cred.cards, policyVersionId]);
+    return validated.find((c) => !!policyHash && c.policy_hash === policyHash) ?? validated[0] ?? null;
+  }, [cred.cards, policyHash]);
 
   const world = useMemo(() => worldOf(baseline, card?.scenario_fingerprint), [baseline, card]);
-  const credibility = cred.resolveScenario(policyVersionId, baseline, { dirty });
+  const credibility = cred.resolveScenario(policyHash, baseline);
 
   return { baseline, card, world, credibility };
 }

@@ -1,0 +1,213 @@
+# AUTHORED — the data contract's sidecar for `experiments`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md.
+#
+# WP 10.4 · `result-binding`. Described at tier 5 DESPITE what a row is, and the
+# note says why: by meaning this is a DECISION (tier 4), and tier 4 obliges the
+# three audit triggers `dataPlaneAudit.test.ts` reads from the migrations, which
+# this table does not have. Declaring tier 4 without them fails that gate;
+# writing them is a migration, not a sidecar. The tier is therefore the honest
+# description of what the database DOES today, and the gap is named.
+table: experiments
+tier: "5"
+schema_name: public
+grain: >-
+  One designed experiment over a project: a name, a design (full factorial or
+  Latin hypercube), the factors and levels it varies, and the `scenarios` it
+  cloned — one per design row — to run. A design a person authors, grouping
+  runs that were MADE to be compared. UNREACHABLE TODAY: the only screen that
+  writes or reads it, `ExperimentDesigner.tsx`, is mounted by no route (§4
+  D115), so although `useExperiments` reads and writes the table, no page a user
+  can open reaches that code.
+owner: engine
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "experiments_pkey"
+
+governance:
+  read: null
+  write: "simulation_lab"
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    `write: simulation_lab`, not `null`, because the table's one policy,
+    `experiments_auth_all` (`FOR ALL TO authenticated USING (true) WITH CHECK
+    (true)`), has no predicate, and `governanceEnforcement.test.ts` refuses a
+    `null` write claim on a table any grant-holder may write. The capability is
+    the one that gates designing and running simulations, which is what the
+    unmounted designer does. §4 D154 lists `experiments` among the eleven tables
+    probe 0.8 measured as writable by `anon`, and that listing deserves a
+    qualifier: the probe intersects `anon`'s GRANT with "a write policy that
+    refuses nothing" without asking which ROLES that policy names, and the only
+    policy the migrations give this table is `TO authenticated`. So as far as the
+    repository can see, `anon` holds the grant and RLS refuses it; whether
+    production carries an `anon` policy no migration declares is D158's class of
+    question and only `pg_policies` can answer it. Either way it is D28's standing
+    decision and WP 7.1's to close. `min_project_role` is `viewer` because nothing
+    enforces a role here today, not because a viewer ought to design experiments.
+    Deleting a project removes its experiments (`ON DELETE CASCADE`). A BEFORE
+    UPDATE trigger (`experiments_updated_at`) re-stamps `updated_at`.
+    NOT AUDITED — AND BY MEANING IT SHOULD BE. A row is what a person chose,
+    like `scenarios` and `disruption_scenarios` beside it, and those are tier 4
+    and audited at statement grain. This one has no audit triggers in any
+    migration, so claiming tier 4 would fail `dataPlaneAudit.test.ts` on the day
+    the contract regenerates. It is held at tier 5 with `audited: false` as the
+    truthful description of the database; moving it to tier 4 means a migration
+    adding the three `audit_tier_write('4')` triggers in the same commit as the
+    tier change — owed by whichever package mounts the designer, because until a
+    page writes it there is no write to attribute.
+
+note: >-
+  A TABLE WITH A HOOK AND NO PAGE. `src/hooks/useExperiments.tsx` selects,
+  inserts, updates and deletes it and subscribes to its changes; its only caller
+  is `ExperimentDesigner.tsx`, which nothing imports (§4 D115). So there is code
+  that reads and writes this table and no surface a user reaches — which is why
+  this sidecar has no `surfaces` block. Mounting the designer would also meet
+  three defects at once: the policy above admits only `authenticated` while the
+  product runs as `anon` (D28), so the designer's writes would be refused;
+  `created_by` points at `auth.users`, which this application never populates;
+  and an experiment binds its scenarios but not the dataset, policy or engine
+  version they ran against, so it does not satisfy `result-binding`. The runs it
+  queues are ordinary `simulation_runs` rows; the `experiment_id` the designer
+  sends with each is not persisted anywhere, so a run cannot be traced back to
+  its experiment except through `scenario_ids`.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: "Surrogate key. Nothing makes an experiment's name unique."
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: "The owning project. ON DELETE CASCADE."
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  name:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The experiment's display name, typed by the user or defaulted to
+      "Experiment <n>". Also the prefix of every scenario it clones.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  design_type:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      How the design rows were generated from the factors — DEFAULT 'factorial'
+      (every combination of levels); the designer also writes 'lhs' (a Latin
+      hypercube sample of a chosen size). No CHECK constraint, so the vocabulary
+      is the designer's `DesignType`, not a rule the database enforces.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  factors:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The factors the experiment varies, as an array of `{key, label, levels}`:
+      a recovery-playbook factor whose levels are playbook ids, and numeric run
+      settings (replications, horizon, warm-up) whose levels are values. The
+      design rows themselves are not stored — they are materialized into the
+      cloned scenarios.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Reaches the engine only through the scenarios it was materialized into;
+      the engine never reads this column.
+  scenario_ids:
+    type: "uuid[]"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The `scenarios` the experiment cloned from its base scenario, one per
+      design row, in design order. The results panel reads the latest run of
+      each. An array with no foreign key, so a deleted scenario leaves a
+      dangling element.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  status:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      DEFAULT 'draft'. The designer inserts 'running' and never updates it, so in
+      practice the column says the runs were queued, not that they finished. No
+      CHECK constraint.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_by:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Meant to name the author. `REFERENCES auth.users ON DELETE SET NULL`, and
+      the hook fills it from `supabase.auth.getUser()` — but this application
+      authenticates against `approved_users`, not Supabase Auth, so for a real
+      user the value can only be NULL.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: "When the experiment was created."
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: "When the experiment was last changed — re-stamped by `experiments_updated_at`."
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

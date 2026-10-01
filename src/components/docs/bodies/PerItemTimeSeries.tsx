@@ -3,8 +3,9 @@
 // ── WHAT THE PAGE OMITTED, AND WHAT IT GOT WRONG ──────────────────────────
 //
 // The explorer draws eight named measures and the page named none of them —
-// `run_item_series` is deferred in the contract, so there was no generated fact
-// to render, which is exactly the correlation WP 5.2i's gap check predicted.
+// `run_item_series` was deferred in the contract, so there was no generated fact
+// to render, which is exactly the correlation WP 5.2i's gap check predicted. WP
+// 10.4 describes the table; the measure vocabulary stays the engine's.
 // They are declared in two places and `deriveItemSeries` joins them: the engine
 // says which item kind each belongs to, the explorer's legend says what the
 // reader sees.
@@ -246,7 +247,7 @@ export default function PerItemTimeSeries() {
         </P>
       </Section>
 
-      <Provenance from="scsim/scsim/core/engine.py's item_series dict for which measures each item kind carries, joined to ItemSeriesExplorer's own legend for the names — the contract describes this table nowhere" />
+      <Provenance from="scsim/scsim/core/engine.py's item_series dict for which measures each item kind carries, joined to ItemSeriesExplorer's own legend for the names — the table itself is described by the contract since WP 10.4, which deliberately does not restate this vocabulary" />
     </>
   );
 }

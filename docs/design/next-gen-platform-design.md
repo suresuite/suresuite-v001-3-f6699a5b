@@ -633,6 +633,20 @@ flowchart TD
     SH --> RK
 ```
 
+> **Phase 10 refinement (PLAN.md §20, WP 10.1): level hashes and automatic versions.** The
+> graph hash keeps its composite (`graph_hash` over the `inputs` and `network` domains) and
+> gains three NAMED LEVEL parts, each a subset of facts already hashed: **`product`** (item
+> masters, customers, single-level BOM, inbound/outbound lanes), **`process`** (multi-level BOM
+> and the multi-tier chain — the SOURCES of what the process page reads, never the derived lane
+> table) and **`firm`** (the deep-tier node/edge topology and the tier-2/3 supplier tables). A
+> network analysis keys on the level it reads, so a price edit does not invalidate a centrality
+> (PLAN.md §4 D235). The project's current hash is STORED and recomputed only when a source
+> changed (D233). And the capture points widen: a Graph Version is taken automatically at the
+> end of every promotion, combine and deep-tier write, deduplicated against ANY earlier version
+> of the project — reverting an edit returns the earlier version rather than minting a new one
+> — and numbered per project ("Graph v7"), so a person can name the world a result came from
+> (D234).
+
 ---
 
 ## 9. Experimentation layer: productizing the engine's riches
@@ -678,6 +692,21 @@ A **`run_cache`** consults the key before dispatch: an exact hit returns stored 
 > keyed by the full RunKey (engine fingerprint included, so stale-engine candidates stop
 > relying on the user reading `code_version` in the prompt), cross-scenario/cross-project hits
 > on normalized `ProjectData` hashes (§8.4 refinement (a)), and warm-state partial hits.
+>
+> **Phase 10 (PLAN.md §20, WP 10.4): the RunKey is built now, not in Phase C.** The run row
+> carries `run_key = H(engine_fingerprint ∥ graph_hash ∥ policy_hash ∥ scenario_hash ∥ seed
+> spec)`, with the engine named by an `sim_engines` registry row rather than an environment
+> flag, and the reuse check becomes a RunKey lookup — an engine change is a different key, so
+> the user is no longer asked to compare `code_version` by eye (PLAN.md §4 D245). Reuse stays
+> visible: a hit is reported and the stored run surfaced, and `force_rerun` still recomputes.
+> Cross-project hits on normalized `ProjectData` and warm-state partial hits remain Phase C.
+> **As built (WP 10.4):** the key hashes a stored `run_spec` — the registered engine and its
+> build, both content hashes, the scenario's whole run spec (every scenario column except
+> identity and presentation, so a new column is in the key by default and the failure mode is a
+> needless re-run, never a false reuse), and the deviations from the Validated Model's protocol.
+> One SQL path computes it for the dispatcher and for the AI read tool alike; identical
+> submissions make one run (a completed one is offered, an in-flight one is attached); and the
+> worker refuses a run bound to an engine it does not run (PLAN.md §16 · WP 10.4).
 
 ### 9.3 Comparison semantics
 
@@ -746,6 +775,36 @@ This subsection is numbered inside §9 but **logically precedes §9.1**: experim
 > (3) The engine fingerprint is recorded from the evidence run's `code_version` and checked
 > post-run (it cannot gate at dispatch, where the worker hasn't stamped it yet); the full §9.2
 > fingerprint strengthens this check in Phase C.
+
+> **Phase 10 refinement (PLAN.md §20, WP 10.2–10.3): the card becomes the Validated Model.**
+> Three changes. (1) **Matched by content, not by id**: a card binds `(policy_hash, graph_hash,
+> scenario_hash)`, and every surface — the badge, inheritance, dispatch stamping — compares
+> those, because two policy-version rows with one hash are one model; matching by
+> `policy_version_id` made a freshly opened Lab read *unvalidated* forever (PLAN.md §4 D241,
+> D242). Policy versions themselves are deduplicated by hash. (2) **The protocol is part of the
+> identity**: the Validated Model states, immutably, how a decision-grade run must be made —
+> replications ("run N seeds"), root seed and CRN, the week steady state begins, horizon,
+> analysis window, CI level and half-width target, and stopping rule — next to the graph
+> version, policy version and engine it was established on, and who validated it when. The
+> model's own hash covers policy, graph, scenario world, protocol and engine, so two models
+> that would instruct different experiments can no longer share an identity (D243). The
+> baseline fingerprint is deliberately NOT widened: it is what a new scenario is matched on to
+> inherit a model, and a scenario has not inherited the protocol at the moment it is matched —
+> a protocol in the fingerprint would stop inheritance from ever matching (PLAN.md §16 · WP
+> 10.3). The model is immutable; newer data or policy make it stale, never different, and
+> adoption needs every selected KPI to pass or a recorded face-validation statement (D244).
+> (3) **The Lab consumes
+> it as a choice**: *select a Validated Model → select an engine → pick a scenario → run*; a
+> deviation from the protocol is allowed, shown and recorded on the run (`protocol_overrides`),
+> and an editor may run an explicitly *exploratory* model that is badged everywhere and never
+> used as surrogate training data. Evidence (warm-up series and detector outputs, replication
+> analysis, per-KPI tests, the face-validation statement) is persisted beside the model rather
+> than summarised into it, and adoption requires every selected KPI to pass or a recorded
+> face-validation acknowledgement (D244). **As built (WP 10.5):** a deviation is read OFF the
+> scenario the run uses — the engine runs the scenario row, so the protocol is what that row
+> should be and the overrides are where it is not; a run of a model dispatches the model's own
+> policy version; and a model's evidence run, dispatched before the model existed, belongs to
+> the model through `evidence_run_id` (PLAN.md §4 D249).
 
 #### 9.5.1 The Run & Validate surface: trust before persistence *(closes G14a)*
 
@@ -883,6 +942,17 @@ Surrogates are models with lifecycles, so they get the same discipline as polici
 **Retraining triggers:** new `dataset_version` whose changes touch feature-relevant structure (supplier panel changes, demand shifts — the paper's quarterly/annual cadence); `policy_hash` change on policies that condition the target; gate rejection-rate drift above threshold (the framework's built-in canary — rising fallback rates mean the surrogate no longer covers the population); `engine_fingerprint` bump (always invalidates). Stale models are never silently used: they flip to `stale` and jobs retrain or fall back to direct simulation.
 
 **`surrogate_predictions`** (conceptual): model id, node, point estimate, interval, novelty score, gate outcome, provenance label — persisted so rankings are auditable and so accepted-vs-routed statistics feed the drift trigger.
+
+> **Phase 10 refinement (PLAN.md §20, WP 10.8): the Validated Model is the lineage unit.** A
+> surrogate's training lineage is stated as **(Validated Model, Graph Version, the set of
+> RunKeys)** rather than as a loose `(dataset_version_id, policy_version_id)` pair: the
+> Validated Model already binds the policy version, the engine and the run protocol, so two
+> training sets drawn under one model are statistically comparable by construction. Only runs
+> that are completed, NOT exploratory and FAITHFUL to the protocol (`protocol_overrides = {}`)
+> are training data — the `surrogate_training_runs` view is that rule, stated once. The
+> structural `feature_spec` is computed once per Graph Version through the analysis store, keyed
+> on its level hash like any other analysis. Validity scoping follows: a surrogate serves only
+> requests whose Validated Model and graph family match its lineage.
 
 ### 11.5 Orchestration: stress testing as a digital-twin analysis job
 

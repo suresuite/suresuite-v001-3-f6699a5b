@@ -1,0 +1,234 @@
+# AUTHORED — the data contract's sidecar for `run_item_series`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md.
+#
+# WP 10.4 · `result-binding`. The per-item sibling of `run_replications`, and
+# modelled on that sidecar: the same writers, the same auth posture, the same
+# tier. Like `time_series` there, `series` is a jsonb blob whose KEYS are the
+# schema, and the key vocabulary is NOT restated here — it is the engine's
+# `item_series` dict (scsim/scsim/core/engine.py), and restating it would be a
+# second author of one fact (§4 D101, D164).
+table: run_item_series
+tier: "5"
+schema_name: public
+grain: >-
+  One item's weekly series from one INSPECTION run: a material or a product of
+  the project, and a map of named weekly arrays for it (on-hand, in-transit and
+  orders for a material; demand, production, fulfillment, backlog and lost units
+  for a product). Written ONLY for an inspection run — exactly one replication,
+  user-chosen seed, engine trace raised to full debug — because per-item
+  evidence at multi-replication scale is deliberately not exposed; every other
+  run has no rows here. Tier 5 — a RESULT of one run, input to nothing; a row is
+  superseded by re-running, never edited.
+owner: engine
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "run_item_series_pkey"
+  - source: "UNIQUE index 20260720000001_run_item_series.sql"
+    columns: [run_id, kind, item_id]
+    name: "run_item_series_run_kind_item_uq"
+
+natural_key_intended: [run_id, kind, item_id]
+
+governance:
+  read: null
+  write: "simulation_lab"
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    `write: simulation_lab` because the table has two PREDICATE-LESS write
+    policies — `run_item_series_auth_all` (authenticated) and
+    `run_item_series_anon_write` (anon and authenticated, widened by WP 7.1 stage
+    1a in `20260919000010`) — and a policy with no predicate is a user-facing
+    write path whether or not a page uses it, so `governanceEnforcement.test.ts`
+    refuses a `null` claim here exactly as it did for `run_replications`. The
+    capability named is the one that gates the action which writes these rows:
+    running a simulation, here an inspection run from Run & Validate.
+    TWO WRITERS, both upserting on `(run_id, kind, item_id)` in chunks of 100:
+    the Fly worker with the service role (`_write_item_series`, which FAILS the
+    run rather than reporting it green when the rows do not persist), and the
+    browser engine as `anon` (`pyodideEngine.persistEngineResult`, best-effort).
+    The second is why this is one of the eleven tables §4 D154 measured as
+    genuinely writable from the browser's `anon` role — D28's standing decision
+    (document, do not change), WP 7.1's to close. `min_project_role` is `viewer`
+    because nothing here enforces a role today, not because a viewer ought to be
+    able to write results.
+    Deleting the run or the project removes its rows (`ON DELETE CASCADE` on both
+    foreign keys).
+    NOT AUDITED, and that is the tier: `audit-actor` covers tiers 2–4, and a row
+    here is the output of one run and an input to nothing.
+
+surfaces:
+  - page: "ProjectPolicies.tsx"
+    via: "component ItemSeriesExplorer (mounted by RunValidateStage) → select kind,item_id from run_item_series"
+    grain: table
+    evidence: "src/components/sim/ItemSeriesExplorer.tsx:79"
+    confirmed: true
+    note: >-
+      Run & Validate is where an inspection run is STARTED, and the explorer sits
+      under it: it first reads the run's item index (ids only), then fetches one
+      item's `series` on demand — the payload is a few MB for a large project, so
+      it is never read whole.
+  - page: "SimulationLab.tsx"
+    via: "component ItemSeriesExplorer (mounted by ResultsDashboard) → select kind,item_id from run_item_series"
+    grain: table
+    evidence: "src/components/sim/ItemSeriesExplorer.tsx:79"
+    confirmed: true
+    note: >-
+      Simulation Lab dispatches no inspection run, so this panel shows rows only
+      for a run started from Run & Validate, and says so rather than rendering
+      empty without a reason (§4 D113's shape).
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key. The row's identity is `natural_key_intended`; nothing reads
+      or joins on this.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  run_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The `simulation_runs` row this series belongs to. ON DELETE CASCADE — a
+      series of a run that no longer exists is not evidence. A third of the
+      natural key, and what the explorer filters every read on.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The owning project, denormalized from the run so a project's rows can be
+      reached without the join. ON DELETE CASCADE.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  kind:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether `item_id` names a material or a product — 'material' or 'product'
+      (CHECK `run_item_series_kind_check`). It decides which measures `series`
+      carries.
+    grain: identifier
+    engine:
+      consumed_by: "scsim_bridge.py::compute_run_from_project -> item_series[].kind"
+      transform: "the prefix of the engine's item_series key, before the '.'"
+      missing_default: null
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces:
+      - page: "ProjectPolicies.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/sim/ItemSeriesExplorer.tsx:79"
+        confirmed: true
+      - page: "SimulationLab.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/sim/ItemSeriesExplorer.tsx:79"
+        confirmed: true
+    resolution: null
+  item_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The material or product id, exactly as the engine's compiled model carries
+      it — the ids the run's dataset supplied. Text, not a foreign key: the
+      series is evidence about the run's world, and must survive an edit to the
+      item master that came after it.
+    grain: identifier
+    engine:
+      consumed_by: "scsim_bridge.py::compute_run_from_project -> item_series[].item_id"
+      transform: "str() of the engine's item_ids[kind][row], the row label of each per-item matrix"
+      missing_default: null
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces:
+      - page: "ProjectPolicies.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/sim/ItemSeriesExplorer.tsx:79"
+        confirmed: true
+      - page: "SimulationLab.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/sim/ItemSeriesExplorer.tsx:79"
+        confirmed: true
+    resolution: null
+  series:
+    type: "jsonb"
+    unit: null
+    unit_source: derived
+    meaning: >-
+      The item's weekly series, one array per measure, each as long as the run's
+      horizon in weeks. The measures are the engine's per-item trace matrices,
+      declared once as the `item_series` dict in scsim/scsim/core/engine.py
+      and keyed `<kind>.<measure>` there; this column carries the part after the
+      dot. Every measure is in units of the item. `unit_source` is `derived`
+      because some measures are stocks (on hand, in transit, backlog) and some
+      are weekly flows (orders, demand, production, fulfillment, lost units),
+      and that follows from the measure, not from one token for the column.
+    grain: level
+    engine:
+      consumed_by: "scsim_bridge.py::compute_run_from_project -> item_series[].series"
+      transform: "one row per (kind, item) of each item_series matrix; _finite(x, 5) per element, so NaN and ±inf become null"
+      missing_default: null
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces:
+      - page: "ProjectPolicies.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/sim/ItemSeriesExplorer.tsx:109"
+        confirmed: true
+      - page: "SimulationLab.tsx"
+        via: "table read"
+        grain: column
+        evidence: "src/components/sim/ItemSeriesExplorer.tsx:109"
+        confirmed: true
+    resolution: null
+    note: >-
+      The explorer's legend names the measures for display; it is a label map,
+      not a second declaration, and a measure it does not know still renders
+      under its key. The migration's header comment also lists them — written
+      when the table was created and not maintained since, so the engine is the
+      authority.
+      NO `computed_by`, for `run_replications`' reason: the producer is scsim
+      (Python, in the Fly worker or in Pyodide), which `contract:check` R18 cannot
+      resolve; `engine.consumed_by` carries the path instead.
+      DEFAULT `'{}'` — a row whose series is empty is a row the engine produced
+      no measures for, not a row of zeros.
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: "When the row was first inserted. An upsert of the same key does not re-stamp it."
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

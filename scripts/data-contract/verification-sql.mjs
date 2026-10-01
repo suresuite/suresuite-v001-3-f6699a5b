@@ -5108,6 +5108,104 @@ async function d170DeleteStillFails() {
   });
 }
 
+// ── Phase 10 · WP 10.2 + WP 10.1 — versions by content, the stored graph state ──
+//
+// Readings, not gates. Taken BEFORE the merge they measure production WITHOUT
+// `20261001000006`/`…07` (the new columns and tables read as "QUERY FAILED", which
+// is the expected shape, not a finding); taken in the push AFTER the merge (D153)
+// they are the after-reading §16 owes. Every project, never one (D42).
+async function phase10Versions() {
+  section("Phase 10 · WP 10.1–10.4 — versions by content, the stored graph state, Validated Models, engines and RunKeys, D248");
+
+  report("(1) D241 — policy versions vs distinct contents, every project",
+    await tryQ(`
+      select count(*) as versions,
+             count(distinct (project_id, policy_hash)) as distinct_contents,
+             count(*) - count(distinct (project_id, policy_hash)) as same_content_duplicates,
+             count(*) filter (where policy_hash is null) as no_hash
+        from public.policy_versions`),
+    (rows) => { out("**(1) D241 — policy versions vs the contents they hold:**"); out(...table(rows)); });
+
+  report("(2) D242 — active cards sharing one content triple (the new unique index refuses >1)",
+    await tryQ(`
+      select count(*) as active_cards,
+             count(distinct (project_id, policy_hash, graph_hash, scenario_hash)) as distinct_triples
+        from public.model_validations where status = 'active'`),
+    (rows) => { out("**(2) D242 — active model cards and the content triples they cover:**"); out(...table(rows)); });
+
+  report("(3) WP 10.2 — policy_versions.version_no assigned",
+    await tryQ(`
+      select count(*) as versions, count(version_no) as numbered,
+             count(distinct (project_id, version_no)) as distinct_numbers
+        from public.policy_versions`),
+    (rows) => { out("**(3) policy version numbers (after the merge):**"); out(...table(rows)); });
+
+  report("(4) D234 — graph versions vs distinct contents, numbering and level hashes",
+    await tryQ(`
+      select count(*) as versions,
+             count(distinct (project_id, graph_hash)) as distinct_contents,
+             count(version_no) as numbered,
+             count(hash_firm) as with_firm_level,
+             count(hash_process) as with_process_level
+        from public.dataset_versions`),
+    (rows) => { out("**(4) graph versions (after the merge: every row numbered, levels where the snapshot supports them):**"); out(...table(rows)); });
+
+  report("(5) D233 — project_graph_state rows, by dirtiness",
+    await tryQ(`
+      select count(*) as projects_with_state,
+             count(*) filter (where dirty) as dirty,
+             count(*) filter (where not dirty and graph_hash is not null) as stored_clean,
+             (select count(*) from public.projects) as projects
+        from public.project_graph_state`),
+    (rows) => { out("**(5) the stored graph state:**"); out(...table(rows)); });
+
+  report("(6) D235 — analysis runs by the level they keyed on",
+    await tryQ(`
+      select analysis_kind, input_scope, status, count(*) as runs,
+             count(dataset_version_id) as with_graph_version
+        from public.analysis_runs group by 1, 2, 3 order by 1, 2, 3`),
+    (rows) => { out("**(6) analysis runs by kind and level:**"); out(...table(rows)); });
+
+  report("(7) D243 — Validated Models: protocols, backfilled ones and their unknown keys",
+    await tryQ(`
+      select status,
+             count(*) as models,
+             count(protocol) as with_protocol,
+             count(*) filter (where protocol ? 'backfilled') as backfilled,
+             coalesce(sum(jsonb_array_length(protocol -> 'unknown')) filter (where protocol ? 'unknown'), 0)
+               as unknown_keys_total,
+             count(engine_id) as with_engine
+        from public.model_validations group by 1 order by 1`),
+    (rows) => { out("**(7) Validated Models (before the merge this errors: the columns deploy with it):**"); out(...table(rows)); });
+
+  report("(8) D245 — the engine registry and what the worker reported",
+    await tryQ(`select slug, status, version, code_version, reported_at from public.sim_engines order by slug`),
+    (rows) => { out("**(8) `sim_engines` (after the merge, scsim should carry the worker's build):**"); out(...table(rows)); });
+
+  report("(9) D245 — runs carrying the binding on the row",
+    await tryQ(`
+      select count(*) as runs,
+             count(engine_id) as with_engine,
+             count(run_key) as with_run_key,
+             count(*) filter (where exploratory) as exploratory,
+             count(*) filter (where protocol_overrides <> '{}'::jsonb) as with_overrides,
+             count(*) filter (where created_at > now() - interval '7 days') as last_7_days
+        from public.simulation_runs`),
+    (rows) => { out("**(9) run rows and their bindings (history has no RunKey by design):**"); out(...table(rows)); });
+
+  report("(10) D248 — internal SECURITY DEFINER helpers executable through the API (must be none after the merge)",
+    await tryQ(`
+      select p.oid::regprocedure::text as function,
+             has_function_privilege('anon', p.oid, 'EXECUTE') as anon,
+             has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated
+        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.prosecdef and p.proname like '\\_%'
+         and (has_function_privilege('anon', p.oid, 'EXECUTE')
+              or has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+       order by 1`),
+    (rows) => { out("**(10) D248 — `_`-prefixed SECURITY DEFINER functions the API roles can execute:**"); out(...table(rows)); });
+}
+
 async function main() {
   out(`# PLAN.md §15 — verification SQL, executed`);
   out("");
@@ -5121,6 +5219,7 @@ async function main() {
   await rqScenarioDiagnostic();
   await d205AdminUsers();
   await wp94ScenarioRole();
+  await phase10Versions();
 
   await schemaProbe();
   await viewSecurity();

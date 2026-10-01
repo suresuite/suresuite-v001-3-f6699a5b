@@ -293,59 +293,45 @@ BEGIN
       'next time the dataset moves.';
   END IF;
 
-  -- ── 6 · the ad-hoc rule now answers from the one rule ────────────────────
+  -- ── 6 · freshness is a HASH comparison, never a clock ────────────────────
   --
   -- `should_recalculate_network_metrics` compared `last_data_time >
-  -- last_calc_time` — whether a CLOCK moved. An UPDATE writing the same value
-  -- made it say stale; a restored backup made it say fresh (§4 D12). Its return
-  -- shape is unchanged because the deployed frontend still calls it, so what
-  -- has to be asserted is the ANSWER, not the signature.
+  -- last_calc_time` — whether a CLOCK moved (§4 D12) — until WP 4.4 made it answer
+  -- from the hash. WP 10.1 DROPPED it (§4 D240: no caller in the repository or
+  -- among the deployed functions), so this section asserts the rule itself — a
+  -- row is fresh iff it names the current hash — which is what the function was
+  -- reduced to, and which the stored hash (`project_graph_state`, D233) must not
+  -- turn back into a clock: a no-op write marks the state DIRTY, and dirty must
+  -- mean "recompute the hash", never "stale".
 
-  -- THE STAMP IS TAKEN AFTER THE INSERT, and WP 5.3 is why. `network_nodes` is
-  -- IN the anchor since `20260917000009` (D75), so inserting a node MOVES
-  -- `current_graph_hash` — and a fixture that reads the hash in the same
-  -- statement stamps the row with the value from before its own insert. The row
-  -- then reads stale the instant it is written, and §6 failed on a fixture
-  -- rather than on the rule it is testing.
+  -- THE STAMP IS TAKEN AFTER THE INSERT, and WP 5.3 is why: `network_nodes` is IN
+  -- the anchor since `20260917000009` (D75), so inserting a node MOVES the hash.
   INSERT INTO public.network_nodes (project_id, plant_name, uid, name)
     VALUES (v_project, 'WP44P', 'N1', 'Node one');
   UPDATE public.network_nodes
      SET computed_from_hash = public.current_graph_hash(v_project), computed_at = now()
    WHERE project_id = v_project AND uid = 'N1';
 
-  SELECT needs_recalculation, data_last_modified INTO v_needs, v_dlm
-    FROM public.should_recalculate_network_metrics(v_project);
-  IF v_needs IS DISTINCT FROM false THEN
-    RAISE EXCEPTION 'WP 4.4 §6 — a node naming the current hash still reported needs_recalculation.';
-  END IF;
-  IF v_dlm IS NOT NULL THEN
-    RAISE EXCEPTION
-      'WP 4.4 §6 — `data_last_modified` returned a value. There is no honest '
-      'answer to "when did the data last change" — that is the question D12 says '
-      'is the wrong one — and returning `now()` would be a fabricated source (T1). '
-      'NULL, with the reason string saying why.';
+  IF (SELECT computed_from_hash FROM public.network_nodes WHERE project_id = v_project AND uid = 'N1')
+     IS DISTINCT FROM public.current_graph_hash(v_project) THEN
+    RAISE EXCEPTION 'WP 4.4 §6 — a node naming the current hash does not read fresh.';
   END IF;
 
   -- THE TOUCH THAT PROVES THE CLOCK IS GONE. Write the SAME value back: an
-  -- `updated_at` moves, no data changes, and the old rule reported stale.
+  -- `updated_at` moves and the state goes dirty, and no data changed.
   UPDATE public.materials SET cost = 10 WHERE project_id = v_project AND material_id = 'M1';
-
-  SELECT needs_recalculation INTO v_needs
-    FROM public.should_recalculate_network_metrics(v_project);
-  IF v_needs IS DISTINCT FROM false THEN
+  IF (SELECT computed_from_hash FROM public.network_nodes WHERE project_id = v_project AND uid = 'N1')
+     IS DISTINCT FROM public.current_graph_hash(v_project) THEN
     RAISE EXCEPTION
-      'WP 4.4 §6 — writing a row''s EXISTING value back reported the metrics as '
-      'needing recalculation. That is the timestamp rule surviving: it asks '
-      'whether a clock moved, and a no-op UPDATE moves one (§4 D12).';
+      'WP 4.4 §6 — writing a row''s EXISTING value back made the node stale. That '
+      'is the timestamp rule surviving inside the stored hash (§4 D12, D233).';
   END IF;
 
-  -- and a genuinely changed input still reports stale, or the rule has been
-  -- softened into uselessness rather than corrected.
+  -- and a genuinely changed input still reads stale.
   UPDATE public.materials SET cost = 99 WHERE project_id = v_project AND material_id = 'M1';
-  SELECT needs_recalculation INTO v_needs
-    FROM public.should_recalculate_network_metrics(v_project);
-  IF v_needs IS DISTINCT FROM true THEN
-    RAISE EXCEPTION 'WP 4.4 §6 — a genuinely changed input did not report as needing recalculation.';
+  IF (SELECT computed_from_hash FROM public.network_nodes WHERE project_id = v_project AND uid = 'N1')
+     IS NOT DISTINCT FROM public.current_graph_hash(v_project) THEN
+    RAISE EXCEPTION 'WP 4.4 §6 — a genuinely changed input did not move the hash a node is compared with.';
   END IF;
   UPDATE public.materials SET cost = 10 WHERE project_id = v_project AND material_id = 'M1';
 

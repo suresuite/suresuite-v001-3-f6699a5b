@@ -40,9 +40,27 @@ const COMPLETE: ReproducibilityRecordInput = {
   disruptionSchedule: "1 event(s) · fnv1a 0badc0de",
   engineCodeVersion: "0.2.3",
   browserEngineVersion: "0.2.3",
+  // WP 10.4 — the binding on the row.
+  scenarioHash: "c".repeat(64),
+  validatedModelId: "66666666-6666-4666-8666-666666666666",
+  engineId: "scsim@scsim-0.2.8",
+  runKey: "d".repeat(64),
+  protocolOverrides: {},
+  exploratory: false,
   analyses: [],
   limits: [],
   measuredAt: "2026-09-19T00:00:00.000Z",
+};
+
+/** A run dispatched before WP 10.4: everything I8 asked for, nothing the row gained. */
+const PRE_RUNKEY: ReproducibilityRecordInput = {
+  ...COMPLETE,
+  scenarioHash: undefined,
+  validatedModelId: undefined,
+  engineId: undefined,
+  runKey: undefined,
+  protocolOverrides: undefined,
+  exploratory: undefined,
 };
 
 const analysis = (over: Partial<AnalysisBinding> = {}): AnalysisBinding => ({
@@ -62,6 +80,33 @@ describe("A5 · every part is bound or its absence is stated", () => {
     expect(r.reproducible).toBe(true);
     expect(r.missing).toEqual([]);
     expect(r.bindings.every((b) => b.value !== null)).toBe(true);
+  });
+
+  it("WP 10.4: the model, the RunKey, the engine and the deviations are bound from the row", () => {
+    const by = Object.fromEntries(bindingsOf(COMPLETE).map((b) => [b.key, b]));
+    expect(by["model.validated_model"].value).toBe(COMPLETE.validatedModelId);
+    expect(by["run.key"].value).toBe(COMPLETE.runKey);
+    expect(by["engine.id"].value).toBe("scsim@scsim-0.2.8");
+    expect(by["run.protocol_overrides"].value).toMatch(/^none — faithful/);
+    expect(by["scenario.hash"].source).toBe("simulation_runs.scenario_hash");
+    const deviated = bindingsOf({ ...COMPLETE, protocolOverrides: { replications: 5, horizon_weeks: 26 } });
+    expect(deviated.find((b) => b.key === "run.protocol_overrides")!.value).toBe(
+      '{"horizon_weeks":26,"replications":5}',
+    );
+  });
+
+  it("WP 10.4: a run from before the registry still reproduces, and SAYS what it lacks", () => {
+    // The new bindings are recommended: D88's history is not made unreproducible by a
+    // column it could not have had — but every absence carries its reason.
+    const r = buildReproducibilityRecord(PRE_RUNKEY);
+    expect(r.reproducible).toBe(true);
+    for (const key of ["model.validated_model", "run.key", "engine.id", "run.protocol_overrides", "scenario.hash"]) {
+      const b = r.bindings.find((x) => x.key === key)!;
+      expect(b.value, key).toBeNull();
+      expect(b.absentBecause, key).toBeTruthy();
+    }
+    const explor = bindingsOf({ ...COMPLETE, validatedModelId: null, exploratory: true });
+    expect(explor.find((b) => b.key === "model.validated_model")!.absentBecause).toMatch(/EXPLORATORY/);
   });
 
   it("every binding names WHERE it comes from, present or absent", () => {

@@ -11,6 +11,7 @@ import { RecoveryImpactCard } from "./RecoveryImpactCard";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
 import type { RecoveryConfig, DisruptionEvent } from "@/lib/sim/recoveryScore";
 import { CredibilityBadge } from "./CredibilityBadge";
+import { RunRetentionLine } from "./RunRetentionLine";
 import { M, MobileChip, MobilePanel, MobileRow } from "@/components/mobile";
 import { cn } from "@/lib/utils";
 import type { Credibility } from "@/hooks/useModelValidation";
@@ -122,6 +123,9 @@ export function ResultsDashboard({
           )}
         </div>
       )}
+
+      {/* WP 10.6 — how long this run keeps its weekly series; expired says so. */}
+      <RunRetentionLine run={run} />
 
       {meta?.scsim_notes && meta.scsim_notes.length > 0 && (
         skin ? (

@@ -1,0 +1,530 @@
+# AUTHORED — the data contract's sidecar for `simulation_runs`.
+# WP 10.4 · §4 D245 · gate `result-binding`. Described here for the first time,
+# by the package that puts the binding ON THE ROW — the deferral this table sat in
+# (WP 4.4 → 6.3 → 9.2 → 10.4) waited for exactly that. Edit this file;
+# docs/data/tables/*.md is generated from it.
+table: simulation_runs
+tier: "5"
+schema_name: public
+grain: >-
+  One simulation run: what it was bound to (engine, graph version, policy
+  version, scenario run spec, Validated Model, deviations), its status, and the
+  run-level KPIs. Tier 5 — a RESULT. Its replications are `run_replications`.
+  Since WP 10.4 every binding of a NEW run resolves from this row alone
+  (`run_spec`, `run_key`, `engine_id`, `model_validation_id`,
+  `protocol_overrides`, `exploratory`); runs dispatched earlier carry the three
+  content hashes, the seed and the schedule, and say so in the record.
+owner: engine
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "simulation_runs_pkey"
+
+governance:
+  read: null
+  write: "simulation_lab"
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    `write: simulation_lab` is the capability behind the one user action that
+    creates a run. The row itself is created by the dispatcher through
+    `create_simulation_run` (service role only — §4 D248 keeps it off the API)
+    and moved on by the worker, or by the browser engine for a browser-computed
+    run. BUT the table carries two predicate-less policies (`sim_runs_auth_all`,
+    `sim_runs_anon_all`), so any holder of the table grant can write a row
+    directly, RunKey and class included — one of the tables §4 D154 measured as
+    writable from the browser's `anon` role, D28's standing decision and WP 7.1's
+    to close. `min_project_role` is `viewer` because nothing here enforces a role,
+    not because a viewer ought to write results. NOT AUDITED: tier 5 is output,
+    and a re-run writes a new row rather than mutating this one.
+
+surfaces:
+  - page: "SimulationLab.tsx"
+    via: "hook useSimulationRun → select * from simulation_runs"
+    grain: table
+    evidence: "src/hooks/useSimulationRun.tsx:100"
+    confirmed: true
+  - page: "ProjectPolicies.tsx"
+    via: "useVerifiableExports → select * from simulation_runs"
+    grain: table
+    evidence: "src/hooks/useVerifiableExports.tsx:234"
+    confirmed: true
+    note: >-
+      The run-results workbook, whose reproducibility sheet binds the run from
+      this row (WP 10.4).
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run's id. Replications, item series and the reproducibility record hang off it.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  scenario_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The scenario the run was dispatched from. Its run spec as it was at dispatch is in
+      `run_spec.scenario` — a later edit to the scenario row moves nothing here.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project. Every read is scoped by it.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  status:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      `queued` → `running` → `done` | `failed` | `cancelled`. Only the dispatcher writes
+      `queued`; the worker (or the browser engine for a browser-computed run) moves it on,
+      through guarded transitions.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  started_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the engine started the run.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  ended_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the run reached a terminal status.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  policy_hash:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The `policy_hash` of the saved policy version the run used — content, not id (WP
+      10.2). Part of the RunKey.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  code_version:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The engine build that computed the run, as the WRITER of the results stamped it:
+      `scsim-<ENGINE_VERSION>` from the worker or the browser wheel, `worker-legacy` from
+      the frozen engine. Empty while queued. The dispatch-time build is
+      `run_spec.engine.code_version`; the two differ only when the worker was redeployed
+      between dispatch and run.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  aggregate_kpis:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run-level KPI aggregates the engine computed over the replications.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  ci_half_widths:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Per-KPI confidence-interval half-widths over the replications.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  warmup_detected_at:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The engine's own detected warm-up, in weeks.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  rep_count_target:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Replications requested.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  rep_count_done:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Replications persisted so far — the counter the worker's cancel check writes.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  error_message:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Why a failed run failed — including a worker refusing a run bound to an engine it
+      does not run (WP 10.4).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_by:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The Supabase Auth user who dispatched it, when there is one (`auth.users`); this
+      application's own accounts are not Supabase Auth users (D28), so it is usually NULL.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the run row was created.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Last write to the row.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  policy_version_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The saved policy version the run used. The run never reads live policies.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  mapping_warnings:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      What the project-to-engine mapper could not map, as the engine reported it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  dataset_version_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The graph version the run was bound to (`dataset_versions`), snapshotted at
+      dispatch.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  graph_hash:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The composite graph hash of that version. Part of the RunKey.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  gate_skipped:
+    type: "boolean"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The pre-run required-data gate could not load its data and dispatch proceeded
+      unchecked.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  scenario_hash:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The scenario's baseline fingerprint hash (horizon, time step, demand model) at
+      dispatch — what a Validated Model is matched on.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  model_validation_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The Validated Model the run follows: the one the caller chose (WP 10.4 — it must be
+      this project's and not revoked), else the one in force for this policy, graph and
+      scenario by content. NULL = the run followed no model, and is then exploratory. This
+      is the binding the brief called `validated_model_id`; it is not a second column (§16
+      · WP 10.4).
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  seed:
+    type: "bigint"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The root seed that ran, stamped at dispatch (audit WP 8).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  disruption_schedule:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The disruption schedule that ran, stamped at dispatch (audit WP 8).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  engine_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The registered engine the run was dispatched to (`sim_engines`). Dispatch refuses a
+      retired engine and defaults to the single active one; the worker refuses a run bound
+      to an engine it does not run. Backfilled for history from `code_version`, and
+      derived the same way for a writer that does not state it.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  run_spec:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Everything the RunKey hashes, as data: the engine (id, slug, version, code_version
+      as registered at dispatch), `policy_hash`, `graph_hash`, the scenario row minus its
+      identity and presentation columns, and `protocol_overrides`. Every binding of the
+      run resolves from here with no live read. NULL for runs dispatched before WP 10.4.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  run_key:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      sha256 of `run_spec` — the run's identity. Identical submissions share it:
+      `create_simulation_run` offers a completed run with this key for reuse and attaches
+      a second submission to one in flight. NULL before WP 10.4.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  protocol_overrides:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Deviations from the Validated Model's protocol, as the caller stated them; `{}` =
+      faithful. Part of the RunKey, and shown on results and exports (T2, T4).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  exploratory:
+    type: "boolean"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run followed no Validated Model, or was dispatched explicitly as exploratory.
+      Never false for a run with no model. Badged everywhere and excluded from surrogate
+      training (WP 10.5, 10.8). Backfilled as `model_validation_id IS NULL`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  series_object:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run's weekly series object in the private `run-results` bucket,
+      `<project_id>/<run_id>/series.parquet` — zstd Parquet, long form (one row per
+      replication and week, one column per series). When set, the replication rows hold
+      `time_series = {}` and `runSeries.ts` hydrates them through a signed URL `sim-
+      command` mints. NULL for a run whose series are in its rows (before WP 10.6,
+      browser-computed runs, or a failed upload — the worker keeps the JSONB rather than
+      lose it) and for a run whose series expired.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  series_bytes:
+    type: "bigint"
+    unit: null
+    unit_source: none
+    meaning: >-
+      What the run's series cost: the object's size when there is one (written by the
+      worker), else the JSONB series in its rows, measured when the run completed.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  retention:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      `standard` (the series expire after `run_series_retention`), `pinned` (an editor or
+      owner keeps them — `set_run_retention`), or `evidence` (the run a Validated Model
+      rests on — set when the model is saved, never released here).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  series_expires_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When a standard run's series expire — set when the run completes. NULL for pinned
+      and evidence runs (a CHECK holds it so).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  series_expired_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When `sweep_expired_run_series` removed the series (object, JSONB, per-item rows).
+      The run row, its aggregates and every replication's KPI row are kept; the screen
+      says the series expired and which RunKey reproduces them.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

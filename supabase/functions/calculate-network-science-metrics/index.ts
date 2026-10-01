@@ -1,11 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import {
-  applyNodeMetrics, completeRun, failRun, getOrStart, topologyDigest,
+  applyNodeMetrics, completeRun, failRun, getOrStart,
 } from "../_shared/analysisStore.ts";
 
-/** WP 4.3 · part of the store's key. Bump when the metrics change. */
-const CODE_VERSION = 'network_metrics@wp43.1';
+/** Part of the store's key. Bump when the metrics change. WP 10.1: the graph read
+ *  is now the one the store names (`inputScope`), so the version moves. */
+const CODE_VERSION = 'network_metrics@wp101.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -54,11 +55,14 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const digest = await topologyDigest(supabase, project_id);
+    // WP 10.1 · §4 D235 — keyed on the LEVEL this kind reads. The store resolves
+    // it from `analysis_kinds`: the firm level, or the process level when the deep
+    // tier has no nodes or no edges — and says which in `inputScope`, so this
+    // function reads that graph rather than deciding the fallback a second time.
     const run = await getOrStart(supabase, {
       projectId: project_id,
       analysisKind: 'network_metrics',
-      params: { weighted: true, topology_digest: digest },
+      params: { weighted: true },
       codeVersion: CODE_VERSION,
       actorUserId: uploaded_by,
     });
@@ -67,7 +71,8 @@ serve(async (req) => {
       console.log(`network_metrics: cache hit on run ${run.runId}`);
       return new Response(JSON.stringify({
         success: true, cache_hit: true, run_id: run.runId,
-        input_hash: run.inputHash, code_version: run.codeVersion,
+        input_hash: run.inputHash, input_scope: run.inputScope,
+        dataset_version_id: run.datasetVersionId, code_version: run.codeVersion,
         nodes_updated: (run.rowCounts as { nodes?: number } | undefined)?.nodes ?? 0,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -79,40 +84,41 @@ serve(async (req) => {
       }), { status: 202, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    console.log(`Calculating network science metrics for project: ${project_id}`);
+    console.log(`Calculating network science metrics for project: ${project_id} (${run.inputScope} level)`);
 
-    // Fetch nodes
-    const { data: nodes, error: nodesError } = await supabase
-      .rpc('get_network_nodes_for_prominence', { p_project_id: project_id });
-
-    if (nodesError) {
-      console.error('Error fetching nodes:', nodesError);
+    // §4 D236 — A READ THAT FAILS FAILS THE RUN. These returned 500 without
+    // `failRun`, so the claim stayed `running` and owned its key forever: every
+    // later request was told "another request is already computing this".
+    const readFailed = async (what: string, err: unknown) => {
+      console.error(`Error fetching ${what}:`, err);
+      await failRun(supabase, run.runId, uploaded_by,
+        [{ code: 'read_failed', what, message: String((err as { message?: string })?.message ?? err) }]);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch nodes' }),
+        JSON.stringify({ error: `Failed to fetch ${what}`, run_id: run.runId }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
+    };
 
-    // Fetch edges
-    const { data: edges, error: edgesError } = await supabase
-      .rpc('get_network_edges_for_prominence', { p_project_id: project_id });
-
-    if (edgesError) {
-      console.error('Error fetching edges:', edgesError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch edges' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`Processing ${nodes.length} nodes and ${edges.length} edges`);
-
-    let effectiveNodes = nodes as Node[];
-    let effectiveEdges = edges as Edge[];
+    let effectiveNodes: Node[] = [];
+    let effectiveEdges: Edge[] = [];
     const fallbackWarnings: Array<Record<string, unknown>> = [];
 
-    // Fallback: if no deep-tier nodes/edges exist, derive graph from supply_chain_data
-    if ((effectiveNodes?.length ?? 0) === 0 || (effectiveEdges?.length ?? 0) === 0) {
+    if (run.inputScope === 'firm') {
+      const { data: nodes, error: nodesError } = await supabase
+        .rpc('get_network_nodes_for_prominence', { p_project_id: project_id });
+      if (nodesError) return await readFailed('nodes', nodesError);
+      const { data: edges, error: edgesError } = await supabase
+        .rpc('get_network_edges_for_prominence', { p_project_id: project_id });
+      if (edgesError) return await readFailed('edges', edgesError);
+      effectiveNodes = (nodes ?? []) as Node[];
+      effectiveEdges = (edges ?? []) as Edge[];
+      console.log(`Processing ${effectiveNodes.length} nodes and ${effectiveEdges.length} edges`);
+    }
+
+    // The lane graph — the process level — when the STORE says the deep tier is
+    // incomplete (`analysis_kinds.fallback_rule`). The decision is no longer made
+    // here; this branch only reads what it was told to read.
+    if (run.inputScope === 'process') {
       console.log('No deep-tier network data found. Deriving graph from supply_chain_data as fallback...');
       const { data: scdRows, error: scdError } = await supabase
         .from('supply_chain_data')
@@ -120,7 +126,7 @@ serve(async (req) => {
         .eq('project_id', project_id);
 
       if (scdError) {
-        console.error('Failed to fetch supply_chain_data for fallback graph:', scdError);
+        return await readFailed('supply_chain_data', scdError);
       } else if ((scdRows?.length ?? 0) > 0) {
         const nodeSet = new Map<string, { uid: string; name: string; plant_name: string }>();
         const edgeList: Edge[] = [];
@@ -142,7 +148,12 @@ serve(async (req) => {
 
         console.log(`Derived fallback graph with ${effectiveNodes.length} nodes and ${effectiveEdges.length} edges from supply_chain_data.`);
 
-        // Ensure nodes exist in network_nodes so metrics can be stored and later queried by RPCs
+        // Ensure nodes exist in network_nodes so metrics can be stored and later
+        // queried by RPCs. WP 10.1 · §4 D236: this write used to INVALIDATE ITS OWN
+        // RUN — it lands in `network_nodes`, which the anchor hashes, AFTER the key
+        // was claimed on that anchor. The run is keyed on the PROCESS level now (the
+        // store chose it because the deep tier is incomplete), and the process level
+        // does not include `network_nodes`, so the stamp it just took stays true.
         if (effectiveNodes.length > 0) {
           const upsertRows = Array.from(nodeSet.values()).map(n => ({
             project_id,
@@ -150,16 +161,10 @@ serve(async (req) => {
             name: n.name,
             plant_name: n.plant_name,
           }));
-          // §4 D72 · THIS UPSERT NAMES A CONSTRAINT THAT DOES NOT EXIST.
-          // `network_nodes` has no unique index on `(project_id, uid)`, so
-          // PostgREST's `on_conflict` is rejected and this call has failed on
-          // EVERY run since it was written — logged, then carried on, and the
-          // metrics below were then written against nodes that were never
-          // stored. The index is not created in WP 4.3 because nothing has
-          // COUNTED the duplicates that would block it (see
-          // `20260917000007`'s header); what changes here is that the failure
-          // is no longer swallowed. It becomes a declared warning on the run,
-          // which is T3 — a computation publishes the limits of its own result.
+          // §4 D72 · this upsert named a constraint that did not exist and failed
+          // on every run until `network_nodes_natural_key` (project_id, uid) landed
+          // in `20260917000007`; it succeeds now. A failure is still not swallowed:
+          // it becomes a declared warning on the run (T3).
           const { error: upsertErr } = await supabase
             .from('network_nodes')
             .upsert(upsertRows, { onConflict: 'project_id,uid' });
@@ -179,6 +184,11 @@ serve(async (req) => {
           }
         }
       }
+    }
+
+    if (run.inputScope !== 'firm' && run.inputScope !== 'process') {
+      return await readFailed(`a graph for scope ${run.inputScope}`,
+        new Error('analysis_kinds declares network_metrics over firm (fallback process); the store resolved another level'));
     }
 
     // Calculate network science metrics for each node using effective graph
@@ -246,10 +256,12 @@ serve(async (req) => {
         cache_hit: false,
         run_id: run.runId,
         input_hash: run.inputHash,
+        input_scope: run.inputScope,
+        dataset_version_id: run.datasetVersionId,
         code_version: run.codeVersion,
         warnings: fallbackWarnings,
-        nodes_processed: nodes.length,
-        edges_processed: edges.length,
+        nodes_processed: effectiveNodes.length,
+        edges_processed: effectiveEdges.length,
         nodes_updated: updatedCount,
         metrics_summary: {
           avg_degree: Object.values(metrics).reduce((sum, m: any) => sum + m.degree_centrality, 0) / Object.keys(metrics).length,

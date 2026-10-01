@@ -19,6 +19,7 @@ from .network_metrics import compute_network_metrics
 from .policy_snapshot import snapshot_to_policies
 from .schemas import Command
 from .scsim_bridge import compute_kpis_scsim, compute_run_from_project, scsim_enabled
+from . import series_store
 
 try:  # scsim ships with the canonical path; the legacy-only image lacks it
     from scsim import RunCancelled
@@ -70,10 +71,49 @@ def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+def engine_report_payload(scsim_on: bool) -> dict[str, Any]:
+    """WP 10.4 · §4 D245 — what this worker tells the engine registry at boot:
+    which registered engine it runs and the build. The slug is the registry's;
+    the code version is spelled exactly as `build_run_update` stamps it on a run,
+    so the registry and the runs agree about what "scsim-0.2.8" means."""
+    if scsim_on:
+        from scsim import ENGINE_VERSION
+
+        return {"p_slug": "scsim", "p_version": ENGINE_VERSION,
+                "p_code_version": f"scsim-{ENGINE_VERSION}", "p_capabilities": None}
+    return {"p_slug": "legacy-worker", "p_version": None,
+            "p_code_version": "worker-legacy", "p_capabilities": None}
+
+
+def engine_mismatch(engine: dict[str, Any] | None, scsim_on: bool) -> str | None:
+    """WP 10.4 · §4 D245 — the engine a run was dispatched to versus the engine
+    this worker runs. Until WP 10.4 the worker ran whichever engine its
+    environment flag chose and the run was LABELLED after the fact, so a run
+    bound to scsim could be computed by the retired legacy engine. Returns the
+    refusal, or None when they agree or the dispatcher named no engine (a
+    dispatcher deployed ahead of the registry)."""
+    slug = (engine or {}).get("slug")
+    if slug == "scsim" and not scsim_on:
+        return ("this run is bound to the scsim engine, and this worker runs the retired "
+                "legacy engine (SCSIM_ENGINE is not set) — not run rather than mislabelled")
+    if slug == "legacy-worker" and scsim_on:
+        return "this run is bound to the retired legacy engine, which this worker does not run"
+    return None
+
+
 def build_run_update(kpis: dict[str, Any], n_reps: int) -> dict[str, Any]:
     """Translate an engine KPI dict (mean_*/ci_* shape) into the
     simulation_runs row update persisted after an experiment.run."""
     aggregate = {k[len("mean_"):]: v for k, v in kpis.items() if k.startswith("mean_")}
+    # The range across replications the bridge computes and this used to drop
+    # (WP 10.6 · §4 D246). Under an underscore key, like `_meta`, so a reader
+    # that iterates KPIs is not handed `min_fill_rate` as a KPI of its own.
+    rng = {
+        k[len("min_"):]: {"min": v, "max": kpis.get("max_" + k[len("min_"):])}
+        for k, v in kpis.items() if k.startswith("min_")
+    }
+    if rng:
+        aggregate["_range"] = rng
     aggregate["_meta"] = {
         "engine": kpis.get("source", "worker"),
         **({"scsim_notes": kpis["scsim_notes"]} if kpis.get("scsim_notes") else {}),
@@ -176,6 +216,7 @@ class SimWorker:
         await self._redis.aclose()
 
     async def run(self) -> None:
+        await self._report_engine()
         self._tasks.append(asyncio.create_task(self._discover_loop()))
         self._tasks.append(asyncio.create_task(self._evict_loop()))
         if self._idle_shutdown > 0 and self._on_idle is not None:
@@ -356,6 +397,14 @@ class SimWorker:
                             **recovery_data,
                         }
 
+                    refusal = engine_mismatch(raw.get("engine"), scsim_enabled())
+                    if refusal and run_id:
+                        log.warning("run %s refused: %s", run_id, refusal)
+                        await self._transition(run_id, {
+                            "status": "failed", "error_message": refusal, "ended_at": _now(),
+                        }, ("queued",))
+                        return  # the outer finally ACKs
+
                     if scsim_enabled() and run_id:
                         # Canonical path: the worker is the SOLE authoritative
                         # writer. Map the project's stored data (item masters +
@@ -414,12 +463,19 @@ class SimWorker:
                             }, ACTIVE)
                             raise
                         kpis["run_id"] = run_id
+                        # The warm tier (WP 10.6): the weekly series of every
+                        # replication go to ONE zstd Parquet object; the rows keep
+                        # their KPIs and the run points at the object. If the
+                        # object cannot be written the rows carry the series as
+                        # before — the tier is an optimisation, never a loss.
+                        reps = kpis.get("replications") or []
+                        series_patch, reps = await self._store_series(run_id, cmd.project_id, reps)
                         # The final authoritative write. Streamed upserts are
                         # best-effort (liveness), but losing THIS one loses
                         # data — mark the run failed instead of reporting a
                         # green run with zero persisted replications.
                         reps_ok = await self._write_replications(
-                            run_id, cmd.project_id, kpis.get("replications") or [])
+                            run_id, cmd.project_id, reps)
                         if not reps_ok:
                             await self._transition(run_id, {
                                 "status": "failed",
@@ -444,7 +500,8 @@ class SimWorker:
                                 }, ACTIVE)
                                 raise RuntimeError("run_item_series upsert failed")
                         if not await self._transition(
-                                run_id, build_run_update(kpis, int(kpis.get("n_reps", n_reps))),
+                                run_id,
+                                {**build_run_update(kpis, int(kpis.get("n_reps", n_reps))), **series_patch},
                                 ACTIVE):
                             log.info("run %s was cancelled before its results landed — "
                                      "results not published", run_id)
@@ -543,6 +600,11 @@ class SimWorker:
         The counter write is a guarded transition, which makes it the cancel
         check too (audit F-06): if it matches no ACTIVE row, the run has been
         cancelled, and the watch stops the engine at its next replication."""
+        # With the warm tier, a streamed row carries KPIs only: the series go to
+        # the run's Parquet object at the end, so realtime ships progress, not
+        # every replication's weekly arrays (WP 10.6 · §4 D246).
+        if series_store.available():
+            rep = {**rep, "time_series": {}}
         await self._write_replications(run_id, project_id, [rep])
         still_active = await self._transition(run_id, {"rep_count_done": done}, ACTIVE)
         if not still_active and watch is not None:
@@ -648,6 +710,60 @@ class SimWorker:
                 log.exception("failed to upsert item series for run %s", run_id)
                 return False
         return True
+
+    async def _store_series(
+        self, run_id: str, project_id: str, reps: list[dict[str, Any]],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Write the run's series object; return (run patch, rows to persist).
+
+        On success the rows lose their series and the patch names the object and
+        its size; on any failure the rows keep their series and the patch is
+        empty, so the run reads exactly as it did before the tier existed."""
+        if not series_store.available() or not any(r.get("time_series") for r in reps):
+            return {}, reps
+        try:
+            data = series_store.write(reps)
+            path = series_store.object_path(project_id, run_id)
+            r = await self._http.post(
+                f"{self._supabase_url}/storage/v1/object/{series_store.BUCKET}/{path}",
+                headers={
+                    "apikey": self._service_role_key,
+                    "Authorization": f"Bearer {self._service_role_key}",
+                    "Content-Type": "application/vnd.apache.parquet",
+                    "x-upsert": "true",
+                },
+                content=data,
+            )
+            if r.status_code >= 300:
+                log.warning("series object upload failed %s %s — keeping JSONB series",
+                            r.status_code, r.text[:200])
+                return {}, reps
+        except Exception:
+            log.exception("series object failed — keeping JSONB series")
+            return {}, reps
+        return (
+            {"series_object": path, "series_bytes": len(data)},
+            [{**rep, "time_series": {}} for rep in reps],
+        )
+
+    async def _report_engine(self) -> None:
+        """Tell the engine registry which build this worker runs (WP 10.4). Never
+        fatal: a registry the migration has not reached yet, or a slow PostgREST,
+        must not keep the worker from consuming its queue."""
+        try:
+            r = await self._http.post(
+                f"{self._supabase_url}/rest/v1/rpc/sim_engine_report",
+                headers={
+                    "apikey": self._service_role_key,
+                    "Authorization": f"Bearer {self._service_role_key}",
+                    "Content-Type": "application/json",
+                },
+                json=engine_report_payload(scsim_enabled()),
+            )
+            if r.status_code >= 300:
+                log.warning("engine report failed %s %s", r.status_code, r.text)
+        except Exception:
+            log.exception("engine report failed")
 
     async def _update_run(self, run_id: str, patch: dict[str, Any]) -> None:
         """PATCH a simulation_runs row via PostgREST (service role)."""

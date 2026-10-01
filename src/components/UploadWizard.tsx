@@ -1310,6 +1310,21 @@ const UploadWizard = ({
 
       // Auto-calculate prominence after successful deep tier uploads
       if (template.id === 'network_nodes' || template.id === 'network_edges' || template.id === 'deep_tier_json' || (selectedDataset === 'deep_tier' && deepTierFormat === 'csv')) {
+        // WP 10.1 · §4 D234 — the uploaded world gets a graph version, ONCE, after
+        // the last chunk: a version per chunk would number half-uploaded graphs.
+        // Promotions and combines take theirs in the database; the deep tier lands
+        // through chunked RPCs, so its single capture is here.
+        try {
+          const { data: gv, error: gvError } = await supabase.rpc('capture_graph_version', {
+            p_project_id: selectedProject?.id,
+            _actor_user_id: user?.id,
+            p_label: `After deep-tier upload ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
+          });
+          if (gvError) console.warn('Graph version capture failed:', gvError.message);
+          else console.log('Graph version after upload:', gv);
+        } catch (gvErr) {
+          console.warn('Graph version capture failed:', gvErr);
+        }
         try {
           console.log('🔄 Auto-calculating prominence after', template.id, 'upload');
           // WP 4.3 · the analyzer writes tier 3 through an RPC that takes the

@@ -116,17 +116,12 @@ describe("WP 4.4 · no surviving timestamp-comparison staleness", () => {
     ).toEqual([]);
   });
 
-  it("`should_recalculate_network_metrics` answers from the hash", () => {
-    // It is kept alive only for the window in which the deployed frontend still
-    // calls it (WP 5.3 deletes it), so what matters is the ANSWER.
-    const body = fn("should_recalculate_network_metrics").sql;
-    expect(body, "it does not consult the one rule").toContain("freshness_of");
-    expect(
-      body.replace(/--[^\n]*/g, ""),
-      "`data_last_modified` must return NULL — there is no honest answer to " +
-        "'when did the data last change', and inventing one is a fabricated " +
-        "source (T1)",
-    ).toMatch(/NULL::timestamptz/);
+  it("`should_recalculate_network_metrics` is gone, and so is every caller (WP 10.1, §4 D240)", () => {
+    // It was kept alive for a deploy window and answered from the hash meanwhile.
+    // WP 10.1 dropped it: nothing in the repository or among the deployed functions
+    // called it. What must hold now is that it stays gone — a stored-hash cache must
+    // not grow a second, clock-based freshness answer back (`rehearsal/140` §6).
+    expect(live().functions.get("should_recalculate_network_metrics"), "it is still defined").toBeUndefined();
   });
 
   it("no page decides freshness by comparing two timestamps", () => {

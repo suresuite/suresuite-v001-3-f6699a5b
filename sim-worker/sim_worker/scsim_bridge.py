@@ -196,7 +196,7 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
         def progress(done: int, total: int, row: dict, series: dict) -> None:
             on_replication({
                 "rep_index": done - 1,
-                "seed_used": project_seed * 1000 + int(row.get("model_rep", done - 1)),
+                "seed_used": project_seed,  # the root seed — as the final rows say (WP 10.6)
                 "kpis": {k: _finite(v, 6) for k, v in row.items()},
                 "time_series": {
                     k: [_finite(x, 5) for x in v.tolist()] for k, v in series.items()
@@ -254,7 +254,13 @@ def compute_run_from_project(data: Any, on_replication: Any = None) -> dict[str,
     out["replications"] = [
         {
             "rep_index": i,
-            "seed_used": seed * 1000 + int(cells[i][0]) if i < len(cells) else seed,
+            # The ROOT seed the run used (WP 10.6 · §4 D246). It was
+            # `seed * 1000 + model_rep`: not a seed (the engine draws from a keyed
+            # SeedSequence tree, so typing it in reproduced nothing) and shared by
+            # every event draw of one world. A replication is identified by
+            # `rep_index` and its cell — `kpis.model_rep` / `kpis.event_rep`, which
+            # the engine writes on every KPI row.
+            "seed_used": seed,
             "kpis": {k: _finite(v, 6) for k, v in row.items()},
             "time_series": _series_for(i),
             "warmup_at": out["warmup_detected_at"],

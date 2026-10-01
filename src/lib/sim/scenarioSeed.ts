@@ -74,6 +74,19 @@ export interface SeedOptions {
   /** a deliberate change of horizon; the scenario then leaves the validated world */
   horizon_days?: number;
   from_network?: boolean;
+  /**
+   * WP 10.5 — a scenario seeded FROM A VALIDATED MODEL takes the model's run
+   * protocol (replications, steady-state week, root seed, CRN, stopping rule), so
+   * a run of it is faithful by construction and records no deviation. Keys the
+   * model never recorded (a backfilled model's `unknown`) fall back as above.
+   */
+  protocol?: {
+    replications?: number | null;
+    warmup_week?: number | null;
+    root_seed?: number | null;
+    crn?: boolean | null;
+    stopping_rule?: string | null;
+  } | null;
 }
 
 /**
@@ -94,7 +107,24 @@ export function buildScenarioSeed(o: SeedOptions): Partial<Scenario> {
     recovery_overrides: {},
     role: "experiment",
     ...(o.from_network ? { from_network: true } : {}),
+    ...protocolFields(o.protocol),
   };
+}
+
+function protocolFields(p: SeedOptions["protocol"]): Partial<Scenario> {
+  if (!p) return {};
+  const out: Partial<Scenario> = {};
+  if (p.replications != null) out.replications = p.replications;
+  if (p.warmup_week != null) {
+    out.warmup_mode = "manual";
+    out.warmup_days = p.warmup_week * 7;
+  }
+  if (p.root_seed != null) out.seed = p.root_seed;
+  if (p.crn != null) out.crn = p.crn;
+  if (p.stopping_rule === "fixed_horizon" || p.stopping_rule === "ci_halfwidth") {
+    out.stopping_rule = { kind: p.stopping_rule };
+  }
+  return out;
 }
 
 /** True when the seed keeps the certified world, so inheritance can match it. */

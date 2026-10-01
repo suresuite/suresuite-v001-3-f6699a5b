@@ -52,6 +52,8 @@ import { NetworkMetricsTable } from '@/components/NetworkMetricsTable';
 import { calculateSupplierMetrics, calculateMaterialMetrics } from '@/utils/networkMetrics';
 import { MobileGroup, MobilePageHeader, ProjectChip } from '@/components/mobile';
 import { RiskDataNotice } from '@/components/network/RiskDataNotice';
+import { GraphVersionChip, type MetricsOutcome } from '@/components/trust/GraphVersionChip';
+import { analyzerOutcome, storedMetricsDecision } from '@/lib/network/storedMetrics';
 import {
   GraphCard,
   LensSearch,
@@ -188,8 +190,14 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
     closeness_centrality: number | null;
     prominence: number | null;
     connection_count: number;
+    // WP 6.3 / 10.1 · where each number came from, beside it (T1/T2).
+    metrics_source?: 'store' | 'column' | 'none' | null;
+    hash_is_current?: boolean | null;
+    run_id?: string | null;
+    computed_at?: string | null;
   }>>([]);
   const [networkMetricsLoading, setNetworkMetricsLoading] = useState(false);
+  const [metricsOutcome, setMetricsOutcome] = useState<MetricsOutcome>(null);
   const [disruptionDialogOpen, setDisruptionDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'network' | 'map'>('network');
   const [countryRiskMap, setCountryRiskMap] = useState<Record<string, string>>({});
@@ -249,281 +257,77 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
     }
   };
 
+  // WP 10.1 · §4 D235–D239 — COMPUTE ONCE. The page READS the stored metrics and
+  // invokes the analyzer only when no stored run is CURRENT — the database's answer
+  // per row (`hash_is_current`, the run's level hash against the project's now). A
+  // reload with unchanged data invokes nothing; a price edit, which no network level
+  // reads, invokes nothing either. It replaced an all-or-nothing gate over
+  // `network_nodes` rows and a browser fallback computation whose numbers
+  // were never saved and carried no provenance — a number that cannot say where it
+  // came from may not render (T1), so that fallback is gone, not relabelled.
   const fetchNetworkMetrics = async (projectId: string, forceRecalculate = false) => {
     if (!user?.id || !user?.email) return;
-    
-    setNetworkMetricsLoading(true);
-    try {
-      // WP 4.4 · THE ONE STALENESS RULE, asked directly.
-      //
-      // This called `should_recalculate_network_metrics`, which compared
-      // `last_data_time > last_calc_time` — whether a CLOCK moved, which an
-      // UPDATE writing the same value answers yes to and a restored backup
-      // answers no to (§4 D12). `project_freshness` asks the one question worth
-      // asking: does every computed row name the dataset now loaded?
-      //
-      // `unknown` is treated as "recompute", which is `is_stale`'s collapse and
-      // the only safe direction for a branch that can go two ways — but the
-      // BADGE beside this view shows the third state, because telling a user a
-      // number is out of date when nothing can say is T1 answered with a guess.
-      if (!forceRecalculate) {
-        const { data: freshness, error: cacheError } = await supabase.rpc('project_freshness', {
-          p_project_id: projectId
-        });
 
-        if (cacheError) {
-          console.error('Error checking freshness:', cacheError);
-        } else if (freshness) {
-          const nodes = (freshness as { tables?: Record<string, { rows?: number; fresh?: number }> })
-            .tables?.network_nodes;
-          const allFresh = (nodes?.rows ?? 0) > 0 && (nodes?.fresh ?? 0) === (nodes?.rows ?? 0);
-          console.log('Freshness:', nodes);
-
-          if (allFresh) {
-            // Fetch existing cached metrics
-            const { data, error } = await supabase.rpc('get_network_metrics_for_materials', {
-              p_project_id: projectId,
-              p_user_id: user.id,
-              p_user_email: user.email
-            });
-
-            if (error) {
-              console.error('Error fetching cached metrics:', error);
-              toast.error('Failed to load cached metrics');
-              return;
-            }
-
-            if (data && data.length > 0) {
-              setNetworkMetrics(data);
-              setMetricsMetadata({
-                lastCalculated: nodes?.computed_at ?? null,
-                // WP 4.4 · deliberately null. "When did the data last change" is
-                // the question §4 D12 says is the wrong one, and there is no
-                // honest value for it — inventing one would be a fabricated
-                // source (T1). The hash below is the answer that replaces it.
-                dataLastModified: null,
-                reason: `every computed row names the dataset now loaded (${
-                  (freshness as { graph_hash_short?: string }).graph_hash_short ?? 'hash unknown'
-                })`
-              });
-              toast.success('Loaded stored metrics — they name the dataset now loaded');
-              return;
-            }
-          }
-        }
-      }
-
-      // Need to calculate metrics
-      console.log('Network metrics calculation needed');
-      toast.info('Calculating network metrics...');
-      
-      const computeLocalMetrics = async () => {
-        try {
-          const { data: scd, error: scdErr } = await supabase.rpc('get_supply_chain_data', {
-            p_project_id: projectId,
-            p_plant_name: null,
-            p_user_id: user.id,
-            p_user_email: user.email
-          });
-          if (scdErr) {
-            console.error('Error fetching supply chain data for local metrics:', scdErr);
-            return false;
-          }
-          const rows = (scd || []).filter((d: any) => d.data_source !== 'multi_tier');
-          if (rows.length === 0) return false;  
-
-          // Build adjacency (undirected) with weights
-          const adjacency = new globalThis.Map<string, globalThis.Map<string, number>>();
-          const allNodesSet = new globalThis.Set<string>();
-          rows.forEach((r: any) => {
-            const a = r.from_location as string;
-            const b = r.to_location as string;
-            const w = Number(r.weighted ?? 1) || 1;
-            allNodesSet.add(a); allNodesSet.add(b);
-            if (!adjacency.has(a)) adjacency.set(a, new globalThis.Map());
-            if (!adjacency.has(b)) adjacency.set(b, new globalThis.Map());
-            adjacency.get(a)!.set(b, (adjacency.get(a)!.get(b) || 0) + w);
-            adjacency.get(b)!.set(a, (adjacency.get(b)!.get(a) || 0) + w);
-          });
-          const nodesArr = Array.from(allNodesSet);
-          const n = nodesArr.length || 1;
-
-          // Degree and weighted degree
-          const degree: Record<string, number> = {};
-          const wdegree: Record<string, number> = {};
-          let maxW = 1;
-          nodesArr.forEach(id => {
-            const neigh = adjacency.get(id) || new globalThis.Map<string, number>();
-            degree[id] = neigh.size / Math.max(1, n - 1);
-            const sumW = Array.from(neigh.values()).reduce((s: number, v: number) => s + v, 0);
-            wdegree[id] = sumW;
-            if (sumW > maxW) maxW = sumW;
-          });
-
-          // Eigenvector (power iteration)
-          const ev: Record<string, number> = {};
-          nodesArr.forEach(id => ev[id] = 1);
-          for (let iter = 0; iter < 40; iter++) {
-            const next: Record<string, number> = {};
-            let norm = 0;
-            nodesArr.forEach(id => {
-              let s = 0; (adjacency.get(id) || new globalThis.Map<string, number>()).forEach((w: number, nb: string) => { s += w * ev[nb]; });
-              next[id] = s; norm += s * s;
-            });
-            norm = Math.sqrt(norm) || 1;
-            nodesArr.forEach(id => { ev[id] = next[id] / norm; });
-          }
-
-          // Closeness (unweighted BFS)
-          const clos: Record<string, number> = {};
-          nodesArr.forEach(src => {
-            const dist: Record<string, number> = {} as any;
-            nodesArr.forEach(id => dist[id] = Infinity);
-            dist[src] = 0;
-            const q: string[] = [src];
-            while (q.length) {
-              const cur = q.shift()!;
-              (adjacency.get(cur) || new globalThis.Map<string, number>()).forEach((_w: number, nb: string) => {
-                if (dist[nb] === Infinity) { dist[nb] = dist[cur] + 1; q.push(nb); }
-              });
-            }
-            const reachable = nodesArr.filter(id => dist[id] < Infinity && dist[id] > 0);
-            clos[src] = reachable.length ? (reachable.length / reachable.reduce((s, d) => s + dist[d], 0)) : 0;
-          });
-
-          // Betweenness (sampled)
-          const btw: Record<string, number> = {}; nodesArr.forEach(id => btw[id] = 0);
-          const sample = nodesArr.slice(0, Math.min(30, nodesArr.length));
-          sample.forEach(source => {
-            const dist: Record<string, number> = {} as any;
-            const pred: Record<string, string[]> = {} as any;
-            const sigma: Record<string, number> = {} as any;
-            nodesArr.forEach(id => { dist[id] = Infinity; pred[id] = []; sigma[id] = 0; });
-            dist[source] = 0; sigma[source] = 1;
-            const q: string[] = [source];
-            while (q.length) {
-              const v = q.shift()!;
-              (adjacency.get(v) || new globalThis.Map<string, number>()).forEach((_w: number, nb: string) => {
-                if (dist[nb] === Infinity) { dist[nb] = dist[v] + 1; q.push(nb); }
-                if (dist[nb] === dist[v] + 1) { sigma[nb] += sigma[v]; pred[nb].push(v); }
-              });
-            }
-            const dep: Record<string, number> = {} as any; nodesArr.forEach(id => dep[id] = 0);
-            const order = nodesArr.filter(id => dist[id] < Infinity).sort((a,b) => dist[b]-dist[a]);
-            order.forEach(w => {
-              pred[w].forEach(v => { dep[v] += (sigma[v] / Math.max(1, sigma[w])) * (1 + dep[w]); });
-              if (w !== source) btw[w] += dep[w];
-            });
-          });
-          const norm = nodesArr.length > 2 ? 2 / ((nodesArr.length - 1) * (nodesArr.length - 2)) : 1;
-          nodesArr.forEach(id => { btw[id] *= norm; });
-
-          // Materials only, from the ONE rule (WP 8.4 · §4 D127). This used to call
-          // `buildGroupClassification`, which assigns by lane with the LAST ROW
-          // WINNING — so which nodes counted as materials depended on the order the
-          // rows came back in, and a sub-assembly counted or did not at random.
-          const materialSet = new Set(
-            [...buildProductLevelGraph(rows as unknown as FlatLaneRow[]).nodes]
-              .filter(([, v]) => v.echelon === 'material')
-              .map(([id]) => id),
-          );
-          const materials = nodesArr.filter(id => materialSet.has(id));
-          const allIds = nodesArr;
-          const maxBtw = Math.max(...allIds.map(id => btw[id] ?? 0), 1);
-          const maxClos = Math.max(...allIds.map(id => clos[id] ?? 0), 1);
-
-          const CONNECTION_WEIGHT_CAP = 20;
-          const CENTRALITY_PARTNER_CAP = 15;
-
-          const result = materials.map(id => ({
-            id,
-            uid: id,
-            name: id,
-            revenue: null,
-            degree_centrality: degree[id] ?? 0,
-            weighted_degree_centrality: maxW ? (wdegree[id] / maxW) : 0,
-            eigenvector_centrality: ev[id] ?? 0,
-            betweenness_centrality: btw[id] ?? 0,
-            closeness_centrality: clos[id] ?? 0,
-            prominence: (() => {
-              const totalConn = (adjacency.get(id)?.size || 0);
-              const inConn    = rows.filter((r: any) => r.to_location   === id).length;
-              const outConn   = rows.filter((r: any) => r.from_location === id).length;
-              const totalIO   = inConn + outConn;
-
-              const connectionWeight  = Math.min(totalConn, CONNECTION_WEIGHT_CAP) / CONNECTION_WEIGHT_CAP;
-              const revenueWeight     = 0;
-              const balanceWeight     = totalIO > 0
-                ? 1 - Math.abs(inConn - outConn) / totalIO : 0;
-              const betweennessApprox = Math.min(totalConn, CENTRALITY_PARTNER_CAP) / CENTRALITY_PARTNER_CAP;
-              const eigenvectorWeight = (ev[id] ?? 0);        // already normalized via power iteration
-              const closenessWeight   = maxClos ? ((clos[id] ?? 0) / maxClos) : 0;
-
-              return Math.min(Math.max(
-                connectionWeight  * 0.60 +  // was 0.80
-                revenueWeight     * 0.05 +
-                balanceWeight     * 0.05 +
-                betweennessApprox * 0.10 +
-                eigenvectorWeight * 0.10 +  // NEW
-                closenessWeight   * 0.10,   // NEW
-              0), 1);
-            })(),
-            connection_count: (adjacency.get(id)?.size || 0),
-          }));
-
-          setNetworkMetrics(result);
-          toast.success('Computed network metrics locally');
-          return true;
-        } catch (e) {
-          console.error('Local metrics computation failed:', e);
-          return false;
-        }
-      };
-
-      // WP 4.3 · the analyzer writes tier 3 through an RPC that takes the
-      // actor, so the actor travels with the request (invariant audit-actor).
-      const { error: calcError } = await supabase.functions.invoke('calculate-network-science-metrics', {
-        body: { project_id: projectId, uploaded_by: user?.id }
-      });
-
-      if (calcError) {
-        console.error('Error calculating network metrics:', calcError);
-        const ok = await computeLocalMetrics();
-        if (!ok) toast.error('Failed to calculate network metrics');
-        return;
-      }
-
-      // Fetch the calculated metrics
-      const { data: calculatedData, error: fetchError } = await supabase.rpc('get_network_metrics_for_materials', {
+    const readStored = async () => {
+      const { data, error } = await supabase.rpc('get_network_metrics_for_materials', {
         p_project_id: projectId,
         p_user_id: user.id,
         p_user_email: user.email
       });
+      if (error) throw error;
+      return (data ?? []) as typeof networkMetrics;
+    };
 
-      if (fetchError) {
-        console.error('Error fetching calculated metrics:', fetchError);
-        const ok = await computeLocalMetrics();
-        if (!ok) toast.error('Failed to load calculated metrics');
-        return;
+    setNetworkMetricsLoading(true);
+    try {
+      let rows = await readStored();
+      let decision = storedMetricsDecision(rows);
+      let outcome: MetricsOutcome = decision.state === 'current' ? 'reused' : null;
+
+      if (forceRecalculate || decision.invoke) {
+        // WP 4.3 · the analyzer writes tier 3 through an RPC that takes the
+        // actor, so the actor travels with the request (invariant audit-actor).
+        const { data: calc, error: calcError } = await supabase.functions.invoke('calculate-network-science-metrics', {
+          body: { project_id: projectId, uploaded_by: user?.id }
+        });
+        if (calcError) {
+          console.error('Error calculating network metrics:', calcError);
+          // What is stored stays on screen, SAID to be what it is; nothing is invented.
+          toast.error(rows.length > 0
+            ? 'Could not recompute network metrics — showing the stored figures, marked by freshness'
+            : 'Could not compute network metrics');
+        } else {
+          outcome = analyzerOutcome(calc);
+          rows = await readStored();
+          decision = storedMetricsDecision(rows);
+        }
       }
 
-      if (!calculatedData || calculatedData.length === 0) {
-        const ok = await computeLocalMetrics();
-        if (!ok) toast.info('No network metrics available');
-        return;
+      setNetworkMetrics(rows);
+      setMetricsOutcome(outcome);
+      setMetricsMetadata({
+        lastCalculated: decision.computedAt,
+        // "When did the data last change" is the question §4 D12 says is the wrong
+        // one; the level hash is the answer that replaces it.
+        dataLastModified: null,
+        reason: {
+          current: 'Every figure below is a stored result computed on the graph now loaded.',
+          stale: 'The stored figures were computed on an earlier graph; each row says so.',
+          unknown: 'These figures predate provenance: nothing can say which graph they were computed on.',
+          missing: 'No network metrics are stored for this project yet.',
+        }[decision.state],
+      });
+      if (outcome === 'reused' && !forceRecalculate) {
+        toast.success('Loaded stored metrics — computed once for this graph, reused');
       }
-
-      setNetworkMetrics(calculatedData || []);
-      setMetricsMetadata(null); // Clear metadata for fresh calculation
-      toast.success('Network metrics calculated successfully');
     } catch (error) {
       console.error('Error in fetchNetworkMetrics:', error);
-      toast.error('Failed to process network metrics');
+      toast.error('Failed to load network metrics');
     } finally {
       setNetworkMetricsLoading(false);
     }
   };
-    
+
   const fetchData = async () => {
     console.log('🔍 fetchData called with:', { 
       hasUser: !!user, 
@@ -1265,6 +1069,11 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                     ? `Last calculated ${new Date(metricsMetadata.lastCalculated).toLocaleString()}`
                     : undefined
                 }
+              />
+              <GraphVersionChip
+                projectId={globalSelectedProjectId}
+                metricsComputedAt={metricsMetadata?.lastCalculated ?? null}
+                outcome={metricsOutcome}
               />
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 <SupplierVolumeChart

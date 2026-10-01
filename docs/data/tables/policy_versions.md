@@ -57,7 +57,7 @@ Tier 4 — the DECISION plane: what a person or an agent CHOSE, as against the d
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `ProjectPolicies.tsx` | table read | `src/hooks/usePolicies.tsx:496` | yes |
+| `ProjectPolicies.tsx` | table read | `src/hooks/usePolicies.tsx:510` | yes |
 | `SimulationLab.tsx` | table read | `src/hooks/useVerifiableExports.tsx:242` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
@@ -84,8 +84,9 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `author_name` | — | `text` | — | — | The author's display name at the moment of saving, for the same reason as `author_email`. |
 | `parent_version_id` | — | `uuid` | — | — | The version this one followed, so the chain can be walked. NULL on the first version of a project — and NULL is also what a version saved before this column existed carries, so an absent parent is `unknown`, not `first`. |
 | `previous_snapshot` | — | `jsonb` | — | — | The bundle this version REPLACED, stored beside the new one. It makes a diff readable from one row rather than two, and it is what lets a restore know what it is undoing. |
-| `policy_hash` | — | `text` | — | — | The hash of `snapshot`. What a reproducibility record carries so a reader can check that a bundle they hold is the one a run used, without trusting the id. |
+| `policy_hash` | — | `text` | — | — | The hash of `snapshot`. What a reproducibility record carries so a reader can check that a bundle they hold is the one a run used, without trusting the id. SINCE WP 10.2 IT IS THE VERSION'S IDENTITY: `snapshot_policy` returns the existing row when the project already has this hash (§4 D241), and a model card is matched by it, never by `id` (D242). |
 | `notes` | — | `text` | — | — | Free text a person wrote about why. The only column here that carries a REASON rather than a state, and nothing reads it today. |
+| `version_no` | — | `integer` | — | — | "Policy v4" — one number per CONTENT per project, in order of first appearance, assigned by a BEFORE INSERT trigger (so a direct insert numbers too). Rows saved before WP 10.2 that share a `policy_hash` share the number, because they are one model saved twice (§4 D241). |
 
 ## Each column in full
 
@@ -247,7 +248,7 @@ The bundle this version REPLACED, stored beside the new one. It makes a diff rea
 
 ### `policy_hash`
 
-The hash of `snapshot`. What a reproducibility record carries so a reader can check that a bundle they hold is the one a run used, without trusting the id.
+The hash of `snapshot`. What a reproducibility record carries so a reader can check that a bundle they hold is the one a run used, without trusting the id. SINCE WP 10.2 IT IS THE VERSION'S IDENTITY: `snapshot_policy` returns the existing row when the project already has this hash (§4 D241), and a model card is matched by it, never by `id` (D242).
 
 | | |
 |---|---|
@@ -273,14 +274,29 @@ Free text a person wrote about why. The only column here that carries a REASON r
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `version_no`
+
+"Policy v4" — one number per CONTENT per project, in order of first appearance, assigned by a BEFORE INSERT trigger (so a direct insert numbers too). Rows saved before WP 10.2 that share a `policy_hash` share the number, because they are one model saved twice (§4 D241).
+
+| | |
+|---|---|
+| Type | `integer` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000006_policy_versions_by_content.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
 |---|---|---|---|
 | `idx_policy_versions_project` | `project_id`, `created_at DESC` | no | `20260609000002_policy_versions.sql` |
+| `policy_versions_project_hash` | `project_id`, `policy_hash` | no | `20261001000006_policy_versions_by_content.sql` |
 
 ---
 
-*Generated from data contract `20a2eadf01bb`, engine `0.2.8`,
+*Generated from data contract `c7120de73956`, engine `0.2.8`,
 sidecar `supabase/contract/policy_versions.contract.yaml`, table created by `20260609000002_policy_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

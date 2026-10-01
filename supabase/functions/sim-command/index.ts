@@ -50,6 +50,11 @@ const CommandSchema = z.object({
     "experiment.run",
     "experiment.cancel",
     "experiment.add_reps",
+    // WP 10.6 · §4 D246 — a short-lived signed URL for a run's series object in
+    // the private `run-results` bucket (no object policies: nothing reads it
+    // directly). The same exposure as the replication rows it replaces, which
+    // the anon key could already read (D28/D154) — no wider.
+    "run.series_url",
   ]),
   payload: z.record(z.unknown()).default({}),
   client_ts: z.number().optional(),
@@ -138,6 +143,41 @@ Deno.serve(async (req) => {
     if (projErr || !project) {
       return new Response(JSON.stringify({ error: "project not found" }), {
         status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (cmd.kind === "run.series_url") {
+      const runId = String((cmd.payload as Record<string, unknown>).run_id ?? "");
+      const { data: run } = await svc
+        .from("simulation_runs")
+        .select("id,project_id,series_object,series_expired_at,run_key")
+        .eq("id", runId)
+        .maybeSingle();
+      if (!run || run.project_id !== cmd.project_id) {
+        return new Response(JSON.stringify({ error: "run not found in this project" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!run.series_object) {
+        // Not an error: the run keeps its series in its rows, or they expired.
+        return new Response(
+          JSON.stringify({ url: null, expired: !!run.series_expired_at, run_key: run.run_key ?? null }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const { data: signed, error: signErr } = await svc.storage
+        .from("run-results")
+        .createSignedUrl(run.series_object as string, 600);
+      if (signErr || !signed?.signedUrl) {
+        return new Response(JSON.stringify({ error: `could not sign the series object: ${signErr?.message ?? "no url"}` }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ url: signed.signedUrl, expired: false }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

@@ -35,7 +35,16 @@ natural_key_intended: [project_id, analysis_kind, input_hash, params_hash, code_
 # `ALTER TYPE`, a migration and a deploy. The catalog of kinds is a data fact, and
 # `single-source` (I1) says a data fact is authored once, here.
 #
-# Adding a kind: add a row below. No migration.
+# Adding a kind: add a row below. No migration — and since WP 10.1 an undeclared
+# kind is keyed on the composite hash (`all`), never stale, only reused less.
+#
+# WHICH LEVEL A KIND READS IS NOT STATED HERE. It is stated ONCE, in the
+# `analysis_kinds` TABLE (`20261001000007`), because `analysis_get_or_start` has to
+# read it at run time and a database cannot read this file. This catalog owns what a
+# kind's PARAMETERS mean; `analysisKindsParity.test.ts` fails when a kind is in one
+# and not the other. `topology_digest` is gone from both centrality kinds: the
+# deep-tier topology has been in the anchor since WP 5.3 and is the FIRM level since
+# WP 10.1, so the parameter only ever split the cache (§4 D240).
 analysis_kinds:
   network_metrics:
     computed_by: "calculate-network-science-metrics (migrated in WP 4.3)"
@@ -46,19 +55,6 @@ analysis_kinds:
         type: boolean
         default: true
         meaning: "Weight edges by `relative_revenue` rather than treating the graph as unweighted."
-      topology_digest:
-        type: string
-        default: null
-        meaning: >-
-          `public.network_topology_hash(project)` — a digest of the six columns
-          `get_network_nodes_for_prominence` and `get_network_edges_for_prominence`
-          return. IT IS AN INPUT TRAVELLING IN A PARAMETER AND THAT IS DECLARED
-          HERE RATHER THAN HIDDEN: `current_graph_hash` covers eleven tier-2 tables
-          and NOT `network_nodes`/`network_edges`, so without this the key cannot
-          tell two different graphs apart and a re-uploaded network is served the
-          previous graph's centralities as a hit. It belongs in `hash_network`;
-          moving it there is a `schema_version` bump and a bump is unsafe until
-          D70 lands, so WP 4.4 moves it and deletes this entry.
   prominence:
     computed_by: "calculate-node-prominence (migrated in WP 4.3)"
     code_version: "prominence@wp43.1"
@@ -73,10 +69,6 @@ analysis_kinds:
           one graph. `null` means the analyzer's `defaultConfig`, which the
           function fills in before the digest is taken, so a stored run always
           records the config it actually used rather than the word "default".
-      topology_digest:
-        type: string
-        default: null
-        meaning: "See `network_metrics.topology_digest` — the same digest, for the same reason."
   critical_nodes:
     computed_by: "predict-critical-nodes (migrated in WP 4.3)"
     code_version: "critical_nodes@wp43.1"
@@ -100,6 +92,16 @@ analysis_kinds:
       the plan rather than from the code. Removed in WP 4.3 rather than carried:
       an undeclared default is `declared-fallback` (I6) broken, and a DECLARED
       parameter that no code reads is the same defect pointing the other way.
+  process_structure:
+    computed_by: "public.process_structure (SQL, WP 10.1)"
+    code_version: "process_structure@wp101.1"
+    entity_type: node
+    params: {}
+    note: >-
+      For every level-1 node of the process network, the nodes it reaches
+      downstream and upstream, transitively, over `supply_chain_data_multi_tier`.
+      Computed where the data is; the process page reads it instead of walking the
+      graph in the browser on every selection (§4 D239).
   combine_etl:
     computed_by: "combine-project (migrated in WP 4.3, as §11 names it)"
     code_version: "combine_etl@wp43.1"
@@ -123,9 +125,9 @@ analysis_kinds:
 
 surfaces:
   - page: "ProductLevelNetwork.tsx"
-    via: "rpc project_freshness"
+    via: "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)"
     grain: table
-    evidence: "src/pages/ProductLevelNetwork.tsx:270"
+    evidence: "src/components/trust/useProjectFreshness.ts:24"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "rpc project_freshness"
@@ -482,5 +484,36 @@ fields:
       csv_header: null
       required: false
       validate: null
+    surfaces: []
+    resolution: null
+  input_scope:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Which LEVEL of the graph `input_hash` is the hash of — `product`, `process`,
+      `firm`, or `all` (the composite). Resolved by `analysis_get_or_start` from
+      `analysis_kinds`, the one place each kind's scope is stated, including
+      `network_metrics`'s fallback to the process level when the deep tier is
+      incomplete (WP 10.1, §4 D235). Every run before WP 10.1 is `all`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  dataset_version_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The graph version this run computed over (WP 10.1). Taken through
+      `snapshot_dataset` at claim time, which returns the existing version of the
+      current content, so this names "Graph vN" rather than a hash a person cannot
+      read. NULL on every run before WP 10.1.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
     surfaces: []
     resolution: null

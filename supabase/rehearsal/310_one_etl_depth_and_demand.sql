@@ -479,10 +479,22 @@ BEGIN
     SELECT unnest(ARRAY['public.get_supply_chain_data_multi_tier(uuid,uuid,text,integer,integer)',
                         'public.get_multi_tier_network_data(uuid,uuid,text)']) AS sig
   LOOP
-    IF (SELECT proacl FROM pg_proc WHERE oid = v_row.sig::regprocedure) IS NOT NULL THEN
+    -- WP 10.4: this read `proacl IS NULL`, which is bare PostgreSQL's answer. The
+    -- rehearsal now mirrors Supabase's default function privileges, under which a
+    -- re-created function carries an explicit ACL naming PUBLIC and the three API
+    -- roles — so "unchanged" means no grantee beyond those (and the owner), not
+    -- an empty ACL. An invented grant still fails here.
+    IF EXISTS (
+      SELECT 1 FROM pg_proc p, aclexplode(p.proacl) a
+       WHERE p.oid = v_row.sig::regprocedure
+         AND a.grantee <> 0 AND a.grantee <> p.proowner
+         AND a.grantee NOT IN (SELECT oid FROM pg_roles
+                                WHERE rolname IN ('anon','authenticated','service_role'))
+    ) THEN
       RAISE EXCEPTION
-        'WP 8.2 §8 — % now carries an explicit ACL where it carried none. If this '
-        'is deliberate the check is wrong; if it is not, a grant has been invented.',
+        'WP 8.2 §8 — % now grants EXECUTE to a role beyond PUBLIC, the owner and the '
+        'three API roles. If this is deliberate the check is wrong; if it is not, a '
+        'grant has been invented.',
         v_row.sig;
     END IF;
     IF NOT has_function_privilege('authenticated', v_row.sig::regprocedure, 'EXECUTE')

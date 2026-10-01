@@ -25,6 +25,7 @@ import {
 import { knownLimits, type FreshnessPayload } from "@/lib/trust/trustReport";
 import { analysesAtRun, exportTrustInput, ingestHistoryFrom } from "@/lib/trust/exportTrustInputs";
 import { resolveRunScenarioBinding, scheduleDigest } from "@/lib/trust/runScenarioBinding";
+import { seriesNotice, withRunSeries } from "@/lib/sim/runSeries";
 import { INGEST_DATASETS } from "../../supabase/functions/_shared/ingestSpec.generated";
 
 /**
@@ -68,6 +69,15 @@ interface UseVerifiableExportsResult {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb = supabase as any;
+
+/** The registered engine a run was dispatched to, as the run ROW records it:
+ *  "slug@code_version" from its `run_spec` (what the RunKey hashed), else the
+ *  bare `engine_id`. Null for a run that predates the registry (WP 10.4). */
+function engineLabel(run: SimulationRun): string | null {
+  const e = (run.run_spec?.engine ?? null) as { slug?: string; code_version?: string | null } | null;
+  if (e?.slug) return e.code_version ? `${e.slug}@${e.code_version}` : e.slug;
+  return run.engine_id ?? null;
+}
 
 function safeName(s: string): string {
   return s.replace(/[^a-z0-9._-]+/gi, "-").slice(0, 48);
@@ -328,6 +338,13 @@ export function useVerifiableExports(
           scenarioSeedReason: ran.reason,
           disruptionSchedule: ran.schedule === null ? null : scheduleDigest(ran.schedule),
           engineCodeVersion: (run as SimulationRun).code_version ?? null,
+          // WP 10.4 · §4 D245 — read from the RUN ROW, never from a live row.
+          scenarioHash: (run as SimulationRun).scenario_hash ?? null,
+          validatedModelId: (run as SimulationRun).model_validation_id ?? null,
+          engineId: engineLabel((run as SimulationRun)),
+          runKey: (run as SimulationRun).run_key ?? null,
+          protocolOverrides: (run as SimulationRun).protocol_overrides,
+          exploratory: (run as SimulationRun).exploratory ?? null,
           browserEngineVersion,
           analyses: analysesBound,
           // The Trust Report's own computation over the Trust Report's own inputs
@@ -346,10 +363,21 @@ export function useVerifiableExports(
           measuredAt: new Date().toISOString(),
         });
 
+        // WP 10.6 — a worker run's series live in its Parquet object; the
+        // workbook's series sheets read them through the one loader, and an
+        // expired run's export says so in its limits rather than shipping
+        // empty sheets as if nothing had been measured.
+        const { reps: withSeries, series } = await withRunSeries(
+          run as SimulationRun & { project_id: string },
+          (reps ?? []) as Replication[],
+        );
+        const notice = seriesNotice(series);
+        if (notice) record.limits = [...record.limits, { ref: "T3", limit: notice, consequence:
+          "The workbook carries the run's KPIs and aggregates; its weekly series sheets are absent." }];
         const wb = buildRunResultsWorkbook(
           run as SimulationRun,
           (scenario ?? null) as RunScenarioMeta | null,
-          (reps ?? []) as Replication[],
+          withSeries,
           versionLabel,
           record,
         );

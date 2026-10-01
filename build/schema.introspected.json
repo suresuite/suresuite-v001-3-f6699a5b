@@ -1,19 +1,19 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 369,
-  "migrations_applied": 361,
+  "migrations_found": 374,
+  "migrations_applied": 366,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000005_analyst_runs_only.sql",
+  "last_migration": "20261001000010_result_tiers.sql",
   "counts": {
-    "tables": 83,
+    "tables": 87,
     "views": 7,
     "enums": 4,
-    "functions": 337,
+    "functions": 378,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
-    "dynamic_ddl_statements": 36,
+    "dynamic_ddl_statements": 37,
     "rls_indeterminate_tables": 4,
     "rls_dynamic_unresolved": 0,
     "orphans": 0,
@@ -1359,6 +1359,171 @@
       ]
     },
     {
+      "name": "analysis_kinds",
+      "schema": "public",
+      "created_by": "20261001000007_graph_levels_compute_once.sql",
+      "columns": [
+        {
+          "name": "kind",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "input_scope",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "fallback_scope",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "fallback_rule",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "description",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": null,
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((fallback_scope IS NULL) = (fallback_rule IS NULL))",
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "analysis_kinds_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "kind"
+          ],
+          "definition": "PRIMARY KEY (kind)",
+          "implicit": true,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "analysis_kinds_kind_check",
+          "kind": "CHECK",
+          "columns": [
+            "kind"
+          ],
+          "definition": "CHECK (kind ~ '^[a-z][a-z0-9_]*$')",
+          "implicit": true,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "analysis_kinds_input_scope_check",
+          "kind": "CHECK",
+          "columns": [
+            "input_scope"
+          ],
+          "definition": "CHECK (input_scope IN ('product','process','firm','all'))",
+          "implicit": true,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "analysis_kinds_fallback_scope_check",
+          "kind": "CHECK",
+          "columns": [
+            "fallback_scope"
+          ],
+          "definition": "CHECK (fallback_scope IN ('product','process','firm','all'))",
+          "implicit": true,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "analysis_kinds_fallback_rule_check",
+          "kind": "CHECK",
+          "columns": [
+            "fallback_rule"
+          ],
+          "definition": "CHECK (fallback_rule IN ('deep_tier_incomplete'))",
+          "implicit": true,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "analysis_kinds_read",
+            "command": "SELECT",
+            "roles": [],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20261001000007_graph_levels_compute_once.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "WP 10.1 · §4 D235. Which level of the graph each analysis kind READS — the one ",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "kind"
+          ],
+          "name": "analysis_kinds_pkey"
+        }
+      ]
+    },
+    {
       "name": "analysis_results",
       "schema": "public",
       "created_by": "20260917000006_analysis_store.sql",
@@ -1719,6 +1884,37 @@
           "unique": false,
           "references": null,
           "added_by": "20260917000006_analysis_store.sql"
+        },
+        {
+          "name": "input_scope",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'all'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "dataset_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "dataset_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
         }
       ],
       "constraints": [
@@ -1760,6 +1956,13 @@
           ],
           "definition": "FOREIGN KEY (actor_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL",
           "added_by": "20260930000007_admin_delete_user.sql"
+        },
+        {
+          "name": "analysis_runs_input_scope_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (input_scope IN ('product','process','firm','all'))",
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
         }
       ],
       "indexes": [
@@ -5218,6 +5421,54 @@
           "unique": false,
           "references": null,
           "added_by": "20260917000002_graph_hash_v2.sql"
+        },
+        {
+          "name": "hash_product",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "hash_process",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "hash_firm",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "version_no",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
         }
       ],
       "constraints": [
@@ -5244,6 +5495,19 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260703000001_dataset_versions.sql"
+        },
+        {
+          "name": "dataset_versions_project_hash",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "graph_hash",
+            "created_at"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
         }
       ],
       "rls": {
@@ -9693,6 +9957,203 @@
       ]
     },
     {
+      "name": "model_validation_evidence",
+      "schema": "public",
+      "created_by": "20261001000008_validated_model.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "validation_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": true,
+          "references": {
+            "schema": "public",
+            "table": "model_validations",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "project_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "warmup",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "replication_analysis",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "kpi_tests",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "face_validation",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "evidence_run_ids",
+          "quoted": false,
+          "type": "uuid[]",
+          "type_raw": "uuid[]",
+          "nullable": false,
+          "default": "'{}'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "author_user_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "model_validation_evidence_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "model_validation_evidence_validation_id_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "validation_id"
+          ],
+          "definition": "UNIQUE (validation_id)",
+          "implicit": true,
+          "added_by": "20261001000008_validated_model.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "model_validation_evidence_select",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.has_project_access(project_id)",
+            "with_check": "public.has_project_access(project_id)",
+            "added_by": "20261001000008_validated_model.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "WP 10.3 · §4 D243. What a Validated Model rests on, kept beside it rather than ",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "model_validation_evidence_pkey"
+        },
+        {
+          "source": "column UNIQUE",
+          "columns": [
+            "validation_id"
+          ],
+          "name": "model_validation_evidence_validation_id_key"
+        }
+      ]
+    },
+    {
       "name": "model_validations",
       "schema": "public",
       "created_by": "20260710000001_model_validations.sql",
@@ -10019,6 +10480,126 @@
           "unique": false,
           "references": null,
           "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "version_no",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "protocol",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "protocol_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "model_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "engine_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "face_validation",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "revoked_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "revoked_by",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "revoke_reason",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000008_validated_model.sql"
         }
       ],
       "constraints": [
@@ -10091,22 +10672,25 @@
           "definition": "CHECK (status IN ('active', 'superseded', 'revoked'))",
           "implicit": true,
           "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "model_validations_protocol_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (protocol IS NULL OR cardinality(public.validated_model_protocol_problems(protocol)) = 0)",
+          "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "model_validations_engine_id_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "engine_id"
+          ],
+          "definition": "FOREIGN KEY (engine_id) REFERENCES public.sim_engines(id)",
+          "added_by": "20261001000009_engines_runkey.sql"
         }
       ],
       "indexes": [
-        {
-          "name": "model_validations_active_triple_uq",
-          "unique": true,
-          "columns": [
-            "policy_version_id",
-            "graph_hash",
-            "scenario_hash"
-          ],
-          "nulls_not_distinct": false,
-          "predicate": "status = 'active'",
-          "partial": true,
-          "added_by": "20260710000001_model_validations.sql"
-        },
         {
           "name": "model_validations_project_created",
           "unique": false,
@@ -10118,6 +10702,20 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "model_validations_active_content_uq",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "policy_hash",
+            "graph_hash",
+            "scenario_hash"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "status = 'active'",
+          "partial": true,
+          "added_by": "20261001000006_policy_versions_by_content.sql"
         }
       ],
       "rls": {
@@ -10151,11 +10749,12 @@
         {
           "source": "partial UNIQUE index",
           "columns": [
-            "policy_version_id",
+            "project_id",
+            "policy_hash",
             "graph_hash",
             "scenario_hash"
           ],
-          "name": "model_validations_active_triple_uq",
+          "name": "model_validations_active_content_uq",
           "predicate": "status = 'active'"
         }
       ]
@@ -13622,6 +14221,18 @@
           "unique": false,
           "references": null,
           "added_by": "20260711000005_policy_version_notes_delete.sql"
+        },
+        {
+          "name": "version_no",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000006_policy_versions_by_content.sql"
         }
       ],
       "constraints": [
@@ -13648,6 +14259,18 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260609000002_policy_versions.sql"
+        },
+        {
+          "name": "policy_versions_project_hash",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "policy_hash"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20261001000006_policy_versions_by_content.sql"
         }
       ],
       "rls": {
@@ -14288,6 +14911,215 @@
             "id"
           ],
           "name": "project_erp_links_pkey"
+        }
+      ]
+    },
+    {
+      "name": "project_graph_state",
+      "schema": "public",
+      "created_by": "20261001000007_graph_levels_compute_once.sql",
+      "columns": [
+        {
+          "name": "project_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": true,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "schema_version",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "level_spec",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "graph_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "hash_inputs",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "hash_network",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "hash_product",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "hash_process",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "hash_firm",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "dirty",
+          "quoted": false,
+          "type": "boolean",
+          "type_raw": "boolean",
+          "nullable": false,
+          "default": "true",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "generation",
+          "quoted": false,
+          "type": "bigint",
+          "type_raw": "bigint",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "computed_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "updated_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "project_graph_state_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "PRIMARY KEY (project_id)",
+          "implicit": true,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "project_graph_state_select",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.has_project_access(project_id)",
+            "with_check": "public.has_project_access(project_id)",
+            "added_by": "20261001000007_graph_levels_compute_once.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "WP 10.1 · §4 D233. Every hash of a project's LIVE data, stored. Marked dirty ",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "project_id"
+          ],
+          "name": "project_graph_state_pkey"
         }
       ]
     },
@@ -17351,6 +18183,189 @@
       ]
     },
     {
+      "name": "sim_engines",
+      "schema": "public",
+      "created_by": "20261001000009_engines_runkey.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "slug",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "version",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "code_version",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "status",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "capabilities",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "reported_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "sim_engines_slug_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "slug"
+          ],
+          "definition": "UNIQUE (slug)",
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "sim_engines_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "sim_engines_status_check",
+          "kind": "CHECK",
+          "columns": [
+            "status"
+          ],
+          "definition": "CHECK (status IN ('active', 'retired'))",
+          "implicit": true,
+          "added_by": "20261001000009_engines_runkey.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "sim_engines_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20261001000009_engines_runkey.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "WP 10.4 · §4 D245 — the engine registry. One row per engine; `status` says whether dispatch may use it. The worker reports `version`/`code_version` through sim_engine_report.",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "slug"
+          ],
+          "name": "sim_engines_slug_key"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "sim_engines_pkey"
+        }
+      ]
+    },
+    {
       "name": "simulation_cache",
       "schema": "public",
       "created_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql",
@@ -19164,6 +20179,126 @@
           "unique": false,
           "references": null,
           "added_by": "20260922000002_run_binds_seed_and_schedule.sql"
+        },
+        {
+          "name": "engine_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "run_spec",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "run_key",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "protocol_overrides",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "exploratory",
+          "quoted": false,
+          "type": "boolean",
+          "type_raw": "boolean",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "series_object",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "series_bytes",
+          "quoted": false,
+          "type": "bigint",
+          "type_raw": "bigint",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "retention",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'standard'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "series_expires_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "series_expired_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql"
         }
       ],
       "constraints": [
@@ -19176,6 +20311,29 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        },
+        {
+          "name": "simulation_runs_engine_id_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "engine_id"
+          ],
+          "definition": "FOREIGN KEY (engine_id) REFERENCES public.sim_engines(id)",
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "simulation_runs_retention_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (retention IN ('standard', 'pinned', 'evidence'))",
+          "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "simulation_runs_retention_expiry_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((retention = 'standard' OR series_expires_at IS NULL) AND (series_expired_at IS NULL OR series_object IS NULL))",
+          "added_by": "20261001000010_result_tiers.sql"
         }
       ],
       "indexes": [
@@ -19200,6 +20358,29 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        },
+        {
+          "name": "simulation_runs_run_key",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "run_key"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "run_key IS NOT NULL",
+          "partial": true,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "simulation_runs_series_due",
+          "unique": false,
+          "columns": [
+            "series_expires_at"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "retention = 'standard' AND series_expired_at IS NULL AND series_expires_at IS NOT NULL",
+          "partial": true,
+          "added_by": "20261001000010_result_tiers.sql"
         }
       ],
       "rls": {
@@ -21656,6 +22837,18 @@
       "defined_by": "20260726000001_chat_plans.sql"
     },
     {
+      "name": "_dataset_all_hashes",
+      "signature": "_dataset_all_hashes(jsonb)",
+      "args": [
+        "p_snapshot jsonb"
+      ],
+      "returns": "jsonb LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+    },
+    {
       "name": "_dataset_domain_hashes",
       "signature": "_dataset_domain_hashes(jsonb)",
       "args": [
@@ -21678,6 +22871,18 @@
       "volatility": "IMMUTABLE",
       "comment": null,
       "defined_by": "20260917000002_graph_hash_v2.sql"
+    },
+    {
+      "name": "_dataset_level_hashes",
+      "signature": "_dataset_level_hashes(jsonb)",
+      "args": [
+        "p_snapshot jsonb"
+      ],
+      "returns": "jsonb LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "_delete_project_rows",
@@ -21706,6 +22911,125 @@
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     },
     {
+      "name": "_engine_for_code_version",
+      "signature": "_engine_for_code_version(text)",
+      "args": [
+        "p_code_version text"
+      ],
+      "returns": "uuid LANGUAGE sql STABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "_graph_state_mark",
+      "signature": "_graph_state_mark(uuid[])",
+      "args": [
+        "p_project_ids uuid[]"
+      ],
+      "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+    },
+    {
+      "name": "_graph_state_store",
+      "signature": "_graph_state_store(uuid, jsonb, bigint)",
+      "args": [
+        "p_project_id uuid",
+        "p_hashes jsonb",
+        "p_generation bigint"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+    },
+    {
+      "name": "_graph_state_touch_del",
+      "signature": "_graph_state_touch_del()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+    },
+    {
+      "name": "_graph_state_touch_ins",
+      "signature": "_graph_state_touch_ins()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+    },
+    {
+      "name": "_graph_state_touch_upd",
+      "signature": "_graph_state_touch_upd()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+    },
+    {
+      "name": "_graph_version_after_promotion",
+      "signature": "_graph_version_after_promotion()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+    },
+    {
+      "name": "_insert_validated_model",
+      "signature": "_insert_validated_model(uuid, uuid, uuid, uuid, text, jsonb, text, jsonb, jsonb, jsonb, text, text, text, uuid, jsonb, uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_policy_version_id uuid",
+        "p_dataset_version_id uuid",
+        "p_scenario_id uuid",
+        "p_name text",
+        "p_protocol jsonb",
+        "p_warmup_method text",
+        "p_replication_basis jsonb",
+        "p_validation_tests jsonb",
+        "p_findings jsonb",
+        "p_verdict text",
+        "p_basis text",
+        "p_face_validation text",
+        "p_evidence_run_id uuid",
+        "p_evidence jsonb",
+        "p_actor uuid",
+        "p_actor_email text"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
+    },
+    {
+      "name": "_jsonb_project",
+      "signature": "_jsonb_project(jsonb, text[])",
+      "args": [
+        "p_rows jsonb",
+        "p_keys text[]"
+      ],
+      "returns": "jsonb LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+    },
+    {
       "name": "_lock_active_super_admins",
       "signature": "_lock_active_super_admins()",
       "args": [],
@@ -21716,6 +23040,18 @@
       "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
+      "name": "_policy_version_hash",
+      "signature": "_policy_version_hash(uuid)",
+      "args": [
+        "p_policy_version_id uuid"
+      ],
+      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
+    },
+    {
       "name": "_proposals_touch",
       "signature": "_proposals_touch()",
       "args": [],
@@ -21724,6 +23060,102 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260715000001_agent_proposals.sql"
+    },
+    {
+      "name": "_simulation_run_derive",
+      "signature": "_simulation_run_derive()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "_simulation_run_drop_series",
+      "signature": "_simulation_run_drop_series()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000010_result_tiers.sql"
+    },
+    {
+      "name": "_simulation_run_retention",
+      "signature": "_simulation_run_retention()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000010_result_tiers.sql"
+    },
+    {
+      "name": "_validated_model_engine",
+      "signature": "_validated_model_engine()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "_validated_model_evidence_immutable",
+      "signature": "_validated_model_evidence_immutable()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
+    },
+    {
+      "name": "_validated_model_evidence_kept",
+      "signature": "_validated_model_evidence_kept()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000010_result_tiers.sql"
+    },
+    {
+      "name": "_validated_model_hash",
+      "signature": "_validated_model_hash(text, text, text, jsonb, text)",
+      "args": [
+        "p_policy_hash text",
+        "p_graph_hash text",
+        "p_scenario_hash text",
+        "p_protocol jsonb",
+        "p_engine text"
+      ],
+      "returns": "text LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
+    },
+    {
+      "name": "_validated_model_immutable",
+      "signature": "_validated_model_immutable()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "_validated_model_number",
+      "signature": "_validated_model_number()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
     },
     {
       "name": "account_self_resolve",
@@ -21738,6 +23170,21 @@
       "defined_by": "20260929000003_account_self_service_names_its_user.sql"
     },
     {
+      "name": "active_model_validation_by_content",
+      "signature": "active_model_validation_by_content(uuid, text, text, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_policy_hash text",
+        "p_graph_hash text",
+        "p_scenario_hash text"
+      ],
+      "returns": "SETOF",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
+    },
+    {
       "name": "active_model_validation",
       "signature": "active_model_validation(uuid, text, text)",
       "args": [
@@ -21749,7 +23196,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260710000001_model_validations.sql"
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
     },
     {
       "name": "admin_add_org_member",
@@ -22430,6 +23877,19 @@
       "defined_by": "20260917000006_analysis_store.sql"
     },
     {
+      "name": "analysis_current_run",
+      "signature": "analysis_current_run(uuid, text)",
+      "args": [
+        "_project_id uuid",
+        "_analysis_kind text"
+      ],
+      "returns": "uuid LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+    },
+    {
       "name": "analysis_fail_run",
       "signature": "analysis_fail_run(uuid, jsonb, uuid)",
       "args": [
@@ -22457,7 +23917,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260917000006_analysis_store.sql"
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "analysis_latest_run",
@@ -22487,19 +23947,6 @@
       "defined_by": "20260917000007_analyzer_provenance.sql"
     },
     {
-      "name": "analysis_mark_critical_nodes",
-      "signature": "analysis_mark_critical_nodes(uuid, jsonb)",
-      "args": [
-        "_actor_user_id uuid",
-        "_scores jsonb"
-      ],
-      "returns": "jsonb LANGUAGE sql SECURITY DEFINER SET search_path",
-      "security_definer": true,
-      "volatility": null,
-      "comment": "DEPRECATED by WP 4.3 — the three-argument form takes `_run_id` and stamps ",
-      "defined_by": "20260917000007_analyzer_provenance.sql"
-    },
-    {
       "name": "analysis_results_are_immutable",
       "signature": "analysis_results_are_immutable()",
       "args": [],
@@ -22508,6 +23955,18 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260917000006_analysis_store.sql"
+    },
+    {
+      "name": "analysis_run_is_current",
+      "signature": "analysis_run_is_current(uuid)",
+      "args": [
+        "p_run_id uuid"
+      ],
+      "returns": "boolean LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "analysis_runs_actor_is_required",
@@ -22528,6 +23987,19 @@
       "volatility": "IMMUTABLE",
       "comment": null,
       "defined_by": "20260930000007_admin_delete_user.sql"
+    },
+    {
+      "name": "analysis_scope_now",
+      "signature": "analysis_scope_now(uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_kind text"
+      ],
+      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "api_can_access_project",
@@ -22619,7 +24091,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260919000007_decision_plane_actor.sql"
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
     },
     {
       "name": "approved_users_derive_name_parts",
@@ -22825,16 +24297,6 @@
       "volatility": null,
       "comment": "WP 4.4 · it has never invoked an analysis — it ran ",
       "defined_by": "20260917000008_one_staleness_rule.sql"
-    },
-    {
-      "name": "auto_calculate_prominence_on_deep_tier_completion",
-      "signature": "auto_calculate_prominence_on_deep_tier_completion()",
-      "args": [],
-      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "comment": "WP 4.3 · STATEMENT-level since this package. It was FOR EACH ROW, so a bulk ",
-      "defined_by": "20260917000007_analyzer_provenance.sql"
     },
     {
       "name": "auto_combine_on_completion",
@@ -23148,6 +24610,20 @@
       "defined_by": "20260905000001_grant_ga_agent_capabilities.sql"
     },
     {
+      "name": "capture_graph_version",
+      "signature": "capture_graph_version(uuid, uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "_actor_user_id uuid",
+        "p_label text DEFAULT NULL"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+    },
+    {
       "name": "change_own_password",
       "signature": "change_own_password(text, text, uuid)",
       "args": [
@@ -23234,7 +24710,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D140. The AUTHORIZING wrapper over `rebuild_supply_chain_lanes`. ",
-      "defined_by": "20260920000003_one_etl.sql"
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "create_agent_proposal",
@@ -23504,6 +24980,21 @@
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
+      "name": "create_simulation_run",
+      "signature": "create_simulation_run(jsonb, boolean, boolean, uuid)",
+      "args": [
+        "p_run jsonb",
+        "p_force_rerun boolean DEFAULT false",
+        "p_attach_inflight boolean DEFAULT true",
+        "_actor_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
       "name": "create_user_file",
       "signature": "create_user_file(uuid, text, text, text, bigint, uuid, uuid, uuid, timestamptz, uuid)",
       "args": [
@@ -23530,11 +25021,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "returns": "text LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
-      "volatility": "STABLE",
+      "volatility": "VOLATILE",
       "comment": null,
-      "defined_by": "20260917000002_graph_hash_v2.sql"
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "current_hash_inputs",
@@ -23542,11 +25033,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "returns": "text LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
-      "volatility": "STABLE",
+      "volatility": "VOLATILE",
       "comment": null,
-      "defined_by": "20260917000002_graph_hash_v2.sql"
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "current_hash_network",
@@ -23554,11 +25045,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "returns": "text LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path TO",
       "security_definer": true,
-      "volatility": "STABLE",
+      "volatility": "VOLATILE",
       "comment": null,
-      "defined_by": "20260917000002_graph_hash_v2.sql"
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "current_is_super_admin",
@@ -23571,6 +25062,19 @@
       "defined_by": "20260709000002_super_admin_phase1.sql"
     },
     {
+      "name": "current_level_hash",
+      "signature": "current_level_hash(uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_scope text"
+      ],
+      "returns": "text LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+    },
+    {
       "name": "current_policy_hash",
       "signature": "current_policy_hash(uuid)",
       "args": [
@@ -23581,6 +25085,16 @@
       "volatility": "STABLE",
       "comment": null,
       "defined_by": "20260612000001_policy_version_snapshots.sql"
+    },
+    {
+      "name": "dataset_versions_assign_number",
+      "signature": "dataset_versions_assign_number()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "delete_all_disruption_scenarios",
@@ -23883,6 +25397,24 @@
       "defined_by": "20260726000001_chat_plans.sql"
     },
     {
+      "name": "find_reusable_runs",
+      "signature": "find_reusable_runs(uuid, text, text, integer, uuid, jsonb, integer)",
+      "args": [
+        "p_scenario_id uuid",
+        "p_policy_hash text",
+        "p_graph_hash text",
+        "p_replications integer",
+        "p_engine_id uuid DEFAULT NULL",
+        "p_protocol_overrides jsonb DEFAULT '{}'::jsonb",
+        "p_limit integer DEFAULT 1"
+      ],
+      "returns": "TABLE (run_id uuid, ended_at timestamptz, created_at timestamptz, code_version text, rep_count_done integer, run_key text)",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
       "name": "freshness_of",
       "signature": "freshness_of(text, uuid)",
       "args": [
@@ -24030,6 +25562,18 @@
       "volatility": "STABLE",
       "comment": "WP 8.3 · §4 D127. The read path for `node_list.echelon` / `bom_depth` / ",
       "defined_by": "20260920000002_graph_nodes_read_path.sql"
+    },
+    {
+      "name": "get_graph_version_state",
+      "signature": "get_graph_version_state(uuid)",
+      "args": [
+        "p_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "get_individual_scenario_results",
@@ -24182,9 +25726,9 @@
       ],
       "returns": "TABLE( id uuid, uid text, name text, revenue numeric, degree_centrality numeric, weighted_degree_centrality numeric, eigenvector_centrality numeric, betweenness_centrality numeric, closeness_centrality numeric, prominence numeric, connection_count bigint, metrics_source text, run_id uuid, computed_from_hash text, computed_at timestamptz, hash_is_current boolean )",
       "security_definer": true,
-      "volatility": "STABLE",
+      "volatility": "VOLATILE",
       "comment": "Phase 6 / WP 6.3 (§4 D88) — material-node network metrics, DUAL READ: the ",
-      "defined_by": "20260919000002_dual_read_node_metrics.sql"
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "get_network_nodes_for_prominence",
@@ -24207,11 +25751,11 @@
         "p_user_email text",
         "p_plant_name text DEFAULT NULL"
       ],
-      "returns": "TABLE( id uuid, project_id uuid, plant_name text, uid text, name text, industry text, website text, traded_as text, number_of_employees integer, revenue numeric, depth integer, lat numeric, long numeric, is_seed boolean, uploaded_by uuid, created_by uuid, organization text, created_at timestamp with time zone, updated_at timestamp with time zone, country text )",
+      "returns": "TABLE( id uuid, project_id uuid, plant_name text, uid text, name text, industry text, website text, traded_as text, number_of_employees integer, revenue numeric, depth integer, lat numeric, long numeric, is_seed boolean, uploaded_by uuid, created_by uuid, organization text, created_at timestamptz, updated_at timestamptz, country text, prominence numeric, metrics_source text, metrics_run_id uuid, metrics_computed_at timestamptz, hash_is_current boolean )",
       "security_definer": true,
-      "volatility": null,
+      "volatility": "VOLATILE",
       "comment": null,
-      "defined_by": "20250904124537_d3482583-9bcd-4aba-a926-655d073e1b37.sql"
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "get_network_summary",
@@ -24474,6 +26018,18 @@
       "volatility": "STABLE",
       "comment": null,
       "defined_by": "20260711000002_unified_access_control.sql"
+    },
+    {
+      "name": "get_validated_model_evidence",
+      "signature": "get_validated_model_evidence(uuid)",
+      "args": [
+        "p_validation_id uuid"
+      ],
+      "returns": "SETOF",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
     },
     {
       "name": "grant_project_delegation",
@@ -24884,11 +26440,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "TABLE ( id uuid, label text, notes text, author_email text, author_name text, parent_version_id uuid, policy_hash text, created_at timestamptz, run_count bigint, card_count bigint )",
+      "returns": "TABLE ( id uuid, label text, notes text, author_email text, author_name text, parent_version_id uuid, policy_hash text, created_at timestamptz, run_count bigint, card_count bigint, version_no integer )",
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260711000005_policy_version_notes_delete.sql"
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
     },
     {
       "name": "list_projects",
@@ -25012,7 +26568,7 @@
       "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
-      "comment": "DEPRECATED by WP 5.3 (§4 D75). The topology it digests is IN ",
+      "comment": "DEPRECATED (WP 5.3, §4 D75) and UNCALLED in the repository since WP 10.1 (D240): ",
       "defined_by": "20260917000007_analyzer_provenance.sql"
     },
     {
@@ -25141,6 +26697,29 @@
       "defined_by": "20260929000003_account_self_service_names_its_user.sql"
     },
     {
+      "name": "policy_versions_assign_number",
+      "signature": "policy_versions_assign_number()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
+    },
+    {
+      "name": "process_structure",
+      "signature": "process_structure(uuid, uuid)",
+      "args": [
+        "p_project_id uuid",
+        "_actor_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+    },
+    {
       "name": "project_access_read",
       "signature": "project_access_read(uuid)",
       "args": [
@@ -25163,6 +26742,18 @@
       "volatility": "STABLE",
       "comment": "WP 4.4 · everything the freshness badge and the Trust Report's per-table ",
       "defined_by": "20260917000008_one_staleness_rule.sql"
+    },
+    {
+      "name": "project_graph_hashes",
+      "signature": "project_graph_hashes(uuid)",
+      "args": [
+        "p_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "VOLATILE",
+      "comment": null,
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "project_owner_membership",
@@ -25360,7 +26951,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260710000001_model_validations.sql"
+      "defined_by": "20261001000008_validated_model.sql"
     },
     {
       "name": "record_proposal_viewed",
@@ -25374,6 +26965,33 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260715000002_agent_telemetry.sql"
+    },
+    {
+      "name": "record_validated_model",
+      "signature": "record_validated_model(uuid, uuid, uuid, uuid, text, jsonb, text, jsonb, jsonb, jsonb, text, text, uuid, jsonb, uuid, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_policy_version_id uuid",
+        "p_dataset_version_id uuid",
+        "p_scenario_id uuid",
+        "p_name text",
+        "p_protocol jsonb",
+        "p_warmup_method text",
+        "p_replication_basis jsonb",
+        "p_validation_tests jsonb",
+        "p_findings jsonb",
+        "p_basis text",
+        "p_face_validation text",
+        "p_evidence_run_id uuid",
+        "p_evidence jsonb",
+        "_actor_user_id uuid",
+        "p_user_email text DEFAULT NULL"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
     },
     {
       "name": "refresh_node_list_for_project",
@@ -25445,15 +27063,17 @@
     },
     {
       "name": "revoke_model_validation",
-      "signature": "revoke_model_validation(uuid)",
+      "signature": "revoke_model_validation(uuid, uuid, text)",
       "args": [
-        "p_validation_id uuid"
+        "p_validation_id uuid",
+        "_actor_user_id uuid DEFAULT NULL",
+        "p_reason text DEFAULT NULL"
       ],
-      "returns": "void LANGUAGE sql SECURITY DEFINER SET search_path TO",
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260710000001_model_validations.sql"
+      "defined_by": "20261001000008_validated_model.sql"
     },
     {
       "name": "revoke_project_delegation",
@@ -25482,6 +27102,18 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260711000001_api_access_control.sql"
+    },
+    {
+      "name": "run_series_retention",
+      "signature": "run_series_retention(uuid)",
+      "args": [
+        "p_project_id uuid"
+      ],
+      "returns": "interval LANGUAGE sql STABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000010_result_tiers.sql"
     },
     {
       "name": "save_policy_defaults",
@@ -25651,6 +27283,20 @@
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
+      "name": "set_run_retention",
+      "signature": "set_run_retention(uuid, text, uuid)",
+      "args": [
+        "p_run_id uuid",
+        "p_retention text",
+        "_actor_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000010_result_tiers.sql"
+    },
+    {
       "name": "set_scenario_child_defaults",
       "signature": "set_scenario_child_defaults()",
       "args": [],
@@ -25731,16 +27377,59 @@
       "defined_by": "20260718000001_stage1_agent_rights_and_summary.sql"
     },
     {
-      "name": "should_recalculate_network_metrics",
-      "signature": "should_recalculate_network_metrics(uuid)",
+      "name": "sim_engine_for_dispatch",
+      "signature": "sim_engine_for_dispatch(uuid)",
       "args": [
-        "p_project_id uuid"
+        "p_engine_id uuid DEFAULT NULL"
       ],
-      "returns": "TABLE( needs_recalculation boolean, reason text, last_calculated timestamp with time zone, data_last_modified timestamp with time zone )",
-      "security_definer": true,
+      "returns": "public.sim_engines LANGUAGE plpgsql STABLE SET search_path TO",
+      "security_definer": false,
       "volatility": "STABLE",
-      "comment": "DEPRECATED (WP 4.2, §4 D12) and REIMPLEMENTED on the one staleness rule ",
-      "defined_by": "20260917000008_one_staleness_rule.sql"
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "sim_engine_report",
+      "signature": "sim_engine_report(text, text, text, jsonb)",
+      "args": [
+        "p_slug text",
+        "p_version text",
+        "p_code_version text",
+        "p_capabilities jsonb DEFAULT NULL"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "simulation_run_key",
+      "signature": "simulation_run_key(jsonb)",
+      "args": [
+        "p_spec jsonb"
+      ],
+      "returns": "text LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "simulation_run_spec",
+      "signature": "simulation_run_spec(uuid, text, text, uuid, jsonb)",
+      "args": [
+        "p_scenario_id uuid",
+        "p_policy_hash text",
+        "p_graph_hash text",
+        "p_engine_id uuid DEFAULT NULL",
+        "p_protocol_overrides jsonb DEFAULT '{}'::jsonb"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql STABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
     },
     {
       "name": "snapshot_dataset",
@@ -25755,7 +27444,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260917000002_graph_hash_v2.sql"
+      "defined_by": "20261001000007_graph_levels_compute_once.sql"
     },
     {
       "name": "snapshot_policy",
@@ -25773,7 +27462,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260919000007_decision_plane_actor.sql"
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
     },
     {
       "name": "split_person_name",
@@ -25811,6 +27500,18 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
+    },
+    {
+      "name": "sweep_expired_run_series",
+      "signature": "sweep_expired_run_series(integer)",
+      "args": [
+        "p_limit integer DEFAULT 500"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000010_result_tiers.sql"
     },
     {
       "name": "switch_my_organization",
@@ -26112,6 +27813,18 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql"
+    },
+    {
+      "name": "validated_model_protocol_problems",
+      "signature": "validated_model_protocol_problems(jsonb)",
+      "args": [
+        "p jsonb"
+      ],
+      "returns": "text[] LANGUAGE plpgsql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000008_validated_model.sql"
     },
     {
       "name": "verify_user_exists",
@@ -26826,6 +28539,15 @@
       "touches_rls": false,
       "has_format_placeholder": true,
       "named_only_via_block": true,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20261001000010_result_tiers.sql",
+      "statement": "BEGIN IF to_regclass('storage.buckets') IS NOT NULL THEN EXECUTE $ins$ INSERT INTO storage.buckets (id, name, public) VALUES ('run-results', 'run-results', false) ON CONFLICT (id) DO UPDATE SET public = false $ins$",
+      "mentions": [],
+      "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     }
   ],

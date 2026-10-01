@@ -355,12 +355,14 @@ BEGIN
       COALESCE(v_hash, '<null>'), v_r ->> 'input_hash';
   END IF;
 
-  -- the two-argument form still works — it has to, across the deploy window —
-  -- and records NULL provenance rather than inventing one.
+  -- A call with NO run records NULL provenance rather than inventing one. This was
+  -- the two-argument shim's behaviour; WP 10.1 dropped the shim (§4 D240) and the
+  -- three-argument form with a NULL run is the same write.
   UPDATE public.supply_chain_data SET computed_from_hash = NULL WHERE id = v_scd;
   PERFORM public.analysis_mark_critical_nodes(
     v_editor,
-    jsonb_build_array(jsonb_build_object('id', v_scd, 'is_critical', false, 'score', 0.1)));
+    jsonb_build_array(jsonb_build_object('id', v_scd, 'is_critical', false, 'score', 0.1)),
+    NULL::uuid);
   SELECT computed_from_hash INTO v_hash FROM public.supply_chain_data WHERE id = v_scd;
   IF v_hash IS NOT NULL THEN
     RAISE EXCEPTION

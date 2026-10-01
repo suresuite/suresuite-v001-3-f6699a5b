@@ -239,9 +239,16 @@ BEGIN
   -- what a test typed into it the moment its inputs move, which is the whole of
   -- §4 D142. `tier2_suppliers` is hashed and is NOT a lane source, so it moves
   -- the anchor and leaves the fixture standing.
-  INSERT INTO public.tier2_suppliers
-    (project_id, plant_name, supplier_id, upstream_supplier_id, material_id)
-    VALUES (v_project, 'WP63D', 'SUP-NEW', 'SUP-UP', 'MAT-NEW');
+  --
+  -- AND WP 10.1 MOVED IT AGAIN (§4 D235). A run is now keyed on the LEVEL its kind
+  -- reads, and this project has deep-tier nodes but no deep-tier edges, so
+  -- `network_metrics` reads the lane graph — the PROCESS level — and a tier-2
+  -- supplier (firm level) is, correctly, not a change it can see. The multi-tier
+  -- chain is in the process level and is not a lane source, so it moves exactly
+  -- the hash this run is keyed on and leaves the hand-written lane rows standing.
+  INSERT INTO public.multi_tier_supply_chain
+    (project_id, plant_name, from_firm_id, to_firm_id, to_firm_tier)
+    VALUES (v_project, 'WP63D', 'SUP-UP', 'SUP-NEW', 2);
 
   SELECT * INTO v_row FROM public.get_network_metrics_for_materials(
     v_project, v_user, 'wp63dr@example.invalid') WHERE uid = 'N-STORE';

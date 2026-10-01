@@ -38,9 +38,9 @@ surfaces:
     evidence: "src/components/MLPrediction.tsx:54"
     confirmed: true
   - page: "ProductLevelNetwork.tsx"
-    via: "rpc project_freshness"
+    via: "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)"
     grain: table
-    evidence: "src/pages/ProductLevelNetwork.tsx:270"
+    evidence: "src/components/trust/useProjectFreshness.ts:24"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "rpc assign_material_supplier"
