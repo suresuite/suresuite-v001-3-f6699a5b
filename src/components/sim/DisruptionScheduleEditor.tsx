@@ -1,17 +1,15 @@
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
 import { disruptionWeeks } from "@/lib/sim/runWindow";
 import { AUTO_WARMUP_RULE, warmupNote } from "@/lib/sim/disruptionTiming";
-import { isWholeWeeks } from "@/lib/sim/planningTime";
+import { engineWeeks, isWholeWeeks } from "@/lib/sim/planningTime";
 import {
   DISRUPTION_RULE,
   DISRUPTION_TERMS,
   addBlockedReason,
   describeEvent,
+  effectMeaning,
   isLeadTimeDelay,
   judgeTarget,
   newEvent,
@@ -19,7 +17,16 @@ import {
   type ScheduleEvent,
 } from "@/lib/sim/disruptionEvents";
 import type { Scenario } from "@/hooks/useScenarios";
-import { WeeksInput } from "./WeeksInput";
+import {
+  CapacityLostStepper,
+  EffectControl,
+  Field,
+  TargetSelect,
+  WeeksStepper,
+  durationHint,
+  hintOf,
+  startHint,
+} from "./DisruptionFields";
 
 interface Props {
   value: Scenario["disruption_schedule"];
@@ -64,6 +71,7 @@ export function DisruptionScheduleEditor({
     commit(next);
   };
 
+  const horizonWeeks = warmup?.horizonDays ? engineWeeks(warmup.horizonDays) : undefined;
   const blocked = addBlockedReason(local);
   const choices = targetChoices(supplierIds);
   const add = () => {
@@ -105,40 +113,43 @@ export function DisruptionScheduleEditor({
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <div className="grid grid-cols-2 items-start gap-2 p-2 md:grid-cols-12">
-              <div className="col-span-2 flex flex-col gap-1 md:col-span-3">
-                <Label className="text-[10px]">{DISRUPTION_TERMS.target}</Label>
-                <TargetSelect
-                  className="h-11 md:h-8"
-                  value={d.target}
-                  choices={choices}
-                  onChange={(v) => patchNow(i, { target: v })}
-                />
+            <div className="flex flex-col gap-3 p-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Field label={DISRUPTION_TERMS.target}>
+                  <TargetSelect value={d.target} choices={choices} onChange={(v) => patchNow(i, { target: v })} />
+                </Field>
+                <Field
+                  label={DISRUPTION_TERMS.effect}
+                  hint={isLeadTimeDelay(d.magnitude_pct) ? effectMeaning(d.magnitude_pct) : undefined}
+                >
+                  <EffectControl value={d.magnitude_pct} onChange={(v) => patchNow(i, { magnitude_pct: v })} />
+                </Field>
               </div>
-              <div className="col-span-2 flex flex-col gap-1 md:col-span-5">
-                <Label className="text-[10px]">{DISRUPTION_TERMS.effect}</Label>
-                <EffectControl value={d.magnitude_pct} onChange={(v) => patchNow(i, { magnitude_pct: v })} />
-              </div>
-              <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
-                <Label className="text-[10px]">{DISRUPTION_TERMS.startTime} (week)</Label>
-                <WeeksInput
-                  ariaLabel="Disruption event start time, in weeks"
-                  className="h-8 min-h-11 w-full md:min-h-0"
-                  days={d.start_day}
-                  min={DISRUPTION_RULE.start_week_min}
-                  onDays={(v) => patchNow(i, { start_day: v })}
-                />
-              </div>
-              <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
-                <Label className="text-[10px]">{DISRUPTION_TERMS.duration} (weeks)</Label>
-                <WeeksInput
-                  ariaLabel="Disruption event duration, in weeks"
-                  className="h-8 min-h-11 w-full md:min-h-0"
-                  days={d.duration_days}
-                  min={DISRUPTION_RULE.duration_weeks_min}
-                  max={DISRUPTION_RULE.duration_weeks_max}
-                  onDays={(v) => patchNow(i, { duration_days: v })}
-                />
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                <Field label={DISRUPTION_TERMS.startTime} hint={startHint(horizonWeeks)}>
+                  <WeeksStepper
+                    ariaLabel="Disruption event start time"
+                    kind="point"
+                    days={d.start_day}
+                    min={DISRUPTION_RULE.start_week_min}
+                    max={horizonWeeks}
+                    onDays={(v) => patchNow(i, { start_day: v })}
+                  />
+                </Field>
+                <Field label={DISRUPTION_TERMS.duration} {...hintOf(durationHint(d.start_day, d.duration_days, horizonWeeks))}>
+                  <WeeksStepper
+                    ariaLabel="Disruption event duration"
+                    days={d.duration_days}
+                    min={DISRUPTION_RULE.duration_weeks_min}
+                    max={DISRUPTION_RULE.duration_weeks_max}
+                    onDays={(v) => patchNow(i, { duration_days: v })}
+                  />
+                </Field>
+                {!isLeadTimeDelay(d.magnitude_pct) ? (
+                  <Field label="Capacity lost" hint={effectMeaning(d.magnitude_pct)} className="col-span-2 md:col-span-1">
+                    <CapacityLostStepper value={d.magnitude_pct} onChange={(v) => patchNow(i, { magnitude_pct: v })} />
+                  </Field>
+                ) : null}
               </div>
               {/* The header already states the engine's weeks; the line returns
                   only when it has a caveat to add (days collapsing, warm-up). */}
@@ -147,9 +158,9 @@ export function DisruptionScheduleEditor({
                 <EngineTicks startDay={d.start_day} durationDays={d.duration_days} warmup={warmup} />
               ) : null}
               {reason ? (
-                <p className="col-span-2 text-[10px] text-[#b3261e] md:col-span-12">{reason}</p>
+                <p className="text-[11.5px] text-[#b3261e]">{reason}</p>
               ) : outageOnly ? (
-                <p className="col-span-2 text-[10px] text-[--warn-ink,#92400e] md:col-span-12">
+                <p className="text-[11.5px] text-[--warn-ink,#92400e]">
                   This supplier has no weekly capacity, so the engine runs a capacity reduction as a lead-time delay.
                 </p>
               ) : null}
@@ -168,143 +179,12 @@ export function DisruptionScheduleEditor({
         >
           <Plus className="h-3.5 w-3.5" /> Add disruption event
         </Button>
-        <span className="text-[10px] tabular-nums text-muted-foreground">
+        <span className="text-[11.5px] tabular-nums text-muted-foreground">
           {local.length} of {DISRUPTION_RULE.event_cap} events
         </span>
       </div>
       {blocked ? <p className="text-[10px] text-muted-foreground">{blocked}</p> : null}
     </div>
-  );
-}
-
-/** A two-or-more-way switch, styled as one control (effect, destination). */
-export function Segmented<T extends string>({
-  value,
-  options,
-  onChange,
-  ariaLabel,
-}: {
-  value: T;
-  options: { value: T; label: string; disabled?: boolean }[];
-  onChange: (v: T) => void;
-  ariaLabel: string;
-}) {
-  return (
-    <span role="radiogroup" aria-label={ariaLabel} className="inline-flex rounded-sm border border-input p-[2px]">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={o.value === value}
-          disabled={o.disabled}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            "min-h-11 whitespace-nowrap rounded-[2px] px-2 text-[12px] md:min-h-0 md:py-[3px]",
-            o.value === value ? "bg-foreground text-background" : "text-[#52525b] hover:text-foreground",
-            o.disabled && "cursor-not-allowed opacity-50 hover:text-[#52525b]",
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </span>
-  );
-}
-
-/** The nodes the engine can disrupt, grouped plant first, then suppliers. A
- *  stored target outside that list is kept visible rather than silently swapped. */
-export function TargetSelect({
-  value,
-  choices,
-  onChange,
-  placeholder,
-  className,
-}: {
-  value: string;
-  choices: ReturnType<typeof targetChoices>;
-  onChange: (v: string) => void;
-  /** shown as an empty first option, for a form that starts with no target */
-  placeholder?: string;
-  className?: string;
-}) {
-  const known = !value || choices.some((c) => c.value === value);
-  const suppliers = choices.filter((c) => c.group === "Suppliers");
-  return (
-    <select
-      aria-label={DISRUPTION_TERMS.target}
-      className={cn(
-        "h-9 min-h-11 w-full rounded-sm border border-input bg-background px-2 text-sm md:min-h-0",
-        className,
-      )}
-      value={known ? value : "__other"}
-      onChange={(e) => {
-        if (e.target.value !== "__other") onChange(e.target.value);
-      }}
-    >
-      {placeholder ? <option value="">{placeholder}</option> : null}
-      {choices
-        .filter((c) => c.group === "Plant")
-        .map((c) => (
-          <option key={c.value} value={c.value}>
-            {c.label}
-          </option>
-        ))}
-      {suppliers.length > 0 ? (
-        <optgroup label={`Suppliers (${suppliers.length})`}>
-          {suppliers.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </optgroup>
-      ) : null}
-      {!known ? <option value="__other">{value} (cannot be disrupted)</option> : null}
-    </select>
-  );
-}
-
-/** Lead-time delay, or a capacity reduction BY a share — the engine's reading of `magnitude_pct`. */
-export function EffectControl({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const full = DISRUPTION_RULE.full_outage_pct;
-  const partial = !isLeadTimeDelay(value);
-  const [text, setText] = useState(String(partial ? value : 50));
-  useEffect(() => {
-    if (value < full) setText(String(value));
-  }, [value, full]);
-  return (
-    <span className="flex flex-wrap items-center gap-1.5">
-      <Segmented
-        ariaLabel={DISRUPTION_TERMS.effect}
-        value={partial ? "partial" : "delay"}
-        options={[
-          { value: "delay", label: DISRUPTION_TERMS.leadTimeDelay },
-          { value: "partial", label: DISRUPTION_TERMS.capacityReduction },
-        ]}
-        onChange={(v) =>
-          onChange(v === "delay" ? full : Math.min(full - 1, Math.max(1, Number(text) || 50)))
-        }
-      />
-      {partial ? (
-        <span className="inline-flex items-center gap-1">
-          <Input
-            aria-label="Capacity lost, percent"
-            className="h-8 min-h-11 w-16 md:min-h-0"
-            type="number"
-            min={1}
-            max={full - 1}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onBlur={() => {
-              const v = Math.round(Number(text));
-              if (!Number.isFinite(v) || v < 1 || v >= full) return setText(String(value));
-              if (v !== value) onChange(v);
-            }}
-          />
-          <span className="whitespace-nowrap text-[12px] text-muted-foreground">% capacity lost</span>
-        </span>
-      ) : null}
-    </span>
   );
 }
 
@@ -318,7 +198,7 @@ export function EngineTicks({ startDay, durationDays, warmup }: {
   const collapsed = startDay % 7 !== 0 || durationDays !== durationWeeks * 7;
   const note = warmupNote(startWeek, warmup);
   return (
-    <p className="col-span-2 text-[10px] text-muted-foreground md:col-span-12">
+    <p className="text-[11.5px] text-muted-foreground">
       Simulated from week {startWeek} for {durationWeeks} wk
       {collapsed ? " — stored in days; the engine advances in weekly ticks" : ""}
       {note ? <span className="block text-[--warn-ink,#92400e]">{note}</span> : null}

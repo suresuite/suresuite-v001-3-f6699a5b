@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import type { Edge } from "@xyflow/react";
@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { DIALOG_AS_SHEET } from "@/components/shared";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +29,7 @@ import {
   addBlockedReason,
   describeEvent,
   effectMeaning,
-  eventWindow,
+  isLeadTimeDelay,
   judgeTarget,
   newEvent,
   supplierTarget,
@@ -38,8 +37,19 @@ import {
   type ScheduleEvent,
 } from "@/lib/sim/disruptionEvents";
 import { scheduleFindings } from "../../../supabase/functions/_shared/disruptionRules";
-import { EffectControl, Segmented, TargetSelect } from "@/components/sim/DisruptionScheduleEditor";
-import { WeeksInput } from "@/components/sim/WeeksInput";
+import {
+  CapacityLostStepper,
+  EffectControl,
+  FIELD_BOX,
+  FIELD_H,
+  Field,
+  Segmented,
+  TargetSelect,
+  WeeksStepper,
+  durationHint,
+  hintOf,
+  startHint,
+} from "@/components/sim/DisruptionFields";
 
 /**
  * "Add disruption event" on the Firm-, Product- and Process-level pages (WP 9.4 slice 7).
@@ -200,6 +210,7 @@ function Body({
   const choices = targetChoices(supplierIds);
   const selectedKind = nodeJudged.reason ? "Cannot be disrupted" : nodeTarget === PLANT_TARGET ? "Plant" : nodeTarget ? "Supplier" : null;
   const destName = dest === "new" ? name.trim() : existing?.name;
+  const horizonWeeks = validated.world.horizon_days ? engineWeeks(validated.world.horizon_days) : undefined;
 
   return (
     <>
@@ -245,7 +256,7 @@ function Body({
                   onClick={() => setTarget(supplierTarget(n))}
                   aria-pressed={target === supplierTarget(n)}
                   className={cn(
-                    "min-h-11 rounded-sm border px-2 py-0.5 md:min-h-0",
+                    "h-11 rounded-sm border px-2.5 md:h-7",
                     target === supplierTarget(n)
                       ? "border-foreground bg-foreground text-background"
                       : "border-[--hair-rule] bg-background hover:border-foreground",
@@ -258,98 +269,105 @@ function Body({
           ) : null}
         </div>
 
-        <Row label={DISRUPTION_TERMS.target}>
+        <Field label={DISRUPTION_TERMS.target} htmlFor="disruption-node">
           <TargetSelect
+            id="disruption-node"
             value={target}
             choices={choices}
             onChange={setTarget}
             placeholder="Choose the plant or a supplier"
           />
-        </Row>
+        </Field>
 
-        <Row label={DISRUPTION_TERMS.effect}>
-          <EffectControl value={ev.magnitude_pct} onChange={(v) => setEvent((e) => ({ ...e, magnitude_pct: v }))} />
-          <p className="mt-1 text-[11.5px] text-[#71717a]">{effectMeaning(ev.magnitude_pct)}</p>
-        </Row>
-
-        <Row label="Timing">
-          <span className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-[11.5px] text-[#71717a]">{DISRUPTION_TERMS.startTime} (week)</span>
-              <WeeksInput
-                ariaLabel="Disruption event start time, in weeks"
-                days={ev.start_day}
-                min={DISRUPTION_RULE.start_week_min}
-                onDays={(d) => setEvent((e) => ({ ...e, start_day: d }))}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[11.5px] text-[#71717a]">{DISRUPTION_TERMS.duration} (weeks)</span>
-              <WeeksInput
-                ariaLabel="Disruption event duration, in weeks"
-                days={ev.duration_days}
-                min={DISRUPTION_RULE.duration_weeks_min}
-                max={DISRUPTION_RULE.duration_weeks_max}
-                onDays={(d) => setEvent((e) => ({ ...e, duration_days: d }))}
-              />
-            </label>
-          </span>
-          <p
-            className="mt-1 text-[11.5px] text-[#71717a]"
-            title={calendar ? "Approximate: week 1 is the project's simulation start; the date is never stored." : undefined}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_168px]">
+          <Field
+            label={DISRUPTION_TERMS.effect}
+            hint={isLeadTimeDelay(ev.magnitude_pct) ? effectMeaning(ev.magnitude_pct) : undefined}
           >
-            Simulation {eventWindow(ev.start_day, ev.duration_days)}
-            {calendar ? ` · starts ≈ ${calendar}` : ""}
-          </p>
-        </Row>
-
-        <Row label="Save to">
-          <div className="flex flex-col gap-2">
-            <div>
-              <Segmented<Dest>
-                ariaLabel="Save to"
-                value={dest}
-                onChange={setDest}
-                options={[
-                  { value: "new", label: "New scenario" },
-                  { value: "existing", label: "Existing scenario", disabled: experiments.length === 0 },
-                ]}
+            <EffectControl value={ev.magnitude_pct} onChange={(v) => setEvent((e) => ({ ...e, magnitude_pct: v }))} />
+          </Field>
+          {!isLeadTimeDelay(ev.magnitude_pct) ? (
+            <Field label="Capacity lost" htmlFor="disruption-share" hint={effectMeaning(ev.magnitude_pct)}>
+              <CapacityLostStepper
+                id="disruption-share"
+                value={ev.magnitude_pct}
+                onChange={(v) => setEvent((e) => ({ ...e, magnitude_pct: v }))}
               />
-            </div>
-            {dest === "new" ? (
-              <>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  aria-label="New scenario name"
-                  className="h-9 min-h-11 md:min-h-0"
-                />
-                {validated.world.source === "validation" ? (
-                  <p className="text-[11.5px] text-[#0e7f88]">Starts from the validated baseline.</p>
-                ) : null}
-              </>
-            ) : (
-              <select
-                aria-label="Scenario that receives the event"
-                value={existingId}
-                onChange={(e) => setExistingId(e.target.value)}
-                className="h-9 min-h-11 w-full rounded-sm border border-input bg-background px-2 text-sm md:min-h-0"
-              >
-                <option value="">Choose a scenario</option>
-                {experiments.map((s) => {
-                  const n = (s.disruption_schedule ?? []).length;
-                  const full = !!addBlockedReason(s.disruption_schedule ?? []);
-                  return (
-                    <option key={s.id} value={s.id} disabled={full}>
-                      {s.name} · {n} of {DISRUPTION_RULE.event_cap} events
-                      {full ? " (full)" : ""}
-                    </option>
-                  );
-                })}
-              </select>
-            )}
-          </div>
-        </Row>
+            </Field>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label={DISRUPTION_TERMS.startTime} htmlFor="disruption-start" hint={startHint(horizonWeeks)}>
+            <WeeksStepper
+              id="disruption-start"
+              ariaLabel="Disruption event start time"
+              kind="point"
+              days={ev.start_day}
+              min={DISRUPTION_RULE.start_week_min}
+              max={horizonWeeks}
+              onDays={(d) => setEvent((e) => ({ ...e, start_day: d }))}
+            />
+          </Field>
+          <Field
+            label={DISRUPTION_TERMS.duration}
+            htmlFor="disruption-duration"
+            {...hintOf(durationHint(ev.start_day, ev.duration_days, horizonWeeks))}
+          >
+            <WeeksStepper
+              id="disruption-duration"
+              ariaLabel="Disruption event duration"
+              days={ev.duration_days}
+              min={DISRUPTION_RULE.duration_weeks_min}
+              max={DISRUPTION_RULE.duration_weeks_max}
+              onDays={(d) => setEvent((e) => ({ ...e, duration_days: d }))}
+            />
+          </Field>
+        </div>
+
+        <Field
+          label="Save to"
+          hint={dest === "new" && validated.world.source === "validation" ? "The new scenario starts from the validated baseline." : undefined}
+        >
+          <Segmented<Dest>
+            className="w-full md:w-auto md:self-start"
+            ariaLabel="Save to"
+            value={dest}
+            onChange={setDest}
+            options={[
+              { value: "new", label: "New scenario" },
+              { value: "existing", label: "Existing scenario", disabled: experiments.length === 0 },
+            ]}
+          />
+          {dest === "new" ? (
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              aria-label="New scenario name"
+              placeholder="Scenario name"
+              className={cn("w-full px-2.5 outline-none", FIELD_H, FIELD_BOX)}
+            />
+          ) : (
+            <select
+              aria-label="Scenario that receives the event"
+              value={existingId}
+              onChange={(e) => setExistingId(e.target.value)}
+              className={cn("w-full px-2.5 outline-none", FIELD_H, FIELD_BOX, !existingId && "text-[#71717a]")}
+            >
+              <option value="">Choose a scenario</option>
+              {experiments.map((s) => {
+                const n = (s.disruption_schedule ?? []).length;
+                const full = !!addBlockedReason(s.disruption_schedule ?? []);
+                return (
+                  <option key={s.id} value={s.id} disabled={full}>
+                    {s.name} · {n} of {DISRUPTION_RULE.event_cap} events
+                    {full ? " (full)" : ""}
+                  </option>
+                );
+              })}
+            </select>
+          )}
+        </Field>
 
         {findings.length > 0 ? (
           <ul className="flex flex-col gap-1 rounded-sm border border-[rgba(224,147,11,0.4)] bg-[rgba(224,147,11,0.06)] px-3 py-2 text-[12px] text-[#9a6206]">
@@ -359,14 +377,17 @@ function Body({
           </ul>
         ) : null}
 
-        <div className="rounded-sm border-l-2 border-l-foreground bg-[#fafafa] px-3 py-2">
+        <div aria-live="polite" className="rounded-sm border border-[--hair-rule] border-l-2 border-l-foreground bg-[#fafafa] px-3 py-2.5">
           {blocker ? (
             <p className="text-[#71717a]">{blocker}</p>
           ) : (
-            <p className="text-[#3f3f46]">
-              <span className="font-medium text-foreground">{describeEvent(ev)}</span>
-              {destName ? <> → {dest === "new" ? "new scenario" : "scenario"} “{destName}”</> : null}
-            </p>
+            <>
+              <p className="font-medium text-foreground">{describeEvent(ev)}</p>
+              <p className="mt-0.5 text-[#52525b]">
+                {calendar ? <>Starts ≈ {calendar} · </> : null}
+                {destName ? <>saved to {dest === "new" ? "new scenario" : "scenario"} “{destName}”</> : null}
+              </p>
+            </>
           )}
         </div>
       </div>
@@ -411,13 +432,4 @@ function useCalendarHint(projectId: string, startDay: number): string | null {
   if (Number.isNaN(d.getTime())) return null;
   d.setDate(d.getDate() + (engineWeeks(startDay) - 1) * 7);
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="grid grid-cols-1 gap-1.5 md:grid-cols-[104px_minmax(0,1fr)] md:items-start md:gap-3">
-      <span className="pt-1.5 text-[12px] font-medium text-[#52525b]">{label}</span>
-      <div className="min-w-0">{children}</div>
-    </div>
-  );
 }
