@@ -16,6 +16,7 @@ import { useIsMobile } from "@/hooks/use-is-mobile";
 import { DIALOG_AS_SHEET } from "@/components/shared";
 import { KX_TIGHT, MonoChip, SURFACE } from "@/components/intelligence/piUi";
 import type { PolicyVersion } from "@/hooks/usePolicies";
+import { useConfirm } from "@/components/shared/confirm/useConfirm";
 
 export function formatVersionWhen(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -133,6 +134,7 @@ export function PolicyHistorySheet({
   exportsSection?: React.ReactNode;
 }) {
   const isMobile = useIsMobile();
+  const confirm = useConfirm();
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -159,10 +161,8 @@ export function PolicyHistorySheet({
   const deleteChecked = async () => {
     if (!onDeleteMany || checkedIds.length === 0) return;
     const n = checkedIds.length;
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(`Delete ${n} version${n === 1 ? "" : "s"}? This cannot be undone.`)
-    )
+    const title = `Delete ${n} version${n === 1 ? "" : "s"}?`;
+    if (!(await confirm({ message: `${title} This cannot be undone.`, title, actionLabel: n === 1 ? "Delete version" : "Delete versions" })))
       return;
     setBulkBusy(true);
     const deleted = await onDeleteMany(checkedIds);
@@ -456,11 +456,8 @@ export function PolicyHistorySheet({
                           : "Delete this version"
                       }
                       onClick={async () => {
-                        if (
-                          typeof window !== "undefined" &&
-                          !window.confirm(`Delete version "${versionDisplayName(v)}"?`)
-                        )
-                          return;
+                        const message = `Delete version "${versionDisplayName(v)}"?`;
+                        if (!(await confirm({ message, title: message, actionLabel: "Delete version" }))) return;
                         setBusyId(v.id);
                         await onDelete(v.id);
                         setBusyId(null);

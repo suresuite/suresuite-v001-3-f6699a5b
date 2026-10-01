@@ -20,6 +20,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ConfirmSheet } from '@/components/shared/confirm/ConfirmSheet';
+import { confirmBullets } from '@/components/shared/confirm/confirmBullets';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogFooter, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/shared/ResponsiveDialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -59,6 +62,7 @@ export default function AdminDocs({ isCollapsed, setIsCollapsed }: Props) {
   const [relatedText, setRelatedText] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<DocsFaqAdminEntry | null>(null);
+  const isMobile = useIsMobile();
 
   const load = useCallback(async () => {
     if (!actor?.id) return;
@@ -344,6 +348,20 @@ export default function AdminDocs({ isCollapsed, setIsCollapsed }: Props) {
         </ResponsiveDialogContent>
       </ResponsiveDialog>
 
+      {/* Phone: the ConfirmSheet, its bullets the description below split by
+          sentence (mobile redesign §2.3). Desktop keeps the AlertDialog. */}
+      {isMobile ? (
+        <ConfirmSheet
+          open={deleting != null}
+          title="Delete this question?"
+          bullets={confirmBullets(
+            `${deleting?.question} — this cannot be undone. Unpublishing it instead keeps the answer for later.`,
+          )}
+          actionLabel="Delete"
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleting(null)}
+        />
+      ) : (
       <AlertDialog open={deleting != null} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -358,6 +376,7 @@ export default function AdminDocs({ isCollapsed, setIsCollapsed }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      )}
     </AdminLayout>
   );
 }

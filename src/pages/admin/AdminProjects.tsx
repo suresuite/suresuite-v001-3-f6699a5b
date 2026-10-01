@@ -15,6 +15,7 @@ import { useIsMobile } from '@/hooks/use-is-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useConfirm } from '@/components/shared/confirm/useConfirm';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogFooter, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/shared/ResponsiveDialog';
@@ -85,8 +86,10 @@ export default function AdminProjects({ isCollapsed, setIsCollapsed }: Props) {
   const openDialog = (kind: DialogKind, row: ProjectRow) => { setTarget(row); setDialog(kind); };
   const closeDialog = () => { setDialog(null); setTarget(null); };
 
+  const confirm = useConfirm();
   const remove = async (row: ProjectRow) => {
-    if (!confirm(`Delete project "${row.name}"? All its data will be removed. This cannot be undone.`)) return;
+    const title = `Delete project "${row.name}"?`;
+    if (!(await confirm({ message: `${title} All its data will be removed. This cannot be undone.`, title, actionLabel: 'Delete project' }))) return;
     const { error } = await db.rpc('admin_delete_project', { ...actorArgs(), p_project_id: row.id });
     if (error) return toast.error(error.message);
     toast.success(`Project "${row.name}" deleted`); load();

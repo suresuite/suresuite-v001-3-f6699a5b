@@ -22,8 +22,8 @@
  *    (sticky) at either end of it,
  *  - nothing is focused on open — neither Radix's auto-focus nor a field's own
  *    `autoFocus` — so the keyboard appears only when the user taps a field,
- *  - a sheet opened from a sheet stacks with the same geometry and no second
- *    scrim.
+ *  - a sheet opened from a sheet — or from any open dialog — stacks above it
+ *    with the same geometry and no second scrim.
  *
  * The caller's `className` on Content / Header / Footer / Title / Description
  * describes the desktop dialog (and `DIALOG_AS_SHEET`'s retired phone layout),
@@ -63,6 +63,8 @@ export const SHEET_SHADOW = '0 -6px 24px rgba(0,0,0,.14)';
 
 interface SheetContext {
   mobile: boolean;
+  /** The dialog's open state, uncontrolled ones included. */
+  open: boolean;
   /** How many responsive dialogs enclose this one; a nested sheet draws no scrim. */
   depth: number;
   requestClose: () => void;
@@ -77,7 +79,7 @@ interface SheetContext {
 }
 
 const NO_DRAG = null;
-const DESKTOP: SheetContext = { mobile: false, depth: 0, requestClose: () => undefined, safeBottom: '0px', drag: NO_DRAG };
+const DESKTOP: SheetContext = { mobile: false, open: false, depth: 0, requestClose: () => undefined, safeBottom: '0px', drag: NO_DRAG };
 const Ctx = React.createContext<SheetContext>(DESKTOP);
 
 type RootProps = React.ComponentProps<typeof Dialog>;
@@ -97,15 +99,17 @@ export function ResponsiveDialog(props: RootProps) {
     },
     [controlled, onOpenChange],
   );
+  const isOpen = controlled ? !!open : innerOpen;
   const ctx = React.useMemo<SheetContext>(
     () => ({
       mobile: true,
+      open: isOpen,
       depth: parent.mobile ? parent.depth + 1 : 0,
       requestClose: () => setOpen(false),
       safeBottom: '0px',
       drag: NO_DRAG,
     }),
-    [parent.mobile, parent.depth, setOpen],
+    [isOpen, parent.mobile, parent.depth, setOpen],
   );
 
   if (!isMobile) {
@@ -117,7 +121,7 @@ export function ResponsiveDialog(props: RootProps) {
   }
   return (
     <Ctx.Provider value={ctx}>
-      <Dialog {...props} open={controlled ? open : innerOpen} onOpenChange={setOpen} />
+      <Dialog {...props} open={isOpen} onOpenChange={setOpen} />
     </Ctx.Provider>
   );
 }
@@ -162,6 +166,22 @@ function SheetContent({
   const startY = React.useRef<number | null>(null);
   const travelled = React.useRef(0);
   const [dragY, setDragY] = React.useState(0);
+
+  // Opened on top of another open dialog — a shadcn Sheet (z-50), a
+  // MobileSheet, or an enclosing ResponsiveDialog — the sheet rises above it
+  // and draws no scrim of its own: one scrim, however deep the stack (§2.2).
+  // Measured as it opens, before its own node exists, and kept while it is open.
+  const [stacked, setStacked] = React.useState(false);
+  const [seenOpen, setSeenOpen] = React.useState(false);
+  if (parent.open !== seenOpen) {
+    setSeenOpen(parent.open);
+    if (parent.open) {
+      setStacked(
+        parent.depth > 0 ||
+          !!document.querySelector('[role="dialog"][data-state="open"], [role="dialog"][aria-modal="true"]'),
+      );
+    }
+  }
 
   const onRoot = isMobileRootRoute(pathname);
   const barPx = (compact ? MOBILE_TABBAR_H_LANDSCAPE : MOBILE_TABBAR_H) + MOBILE_TABBAR_BORDER;
@@ -213,9 +233,8 @@ function SheetContent({
     <DialogPortal>
       <DialogPrimitive.Overlay
         className={cn(
-          'fixed inset-0 z-[45] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-          // One scrim, however deep the stack.
-          parent.depth === 0 ? 'bg-black/[.32]' : 'bg-transparent',
+          'fixed inset-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+          stacked ? 'z-[60] bg-transparent' : 'z-[45] bg-black/[.32]',
         )}
       />
       <DialogPrimitive.Content
@@ -226,9 +245,11 @@ function SheetContent({
           e.preventDefault();
         }}
         // Above the pinned action bar (z-40), below the tab bar (z-50) the
-        // sheet stops short of — MobileSheet's layer.
+        // sheet stops short of — MobileSheet's layer. Stacked, above whatever
+        // it was opened from.
         className={cn(
-          'fixed inset-x-0 z-[45] flex flex-col overflow-hidden rounded-t-[16px] bg-[#f4f4f5] outline-none',
+          stacked ? 'z-[60]' : 'z-[45]',
+          'fixed inset-x-0 flex flex-col overflow-hidden rounded-t-[16px] bg-[#f4f4f5] outline-none',
           'duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out',
           'data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8',
           'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0',
@@ -268,9 +289,15 @@ function SheetContent({
 export function ResponsiveDialogHeader({
   className,
   mobileClassName,
+  hideClose,
   children,
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & { mobileClassName?: string }) {
+}: React.HTMLAttributes<HTMLDivElement> & {
+  mobileClassName?: string;
+  /** Phone only: no ✕, for a sheet that must be answered (ConfirmSheet's
+   *  non-dismissible variant). */
+  hideClose?: boolean;
+}) {
   const { mobile, drag } = React.useContext(Ctx);
   if (!mobile) return <DialogHeader className={className} {...props}>{children}</DialogHeader>;
   return (
@@ -284,14 +311,14 @@ export function ResponsiveDialogHeader({
         mobileClassName,
       )}
     >
-      <div className="min-w-0 flex-1 pt-0.5">{children}</div>
-      <DialogPrimitive.Close
+      <div className={cn('min-w-0 flex-1 pt-0.5', hideClose && 'pr-[calc(var(--m-gutter)-6px)]')}>{children}</div>
+      {!hideClose && <DialogPrimitive.Close
         aria-label="Close"
         title="Close"
         className="-mt-2.5 grid h-11 w-11 shrink-0 place-items-center text-[#525252] outline-none"
       >
         <X className="h-[18px] w-[18px]" />
-      </DialogPrimitive.Close>
+      </DialogPrimitive.Close>}
     </div>
   );
 }
@@ -332,23 +359,37 @@ ResponsiveDialogDescription.displayName = 'ResponsiveDialogDescription';
 export function ResponsiveDialogFooter({
   className,
   mobileClassName,
+  note,
   style,
+  children,
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & { mobileClassName?: string }) {
+}: React.HTMLAttributes<HTMLDivElement> & {
+  mobileClassName?: string;
+  /** Phone only: the 12px line above the buttons — why the primary is
+   *  disabled, or what went wrong. */
+  note?: React.ReactNode;
+}) {
   const { mobile, safeBottom } = React.useContext(Ctx);
-  if (!mobile) return <DialogFooter className={className} style={style} {...props} />;
+  if (!mobile) return <DialogFooter className={className} style={style} {...props}>{children}</DialogFooter>;
   return (
     <div
       {...props}
       data-sheet-footer=""
-      className={cn(
-        // Pinned at the bottom of the scroll container: secondary then primary,
-        // equal flex, 46px — the action bar's buttons.
-        'sticky bottom-0 z-10 -mx-[var(--m-gutter)] mt-auto flex gap-2 border-t border-[#e8e8ea] bg-white px-[var(--m-gutter)] pt-[9px]',
-        '[&>*]:min-w-0 [&>*]:flex-1 [&>button]:h-[46px] [&>button]:rounded-[4px] [&>button]:text-[15px]',
-        mobileClassName,
-      )}
+      // Pinned at the bottom of the scroll container.
+      className="sticky bottom-0 z-10 -mx-[var(--m-gutter)] mt-auto border-t border-[#e8e8ea] bg-white px-[var(--m-gutter)] pt-[9px]"
       style={{ ...style, paddingBottom: `calc(9px + ${safeBottom})` }}
-    />
+    >
+      {note}
+      <div
+        className={cn(
+          // Secondary then primary, equal flex, 46px — the action bar's buttons.
+          // A long verb ("Delete organization" at 320px) wraps rather than clips.
+          'flex gap-2 [&>*]:min-w-0 [&>*]:flex-1 [&>button]:h-auto [&>button]:min-h-[46px] [&>button]:whitespace-normal [&>button]:rounded-[4px] [&>button]:px-2 [&>button]:py-1.5 [&>button]:text-[15px] [&>button]:leading-[1.2]',
+          mobileClassName,
+        )}
+      >
+        {children}
+      </div>
+    </div>
   );
 }

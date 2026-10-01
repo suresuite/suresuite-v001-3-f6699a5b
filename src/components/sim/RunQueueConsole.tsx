@@ -38,6 +38,7 @@ import type { SimulationRun, Replication } from "@/hooks/useSimulationRun";
 import { CredibilityBadge } from "@/components/sim/CredibilityBadge";
 import { engineLabel } from "@/components/sim/RunProgressPanel";
 import type { Credibility } from "@/hooks/useModelValidation";
+import { useConfirm } from "@/components/shared/confirm/useConfirm";
 import {
   activeJob,
   isActiveStatus,
@@ -141,6 +142,7 @@ export function RunQueueConsole({
   onView,
   onRetry,
 }: RunQueueConsoleProps) {
+  const confirm = useConfirm();
   const [filter, setFilter] = useState<QueueFilter>("all");
   // Client-side dismissal of finished rows ("Clear finished"). Keyed by id so
   // a realtime reload can't resurrect a cleared row, yet genuinely new runs
@@ -167,9 +169,10 @@ export function RunQueueConsole({
       return next;
     });
 
-  const cancelAll = () => {
+  const cancelAll = async () => {
     if (activeJobs.length === 0) return;
-    if (typeof window !== "undefined" && !window.confirm(`Cancel all ${activeJobs.length} active job(s)?`)) return;
+    const message = `Cancel all ${activeJobs.length} active job(s)?`;
+    if (!(await confirm({ message, title: message, actionLabel: "Cancel jobs", cancelLabel: "Keep running" }))) return;
     onCancelAllActive(activeJobs);
   };
 

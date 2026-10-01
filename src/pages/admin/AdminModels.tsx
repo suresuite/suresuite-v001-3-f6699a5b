@@ -11,6 +11,7 @@ import { useIsMobile } from '@/hooks/use-is-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useConfirm } from '@/components/shared/confirm/useConfirm';
 import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle, ResponsiveDialogTrigger, ResponsiveDialogFooter } from '@/components/shared/ResponsiveDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
@@ -45,6 +46,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+  const confirm = useConfirm();
 
   const toggle = async (row: Model) => {
     const next = !row.enabled;
@@ -53,7 +55,8 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
     setModels((prev) => prev.map((m) => (m.id === row.id ? { ...m, enabled: next } : m)));
   };
   const remove = async (row: Model) => {
-    if (!confirm(`Delete model ${row.code}?`)) return;
+    const message = `Delete model ${row.code}?`;
+    if (!(await confirm({ message, title: message, actionLabel: 'Delete model' }))) return;
     const { error } = await db.from('ai_models').delete().eq('id', row.id);
     if (error) return toast.error(error.message);
     setModels((prev) => prev.filter((m) => m.id !== row.id));

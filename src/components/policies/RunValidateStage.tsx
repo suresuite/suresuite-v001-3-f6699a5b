@@ -65,7 +65,8 @@ import { useItemMasters } from "@/hooks/useItemMasters";
 import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
 import { fetchValidationBaseline, useScenarios } from "@/hooks/useScenarios";
-import { dispatchExperiment, reusePromptText } from "@/lib/sim/dispatch";
+import { dispatchExperiment, reuseConfirmRequest } from "@/lib/sim/dispatch";
+import { useConfirm } from "@/components/shared/confirm/useConfirm";
 import { useSimulationRun } from "@/hooks/useSimulationRun";
 import {
   fetchScenarioFingerprintHash,
@@ -298,6 +299,7 @@ export function RunValidateStage({
   customerRows,
 }: Props) {
   const isMobile = useIsMobile();
+  const confirm = useConfirm();
   const itemMasters = useItemMasters(projectId);
   const dataset = useDatasetVersion(projectId);
   const { unit: timeUnit } = useTimeUnit(projectId);
@@ -830,7 +832,7 @@ export function RunValidateStage({
     // fingerprint, seed spec) and answers 409 instead of recomputing. Reuse
     // is ALWAYS the user's choice — never silent.
     if (result.status === "reuse_available" && result.reuseCandidate) {
-      if (window.confirm(reusePromptText(result.reuseCandidate))) {
+      if (await confirm(reuseConfirmRequest(result.reuseCandidate))) {
         toast.success("Reusing the stored run — no recompute needed.");
         return { runId: result.reuseCandidate.run_id, reused: true };
       }

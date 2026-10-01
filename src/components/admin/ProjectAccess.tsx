@@ -16,6 +16,7 @@ import { RoleLegend } from '@/components/admin/UserMemberships';
 import { PROJECT_ROLES, cap, day, endOfDay, toDateInput } from '@/components/admin/projectRoles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useConfirm } from '@/components/shared/confirm/useConfirm';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/shared/ResponsiveDialog';
 import { DIALOG_AS_SHEET } from '@/components/shared';
@@ -89,8 +90,10 @@ export function ProjectAccessDialog({ projectId, projectName, users, actorId, ac
     run('admin_set_project_member', { p_target_user_id: p.user_id, p_project_role: role, p_expires_at: expiresAt, p_rationale: rationale },
       `${personLabel(p)}: ${role}${expiresAt ? ` until ${day(expiresAt)}` : ''}`);
 
-  const removeMember = (p: Person) => {
-    if (!confirm(`Remove ${personLabel(p)}'s ${p.member?.project_role} membership on "${projectName}"?`)) return;
+  const confirm = useConfirm();
+  const removeMember = async (p: Person) => {
+    const message = `Remove ${personLabel(p)}'s ${p.member?.project_role} membership on "${projectName}"?`;
+    if (!(await confirm({ message, title: message, actionLabel: 'Remove' }))) return;
     run('admin_remove_project_member', { p_target_user_id: p.user_id }, `${personLabel(p)}: membership removed`);
   };
 

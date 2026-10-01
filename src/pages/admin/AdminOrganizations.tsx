@@ -30,6 +30,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ConfirmSheet } from '@/components/shared/confirm/ConfirmSheet';
+import { confirmBullets } from '@/components/shared/confirm/confirmBullets';
 import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogHeader, ResponsiveDialogTitle, ResponsiveDialogFooter, ResponsiveDialogTrigger } from '@/components/shared/ResponsiveDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Ban, Loader2, MoreHorizontal, Pencil, Plus, ShieldCheck, Trash2, Undo2 } from 'lucide-react';
@@ -356,16 +358,20 @@ function LimitsDialog({ org, onClose, onSave }: {
 // slug, an organization the admin belongs to, one whose delete would remove a super
 // admin, or an account with recorded work in another organization's project.
 function DeleteOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; actorArgs: () => Record<string, unknown>; onClose: () => void; onDone: () => void }) {
+  const isMobile = useIsMobile();
   const [typed, setTyped] = useState('');
   const [deleting, setDeleting] = useState(false);
+  // The phone sheet repeats a refusal above its buttons (§2.3); desktop has the toast alone.
+  const [failure, setFailure] = useState<string | null>(null);
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const matches = typed.trim() === org.slug;
   const remove = async () => {
     if (!matches) return;
     setDeleting(true);
+    setFailure(null);
     const { data, error } = await db.rpc('admin_delete_organization', { ...actorArgs(), p_org_id: org.id, p_confirm_slug: typed.trim() });
     setDeleting(false);
-    if (error) return toast.error(error.message);
+    if (error) { setFailure(error.message); return toast.error(error.message); }
     const projects = Number(data?.projects ?? 0);
     const users = Number(data?.users ?? 0);
     const detached = Number(data?.detached ?? 0);
@@ -373,6 +379,45 @@ function DeleteOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
       detached ? `; ${plural(detached, 'account', 'accounts')} removed from it and kept in their other organizations` : ''}`);
     onClose(); onDone();
   };
+  if (isMobile) {
+    // The typed-name ConfirmSheet (mobile redesign §2.3): the same copy as the
+    // dialog below, as bullets under its own headings, and the same slug check.
+    const sharedOnly = org.members - org.members_only_here;
+    return (
+      <ConfirmSheet
+        open
+        title={`Delete “${org.name}” permanently?`}
+        groups={[
+          {
+            label: 'Deleted, forever',
+            bullets: [
+              `${plural(org.projects, 'project', 'projects')} and all of their data — datasets, the network, scenarios, policies, simulation runs and results`,
+              `${plural(org.members_only_here, 'user account', 'user accounts')} that belong to no other organization — they will no longer be able to sign in`,
+              'the organization’s API keys, access defaults and AI budgets',
+            ].map((text) => ({ text, tone: 'red' as const })),
+          },
+          {
+            // The copy names what is kept in each line, so this panel has no head.
+            bullets: [
+              ...(sharedOnly > 0
+                ? [`Removed from this organization but kept: ${plural(sharedOnly, 'account that also belongs', 'accounts that also belong')} to another organization.`]
+                : []),
+              'Kept: the audit log and usage logs, which record what happened.',
+            ].map((text) => ({ text, tone: 'amber' as const })),
+          },
+        ]}
+        notes={['This cannot be undone. Suspending can be reversed; deleting cannot.', 'If you may need it back, suspend it instead.']}
+        typed={{ label: <>Type <span className="font-mono">{org.slug}</span> to confirm</>, value: typed, onChange: setTyped }}
+        disabledReason={matches ? null : `Type ${org.slug} exactly to enable this.`}
+        actionLabel="Delete organization"
+        busy={deleting}
+        busyLabel="Deleting…"
+        error={failure}
+        onConfirm={remove}
+        onCancel={() => !deleting && onClose()}
+      />
+    );
+  }
   return (
     <ResponsiveDialog open onOpenChange={(v) => !v && !deleting && onClose()}>
       <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
