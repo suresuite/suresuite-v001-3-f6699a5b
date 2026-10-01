@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 379,
-  "migrations_applied": 371,
+  "migrations_found": 380,
+  "migrations_applied": 372,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000015_surrogate_training_totals.sql",
+  "last_migration": "20261001000016_project_settings_one_writer.sql",
   "counts": {
     "tables": 91,
     "views": 8,
     "enums": 4,
-    "functions": 395,
+    "functions": 386,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -25760,7 +25760,7 @@
     },
     {
       "name": "create_project",
-      "signature": "create_project(text, text, text, text, uuid, text, text, date, date, boolean)",
+      "signature": "create_project(text, text, text, text, uuid, text, text, date, date, text, boolean)",
       "args": [
         "p_name text",
         "p_plant text",
@@ -25771,105 +25771,14 @@
         "p_user_name text",
         "p_simulation_start date DEFAULT NULL::date",
         "p_simulation_end date DEFAULT NULL::date",
+        "p_data_type text DEFAULT 'curated'::text",
         "p_deep_tier_enabled boolean DEFAULT false"
       ],
       "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20250923105656_9e8bac4c-e86d-470c-8d9c-4081bea56395.sql"
-    },
-    {
-      "name": "create_project",
-      "signature": "create_project(text, text, text, text, uuid, text, text, date, date, text)",
-      "args": [
-        "p_name text",
-        "p_plant text",
-        "p_model text",
-        "p_bom_level text",
-        "p_user_id uuid",
-        "p_user_email text",
-        "p_user_name text",
-        "p_simulation_start date DEFAULT NULL::date",
-        "p_simulation_end date DEFAULT NULL::date",
-        "p_data_type text DEFAULT 'curated'::text"
-      ],
-      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250923120308_4bbb560c-69c8-415c-970c-48b6ff7ce13a.sql"
-    },
-    {
-      "name": "create_project",
-      "signature": "create_project(text, text, text, text, uuid, text, text, date, date)",
-      "args": [
-        "p_name text",
-        "p_plant text",
-        "p_model text",
-        "p_bom_level text",
-        "p_user_id uuid",
-        "p_user_email text",
-        "p_user_name text",
-        "p_simulation_start date DEFAULT NULL",
-        "p_simulation_end date DEFAULT NULL"
-      ],
-      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250828002252_f68f9689-a9ff-4fcd-a6f6-2cae7a3c3a5f.sql"
-    },
-    {
-      "name": "create_project",
-      "signature": "create_project(text, text, text, text, uuid, text, text)",
-      "args": [
-        "p_name text",
-        "p_plant text",
-        "p_model text",
-        "p_bom_level text",
-        "p_user_id uuid",
-        "p_user_email text",
-        "p_user_name text"
-      ],
-      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250915000000_add_bom_level_to_projects.sql"
-    },
-    {
-      "name": "create_project",
-      "signature": "create_project(text, text, text, uuid, text, text)",
-      "args": [
-        "p_name text",
-        "p_plant text",
-        "p_model text",
-        "p_user_id uuid",
-        "p_user_email text",
-        "p_user_name text"
-      ],
-      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250820220456_55139542-4086-4daa-9dbf-314f29f22708.sql"
-    },
-    {
-      "name": "create_project",
-      "signature": "create_project(text, text, text, uuid, text)",
-      "args": [
-        "p_name text",
-        "p_plant text",
-        "p_model text",
-        "p_user_id uuid",
-        "p_user_email text"
-      ],
-      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250820175710_6a691ced-c936-440f-a101-67861d562557.sql"
+      "defined_by": "20261001000016_project_settings_one_writer.sql"
     },
     {
       "name": "create_simulation_result",
@@ -28586,7 +28495,7 @@
     },
     {
       "name": "update_project",
-      "signature": "update_project(uuid, text, text, text, text, uuid, text, date, date, boolean)",
+      "signature": "update_project(uuid, text, text, text, text, uuid, text, date, date, text, boolean)",
       "args": [
         "p_project_id uuid",
         "p_name text",
@@ -28597,89 +28506,14 @@
         "p_user_email text",
         "p_simulation_start date DEFAULT NULL::date",
         "p_simulation_end date DEFAULT NULL::date",
-        "p_deep_tier_enabled boolean DEFAULT false"
+        "p_data_type text DEFAULT NULL::text",
+        "p_deep_tier_enabled boolean DEFAULT NULL::boolean"
       ],
       "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20250906113204_aa42c052-0d52-4c76-a6d1-806beb3af9cc.sql"
-    },
-    {
-      "name": "update_project",
-      "signature": "update_project(uuid, text, text, text, text, uuid, text, date, date, text)",
-      "args": [
-        "p_project_id uuid",
-        "p_name text",
-        "p_plant text",
-        "p_model text",
-        "p_bom_level text",
-        "p_user_id uuid",
-        "p_user_email text",
-        "p_simulation_start date DEFAULT NULL::date",
-        "p_simulation_end date DEFAULT NULL::date",
-        "p_data_type text DEFAULT NULL::text"
-      ],
-      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250923120308_4bbb560c-69c8-415c-970c-48b6ff7ce13a.sql"
-    },
-    {
-      "name": "update_project",
-      "signature": "update_project(uuid, text, text, text, text, uuid, text, date, date)",
-      "args": [
-        "p_project_id uuid",
-        "p_name text",
-        "p_plant text",
-        "p_model text",
-        "p_bom_level text",
-        "p_user_id uuid",
-        "p_user_email text",
-        "p_simulation_start date DEFAULT NULL",
-        "p_simulation_end date DEFAULT NULL"
-      ],
-      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250828002252_f68f9689-a9ff-4fcd-a6f6-2cae7a3c3a5f.sql"
-    },
-    {
-      "name": "update_project",
-      "signature": "update_project(uuid, text, text, text, text, uuid, text)",
-      "args": [
-        "p_project_id uuid",
-        "p_name text",
-        "p_plant text",
-        "p_model text",
-        "p_bom_level text",
-        "p_user_id uuid",
-        "p_user_email text"
-      ],
-      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250915000000_add_bom_level_to_projects.sql"
-    },
-    {
-      "name": "update_project",
-      "signature": "update_project(uuid, text, text, text, uuid, text)",
-      "args": [
-        "p_project_id uuid",
-        "p_name text",
-        "p_plant text",
-        "p_model text",
-        "p_user_id uuid",
-        "p_user_email text"
-      ],
-      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
-      "security_definer": true,
-      "volatility": null,
-      "comment": null,
-      "defined_by": "20250901000000_add_project_management_functions.sql"
+      "defined_by": "20261001000016_project_settings_one_writer.sql"
     },
     {
       "name": "update_risk_alert_impact",

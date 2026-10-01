@@ -398,7 +398,10 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
       // two-argument deploy-window shim (§4 D240).
       "capabilities_for_user",
       "create_disruption_scenario_v2",
-      "create_project",
+      // `create_project` (six overloads) and `update_project` (five) stood here
+      // until §4 D255: the deep-tier switch was added to one copy and the data
+      // type to another, the page reached the copy without the switch, and the
+      // setting never saved. One of each now takes both.
       "get_project_dataset_status",
       // `get_supply_chain_data_multi_tier` stood here until WP 8.2. It had a
       // five-argument and a three-argument form projecting the SAME table, so
@@ -408,7 +411,6 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
       // THIS LIST MAY SHRINK AND MAY NOT GROW, so removing the name here is the
       // record of that (§4 D145's class).
       "refresh_node_list_for_project",
-      "update_project",
       "update_project_completion_status",
     ]);
   });
