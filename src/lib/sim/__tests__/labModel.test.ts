@@ -116,7 +116,7 @@ describe("a comparison defaults to the same model; an exploratory run is never t
 });
 
 // WP 10.7 · §4 D247 — the Run card's estimate against what the plan leaves. The
-// figures mirror `rehearsal/610`, so the card and the database agree on them.
+// figures mirror `rehearsal/615`, so the card and the database agree on them.
 describe("capacityVerdict (WP 10.7)", () => {
   const state = (over: Partial<CapacityState["pool"]> = {}, share: Partial<NonNullable<CapacityState["share"]>> | null = {}): CapacityState => ({
     org_id: "o",

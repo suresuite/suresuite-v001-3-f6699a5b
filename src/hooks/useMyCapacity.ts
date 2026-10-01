@@ -24,7 +24,7 @@ export function useMyCapacity(
     void sb
       .rpc("get_my_capacity", { p_project_id: projectId, _actor_user_id: userId ?? null })
       .then(({ data, error }: { data: CapacityState | null; error: unknown }) => {
-        // A database without `20261001000011` (the deploy window): no figure,
+        // A database without `20261001000012` (the deploy window): no figure,
         // and the card says the plan could not be read rather than inventing one.
         if (alive) setState(error ? null : data);
       });

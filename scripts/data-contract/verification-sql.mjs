@@ -5248,7 +5248,7 @@ async function phase10Versions() {
       union all
       select 'run_usage', 'all', kind, count(*), sum(rep_weeks) from public.run_usage group by 1, 2, 3
       order by 1, 2, 3`),
-    (rows) => { out("**(15) role shares, and the ledger by kind (a post-merge run with no `dispatch` row skipped admission — D251):**"); out(...table(rows)); });
+    (rows) => { out("**(15) role shares, and the ledger by kind (a post-merge run with no `dispatch` row skipped admission — D252):**"); out(...table(rows)); });
 
   report("(16) D249 — the surrogate training set, per project, and the feature kind",
     await tryQ(`

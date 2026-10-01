@@ -162,7 +162,7 @@ PROJECT_DISCOVERY_KEY = "sim.active_projects"  # set populated by edge function 
 # first-ever stream — streams persist, so repeat runs are unaffected.
 DEFAULT_PROJECTS_REFRESH = 30.0  # seconds
 EVICT_INTERVAL = 60.0
-# The series sweep (WP 10.9 · §4 D252): production ships no pg_cron, so the
+# The series sweep (WP 10.9 · §4 D253): production ships no pg_cron, so the
 # worker is what runs retention — once at boot (every wake from scale-to-zero)
 # and then daily while it stays up.
 SERIES_SWEEP_INTERVAL = 24 * 60 * 60

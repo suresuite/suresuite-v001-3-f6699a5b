@@ -13,7 +13,7 @@
 -- §6 a deleted run QUEUES its series object, and the next sweep hands it over for
 --    removal through the Storage API — neither ever deletes a `storage.objects`
 --    row with SQL, which orphans the file and which hosted Supabase refuses
---    (WP 10.9 · §4 D252; the stand-in below refuses it the same way).
+--    (WP 10.9 · §4 D253; the stand-in below refuses it the same way).
 
 -- Supabase's `storage.objects`, reduced to the two columns the sweep and the
 -- delete trigger read. The prelude creates the schema and not the table, so

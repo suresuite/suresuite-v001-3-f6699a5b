@@ -15,7 +15,7 @@ natural_key_unique:
   - source: "column PRIMARY KEY"
     columns: [id]
     name: "run_usage_pkey"
-  - source: "table constraint 20261001000011_capacity.sql"
+  - source: "table constraint 20261001000012_capacity.sql"
     columns: [run_id, kind]
     name: "run_usage_run_kind_key"
 

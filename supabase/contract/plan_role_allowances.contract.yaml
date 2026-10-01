@@ -16,7 +16,7 @@ natural_key_unique:
   - source: "column PRIMARY KEY"
     columns: [id]
     name: "plan_role_allowances_pkey"
-  - source: "table constraint 20261001000011_capacity.sql"
+  - source: "table constraint 20261001000012_capacity.sql"
     columns: [org_id, project_role]
     name: "plan_role_allowances_org_role_key"
 

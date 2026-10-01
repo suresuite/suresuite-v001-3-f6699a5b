@@ -1,5 +1,5 @@
 # AUTHORED — the data contract's sidecar for `run_series_orphans`.
-# WP 10.9 · §4 D252. Edit this file; docs/data/tables/*.md is generated from it.
+# WP 10.9 · §4 D253. Edit this file; docs/data/tables/*.md is generated from it.
 table: run_series_orphans
 tier: "5"
 schema_name: public

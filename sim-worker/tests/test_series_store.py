@@ -99,7 +99,7 @@ def test_the_run_row_keeps_the_range_the_bridge_computes():
     assert upd["aggregate_kpis"]["_range"] == {"fill_rate": {"min": 0.8, "max": 0.97}}
 
 
-# WP 10.9 · §4 D252 — production ships no pg_cron, so the worker runs the sweep,
+# WP 10.9 · §4 D253 — production ships no pg_cron, so the worker runs the sweep,
 # and objects go through the Storage API (a SQL delete orphans the stored file).
 def test_the_sweep_removes_returned_paths_through_the_storage_api():
     seen: list[tuple[str, str, dict]] = []

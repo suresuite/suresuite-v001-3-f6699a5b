@@ -1,5 +1,5 @@
 -- ============================================================================
--- Phase 10 / WP 10.9 · §4 D252 · blueprint §9.2, §11.6
+-- Phase 10 / WP 10.9 · §4 D253 · blueprint §9.2, §11.6
 -- THE SERIES SWEEP RUNS, AND REMOVES OBJECTS THROUGH THE STORAGE API.
 --
 -- The after-merge reading of WP 10.0–10.6 (§15 run 36857125032) found two faults
@@ -8,7 +8,7 @@
 --   1. NOTHING RUNS THE SWEEP. Production has no pg_cron (`cron.job` does not
 --      exist), so the guarded `cron.schedule('run-series-sweep', …)` was a silent
 --      no-op and retention is declared but inert. (So are the two older guarded
---      schedules, `workspace-file-sweep` and the ERP sync — named in D252, not
+--      schedules, `workspace-file-sweep` and the ERP sync — named in D253, not
 --      changed here.)
 --   2. OBJECTS WERE "REMOVED" WITH SQL. `DELETE FROM storage.objects` drops the
 --      metadata row and leaves the stored file — the bytes the tier exists to

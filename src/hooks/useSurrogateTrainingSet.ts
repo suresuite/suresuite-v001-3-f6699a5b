@@ -18,7 +18,7 @@ export function useSurrogateTrainingSet(projectId: string | null | undefined, re
     void sb
       .rpc("surrogate_training_summary", { p_project_id: projectId })
       .then(({ data, error }: { data: TrainingGroup[] | null; error: unknown }) => {
-        // A database without `20261001000012` (the deploy window): no line at all.
+        // A database without `20261001000013` (the deploy window): no line at all.
         if (alive) setGroups(error || !Array.isArray(data) ? null : data);
       });
     return () => {
