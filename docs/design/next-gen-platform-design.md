@@ -800,7 +800,11 @@ This subsection is numbered inside §9 but **logically precedes §9.1**: experim
 > used as surrogate training data. Evidence (warm-up series and detector outputs, replication
 > analysis, per-KPI tests, the face-validation statement) is persisted beside the model rather
 > than summarised into it, and adoption requires every selected KPI to pass or a recorded
-> face-validation acknowledgement (D244).
+> face-validation acknowledgement (D244). **As built (WP 10.5):** a deviation is read OFF the
+> scenario the run uses — the engine runs the scenario row, so the protocol is what that row
+> should be and the overrides are where it is not; a run of a model dispatches the model's own
+> policy version; and a model's evidence run, dispatched before the model existed, belongs to
+> the model through `evidence_run_id` (PLAN.md §4 D249).
 
 #### 9.5.1 The Run & Validate surface: trust before persistence *(closes G14a)*
 

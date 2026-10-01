@@ -31547,7 +31547,15 @@
         "slug"
       ],
       "ingest_dataset": null,
-      "surfaces": [],
+      "surfaces": [
+        {
+          "page": "SimulationLab.tsx",
+          "via": "hook useSimEngines → select active rows from sim_engines (the Engine step, WP 10.5)",
+          "grain": "table",
+          "evidence": "src/hooks/useSimEngines.ts:25",
+          "confirmed": true
+        }
+      ],
       "governance": {
         "read": null,
         "write": null,
@@ -40333,5 +40341,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "c833aa3d4794"
+  "contract_version": "68f8e8bc6722"
 }

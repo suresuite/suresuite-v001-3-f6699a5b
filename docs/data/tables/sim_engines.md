@@ -67,6 +67,18 @@ A registry, not project data: read by everyone through `sim_engines_read` (`USIN
 
 </details>
 
+## Where this data is read
+
+| Page | Via | Evidence | Confirmed |
+|---|---|---|---|
+| `SimulationLab.tsx` | hook useSimEngines → select active rows from sim_engines (the Engine step, WP 10.5) | `src/hooks/useSimEngines.ts:25` | yes |
+
+Each row says the page READS the table by that path, at that line. It does
+not say every column below is displayed there — a column carries its own
+lineage only where an explicit `select` names it. `npm run contract:check`
+R12 re-opens every evidence line on each run, so an entry cannot go stale
+unnoticed.
+
 ## Columns
 
 `CSV header` is the name the **user types**, which is not always the column name —
@@ -214,6 +226,6 @@ When the row was seeded.
 
 ---
 
-*Generated from data contract `c833aa3d4794`, engine `0.2.8`,
+*Generated from data contract `68f8e8bc6722`, engine `0.2.8`,
 sidecar `supabase/contract/sim_engines.contract.yaml`, table created by `20261001000009_engines_runkey.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -29,6 +29,7 @@ export function RunCard({
   findings,
   capacity,
   progress,
+  estimate,
 }: {
   versionText: string;
   credibility: Credibility | null;
@@ -44,6 +45,8 @@ export function RunCard({
   findings: ReactNode;
   capacity: ReactNode;
   progress: ReactNode;
+  /** WP 10.5 — replication-weeks and expected storage, with its basis. */
+  estimate?: ReactNode;
 }) {
   const mustSee = gate.kind === "blocked" || gate.kind === "ack_required";
   const [showFindings, setShowFindings] = useState(mustSee);
@@ -116,6 +119,7 @@ export function RunCard({
       </section>
 
       {showFindings ? findings : null}
+      {estimate}
       {capacity}
       {progress}
     </div>

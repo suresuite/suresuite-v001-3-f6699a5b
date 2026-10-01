@@ -279,6 +279,6 @@ The most accounts the organization may have, counted as its `organization_member
 
 ---
 
-*Generated from data contract `c833aa3d4794`, engine `0.2.8`,
+*Generated from data contract `68f8e8bc6722`, engine `0.2.8`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

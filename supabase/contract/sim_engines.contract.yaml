@@ -36,6 +36,13 @@ governance:
     by migration, and whose one runtime write is a build report stamped with
     `reported_at`.
 
+surfaces:
+  - page: "SimulationLab.tsx"
+    via: "hook useSimEngines → select active rows from sim_engines (the Engine step, WP 10.5)"
+    grain: table
+    evidence: "src/hooks/useSimEngines.ts:25"
+    confirmed: true
+
 fields:
   id:
     type: "uuid"

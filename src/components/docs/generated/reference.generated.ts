@@ -20511,7 +20511,13 @@ export const REFERENCE_TABLES: RefTable[] = [
       }
     ],
     "ingestDataset": null,
-    "surfaces": [],
+    "surfaces": [
+      {
+        "page": "SimulationLab.tsx",
+        "via": "hook useSimEngines → select active rows from sim_engines (the Engine step, WP 10.5)",
+        "evidence": "src/hooks/useSimEngines.ts:25"
+      }
+    ],
     "governance": {
       "read": null,
       "write": null,

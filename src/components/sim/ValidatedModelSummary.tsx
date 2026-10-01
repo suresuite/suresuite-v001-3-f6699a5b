@@ -6,43 +6,18 @@
 // version row it points at, and a value that was never recorded is SAID to be
 // unrecorded with the reason, never shown as a default.
 // `validatedModelSummary.test.tsx` holds it to that.
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SURFACE, StatusDot, TD } from "@/components/intelligence/piUi";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import type { Credibility, ModelValidationCard } from "@/hooks/useModelValidation";
+import { useVersionRefs } from "@/hooks/useModelVersionRefs";
 import {
   modelDeepLink,
   shortHash,
   staleMessage,
   validatedModelLines,
-  type VersionRefs,
 } from "@/lib/sim/validatedModel";
-
-/** Reads the two version numbers the card names (one row each). */
-function useVersionRefs(card: ModelValidationCard): VersionRefs {
-  const [refs, setRefs] = useState<VersionRefs>({ graphVersionNo: null, policyVersionNo: null });
-  useEffect(() => {
-    let alive = true;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sb = supabase as any;
-    void Promise.all([
-      card.dataset_version_id
-        ? sb.from("dataset_versions").select("version_no").eq("id", card.dataset_version_id).maybeSingle()
-        : Promise.resolve({ data: null }),
-      sb.from("policy_versions").select("version_no").eq("id", card.policy_version_id).maybeSingle(),
-    ]).then(([ds, pv]: Array<{ data: { version_no?: number | null } | null }>) => {
-      if (!alive) return;
-      setRefs({ graphVersionNo: ds.data?.version_no ?? null, policyVersionNo: pv.data?.version_no ?? null });
-    });
-    return () => {
-      alive = false;
-    };
-  }, [card.dataset_version_id, card.policy_version_id]);
-  return refs;
-}
 
 export function ValidatedModelSummary({
   card,
