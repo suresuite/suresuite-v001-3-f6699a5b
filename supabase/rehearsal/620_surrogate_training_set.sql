@@ -12,6 +12,8 @@
 --    first run again.
 -- §6 the doors: the view runs as its caller, and the feature computation is not
 --    an API door.
+-- §7 §4 D254: a run two models cite counts ONCE in the set's size — the
+--    per-model summary lists it under each, the totals do not add them up.
 
 INSERT INTO public.sim_engines (slug, name, status, capabilities) VALUES
   ('scsim', 'scsim — the strategic engine', 'active', '{"compute": ["worker", "browser"]}'::jsonb)
@@ -179,6 +181,21 @@ BEGIN
   IF has_function_privilege('anon', 'public._feature_spec_compute(uuid)', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public._feature_spec_compute(uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'R620 §6: the feature computation is an API door';
+  END IF;
+
+  -- ══ §7 · a shared evidence run counts once (D254) ══
+  -- A second version of the model, validated on the same evidence run — the shape
+  -- production holds (§15 run 36863326325, probe 16).
+  PERFORM public.record_validated_model(v_proj, v_pv, v_ds, v_scen, 'R620 model v2',
+    k_proto || '{"replications":4}'::jsonb,
+    'engine', '{}'::jsonb, '[]'::jsonb, '[]'::jsonb, 'face', 'Reviewed with operations.', v_ev, '{}'::jsonb, v_user);
+  IF jsonb_array_length(public.surrogate_training_summary(v_proj)) <> 2 THEN
+    RAISE EXCEPTION 'R620 §7: the second model''s lineage is not its own group: %', public.surrogate_training_summary(v_proj);
+  END IF;
+  v_sum := public.surrogate_training_totals(v_proj);
+  IF (v_sum ->> 'runs')::int <> 2 OR (v_sum ->> 'replications')::int <> 3
+     OR (v_sum ->> 'models')::int <> 2 OR (v_sum ->> 'graph_versions')::int <> 1 THEN
+    RAISE EXCEPTION 'R620 §7: the set''s size counted a shared run twice (want 2 runs, 3 replications, 2 models, 1 graph version): %', v_sum;
   END IF;
 
   RAISE NOTICE 'R620 ok — faithful runs and evidence in, the rest out, features once per graph';

@@ -84,7 +84,7 @@ import { CompareScenariosPanel } from "./CompareScenariosPanel";
 import { ExperimentLibraryBox, ScenarioList } from "./ScenarioRail";
 import { StressTestDrawer, type StressTestPreset } from "./StressTestCard";
 import { SurrogateCard } from "./SurrogateCard";
-import type { TrainingGroup } from "@/lib/sim/surrogateTraining";
+import type { TrainingTotals } from "@/lib/sim/surrogateTraining";
 import { ReadOnlyFrame } from "./ReadOnlyFrame";
 import { RESPONSE_LABELS, type RecoveryConfig, type RecoveryResponseKey } from "@/lib/sim/recoveryScore";
 import { kpiDisplay } from "@/lib/sim/kpiDisplay";
@@ -206,7 +206,7 @@ export interface MobileSimulationLabProps {
   /** replication-weeks and expected storage, with its basis */
   runEstimate?: string | null;
   /** WP 10.8 — the surrogate's training set, grouped by model and graph version */
-  trainingSet?: TrainingGroup[] | null;
+  trainingSet?: TrainingTotals | null;
 }
 
 export function MobileSimulationLab(props: MobileSimulationLabProps) {

@@ -15,11 +15,11 @@
  *
  * WP 10.8 (§4 D249) gives it ONE figure, and it is a count, not a prediction:
  * how many replications the training set already holds, from
- * `surrogate_training_summary`. Absent until it is read.
+ * `surrogate_training_totals` (distinct, §4 D254). Absent until it is read.
  */
-import { trainingSetLine, type TrainingGroup } from "@/lib/sim/surrogateTraining";
+import { trainingSetLine, type TrainingTotals } from "@/lib/sim/surrogateTraining";
 
-export function SurrogateCard({ training = null }: { training?: TrainingGroup[] | null } = {}) {
+export function SurrogateCard({ training = null }: { training?: TrainingTotals | null } = {}) {
   const line = trainingSetLine(training);
   return (
     <section
