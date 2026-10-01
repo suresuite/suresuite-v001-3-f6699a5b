@@ -6,13 +6,7 @@
 // section — lives here, in the sheet that "History n" opens.
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogFooter, ResponsiveDialogHeader, ResponsiveDialogTitle } from "@/components/shared/ResponsiveDialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -53,7 +47,7 @@ export function SaveVersionDialog({
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
   return (
-    <Dialog
+    <ResponsiveDialog
       open={open}
       onOpenChange={(v) => {
         if (v) {
@@ -63,10 +57,10 @@ export function SaveVersionDialog({
         onOpenChange(v);
       }}
     >
-      <DialogContent className={cn(DIALOG_AS_SHEET, "md:max-w-sm")}>
-        <DialogHeader>
-          <DialogTitle className="text-[13px]">Save model version</DialogTitle>
-        </DialogHeader>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, "md:max-w-sm")}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="text-[13px]">Save model version</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         <div className="flex flex-col gap-1">
           <span className={KX_TIGHT}>Label</span>
           <Input
@@ -92,7 +86,7 @@ export function SaveVersionDialog({
             Parent {versionDisplayName(current)}
           </span>
         )}
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
@@ -105,9 +99,9 @@ export function SaveVersionDialog({
           >
             Save
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 

@@ -40,7 +40,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogHeader, ResponsiveDialogTitle, ResponsiveDialogFooter, ResponsiveDialogTrigger } from '@/components/shared/ResponsiveDialog';
 import { DIALOG_AS_SHEET, HDR_PRIMARY_BUTTON, HDR_SEARCH_INPUT } from '@/components/shared';
 import { Ban, Building2, KeyRound, Loader2, Plus, SlidersHorizontal, Star, Trash2, Undo2, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -443,9 +443,9 @@ function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
   };
 
   return (
-    <Dialog open onOpenChange={(v) => !v && !busy && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Organizations — {row.name || row.email}</DialogTitle></DialogHeader>
+    <ResponsiveDialog open onOpenChange={(v) => !v && !busy && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader><ResponsiveDialogTitle>Organizations — {row.name || row.email}</ResponsiveDialogTitle></ResponsiveDialogHeader>
         <div className="grid gap-3 text-[13px]">
           {memberships.length === 0 ? (
             <p className="text-muted-foreground">This account belongs to no organization, so it can see no organization&rsquo;s projects.</p>
@@ -502,11 +502,11 @@ function MembershipsDialog({ row, orgs, actorArgs, onClose, onChanged }: {
             </div>
           )}
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={busy}>Done</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -540,14 +540,14 @@ function DeleteUserDialog({ row, actorArgs, onClose, onDone }: {
     onClose(); onDone();
   };
   return (
-    <Dialog open onOpenChange={(v) => !v && !deleting && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader>
-          <DialogTitle>Delete “{row.name || email}” permanently</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog open onOpenChange={(v) => !v && !deleting && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Delete “{row.name || email}” permanently</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             This cannot be undone. Suspending can be reversed; deleting cannot.
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
         {isSuper ? (
           <p className="text-[13px] text-muted-foreground">
             This account is a super admin. Change its role first, then delete it — the role change is where the
@@ -579,14 +579,14 @@ function DeleteUserDialog({ row, actorArgs, onClose, onDone }: {
             </div>
           </div>
         )}
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={deleting}>Cancel</Button>
           <Button variant="destructive" className="rounded-sm" onClick={remove} disabled={isSuper || !matches || deleting}>
             {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete account
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -619,12 +619,12 @@ function AddUserDialog({ orgs, actorArgs, onCreated }: {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
-      <DialogTrigger asChild>
+    <ResponsiveDialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+      <ResponsiveDialogTrigger asChild>
         <Button size="sm" className={cn('gap-1.5 rounded-sm', HDR_PRIMARY_BUTTON)}><Plus className="h-3.5 w-3.5" />Add user</Button>
-      </DialogTrigger>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Add user</DialogTitle></DialogHeader>
+      </ResponsiveDialogTrigger>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader><ResponsiveDialogTitle>Add user</ResponsiveDialogTitle></ResponsiveDialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Full name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-sm" placeholder="Jane Doe" /></div>
           <div><Label className="text-xs">Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 rounded-sm" placeholder="jane@company.com" /></div>
@@ -653,12 +653,12 @@ function AddUserDialog({ orgs, actorArgs, onCreated }: {
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={create} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create user</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -735,16 +735,16 @@ function ResetPasswordDialog({ target, actorArgs, onClose, onDone }: {
   };
 
   return (
-    <Dialog open onOpenChange={(v) => !v && !saving && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader>
-          <DialogTitle>{done ? 'Password reset' : `Reset password for “${who}”`}</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog open onOpenChange={(v) => !v && !saving && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>{done ? 'Password reset' : `Reset password for “${who}”`}</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             {done
               ? `Send this temporary password to ${target.email ?? who} now. It will not be shown again.`
               : 'Their current password stops working at once. They sign in with the temporary password below and must choose a new one before they can continue.'}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
         <div className="grid gap-3 text-[13px]">
           <div>
             <Label className="text-xs">Temporary password</Label>
@@ -772,7 +772,7 @@ function ResetPasswordDialog({ target, actorArgs, onClose, onDone }: {
             </p>
           )}
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           {done ? (
             <Button className="rounded-sm" onClick={onClose}>Done</Button>
           ) : (
@@ -783,8 +783,8 @@ function ResetPasswordDialog({ target, actorArgs, onClose, onDone }: {
               </Button>
             </>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

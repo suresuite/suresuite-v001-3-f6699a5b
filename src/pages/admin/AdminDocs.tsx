@@ -20,9 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogFooter, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/shared/ResponsiveDialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -288,12 +286,12 @@ export default function AdminDocs({ isCollapsed, setIsCollapsed }: Props) {
         </div>
       )}
 
-      <Dialog open={draft != null} onOpenChange={(o) => !o && setDraft(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{draft?.id ? 'Edit question' : 'Add question'}</DialogTitle>
-            <DialogDescription>Readers see the question and its answer on the Questions &amp; answers page.</DialogDescription>
-          </DialogHeader>
+      <ResponsiveDialog open={draft != null} onOpenChange={(o) => !o && setDraft(null)}>
+        <ResponsiveDialogContent className="max-w-2xl">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>{draft?.id ? 'Edit question' : 'Add question'}</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>Readers see the question and its answer on the Questions &amp; answers page.</ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
           {draft && (
             <div className="space-y-3">
               <div className="space-y-1.5">
@@ -339,12 +337,12 @@ export default function AdminDocs({ isCollapsed, setIsCollapsed }: Props) {
               </div>
             </div>
           )}
-          <DialogFooter>
+          <ResponsiveDialogFooter>
             <Button variant="ghost" onClick={() => setDraft(null)}>Cancel</Button>
             <Button onClick={save} disabled={saving}>{saving && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       <AlertDialog open={deleting != null} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>

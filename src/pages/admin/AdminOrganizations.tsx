@@ -30,7 +30,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogHeader, ResponsiveDialogTitle, ResponsiveDialogFooter, ResponsiveDialogTrigger } from '@/components/shared/ResponsiveDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Ban, Loader2, MoreHorizontal, Pencil, Plus, ShieldCheck, Trash2, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -296,16 +296,16 @@ function RenameOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
     toast.success(`Renamed to "${name.trim()}"`); onClose(); onDone();
   };
   return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Rename “{org.name}”</DialogTitle></DialogHeader>
+    <ResponsiveDialog open onOpenChange={(v) => !v && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader><ResponsiveDialogTitle>Rename “{org.name}”</ResponsiveDialogTitle></ResponsiveDialogHeader>
         <div><Label className="text-xs">New name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-sm" autoFocus /></div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={save} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Rename</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -325,12 +325,12 @@ function LimitsDialog({ org, onClose, onSave }: {
     onClose();
   };
   return (
-    <Dialog open onOpenChange={(v) => !v && !saving && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader>
-          <DialogTitle>Limits for “{org.name}”</DialogTitle>
-          <DialogDescription>Lowering a limit removes nothing; nothing can be added until the organization is under it.</DialogDescription>
-        </DialogHeader>
+    <ResponsiveDialog open onOpenChange={(v) => !v && !saving && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Limits for “{org.name}”</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>Lowering a limit removes nothing; nothing can be added until the organization is under it.</ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
         <div className="grid gap-3">
           <div>
             <Label className="text-xs">Users · {usage(org.members, org.user_limit)} now</Label>
@@ -341,12 +341,12 @@ function LimitsDialog({ org, onClose, onSave }: {
             <LimitSelect value={limitFromSelect(projectLimit)} noun="project" onChange={setProjectLimit} className="mt-1 rounded-sm" />
           </div>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={save} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save limits</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -374,14 +374,14 @@ function DeleteOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
     onClose(); onDone();
   };
   return (
-    <Dialog open onOpenChange={(v) => !v && !deleting && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader>
-          <DialogTitle>Delete “{org.name}” permanently</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog open onOpenChange={(v) => !v && !deleting && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Delete “{org.name}” permanently</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             This cannot be undone. Suspending can be reversed; deleting cannot.
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
         <div className="grid gap-3 text-[13px]">
           <div>
             <p className="font-medium">Deleted, forever:</p>
@@ -403,14 +403,14 @@ function DeleteOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
             <Input value={typed} onChange={(e) => setTyped(e.target.value)} className="mt-1 rounded-sm font-mono" autoFocus autoComplete="off" spellCheck={false} />
           </div>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={deleting}>Cancel</Button>
           <Button variant="destructive" className="rounded-sm" onClick={remove} disabled={!matches || deleting}>
             {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete organization
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -439,10 +439,10 @@ function AddOrgDialog({ actorArgs, onCreated }: { actorArgs: () => any; onCreate
     toast.success(`Organization "${name.trim()}" created`); reset(); setOpen(false); onCreated();
   };
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
-      <DialogTrigger asChild><Button size="sm" className={cn('gap-1.5 rounded-sm', HDR_PRIMARY_BUTTON)}><Plus className="h-3.5 w-3.5" />Add organization</Button></DialogTrigger>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Add organization</DialogTitle></DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+      <ResponsiveDialogTrigger asChild><Button size="sm" className={cn('gap-1.5 rounded-sm', HDR_PRIMARY_BUTTON)}><Plus className="h-3.5 w-3.5" />Add organization</Button></ResponsiveDialogTrigger>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader><ResponsiveDialogTitle>Add organization</ResponsiveDialogTitle></ResponsiveDialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-sm" placeholder="Acme Robotics" /></div>
           <div><Label className="text-xs">Slug (optional)</Label><Input value={slug} onChange={(e) => setSlug(e.target.value)} className="mt-1 rounded-sm font-mono" placeholder="auto-generated from name" /></div>
@@ -464,11 +464,11 @@ function AddOrgDialog({ actorArgs, onCreated }: { actorArgs: () => any; onCreate
             The period is counted from when the organization is created; after it ends its members cannot sign in (super admins excepted) until it is renewed — unless they also belong to another organization that is still current, which they are switched to.
           </p>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={create} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create organization</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
