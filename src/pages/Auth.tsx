@@ -1,4 +1,5 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { lazyChunk } from '@/lib/lazyChunk';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,7 +13,7 @@ import { Check } from 'lucide-react';
 import AuthHeroStrip from '@/components/AuthHeroStrip';
 
 // Loaded on demand: /auth is in the initial graph, and the panel is rarely opened.
-const ForgotPasswordPanel = lazy(() => import('@/pages/AuthForgotPassword'));
+const ForgotPasswordPanel = lazyChunk(() => import('@/pages/AuthForgotPassword'));
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -32,17 +33,20 @@ const Auth = () => {
   const { login, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { homePath } = useCapabilities();
+  const { homePath, ready } = useCapabilities();
   const { toast } = useToast();
 
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
   const redirectTo = from && !from.startsWith('/auth') ? from : homePath;
 
+  // Waits for `ready`: `homePath` is only this user's once their capability set
+  // has been read. Before that it comes from the role fallback, which sends a
+  // restricted account to /app and from there to /forbidden.
   useEffect(() => {
-    if (user) {
+    if (user && ready) {
       navigate(redirectTo, { replace: true });
     }
-  }, [user, navigate, redirectTo]);
+  }, [user, ready, navigate, redirectTo]);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -72,7 +76,11 @@ const Auth = () => {
     setIsLoading(false);
   };
 
-  const isBusy = isLoading || signedIn;
+  // Signed in already (this login, or a visitor who opened /auth with a live
+  // session): the hand-off is under way, so the form stays disabled while the
+  // capability read that picks their home finishes.
+  const handingOff = signedIn || Boolean(user);
+  const isBusy = isLoading || handingOff;
 
   return (
     <div className="flex min-h-dvh items-stretch bg-white text-[#171717] min-[1920px]:[zoom:1.15] min-[2560px]:[zoom:1.35]">
@@ -109,7 +117,7 @@ const Auth = () => {
             </div>
           )}
 
-          {signedIn && (
+          {handingOff && (
             <div className="flex items-center gap-[11px] rounded bg-[#171717] p-[14px]">
               <span className="size-[6px] shrink-0 animate-pulse rounded-full bg-white" />
               <span className="text-[13px] tracking-[-0.01em] text-white">

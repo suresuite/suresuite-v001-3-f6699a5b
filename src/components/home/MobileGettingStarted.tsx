@@ -34,6 +34,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { User } from 'lucide-react';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
 import { useAuth } from '@/hooks/useAuth';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import {
   M,
   MobileActionBar,
@@ -95,6 +96,12 @@ export function MobileGettingStarted() {
   const { selectedProject } = useGlobalProject();
   const { user } = useAuth();
   const navigate = useNavigate();
+  // Only steps — and the pinned action — this account may open (the sidebar's
+  // rule): a restricted account is not offered a row that bounces to /forbidden.
+  // Each step keeps its printed number, which names the step, not the row.
+  const { canAccessPage } = useCapabilities();
+  const steps = QUICK_START.filter((step) => canAccessPage(step.to));
+  const canOpenProjectManager = canAccessPage('/project-manager');
 
   const initial =
     (user?.display_name || user?.name || '')?.charAt(0).toUpperCase() || null;
@@ -158,9 +165,10 @@ export function MobileGettingStarted() {
       </MobilePanel>
 
       {/* ── Quick start ────────────────────────────────────────────────── */}
+      {steps.length > 0 && (
       <MobileGroup label="Start here">
-      <MobilePanel label="Quick start" counter={`${QUICK_START.length}`}>
-        {QUICK_START.map((step) => (
+      <MobilePanel label="Quick start" counter={`${steps.length}`}>
+        {steps.map((step) => (
           <MobileRow
             key={step.to}
             onClick={() => navigate(step.to)}
@@ -175,14 +183,17 @@ export function MobileGettingStarted() {
         ))}
       </MobilePanel>
       </MobileGroup>
+      )}
 
       {/* §8 — the one primary action, pinned. */}
-      <MobileActionBar
-        primary={{
-          label: selectedProject ? 'Continue' : 'Choose a project',
-          onClick: () => navigate('/project-manager'),
-        }}
-      />
+      {canOpenProjectManager && (
+        <MobileActionBar
+          primary={{
+            label: selectedProject ? 'Continue' : 'Choose a project',
+            onClick: () => navigate('/project-manager'),
+          }}
+        />
+      )}
       </div>
     </>
   );

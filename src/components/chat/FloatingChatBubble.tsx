@@ -95,7 +95,7 @@ export function FloatingChatBubble() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { canFeature, isModelAllowed } = useCapabilities();
+  const { canFeature, canAccessPage, isModelAllowed } = useCapabilities();
   const { selectedProject, globalSelectedProjectId, setGlobalSelectedProjectId, setSelectedProject } = useGlobalProject();
   const projectId = selectedProject?.id ?? globalSelectedProjectId ?? null;
   const { projects, loading: projectsLoading } = useProjects();
@@ -351,20 +351,23 @@ export function FloatingChatBubble() {
                 <Trash2 className="h-4 w-4" />
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 min-h-11 min-w-11 shrink-0 text-background/90 hover:bg-background/10 hover:text-background md:min-h-0 md:min-w-0"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => {
-                setOpen(false);
-                navigate(`/project-intelligence?thread=${QUICK_THREAD_ID}`);
-              }}
-              aria-label="Open in Project Intelligence"
-              title="Open in Project Intelligence"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </Button>
+            {/* Only for an account that may open the page — otherwise it bounces to /forbidden. */}
+            {canAccessPage("/project-intelligence") && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 min-h-11 min-w-11 shrink-0 text-background/90 hover:bg-background/10 hover:text-background md:min-h-0 md:min-w-0"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => {
+                  setOpen(false);
+                  navigate(`/project-intelligence?thread=${QUICK_THREAD_ID}`);
+                }}
+                aria-label="Open in Project Intelligence"
+                title="Open in Project Intelligence"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"

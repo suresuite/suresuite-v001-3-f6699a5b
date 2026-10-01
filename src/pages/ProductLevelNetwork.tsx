@@ -1,5 +1,6 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
-import { Suspense, lazy, useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { lazyChunk } from '@/lib/lazyChunk';
 import { Node, Edge, Position } from '@xyflow/react';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -47,7 +48,7 @@ import SupplierMaterialChart from '@/components/SupplierMaterialChart';
 import { NetworkDisruptionDialog } from '@/components/network/NetworkDisruptionDialog';
 // See the note in FirmLevelNetwork.tsx — mapbox-gl loads only when the user
 // actually switches this card to map view.
-const MapView = lazy(() => import('@/components/MapView'));
+const MapView = lazyChunk(() => import('@/components/MapView'));
 import { NetworkMetricsTable } from '@/components/NetworkMetricsTable';
 import { calculateSupplierMetrics, calculateMaterialMetrics } from '@/utils/networkMetrics';
 import { MobileGroup, MobilePageHeader, ProjectChip } from '@/components/mobile';

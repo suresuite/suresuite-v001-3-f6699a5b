@@ -2,7 +2,8 @@
 // Authenticated users are redirected to their app home (`/app` when granted).
 
 import { Link, Navigate } from 'react-router-dom';
-import { Suspense, lazy, useState, useEffect, useRef } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
+import { lazyChunk } from '@/lib/lazyChunk';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -12,7 +13,7 @@ import ResearchNotice from '@/components/shared/ResearchNotice';
 // public landing page that needs them. Eager, they were downloaded and parsed
 // by every visitor on every route — including phones, which render this scene
 // at 220px on a black background. Lazy, they cost nothing until the hero paints.
-const NetworkVisualization3D = lazy(() => import('@/components/NetworkVisualization3D'));
+const NetworkVisualization3D = lazyChunk(() => import('@/components/NetworkVisualization3D'));
 import {
   ArrowRight,
   Play,
@@ -290,14 +291,17 @@ function HeroRipple() {
 
 export default function Landing() {
   const { user, loading } = useAuth();
-  const { homePath, docs } = useCapabilities();
+  const { homePath, docs, ready } = useCapabilities();
   // The public site advertises the manual once a super admin has made at least
   // one of its sections public (/admin/docs, docsVisibility.ts).
   const docsPublic = docs.anyPublic;
   const [activeTech, setActiveTech] = useState<TechKey>('network');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  if (loading) {
+  // `ready`: a signed-in visitor is forwarded to their home, and `homePath` is
+  // only theirs once the server's capability set lands — before it, the role
+  // fallback sends a restricted account to /app and on to /forbidden.
+  if (loading || !ready) {
     return (
       <div className="min-h-dvh grid place-items-center bg-background">
         <div className="h-8 w-8 rounded-full border-b-2 border-primary animate-spin" />

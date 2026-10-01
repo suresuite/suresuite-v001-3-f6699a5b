@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Suspense, lazy, useState, type ReactNode } from 'react';
+import { Suspense, useState, type ReactNode } from 'react';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { CapabilitiesProvider, useCapabilities } from '@/hooks/useCapabilities';
 import { GlobalProjectProvider } from '@/hooks/useGlobalProject';
@@ -11,12 +11,14 @@ import { Toaster } from '@/components/ui/sonner';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import RoleGuard from '@/components/RoleGuard';
 import RouteErrorBoundary from '@/components/RouteErrorBoundary';
+import PageSpinner from '@/components/PageSpinner';
 import { PageLayout } from '@/components/shared/PageLayout';
 import { passwordStatus } from '@/lib/auth/passwordPolicy';
+import { lazyChunk } from '@/lib/lazyChunk';
 
 // Renders on every route, but never in the first frame that matters — so the
 // chat tree and its dependencies come after the page, not with it.
-const FloatingChatBubble = lazy(() =>
+const FloatingChatBubble = lazyChunk(() =>
   import('@/components/chat/FloatingChatBubble').then((m) => ({ default: m.FloatingChatBubble })),
 );
 
@@ -31,50 +33,41 @@ const FloatingChatBubble = lazy(() =>
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 
-const OrbitMrpCallback = lazy(() => import('./pages/OrbitMrpCallback'));
-const DataManager = lazy(() => import('./pages/DataManager'));
-const ProductLevelNetwork = lazy(() => import('./pages/ProductLevelNetwork'));
-const ProcessLevelNetwork = lazy(() => import('./pages/ProcessLevelNetwork'));
-const FirmLevelNetwork = lazy(() => import('./pages/FirmLevelNetwork'));
-const InteractiveNetworkSpace = lazy(() => import('./pages/InteractiveNetworkSpace'));
-const GettingStarted = lazy(() => import('./pages/GettingStarted'));
-const ProjectPolicies = lazy(() => import('./pages/ProjectPolicies'));
-const SimulationLab = lazy(() => import('./pages/SimulationLab'));
-const ProjectIntelligence = lazy(() => import('./pages/ProjectIntelligence'));
-const Profile = lazy(() => import('./pages/Profile'));
-const DeveloperApi = lazy(() => import('./pages/DeveloperApi'));
-const Forbidden = lazy(() => import('./pages/Forbidden'));
-const NotFound = lazy(() => import('./pages/NotFound'));
-const About = lazy(() => import('./pages/About'));
-const DocsLayout = lazy(() => import('./components/docs/DocsLayout'));
-const DocsHome = lazy(() => import('./components/docs/DocsHome'));
-const DocPage = lazy(() => import('./components/docs/DocPage'));
-const HelpSlugRedirect = lazy(() => import('./components/docs/legacyRedirects'));
-const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
-const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
-const AdminUserAccess = lazy(() => import('./pages/admin/AdminUserAccess'));
-const AdminRoles = lazy(() => import('./pages/admin/AdminRoles'));
-const AdminOrganizations = lazy(() => import('./pages/admin/AdminOrganizations'));
-const AdminProjects = lazy(() => import('./pages/admin/AdminProjects'));
-const AdminModels = lazy(() => import('./pages/admin/AdminModels'));
-const AdminUsage = lazy(() => import('./pages/admin/AdminUsage'));
-const AdminAudit = lazy(() => import('./pages/admin/AdminAudit'));
-const AdminDocs = lazy(() => import('./pages/admin/AdminDocs'));
+const OrbitMrpCallback = lazyChunk(() => import('./pages/OrbitMrpCallback'));
+const DataManager = lazyChunk(() => import('./pages/DataManager'));
+const ProductLevelNetwork = lazyChunk(() => import('./pages/ProductLevelNetwork'));
+const ProcessLevelNetwork = lazyChunk(() => import('./pages/ProcessLevelNetwork'));
+const FirmLevelNetwork = lazyChunk(() => import('./pages/FirmLevelNetwork'));
+const InteractiveNetworkSpace = lazyChunk(() => import('./pages/InteractiveNetworkSpace'));
+const GettingStarted = lazyChunk(() => import('./pages/GettingStarted'));
+const ProjectPolicies = lazyChunk(() => import('./pages/ProjectPolicies'));
+const SimulationLab = lazyChunk(() => import('./pages/SimulationLab'));
+const ProjectIntelligence = lazyChunk(() => import('./pages/ProjectIntelligence'));
+const Profile = lazyChunk(() => import('./pages/Profile'));
+const DeveloperApi = lazyChunk(() => import('./pages/DeveloperApi'));
+const Forbidden = lazyChunk(() => import('./pages/Forbidden'));
+const NotFound = lazyChunk(() => import('./pages/NotFound'));
+const About = lazyChunk(() => import('./pages/About'));
+const DocsLayout = lazyChunk(() => import('./components/docs/DocsLayout'));
+const DocsHome = lazyChunk(() => import('./components/docs/DocsHome'));
+const DocPage = lazyChunk(() => import('./components/docs/DocPage'));
+const HelpSlugRedirect = lazyChunk(() => import('./components/docs/legacyRedirects'));
+const AdminDashboard = lazyChunk(() => import('./pages/admin/AdminDashboard'));
+const AdminUsers = lazyChunk(() => import('./pages/admin/AdminUsers'));
+const AdminUserAccess = lazyChunk(() => import('./pages/admin/AdminUserAccess'));
+const AdminRoles = lazyChunk(() => import('./pages/admin/AdminRoles'));
+const AdminOrganizations = lazyChunk(() => import('./pages/admin/AdminOrganizations'));
+const AdminProjects = lazyChunk(() => import('./pages/admin/AdminProjects'));
+const AdminModels = lazyChunk(() => import('./pages/admin/AdminModels'));
+const AdminUsage = lazyChunk(() => import('./pages/admin/AdminUsage'));
+const AdminAudit = lazyChunk(() => import('./pages/admin/AdminAudit'));
+const AdminDocs = lazyChunk(() => import('./pages/admin/AdminDocs'));
 
 /** Shown while a route chunk arrives. Deliberately the same spinner
- *  `ProtectedRoute` shows while it resolves the session — from the user's side
- *  both are "the page is coming", and two different waits would read as two
+ *  `ProtectedRoute` and `RoleGuard` show (`PageSpinner`) — from the user's side
+ *  all are "the page is coming", and two different waits would read as two
  *  different kinds of slow. */
-function RouteFallback() {
-  return (
-    <div className="min-h-dvh bg-background flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-        <p className="mt-2 text-muted-foreground">Loading...</p>
-      </div>
-    </div>
-  );
-}
+const RouteFallback = PageSpinner;
 
 /** The manual's door. Each SECTION has an audience a super admin sets from
  *  /admin/docs (public · internal · confidential — `docsVisibility.ts`), so the
@@ -84,9 +77,11 @@ function RouteFallback() {
  *  `canAccessPage`, the same call the sidebar and phone drawer make. */
 function DocsGate({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
-  const { canAccessPage, docs } = useCapabilities();
+  const { canAccessPage, docs, ready } = useCapabilities();
   const location = useLocation();
-  if (loading || docs.loading) return <RouteFallback />;
+  // `ready`: a signed-in reader's Confidential grant is in the server's set,
+  // not in the role fallback — deciding before it lands sends them to /forbidden.
+  if (loading || docs.loading || !ready) return <RouteFallback />;
   // RoleGuard's rule, kept here because a signed-in reader does not pass through it.
   if (user && passwordStatus(user).mustChange) {
     return <Navigate to="/profile?tab=password&forced=1" replace />;

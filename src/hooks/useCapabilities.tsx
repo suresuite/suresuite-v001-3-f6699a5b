@@ -12,15 +12,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserRole } from '@/hooks/useUserRole';
 import {
+  capabilitiesReady,
   checkBudget as checkBudgetPure,
   homePathFor,
   isModelAllowed as isModelAllowedPure,
   normalizeCapabilities,
   pageKeyForPath,
   roleFallbackCapabilities,
+  serverCapabilitiesFor,
+  settleCapabilities,
   type EffectiveCapabilities,
   type FeatureKey,
   type ModelGateResult,
+  type ResolvedCapabilities,
 } from '@/lib/capabilities';
 import {
   canReadAnySection,
@@ -53,8 +57,15 @@ export interface DocsAccess {
 interface CapabilitiesContextValue {
   /** Resolved set — server-provided when available, role fallback otherwise. */
   capabilities: EffectiveCapabilities | null;
-  /** True until the first server fetch resolves (or fails). */
+  /** True while a server read is in flight (the first one, or a refresh). */
   loading: boolean;
+  /**
+   * True once this user's server set has been read, or the read failed or timed
+   * out (then the role fallback governs). Until then the fallback is a guess
+   * that knows nothing of org/user overrides, so access decisions wait for it.
+   * A refresh does not make it false again.
+   */
+  ready: boolean;
   /** True while gating from the role fallback rather than the server set. */
   usingFallback: boolean;
   refresh: () => Promise<void>;
@@ -73,11 +84,18 @@ interface CapabilitiesContextValue {
 
 const CapabilitiesContext = createContext<CapabilitiesContextValue | undefined>(undefined);
 
+/** A read that has not answered by now stops holding pages on a spinner; the
+ *  role fallback governs until it lands, and the real answer still applies. */
+const CAPABILITIES_WAIT_MS = 8000;
+
 export const CapabilitiesProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
-  const [serverCaps, setServerCaps] = useState<EffectiveCapabilities | null>(null);
+  const userId = user?.id ?? null;
+  const [resolved, setResolved] = useState<ResolvedCapabilities | null>(null);
   const [loading, setLoading] = useState(false);
-  const lastUserId = useRef<string | null>(null);
+  // Every read takes a number; only the newest may write, so a superseded
+  // answer (another user, a sign-out) is dropped rather than applied.
+  const seq = useRef(0);
   const [docsReleases, setDocsReleases] = useState<DocsReleases | null>(null);
   const [docsLoading, setDocsLoading] = useState(true);
 
@@ -98,36 +116,50 @@ export const CapabilitiesProvider = ({ children }: { children: ReactNode }) => {
     refreshDocs();
   }, [refreshDocs]);
 
-  const load = useCallback(async (userId: string) => {
+  const load = useCallback(async (id: string) => {
+    const req = ++seq.current;
+    const isCurrent = () => seq.current === req;
     setLoading(true);
+    const timer = setTimeout(() => {
+      if (isCurrent()) setResolved((prev) => settleCapabilities(prev, id, null));
+    }, CAPABILITIES_WAIT_MS);
+    let caps: EffectiveCapabilities | null = null;
     try {
-      const { data, error } = await (supabase as any).rpc('get_my_capabilities', { _user_id: userId });
+      const { data, error } = await (supabase as any).rpc('get_my_capabilities', { _user_id: id });
       if (error) throw error;
-      const normalized = normalizeCapabilities(data);
-      // Ignore a resolve that arrives after the user switched away.
-      if (lastUserId.current === userId) setServerCaps(normalized);
+      caps = normalizeCapabilities(data);
     } catch (e) {
       console.warn('[capabilities] fetch failed, using role fallback:', e);
-      if (lastUserId.current === userId) setServerCaps(null);
     } finally {
-      if (lastUserId.current === userId) setLoading(false);
+      clearTimeout(timer);
     }
+    if (!isCurrent()) return;
+    // The set and its readiness change in ONE update, so nothing renders a
+    // moment of "ready" on the old answer.
+    setResolved((prev) => settleCapabilities(prev, id, caps));
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    const id = user?.id ?? null;
-    lastUserId.current = id;
-    setServerCaps(null);
-    if (id) {
-      load(id);
-    } else {
-      setLoading(false);
+    if (userId) {
+      load(userId);
+      return;
     }
-  }, [user?.id, load]);
+    // Signed out: drop any read in flight, and forget the answer, so signing
+    // back in — even as the same user — waits for a fresh one.
+    seq.current++;
+    setResolved(null);
+    setLoading(false);
+  }, [userId, load]);
 
   const refresh = useCallback(async () => {
-    if (user?.id) await load(user.id);
-  }, [user?.id, load]);
+    if (userId) await load(userId);
+  }, [userId, load]);
+
+  // Keyed by user: a previous user's answer is never this user's, even in the
+  // render before the effect above runs.
+  const serverCaps = serverCapabilitiesFor(resolved, userId);
+  const ready = capabilitiesReady(resolved, userId);
 
   // Role fallback keeps gating working instantly (and if the fetch fails).
   const capabilities: EffectiveCapabilities | null = useMemo(() => {
@@ -173,6 +205,7 @@ export const CapabilitiesProvider = ({ children }: { children: ReactNode }) => {
     return {
       capabilities,
       loading,
+      ready,
       usingFallback: !serverCaps,
       refresh,
       can,
@@ -186,7 +219,7 @@ export const CapabilitiesProvider = ({ children }: { children: ReactNode }) => {
       allModelsAllowed: capabilities?.models.all_allowed ?? true,
       docs,
     };
-  }, [capabilities, loading, serverCaps, refresh, user, docsReleases, docsLoading, refreshDocs]);
+  }, [capabilities, loading, ready, serverCaps, refresh, user, docsReleases, docsLoading, refreshDocs]);
 
   return <CapabilitiesContext.Provider value={value}>{children}</CapabilitiesContext.Provider>;
 };

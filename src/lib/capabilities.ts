@@ -213,6 +213,48 @@ export function roleFallbackCapabilities(
   };
 }
 
+/**
+ * The server's answer, keyed by the user it was asked for. `caps: null` means
+ * the read failed or timed out, so the role fallback governs. Keying it is
+ * what keeps an answer from leaking across a sign-out and sign-in, or a switch
+ * from one user to another, before the next read lands.
+ */
+export interface ResolvedCapabilities {
+  userId: string;
+  caps: EffectiveCapabilities | null;
+}
+
+/** A failed REFRESH keeps the last good set; a failed first read falls back to the role. */
+export function settleCapabilities(
+  prev: ResolvedCapabilities | null,
+  userId: string,
+  caps: EffectiveCapabilities | null,
+): ResolvedCapabilities {
+  if (caps) return { userId, caps };
+  if (prev && prev.userId === userId && prev.caps) return prev;
+  return { userId, caps: null };
+}
+
+/**
+ * True once this user's set has been read, or the read has failed or timed out.
+ * Until then the role fallback is a GUESS — it knows nothing of organization
+ * or user overrides — so nothing should gate on it.
+ */
+export function capabilitiesReady(
+  resolved: ResolvedCapabilities | null,
+  userId: string | null,
+): boolean {
+  return userId === null || resolved?.userId === userId;
+}
+
+/** The server's set for this user, or null (not read yet, failed, or another user's). */
+export function serverCapabilitiesFor(
+  resolved: ResolvedCapabilities | null,
+  userId: string | null,
+): EffectiveCapabilities | null {
+  return userId !== null && resolved?.userId === userId ? resolved.caps : null;
+}
+
 /** Normalise the raw jsonb from get_my_capabilities into a typed object. */
 export function normalizeCapabilities(raw: unknown): EffectiveCapabilities | null {
   if (!raw || typeof raw !== 'object') return null;
