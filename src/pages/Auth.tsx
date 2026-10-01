@@ -10,6 +10,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { useToast } from '@/hooks/use-toast';
 import { Check } from 'lucide-react';
 import AuthHeroStrip from '@/components/AuthHeroStrip';
+import ForgotPasswordPanel from '@/pages/AuthForgotPassword';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -24,6 +25,8 @@ const Auth = () => {
   const [rememberMe, setRememberMe] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
+  // "Forgot password?" swaps the form for a request to a super admin (§4 D233).
+  const [forgot, setForgot] = useState(false);
   const { login, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -80,6 +83,10 @@ const Auth = () => {
         />
 
         <div className="my-auto flex w-full max-w-[400px] flex-col gap-[22px] py-7">
+          {forgot ? (
+            <ForgotPasswordPanel initialEmail={form.getValues('email')} onBack={() => setForgot(false)} />
+          ) : (
+          <>
           <h1 className="m-0 text-[31px] font-semibold leading-[1.1] tracking-[-0.022em]">
             Welcome <span className="font-serif italic font-medium">back.</span>
           </h1>
@@ -141,10 +148,14 @@ const Auth = () => {
                       <FormLabel className="text-[12.5px] font-medium tracking-[-0.005em] text-[#171717]">
                         Password
                       </FormLabel>
-                      {/* TODO: point at a real reset route once it exists */}
-                      <a href="#" className="text-[12px] text-[#525252] no-underline hover:text-[#171717] md:text-[#737373]">
+                      <button
+                        type="button"
+                        onClick={() => { setFormError(null); setForgot(true); }}
+                        disabled={isBusy}
+                        className="text-[12px] text-[#525252] no-underline hover:text-[#171717] md:text-[#737373]"
+                      >
                         Forgot password?
-                      </a>
+                      </button>
                     </div>
                     <FormControl>
                       <div className="relative flex items-center">
@@ -212,6 +223,8 @@ const Auth = () => {
               </button>
             </form>
           </Form>
+          </>
+          )}
 
           <div className="flex flex-col gap-3 border-t border-[--hair-border] pt-5">
             <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#525252] md:tracking-[0.2em] md:text-[#737373]">No account yet</span>

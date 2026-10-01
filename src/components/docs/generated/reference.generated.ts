@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 712;
+export const REFERENCE_COLUMN_COUNT = 718;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -12623,6 +12623,203 @@ export const REFERENCE_TABLES: RefTable[] = [
         "primaryKey": false,
         "unique": false,
         "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      }
+    ]
+  },
+  {
+    "table": "password_reset_requests",
+    "tier": "G",
+    "tierName": "governance — identity, capability, delegation, audit",
+    "owner": "platform",
+    "grain": "One \"Forgot password?\" request for one account, from the moment the person asks until a super admin resets the password or dismisses the request (PLAN.md §4 D233).",
+    "naturalKey": [
+      "id",
+      "user_id"
+    ],
+    "naturalKeyIntended": null,
+    "checks": [
+      {
+        "name": "password_reset_requests_closed_shape",
+        "definition": "CHECK ((status = 'open') = (closed_at IS NULL))"
+      },
+      {
+        "name": "password_reset_requests_status",
+        "definition": "CHECK (status IN ('open', 'resolved', 'dismissed'))"
+      }
+    ],
+    "ingestDataset": null,
+    "surfaces": [],
+    "governance": {
+      "read": "super_admin",
+      "write": "super_admin",
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 0,
+      "unrestricted": 0
+    },
+    "columns": [
+      {
+        "name": "id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Surrogate id, `gen_random_uuid()`.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "user_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The account the request is for — the active `approved_users` row whose email was typed. Deleting the account deletes its requests (`ON DELETE CASCADE`).",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "approved_users",
+          "columns": [
+            "id"
+          ],
+          "onDelete": "CASCADE"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "status",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": "open | resolved | dismissed",
+        "meaning": "`open` until a super admin acts; then `resolved` (the password was reset) or `dismissed` (the request was not genuine, or was handled another way). CHECK-constrained, and `closed_at` is set exactly when the status is not `open`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "requested_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the person asked. Server-stamped.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "closed_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When a super admin resolved or dismissed the request; NULL while it is open.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "closed_by",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The super admin who closed it; NULL while open, or once that account is deleted (`ON DELETE SET NULL`).",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "approved_users",
+          "columns": [
+            "id"
+          ],
+          "onDelete": "SET NULL"
+        },
         "substitutions": [],
         "engineChain": null,
         "engineLevel": null,

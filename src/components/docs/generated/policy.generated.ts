@@ -3688,7 +3688,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 57,
+  "described": 58,
   "open": [
     {
       "table": "approved_users",
