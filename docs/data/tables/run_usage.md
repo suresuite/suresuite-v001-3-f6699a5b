@@ -29,7 +29,7 @@ partially or get corrected — the write fails.
 
 | Constraint | Rule | Added by |
 |---|---|---|
-| `run_usage_kind_check` | `CHECK (kind IN ('dispatch', 'complete', 'expire'))` | `20261001000011_capacity.sql` |
+| `run_usage_kind_check` | `CHECK (kind IN ('dispatch', 'complete', 'expire'))` | `20261001000012_capacity.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
@@ -92,7 +92,7 @@ The row's surrogate id.
 | Type | `uuid`, `NOT NULL`, default `gen_random_uuid()` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -106,7 +106,7 @@ The organization whose pool the run drew on — its project's `organization_id` 
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | References | `public.organizations(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -121,7 +121,7 @@ The member whose role share the run drew on: the app's asserted user the dispatc
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -135,7 +135,7 @@ The run's project.
 | Type | `uuid`, `NOT NULL` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | References | `public.projects(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -150,7 +150,7 @@ The run. Kept as NULL when the run is deleted, so the month's compute it used st
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | References | `public.simulation_runs(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -165,7 +165,7 @@ Compute, in replication-weeks: at `dispatch` the reservation (replications × ce
 | Type | `bigint`, `NOT NULL`, default `0` |
 | Grain | `level` |
 | Unit | `replication-weeks` — fixed |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -181,7 +181,7 @@ Series storage: 0 at `dispatch`; at `complete` the bytes a finished run keeps (`
 | Type | `bigint`, `NOT NULL`, default `0` |
 | Grain | `level` |
 | Unit | `bytes` — fixed |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -197,7 +197,7 @@ Series storage: 0 at `dispatch`; at `complete` the bytes a finished run keeps (`
 | Type | `text`, `NOT NULL` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -211,7 +211,7 @@ When the event happened; the month a reservation counts in.
 | Type | `timestamp with time zone`, `NOT NULL`, default `now()` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -220,11 +220,11 @@ When the event happened; the month a reservation counts in.
 
 | Index | Columns | Unique | Added by |
 |---|---|---|---|
-| `run_usage_org_at` | `org_id`, `at` | no | `20261001000011_capacity.sql` |
-| `run_usage_user_at` | `user_id`, `at` | no | `20261001000011_capacity.sql` |
+| `run_usage_org_at` | `org_id`, `at` | no | `20261001000012_capacity.sql` |
+| `run_usage_user_at` | `user_id`, `at` | no | `20261001000012_capacity.sql` |
 
 ---
 
-*Generated from data contract `cd592a2762e3`, engine `0.2.8`,
-sidecar `supabase/contract/run_usage.contract.yaml`, table created by `20261001000011_capacity.sql`. No wall-clock date: a generated
+*Generated from data contract `a9625dbc0ec9`, engine `0.2.8`,
+sidecar `supabase/contract/run_usage.contract.yaml`, table created by `20261001000012_capacity.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

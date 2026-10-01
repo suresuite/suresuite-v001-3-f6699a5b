@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-73 of 90 tables are covered,
-948 columns in all. A table that is not here is listed
+74 of 91 tables are covered,
+954 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -51,6 +51,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`organization_members`](organization_members.md) | G | `platform` | 6 | One user's membership of one organization, and the role they hold IN that organization. An account may hold several — one per organization it belongs to (§4 D210). Org-level only: it says nothing about which projects inside the organization the user may touch, which is what WP 2.2's `project_members` is for. |
 | [`organizations`](organizations.md) | G | `platform` | 18 | One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold. |
 | [`outbound_logistics`](outbound_logistics.md) | 2 | `data-ingestion` | 13 | One demand arc as the user uploaded it: this customer buys this product from this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row (D5 closed). |
+| [`password_reset_requests`](password_reset_requests.md) | G | `platform` | 6 | One "Forgot password?" request for one account, from the moment the person asks until a super admin resets the password or dismisses the request (PLAN.md §4 D251). |
 | [`plan_role_allowances`](plan_role_allowances.md) | 4 | `platform` | 8 | One project role's share of an organization's capacity pool: the percentage of the month's compute and of the series storage a member holding that role may use, and how many runs that member may have in flight. A row with no organization is the platform default; a row naming one overrides it for that organization alone. |
 | [`policy_defaults`](policy_defaults.md) | 4 | `policy-ui` | 15 | One row per project: the policy each family runs with unless a specific node overrides it. The bundle, in other words — and the thing a policy_override is a patch against. |
 | [`policy_overrides`](policy_overrides.md) | 4 | `policy-ui` | 10 | One patch against the project bundle, for one target: this supplier, this material, this customer/product pair. The only tier-4 table with a real natural key — (project, scope, target, family) is UNIQUE, so a target cannot hold two conflicting patches for the same family. |
@@ -88,4 +89,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `cd592a2762e3`, engine `0.2.8`.*
+*Generated from data contract `a9625dbc0ec9`, engine `0.2.8`.*

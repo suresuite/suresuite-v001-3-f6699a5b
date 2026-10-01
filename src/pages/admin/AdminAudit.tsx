@@ -90,6 +90,7 @@ function describe(r: AuditRow): string {
   }
   if (r.action === 'auth.sign_in') return 'signed in';
   if (r.action === 'auth.sign_in_failed') return `wrong password for ${r.target_name ?? 'an account'}`;
+  if (r.action === 'auth.password_reset_requested') return `password reset requested for ${r.target_name ?? 'an account'}`;
   if (r.action.startsWith('export.')) {
     return `${r.action === 'export.allowed' ? 'exported' : 'export refused'}${a.export_kind ? ` · ${String(a.export_kind)}` : ''}`;
   }

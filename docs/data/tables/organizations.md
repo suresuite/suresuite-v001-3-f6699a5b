@@ -32,7 +32,7 @@ partially or get corrected — the write fails.
 | `organizations_access_period_start_check` | `CHECK ((access_period IS NULL) = (access_valid_from IS NULL))` | `20260929000004_organization_plan.sql` |
 | `organizations_project_limit_check` | `CHECK (project_limit IN (1, 2, 3, 5, 10, 20, 50, 100))` | `20260930000012_organization_limit_options.sql` |
 | `organizations_user_limit_check` | `CHECK (user_limit IN (1, 2, 3, 5, 10, 20, 50, 100))` | `20260930000012_organization_limit_options.sql` |
-| `organizations_capacity_check` | `CHECK ( (storage_quota_bytes IS NULL OR storage_quota_bytes > 0) AND (compute_quota_rep_weeks_month IS NULL OR compute_quota_rep_weeks_month > 0) AND (max_replications_per_run IS NULL OR max_replications_per_run BETWEEN 1 AND 200) AND (max_concurrent_runs IS NULL OR max_concurrent_runs > 0) AND (series_retention_days IS NULL OR series_retention_days > 0))` | `20261001000011_capacity.sql` |
+| `organizations_capacity_check` | `CHECK ( (storage_quota_bytes IS NULL OR storage_quota_bytes > 0) AND (compute_quota_rep_weeks_month IS NULL OR compute_quota_rep_weeks_month > 0) AND (max_replications_per_run IS NULL OR max_replications_per_run BETWEEN 1 AND 200) AND (max_concurrent_runs IS NULL OR max_concurrent_runs > 0) AND (series_retention_days IS NULL OR series_retention_days > 0))` | `20261001000012_capacity.sql` |
 
 ## Governance
 
@@ -292,7 +292,7 @@ The simulation-result storage the organization's plan grants, in bytes: the `ser
 | Type | `bigint` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | > 0, or NULL |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -306,7 +306,7 @@ The simulation compute the plan grants per calendar month, in replication-weeks 
 | Type | `bigint` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | > 0, or NULL |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -320,7 +320,7 @@ The most replications one run may ask for, under the global clamp of 200. NULL i
 | Type | `integer` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | 1 – 200, or NULL |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -334,7 +334,7 @@ The most runs the organization may have queued or running at once. NULL is unlim
 | Type | `integer` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | > 0, or NULL |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -348,13 +348,13 @@ How long a standard run keeps its weekly series after it completes, read by `run
 | Type | `integer`, default `90` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | > 0, or NULL |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 ---
 
-*Generated from data contract `cd592a2762e3`, engine `0.2.8`,
+*Generated from data contract `a9625dbc0ec9`, engine `0.2.8`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

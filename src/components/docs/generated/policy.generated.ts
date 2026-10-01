@@ -3700,7 +3700,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 73,
+  "described": 74,
   "open": [
     {
       "table": "analysis_kinds",

@@ -29,10 +29,10 @@ partially or get corrected — the write fails.
 
 | Constraint | Rule | Added by |
 |---|---|---|
-| `plan_role_allowances_project_role_check` | `CHECK (project_role IN ('owner','editor','analyst','viewer'))` | `20261001000011_capacity.sql` |
-| `plan_role_allowances_compute_share_pct_check` | `CHECK (compute_share_pct BETWEEN 0 AND 100)` | `20261001000011_capacity.sql` |
-| `plan_role_allowances_storage_share_pct_check` | `CHECK (storage_share_pct BETWEEN 0 AND 100)` | `20261001000011_capacity.sql` |
-| `plan_role_allowances_max_concurrent_check` | `CHECK (max_concurrent IS NULL OR max_concurrent >= 0)` | `20261001000011_capacity.sql` |
+| `plan_role_allowances_project_role_check` | `CHECK (project_role IN ('owner','editor','analyst','viewer'))` | `20261001000012_capacity.sql` |
+| `plan_role_allowances_compute_share_pct_check` | `CHECK (compute_share_pct BETWEEN 0 AND 100)` | `20261001000012_capacity.sql` |
+| `plan_role_allowances_storage_share_pct_check` | `CHECK (storage_share_pct BETWEEN 0 AND 100)` | `20261001000012_capacity.sql` |
+| `plan_role_allowances_max_concurrent_check` | `CHECK (max_concurrent IS NULL OR max_concurrent >= 0)` | `20261001000012_capacity.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
@@ -66,7 +66,7 @@ The plan, not tenant data: readable by everyone (`plan_role_allowances_read`, `U
 
 | Policy | Command | Roles | Added by |
 |---|---|---|---|
-| plan_role_allowances_read | SELECT | anon, authenticated | `20261001000011_capacity.sql` |
+| plan_role_allowances_read | SELECT | anon, authenticated | `20261001000012_capacity.sql` |
 
 </details>
 
@@ -109,7 +109,7 @@ The row's surrogate id.
 | Type | `uuid`, `NOT NULL`, default `gen_random_uuid()` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -123,7 +123,7 @@ The organization this share overrides the default for; NULL is the platform defa
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | References | `public.organizations(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -138,7 +138,7 @@ The project role the share applies to — owner, editor, analyst or viewer, as `
 | Type | `text`, `NOT NULL` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -152,7 +152,7 @@ The percentage of the organization's monthly compute pool (`organizations.comput
 | Type | `numeric(5,2)`, `NOT NULL` |
 | Grain | `level` |
 | Unit | `percent of the pool` — fixed |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -168,7 +168,7 @@ The percentage of the organization's series storage (`organizations.storage_quot
 | Type | `numeric(5,2)`, `NOT NULL` |
 | Grain | `level` |
 | Unit | `percent of the pool` — fixed |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -184,7 +184,7 @@ How many runs one member holding this role may have queued or running. NULL is n
 | Type | `integer` |
 | Grain | `level` |
 | Unit | `runs` — fixed |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -200,7 +200,7 @@ When the row was created.
 | Type | `timestamp with time zone`, `NOT NULL`, default `now()` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -214,13 +214,13 @@ When `admin_set_role_allowance` last changed it.
 | Type | `timestamp with time zone`, `NOT NULL`, default `now()` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000011_capacity.sql` |
+| Added by | `20261001000012_capacity.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 ---
 
-*Generated from data contract `cd592a2762e3`, engine `0.2.8`,
-sidecar `supabase/contract/plan_role_allowances.contract.yaml`, table created by `20261001000011_capacity.sql`. No wall-clock date: a generated
+*Generated from data contract `a9625dbc0ec9`, engine `0.2.8`,
+sidecar `supabase/contract/plan_role_allowances.contract.yaml`, table created by `20261001000012_capacity.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

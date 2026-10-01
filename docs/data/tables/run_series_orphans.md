@@ -61,7 +61,7 @@ The object's path in the `run-results` bucket (`<project_id>/<run_id>/series.par
 | Type | `text`, `NOT NULL` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000013_series_sweep_via_storage_api.sql` |
+| Added by | `20261001000014_series_sweep_via_storage_api.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -75,7 +75,7 @@ The deleted run's id — a record, not a reference: the run is gone.
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000013_series_sweep_via_storage_api.sql` |
+| Added by | `20261001000014_series_sweep_via_storage_api.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -89,7 +89,7 @@ The deleted run's project — also a record; the project may be gone too.
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000013_series_sweep_via_storage_api.sql` |
+| Added by | `20261001000014_series_sweep_via_storage_api.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -103,13 +103,13 @@ When the run was deleted; the sweep hands objects over oldest first.
 | Type | `timestamp with time zone`, `NOT NULL`, default `now()` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000013_series_sweep_via_storage_api.sql` |
+| Added by | `20261001000014_series_sweep_via_storage_api.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 ---
 
-*Generated from data contract `cd592a2762e3`, engine `0.2.8`,
-sidecar `supabase/contract/run_series_orphans.contract.yaml`, table created by `20261001000013_series_sweep_via_storage_api.sql`. No wall-clock date: a generated
+*Generated from data contract `a9625dbc0ec9`, engine `0.2.8`,
+sidecar `supabase/contract/run_series_orphans.contract.yaml`, table created by `20261001000014_series_sweep_via_storage_api.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
