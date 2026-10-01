@@ -105,7 +105,7 @@ Surrogate identifier for the version. Referenced by runs.
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -139,7 +139,7 @@ A human-chosen name for this version, so a user can say which one they mean.
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -160,7 +160,7 @@ The frozen tier-2 rows themselves, as JSON. What the run actually ran against, n
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -181,7 +181,7 @@ The fingerprint of the snapshot. Two runs with the same graph_hash saw the same 
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -233,7 +233,7 @@ When the version was frozen. Server-set.
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -252,7 +252,7 @@ SHA-256 over the `inputs` domain of the snapshot — the tier-2 tables a SIMULAT
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -273,7 +273,7 @@ SHA-256 over the `network` domain — `tier2_suppliers`, `tier3_suppliers`, `mul
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:129`) —
+**Rendered on** `ProjectPolicies.tsx` (`src/hooks/useVerifiableExports.tsx:145`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -344,6 +344,6 @@ SHA-256 over the FIRM level (WP 10.1): the deep-tier topology (`network_nodes(ui
 
 ---
 
-*Generated from data contract `e45cd87ffb80`, engine `0.2.8`,
+*Generated from data contract `c833aa3d4794`, engine `0.2.8`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -33,6 +33,10 @@ partially or get corrected — the write fails.
 | `model_validations_status_check` | `CHECK (status IN ('active', 'superseded', 'revoked'))` | `20260710000001_model_validations.sql` |
 | `model_validations_protocol_check` | `CHECK (protocol IS NULL OR cardinality(public.validated_model_protocol_problems(protocol)) = 0)` | `20261001000008_validated_model.sql` |
 
+| Constraint | Kind | Definition |
+|---|---|---|
+| `model_validations_engine_id_fkey` | FOREIGN KEY | `FOREIGN KEY (engine_id) REFERENCES public.sim_engines(id)` |
+
 ## Governance
 
 | | |
@@ -612,6 +616,6 @@ Why, in their words.
 
 ---
 
-*Generated from data contract `e45cd87ffb80`, engine `0.2.8`,
+*Generated from data contract `c833aa3d4794`, engine `0.2.8`,
 sidecar `supabase/contract/model_validations.contract.yaml`, table created by `20260710000001_model_validations.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

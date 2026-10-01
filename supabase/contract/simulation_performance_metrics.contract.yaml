@@ -1,0 +1,229 @@
+# AUTHORED — the data contract's sidecar for `simulation_performance_metrics`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md.
+#
+# WP 10.4 · `result-binding`. A DORMANT table of the retired batch pipeline,
+# described so the contract can see it (§4 D54) — see `note`.
+table: simulation_performance_metrics
+tier: "5"
+schema_name: public
+grain: >-
+  One telemetry record for one legacy job: how long the RETIRED `ml-service`
+  took, what memory and CPU it used, how many iterations it needed and how many
+  service calls and database queries it made. Operational measurements of a
+  run, not results of the simulated supply chain. Tier 5 — input to nothing.
+  DORMANT IN THE REPOSITORY: no code in `src/`, `supabase/functions/`,
+  `sim-worker/` or `scsim/` reads or writes it; its only writer was the
+  `ml-service`, whose source left this repository with the legacy stack.
+owner: engine
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "simulation_performance_metrics_pkey"
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    Two policies through the project's organization
+    (`org_is_current_user_org(p.organization_id, p.organization)`): SELECT for any
+    member of that organization, ALL for the project's modeler or an organization
+    admin. Neither is predicate-less, so `write: null` agrees with
+    `governanceEnforcement.test.ts`, and no user-facing write path exists in the
+    repository. Deleting a project, or a legacy job, removes these rows through the
+    inline `REFERENCES … ON DELETE CASCADE` on `project_id` and
+    `simulation_job_id`.
+    The `ml-service` that wrote it ran on Render, outside this repository and
+    outside D168's function list; the 2026-07-02 removal commit asks for that
+    service to be deleted by hand, and the repository does not record whether it
+    was. §4 D168 does list `delete-simulation-job` — which deleted these rows —
+    among the legacy edge functions still LIVE in production with no source here.
+    NOT AUDITED: tier 5, and `audit-actor` covers tiers 2–4.
+
+note: >-
+  A RETIRED PIPELINE'S TELEMETRY, LEFT IN PLACE ON PURPOSE by the 2026-07-02
+  commit that removed the legacy batch stack. A drop needs a production row count
+  first, which no §15 run has taken. Every measure below was whatever the
+  `ml-service` chose to report — its writer spread a metrics dict straight into
+  the insert — so no column has a definition this repository can still check.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: "Surrogate key. One row per report; nothing enforces one per job."
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  simulation_job_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The `simulation_jobs.id` the measurements describe. `REFERENCES
+      simulation_jobs ON DELETE CASCADE`, inline.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The owning project, looked up from the job by the writer. `REFERENCES
+      projects ON DELETE CASCADE`, inline.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  execution_time_seconds:
+    type: "numeric"
+    unit: "second"
+    unit_source: fixed
+    meaning: "Wall-clock time the legacy run took, as the service measured it."
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: "NOT TRACED: telemetry from the retired `ml-service`, read by nothing that still runs."
+  memory_usage_mb:
+    type: "numeric"
+    unit: "megabytes"
+    unit_source: fixed
+    meaning: "Memory the legacy run used, as the service reported it."
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: "NOT TRACED: telemetry from the retired `ml-service`, read by nothing that still runs."
+  cpu_usage_percent:
+    type: "numeric"
+    unit: "percent"
+    unit_source: fixed
+    meaning: "CPU utilisation during the legacy run, as the service reported it."
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: "NOT TRACED: telemetry from the retired `ml-service`, read by nothing that still runs."
+  data_processing_time_seconds:
+    type: "numeric"
+    unit: "second"
+    unit_source: fixed
+    meaning: "The part of the run spent loading and preparing project data."
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: "NOT TRACED: telemetry from the retired `ml-service`, read by nothing that still runs."
+  cache_hit_ratio:
+    type: "numeric"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Share of the run's lookups served from `simulation_cache`, as the service
+      reported it. Dimensionless; whether it was stated as a fraction or a
+      percentage was the service's choice and is not recoverable.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: "NOT TRACED: telemetry from the retired `ml-service`, read by nothing that still runs."
+  convergence_iterations:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: "How many iterations the legacy engine took to meet its convergence threshold."
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: "NOT TRACED: telemetry from the retired `ml-service`, read by nothing that still runs."
+  accuracy_score:
+    type: "numeric"
+    unit: null
+    unit_source: none
+    meaning: >-
+      A quality score the legacy service attached to its own run. Its definition
+      lived in that service and is not in this repository, so the number cannot
+      be interpreted — it is NOT a validation result (that is `model_validations`).
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: "NOT TRACED: telemetry from the retired `ml-service`, read by nothing that still runs."
+  python_service_calls:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: "How many calls the run made to the Python service. DEFAULT 0."
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: "NOT TRACED: telemetry from the retired `ml-service`, read by nothing that still runs."
+  database_queries:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: "How many database queries the run issued. DEFAULT 0."
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: "NOT TRACED: telemetry from the retired `ml-service`, read by nothing that still runs."
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: "When the row was inserted."
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  organization:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The organization's NAME at write time, DEFAULT 'default_org'. Legacy
+      tenancy text; the policies read the project's organization instead.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

@@ -52,6 +52,15 @@ DO $prelude$ BEGIN
   CREATE ROLE supabase_admin NOLOGIN NOINHERIT;
 EXCEPTION WHEN duplicate_object THEN NULL; END $prelude$;
 
+-- Supabase's DEFAULT FUNCTION PRIVILEGES. Every function created in \`public\` is
+-- EXECUTABLE by anon and authenticated as well as PUBLIC, so \`REVOKE … FROM PUBLIC\`
+-- alone leaves a SECURITY DEFINER helper callable through PostgREST by anyone.
+-- Without this line the rehearsal answered \`has_function_privilege('anon', …)\`
+-- for a bare PostgreSQL, where a revoke from PUBLIC is the whole story — and a
+-- helper the database could not see as exposed was exposed in production
+-- (§16 · WP 10.4, the internal writers WP 10.1 and 10.3 shipped).
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
+
 CREATE SCHEMA IF NOT EXISTS auth;
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE SCHEMA IF NOT EXISTS storage;
@@ -465,10 +474,22 @@ function emitGrants(root, files) {
   for (const file of files) {
     const sql = readMigration(root, file);
     if (sql === null) continue;
-    for (const s of statementsMatching(sql, /^(GRANT|REVOKE)\b/i)) {
+    for (const s of splitStatements(sql)) {
+      const flat = squash(s);
       // Grants to roles Supabase defines and this rehearsal does not are the
       // caller's problem to notice, not this function's to guess at.
-      out.push(s + ";");
+      if (/^(GRANT|REVOKE)\b/i.test(flat)) {
+        out.push(s + ";");
+      } else if (/^DO\b/i.test(flat)) {
+        // A function privilege changed inside a DO block — the shape a migration
+        // uses to guard on a role existing (`20261001000001`'s revoke from anon).
+        // Replaying only top-level statements left those functions executable by
+        // anon here once the prelude mirrored Supabase's default privileges, and
+        // a rehearsal reported an exposure production does not have.
+        for (const m of flat.matchAll(/\b(?:GRANT|REVOKE)\s[^;]*?\bON\s+FUNCTION\s[^;]*;/gi)) {
+          out.push(m[0]);
+        }
+      }
     }
   }
   return out;

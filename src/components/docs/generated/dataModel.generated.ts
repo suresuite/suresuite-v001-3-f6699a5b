@@ -25,15 +25,15 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "e45cd87ffb80";
+export const CONTRACT_VERSION = "c833aa3d4794";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261001000008_validated_model.sql";
+export const LAST_MIGRATION = "20261001000009_engines_runkey.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 86,
-  "tablesDescribed": 61,
-  "columnsDescribed": 782,
-  "tablesUndescribed": 25
+  "tablesInSchema": 87,
+  "tablesDescribed": 70,
+  "columnsDescribed": 917,
+  "tablesUndescribed": 17
 } as const;
 
 /** Described tables, grouped by the tier their data sits in. */
@@ -325,9 +325,57 @@ export const TIERS: GlanceTier[] = [
     "name": "results — pinned to dataset + policy + engine version",
     "tables": [
       {
+        "table": "experiments",
+        "grain": "One designed experiment over a project: a name, a design (full factorial or Latin hypercube), the factors and levels it varies, and the `scenarios` it cloned — one per design row — to run. A design a person authors, grouping runs that were MADE to be compared. UNREACHABLE TODAY: the only screen that writes or reads it, `ExperimentDesigner.tsx`, is mounted by no route (§4 D115), so although `useExperiments` reads and writes the table, no page a user can open reaches that code.",
+        "columns": 10,
+        "owner": "engine"
+      },
+      {
+        "table": "run_item_series",
+        "grain": "One item's weekly series from one INSPECTION run: a material or a product of the project, and a map of named weekly arrays for it (on-hand, in-transit and orders for a material; demand, production, fulfillment, backlog and lost units for a product). Written ONLY for an inspection run — exactly one replication, user-chosen seed, engine trace raised to full debug — because per-item evidence at multi-replication scale is deliberately not exposed; every other run has no rows here. Tier 5 — a RESULT of one run, input to nothing; a row is superseded by re-running, never edited.",
+        "columns": 7,
+        "owner": "engine"
+      },
+      {
         "table": "run_replications",
         "grain": "One replication of one simulation run: the seed it used, the KPI row the engine computed for it, and its weekly series. A run has as many rows here as it has replications, and `rep_index` orders them. Tier 5 — a RESULT, derived from a tier-2 dataset by a named engine version, never an input to anything. Nothing downstream reads it except the result surfaces; a row is superseded by re-running, never edited.",
         "columns": 12,
+        "owner": "engine"
+      },
+      {
+        "table": "simulation_cache",
+        "grain": "One cached payload of the RETIRED batch pipeline, per project and cache key: baseline data, scenario data, network analysis or risk factors that the legacy `simulation-cache-manager` stored with a time-to-live so the next legacy run could skip recomputing it. Tier 5 — derived, disposable, input to nothing that still runs. DORMANT IN THE REPOSITORY: no code in `src/`, `supabase/functions/`, `sim-worker/` or `scsim/` reads or writes it. The current product's cache is a different mechanism entirely — `analysis_get_or_start` keyed on the graph hash, and the run reuse that `simulation_runs` performs.",
+        "columns": 13,
+        "owner": "engine"
+      },
+      {
+        "table": "simulation_job_magnitudes",
+        "grain": "One disruption effect as one legacy job actually applied it: the job, the legacy disruption profile, the effect type, and the magnitude and unit used — with whether that magnitude came from the stored profile or from a slider the user had moved. It was the legacy pipeline's record of \"what was this run told\", written beside each `simulation_jobs` row. Tier 5 — run bookkeeping, input to nothing. DORMANT IN THE REPOSITORY: no code in `src/`, `supabase/functions/`, `sim-worker/` or `scsim/` reads or writes it.",
+        "columns": 13,
+        "owner": "engine"
+      },
+      {
+        "table": "simulation_jobs",
+        "grain": "One queued run of the RETIRED batch pipeline: a project, the legacy disruption profiles it applied, a priority, a status and progress, and a pointer to the `simulation_results` row it produced. It was the queue between `simulation-runner` and `external-simulation-processor` / the Render-hosted `ml-service`. Tier 5 — run bookkeeping for a result, input to nothing. DORMANT IN THE REPOSITORY: no code in `src/`, `supabase/functions/`, `sim-worker/` or `scsim/` reads or writes it. The current product's run queue is `simulation_runs`, driven by `sim-command` and the Fly worker, and it never touches this table.",
+        "columns": 25,
+        "owner": "engine"
+      },
+      {
+        "table": "simulation_performance_metrics",
+        "grain": "One telemetry record for one legacy job: how long the RETIRED `ml-service` took, what memory and CPU it used, how many iterations it needed and how many service calls and database queries it made. Operational measurements of a run, not results of the simulated supply chain. Tier 5 — input to nothing. DORMANT IN THE REPOSITORY: no code in `src/`, `supabase/functions/`, `sim-worker/` or `scsim/` reads or writes it; its only writer was the `ml-service`, whose source left this repository with the legacy stack.",
+        "columns": 14,
+        "owner": "engine"
+      },
+      {
+        "table": "simulation_results",
+        "grain": "One result of one run of the RETIRED batch pipeline (the \"Legacy Sim\" path: `simulation-runner` → `external-simulation-processor` → the Render-hosted `ml-service`), for one project, one plant and a set of legacy disruption profiles: a status and a `metrics` blob. Tier 5 — a result, input to nothing. DORMANT IN THE REPOSITORY: no code in `src/`, `supabase/functions/`, `sim-worker/` or `scsim/` reads or inserts it. The current product's results are `simulation_runs` + `run_replications`, which this table predates and which never write here.",
+        "columns": 13,
+        "owner": "engine"
+      },
+      {
+        "table": "simulation_runs",
+        "grain": "One simulation run: what it was bound to (engine, graph version, policy version, scenario run spec, Validated Model, deviations), its status, and the run-level KPIs. Tier 5 — a RESULT. Its replications are `run_replications`. Since WP 10.4 every binding of a NEW run resolves from this row alone (`run_spec`, `run_key`, `engine_id`, `model_validation_id`, `protocol_overrides`, `exploratory`); runs dispatched earlier carry the three content hashes, the seed and the schedule, and say so in the record.",
+        "columns": 31,
         "owner": "engine"
       }
     ]
@@ -449,6 +497,12 @@ export const TIERS: GlanceTier[] = [
         "grain": "One country's current risk class, as one named publisher graded it in one named edition. NOT project-scoped: two projects sourcing from the same country see the same row, which is the point — a per-project copy drifts.",
         "columns": 9,
         "owner": "reference-data"
+      },
+      {
+        "table": "sim_engines",
+        "grain": "One row per simulation engine the platform knows: whether dispatch may use it (`status`) and which build the worker last reported running. scsim is the one active engine; the legacy worker engine is registered RETIRED — it stays frozen (CLAUDE.md's standing law) and is never offered. A run row names its engine (`simulation_runs.engine_id`) and the build is part of its RunKey.",
+        "columns": 9,
+        "owner": "engine"
       }
     ]
   }
@@ -527,44 +581,6 @@ export const UNDESCRIBED: UndescribedGroup[] = [
       {
         "table": "user_files",
         "columns": 12
-      }
-    ]
-  },
-  {
-    "wp": "10.4",
-    "why": "Runs and results (tier 5). RE-HOMED FROM WP 9.2 BY WP 10.0 (2026-10-01). Phase 10 absorbs WP 9.2: the binding lands ON THE ROW in WP 10.4, together with the engine registry and the RunKey it is built from, and WP 10.4 writes the sidecars. WP 9.2 never started, so this is a move to the package that will do the work, not a rescue from one that finished. Invariant `result-binding` is the claim these tables have to satisfy — every result binds dataset + policy + scenario + engine version. RE-HOMED FROM WP 6.3 BY WP 9.1, AND THIS IS THE SECOND TIME THIS ROW HAS OUTLIVED ITS OWNER. WP 6.3 shipped the A5 Reproducibility Record and finished; these tables stayed deferred to it, so the owner was a completed package — which is exactly the state `contract:check` R8 exists to refuse, and exactly what the note below describes happening to WP 4.4. A deferral whose owner has shipped is not a plan, and it is not free: `dataPlaneAudit` scopes the audit rule to tables IN the contract, so a deferred table's writes are unaudited with nothing to notice (§4 D54). WP 9.1 describes ONE of the group — `run_replications` — because it added facts to that table's `time_series` and a fact the product reads cannot live in a column the contract does not describe. It did NOT describe the other eight, because what they owe is `result-binding` and WP 9.1 does not pay it. WP 9.2 is where that binding lands. MOVED FROM WP 4.4 BY WP 4.4 ITSELF. This row read \"WP 4.1/4.4 are where the binding is completed\", and neither package was ever scoped to complete it: §11's WP 4.1 is the graph hash and §11's WP 4.4 is staleness plus the Trust Report. Ten tables were waiting on a sentence no work item behind them ever agreed to. WP 6.3 ships the A5 Reproducibility Record — \"dataset, policy, scenario, engine and analysis versions plus declared limits\" — which is `result-binding` stated as a deliverable, so the tables and the invariant now wait on the same package. See §16 · WP 4.4 · J. NOTE for whoever authors `simulation_jobs`: it carries an UNRESOLVED shadowed definition (`20250914113723` re-declares what `20250913085427` created, and the two disagree about `job_id`). The introspector records the disagreement rather than picking a winner. Resolve it BEFORE writing the sidecar — a field entry for a column whose type depends on which CREATE TABLE won is a guess with a schema around it.",
-    "tables": [
-      {
-        "table": "experiments",
-        "columns": 10
-      },
-      {
-        "table": "run_item_series",
-        "columns": 7
-      },
-      {
-        "table": "simulation_cache",
-        "columns": 13
-      },
-      {
-        "table": "simulation_job_magnitudes",
-        "columns": 13
-      },
-      {
-        "table": "simulation_jobs",
-        "columns": 25
-      },
-      {
-        "table": "simulation_performance_metrics",
-        "columns": 14
-      },
-      {
-        "table": "simulation_results",
-        "columns": 13
-      },
-      {
-        "table": "simulation_runs",
-        "columns": 26
       }
     ]
   }

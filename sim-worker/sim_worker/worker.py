@@ -70,6 +70,36 @@ def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+def engine_report_payload(scsim_on: bool) -> dict[str, Any]:
+    """WP 10.4 · §4 D245 — what this worker tells the engine registry at boot:
+    which registered engine it runs and the build. The slug is the registry's;
+    the code version is spelled exactly as `build_run_update` stamps it on a run,
+    so the registry and the runs agree about what "scsim-0.2.8" means."""
+    if scsim_on:
+        from scsim import ENGINE_VERSION
+
+        return {"p_slug": "scsim", "p_version": ENGINE_VERSION,
+                "p_code_version": f"scsim-{ENGINE_VERSION}", "p_capabilities": None}
+    return {"p_slug": "legacy-worker", "p_version": None,
+            "p_code_version": "worker-legacy", "p_capabilities": None}
+
+
+def engine_mismatch(engine: dict[str, Any] | None, scsim_on: bool) -> str | None:
+    """WP 10.4 · §4 D245 — the engine a run was dispatched to versus the engine
+    this worker runs. Until WP 10.4 the worker ran whichever engine its
+    environment flag chose and the run was LABELLED after the fact, so a run
+    bound to scsim could be computed by the retired legacy engine. Returns the
+    refusal, or None when they agree or the dispatcher named no engine (a
+    dispatcher deployed ahead of the registry)."""
+    slug = (engine or {}).get("slug")
+    if slug == "scsim" and not scsim_on:
+        return ("this run is bound to the scsim engine, and this worker runs the retired "
+                "legacy engine (SCSIM_ENGINE is not set) — not run rather than mislabelled")
+    if slug == "legacy-worker" and scsim_on:
+        return "this run is bound to the retired legacy engine, which this worker does not run"
+    return None
+
+
 def build_run_update(kpis: dict[str, Any], n_reps: int) -> dict[str, Any]:
     """Translate an engine KPI dict (mean_*/ci_* shape) into the
     simulation_runs row update persisted after an experiment.run."""
@@ -176,6 +206,7 @@ class SimWorker:
         await self._redis.aclose()
 
     async def run(self) -> None:
+        await self._report_engine()
         self._tasks.append(asyncio.create_task(self._discover_loop()))
         self._tasks.append(asyncio.create_task(self._evict_loop()))
         if self._idle_shutdown > 0 and self._on_idle is not None:
@@ -355,6 +386,14 @@ class SimWorker:
                             **policies.get("default", {}).get("recovery", {}),
                             **recovery_data,
                         }
+
+                    refusal = engine_mismatch(raw.get("engine"), scsim_enabled())
+                    if refusal and run_id:
+                        log.warning("run %s refused: %s", run_id, refusal)
+                        await self._transition(run_id, {
+                            "status": "failed", "error_message": refusal, "ended_at": _now(),
+                        }, ("queued",))
+                        return  # the outer finally ACKs
 
                     if scsim_enabled() and run_id:
                         # Canonical path: the worker is the SOLE authoritative
@@ -648,6 +687,25 @@ class SimWorker:
                 log.exception("failed to upsert item series for run %s", run_id)
                 return False
         return True
+
+    async def _report_engine(self) -> None:
+        """Tell the engine registry which build this worker runs (WP 10.4). Never
+        fatal: a registry the migration has not reached yet, or a slow PostgREST,
+        must not keep the worker from consuming its queue."""
+        try:
+            r = await self._http.post(
+                f"{self._supabase_url}/rest/v1/rpc/sim_engine_report",
+                headers={
+                    "apikey": self._service_role_key,
+                    "Authorization": f"Bearer {self._service_role_key}",
+                    "Content-Type": "application/json",
+                },
+                json=engine_report_payload(scsim_enabled()),
+            )
+            if r.status_code >= 300:
+                log.warning("engine report failed %s %s", r.status_code, r.text)
+        except Exception:
+            log.exception("engine report failed")
 
     async def _update_run(self, run_id: str, patch: dict[str, Any]) -> None:
         """PATCH a simulation_runs row via PostgREST (service role)."""

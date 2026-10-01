@@ -131,6 +131,10 @@ describe("D28 — the truth table of what is actually unconditional", () => {
    * which level of the graph each analysis kind reads. It is a catalog authored in a
    * migration, carries no project id, and a page reads it to say what a stored
    * metric was keyed on. Same standing as `capabilities` above.
+   *
+   * AND `sim_engines` — WP 10.4 (§4 D245): the engine registry. Which engines exist
+   * and which build the worker runs is not tenant data, carries no project id, and
+   * the Lab's engine selector reads it. SELECT only; no API role writes it.
    */
   const EXPECTED_UNCONDITIONAL = [
     "ai_models", "ai_providers", "analysis_kinds", "approved_users", "bom_multi_level", "bom_single_level",
@@ -139,7 +143,7 @@ describe("D28 — the truth table of what is actually unconditional", () => {
     "outbound_logistics", "policy_defaults", "policy_overrides", "policy_presets",
     "policy_versions", "products", "project_memory", "project_role_capabilities",
     "proposals", "recovery_playbooks", "risk_data", "role_capabilities",
-    "run_item_series", "run_replications", "scenarios", "simulation_runs", "suppliers",
+    "run_item_series", "run_replications", "scenarios", "sim_engines", "simulation_runs", "suppliers",
   ];
 
   it("no table has gained an unconditional policy that this list does not name", () => {

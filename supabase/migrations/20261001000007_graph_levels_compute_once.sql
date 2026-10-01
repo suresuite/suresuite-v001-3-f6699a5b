@@ -506,11 +506,11 @@ $$;
 -- readers below reach these as SECURITY DEFINER; nothing else can
 -- (`dataPlaneAudit.test.ts` holds the revocation, on which their exemption from
 -- the actor rule rests).
-REVOKE ALL ON FUNCTION public._graph_state_mark(uuid[]) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public._graph_state_store(uuid, jsonb, bigint) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public._graph_state_touch_ins() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public._graph_state_touch_upd() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public._graph_state_touch_del() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._graph_state_mark(uuid[]) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public._graph_state_store(uuid, jsonb, bigint) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public._graph_state_touch_ins() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public._graph_state_touch_upd() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public._graph_state_touch_del() FROM PUBLIC, anon, authenticated;
 
 -- THE read. Every caller of a current hash comes through here.
 CREATE OR REPLACE FUNCTION public.project_graph_hashes(p_project_id uuid)
@@ -695,6 +695,7 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public._graph_version_after_promotion() FROM PUBLIC, anon, authenticated;
 DROP TRIGGER IF EXISTS ingest_runs_graph_version ON public.ingest_runs;
 CREATE TRIGGER ingest_runs_graph_version
   AFTER UPDATE OF status ON public.ingest_runs

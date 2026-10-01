@@ -247,6 +247,9 @@ AS $$
     FROM public.policy_versions
    WHERE id = p_policy_version_id;
 $$;
+-- An internal helper: its SECURITY DEFINER callers run as owner, so the API
+-- roles need no EXECUTE — and Supabase grants them one by default (§4 D248).
+REVOKE ALL ON FUNCTION public._policy_version_hash(uuid) FROM PUBLIC, anon, authenticated;
 
 -- Supersede the duplicates the old per-id index allowed (see the header).
 WITH ranked AS (

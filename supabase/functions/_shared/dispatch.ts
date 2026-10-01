@@ -132,6 +132,10 @@ export interface ReuseIdentity {
   graphHash: string;
   scenarioHash: string;
   replications: number;
+  /** WP 10.4 — the engine the run would use (null = the single active one). */
+  engineId?: string | null;
+  /** WP 10.4 — deviations from the Validated Model's protocol (`{}` = faithful). */
+  protocolOverrides?: Record<string, unknown>;
 }
 
 /**
@@ -150,6 +154,30 @@ export async function findReuseCandidates(
   opts?: { limit?: number },
 ): Promise<ReuseCandidate[]> {
   const limit = Math.max(1, Math.min(5, opts?.limit ?? 1));
+  // WP 10.4 · §4 D245 — THE predicate is now a RunKey, computed in SQL by the same
+  // `simulation_run_spec` the dispatcher's `create_simulation_run` uses, so the
+  // engine build and the seed spec are part of identity and a scenario rename is
+  // not. The three-hash predicate below is the fallback for a database without
+  // `20261001000009` (a function deployed ahead of its migration).
+  const { data: keyed, error: keyErr } = await svc.rpc("find_reusable_runs", {
+    p_scenario_id: identity.scenario.id,
+    p_policy_hash: identity.policyHash,
+    p_graph_hash: identity.graphHash,
+    p_replications: identity.replications,
+    p_engine_id: identity.engineId ?? null,
+    p_protocol_overrides: identity.protocolOverrides ?? {},
+    p_limit: limit,
+  });
+  if (!keyErr) {
+    return ((keyed ?? []) as Array<Record<string, unknown>>).map((cand) => ({
+      run_id: String(cand.run_id),
+      ended_at: (cand.ended_at as string | null) ?? null,
+      created_at: String(cand.created_at),
+      code_version: (cand.code_version as string | null) ?? null,
+      rep_count_done: (cand.rep_count_done as number | null) ?? null,
+    }));
+  }
+  if (!isMissingFunction(keyErr)) throw keyErr;
   const { data: rows, error } = await svc
     .from("simulation_runs")
     .select("id,ended_at,created_at,code_version,rep_count_done")
@@ -196,7 +224,7 @@ export async function dispatchExperimentRun(
   deps: DispatchDeps,
   cmd: DispatchCommand,
   userId: string | null,
-): Promise<{ run_id: string }> {
+): Promise<{ run_id: string; attached?: boolean }> {
   const { reader: sb, svc, upstash } = deps;
   if (!cmd.scenario_id) throw new Error("experiment.run requires scenario_id");
 
@@ -347,81 +375,146 @@ export async function dispatchExperimentRun(
     console.error("model-validation stamp failed (run continues unstamped)", e);
   }
 
-  // Reuse-or-rerun check (G17 — the read-path slice of the §9.2 run cache).
-  // Run identity here = (policy_hash, graph_hash, scenario fingerprint hash,
-  // seed spec, disruption schedule): the first three compare stamped hashes;
-  // the seed spec + disruption schedule are covered by requiring the scenario
-  // row to be UNCHANGED since the candidate was dispatched (the stamped
-  // scenario_hash is the baseline fingerprint, which excludes events and
-  // estimation settings — the row-unchanged guard closes exactly that gap).
-  // The candidate's engine code_version is returned for the user to judge;
-  // the full RunKey with the engine fingerprint lands with Phase C.
-  // Never silent: a hit raises ReuseAvailable (→ 409) unless the caller
-  // explicitly asked to recompute via payload.force_rerun.
-  const forceRerun = (cmd.payload as Record<string, unknown>).force_rerun === true;
-  if (!forceRerun && graphHash && scenarioHash) {
-    try {
-      // The single extracted G17 predicate (shared with the §20.2 read tool).
-      const [cand] = await findReuseCandidates(svc, {
-        scenario: { id: scenario.id as string, updated_at: scenario.updated_at },
-        policyHash,
-        graphHash,
-        scenarioHash,
-        replications,
-      });
-      if (cand) throw new ReuseAvailable(cand);
-    } catch (e) {
-      if (e instanceof ReuseAvailable) throw e;
-      // The reuse check is an optimization — never let it take dispatch down.
-      console.error("reuse check skipped (lookup failed)", e);
+  // WP 10.4 · §4 D245 — what the run is bound to beyond the content hashes: the
+  // engine (dispatch refuses a retired one and defaults to the single active one),
+  // the Validated Model it follows when the caller chose one (it must be this
+  // project's and not revoked; otherwise the content-matched model in force
+  // above), the deviations from that model's protocol, and whether the run is
+  // exploratory — never false for a run with no model.
+  const payload = cmd.payload as Record<string, unknown>;
+  const engineId = typeof payload.engine_id === "string" && payload.engine_id ? payload.engine_id : null;
+  const protocolOverrides =
+    payload.protocol_overrides && typeof payload.protocol_overrides === "object" &&
+      !Array.isArray(payload.protocol_overrides)
+      ? (payload.protocol_overrides as Record<string, unknown>)
+      : {};
+  const chosenModel =
+    typeof payload.validated_model_id === "string" && payload.validated_model_id
+      ? payload.validated_model_id
+      : null;
+  if (chosenModel) {
+    const { data: m } = await svc
+      .from("model_validations")
+      .select("id,project_id,status")
+      .eq("id", chosenModel)
+      .maybeSingle();
+    if (!m || m.project_id !== scenario.project_id) {
+      throw new Error("validated model not found in this project");
     }
+    if (m.status === "revoked") throw new Error("this Validated Model was revoked and cannot be run");
+    modelValidationId = String(m.id);
   }
+  const exploratory = payload.exploratory === true || !modelValidationId;
 
-  // Insert run row (queued) with the SERVICE ROLE: the dispatcher is the
-  // authoritative creator of the queued row (as the worker is of results),
-  // and an RLS/migration-ordering gap must never 500 a dispatch. The anon
-  // grants migration (20260706000001) remains required for the FRONTEND to
-  // read runs/replications + receive their realtime events.
-  // What ran is stamped on the run (audit F-11): the seed and the disruption
-  // schedule, so an export binds THESE rather than whatever the scenario row says
-  // later. A database without `20260922000002` rejects the unknown columns with
-  // PGRST204; the insert is retried without them once, so a function deployed
-  // ahead of its migration still dispatches (both deploy on merge, in no fixed
-  // order) — and the export then resolves the run as "not stamped", honestly.
+  // Reuse-or-rerun (G17, §9.2) and the run row, in ONE statement since WP 10.4:
+  // `create_simulation_run` computes the RunKey from engine ∥ graph ∥ policy ∥ the
+  // scenario's whole run spec ∥ the overrides, and under an advisory lock on it
+  // either offers a completed identical run (→ 409, never silent), attaches an
+  // identical in-flight one (two clicks are one run — never for a browser run,
+  // whose browser computes it), or inserts the queued row with every binding on
+  // it. What ran is stamped on the run (audit F-11): the seed and the schedule.
+  const forceRerun = payload.force_rerun === true;
+  const clientComputeRun = payload.compute === "client";
   const stamp = runStamp(scenario as Record<string, unknown>);
-  const insertRun = (withStamp: boolean) =>
-    // deno-lint-ignore no-explicit-any
-    (svc as any).from("simulation_runs").insert({
-      ...(withStamp ? stamp : {}),
-      scenario_id: scenario.id,
-      project_id: scenario.project_id,
-      status: "queued",
-      rep_count_target: replications,
-      rep_count_done: 0,
-      code_version: "",
-      policy_version_id: policyVersionId,
-      policy_hash: policyHash,
-      dataset_version_id: datasetVersionId,
-      graph_hash: graphHash,
-      created_by: userId,
-      // Spread-guarded so a database without the B0 migration still inserts.
-      ...(scenarioHash ? { scenario_hash: scenarioHash } : {}),
-      ...(modelValidationId ? { model_validation_id: modelValidationId } : {}),
-      ...(gateSkipped ? { gate_skipped: true } : {}),
-    }).select().single();
-  let { data: run, error: runErr } = await insertRun(true);
-  if (runErr && isMissingStampColumn(runErr)) {
-    console.error("run stamp columns missing — dispatching unstamped (migration pending?)", runErr);
-    ({ data: run, error: runErr } = await insertRun(false));
+  const runRow: Record<string, unknown> = {
+    ...stamp,
+    scenario_id: scenario.id,
+    project_id: scenario.project_id,
+    rep_count_target: replications,
+    policy_version_id: policyVersionId,
+    policy_hash: policyHash,
+    dataset_version_id: datasetVersionId,
+    graph_hash: graphHash,
+    created_by: userId,
+    scenario_hash: scenarioHash,
+    model_validation_id: modelValidationId,
+    gate_skipped: gateSkipped,
+    engine_id: engineId,
+    protocol_overrides: protocolOverrides,
+    exploratory,
+  };
+  // `svc` is the dispatcher's service client (typed loosely in DispatchDeps).
+  const created = await svc.rpc("create_simulation_run", {
+    p_run: runRow,
+    p_force_rerun: forceRerun,
+    p_attach_inflight: !clientComputeRun,
+    _actor_user_id: userId,
+  });
+  let run: { id: string } | null = null;
+  let engine: Record<string, unknown> | null = null;
+  if (!created.error) {
+    const res = (created.data ?? {}) as Record<string, unknown>;
+    if (res.reuse) {
+      const c = res.reuse as Record<string, unknown>;
+      throw new ReuseAvailable({
+        run_id: String(c.run_id),
+        ended_at: (c.ended_at as string | null) ?? null,
+        created_at: String(c.created_at),
+        code_version: (c.code_version as string | null) ?? null,
+        rep_count_done: (c.rep_count_done as number | null) ?? null,
+      });
+    }
+    if (res.attached === true) {
+      // An identical run is already queued or running: this submission IS it.
+      return { run_id: String(res.run_id), attached: true };
+    }
+    run = { id: String(res.run_id) };
+    engine = (res.engine as Record<string, unknown> | null) ?? null;
+  } else if (!isMissingFunction(created.error)) {
+    // An engine refusal (retired, unknown, ambiguous) is the caller's to see.
+    throw new Error(`run not created: ${created.error.message ?? created.error}`);
+  } else {
+    // A database without `20261001000009`: the pre-WP-10.4 path, unchanged.
+    console.error("create_simulation_run missing — dispatching on the pre-RunKey path (migration pending?)");
+    if (!forceRerun && graphHash && scenarioHash) {
+      try {
+        const [cand] = await findReuseCandidates(svc, {
+          scenario: { id: scenario.id as string, updated_at: scenario.updated_at },
+          policyHash,
+          graphHash,
+          scenarioHash,
+          replications,
+        });
+        if (cand) throw new ReuseAvailable(cand);
+      } catch (e) {
+        if (e instanceof ReuseAvailable) throw e;
+        console.error("reuse check skipped (lookup failed)", e);
+      }
+    }
+    const insertRun = (withStamp: boolean) =>
+      // deno-lint-ignore no-explicit-any
+      (svc as any).from("simulation_runs").insert({
+        ...(withStamp ? stamp : {}),
+        scenario_id: scenario.id,
+        project_id: scenario.project_id,
+        status: "queued",
+        rep_count_target: replications,
+        rep_count_done: 0,
+        code_version: "",
+        policy_version_id: policyVersionId,
+        policy_hash: policyHash,
+        dataset_version_id: datasetVersionId,
+        graph_hash: graphHash,
+        created_by: userId,
+        // Spread-guarded so a database without the B0 migration still inserts.
+        ...(scenarioHash ? { scenario_hash: scenarioHash } : {}),
+        ...(modelValidationId ? { model_validation_id: modelValidationId } : {}),
+        ...(gateSkipped ? { gate_skipped: true } : {}),
+      }).select().single();
+    let { data: inserted, error: runErr } = await insertRun(true);
+    if (runErr && isMissingStampColumn(runErr)) {
+      console.error("run stamp columns missing — dispatching unstamped (migration pending?)", runErr);
+      ({ data: inserted, error: runErr } = await insertRun(false));
+    }
+    if (runErr || !inserted) throw new Error(`run insert failed: ${runErr?.message}`);
+    run = { id: String(inserted.id) };
   }
-  if (runErr || !run) throw new Error(`run insert failed: ${runErr?.message}`);
 
   // Browser/offline runs (payload.compute === "client") go through the same
   // gate + version binding + queued row, but the CLIENT computes and persists
   // the results itself — so don't wake the worker, or two writers would race
   // on the same run. Server runs (the default) enqueue for the Fly worker.
-  const clientCompute =
-    (cmd.payload as Record<string, unknown>).compute === "client";
+  const clientCompute = clientComputeRun;
 
   // Push command to worker queue for the real engine. The policy snapshot is
   // embedded so the worker runs the saved version, not the live tables; if the
@@ -435,6 +528,8 @@ export async function dispatchExperimentRun(
       policy_version_id: policyVersionId,
       policy_hash: policyHash,
       policy_snapshot: snapshot,
+      // WP 10.4 — the engine the run is bound to; the worker refuses a mismatch.
+      ...(engine ? { engine } : {}),
       server_ts: Date.now(),
     };
     if (JSON.stringify(workerEnvelope).length > 700_000) {

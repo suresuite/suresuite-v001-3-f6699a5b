@@ -525,9 +525,16 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
       const def = fn(name);
       expect(def, `${name} is gone — remove it from INTERNAL_CACHE_WRITERS`).toBeDefined();
       const src = readFileSync(join(ROOT, "supabase", "migrations", def!.migration ?? ""), "utf8");
+      // FROM PUBLIC is not enough: Supabase grants EXECUTE on every new `public`
+      // function to anon and authenticated EXPLICITLY, so the revoke must name them
+      // (§4 D248 — this test accepted `FROM PUBLIC` alone until WP 10.4, and so did
+      // the rehearsal, which did not mirror those default privileges).
       expect(
-        new RegExp(`REVOKE\\s+ALL\\s+ON\\s+FUNCTION\\s+public\\.${name}\\([^)]*\\)\\s+FROM\\s+PUBLIC`, "i").test(src),
-        `${name} is not REVOKEd from PUBLIC, so any API role can write the cache it fills`,
+        new RegExp(
+          `REVOKE\\s+ALL\\s+ON\\s+FUNCTION\\s+public\\.${name}\\([^)]*\\)\\s+FROM\\s+PUBLIC\\s*,\\s*anon\\s*,\\s*authenticated`,
+          "i",
+        ).test(src),
+        `${name} is not REVOKEd from PUBLIC, anon and authenticated, so an API role can write the cache it fills`,
       ).toBe(true);
       expect(
         new RegExp(`GRANT\\s+EXECUTE\\s+ON\\s+FUNCTION\\s+public\\.${name}\\b[^;]*\\b(anon|authenticated)\\b`, "i").test(src),

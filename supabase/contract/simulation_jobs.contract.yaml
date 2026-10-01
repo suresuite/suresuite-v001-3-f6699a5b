@@ -1,0 +1,427 @@
+# AUTHORED — the data contract's sidecar for `simulation_jobs`.
+# The schema half is introspected (build/schema.introspected.json); this half says
+# what the columns MEAN. Edit this file; do not edit docs/data/tables/*.md.
+#
+# WP 10.4 · `result-binding`. Described as a DORMANT table of the retired batch
+# pipeline — see `note` — and with the shadowed definition RESOLVED rather than
+# guessed, which is what kept it deferred for six packages (see the note's
+# second half for the evidence).
+table: simulation_jobs
+tier: "5"
+schema_name: public
+grain: >-
+  One queued run of the RETIRED batch pipeline: a project, the legacy disruption
+  profiles it applied, a priority, a status and progress, and a pointer to the
+  `simulation_results` row it produced. It was the queue between
+  `simulation-runner` and `external-simulation-processor` / the Render-hosted
+  `ml-service`. Tier 5 — run bookkeeping for a result, input to nothing.
+  DORMANT IN THE REPOSITORY: no code in `src/`, `supabase/functions/`,
+  `sim-worker/` or `scsim/` reads or writes it. The current product's run queue
+  is `simulation_runs`, driven by `sim-command` and the Fly worker, and it never
+  touches this table.
+owner: engine
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "simulation_jobs_pkey"
+  - source: "UNIQUE constraint 20250914113757_40b93edc-1f10-4dda-a32e-d35f851ebf20.sql"
+    columns: [job_id]
+    name: "simulation_jobs_job_id_key"
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    Two policies through the project's organization
+    (`org_is_current_user_org(p.organization_id, p.organization)`): SELECT for any
+    member of that organization, ALL for the project's modeler or an organization
+    admin — recreated in that form by WP 2.1's `20260915000004`, which is why the
+    duplicate-policy question of §4 D30 no longer leaves the end state in doubt.
+    Neither policy is predicate-less, so `write: null` agrees with
+    `governanceEnforcement.test.ts`, and no user-facing write path exists in the
+    repository. Two BEFORE triggers still fire on any write
+    (`simulation_jobs_defaults`, `simulation_job_timing_trigger`); the AFTER
+    trigger that once posted every new job to `external-simulation-processor`
+    was dropped on 2025-09-19, so the database no longer calls out on a write.
+    Deleting a project removes its jobs through the inline
+    `REFERENCES projects ON DELETE CASCADE`.
+    NOT IN PRODUCTION'S CASE: §4 D168 found the legacy functions that wrote this
+    queue (`simulation-runner`, `external-simulation-processor`,
+    `simulation-status`, `delete-simulation-job`) still LIVE in production with no
+    source here. "Dormant" is true of the repository; whether those endpoints are
+    still called is D168's production question (WP 7.1).
+    NOT AUDITED: tier 5, and `audit-actor` covers tiers 2–4.
+
+note: >-
+  A RETIRED PIPELINE'S QUEUE, LEFT IN PLACE ON PURPOSE by the 2026-07-02 commit
+  that removed the legacy batch stack ("left in place, inert, for a later cleanup
+  migration"). A drop needs a production row count first, which no §15 run has
+  taken, and D168's live legacy functions are a reason to take one.
+  THE SHADOWED DEFINITION IS RESOLVED, AND THE ARTIFACT ALREADY HAD THE ANSWER.
+  `20250913085427` created this table with no `job_id`; `20250914113723`
+  re-declared it with `job_id TEXT UNIQUE NOT NULL`, `plant_name`,
+  `current_stage` and three CHECKs (`valid_status`, `valid_job_type`,
+  `valid_priority`). The re-declaration never took effect, by three independent
+  lines of evidence. (1) Its `CREATE TABLE IF NOT EXISTS` was a no-op against the
+  existing table, and its later `CREATE INDEX … (job_id)` names a column that
+  table did not have, so PostgreSQL raised 42703 and the whole file rolled back —
+  §4 D97, which taught the introspector to record a rejected statement as an
+  abort; `build/schema.introspected.json` lists `20250914113723` under
+  `aborted_migrations` for that reason, so the columns above come from
+  `20250913085427` alone. (2) Production agrees: §4 D30's trigger probe (§15 run
+  `35064364537`) found all four of `20250913085427`'s triggers and NONE of
+  `20250914113723`'s, so the later file never ran to its end there. (3) Its
+  author knew: `20250914113757`, 34 seconds later, is titled "Fix existing
+  simulation_jobs table structure" and ADDs `job_id TEXT` (nullable), backfills
+  it with `id::text`, adds `simulation_jobs_job_id_key UNIQUE (job_id)` and
+  ADDs `current_stage` — the shape recorded here. So: `job_id` is NULLABLE text
+  with a unique constraint, `plant_name` was never a column, and the
+  `job_type`/`priority` CHECKs do not exist (the legacy runner wrote
+  `job_type` values 'baseline' and 'scenarios', which `valid_job_type` would have
+  refused — consistent with it never landing). The one residual risk is a fresh
+  database replayed from empty, where `20250914113723` has nothing to collide
+  with and would run — D30's closing sentence, unchanged.
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Surrogate key, and the job's identity as the Supabase half of the legacy
+      pipeline saw it: `simulation_job_magnitudes.job_id` and
+      `simulation_performance_metrics.simulation_job_id` both point here.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The owning project. `REFERENCES projects ON DELETE CASCADE`, declared
+      inline in `20250913085427`.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  simulation_result_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The `simulation_results` row this job produced, set by the processor when
+      the external run returned. Null for a job that never completed.
+      `REFERENCES simulation_results ON DELETE CASCADE`, inline.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  job_type:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      What the legacy job ran. DEFAULT 'baseline_scenario'; the last runner wrote
+      'baseline' for an availability check and 'scenarios' otherwise. No CHECK —
+      the one that would have constrained it was in the aborted re-declaration.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  status:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Queue state: one of 'pending', 'queued', 'running', 'completed', 'failed',
+      'cancelled' (CHECK `simulation_jobs_status_check`). A change of status
+      fires `update_simulation_job_timing`, which stamps `started_at` on
+      'running' and `completed_at` on a terminal state.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  priority:
+    type: "integer"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Queue priority, DEFAULT 1; the queue index orders by it descending. No
+      range CHECK (the 1–10 rule was in the aborted re-declaration).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  progress:
+    type: "numeric"
+    unit: "percent"
+    unit_source: fixed
+    meaning: >-
+      How far the legacy run had got, 0–100 (CHECK
+      `simulation_jobs_progress_check`), as the external service reported it.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED to the engine: it was reported by the retired `ml-service`,
+      not consumed by anything.
+  config:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The request the runner queued — horizon in days, a convergence threshold
+      and a snapshot of each scenario's effects with any magnitude the UI
+      overrode. The legacy equivalent of a run's parameters, bound to nothing
+      versioned.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  scenario_ids:
+    type: "uuid[]"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The legacy disruption profiles (`disruption_scenario_profiles` ids) the
+      job applied; copied onto the result row it produced. Not `scenarios` ids.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  baseline_enabled:
+    type: "boolean"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Whether the job also ran an undisrupted baseline. The last runner set it
+      from its availability-check flag.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  python_job_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The external Python service's handle for the job, when it reported one.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  python_status:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The external Python service's own status string for the job, kept beside
+      `status` rather than mapped onto it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  queued_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: "When the job entered the queue. DEFAULT now()."
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  started_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the job started running — stamped by the timing trigger on the
+      transition to 'running' if the writer did not set it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  completed_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the job reached 'completed', 'failed' or 'cancelled' — stamped by the
+      timing trigger if the writer did not set it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  estimated_duration_seconds:
+    type: "integer"
+    unit: "second"
+    unit_source: fixed
+    meaning: >-
+      The runner's guess at how long the job would take — the last runner
+      wrote a constant 60. An estimate, never a measurement.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NOT TRACED to the engine: written by the retired runner as a constant,
+      read by nothing.
+  error_message:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: "Why the job failed, in one line, when it did."
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  error_details:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: "The failure's structured detail — the processor wrote the error and its stack."
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  partial_results:
+    type: "jsonb"
+    unit: null
+    unit_source: none
+    meaning: >-
+      Progress payload the external service posted while the job ran — in the
+      last version, only `{current_stage}`. Never a result.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_by:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The approved user who queued the job; the defaults trigger fills it from
+      the session's user when the writer leaves it null. No foreign key.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  organization:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The organization's NAME at write time, DEFAULT 'default_org'. Legacy
+      tenancy text; the policies read the project's organization instead.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: "When the row was inserted."
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: "When the row was last changed — re-stamped by both BEFORE triggers on every write."
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  job_id:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The external `ml-service`'s text key for the job — the column that
+      service updated rows BY. Added by `20250914113757` (nullable), which
+      backfilled it with `id::text` for every row existing at that moment, then
+      gave it `simulation_jobs_job_id_key UNIQUE`. Rows queued afterwards by
+      `simulation-runner` did not set it, so it is NULL wherever the service
+      never claimed the job — and a plain unique constraint permits any number
+      of NULLs.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      This is the column the shadowed definition disagreed about: the aborted
+      `20250914113723` declared it `TEXT UNIQUE NOT NULL`. The resolution and
+      its evidence are in the table note. NOT the key
+      `simulation_job_magnitudes.job_id` holds — that one is a uuid and points
+      at `id`.
+  current_stage:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      A human-readable stage label the external service reported while the job
+      ran ("Initializing", …, "Completed"). Added by `20250914113757`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

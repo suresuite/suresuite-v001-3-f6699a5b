@@ -700,6 +700,13 @@ A **`run_cache`** consults the key before dispatch: an exact hit returns stored 
 > the user is no longer asked to compare `code_version` by eye (PLAN.md §4 D245). Reuse stays
 > visible: a hit is reported and the stored run surfaced, and `force_rerun` still recomputes.
 > Cross-project hits on normalized `ProjectData` and warm-state partial hits remain Phase C.
+> **As built (WP 10.4):** the key hashes a stored `run_spec` — the registered engine and its
+> build, both content hashes, the scenario's whole run spec (every scenario column except
+> identity and presentation, so a new column is in the key by default and the failure mode is a
+> needless re-run, never a false reuse), and the deviations from the Validated Model's protocol.
+> One SQL path computes it for the dispatcher and for the AI read tool alike; identical
+> submissions make one run (a completed one is offered, an in-flight one is attached); and the
+> worker refuses a run bound to an engine it does not run (PLAN.md §16 · WP 10.4).
 
 ### 9.3 Comparison semantics
 

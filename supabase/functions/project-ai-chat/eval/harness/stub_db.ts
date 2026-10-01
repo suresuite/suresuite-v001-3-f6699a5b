@@ -142,7 +142,16 @@ export function makeStubDb(
     },
     rpc(fn: string, args: Record<string, unknown> = {}) {
       const handler = rpcs[fn];
-      if (!handler) return Promise.resolve({ data: null, error: { message: `no stub rpc: ${fn}` } });
+      // PostgREST's own answer for a function the schema does not have (PGRST202),
+      // so callers that fall back for a database without a migration — WP 10.4's
+      // `find_reusable_runs` / `create_simulation_run` — take that path here too.
+      // This stub does not mirror those two; `rehearsal/590` holds them.
+      if (!handler) {
+        return Promise.resolve({
+          data: null,
+          error: { code: "PGRST202", message: `no stub rpc: Could not find the function public.${fn}` },
+        });
+      }
       try {
         return Promise.resolve({ data: handler(args), error: null });
       } catch (e) {

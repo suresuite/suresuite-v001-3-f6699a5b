@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 372,
-  "migrations_applied": 364,
+  "migrations_found": 373,
+  "migrations_applied": 365,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000008_validated_model.sql",
+  "last_migration": "20261001000009_engines_runkey.sql",
   "counts": {
-    "tables": 86,
+    "tables": 87,
     "views": 7,
     "enums": 4,
-    "functions": 363,
+    "functions": 372,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -10679,6 +10679,15 @@
           "columns": [],
           "definition": "CHECK (protocol IS NULL OR cardinality(public.validated_model_protocol_problems(protocol)) = 0)",
           "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "model_validations_engine_id_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "engine_id"
+          ],
+          "definition": "FOREIGN KEY (engine_id) REFERENCES public.sim_engines(id)",
+          "added_by": "20261001000009_engines_runkey.sql"
         }
       ],
       "indexes": [
@@ -18174,6 +18183,189 @@
       ]
     },
     {
+      "name": "sim_engines",
+      "schema": "public",
+      "created_by": "20261001000009_engines_runkey.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "slug",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "name",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "version",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "code_version",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "status",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "capabilities",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "reported_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "sim_engines_slug_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "slug"
+          ],
+          "definition": "UNIQUE (slug)",
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "sim_engines_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "sim_engines_status_check",
+          "kind": "CHECK",
+          "columns": [
+            "status"
+          ],
+          "definition": "CHECK (status IN ('active', 'retired'))",
+          "implicit": true,
+          "added_by": "20261001000009_engines_runkey.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "sim_engines_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20261001000009_engines_runkey.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "WP 10.4 · §4 D245 — the engine registry. One row per engine; `status` says whether dispatch may use it. The worker reports `version`/`code_version` through sim_engine_report.",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "slug"
+          ],
+          "name": "sim_engines_slug_key"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "sim_engines_pkey"
+        }
+      ]
+    },
+    {
       "name": "simulation_cache",
       "schema": "public",
       "created_by": "20250913085427_4fb4acfc-fb3c-4021-8851-ffe01adf9d76.sql",
@@ -19987,6 +20179,66 @@
           "unique": false,
           "references": null,
           "added_by": "20260922000002_run_binds_seed_and_schedule.sql"
+        },
+        {
+          "name": "engine_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "run_spec",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "run_key",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "protocol_overrides",
+          "quoted": false,
+          "type": "jsonb",
+          "type_raw": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "exploratory",
+          "quoted": false,
+          "type": "boolean",
+          "type_raw": "boolean",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000009_engines_runkey.sql"
         }
       ],
       "constraints": [
@@ -19999,6 +20251,15 @@
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        },
+        {
+          "name": "simulation_runs_engine_id_fkey",
+          "kind": "FOREIGN KEY",
+          "columns": [
+            "engine_id"
+          ],
+          "definition": "FOREIGN KEY (engine_id) REFERENCES public.sim_engines(id)",
+          "added_by": "20261001000009_engines_runkey.sql"
         }
       ],
       "indexes": [
@@ -20023,6 +20284,18 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql"
+        },
+        {
+          "name": "simulation_runs_run_key",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "run_key"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "run_key IS NOT NULL",
+          "partial": true,
+          "added_by": "20261001000009_engines_runkey.sql"
         }
       ],
       "rls": {
@@ -22553,6 +22826,18 @@
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
     },
     {
+      "name": "_engine_for_code_version",
+      "signature": "_engine_for_code_version(text)",
+      "args": [
+        "p_code_version text"
+      ],
+      "returns": "uuid LANGUAGE sql STABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
       "name": "_graph_state_mark",
       "signature": "_graph_state_mark(uuid[])",
       "args": [
@@ -22692,6 +22977,26 @@
       "defined_by": "20260715000001_agent_proposals.sql"
     },
     {
+      "name": "_simulation_run_derive",
+      "signature": "_simulation_run_derive()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "_validated_model_engine",
+      "signature": "_validated_model_engine()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
       "name": "_validated_model_evidence_immutable",
       "signature": "_validated_model_evidence_immutable()",
       "args": [],
@@ -22725,7 +23030,7 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "comment": null,
-      "defined_by": "20261001000008_validated_model.sql"
+      "defined_by": "20261001000009_engines_runkey.sql"
     },
     {
       "name": "_validated_model_number",
@@ -24560,6 +24865,21 @@
       "defined_by": "20260915000004_org_identity_dual_read.sql"
     },
     {
+      "name": "create_simulation_run",
+      "signature": "create_simulation_run(jsonb, boolean, boolean, uuid)",
+      "args": [
+        "p_run jsonb",
+        "p_force_rerun boolean DEFAULT false",
+        "p_attach_inflight boolean DEFAULT true",
+        "_actor_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
       "name": "create_user_file",
       "signature": "create_user_file(uuid, text, text, text, bigint, uuid, uuid, uuid, timestamptz, uuid)",
       "args": [
@@ -24960,6 +25280,24 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260726000001_chat_plans.sql"
+    },
+    {
+      "name": "find_reusable_runs",
+      "signature": "find_reusable_runs(uuid, text, text, integer, uuid, jsonb, integer)",
+      "args": [
+        "p_scenario_id uuid",
+        "p_policy_hash text",
+        "p_graph_hash text",
+        "p_replications integer",
+        "p_engine_id uuid DEFAULT NULL",
+        "p_protocol_overrides jsonb DEFAULT '{}'::jsonb",
+        "p_limit integer DEFAULT 1"
+      ],
+      "returns": "TABLE (run_id uuid, ended_at timestamptz, created_at timestamptz, code_version text, rep_count_done integer, run_key text)",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
     },
     {
       "name": "freshness_of",
@@ -26896,6 +27234,61 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260718000001_stage1_agent_rights_and_summary.sql"
+    },
+    {
+      "name": "sim_engine_for_dispatch",
+      "signature": "sim_engine_for_dispatch(uuid)",
+      "args": [
+        "p_engine_id uuid DEFAULT NULL"
+      ],
+      "returns": "public.sim_engines LANGUAGE plpgsql STABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "sim_engine_report",
+      "signature": "sim_engine_report(text, text, text, jsonb)",
+      "args": [
+        "p_slug text",
+        "p_version text",
+        "p_code_version text",
+        "p_capabilities jsonb DEFAULT NULL"
+      ],
+      "returns": "uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "simulation_run_key",
+      "signature": "simulation_run_key(jsonb)",
+      "args": [
+        "p_spec jsonb"
+      ],
+      "returns": "text LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "simulation_run_spec",
+      "signature": "simulation_run_spec(uuid, text, text, uuid, jsonb)",
+      "args": [
+        "p_scenario_id uuid",
+        "p_policy_hash text",
+        "p_graph_hash text",
+        "p_engine_id uuid DEFAULT NULL",
+        "p_protocol_overrides jsonb DEFAULT '{}'::jsonb"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql STABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000009_engines_runkey.sql"
     },
     {
       "name": "snapshot_dataset",

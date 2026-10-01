@@ -3684,7 +3684,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 61,
+  "described": 70,
   "open": [
     {
       "table": "analysis_kinds",
@@ -3736,6 +3736,12 @@ export const READ_EXPOSURE: ReadExposure = {
       "table": "docs_section_releases",
       "roles": [
         "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "experiments",
+      "roles": [
         "authenticated"
       ]
     },
@@ -3835,6 +3841,13 @@ export const READ_EXPOSURE: ReadExposure = {
       ]
     },
     {
+      "table": "run_item_series",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
       "table": "run_replications",
       "roles": [
         "anon",
@@ -3843,6 +3856,20 @@ export const READ_EXPOSURE: ReadExposure = {
     },
     {
       "table": "scenarios",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "sim_engines",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "simulation_runs",
       "roles": [
         "anon",
         "authenticated"
@@ -3878,8 +3905,11 @@ export const READ_EXPOSURE: ReadExposure = {
     "project_role_capabilities",
     "risk_data",
     "role_capabilities",
+    "run_item_series",
     "run_replications",
     "scenarios",
+    "sim_engines",
+    "simulation_runs",
     "suppliers"
   ]
 };

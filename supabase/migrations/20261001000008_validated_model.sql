@@ -487,7 +487,7 @@ BEGIN
   RETURN v_id;
 END;
 $fn$;
-REVOKE ALL ON FUNCTION public._insert_validated_model(uuid,uuid,uuid,uuid,text,jsonb,text,jsonb,jsonb,jsonb,text,text,text,uuid,jsonb,uuid,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._insert_validated_model(uuid,uuid,uuid,uuid,text,jsonb,text,jsonb,jsonb,jsonb,text,text,text,uuid,jsonb,uuid,text) FROM PUBLIC, anon, authenticated;
 
 -- Save Validated Model. The adoption rule lives HERE, not only in the browser:
 -- a statistical model needs every selected KPI's test to have run and passed; a
@@ -608,6 +608,7 @@ $fn$;
 
 -- Revocation is a lifecycle change and names who made it.
 DROP FUNCTION IF EXISTS public.revoke_model_validation(uuid);
+DROP FUNCTION IF EXISTS public.revoke_model_validation(uuid, uuid, text);   -- re-runnable
 CREATE FUNCTION public.revoke_model_validation(
   p_validation_id uuid,
   _actor_user_id  uuid DEFAULT NULL,

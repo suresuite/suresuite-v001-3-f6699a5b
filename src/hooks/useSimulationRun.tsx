@@ -42,6 +42,18 @@ export interface SimulationRun {
   /** The pre-run gate could not load its data and dispatch proceeded unchecked
    *  (`20260707000001_run_gate_skipped.sql`). Rendered by `gateNotice` (F-19a). */
   gate_skipped?: boolean | null;
+  // ── WP 10.4 · §4 D245 — the binding on the row (`20261001000009`) ──
+  /** The registered engine the run was dispatched to (`sim_engines.id`). */
+  engine_id?: string | null;
+  /** sha256 of `run_spec` — the run's identity; identical submissions share it. */
+  run_key?: string | null;
+  /** Everything the RunKey hashes, as data: engine, hashes, the scenario's run
+   *  spec, overrides. Every binding resolves from here without a live read. */
+  run_spec?: Record<string, unknown> | null;
+  /** Deviations from the Validated Model's protocol; `{}` = faithful. */
+  protocol_overrides?: Record<string, unknown> | null;
+  /** Ran under no Validated Model, or explicitly as an exploratory model. */
+  exploratory?: boolean | null;
 }
 
 // The dispatch types and client live in lib/sim/dispatch.ts (WP 9.4 slice 8),
