@@ -57,7 +57,7 @@ Written by the `_build_dataset_snapshot` database function, never by a page — 
 |---|---|---|---|
 | `DataManager.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:464` | yes |
 | `DeveloperApi.tsx` | rpc list_dataset_versions | `src/pages/DeveloperApi.tsx:311` | yes |
-| `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:24` | yes |
+| `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:28` | yes |
 | `ProjectPolicies.tsx` | rpc record_validated_model (Save Validated Model, WP 10.3) | `src/hooks/useModelValidation.tsx:492` | yes |
 | `SimulationLab.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:464` | yes |
 
@@ -344,6 +344,6 @@ SHA-256 over the FIRM level (WP 10.1): the deep-tier topology (`network_nodes(ui
 
 ---
 
-*Generated from data contract `ce1d4e91513a`, engine `0.2.8`,
+*Generated from data contract `003b11a8b018`, engine `0.2.8`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

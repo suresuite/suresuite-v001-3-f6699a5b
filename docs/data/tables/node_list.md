@@ -67,8 +67,8 @@ Read follows project reachability. Written by `refresh_node_list_for_project`, w
 |---|---|---|---|
 | `DataManager.tsx` | rpc get_node_list | `src/pages/DataManager.tsx:433` | yes |
 | `FirmLevelNetwork.tsx` | rpc get_node_list | `src/components/MapView.tsx:355` | yes |
-| `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:24` | yes |
-| `SimulationLab.tsx` | rpc project_freshness | `src/components/trust/useProjectFreshness.ts:24` | yes |
+| `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:28` | yes |
+| `SimulationLab.tsx` | rpc project_freshness | `src/components/trust/useProjectFreshness.ts:28` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -470,6 +470,6 @@ Tiers upstream of the focal plant: 0 the plant itself, 1 a direct supplier, 2 an
 
 ---
 
-*Generated from data contract `ce1d4e91513a`, engine `0.2.8`,
+*Generated from data contract `003b11a8b018`, engine `0.2.8`,
 sidecar `supabase/contract/node_list.contract.yaml`, table created by `20250829101944_b2ded57f-be29-4ae7-afff-38b3712e92e5.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

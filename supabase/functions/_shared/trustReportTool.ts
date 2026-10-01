@@ -99,8 +99,14 @@ async function loadIngestHistory(
 export async function buildTrustSections(
   sb: TrustDb,
   projectId: string,
+  userId?: string | null,
 ): Promise<{ sections: TrustSection[]; coverageComputed: boolean }> {
-  const { data: fresh, error: freshErr } = await sb.rpc("project_freshness", { p_project_id: projectId });
+  // D257 — `project_freshness` names its reader; a caller with no session (the browser, or
+  // this function's service-role client) is refused without one.
+  const { data: fresh, error: freshErr } = await sb.rpc("project_freshness", {
+    p_project_id: projectId,
+    p_user_id: userId ?? null,
+  });
   if (freshErr || !fresh) {
     // The panel's rule, server side: if freshness cannot be read, there is no
     // verdict, and saying so is the only honest output. A report assembled
@@ -153,7 +159,7 @@ async function getDataTrustReport(
     ? String(args.section)
     : "headline";
   try {
-    const { sections } = await buildTrustSections(ctx.supabase as unknown as TrustDb, ctx.projectId);
+    const { sections } = await buildTrustSections(ctx.supabase as unknown as TrustDb, ctx.projectId, ctx.userId);
     const section = sections.find((s) => s.id === wanted);
     if (!section) {
       return { kind: "text", data: `No such trust-report section: ${wanted}`, meta: { tool, row_count: 0, note: "error" } };

@@ -9,19 +9,23 @@
  */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import type { FreshnessPayload } from "@/lib/trust/trustReport";
 
 export function useProjectFreshness(projectId: string | null | undefined) {
+  // D257 — the browser calls as `anon`, so the reader is NAMED (D155).
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [data, setData] = useState<FreshnessPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!projectId) { setData(null); return; }
+    if (!projectId || !userId) { setData(null); return; }
     let cancelled = false;
     setLoading(true);
     supabase
-      .rpc("project_freshness", { p_project_id: projectId })
+      .rpc("project_freshness", { p_project_id: projectId, p_user_id: userId })
       .then(({ data: d, error: e }) => {
         if (cancelled) return;
         setLoading(false);
@@ -32,7 +36,7 @@ export function useProjectFreshness(projectId: string | null | undefined) {
         setData(d as unknown as FreshnessPayload);
       });
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, userId]);
 
   return { freshness: data, error, loading };
 }

@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 381,
-      "migrations_applied": 373,
-      "last_migration": "20261001000017_super_admin_acts_as_admin.sql"
+      "migrations_found": 382,
+      "migrations_applied": 374,
+      "last_migration": "20261001000018_project_freshness_names_its_reader.sql"
     },
     "sidecars": 74,
     "registry": {
@@ -667,14 +667,14 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "evidence": "src/components/trust/useProjectFreshness.ts:28",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "evidence": "src/components/trust/useProjectFreshness.ts:28",
           "confirmed": true
         }
       ],
@@ -5021,7 +5021,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "evidence": "src/components/trust/useProjectFreshness.ts:28",
           "confirmed": true
         },
         {
@@ -17918,14 +17918,14 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "evidence": "src/components/trust/useProjectFreshness.ts:28",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "evidence": "src/components/trust/useProjectFreshness.ts:28",
           "confirmed": true
         }
       ],
@@ -19032,14 +19032,14 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "evidence": "src/components/trust/useProjectFreshness.ts:28",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "evidence": "src/components/trust/useProjectFreshness.ts:28",
           "confirmed": true
         }
       ],
@@ -19583,14 +19583,14 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "evidence": "src/components/trust/useProjectFreshness.ts:28",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "rpc project_freshness",
           "grain": "table",
-          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "evidence": "src/components/trust/useProjectFreshness.ts:28",
           "confirmed": true
         }
       ],
@@ -23790,7 +23790,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "evidence": "src/components/trust/useProjectFreshness.ts:28",
           "confirmed": true
         },
         {
@@ -38447,7 +38447,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/components/trust/useProjectFreshness.ts:24",
+          "evidence": "src/components/trust/useProjectFreshness.ts:28",
           "confirmed": true
         },
         {
@@ -42008,5 +42008,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "ce1d4e91513a"
+  "contract_version": "003b11a8b018"
 }
