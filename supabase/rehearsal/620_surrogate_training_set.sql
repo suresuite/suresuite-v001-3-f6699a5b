@@ -14,6 +14,10 @@
 --    an API door.
 -- §7 §4 D254: a run two models cite counts ONCE in the set's size — the
 --    per-model summary lists it under each, the totals do not add them up.
+-- §8 WP 11.4 · §4 D262: two snapshots that differ only in the deep tier are ONE
+--    simulation version — one group, one version in the totals — and a run inserted
+--    without its inputs learns them from its snapshot; the shared run still counts
+--    once; the features name the PRODUCT version, not the composite.
 
 INSERT INTO public.sim_engines (slug, name, status, capabilities) VALUES
   ('scsim', 'scsim — the strategic engine', 'active', '{"compute": ["worker", "browser"]}'::jsonb)
@@ -44,6 +48,8 @@ DECLARE
   v_f2    jsonb;
   v_n     bigint;
   v_sum   jsonb;
+  v_ds2   uuid;
+  v_new   uuid;
   k_proto jsonb := '{"replications":2,"root_seed":42,"crn":true,"warmup_week":0,"horizon_weeks":3,"analysis_window_weeks":3,
                      "ci_level":0.95,"ci_halfwidth_target":0.05,"stopping_rule":"fixed_horizon"}'::jsonb;
 BEGIN
@@ -196,6 +202,53 @@ BEGIN
   IF (v_sum ->> 'runs')::int <> 2 OR (v_sum ->> 'replications')::int <> 3
      OR (v_sum ->> 'models')::int <> 2 OR (v_sum ->> 'graph_versions')::int <> 1 THEN
     RAISE EXCEPTION 'R620 §7: the set''s size counted a shared run twice (want 2 runs, 3 replications, 2 models, 1 graph version): %', v_sum;
+  END IF;
+
+  -- ══ §8 · KPIs by the simulation version, not the composite (WP 11.4, D262) ══
+  INSERT INTO public.network_nodes (project_id, plant_name, uid, name, revenue) VALUES
+    (v_proj, 'P', 'F1', 'Firm one', 5), (v_proj, 'P', 'F2', 'Firm two', 7);
+  INSERT INTO public.network_edges (project_id, plant_name, src_uid, dst_uid, relative_revenue)
+    VALUES (v_proj, 'P', 'F1', 'F2', 0.5);
+  v_ds2 := public.snapshot_dataset(v_proj, NULL, v_user);
+  IF v_ds2 = v_ds
+     OR (SELECT simulation_version_id FROM public.dataset_versions WHERE id = v_ds2)
+        IS DISTINCT FROM (SELECT simulation_version_id FROM public.dataset_versions WHERE id = v_ds) THEN
+    RAISE EXCEPTION 'R620 §8: the fixture is not two composites over one simulation version';
+  END IF;
+  -- A faithful run on the new snapshot, inserted WITHOUT naming its inputs.
+  INSERT INTO public.simulation_runs (scenario_id, project_id, status, rep_count_target, rep_count_done, code_version,
+                                      dataset_version_id, policy_version_id, model_validation_id, exploratory, protocol_overrides, gate_skipped)
+  VALUES (v_scen, v_proj, 'done', 1, 1, 'scsim-0.2.8', v_ds2, v_pv, v_m, false, '{}', false) RETURNING id INTO v_new;
+  INSERT INTO public.run_replications (run_id, project_id, rep_index, seed_used, status, kpis)
+    VALUES (v_new, v_proj, 0, 42, 'done', '{"fill_rate": 0.95, "model_rep": 0, "event_rep": 0}'::jsonb);
+  IF (SELECT simulation_version_id FROM public.simulation_runs WHERE id = v_new)
+       IS DISTINCT FROM (SELECT simulation_version_id FROM public.dataset_versions WHERE id = v_ds2) THEN
+    RAISE EXCEPTION 'R620 §8: a run inserted without its inputs did not learn them from its snapshot';
+  END IF;
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(public.surrogate_training_summary(v_proj)) g
+   WHERE (g ->> 'validated_model_id')::uuid = v_m;
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION 'R620 §8: one model''s runs on one simulation version split into % groups: %', v_n,
+      public.surrogate_training_summary(v_proj);
+  END IF;
+  SELECT g INTO v_sum FROM jsonb_array_elements(public.surrogate_training_summary(v_proj)) g
+   WHERE (g ->> 'validated_model_id')::uuid = v_m;
+  IF (v_sum ->> 'runs')::int <> 3 OR (v_sum ->> 'graph_versions')::int <> 2
+     OR (v_sum ->> 'simulation_version_no')::int IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'R620 §8: the group is not 3 runs over 2 composites of simulation v1: %', v_sum;
+  END IF;
+  v_sum := public.surrogate_training_totals(v_proj);
+  IF (v_sum ->> 'simulation_versions')::int <> 1 OR (v_sum ->> 'graph_versions')::int <> 2
+     OR (v_sum ->> 'runs')::int <> 3 OR (v_sum ->> 'replications')::int <> 4 THEN
+    RAISE EXCEPTION 'R620 §8: the totals are not 3 runs / 4 replications / 1 simulation version / 2 composites: %', v_sum;
+  END IF;
+  -- The features name the product version (the deep-tier edit did not move it).
+  v_f2 := public.surrogate_feature_spec(v_proj, v_user);
+  IF (v_f2 ->> 'product_version_no')::int IS DISTINCT FROM
+       (SELECT g.version_no FROM public.dataset_versions dv JOIN public.graph_level_versions g ON g.id = dv.product_version_id
+         WHERE dv.id = v_ds2)
+     OR (v_f2 ->> 'level_version_id') IS NULL OR NOT (v_f2 ? 'snapshot_version_no') OR v_f2 ? 'graph_version_no' THEN
+    RAISE EXCEPTION 'R620 §8: the features do not name their product version: %', v_f2;
   END IF;
 
   RAISE NOTICE 'R620 ok — faithful runs and evidence in, the rest out, features once per graph';

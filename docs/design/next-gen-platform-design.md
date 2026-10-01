@@ -1007,6 +1007,11 @@ Surrogates are models with lifecycles, so they get the same discipline as polici
 > The training set groups and counts by the simulation-input version, so two snapshots that differ
 > only in the deep tier are one group (PLAN.md §4 D262); the join key between KPIs and features is
 > the run's snapshot, whose tuple names both versions.
+>
+> **As built (WP 11.4):** `surrogate_training_runs` carries the simulation version beside the
+> composite; the summary groups by Validated Model and simulation version and counts the
+> composites inside; the features answer with the product version. A run names its inputs
+> whoever wrote it — the run's BEFORE trigger reads them off its snapshot (PLAN.md §16 · WP 11.4).
 
 ### 11.5 Orchestration: stress testing as a digital-twin analysis job
 

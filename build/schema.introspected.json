@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 385,
-  "migrations_applied": 377,
+  "migrations_found": 386,
+  "migrations_applied": 378,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000021_level_version_reads.sql",
+  "last_migration": "20261001000022_training_set_by_simulation_version.sql",
   "counts": {
     "tables": 92,
     "views": 8,
     "enums": 4,
-    "functions": 394,
+    "functions": 395,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -23773,7 +23773,7 @@
       "security_invoker": true
     },
     "surrogate_training_runs": {
-      "defined_by": "20261001000013_surrogate_training_set.sql",
+      "defined_by": "20261001000022_training_set_by_simulation_version.sql",
       "materialized": false,
       "security_invoker": false
     },
@@ -24328,7 +24328,7 @@
       "security_definer": false,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000009_engines_runkey.sql"
+      "defined_by": "20261001000022_training_set_by_simulation_version.sql"
     },
     {
       "name": "_simulation_run_drop_series",
@@ -27332,6 +27332,18 @@
       "defined_by": "20260915000005_project_membership_and_delegation.sql"
     },
     {
+      "name": "graph_level_version_no",
+      "signature": "graph_level_version_no(uuid)",
+      "args": [
+        "p_level_version_id uuid"
+      ],
+      "returns": "integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000022_training_set_by_simulation_version.sql"
+    },
+    {
       "name": "has_project_access",
       "signature": "has_project_access(uuid)",
       "args": [
@@ -28796,7 +28808,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000013_surrogate_training_set.sql"
+      "defined_by": "20261001000022_training_set_by_simulation_version.sql"
     },
     {
       "name": "surrogate_training_summary",
@@ -28808,7 +28820,7 @@
       "security_definer": false,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000013_surrogate_training_set.sql"
+      "defined_by": "20261001000022_training_set_by_simulation_version.sql"
     },
     {
       "name": "surrogate_training_totals",
@@ -28820,7 +28832,7 @@
       "security_definer": false,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000015_surrogate_training_totals.sql"
+      "defined_by": "20261001000022_training_set_by_simulation_version.sql"
     },
     {
       "name": "sweep_expired_files",
