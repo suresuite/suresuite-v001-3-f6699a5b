@@ -13,8 +13,9 @@
 -- inputs the two centrality analyzers read. Change the graph — add an edge, move
 -- a revenue — and the anchor does not move. On a branch where the analyzers key
 -- their cache on that hash alone, a re-uploaded network serves the PREVIOUS
--- graph's centralities and reports a hit. §1 fails on a database where
--- `network_topology_hash` does not exist, which is every commit before this one.
+-- graph's centralities and reports a hit. (WP 5.3 folded the topology into the
+-- anchor and inverted §1; WP 11.5 dropped the deprecated `network_topology_hash`
+-- (§4 D240), so the anchor is the only digest left to assert on.)
 --
 -- EVERY NULLABLE COMPARISON IS `IS DISTINCT FROM` (WP 3.4's lesson: `NULL <> x`
 -- is NULL, which an IF reads as false, so the assertion can never fail).
@@ -32,9 +33,6 @@ DECLARE
   v_other    uuid := '00000000-0000-4000-8000-000000043304';
   v_graph0   text;
   v_graph1   text;
-  v_topo0    text;
-  v_topo1    text;
-  v_topo2    text;
   v_r        jsonb;
   v_r2       jsonb;
   v_run      uuid;
@@ -119,14 +117,14 @@ BEGIN
   -- anchor must distinguish two different graphs, and must NOT move for an edit
   -- no analysis reads.
 
-  v_topo0 := public.network_topology_hash(v_project);
+  -- (WP 11.5 · §4 D240: the deprecated params-borne digest, `network_topology_hash`,
+  -- is dropped; the anchor below is the only one, and the analyses key on it.)
 
   -- half one: change the graph. The ANCHOR moves now, not just the digest.
   UPDATE public.network_edges SET relative_revenue = 0.9
    WHERE project_id = v_project AND src_uid = 'N1' AND dst_uid = 'N2';
 
   v_graph1 := public.current_graph_hash(v_project);
-  v_topo1  := public.network_topology_hash(v_project);
 
   IF v_graph1 IS NOT DISTINCT FROM v_graph0 THEN
     RAISE EXCEPTION
@@ -134,12 +132,6 @@ BEGIN
       'so the anchor is blind to the inputs the two centrality analyzers read and '
       'D75 is open again. A re-uploaded network is served the previous graph''s '
       'centralities as a cache hit.';
-  END IF;
-  IF v_topo1 IS NOT DISTINCT FROM v_topo0 THEN
-    RAISE EXCEPTION
-      'WP 4.3 §1 — the topology digest did NOT move when an edge weight changed. '
-      'It is deprecated but still live for the deploy window, and a deprecated '
-      'function that has silently stopped working is worse than a deleted one.';
   END IF;
 
   -- half two: put it back. A hash that only ever changes is a version counter.
@@ -151,12 +143,6 @@ BEGIN
       'WP 5.3 §1 — reverting the edge did not restore the anchor. The hash is '
       'order-dependent or time-dependent, which makes every repeat request a miss '
       'and every analysis a full recomputation.';
-  END IF;
-  v_topo2 := public.network_topology_hash(v_project);
-  IF v_topo2 IS DISTINCT FROM v_topo0 THEN
-    RAISE EXCEPTION
-      'WP 4.3 §1 — reverting the edge did not restore the digest (% then %).',
-      v_topo0, v_topo2;
   END IF;
 
   -- AND IT MUST STAY NARROWER THAN THE TABLE. `country` is an uploaded column on
@@ -173,16 +159,13 @@ BEGIN
       'prominence RPCs return, so every unrelated edit now invalidates every '
       'centrality in the project.';
   END IF;
-  IF public.network_topology_hash(v_project) IS DISTINCT FROM v_topo0 THEN
-    RAISE EXCEPTION 'WP 4.3 §1 — the digest moved when `country` changed.';
-  END IF;
 
   -- ── 2 · the dual-write · both destinations, one run, one hash ───────────
 
   PERFORM set_config('app.current_user_id', v_analyst::text, true);  -- POISON
   v_r := public.analysis_get_or_start(
            v_project, 'network_metrics',
-           jsonb_build_object('weighted', true, 'topology_digest', v_topo0),
+           jsonb_build_object('weighted', true),
            'nm@wp43', v_editor);
   v_run := (v_r ->> 'run_id')::uuid;
 
@@ -281,7 +264,7 @@ BEGIN
   PERFORM set_config('app.current_user_id', v_analyst::text, true);  -- POISON
   v_r2 := public.analysis_get_or_start(
             v_project, 'prominence',
-            jsonb_build_object('topology_digest', v_topo0),
+            '{}'::jsonb,
             'prom@wp43', v_editor);
   v_run2 := (v_r2 ->> 'run_id')::uuid;
 
@@ -388,7 +371,7 @@ BEGIN
 
   v_r2 := public.analysis_get_or_start(
             v_project, 'network_metrics',
-            jsonb_build_object('weighted', false, 'topology_digest', v_topo0),
+            jsonb_build_object('weighted', false),
             'nm@wp43', v_editor);
 
   -- POISONED BETWEEN THE TWO CALLS, NOT BEFORE THEM, and the difference is the
@@ -441,8 +424,7 @@ BEGIN
   PERFORM set_config('app.current_user_id', v_analyst::text, true);  -- POISON
   v_r2 := public.analysis_get_or_start(
             v_project, 'network_metrics',
-            jsonb_build_object('weighted', true,
-                               'topology_digest', public.network_topology_hash(v_project)),
+            jsonb_build_object('weighted', true),
             'nm@wp43', v_editor);
 
   IF (v_r2 ->> 'cache_hit')::boolean IS DISTINCT FROM false THEN
@@ -461,8 +443,7 @@ BEGIN
   PERFORM set_config('app.current_user_id', v_analyst::text, true);  -- POISON
   v_r2 := public.analysis_get_or_start(
             v_project, 'network_metrics',
-            jsonb_build_object('weighted', true,
-                               'topology_digest', public.network_topology_hash(v_project)),
+            jsonb_build_object('weighted', true),
             'nm@wp43', v_editor);
 
   IF (v_r2 ->> 'run_id')::uuid IS DISTINCT FROM v_run THEN
