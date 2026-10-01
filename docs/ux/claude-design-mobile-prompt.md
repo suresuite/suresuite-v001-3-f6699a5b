@@ -88,7 +88,7 @@ For each screen, I give the problem the audit found, what the user is trying to 
 - **Problem:** at 844 × 390 the app shows the **desktop** layout: icon sidebar, desktop header, a credit footer over the content, and the AI bubble over the grid.
 - **Direction:** show how each main screen (Home, Policies, Lab, Admin users) looks in the **mobile shell in landscape**: 52 px bars, a two-column list where it helps, the action bar merged into the header where the height is tight. (The switch itself is a one-line change to the mobile detection. You only design the result.)
 
-### P1-1 · A confirmation sheet for every destructive action — shot `37`
+### P1-1 · A confirmation sheet for every destructive action
 - **Problem:** delete project, remove a member, remove from an organization, delete a version or scenario, and cancel a run all use the browser's grey `confirm()` box, with the URL as its title.
 - **Direction:** one reusable **ConfirmSheet**:
   - a title naming the object ("Delete Lyon Stamping Plant — FY27 resilience study?");
