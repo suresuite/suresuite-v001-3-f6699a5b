@@ -203,6 +203,6 @@ When it was written.
 
 ---
 
-*Generated from data contract `68f8e8bc6722`, engine `0.2.8`,
+*Generated from data contract `c7120de73956`, engine `0.2.8`,
 sidecar `supabase/contract/model_validation_evidence.contract.yaml`, table created by `20261001000008_validated_model.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

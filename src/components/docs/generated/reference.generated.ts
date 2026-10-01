@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 917;
+export const REFERENCE_COLUMN_COUNT = 922;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -19134,12 +19134,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "hook useSimulationRun → select * from run_replications",
-        "evidence": "src/hooks/useSimulationRun.tsx:97"
+        "evidence": "src/hooks/useSimulationRun.tsx:110"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "hook useSimulationRun::loadReps → select * from run_replications",
-        "evidence": "src/hooks/useSimulationRun.tsx:201"
+        "evidence": "src/hooks/useSimulationRun.tsx:225"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -19279,7 +19279,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The random seed this replication actually ran with, derived as `project_seed * 1000 + model_rep`. It is recorded rather than recomputed so a single replication can be reproduced exactly — the per-seed explorer addresses rows by it.",
+        "meaning": "The run's ROOT seed since WP 10.6 (§4 D246). The engine draws every stream from a keyed SeedSequence tree on (root seed, `model_rep`, `event_rep`), so a replication is reproduced by re-running with this root seed and is identified by `rep_index` and its cell (`kpis.model_rep`, `kpis.event_rep`). Before WP 10.6 the bridge wrote `project_seed * 1000 + model_rep` here — not a seed (typing it in reproduced nothing) and shared by every event draw of one world — and this description called it \"the seed this replication actually ran with\", which it never was.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -19351,7 +19351,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "This replication's weekly series, one array per key, each as long as the horizon in weeks. The keys are scsim's PUBLISHED weekly series and are declared in ONE place — `WEEKLY_SERIES` in scsim/scsim/core/context.py — which also fixes each series' unit and how it may be aggregated across weeks (`level` = a stock, average it; `flow` = a weekly quantity, sum it; `ratio` = neither). `unit_source` is `derived` because the unit is per-key, from that declaration, not one token for the column. The four inventory series (`on_hand_value`, `fg_value`, `on_hand_units`, `fg_units`) are what WP 9.1 added to a user's view; `fg_value` had been computed on every replication since the trace was written and published by nothing, because the vocabulary was authored six times and it was present in only two of them (§4 D164).",
+        "meaning": "This replication's weekly series, one array per key, each as long as the horizon in weeks — OR `{}` when they are kept elsewhere: since WP 10.6 a worker run writes them to ONE Parquet object per run (`simulation_runs.series_object`, private `run-results` bucket) and `runSeries.ts` hydrates the rows from it, and the retention sweep empties them when a standard run's series expire (`series_expired_at`). `{}` and not NULL because the column is NOT NULL DEFAULT `{}`, the value every reader already treats as \"no series\". The keys are scsim's PUBLISHED weekly series and are declared in ONE place — `WEEKLY_SERIES` in scsim/scsim/core/context.py — which also fixes each series' unit and how it may be aggregated across weeks (`level` = a stock, average it; `flow` = a weekly quantity, sum it; `ratio` = neither). `unit_source` is `derived` because the unit is per-key, from that declaration, not one token for the column. The four inventory series (`on_hand_value`, `fg_value`, `on_hand_units`, `fg_units`) are what WP 9.1 added to a user's view; `fg_value` had been computed on every replication since the trace was written and published by nothing, because the vocabulary was authored six times and it was present in only two of them (§4 D164).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -22829,13 +22829,22 @@ export const REFERENCE_TABLES: RefTable[] = [
       "id"
     ],
     "naturalKeyIntended": null,
-    "checks": [],
+    "checks": [
+      {
+        "name": "simulation_runs_retention_check",
+        "definition": "CHECK (retention IN ('standard', 'pinned', 'evidence'))"
+      },
+      {
+        "name": "simulation_runs_retention_expiry_check",
+        "definition": "CHECK ((retention = 'standard' OR series_expires_at IS NULL) AND (series_expired_at IS NULL OR series_object IS NULL))"
+      }
+    ],
     "ingestDataset": null,
     "surfaces": [
       {
         "page": "SimulationLab.tsx",
         "via": "hook useSimulationRun → select * from simulation_runs",
-        "evidence": "src/hooks/useSimulationRun.tsx:87"
+        "evidence": "src/hooks/useSimulationRun.tsx:100"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -23628,6 +23637,126 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "The run followed no Validated Model, or was dispatched explicitly as exploratory. Never false for a run with no model. Badged everywhere and excluded from surrogate training (WP 10.5, 10.8). Backfilled as `model_validation_id IS NULL`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "series_object",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The run's weekly series object in the private `run-results` bucket, `<project_id>/<run_id>/series.parquet` — zstd Parquet, long form (one row per replication and week, one column per series). When set, the replication rows hold `time_series = {}` and `runSeries.ts` hydrates them through a signed URL `sim- command` mints. NULL for a run whose series are in its rows (before WP 10.6, browser-computed runs, or a failed upload — the worker keeps the JSONB rather than lose it) and for a run whose series expired.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "series_bytes",
+        "type": "bigint",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "What the run's series cost: the object's size when there is one (written by the worker), else the JSONB series in its rows, measured when the run completed.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "retention",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "`standard` (the series expire after `run_series_retention`), `pinned` (an editor or owner keeps them — `set_run_retention`), or `evidence` (the run a Validated Model rests on — set when the model is saved, never released here).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "series_expires_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When a standard run's series expire — set when the run completes. NULL for pinned and evidence runs (a CHECK holds it so).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "series_expired_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When `sweep_expired_run_series` removed the series (object, JSONB, per-item rows). The run row, its aggregates and every replication's KPI row are kept; the screen says the series expired and which RunKey reproduces them.",
         "primaryKey": false,
         "unique": false,
         "references": null,

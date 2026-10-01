@@ -364,6 +364,6 @@ The graph version this run computed over (WP 10.1). Taken through `snapshot_data
 
 ---
 
-*Generated from data contract `68f8e8bc6722`, engine `0.2.8`,
+*Generated from data contract `c7120de73956`, engine `0.2.8`,
 sidecar `supabase/contract/analysis_runs.contract.yaml`, table created by `20260917000006_analysis_store.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

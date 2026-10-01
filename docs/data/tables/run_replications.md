@@ -61,8 +61,8 @@ it rather than duplicating it.
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `ProjectPolicies.tsx` | hook useSimulationRun → select * from run_replications | `src/hooks/useSimulationRun.tsx:97` | yes |
-| `SimulationLab.tsx` | hook useSimulationRun::loadReps → select * from run_replications | `src/hooks/useSimulationRun.tsx:201` | yes |
+| `ProjectPolicies.tsx` | hook useSimulationRun → select * from run_replications | `src/hooks/useSimulationRun.tsx:110` | yes |
+| `SimulationLab.tsx` | hook useSimulationRun::loadReps → select * from run_replications | `src/hooks/useSimulationRun.tsx:225` | yes |
 | `ProjectPolicies.tsx` | useVerifiableExports → select * from run_replications | `src/hooks/useVerifiableExports.tsx:245` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
@@ -82,10 +82,10 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `run_id` | — | `uuid` | — | — | The `simulation_runs` row this replication belongs to. ON DELETE CASCADE: deleting a run takes its replications with it, which is right for a result — a replication of a run that no longer exists is not evidence. |
 | `project_id` | — | `uuid` | — | — | The owning project. Denormalized from `simulation_runs` so RLS and the per-project reads do not need the join. |
 | `rep_index` | — | `integer` | — | — | This replication's position in the run, from 0. Half of the natural key, and the order the convergence plot walks. |
-| `seed_used` | — | `bigint` | — | — | The random seed this replication actually ran with, derived as `project_seed * 1000 + model_rep`. It is recorded rather than recomputed so a single replication can be reproduced exactly — the per-seed explorer addresses rows by it. |
+| `seed_used` | — | `bigint` | — | — | The run's ROOT seed since WP 10.6 (§4 D246). The engine draws every stream from a keyed SeedSequence tree on (root seed, `model_rep`, `event_rep`), so a replication is reproduced by re-running with this root seed and is identified by `rep_index` and its cell (`kpis.model_rep`, `kpis.event_rep`). Before WP 10.6 the bridge wrote `project_seed * 1000 + model_rep` here — not a seed (typing it in reproduced nothing) and shared by every event draw of one world — and this description called it "the seed this replication actually ran with", which it never was. |
 | `status` | — | `text` | — | — | Lifecycle of the one replication — 'queued' until the engine returns it, 'done' once its KPI row and series are written. The result surfaces filter on 'done' so a partially-streamed run does not render half-written rows as if they were results. |
 | `kpis` | — | `jsonb` | — | — | This replication's KPI row, exactly as `compute_replication_kpis` built it: fill rate, revenue, lost sales, peak backlog, the inventory window averages, capacity utilization and one `cost_<component>` key per entry of scsim's COST_COMPONENTS. Units are per-key and follow the engine's definition of each measure, which is why `unit_source` is `derived` rather than a single token. |
-| `time_series` | — | `jsonb` | — | — | This replication's weekly series, one array per key, each as long as the horizon in weeks. The keys are scsim's PUBLISHED weekly series and are declared in ONE place — `WEEKLY_SERIES` in scsim/scsim/core/context.py — which also fixes each series' unit and how it may be aggregated across weeks (`level` = a stock, average it; `flow` = a weekly quantity, sum it; `ratio` = neither). `unit_source` is `derived` because the unit is per-key, from that declaration, not one token for the column. The four inventory series (`on_hand_value`, `fg_value`, `on_hand_units`, `fg_units`) are what WP 9.1 added to a user's view; `fg_value` had been computed on every replication since the trace was written and published by nothing, because the vocabulary was authored six times and it was present in only two of them (§4 D164). |
+| `time_series` | — | `jsonb` | — | — | This replication's weekly series, one array per key, each as long as the horizon in weeks — OR `{}` when they are kept elsewhere: since WP 10.6 a worker run writes them to ONE Parquet object per run (`simulation_runs.series_object`, private `run-results` bucket) and `runSeries.ts` hydrates the rows from it, and the retention sweep empties them when a standard run's series expire (`series_expired_at`). `{}` and not NULL because the column is NOT NULL DEFAULT `{}`, the value every reader already treats as "no series". The keys are scsim's PUBLISHED weekly series and are declared in ONE place — `WEEKLY_SERIES` in scsim/scsim/core/context.py — which also fixes each series' unit and how it may be aggregated across weeks (`level` = a stock, average it; `flow` = a weekly quantity, sum it; `ratio` = neither). `unit_source` is `derived` because the unit is per-key, from that declaration, not one token for the column. The four inventory series (`on_hand_value`, `fg_value`, `on_hand_units`, `fg_units`) are what WP 9.1 added to a user's view; `fg_value` had been computed on every replication since the trace was written and published by nothing, because the vocabulary was authored six times and it was present in only two of them (§4 D164). |
 | `warmup_at` | — | `integer` | `weeks` | — | The week the run's warm-up was detected to end, copied onto every replication of the run. Nullable because it is known only at run end: the rows streamed live during a run carry null and the final upsert fills it. |
 | `started_at` | — | `timestamp with time zone` | — | — | When this replication began executing. Null until it starts. |
 | `ended_at` | — | `timestamp with time zone` | — | — | When this replication finished. Null while it is queued or running. |
@@ -156,7 +156,7 @@ This replication's position in the run, from 0. Half of the natural key, and the
 
 ### `seed_used`
 
-The random seed this replication actually ran with, derived as `project_seed * 1000 + model_rep`. It is recorded rather than recomputed so a single replication can be reproduced exactly — the per-seed explorer addresses rows by it.
+The run's ROOT seed since WP 10.6 (§4 D246). The engine draws every stream from a keyed SeedSequence tree on (root seed, `model_rep`, `event_rep`), so a replication is reproduced by re-running with this root seed and is identified by `rep_index` and its cell (`kpis.model_rep`, `kpis.event_rep`). Before WP 10.6 the bridge wrote `project_seed * 1000 + model_rep` here — not a seed (typing it in reproduced nothing) and shared by every event draw of one world — and this description called it "the seed this replication actually ran with", which it never was.
 
 | | |
 |---|---|
@@ -206,7 +206,7 @@ This replication's KPI row, exactly as `compute_replication_kpis` built it: fill
 
 ### `time_series`
 
-This replication's weekly series, one array per key, each as long as the horizon in weeks. The keys are scsim's PUBLISHED weekly series and are declared in ONE place — `WEEKLY_SERIES` in scsim/scsim/core/context.py — which also fixes each series' unit and how it may be aggregated across weeks (`level` = a stock, average it; `flow` = a weekly quantity, sum it; `ratio` = neither). `unit_source` is `derived` because the unit is per-key, from that declaration, not one token for the column. The four inventory series (`on_hand_value`, `fg_value`, `on_hand_units`, `fg_units`) are what WP 9.1 added to a user's view; `fg_value` had been computed on every replication since the trace was written and published by nothing, because the vocabulary was authored six times and it was present in only two of them (§4 D164).
+This replication's weekly series, one array per key, each as long as the horizon in weeks — OR `{}` when they are kept elsewhere: since WP 10.6 a worker run writes them to ONE Parquet object per run (`simulation_runs.series_object`, private `run-results` bucket) and `runSeries.ts` hydrates the rows from it, and the retention sweep empties them when a standard run's series expire (`series_expired_at`). `{}` and not NULL because the column is NOT NULL DEFAULT `{}`, the value every reader already treats as "no series". The keys are scsim's PUBLISHED weekly series and are declared in ONE place — `WEEKLY_SERIES` in scsim/scsim/core/context.py — which also fixes each series' unit and how it may be aggregated across weeks (`level` = a stock, average it; `flow` = a weekly quantity, sum it; `ratio` = neither). `unit_source` is `derived` because the unit is per-key, from that declaration, not one token for the column. The four inventory series (`on_hand_value`, `fg_value`, `on_hand_units`, `fg_units`) are what WP 9.1 added to a user's view; `fg_value` had been computed on every replication since the trace was written and published by nothing, because the vocabulary was authored six times and it was present in only two of them (§4 D164).
 
 | | |
 |---|---|
@@ -291,6 +291,6 @@ When the row was inserted.
 
 ---
 
-*Generated from data contract `68f8e8bc6722`, engine `0.2.8`,
+*Generated from data contract `c7120de73956`, engine `0.2.8`,
 sidecar `supabase/contract/run_replications.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

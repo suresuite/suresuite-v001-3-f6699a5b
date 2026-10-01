@@ -330,6 +330,6 @@ Whether the schedule is live. Two fields rather than one because a paused schedu
 
 ---
 
-*Generated from data contract `68f8e8bc6722`, engine `0.2.8`,
+*Generated from data contract `c7120de73956`, engine `0.2.8`,
 sidecar `supabase/contract/project_erp_links.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

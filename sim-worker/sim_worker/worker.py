@@ -19,6 +19,7 @@ from .network_metrics import compute_network_metrics
 from .policy_snapshot import snapshot_to_policies
 from .schemas import Command
 from .scsim_bridge import compute_kpis_scsim, compute_run_from_project, scsim_enabled
+from . import series_store
 
 try:  # scsim ships with the canonical path; the legacy-only image lacks it
     from scsim import RunCancelled
@@ -104,6 +105,15 @@ def build_run_update(kpis: dict[str, Any], n_reps: int) -> dict[str, Any]:
     """Translate an engine KPI dict (mean_*/ci_* shape) into the
     simulation_runs row update persisted after an experiment.run."""
     aggregate = {k[len("mean_"):]: v for k, v in kpis.items() if k.startswith("mean_")}
+    # The range across replications the bridge computes and this used to drop
+    # (WP 10.6 · §4 D246). Under an underscore key, like `_meta`, so a reader
+    # that iterates KPIs is not handed `min_fill_rate` as a KPI of its own.
+    rng = {
+        k[len("min_"):]: {"min": v, "max": kpis.get("max_" + k[len("min_"):])}
+        for k, v in kpis.items() if k.startswith("min_")
+    }
+    if rng:
+        aggregate["_range"] = rng
     aggregate["_meta"] = {
         "engine": kpis.get("source", "worker"),
         **({"scsim_notes": kpis["scsim_notes"]} if kpis.get("scsim_notes") else {}),
@@ -453,12 +463,19 @@ class SimWorker:
                             }, ACTIVE)
                             raise
                         kpis["run_id"] = run_id
+                        # The warm tier (WP 10.6): the weekly series of every
+                        # replication go to ONE zstd Parquet object; the rows keep
+                        # their KPIs and the run points at the object. If the
+                        # object cannot be written the rows carry the series as
+                        # before — the tier is an optimisation, never a loss.
+                        reps = kpis.get("replications") or []
+                        series_patch, reps = await self._store_series(run_id, cmd.project_id, reps)
                         # The final authoritative write. Streamed upserts are
                         # best-effort (liveness), but losing THIS one loses
                         # data — mark the run failed instead of reporting a
                         # green run with zero persisted replications.
                         reps_ok = await self._write_replications(
-                            run_id, cmd.project_id, kpis.get("replications") or [])
+                            run_id, cmd.project_id, reps)
                         if not reps_ok:
                             await self._transition(run_id, {
                                 "status": "failed",
@@ -483,7 +500,8 @@ class SimWorker:
                                 }, ACTIVE)
                                 raise RuntimeError("run_item_series upsert failed")
                         if not await self._transition(
-                                run_id, build_run_update(kpis, int(kpis.get("n_reps", n_reps))),
+                                run_id,
+                                {**build_run_update(kpis, int(kpis.get("n_reps", n_reps))), **series_patch},
                                 ACTIVE):
                             log.info("run %s was cancelled before its results landed — "
                                      "results not published", run_id)
@@ -582,6 +600,11 @@ class SimWorker:
         The counter write is a guarded transition, which makes it the cancel
         check too (audit F-06): if it matches no ACTIVE row, the run has been
         cancelled, and the watch stops the engine at its next replication."""
+        # With the warm tier, a streamed row carries KPIs only: the series go to
+        # the run's Parquet object at the end, so realtime ships progress, not
+        # every replication's weekly arrays (WP 10.6 · §4 D246).
+        if series_store.available():
+            rep = {**rep, "time_series": {}}
         await self._write_replications(run_id, project_id, [rep])
         still_active = await self._transition(run_id, {"rep_count_done": done}, ACTIVE)
         if not still_active and watch is not None:
@@ -687,6 +710,41 @@ class SimWorker:
                 log.exception("failed to upsert item series for run %s", run_id)
                 return False
         return True
+
+    async def _store_series(
+        self, run_id: str, project_id: str, reps: list[dict[str, Any]],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """Write the run's series object; return (run patch, rows to persist).
+
+        On success the rows lose their series and the patch names the object and
+        its size; on any failure the rows keep their series and the patch is
+        empty, so the run reads exactly as it did before the tier existed."""
+        if not series_store.available() or not any(r.get("time_series") for r in reps):
+            return {}, reps
+        try:
+            data = series_store.write(reps)
+            path = series_store.object_path(project_id, run_id)
+            r = await self._http.post(
+                f"{self._supabase_url}/storage/v1/object/{series_store.BUCKET}/{path}",
+                headers={
+                    "apikey": self._service_role_key,
+                    "Authorization": f"Bearer {self._service_role_key}",
+                    "Content-Type": "application/vnd.apache.parquet",
+                    "x-upsert": "true",
+                },
+                content=data,
+            )
+            if r.status_code >= 300:
+                log.warning("series object upload failed %s %s — keeping JSONB series",
+                            r.status_code, r.text[:200])
+                return {}, reps
+        except Exception:
+            log.exception("series object failed — keeping JSONB series")
+            return {}, reps
+        return (
+            {"series_object": path, "series_bytes": len(data)},
+            [{**rep, "time_series": {}} for rep in reps],
+        )
 
     async def _report_engine(self) -> None:
         """Tell the engine registry which build this worker runs (WP 10.4). Never

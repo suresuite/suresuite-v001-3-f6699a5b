@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 373,
-      "migrations_applied": 365,
-      "last_migration": "20261001000009_engines_runkey.sql"
+      "migrations_found": 374,
+      "migrations_applied": 366,
+      "last_migration": "20261001000010_result_tiers.sql"
     },
     "sidecars": 70,
     "registry": {
@@ -18,8 +18,8 @@
   "counts": {
     "tables_in_schema": 87,
     "tables_covered": 70,
-    "columns_covered": 917,
-    "check_constraints": 78,
+    "columns_covered": 922,
+    "check_constraints": 80,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -29529,7 +29529,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "hook useSimulationRun → select * from run_replications",
           "grain": "table",
-          "evidence": "src/hooks/useSimulationRun.tsx:97",
+          "evidence": "src/hooks/useSimulationRun.tsx:110",
           "confirmed": true,
           "note": "Both result surfaces reach this table through the SAME hook, so the evidence is the hook's read rather than either page's render. Run & Validate reads every replication of the newest run: the weekly series charts, the financial statement, the per-seed explorer and the inventory chart all render from these rows."
         },
@@ -29537,7 +29537,7 @@
           "page": "SimulationLab.tsx",
           "via": "hook useSimulationRun::loadReps → select * from run_replications",
           "grain": "table",
-          "evidence": "src/hooks/useSimulationRun.tsx:201",
+          "evidence": "src/hooks/useSimulationRun.tsx:225",
           "confirmed": true
         },
         {
@@ -29790,7 +29790,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The random seed this replication actually ran with, derived as `project_seed * 1000 + model_rep`. It is recorded rather than recomputed so a single replication can be reproduced exactly — the per-seed explorer addresses rows by it.",
+          "meaning": "The run's ROOT seed since WP 10.6 (§4 D246). The engine draws every stream from a keyed SeedSequence tree on (root seed, `model_rep`, `event_rep`), so a replication is reproduced by re-running with this root seed and is identified by `rep_index` and its cell (`kpis.model_rep`, `kpis.event_rep`). Before WP 10.6 the bridge wrote `project_seed * 1000 + model_rep` here — not a seed (typing it in reproduced nothing) and shared by every event draw of one world — and this description called it \"the seed this replication actually ran with\", which it never was.",
           "grain": "identifier",
           "computed_by": null,
           "engine": {
@@ -29886,7 +29886,7 @@
           "unit_source": "derived",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "This replication's weekly series, one array per key, each as long as the horizon in weeks. The keys are scsim's PUBLISHED weekly series and are declared in ONE place — `WEEKLY_SERIES` in scsim/scsim/core/context.py — which also fixes each series' unit and how it may be aggregated across weeks (`level` = a stock, average it; `flow` = a weekly quantity, sum it; `ratio` = neither). `unit_source` is `derived` because the unit is per-key, from that declaration, not one token for the column. The four inventory series (`on_hand_value`, `fg_value`, `on_hand_units`, `fg_units`) are what WP 9.1 added to a user's view; `fg_value` had been computed on every replication since the trace was written and published by nothing, because the vocabulary was authored six times and it was present in only two of them (§4 D164).",
+          "meaning": "This replication's weekly series, one array per key, each as long as the horizon in weeks — OR `{}` when they are kept elsewhere: since WP 10.6 a worker run writes them to ONE Parquet object per run (`simulation_runs.series_object`, private `run-results` bucket) and `runSeries.ts` hydrates the rows from it, and the retention sweep empties them when a standard run's series expire (`series_expired_at`). `{}` and not NULL because the column is NOT NULL DEFAULT `{}`, the value every reader already treats as \"no series\". The keys are scsim's PUBLISHED weekly series and are declared in ONE place — `WEEKLY_SERIES` in scsim/scsim/core/context.py — which also fixes each series' unit and how it may be aggregated across weeks (`level` = a stock, average it; `flow` = a weekly quantity, sum it; `ratio` = neither). `unit_source` is `derived` because the unit is per-key, from that declaration, not one token for the column. The four inventory series (`on_hand_value`, `fg_value`, `on_hand_units`, `fg_units`) are what WP 9.1 added to a user's view; `fg_value` had been computed on every replication since the trace was written and published by nothing, because the vocabulary was authored six times and it was present in only two of them (§4 D164).",
           "grain": "level",
           "computed_by": null,
           "engine": {
@@ -35028,7 +35028,7 @@
           "page": "SimulationLab.tsx",
           "via": "hook useSimulationRun → select * from simulation_runs",
           "grain": "table",
-          "evidence": "src/hooks/useSimulationRun.tsx:87",
+          "evidence": "src/hooks/useSimulationRun.tsx:100",
           "confirmed": true
         },
         {
@@ -35095,6 +35095,20 @@
           ],
           "definition": "FOREIGN KEY (engine_id) REFERENCES public.sim_engines(id)",
           "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "simulation_runs_retention_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (retention IN ('standard', 'pinned', 'evidence'))",
+          "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "simulation_runs_retention_expiry_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((retention = 'standard' OR series_expires_at IS NULL) AND (series_expired_at IS NULL OR series_object IS NULL))",
+          "added_by": "20261001000010_result_tiers.sql"
         }
       ],
       "indexes": [
@@ -35131,6 +35145,17 @@
           "predicate": "run_key IS NOT NULL",
           "partial": true,
           "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "simulation_runs_series_due",
+          "unique": false,
+          "columns": [
+            "series_expires_at"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "retention = 'standard' AND series_expired_at IS NULL AND series_expires_at IS NOT NULL",
+          "partial": true,
+          "added_by": "20261001000010_result_tiers.sql"
         }
       ],
       "columns": [
@@ -36150,6 +36175,166 @@
           "unit_column": null,
           "normalize_at_promotion": null,
           "meaning": "The run followed no Validated Model, or was dispatched explicitly as exploratory. Never false for a run with no model. Badged everywhere and excluded from surrogate training (WP 10.5, 10.8). Backfilled as `model_validation_id IS NULL`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "series_object",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The run's weekly series object in the private `run-results` bucket, `<project_id>/<run_id>/series.parquet` — zstd Parquet, long form (one row per replication and week, one column per series). When set, the replication rows hold `time_series = {}` and `runSeries.ts` hydrates them through a signed URL `sim- command` mints. NULL for a run whose series are in its rows (before WP 10.6, browser-computed runs, or a failed upload — the worker keeps the JSONB rather than lose it) and for a run whose series expired.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "series_bytes",
+          "type": "bigint",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What the run's series cost: the object's size when there is one (written by the worker), else the JSONB series in its rows, measured when the run completed.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "retention",
+          "type": "text",
+          "nullable": false,
+          "default": "'standard'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "`standard` (the series expire after `run_series_retention`), `pinned` (an editor or owner keeps them — `set_run_retention`), or `evidence` (the run a Validated Model rests on — set when the model is saved, never released here).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "series_expires_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When a standard run's series expire — set when the run completes. NULL for pinned and evidence runs (a CHECK holds it so).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "series_expired_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When `sweep_expired_run_series` removed the series (object, JSONB, per-item rows). The run row, its aggregates and every replication's KPI row are kept; the screen says the series expired and which RunKey reproduces them.",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -40341,5 +40526,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "68f8e8bc6722"
+  "contract_version": "c7120de73956"
 }

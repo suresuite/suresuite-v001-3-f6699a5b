@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "68f8e8bc6722";
+export const CONTRACT_VERSION = "c7120de73956";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261001000009_engines_runkey.sql";
+export const LAST_MIGRATION = "20261001000010_result_tiers.sql";
 
 export const COUNTS = {
   "tablesInSchema": 87,
   "tablesDescribed": 70,
-  "columnsDescribed": 917,
+  "columnsDescribed": 922,
   "tablesUndescribed": 17
 } as const;
 
@@ -375,7 +375,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "simulation_runs",
         "grain": "One simulation run: what it was bound to (engine, graph version, policy version, scenario run spec, Validated Model, deviations), its status, and the run-level KPIs. Tier 5 — a RESULT. Its replications are `run_replications`. Since WP 10.4 every binding of a NEW run resolves from this row alone (`run_spec`, `run_key`, `engine_id`, `model_validation_id`, `protocol_overrides`, `exploratory`); runs dispatched earlier carry the three content hashes, the seed and the schedule, and say so in the record.",
-        "columns": 31,
+        "columns": 36,
         "owner": "engine"
       }
     ]

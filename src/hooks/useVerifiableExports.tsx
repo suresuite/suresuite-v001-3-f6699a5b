@@ -25,6 +25,7 @@ import {
 import { knownLimits, type FreshnessPayload } from "@/lib/trust/trustReport";
 import { analysesAtRun, exportTrustInput, ingestHistoryFrom } from "@/lib/trust/exportTrustInputs";
 import { resolveRunScenarioBinding, scheduleDigest } from "@/lib/trust/runScenarioBinding";
+import { seriesNotice, withRunSeries } from "@/lib/sim/runSeries";
 import { INGEST_DATASETS } from "../../supabase/functions/_shared/ingestSpec.generated";
 
 /**
@@ -362,10 +363,21 @@ export function useVerifiableExports(
           measuredAt: new Date().toISOString(),
         });
 
+        // WP 10.6 — a worker run's series live in its Parquet object; the
+        // workbook's series sheets read them through the one loader, and an
+        // expired run's export says so in its limits rather than shipping
+        // empty sheets as if nothing had been measured.
+        const { reps: withSeries, series } = await withRunSeries(
+          run as SimulationRun & { project_id: string },
+          (reps ?? []) as Replication[],
+        );
+        const notice = seriesNotice(series);
+        if (notice) record.limits = [...record.limits, { ref: "T3", limit: notice, consequence:
+          "The workbook carries the run's KPIs and aggregates; its weekly series sheets are absent." }];
         const wb = buildRunResultsWorkbook(
           run as SimulationRun,
           (scenario ?? null) as RunScenarioMeta | null,
-          (reps ?? []) as Replication[],
+          withSeries,
           versionLabel,
           record,
         );

@@ -1,19 +1,19 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 373,
-  "migrations_applied": 365,
+  "migrations_found": 374,
+  "migrations_applied": 366,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000009_engines_runkey.sql",
+  "last_migration": "20261001000010_result_tiers.sql",
   "counts": {
     "tables": 87,
     "views": 7,
     "enums": 4,
-    "functions": 372,
+    "functions": 378,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
-    "dynamic_ddl_statements": 36,
+    "dynamic_ddl_statements": 37,
     "rls_indeterminate_tables": 4,
     "rls_dynamic_unresolved": 0,
     "orphans": 0,
@@ -20239,6 +20239,66 @@
           "unique": false,
           "references": null,
           "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "series_object",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "series_bytes",
+          "quoted": false,
+          "type": "bigint",
+          "type_raw": "bigint",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "retention",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'standard'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "series_expires_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "series_expired_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000010_result_tiers.sql"
         }
       ],
       "constraints": [
@@ -20260,6 +20320,20 @@
           ],
           "definition": "FOREIGN KEY (engine_id) REFERENCES public.sim_engines(id)",
           "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "simulation_runs_retention_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (retention IN ('standard', 'pinned', 'evidence'))",
+          "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "simulation_runs_retention_expiry_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((retention = 'standard' OR series_expires_at IS NULL) AND (series_expired_at IS NULL OR series_object IS NULL))",
+          "added_by": "20261001000010_result_tiers.sql"
         }
       ],
       "indexes": [
@@ -20296,6 +20370,17 @@
           "predicate": "run_key IS NOT NULL",
           "partial": true,
           "added_by": "20261001000009_engines_runkey.sql"
+        },
+        {
+          "name": "simulation_runs_series_due",
+          "unique": false,
+          "columns": [
+            "series_expires_at"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "retention = 'standard' AND series_expired_at IS NULL AND series_expires_at IS NOT NULL",
+          "partial": true,
+          "added_by": "20261001000010_result_tiers.sql"
         }
       ],
       "rls": {
@@ -22987,6 +23072,26 @@
       "defined_by": "20261001000009_engines_runkey.sql"
     },
     {
+      "name": "_simulation_run_drop_series",
+      "signature": "_simulation_run_drop_series()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000010_result_tiers.sql"
+    },
+    {
+      "name": "_simulation_run_retention",
+      "signature": "_simulation_run_retention()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000010_result_tiers.sql"
+    },
+    {
       "name": "_validated_model_engine",
       "signature": "_validated_model_engine()",
       "args": [],
@@ -23005,6 +23110,16 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20261001000008_validated_model.sql"
+    },
+    {
+      "name": "_validated_model_evidence_kept",
+      "signature": "_validated_model_evidence_kept()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000010_result_tiers.sql"
     },
     {
       "name": "_validated_model_hash",
@@ -26989,6 +27104,18 @@
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
+      "name": "run_series_retention",
+      "signature": "run_series_retention(uuid)",
+      "args": [
+        "p_project_id uuid"
+      ],
+      "returns": "interval LANGUAGE sql STABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000010_result_tiers.sql"
+    },
+    {
       "name": "save_policy_defaults",
       "signature": "save_policy_defaults(uuid, text, jsonb, text, text, timestamptz, uuid)",
       "args": [
@@ -27154,6 +27281,20 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260915000004_org_identity_dual_read.sql"
+    },
+    {
+      "name": "set_run_retention",
+      "signature": "set_run_retention(uuid, text, uuid)",
+      "args": [
+        "p_run_id uuid",
+        "p_retention text",
+        "_actor_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000010_result_tiers.sql"
     },
     {
       "name": "set_scenario_child_defaults",
@@ -27359,6 +27500,18 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260723000001_reports_and_file_workspace.sql"
+    },
+    {
+      "name": "sweep_expired_run_series",
+      "signature": "sweep_expired_run_series(integer)",
+      "args": [
+        "p_limit integer DEFAULT 500"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000010_result_tiers.sql"
     },
     {
       "name": "switch_my_organization",
@@ -28386,6 +28539,15 @@
       "touches_rls": false,
       "has_format_placeholder": true,
       "named_only_via_block": true,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20261001000010_result_tiers.sql",
+      "statement": "BEGIN IF to_regclass('storage.buckets') IS NOT NULL THEN EXECUTE $ins$ INSERT INTO storage.buckets (id, name, public) VALUES ('run-results', 'run-results', false) ON CONFLICT (id) DO UPDATE SET public = false $ins$",
+      "mentions": [],
+      "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
       "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
     }
   ],

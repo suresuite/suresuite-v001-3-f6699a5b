@@ -19,6 +19,14 @@
 
 ## Constraints
 
+These reject the row outright. A value that fails one of them does not arrive
+partially or get corrected — the write fails.
+
+| Constraint | Rule | Added by |
+|---|---|---|
+| `simulation_runs_retention_check` | `CHECK (retention IN ('standard', 'pinned', 'evidence'))` | `20261001000010_result_tiers.sql` |
+| `simulation_runs_retention_expiry_check` | `CHECK ((retention = 'standard' OR series_expires_at IS NULL) AND (series_expired_at IS NULL OR series_object IS NULL))` | `20261001000010_result_tiers.sql` |
+
 | Constraint | Kind | Definition |
 |---|---|---|
 | `simulation_runs_engine_id_fkey` | FOREIGN KEY | `FOREIGN KEY (engine_id) REFERENCES public.sim_engines(id)` |
@@ -61,7 +69,7 @@
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `SimulationLab.tsx` | hook useSimulationRun → select * from simulation_runs | `src/hooks/useSimulationRun.tsx:87` | yes |
+| `SimulationLab.tsx` | hook useSimulationRun → select * from simulation_runs | `src/hooks/useSimulationRun.tsx:100` | yes |
 | `ProjectPolicies.tsx` | useVerifiableExports → select * from simulation_runs | `src/hooks/useVerifiableExports.tsx:234` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
@@ -108,6 +116,11 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `run_key` | — | `text` | — | — | sha256 of `run_spec` — the run's identity. Identical submissions share it: `create_simulation_run` offers a completed run with this key for reuse and attaches a second submission to one in flight. NULL before WP 10.4. |
 | `protocol_overrides` | — | `jsonb` | — | — | Deviations from the Validated Model's protocol, as the caller stated them; `{}` = faithful. Part of the RunKey, and shown on results and exports (T2, T4). |
 | `exploratory` | — | `boolean` | — | — | The run followed no Validated Model, or was dispatched explicitly as exploratory. Never false for a run with no model. Badged everywhere and excluded from surrogate training (WP 10.5, 10.8). Backfilled as `model_validation_id IS NULL`. |
+| `series_object` | — | `text` | — | — | The run's weekly series object in the private `run-results` bucket, `<project_id>/<run_id>/series.parquet` — zstd Parquet, long form (one row per replication and week, one column per series). When set, the replication rows hold `time_series = {}` and `runSeries.ts` hydrates them through a signed URL `sim- command` mints. NULL for a run whose series are in its rows (before WP 10.6, browser-computed runs, or a failed upload — the worker keeps the JSONB rather than lose it) and for a run whose series expired. |
+| `series_bytes` | — | `bigint` | — | — | What the run's series cost: the object's size when there is one (written by the worker), else the JSONB series in its rows, measured when the run completed. |
+| `retention` | — | `text` | — | — | `standard` (the series expire after `run_series_retention`), `pinned` (an editor or owner keeps them — `set_run_retention`), or `evidence` (the run a Validated Model rests on — set when the model is saved, never released here). |
+| `series_expires_at` | — | `timestamp with time zone` | — | — | When a standard run's series expire — set when the run completes. NULL for pinned and evidence runs (a CHECK holds it so). |
+| `series_expired_at` | — | `timestamp with time zone` | — | — | When `sweep_expired_run_series` removed the series (object, JSONB, per-item rows). The run row, its aggregates and every replication's KPI row are kept; the screen says the series expired and which RunKey reproduces them. |
 
 ## Each column in full
 
@@ -551,6 +564,76 @@ The run followed no Validated Model, or was dispatched explicitly as exploratory
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `series_object`
+
+The run's weekly series object in the private `run-results` bucket, `<project_id>/<run_id>/series.parquet` — zstd Parquet, long form (one row per replication and week, one column per series). When set, the replication rows hold `time_series = {}` and `runSeries.ts` hydrates them through a signed URL `sim- command` mints. NULL for a run whose series are in its rows (before WP 10.6, browser-computed runs, or a failed upload — the worker keeps the JSONB rather than lose it) and for a run whose series expired.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000010_result_tiers.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `series_bytes`
+
+What the run's series cost: the object's size when there is one (written by the worker), else the JSONB series in its rows, measured when the run completed.
+
+| | |
+|---|---|
+| Type | `bigint` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000010_result_tiers.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `retention`
+
+`standard` (the series expire after `run_series_retention`), `pinned` (an editor or owner keeps them — `set_run_retention`), or `evidence` (the run a Validated Model rests on — set when the model is saved, never released here).
+
+| | |
+|---|---|
+| Type | `text`, `NOT NULL`, default `'standard'` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000010_result_tiers.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `series_expires_at`
+
+When a standard run's series expire — set when the run completes. NULL for pinned and evidence runs (a CHECK holds it so).
+
+| | |
+|---|---|
+| Type | `timestamp with time zone` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000010_result_tiers.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `series_expired_at`
+
+When `sweep_expired_run_series` removed the series (object, JSONB, per-item rows). The run row, its aggregates and every replication's KPI row are kept; the screen says the series expired and which RunKey reproduces them.
+
+| | |
+|---|---|
+| Type | `timestamp with time zone` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000010_result_tiers.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -558,9 +641,10 @@ The run followed no Validated Model, or was dispatched explicitly as exploratory
 | `sim_runs_scenario_idx` | `scenario_id` | no | `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql` |
 | `sim_runs_project_idx` | `project_id` | no | `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql` |
 | `simulation_runs_run_key` | `project_id`, `run_key` | no | `20261001000009_engines_runkey.sql` |
+| `simulation_runs_series_due` | `series_expires_at` | no | `20261001000010_result_tiers.sql` |
 
 ---
 
-*Generated from data contract `68f8e8bc6722`, engine `0.2.8`,
+*Generated from data contract `c7120de73956`, engine `0.2.8`,
 sidecar `supabase/contract/simulation_runs.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

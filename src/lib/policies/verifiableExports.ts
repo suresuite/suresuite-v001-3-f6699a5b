@@ -15,6 +15,7 @@
 // Builders are pure (data in → XLSX.WorkBook out); fetching lives in
 // src/hooks/useVerifiableExports.tsx.
 
+import { replicationLabel } from "@/lib/sim/replicationLabel";
 import * as XLSX from "xlsx";
 import { recordRows, type ReproducibilityRecord } from "@/lib/trust/reproducibilityRecord";
 import {
@@ -547,13 +548,19 @@ export function buildRunResultsWorkbook(
   // aggregate_kpis — mean + CI half-width per KPI key.
   const agg = run.aggregate_kpis ?? {};
   const ci = run.ci_half_widths ?? {};
-  const aggKeys = Object.keys(agg).filter((k) => k !== "_meta");
+  // Underscore keys are metadata, not KPIs. `_range` (WP 10.6 · §4 D246) is the
+  // min/max across replications the worker used to drop — two more columns,
+  // empty for a run that predates it rather than invented.
+  const aggKeys = Object.keys(agg).filter((k) => !k.startsWith("_"));
+  const range = ((agg as Record<string, unknown>)._range ?? {}) as Record<string, { min?: unknown; max?: unknown }>;
   const aggRows: (string | number | null)[][] = [
-    ["kpi", "mean", "ci_halfwidth"],
+    ["kpi", "mean", "ci_halfwidth", "min", "max"],
     ...aggKeys.sort().map((k) => [
       k,
       normalize(agg[k]) as number | string | null,
       normalize(ci[k]) as number | string | null,
+      normalize(range[k]?.min) as number | string | null,
+      normalize(range[k]?.max) as number | string | null,
     ]),
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aggRows), "aggregate_kpis");
@@ -563,11 +570,12 @@ export function buildRunResultsWorkbook(
     done.reduce((s, r) => (Object.keys(r.kpis ?? {}).forEach((k) => s.add(k)), s), new Set<string>()),
   ).sort();
   const repRows: (string | number | boolean | null)[][] = [
-    // `seed_used` is `project_seed × 1000 + model_rep`, a display key and NOT a
-    // seed — entering it as a project seed reproduces nothing (audit F-23; WP 6
-    // handed the export's column to WP 8). The header says so; the value is
-    // unchanged so an existing reader's column still lines up.
-    ["rep_index", "seed_used (display key, not a seed)", ...kpiKeys],
+    // `seed_used` is the run's ROOT seed since WP 10.6 (§4 D246); before it, it
+    // was `project_seed × 1000 + model_rep`, a display key and not a seed (audit
+    // F-23). A replication is its `rep_index` and its cell (`model_rep`,
+    // `event_rep`, in the KPI columns). The header says both, so an old run's
+    // value is not read as a seed.
+    ["rep_index", "seed_used (root seed; a display key on runs before WP 10.6)", ...kpiKeys],
     ...done.map((r) => [
       r.rep_index,
       r.seed_used,
@@ -588,7 +596,10 @@ export function buildRunResultsWorkbook(
     if (withSeries.length === 0) continue;
     const weeks = Math.max(...withSeries.map((r) => r.time_series[key].length));
     const rows: (string | number | boolean | null)[][] = [
-      ["week", ...withSeries.map((r) => `seed_${r.seed_used}`)],
+      // One column per REPLICATION, named by its index and cell — the old
+      // `seed_<seed_used>` names repeated across every event draw of one world
+      // and, since the root seed is one value per run, would repeat across all.
+      ["week", ...withSeries.map((r) => replicationLabel(r))],
     ];
     for (let w = 0; w < weeks; w++) {
       rows.push([w, ...withSeries.map((r) => normalize(r.time_series[key][w]))]);

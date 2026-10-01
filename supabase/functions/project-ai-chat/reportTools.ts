@@ -243,7 +243,7 @@ export async function buildReportContext(
       reps_done: r.rep_count_done ?? 0,
       scenario_id: r.scenario_id ?? null,
       policy_version_id: r.policy_version_id ?? null,
-      kpis: Object.keys((r.aggregate_kpis ?? {}) as Record<string, unknown>).sort(),
+      kpis: Object.keys((r.aggregate_kpis ?? {}) as Record<string, unknown>).filter((k) => !k.startsWith("_")).sort(),
     }));
     runsJson = clampJson(rows, REPORT_RUNS_BUDGET);
   } catch { /* shown as empty */ }

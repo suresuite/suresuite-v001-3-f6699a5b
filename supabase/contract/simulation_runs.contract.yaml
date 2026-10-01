@@ -44,7 +44,7 @@ surfaces:
   - page: "SimulationLab.tsx"
     via: "hook useSimulationRun → select * from simulation_runs"
     grain: table
-    evidence: "src/hooks/useSimulationRun.tsx:87"
+    evidence: "src/hooks/useSimulationRun.tsx:100"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "useVerifiableExports → select * from simulation_runs"
@@ -450,6 +450,78 @@ fields:
       The run followed no Validated Model, or was dispatched explicitly as exploratory.
       Never false for a run with no model. Badged everywhere and excluded from surrogate
       training (WP 10.5, 10.8). Backfilled as `model_validation_id IS NULL`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  series_object:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run's weekly series object in the private `run-results` bucket,
+      `<project_id>/<run_id>/series.parquet` — zstd Parquet, long form (one row per
+      replication and week, one column per series). When set, the replication rows hold
+      `time_series = {}` and `runSeries.ts` hydrates them through a signed URL `sim-
+      command` mints. NULL for a run whose series are in its rows (before WP 10.6,
+      browser-computed runs, or a failed upload — the worker keeps the JSONB rather than
+      lose it) and for a run whose series expired.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  series_bytes:
+    type: "bigint"
+    unit: null
+    unit_source: none
+    meaning: >-
+      What the run's series cost: the object's size when there is one (written by the
+      worker), else the JSONB series in its rows, measured when the run completed.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  retention:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      `standard` (the series expire after `run_series_retention`), `pinned` (an editor or
+      owner keeps them — `set_run_retention`), or `evidence` (the run a Validated Model
+      rests on — set when the model is saved, never released here).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  series_expires_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When a standard run's series expire — set when the run completes. NULL for pinned
+      and evidence runs (a CHECK holds it so).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  series_expired_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When `sweep_expired_run_series` removed the series (object, JSONB, per-item rows).
+      The run row, its aggregates and every replication's KPI row are kept; the screen
+      says the series expired and which RunKey reproduces them.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
