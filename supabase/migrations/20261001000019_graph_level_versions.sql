@@ -59,6 +59,12 @@ COMMENT ON TABLE public.graph_level_versions IS
 
 ALTER TABLE public.graph_level_versions ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON public.graph_level_versions TO anon, authenticated, service_role;
+-- Supabase's bootstrap grants the three PostgREST roles ALL on every table in
+-- `public`; RLS would refuse their writes (there is no write policy), but the grant
+-- is a claim, and this table's claim is that only a snapshot mints a version. The
+-- write privileges are taken back so the grant says what the policy enforces
+-- (`contract:rehearse --since HEAD` builds that bootstrap, and was red here first).
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.graph_level_versions FROM anon, authenticated, service_role;
 DROP POLICY IF EXISTS graph_level_versions_select ON public.graph_level_versions;
 CREATE POLICY graph_level_versions_select ON public.graph_level_versions
   FOR SELECT USING (public.has_project_access(project_id));

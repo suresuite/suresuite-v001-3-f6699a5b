@@ -5,8 +5,11 @@
 -- `app.current_user_id` setting, so a real browser call arrived with neither and was
 -- refused for EVERYONE (PostgREST 401). `rehearsal/140` sets the setting by hand before
 -- every call, which is why it never saw it. This file calls the way the browser does:
--- AS anon, with the user NAMED and nothing set beforehand. Each DO block is its own
--- transaction (the runner does not wrap a file), so the setting never carries over.
+-- AS anon, with the user NAMED and nothing set beforehand. THE RUNNER WRAPS THE WHOLE
+-- FILE IN ONE TRANSACTION (`BEGIN` … `ROLLBACK`, `rehearse-migrations.mjs`), so a
+-- setting made LOCAL by one block is still set in the next: §4 clears it before it
+-- asks an unnamed question (this file's first run, after merge, was red there for
+-- exactly that reason — §16 · WP 11.1 base merge).
 --
 --   §1 ONE OF THEM: exactly one `project_freshness` exists, and it takes the user.
 --   §2 NAMED, AS ANON: the project's owner, an admin and a super admin are answered, with
@@ -84,9 +87,12 @@ BEGIN
   RESET ROLE;
 END $d257b$;
 
--- ── §4 · unnamed, nothing set: refused (a fresh transaction, so nothing is set) ──
+-- ── §4 · unnamed, nothing set: refused ──
+-- §2's calls set the actor LOCAL to the transaction, which is the whole file; clear it,
+-- so "nothing set" is true rather than assumed.
 DO $d257c$
 BEGIN
+  PERFORM set_config('app.current_user_id', '', true);
   SET LOCAL ROLE anon;
   BEGIN
     PERFORM public.project_freshness(p_project_id => '00000000-0000-4000-8000-000000025721');
