@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { WeeksInput } from "./WeeksInput";
 import { KPI_OPTIONS } from "./ScenarioSetupForm";
-import { STRESS_TESTS } from "./StressTestCard";
+import { STRESS_TESTS, scheduleLine } from "./StressTestCard";
 import { stressPresetUnavailableReason } from "@/lib/sim/stressTargets";
 import { HORIZON_WEEKS, formatDuration } from "@/lib/sim/planningTime";
 import type { SeedWorld } from "@/lib/sim/scenarioSeed";
@@ -179,12 +179,13 @@ export function NewScenarioDialog({
                       if (!name.trim() || name === defaultName) setName(t.scenario.name);
                     }}
                     className={cn(
-                      "min-h-11 border-b border-[--sim-divider] px-3 py-1.5 text-left last:border-b-0 md:min-h-0",
-                      presetId === t.id ? "bg-[#f4f4f5] font-medium" : "hover:bg-[#fafafa]",
+                      "flex min-h-11 flex-col gap-0.5 border-b border-[--sim-divider] px-3 py-1.5 text-left last:border-b-0 md:min-h-0",
+                      presetId === t.id ? "bg-[#f4f4f5]" : "hover:bg-[#fafafa]",
                       reason !== null && "cursor-not-allowed opacity-50",
                     )}
                   >
-                    {t.label}
+                    <span className={cn(presetId === t.id && "font-medium")}>{t.label}</span>
+                    <span className="text-[11px] tabular-nums text-[#71717a]">{scheduleLine(t.scenario)}</span>
                   </button>
                 ))}
               </div>

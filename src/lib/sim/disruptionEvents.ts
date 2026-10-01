@@ -21,6 +21,7 @@ import {
 } from "../../../supabase/functions/_shared/disruptionRules";
 import { defaultDisruptionStartDay } from "./disruptionTiming";
 import { DAYS_PER_WEEK } from "./planningTime";
+import { disruptionWeeks } from "./runWindow";
 
 export type ScheduleEvent = Scenario["disruption_schedule"][number];
 
@@ -59,15 +60,71 @@ export function addBlockedReason(schedule: readonly unknown[]): string | null {
     : null;
 }
 
-/** "Full outage" or "Cut by 30%" — the engine's reading of `magnitude_pct`. */
-export function effectLabel(magnitudePct: number): string {
-  return magnitudePct >= DISRUPTION_RULE.full_outage_pct ? "Full outage" : `Cut by ${magnitudePct}%`;
+/**
+ * The words every disruption surface uses, so the network pages' dialog, the
+ * Lab's schedule editor, the stress presets and the phone sheet cannot name one
+ * thing three ways. They are the engine's own model
+ * (`scsim/scsim/entities/disruption.py`): a disruption EVENT hits a TARGET node
+ * with an EFFECT — a full outage, or a capacity reduction that leaves a share of
+ * the node's capacity — from its ONSET week for a DURATION, counted in
+ * simulation weeks. A scenario's events, together, are its disruption schedule.
+ */
+export const DISRUPTION_TERMS = {
+  event: "Disruption event",
+  schedule: "Disruption schedule",
+  target: "Disrupted node",
+  effect: "Effect",
+  fullOutage: "Full outage",
+  capacityReduction: "Capacity reduction",
+  onset: "Onset week",
+  duration: "Duration",
+} as const;
+
+/** The engine's reading of `magnitude_pct`: at or above the outage threshold
+ *  nothing flows; below it, capacity is reduced BY that share. */
+export function isFullOutage(magnitudePct: number): boolean {
+  return magnitudePct >= DISRUPTION_RULE.full_outage_pct;
 }
 
-/** Target choices the engine can disrupt: the plant, then the project's suppliers. */
-export function targetChoices(supplierIds: readonly string[]): { value: string; label: string }[] {
+/** "Full outage" or "Capacity reduction 30%". */
+export function effectLabel(magnitudePct: number): string {
+  return isFullOutage(magnitudePct)
+    ? DISRUPTION_TERMS.fullOutage
+    : `${DISRUPTION_TERMS.capacityReduction} ${magnitudePct}%`;
+}
+
+/** What the effect does to the node, in one sentence. */
+export function effectMeaning(magnitudePct: number): string {
+  return isFullOutage(magnitudePct)
+    ? "The node delivers nothing until the event ends."
+    : `${100 - magnitudePct}% of the node's weekly capacity remains.`;
+}
+
+/** A target as a person reads it: "Plant", "Supplier S-104", or the raw value. */
+export function targetLabel(target: string): string {
+  if (!target) return "No node";
+  if (target === PLANT_TARGET) return "Plant";
+  if (target.startsWith("supplier:")) return `Supplier ${target.slice("supplier:".length)}`;
+  return target;
+}
+
+/** The simulation weeks an event covers, as the engine rounds them: "weeks 19–22". */
+export function eventWindow(startDay: number, durationDays: number): string {
+  const { startWeek, durationWeeks } = disruptionWeeks(startDay, durationDays);
+  return durationWeeks <= 1
+    ? `week ${startWeek}`
+    : `weeks ${startWeek}–${startWeek + durationWeeks - 1}`;
+}
+
+/** One line per event: "Full outage · Supplier S-104 · weeks 19–22". */
+export function describeEvent(e: Pick<ScheduleEvent, "target" | "start_day" | "duration_days" | "magnitude_pct">): string {
+  return `${effectLabel(e.magnitude_pct)} · ${targetLabel(e.target)} · ${eventWindow(e.start_day, e.duration_days)}`;
+}
+
+/** Target choices the engine can disrupt, grouped: the plant, then the project's suppliers. */
+export function targetChoices(supplierIds: readonly string[]): { value: string; label: string; group: "Plant" | "Suppliers" }[] {
   return [
-    { value: PLANT_TARGET, label: "Plant" },
-    ...[...supplierIds].sort().map((id) => ({ value: supplierTarget(id), label: id })),
+    { value: PLANT_TARGET, label: "Plant", group: "Plant" },
+    ...[...supplierIds].sort().map((id) => ({ value: supplierTarget(id), label: id, group: "Suppliers" as const })),
   ];
 }

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { stressPresetUnavailableReason } from "@/lib/sim/stressTargets";
-import { formatDuration, formatWeek } from "@/lib/sim/planningTime";
+import { PLANT_TARGET, effectLabel, eventWindow, targetLabel } from "@/lib/sim/disruptionEvents";
 
 export type StressTestPreset = {
   name: string;
@@ -118,12 +118,28 @@ export const STRESS_TESTS: StressTest[] = [
   },
 ];
 
-/** One preset = one line of facts: what is hit, when, for how long, how hard.
- *  The prose blurb is gone — the schedule itself is the description. */
-function scheduleLine(preset: StressTestPreset): string {
+/** The presets' placeholder targets, named as a person reads them. */
+const PLACEHOLDER_TARGETS: Record<string, string> = {
+  "supplier:primary": "Top-volume supplier",
+  "material:critical": "Critical material",
+  "edge:inbound": "Inbound lane",
+  "customer:all": "All customers",
+  "node:nexus": "Highest-prominence node",
+};
+
+/** One preset = one line of facts: how hard, what is hit, which simulation weeks
+ *  — the same words as every disruption event (`DISRUPTION_TERMS`). The prose
+ *  blurb is gone — the schedule itself is the description. A magnitude on a
+ *  target the engine cannot disrupt has no engine meaning, so it is shown as is. */
+export function scheduleLine(preset: StressTestPreset): string {
   return preset.disruption_schedule
-    .map((e) => `${e.target} · ${formatWeek(e.start_day)} + ${formatDuration(e.duration_days)} · ${e.magnitude_pct}%`)
-    .join("   ");
+    .map((e) => {
+      const engineTarget = e.target === PLANT_TARGET || e.target.startsWith("supplier:");
+      const how = engineTarget ? effectLabel(e.magnitude_pct) : `Magnitude ${e.magnitude_pct}%`;
+      const what = PLACEHOLDER_TARGETS[e.target] ?? targetLabel(e.target);
+      return `${how} · ${what} · ${eventWindow(e.start_day, e.duration_days)}`;
+    })
+    .join("; then ");
 }
 
 interface Props {
@@ -148,7 +164,7 @@ export function StressTestDrawer({ onLaunch }: Props) {
             onClick={() => void onLaunch(t.scenario)}
             title={
               reason ??
-              `Create a scenario pre-configured with: ${scheduleLine(t.scenario)}`
+              `Create a scenario with this disruption schedule: ${scheduleLine(t.scenario)}`
             }
             className={cn(
               "flex w-full flex-col gap-[3px] border-l-2 border-l-transparent px-[13px] py-[9px] text-left",

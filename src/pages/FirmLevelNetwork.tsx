@@ -1165,7 +1165,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
                   )}
                 >
                   <AlertTriangle className="h-4 w-4" />
-                  <span className="hidden sm:inline">Add Disruption</span>
+                  <span className="hidden sm:inline">Add disruption event</span>
                 </Button>
               )}
               

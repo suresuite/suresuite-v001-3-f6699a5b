@@ -89,6 +89,7 @@ import { RESPONSE_LABELS, type RecoveryConfig, type RecoveryResponseKey } from "
 import { kpiDisplay } from "@/lib/sim/kpiDisplay";
 import { useTimeUnit, UNIT_LABEL_PLURAL } from "@/hooks/useTimeUnit";
 import { formatDuration, formatWeek } from "@/lib/sim/planningTime";
+import { effectLabel, targetLabel } from "@/lib/sim/disruptionEvents";
 import type { PaneId } from "./StageRail";
 import type { Scenario } from "@/hooks/useScenarios";
 import type { Replication, SimulationRun } from "@/hooks/useSimulationRun";
@@ -485,7 +486,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
           {events.length === 0 ? (
             <EmptyBody>
               <span className="max-w-[250px] text-[13px] leading-relaxed text-[#525252] [text-wrap:pretty]">
-                No disruption schedule yet — this project has no network to disrupt.
+                No disruption events — this scenario runs undisrupted.
               </span>
             </EmptyBody>
           ) : (
@@ -494,7 +495,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
                 <MobileRow
                   key={i}
                   chevron={false}
-                  label={`${e.target_type === "edge" ? "Lane" : "Node"} · ${e.magnitude_pct}%`}
+                  label={`${effectLabel(e.magnitude_pct)} · ${targetLabel(e.target)}`}
                   sub={`${e.target || "—"} · from ${formatWeek(e.start_day)} · ${formatDuration(e.duration_days)}`}
                   value={formatWeek(e.start_day)}
                 />
@@ -515,7 +516,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
 
         <MobileButtonRow>
           <MobileButton weight="secondary" onClick={() => setSheet("schedule")}>
-            Add disruption
+            Add disruption event
           </MobileButton>
           <MobileButton weight="secondary" onClick={() => onPane("setup")}>
             Setup
