@@ -69,10 +69,10 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `uploaded_by` | — | `uuid` | — | — | The user the upload named. Same client-asserted caveat as `created_by` (D28). |
 | `created_at` | — | `timestamp with time zone` | — | — | Row insert time, maintained by the database. |
 | `updated_at` | — | `timestamp with time zone` | — | — | Row update time, maintained by the database. When a row was TOUCHED is not what it SAYS, which is why `input-hash` (I5) is anchored on `computed_from_hash` and not on this (§4 D12). |
-| `src_uid` | — | `text` | — | — | Source node `uid`. Part of the natural key with `project_id` and `dst_uid`; READ BY THE PROMINENCE ANALYSIS, so it is digested by `network_topology_hash`. |
-| `dst_uid` | — | `text` | — | — | Destination node `uid`. Part of the natural key; digested by `network_topology_hash`. |
+| `src_uid` | — | `text` | — | — | Source node `uid`. Part of the natural key with `project_id` and `dst_uid`; READ BY THE PROMINENCE ANALYSIS, so it is digested by the anchor's `hash_network` (WP 5.3). |
+| `dst_uid` | — | `text` | — | — | Destination node `uid`. Part of the natural key; digested by the anchor's `hash_network` (WP 5.3). |
 | `relation_type` | — | `text` | — | — | What the edge represents (supplier, customer, …), as uploaded. |
-| `relative_revenue` | — | `numeric` | — | — | The share of revenue this relationship carries, as uploaded. READ BY THE PROMINENCE ANALYSIS as the edge weight, so it is digested by `network_topology_hash` — changing it changes every centrality in the project. |
+| `relative_revenue` | — | `numeric` | — | — | The share of revenue this relationship carries, as uploaded. READ BY THE PROMINENCE ANALYSIS as the edge weight, so it is digested by the anchor's `hash_network` (WP 5.3) — changing it changes every centrality in the project. |
 | `relative_revenue_percentage` | — | `numeric` | — | — | The same share expressed as a percentage. Uploaded, and read by no analysis — a second spelling of one fact, which is the shape `single-source` (I1) exists to refuse. Named for the WP 6.2 sweep. |
 | `depth` | — | `integer` | — | — | Tier distance of the edge from the seed, as uploaded. |
 | `direction` | — | `text` | — | — | Upstream or downstream relative to the seed, as uploaded. |
@@ -209,7 +209,7 @@ Row update time, maintained by the database. When a row was TOUCHED is not what 
 
 ### `src_uid`
 
-Source node `uid`. Part of the natural key with `project_id` and `dst_uid`; READ BY THE PROMINENCE ANALYSIS, so it is digested by `network_topology_hash`.
+Source node `uid`. Part of the natural key with `project_id` and `dst_uid`; READ BY THE PROMINENCE ANALYSIS, so it is digested by the anchor's `hash_network` (WP 5.3).
 
 | | |
 |---|---|
@@ -225,7 +225,7 @@ Source node `uid`. Part of the natural key with `project_id` and `dst_uid`; READ
 
 ### `dst_uid`
 
-Destination node `uid`. Part of the natural key; digested by `network_topology_hash`.
+Destination node `uid`. Part of the natural key; digested by the anchor's `hash_network` (WP 5.3).
 
 | | |
 |---|---|
@@ -257,7 +257,7 @@ What the edge represents (supplier, customer, …), as uploaded.
 
 ### `relative_revenue`
 
-The share of revenue this relationship carries, as uploaded. READ BY THE PROMINENCE ANALYSIS as the edge weight, so it is digested by `network_topology_hash` — changing it changes every centrality in the project.
+The share of revenue this relationship carries, as uploaded. READ BY THE PROMINENCE ANALYSIS as the edge weight, so it is digested by the anchor's `hash_network` (WP 5.3) — changing it changes every centrality in the project.
 
 | | |
 |---|---|
@@ -327,6 +327,6 @@ Upstream or downstream relative to the seed, as uploaded.
 
 ---
 
-*Generated from data contract `5801850de943`, engine `0.2.8`,
+*Generated from data contract `278f5355176f`, engine `0.2.8`,
 sidecar `supabase/contract/network_edges.contract.yaml`, table created by `20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

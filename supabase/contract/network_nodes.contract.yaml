@@ -468,7 +468,7 @@ fields:
     meaning: >-
       Firm revenue, as uploaded. READ BY THE PROMINENCE ANALYSIS
       (`get_network_nodes_for_prominence` returns it), so it is one of
-      the six columns `network_topology_hash` digests.
+      the six columns the anchor's `hash_network` digests (WP 5.3).
     grain: level
     engine:
       consumed_by: null

@@ -83,7 +83,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `website` | — | `text` | — | — | Firm website, as uploaded. Display only. |
 | `traded_as` | — | `text` | — | — | Ticker or trading symbol, as uploaded. Display only. |
 | `number_of_employees` | — | `integer` | — | — | Headcount, as uploaded. Read by no analysis and by no engine mapping today — same class as D18, and a candidate for the WP 6.2 sweep. |
-| `revenue` | — | `numeric` | — | — | Firm revenue, as uploaded. READ BY THE PROMINENCE ANALYSIS (`get_network_nodes_for_prominence` returns it), so it is one of the six columns `network_topology_hash` digests. |
+| `revenue` | — | `numeric` | — | — | Firm revenue, as uploaded. READ BY THE PROMINENCE ANALYSIS (`get_network_nodes_for_prominence` returns it), so it is one of the six columns the anchor's `hash_network` digests (WP 5.3). |
 | `lat` | — | `numeric` | — | — | Latitude, as uploaded. Display only — the map reads `node_list`, not this table. |
 | `long` | — | `numeric` | — | — | Longitude, as uploaded. Display only. |
 | `is_seed` | — | `boolean` | — | — | True for the focal firm the deep-tier crawl started from. |
@@ -358,7 +358,7 @@ Headcount, as uploaded. Read by no analysis and by no engine mapping today — s
 
 ### `revenue`
 
-Firm revenue, as uploaded. READ BY THE PROMINENCE ANALYSIS (`get_network_nodes_for_prominence` returns it), so it is one of the six columns `network_topology_hash` digests.
+Firm revenue, as uploaded. READ BY THE PROMINENCE ANALYSIS (`get_network_nodes_for_prominence` returns it), so it is one of the six columns the anchor's `hash_network` digests (WP 5.3).
 
 | | |
 |---|---|
@@ -591,6 +591,6 @@ WP 4.3 · when the run that wrote the computed columns finished. It is provenanc
 
 ---
 
-*Generated from data contract `5801850de943`, engine `0.2.8`,
+*Generated from data contract `278f5355176f`, engine `0.2.8`,
 sidecar `supabase/contract/network_nodes.contract.yaml`, table created by `20250904105527_e00a21a9-0120-48a7-a62d-e2db83fd4cc6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
