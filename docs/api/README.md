@@ -155,7 +155,9 @@ experiments. Get it from the `/developer` page's **Notebook** tab, which also:
   notebook needs (scenario / policy-version / dataset-version ids, base URL)
   with a copy-paste CONFIG cell;
 - downloads the notebook with that CONFIG cell pre-filled; and
-- links **Open in Google Colab** (store the key in Colab's Secrets panel as
+- offers **Open in Colab**, which downloads that pre-filled copy and opens
+  Colab for *File → Upload notebook* — it never links Colab to the source
+  repository, which is private (store the key in Colab's Secrets panel as
   `SURESUITE_API_KEY` — never in a cell).
 
 ## Security model (summary)

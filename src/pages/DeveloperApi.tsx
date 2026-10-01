@@ -130,12 +130,14 @@ const SUPABASE_URL: string =
   (supabase as any).supabaseUrl ?? 'https://wckdrutwkytwcomrlpib.supabase.co';
 const API_BASE = `${SUPABASE_URL}/functions/v1/api/v1`;
 
-// Canonical quickstart notebook: committed in the repo (Colab opens it from
-// GitHub) and shipped as a static asset (the download button patches its
-// CONFIG cell with the selected project's ids).
+// Canonical quickstart notebook, shipped as a static asset; the download
+// patches its CONFIG cell with the selected project's ids. "Open in Colab"
+// downloads that same patched copy and opens Colab's start page for upload.
+// It must NOT use a colab.research.google.com/github/... link: the source
+// repository is private, so Colab 404s and its error page prints the repo's
+// owner, name, branch and path to every customer who clicks it.
 const NOTEBOOK_ASSET_PATH = '/notebooks/suresuite_api_quickstart.ipynb';
-const NOTEBOOK_COLAB_URL =
-  'https://colab.research.google.com/github/suresuite/suresuite-v001-3-f6699a5b/blob/main/public/notebooks/suresuite_api_quickstart.ipynb';
+const COLAB_START_URL = 'https://colab.research.google.com/';
 
 // ── Shared SuReSuite treatment (sharp corners, thin borders, mono labels) ────
 const SURFACE = 'rounded-sm border border-[--hair-border] bg-white';
@@ -373,6 +375,7 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
       a.download = `suresuite_api_quickstart${slug}.ipynb`;
       a.click();
       URL.revokeObjectURL(a.href);
+      return true;
     } catch (e) {
       toast({
         title: 'Notebook download failed',
@@ -381,6 +384,20 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
       });
     } finally {
       setNbDownloading(false);
+    }
+    return false;
+  };
+
+  // Colab cannot read the private repository, so hand it the downloaded file.
+  // The tab opens before the await so a popup blocker still treats it as the
+  // click's own window.
+  const openInColab = async () => {
+    window.open(COLAB_START_URL, '_blank', 'noopener,noreferrer');
+    if (await downloadNotebook()) {
+      toast({
+        title: 'Notebook downloaded',
+        description: 'In the Colab tab choose File → Upload notebook and pick the downloaded .ipynb.',
+      });
     }
   };
 
@@ -967,7 +984,8 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
             <MobileButtonRow>
               <MobileButton
                 weight="secondary"
-                onClick={() => window.open(NOTEBOOK_COLAB_URL, '_blank', 'noreferrer')}
+                onClick={openInColab}
+                disabled={nbDownloading}
               >
                 Open in Colab
               </MobileButton>
@@ -1410,10 +1428,8 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
                 </p>
               </div>
               <div className="flex flex-none gap-2">
-                <Button size="sm" variant="outline" className="rounded-sm" asChild>
-                  <a href={NOTEBOOK_COLAB_URL} target="_blank" rel="noreferrer">
-                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open example in Colab
-                  </a>
+                <Button size="sm" variant="outline" className="rounded-sm" onClick={openInColab} disabled={nbDownloading}>
+                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open in Colab
                 </Button>
                 <Button size="sm" className={`rounded-sm ${TEMPLATE_BTN}`} onClick={downloadNotebook} disabled={nbDownloading}>
                   {nbDownloading
@@ -1596,8 +1612,8 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
                 Never paste your API key into a notebook cell. In Colab, store it once in the{' '}
                 <span className="font-medium">Secrets</span> panel as{' '}
                 <span className="font-mono">SURESUITE_API_KEY</span> — the notebook reads it from
-                there (or from the environment / a hidden prompt when run locally). If Colab can’t
-                open the repository directly, download the template and use Colab’s{' '}
+                there (or from the environment / a hidden prompt when run locally). Open in Colab
+                downloads your pre-filled copy and opens Colab — load it with{' '}
                 <span className="font-medium">File → Upload notebook</span>.
               </div>
             </div>
