@@ -521,12 +521,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       }
     ],
     "governance": {
@@ -3128,7 +3128,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -11617,12 +11617,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       }
     ],
     "governance": {
@@ -12382,12 +12382,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       }
     ],
     "governance": {
@@ -12758,12 +12758,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       }
     ],
     "governance": {
@@ -15493,7 +15493,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "ProjectIntelligence.tsx",
@@ -25150,7 +25150,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "ProjectPolicies.tsx",

@@ -206,9 +206,12 @@ describe("WP 6.2 · D48 · which overload the caller actually reaches", () => {
   const overloads = () => artifact.functions.filter((f) => f.name === "create_disruption_scenario_v2");
 
   it("there are exactly two, and the phantom is not among them", () => {
+    // The second is `20261001000017`'s: it widened the 13-argument overload's role test to
+    // `super_admin` and left the 11-argument one (`20250827171106`) exactly as it was —
+    // `20250902084844` drops that signature, so re-creating it would bring the ambiguity back.
     expect(overloads().map((f) => f.defined_by).sort()).toEqual([
       "20250827171106_00d577a4-5496-4e8d-8775-bbe357746c20.sql",
-      "20250828005114_4c7e88dc-9c73-4538-ab14-fe93b22d07dc.sql",
+      "20261001000017_super_admin_acts_as_admin.sql",
     ]);
   });
 

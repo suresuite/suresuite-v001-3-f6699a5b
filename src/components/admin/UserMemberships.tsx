@@ -192,7 +192,7 @@ export function UserMemberships({ actor, userId, userLabel, onOrganizationChange
             ? <>Working in <strong className="text-foreground">{active.name}</strong> now — the user switches between their organizations from their account menu, which does not change the default. </>
             : null}
           Owners and admins manage an organization's API keys. Platform role <MonoChip>{data.role.replace('_', ' ')}</MonoChip>
-          {data.role === 'admin' ? ' also edits and deletes every project of the active organization.' : ''}
+          {data.role === 'admin' || data.role === 'super_admin' ? ' also edits and deletes every project of the active organization.' : ''}
         </p>
       </AdminSection>
 

@@ -301,7 +301,7 @@ export function ProjectCard({
   const periodDefaulted = !project.simulation_start || !project.simulation_end;
 
   // Deleting the project stays the owner rule it always was (no /profile right states it).
-  const owns = canModify && (project.modeler_id === userId || role === 'admin');
+  const owns = canModify && (project.modeler_id === userId || role === 'admin' || role === 'super_admin');
   // D230 — every other action is the right /profile lists for this person on this project:
   // uploads, the item master, combining and generating the node list are "Edit Input Data";
   // the settings form is "Edits project settings"; downloading the node list is "Export".
