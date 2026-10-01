@@ -3,15 +3,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseLevelStates } from "../graphLevels";
 
-// WP 11.1 · §4 D257 — each level has its own version, read from the same state RPC
-// as the composite. These pin the reading; `rehearsal/650` pins what the database
+// WP 11.1 · §4 D258 — each level has its own version, read from the same state RPC
+// as the composite. These pin the reading; `rehearsal/660` pins what the database
 // says.
 
 const ROOT = join(__dirname, "../../../..");
 
 describe("graph level versions: the state's levels block", () => {
   // The shape `get_graph_version_state` returns after a deep-tier edit and before
-  // its capture (rehearsal/650 §4): product and process current, firm unsaved.
+  // its capture (rehearsal/660 §4): product and process current, firm unsaved.
   const state = {
     product: { level: "product", hash: "aaa", version_count: 3, unsaved: false,
       current_version: { id: "p3", version_no: 3, created_at: "2026-10-01T10:00:00Z" },

@@ -1,5 +1,5 @@
 /**
- * WP 11.1 · §4 D257 — a version per graph LEVEL.
+ * WP 11.1 · §4 D258 — a version per graph LEVEL.
  *
  * `get_graph_version_state` returns, beside the composite snapshot, each level's
  * own state: the level version the live content IS ("Product graph v3"), the

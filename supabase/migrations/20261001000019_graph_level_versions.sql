@@ -1,5 +1,5 @@
 -- ============================================================================
--- Phase 11 / WP 11.1 · blueprint §8.4 · gate `single-source` · §4 D257
+-- Phase 11 / WP 11.1 · blueprint §8.4 · gate `single-source` · §4 D258
 -- A VERSION PER LEVEL.
 --
 -- WP 10.1 gave the graph three named levels — product, process, firm — and a HASH
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS public.graph_level_versions (
 );
 
 COMMENT ON TABLE public.graph_level_versions IS
-  'WP 11.1 · §4 D257. One row per (project, level, content): the first time a '
+  'WP 11.1 · §4 D258. One row per (project, level, content): the first time a '
   'project''s product, process, firm or simulation level had that hash, numbered '
   'per project PER LEVEL ("Product graph v3"). Registered from `dataset_versions` '
   'by trigger, deduplicated against any earlier version of the level, immutable.';
@@ -126,7 +126,7 @@ CREATE TRIGGER graph_level_versions_immutable
 
 -- ── 2 · a snapshot IS its tuple — and only a snapshot function writes one ───
 --
--- §4 D264. `dataset_versions` has carried `dataset_versions_insert_all` (`FOR
+-- §4 D265. `dataset_versions` has carried `dataset_versions_insert_all` (`FOR
 -- INSERT … WITH CHECK (true)`) and an INSERT grant to `anon` and `authenticated`
 -- since `20260703000001`. WP 2.4 measured it and pinned it rather than change it,
 -- because the app runs as `anon`. But no path in the app, the edge functions or
@@ -242,7 +242,7 @@ CREATE TRIGGER dataset_versions_register_levels_upd
 -- Per project, oldest snapshot first, so "Product graph v1" is the first product
 -- content the project ever froze. Each call is the trigger's own function, so the
 -- backfill cannot number by a rule the live path does not use. A FUNCTION rather
--- than a `DO` block so `rehearsal/650` §7 runs the code this migration ran, on a
+-- than a `DO` block so `rehearsal/660` §7 runs the code this migration ran, on a
 -- planted history, instead of a copy of it.
 CREATE OR REPLACE FUNCTION public._graph_level_backfill(p_project_id uuid DEFAULT NULL)
 RETURNS integer
@@ -326,7 +326,7 @@ BEGIN
         'firm_version_id', v_lat.firm_version_id,
         'author_email', v_lat.author_email, 'created_at', v_lat.created_at) END,
     'version_count', v_n,
-    -- WP 11.1 · §4 D257 — each level's own version, from the same stored hashes.
+    -- WP 11.1 · §4 D258 — each level's own version, from the same stored hashes.
     'levels', jsonb_build_object(
       'product', public._graph_level_state(p_project_id, 'product', v_h ->> 'hash_product'),
       'process', public._graph_level_state(p_project_id, 'process', v_h ->> 'hash_process'),

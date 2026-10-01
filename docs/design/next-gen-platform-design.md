@@ -651,11 +651,11 @@ flowchart TD
 > tuple.** Each level — product, process, firm, and the `simulation` scope the engine reads —
 > has its own numbered history ("Product graph v3", "Firm graph v5"), deduplicated against any
 > earlier version of THAT level, so a change to one level moves that level's number and no other
-> (PLAN.md §4 D257). The `dataset_versions` snapshot stays as the frozen world a run can be
+> (PLAN.md §4 D258). The `dataset_versions` snapshot stays as the frozen world a run can be
 > re-executed against, and is the tuple of its level versions; its own number is kept for history
 > and the reproducibility record. The `simulation` scope is not a new hash: the snapshot's
 > `inputs` domain has been exactly the tables the worker reads since WP 4.1, so the scope is
-> NAMED (its hash is `hash_inputs`) and gated against the worker's read list (D263). No stored
+> NAMED (its hash is `hash_inputs`) and gated against the worker's read list (D264). No stored
 > hash and no `schema_version` moves.
 
 ---
@@ -736,7 +736,7 @@ A **`run_cache`** consults the key before dispatch: an exact hit returns stored 
 > **Phase 11 refinement (PLAN.md §21): the RunKey hashes the simulation scope.** The key's
 > graph term is the hash of what the engine READS (`hash_inputs`, the `simulation` scope), not the
 > composite, so a deep-tier upload — which no simulation reads — no longer makes identical runs
-> distinct (PLAN.md §4 D259). The run row keeps the composite and its snapshot, and gains the
+> distinct (PLAN.md §4 D260). The run row keeps the composite and its snapshot, and gains the
 > simulation hash and its version. The key is versioned (`run_key_version` 2): a stored
 > `run_spec` is the identity a run was dispatched under and is never rewritten, so the first
 > identical submission after the change re-runs once — the safe direction.
@@ -843,7 +843,7 @@ This subsection is numbered inside §9 but **logically precedes §9.1**: experim
 > is stale when the simulation's inputs changed, not when the composite did: it binds
 > `hash_simulation` and its version beside the snapshot it was validated on, its `model_hash`
 > digests the simulation hash, and every content match — the badge, inheritance, dispatch
-> stamping, supersession — compares it (PLAN.md §4 D258). A deep-tier change is still SHOWN, as an
+> stamping, supersession — compares it (PLAN.md §4 D259). A deep-tier change is still SHOWN, as an
 > informational note that the network moved and the simulation does not read it, and never marks
 > the model stale.
 
@@ -1005,7 +1005,7 @@ Surrogates are models with lifecycles, so they get the same discipline as polici
 > KPIs is (Validated Model, simulation-input version, RunKeys) — the world the KPIs came from —
 > and for its structural features the PRODUCT-level version, the world the features came from.
 > The training set groups and counts by the simulation-input version, so two snapshots that differ
-> only in the deep tier are one group (PLAN.md §4 D261); the join key between KPIs and features is
+> only in the deep tier are one group (PLAN.md §4 D262); the join key between KPIs and features is
 > the run's snapshot, whose tuple names both versions.
 
 ### 11.5 Orchestration: stress testing as a digital-twin analysis job

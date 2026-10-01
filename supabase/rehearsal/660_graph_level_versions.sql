@@ -1,4 +1,4 @@
--- §4 D257 · A VERSION PER LEVEL (WP 11.1).
+-- §4 D258 · A VERSION PER LEVEL (WP 11.1).
 --
 -- §1  a snapshot registers three level rows, each numbered 1, and the snapshot
 --     names them (its tuple).
@@ -15,11 +15,11 @@
 -- §8  immutability: content and number refuse an UPDATE; the cascade that forgets
 --     a deleted first snapshot does not.
 -- §9  doors: no API role writes the table, nor plants the snapshot that would
---     register one (D264); the registering, backfill and number
+--     register one (D265); the registering, backfill and number
 --     functions are not executable by `anon` or `authenticated` (D248); the audit
 --     row of a registration names the actor who froze the snapshot.
 
-DO $g650$
+DO $g660$
 DECLARE
   v_user  uuid := gen_random_uuid();
   v_proj  uuid := gen_random_uuid();
@@ -46,9 +46,9 @@ DECLARE
   v_no    integer;
 BEGIN
   INSERT INTO public.approved_users (id, email, name, password_hash)
-    VALUES (v_user, 'r650@example.invalid', 'R650', 'x');
+    VALUES (v_user, 'r650@example.invalid', 'R660', 'x');
   INSERT INTO public.projects (id, name, modeler_id, plant_name)
-    VALUES (v_proj, 'R650', v_user, 'P'), (v_proj3, 'R650 history', v_user, 'P');
+    VALUES (v_proj, 'R660', v_user, 'P'), (v_proj3, 'R660 history', v_user, 'P');
   PERFORM set_config('app.current_user_id', v_user::text, true);
 
   INSERT INTO public.suppliers (project_id, supplier_id) VALUES (v_proj, 'S1');
@@ -64,35 +64,35 @@ BEGIN
   SELECT * INTO v_dv FROM public.dataset_versions WHERE id = v_d1;
   SELECT count(*) INTO v_n FROM public.graph_level_versions WHERE project_id = v_proj;
   IF v_n <> 3 THEN
-    RAISE EXCEPTION 'R650 §1: a snapshot registered % level rows, expected 3 (product, process, firm)', v_n;
+    RAISE EXCEPTION 'R660 §1: a snapshot registered % level rows, expected 3 (product, process, firm)', v_n;
   END IF;
   IF EXISTS (SELECT 1 FROM public.graph_level_versions WHERE project_id = v_proj AND version_no <> 1) THEN
-    RAISE EXCEPTION 'R650 §1: a first snapshot''s level is not numbered 1';
+    RAISE EXCEPTION 'R660 §1: a first snapshot''s level is not numbered 1';
   END IF;
   v_p1 := v_dv.product_version_id; v_r1 := v_dv.process_version_id; v_f1 := v_dv.firm_version_id;
   IF v_p1 IS NULL OR v_r1 IS NULL OR v_f1 IS NULL THEN
-    RAISE EXCEPTION 'R650 §1: the snapshot does not name its tuple (% / % / %)', v_p1, v_r1, v_f1;
+    RAISE EXCEPTION 'R660 §1: the snapshot does not name its tuple (% / % / %)', v_p1, v_r1, v_f1;
   END IF;
   IF (SELECT level_hash FROM public.graph_level_versions WHERE id = v_p1) IS DISTINCT FROM v_dv.hash_product
      OR (SELECT level_hash FROM public.graph_level_versions WHERE id = v_r1) IS DISTINCT FROM v_dv.hash_process
      OR (SELECT level_hash FROM public.graph_level_versions WHERE id = v_f1) IS DISTINCT FROM v_dv.hash_firm THEN
-    RAISE EXCEPTION 'R650 §1: a level row carries a hash its snapshot does not';
+    RAISE EXCEPTION 'R660 §1: a level row carries a hash its snapshot does not';
   END IF;
   IF (SELECT first_dataset_version_id FROM public.graph_level_versions WHERE id = v_p1) IS DISTINCT FROM v_d1 THEN
-    RAISE EXCEPTION 'R650 §1: the level row does not name the snapshot that first carried it';
+    RAISE EXCEPTION 'R660 §1: the level row does not name the snapshot that first carried it';
   END IF;
 
   -- ══ §2 · a price edit moves product only ══
   UPDATE public.materials SET cost = 11 WHERE project_id = v_proj;
   v_d2 := public.snapshot_dataset(v_proj, 'price', v_user);
   SELECT * INTO v_dv FROM public.dataset_versions WHERE id = v_d2;
-  IF v_d2 = v_d1 THEN RAISE EXCEPTION 'R650 §2: a price edit did not make a new snapshot'; END IF;
+  IF v_d2 = v_d1 THEN RAISE EXCEPTION 'R660 §2: a price edit did not make a new snapshot'; END IF;
   SELECT version_no INTO v_no FROM public.graph_level_versions WHERE id = v_dv.product_version_id;
   IF v_no IS DISTINCT FROM 2 THEN
-    RAISE EXCEPTION 'R650 §2: a price edit made product v%, expected v2', v_no;
+    RAISE EXCEPTION 'R660 §2: a price edit made product v%, expected v2', v_no;
   END IF;
   IF v_dv.process_version_id IS DISTINCT FROM v_r1 OR v_dv.firm_version_id IS DISTINCT FROM v_f1 THEN
-    RAISE EXCEPTION 'R650 §2: a price edit moved the process or firm version';
+    RAISE EXCEPTION 'R660 §2: a price edit moved the process or firm version';
   END IF;
 
   -- ══ §3 · a BOM quantity moves product AND process ══
@@ -101,14 +101,14 @@ BEGIN
   SELECT * INTO v_dv FROM public.dataset_versions WHERE id = v_d3;
   SELECT version_no INTO v_no FROM public.graph_level_versions WHERE id = v_dv.product_version_id;
   IF v_no IS DISTINCT FROM 3 THEN
-    RAISE EXCEPTION 'R650 §3: a BOM quantity made product v%, expected v3', v_no;
+    RAISE EXCEPTION 'R660 §3: a BOM quantity made product v%, expected v3', v_no;
   END IF;
   SELECT version_no INTO v_no FROM public.graph_level_versions WHERE id = v_dv.process_version_id;
   IF v_no IS DISTINCT FROM 2 THEN
-    RAISE EXCEPTION 'R650 §3: a BOM quantity made process v%, expected v2 (numbered per LEVEL, not per project)', v_no;
+    RAISE EXCEPTION 'R660 §3: a BOM quantity made process v%, expected v2 (numbered per LEVEL, not per project)', v_no;
   END IF;
   IF v_dv.firm_version_id IS DISTINCT FROM v_f1 THEN
-    RAISE EXCEPTION 'R650 §3: a BOM quantity moved the firm version';
+    RAISE EXCEPTION 'R660 §3: a BOM quantity moved the firm version';
   END IF;
 
   -- ══ §4 · a deep-tier edit moves firm only, and says so before the capture ══
@@ -119,34 +119,34 @@ BEGIN
   v_st := public.get_graph_version_state(v_proj);
   IF (v_st #>> '{levels,product,unsaved}')::boolean IS NOT FALSE
      OR (v_st #>> '{levels,product,current_version,version_no}')::int IS DISTINCT FROM 3 THEN
-    RAISE EXCEPTION 'R650 §4: after a deep-tier edit the product level does not read current v3: %', v_st -> 'levels' -> 'product';
+    RAISE EXCEPTION 'R660 §4: after a deep-tier edit the product level does not read current v3: %', v_st -> 'levels' -> 'product';
   END IF;
   IF (v_st #>> '{levels,process,unsaved}')::boolean IS NOT FALSE
      OR (v_st #>> '{levels,process,current_version,version_no}')::int IS DISTINCT FROM 2 THEN
-    RAISE EXCEPTION 'R650 §4: after a deep-tier edit the process level does not read current v2: %', v_st -> 'levels' -> 'process';
+    RAISE EXCEPTION 'R660 §4: after a deep-tier edit the process level does not read current v2: %', v_st -> 'levels' -> 'process';
   END IF;
   IF (v_st #>> '{levels,firm,unsaved}')::boolean IS NOT TRUE
      OR (v_st #> '{levels,firm,current_version}') <> 'null'::jsonb THEN
-    RAISE EXCEPTION 'R650 §4: after a deep-tier edit the firm level does not read unsaved: %', v_st -> 'levels' -> 'firm';
+    RAISE EXCEPTION 'R660 §4: after a deep-tier edit the firm level does not read unsaved: %', v_st -> 'levels' -> 'firm';
   END IF;
   IF (v_st -> 'current_version') <> 'null'::jsonb THEN
-    RAISE EXCEPTION 'R650 §4: the composite reads a saved version for an unsaved world';
+    RAISE EXCEPTION 'R660 §4: the composite reads a saved version for an unsaved world';
   END IF;
   v_cap := public.capture_graph_version(v_proj, v_user, 'deep tier');
   v_d4 := (v_cap ->> 'dataset_version_id')::uuid;
   SELECT * INTO v_dv FROM public.dataset_versions WHERE id = v_d4;
   SELECT version_no INTO v_no FROM public.graph_level_versions WHERE id = v_dv.firm_version_id;
   IF v_no IS DISTINCT FROM 2 THEN
-    RAISE EXCEPTION 'R650 §4: the deep-tier capture made firm v%, expected v2', v_no;
+    RAISE EXCEPTION 'R660 §4: the deep-tier capture made firm v%, expected v2', v_no;
   END IF;
   IF v_dv.product_version_id IS DISTINCT FROM (SELECT product_version_id FROM public.dataset_versions WHERE id = v_d3)
      OR v_dv.process_version_id IS DISTINCT FROM (SELECT process_version_id FROM public.dataset_versions WHERE id = v_d3) THEN
-    RAISE EXCEPTION 'R650 §4: a deep-tier capture moved the product or process version';
+    RAISE EXCEPTION 'R660 §4: a deep-tier capture moved the product or process version';
   END IF;
   v_st := public.get_graph_version_state(v_proj);
   IF (v_st #>> '{levels,firm,unsaved}')::boolean IS NOT FALSE
      OR (v_st #>> '{levels,firm,current_version,version_no}')::int IS DISTINCT FROM 2 THEN
-    RAISE EXCEPTION 'R650 §4: after the capture the firm level does not read current v2';
+    RAISE EXCEPTION 'R660 §4: after the capture the firm level does not read current v2';
   END IF;
 
   -- ══ §5 · revert the deep tier past a newer firm version → Firm v1, no new row ══
@@ -157,18 +157,18 @@ BEGIN
   v_d5 := public.snapshot_dataset(v_proj, 'revert', v_user);
   SELECT * INTO v_dv FROM public.dataset_versions WHERE id = v_d5;
   IF v_d5 IN (v_d1, v_d2, v_d3, v_d4) THEN
-    RAISE EXCEPTION 'R650 §5: the fixture did not produce a new composite — it cannot tell "any" from "latest"';
+    RAISE EXCEPTION 'R660 §5: the fixture did not produce a new composite — it cannot tell "any" from "latest"';
   END IF;
   IF v_dv.firm_version_id IS DISTINCT FROM v_f1 THEN
-    RAISE EXCEPTION 'R650 §5: reverting the deep tier did not return Firm v1 (got version %)',
+    RAISE EXCEPTION 'R660 §5: reverting the deep tier did not return Firm v1 (got version %)',
       (SELECT version_no FROM public.graph_level_versions WHERE id = v_dv.firm_version_id);
   END IF;
   IF (SELECT count(*) FROM public.graph_level_versions WHERE project_id = v_proj AND level = 'firm') <> v_n THEN
-    RAISE EXCEPTION 'R650 §5: reverting the deep tier minted a firm row';
+    RAISE EXCEPTION 'R660 §5: reverting the deep tier minted a firm row';
   END IF;
   SELECT version_no INTO v_no FROM public.graph_level_versions WHERE id = v_dv.product_version_id;
   IF v_no IS DISTINCT FROM 4 THEN
-    RAISE EXCEPTION 'R650 §5: the price edit beside the revert made product v%, expected v4', v_no;
+    RAISE EXCEPTION 'R660 §5: the price edit beside the revert made product v%, expected v4', v_no;
   END IF;
 
   -- ══ §6 · the state and the newest snapshot's tuple agree ══
@@ -176,11 +176,11 @@ BEGIN
   IF (v_st #>> '{levels,product,current_version,id}')::uuid IS DISTINCT FROM v_dv.product_version_id
      OR (v_st #>> '{levels,process,current_version,id}')::uuid IS DISTINCT FROM v_dv.process_version_id
      OR (v_st #>> '{levels,firm,current_version,id}')::uuid IS DISTINCT FROM v_dv.firm_version_id THEN
-    RAISE EXCEPTION 'R650 §6: the state and the snapshot name different level versions';
+    RAISE EXCEPTION 'R660 §6: the state and the snapshot name different level versions';
   END IF;
   IF (v_st #>> '{levels,firm,version_count}')::int <> 2
      OR (v_st #>> '{levels,firm,latest_version,version_no}')::int <> 2 THEN
-    RAISE EXCEPTION 'R650 §6: the firm level''s history is not two versions with v2 the latest: %', v_st #> '{levels,firm}';
+    RAISE EXCEPTION 'R660 §6: the firm level''s history is not two versions with v2 the latest: %', v_st #> '{levels,firm}';
   END IF;
 
   -- ══ §7 · the backfill numbers history in created_at order ══
@@ -199,10 +199,10 @@ BEGIN
     RETURNING id INTO v_b;
   ALTER TABLE public.dataset_versions ENABLE TRIGGER dataset_versions_register_levels_ins;
   IF EXISTS (SELECT 1 FROM public.graph_level_versions WHERE project_id = v_proj3) THEN
-    RAISE EXCEPTION 'R650 §7: the planted history registered with the trigger disabled';
+    RAISE EXCEPTION 'R660 §7: the planted history registered with the trigger disabled';
   END IF;
   IF public._graph_level_backfill(v_proj3) <> 3 THEN
-    RAISE EXCEPTION 'R650 §7: the backfill did not visit the three planted snapshots';
+    RAISE EXCEPTION 'R660 §7: the backfill did not visit the three planted snapshots';
   END IF;
   FOR v_row IN
     SELECT dv.label, p.version_no AS p_no, r.version_no AS r_no, f.version_no AS f_no, dv.firm_version_id
@@ -213,26 +213,26 @@ BEGIN
      WHERE dv.project_id = v_proj3
   LOOP
     IF v_row.p_no IS DISTINCT FROM (CASE v_row.label WHEN 'a' THEN 1 WHEN 'b' THEN 2 ELSE 3 END) THEN
-      RAISE EXCEPTION 'R650 §7: snapshot % is product v%, expected the created_at order (a=1, b=2, c=3)', v_row.label, v_row.p_no;
+      RAISE EXCEPTION 'R660 §7: snapshot % is product v%, expected the created_at order (a=1, b=2, c=3)', v_row.label, v_row.p_no;
     END IF;
     IF v_row.r_no IS DISTINCT FROM 1 THEN
-      RAISE EXCEPTION 'R650 §7: snapshot % is process v% for one unchanged content, expected v1', v_row.label, v_row.r_no;
+      RAISE EXCEPTION 'R660 §7: snapshot % is process v% for one unchanged content, expected v1', v_row.label, v_row.r_no;
     END IF;
     IF v_row.label = 'a' AND v_row.firm_version_id IS NOT NULL THEN
-      RAISE EXCEPTION 'R650 §7: a NULL firm hash registered a firm version';
+      RAISE EXCEPTION 'R660 §7: a NULL firm hash registered a firm version';
     END IF;
     IF v_row.label <> 'a' AND v_row.f_no IS DISTINCT FROM (CASE v_row.label WHEN 'b' THEN 1 ELSE 2 END) THEN
-      RAISE EXCEPTION 'R650 §7: snapshot % is firm v%, expected b=1, c=2', v_row.label, v_row.f_no;
+      RAISE EXCEPTION 'R660 §7: snapshot % is firm v%, expected b=1, c=2', v_row.label, v_row.f_no;
     END IF;
   END LOOP;
   IF EXISTS (SELECT 1 FROM public.graph_level_versions WHERE project_id = v_proj3 AND level = 'firm' AND level_hash IS NULL) THEN
-    RAISE EXCEPTION 'R650 §7: a firm row carries no hash';
+    RAISE EXCEPTION 'R660 §7: a firm row carries no hash';
   END IF;
   -- Idempotent: a second pass mints nothing.
   SELECT count(*) INTO v_n FROM public.graph_level_versions WHERE project_id = v_proj3;
   PERFORM public._graph_level_backfill(v_proj3);
   IF (SELECT count(*) FROM public.graph_level_versions WHERE project_id = v_proj3) <> v_n THEN
-    RAISE EXCEPTION 'R650 §7: a second backfill minted level rows';
+    RAISE EXCEPTION 'R660 §7: a second backfill minted level rows';
   END IF;
 
   -- ══ §8 · immutability ══
@@ -241,25 +241,25 @@ BEGIN
     UPDATE public.graph_level_versions SET level_hash = 'tampered' WHERE id = v_p1;
   EXCEPTION WHEN SQLSTATE 'P0A02' THEN v_ok := true;
   END;
-  IF NOT v_ok THEN RAISE EXCEPTION 'R650 §8: a level version''s hash was editable'; END IF;
+  IF NOT v_ok THEN RAISE EXCEPTION 'R660 §8: a level version''s hash was editable'; END IF;
   v_ok := false;
   BEGIN
     UPDATE public.graph_level_versions SET version_no = 99 WHERE id = v_p1;
   EXCEPTION WHEN SQLSTATE 'P0A02' THEN v_ok := true;
   END;
-  IF NOT v_ok THEN RAISE EXCEPTION 'R650 §8: a level version''s number was editable'; END IF;
+  IF NOT v_ok THEN RAISE EXCEPTION 'R660 §8: a level version''s number was editable'; END IF;
   v_ok := false;
   BEGIN
     UPDATE public.graph_level_versions SET first_dataset_version_id = v_d2 WHERE id = v_p1;
   EXCEPTION WHEN SQLSTATE 'P0A02' THEN v_ok := true;
   END;
-  IF NOT v_ok THEN RAISE EXCEPTION 'R650 §8: a level version''s first snapshot could be re-pointed'; END IF;
+  IF NOT v_ok THEN RAISE EXCEPTION 'R660 §8: a level version''s first snapshot could be re-pointed'; END IF;
   -- The cascade: deleting the first snapshot forgets it and keeps the version.
   DELETE FROM public.dataset_versions WHERE id = v_c;
   SELECT count(*) INTO v_n FROM public.graph_level_versions
    WHERE project_id = v_proj3 AND level = 'product' AND level_hash = 'p-c' AND first_dataset_version_id IS NULL;
   IF v_n <> 1 THEN
-    RAISE EXCEPTION 'R650 §8: deleting a snapshot did not leave its level version standing with no first snapshot';
+    RAISE EXCEPTION 'R660 §8: deleting a snapshot did not leave its level version standing with no first snapshot';
   END IF;
 
   -- ══ §9 · doors and attribution ══
@@ -268,19 +268,19 @@ BEGIN
      OR has_table_privilege('authenticated', 'public.graph_level_versions', 'UPDATE')
      OR has_table_privilege('authenticated', 'public.graph_level_versions', 'DELETE')
      OR has_table_privilege('service_role', 'public.graph_level_versions', 'INSERT') THEN
-    RAISE EXCEPTION 'R650 §9: an API role can write graph_level_versions — only a snapshot may mint a level version';
+    RAISE EXCEPTION 'R660 §9: an API role can write graph_level_versions — only a snapshot may mint a level version';
   END IF;
-  -- §4 D264: nor may an API role plant a snapshot, which would mint level versions.
+  -- §4 D265: nor may an API role plant a snapshot, which would mint level versions.
   IF has_table_privilege('anon', 'public.dataset_versions', 'INSERT')
      OR has_table_privilege('authenticated', 'public.dataset_versions', 'INSERT')
      OR EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'dataset_versions' AND cmd IN ('INSERT', 'ALL')
                  AND roles && ARRAY['anon', 'authenticated']::name[]) THEN
-    RAISE EXCEPTION 'R650 §9: an API role can insert a dataset_versions row directly (D264)';
+    RAISE EXCEPTION 'R660 §9: an API role can insert a dataset_versions row directly (D265)';
   END IF;
   FOR v_row IN SELECT unnest(ARRAY['public._graph_level_register(uuid)', 'public._graph_level_backfill(uuid)',
                                    'public._graph_level_state(uuid,text,text)']) AS f LOOP
     IF has_function_privilege('anon', v_row.f, 'EXECUTE') OR has_function_privilege('authenticated', v_row.f, 'EXECUTE') THEN
-      RAISE EXCEPTION 'R650 §9: % is executable by an API role (D248)', v_row.f;
+      RAISE EXCEPTION 'R660 §9: % is executable by an API role (D248)', v_row.f;
     END IF;
   END LOOP;
 
@@ -295,10 +295,10 @@ BEGIN
    WHERE plane = 'data' AND target_type = 'graph_level_versions' AND action = 'insert'
    ORDER BY created_at DESC LIMIT 1;
   IF v_row IS NULL OR v_row.actor_user_id IS DISTINCT FROM v_user THEN
-    RAISE EXCEPTION 'R650 §9: a level version''s audit row does not name the snapshot''s actor (got %)',
+    RAISE EXCEPTION 'R660 §9: a level version''s audit row does not name the snapshot''s actor (got %)',
       CASE WHEN v_row IS NULL THEN 'no row' ELSE COALESCE(v_row.actor_user_id::text, 'NULL') END;
   END IF;
 
-  RAISE NOTICE 'R650: a version per level — numbered per level, deduplicated against any, a snapshot names its tuple, history backfilled in order';
+  RAISE NOTICE 'R660: a version per level — numbered per level, deduplicated against any, a snapshot names its tuple, history backfilled in order';
 END
-$g650$;
+$g660$;

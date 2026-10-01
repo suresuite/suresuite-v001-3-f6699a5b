@@ -1,5 +1,5 @@
 # AUTHORED — the data contract's sidecar for `graph_level_versions`.
-# WP 11.1 · §4 D257. Edit this file; docs/data/tables/*.md is generated from it.
+# WP 11.1 · §4 D258. Edit this file; docs/data/tables/*.md is generated from it.
 table: graph_level_versions
 tier: "3"
 schema_name: public
@@ -15,10 +15,10 @@ natural_key_unique:
   - source: "column PRIMARY KEY"
     columns: [id]
     name: "graph_level_versions_pkey"
-  - source: "constraint 20261001000018_graph_level_versions.sql"
+  - source: "constraint 20261001000019_graph_level_versions.sql"
     columns: [project_id, level, level_hash]
     name: "graph_level_versions_content_key"
-  - source: "constraint 20261001000018_graph_level_versions.sql"
+  - source: "constraint 20261001000019_graph_level_versions.sql"
     columns: [project_id, level, version_no]
     name: "graph_level_versions_number_key"
 

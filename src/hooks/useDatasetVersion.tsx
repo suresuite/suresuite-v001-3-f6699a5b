@@ -61,7 +61,7 @@ interface UseDatasetVersionResult {
   /** The saved version whose content IS the live data ("Graph v7"), or null. */
   currentVersion: { id: string; version_no: number | null; label: string | null; created_at: string } | null;
   current: GraphHashes | null;
-  /** WP 11.1 · §4 D257 — each level's own version ("Product graph v3"), from the
+  /** WP 11.1 · §4 D258 — each level's own version ("Product graph v3"), from the
    *  same read. Empty on a database before WP 11.1. */
   levels: LevelStates;
   currentHash: string | null;

@@ -57,7 +57,7 @@ governance:
   note: >-
     Written by the `_build_dataset_snapshot` database function, never by a page —
     that is the INTENT, and `write: null` records it. **And since WP 11.1 the
-    database enforces it** (§4 D264): from WP 2.4 to WP 11.1 the live policy
+    database enforces it** (§4 D265): from WP 2.4 to WP 11.1 the live policy
     `dataset_versions_insert_all` was `FOR INSERT ... WITH CHECK (true)` with an
     INSERT grant to `anon` and `authenticated`, pinned by
     `governanceEnforcement.test.ts` rather than changed. No path inserted a row
@@ -419,7 +419,7 @@ fields:
       This snapshot's PRODUCT level version — the `graph_level_versions` row whose
       content is this row's `hash_product` ("Product graph v3"). With its two
       siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1,
-      §4 D257). Written by the registration trigger the moment the row is frozen.
+      §4 D258). Written by the registration trigger the moment the row is frozen.
     grain: identifier
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
@@ -436,7 +436,7 @@ fields:
       This snapshot's PROCESS level version — the `graph_level_versions` row whose
       content is this row's `hash_process` ("Process graph v3"). With its two
       siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1,
-      §4 D257). Written by the registration trigger the moment the row is frozen.
+      §4 D258). Written by the registration trigger the moment the row is frozen.
     grain: identifier
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
@@ -453,7 +453,7 @@ fields:
       This snapshot's FIRM level version — the `graph_level_versions` row whose
       content is this row's `hash_firm` ("Firm graph v3"). With its two
       siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1,
-      §4 D257). Written by the registration trigger the moment the row is frozen.
+      §4 D258). Written by the registration trigger the moment the row is frozen.
     grain: identifier
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
