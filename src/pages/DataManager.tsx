@@ -46,6 +46,7 @@ import UploadWizard from '@/components/UploadWizard';
 import { ProjectCard } from '@/components/ProjectCard';
 import { ErpConnectionsPanelForEditors } from '@/components/erp/ErpConnectionsPanel';
 import { confirmProjectDeletion } from '@/lib/projects/projectDeletion';
+import { useConfirm } from '@/components/shared/confirm/useConfirm';
 import { planRefusal } from '@/lib/auth/organizationPlan';
 
 interface Project {
@@ -133,6 +134,7 @@ function projectStatus(project, completion) {
 }
 
 const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
+  const confirm = useConfirm();
   // Walk-to deep link (§8.2 findings → data): ?project=<id> expands the
   // project's data card; &item_master=<materials|products|suppliers> also
   // opens the Item Master editor on that tab (see fieldWalkToRoute).
@@ -672,13 +674,13 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
     setEditDeepTierEnabled(selectedProject.deep_tier_enabled || false);
   };
 
-  const handleDeleteSelectedProject = () => {
+  const handleDeleteSelectedProject = async () => {
     if (!selectedProject) {
       toast.error('Please select a project first');
       return;
     }
     
-    if (confirmProjectDeletion(selectedProject.name)) {
+    if (await confirmProjectDeletion(confirm, selectedProject.name)) {
       handleDeleteProject(selectedProject);
     }
   };
@@ -694,11 +696,15 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
   const handleDeleteAllData = async (project: Project) => {
     if (!canModify || !user?.id || !user?.email) return;
 
-    const confirm = window.confirm(
-      `Are you sure you want to delete ALL data for project "${project.name}"? This action cannot be undone.`
-    );
+    const lead = `Are you sure you want to delete ALL data for project "${project.name}"?`;
+    const ok = await confirm({
+      message: `${lead} This action cannot be undone.`,
+      lead,
+      title: `Delete all data for project "${project.name}"?`,
+      actionLabel: 'Delete all data',
+    });
 
-    if (!confirm) return;
+    if (!ok) return;
 
     try {
       // Use secure RPC to delete all datasets

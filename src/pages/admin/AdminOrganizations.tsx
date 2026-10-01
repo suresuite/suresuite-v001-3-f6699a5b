@@ -30,7 +30,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { ConfirmSheet } from '@/components/shared/confirm/ConfirmSheet';
+import { confirmBullets } from '@/components/shared/confirm/confirmBullets';
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogHeader, ResponsiveDialogTitle, ResponsiveDialogFooter, ResponsiveDialogTrigger } from '@/components/shared/ResponsiveDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Ban, Loader2, MoreHorizontal, Pencil, Plus, ShieldCheck, Trash2, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -296,16 +298,16 @@ function RenameOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
     toast.success(`Renamed to "${name.trim()}"`); onClose(); onDone();
   };
   return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Rename “{org.name}”</DialogTitle></DialogHeader>
+    <ResponsiveDialog open onOpenChange={(v) => !v && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader><ResponsiveDialogTitle>Rename “{org.name}”</ResponsiveDialogTitle></ResponsiveDialogHeader>
         <div><Label className="text-xs">New name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-sm" autoFocus /></div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={save} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Rename</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -325,12 +327,12 @@ function LimitsDialog({ org, onClose, onSave }: {
     onClose();
   };
   return (
-    <Dialog open onOpenChange={(v) => !v && !saving && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader>
-          <DialogTitle>Limits for “{org.name}”</DialogTitle>
-          <DialogDescription>Lowering a limit removes nothing; nothing can be added until the organization is under it.</DialogDescription>
-        </DialogHeader>
+    <ResponsiveDialog open onOpenChange={(v) => !v && !saving && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Limits for “{org.name}”</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>Lowering a limit removes nothing; nothing can be added until the organization is under it.</ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
         <div className="grid gap-3">
           <div>
             <Label className="text-xs">Users · {usage(org.members, org.user_limit)} now</Label>
@@ -341,12 +343,12 @@ function LimitsDialog({ org, onClose, onSave }: {
             <LimitSelect value={limitFromSelect(projectLimit)} noun="project" onChange={setProjectLimit} className="mt-1 rounded-sm" />
           </div>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={save} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save limits</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -356,16 +358,20 @@ function LimitsDialog({ org, onClose, onSave }: {
 // slug, an organization the admin belongs to, one whose delete would remove a super
 // admin, or an account with recorded work in another organization's project.
 function DeleteOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; actorArgs: () => Record<string, unknown>; onClose: () => void; onDone: () => void }) {
+  const isMobile = useIsMobile();
   const [typed, setTyped] = useState('');
   const [deleting, setDeleting] = useState(false);
+  // The phone sheet repeats a refusal above its buttons (§2.3); desktop has the toast alone.
+  const [failure, setFailure] = useState<string | null>(null);
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const matches = typed.trim() === org.slug;
   const remove = async () => {
     if (!matches) return;
     setDeleting(true);
+    setFailure(null);
     const { data, error } = await db.rpc('admin_delete_organization', { ...actorArgs(), p_org_id: org.id, p_confirm_slug: typed.trim() });
     setDeleting(false);
-    if (error) return toast.error(error.message);
+    if (error) { setFailure(error.message); return toast.error(error.message); }
     const projects = Number(data?.projects ?? 0);
     const users = Number(data?.users ?? 0);
     const detached = Number(data?.detached ?? 0);
@@ -373,15 +379,54 @@ function DeleteOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
       detached ? `; ${plural(detached, 'account', 'accounts')} removed from it and kept in their other organizations` : ''}`);
     onClose(); onDone();
   };
+  if (isMobile) {
+    // The typed-name ConfirmSheet (mobile redesign §2.3): the same copy as the
+    // dialog below, as bullets under its own headings, and the same slug check.
+    const sharedOnly = org.members - org.members_only_here;
+    return (
+      <ConfirmSheet
+        open
+        title={`Delete “${org.name}” permanently?`}
+        groups={[
+          {
+            label: 'Deleted, forever',
+            bullets: [
+              `${plural(org.projects, 'project', 'projects')} and all of their data — datasets, the network, scenarios, policies, simulation runs and results`,
+              `${plural(org.members_only_here, 'user account', 'user accounts')} that belong to no other organization — they will no longer be able to sign in`,
+              'the organization’s API keys, access defaults and AI budgets',
+            ].map((text) => ({ text, tone: 'red' as const })),
+          },
+          {
+            // The copy names what is kept in each line, so this panel has no head.
+            bullets: [
+              ...(sharedOnly > 0
+                ? [`Removed from this organization but kept: ${plural(sharedOnly, 'account that also belongs', 'accounts that also belong')} to another organization.`]
+                : []),
+              'Kept: the audit log and usage logs, which record what happened.',
+            ].map((text) => ({ text, tone: 'amber' as const })),
+          },
+        ]}
+        notes={['This cannot be undone. Suspending can be reversed; deleting cannot.', 'If you may need it back, suspend it instead.']}
+        typed={{ label: <>Type <span className="font-mono">{org.slug}</span> to confirm</>, value: typed, onChange: setTyped }}
+        disabledReason={matches ? null : `Type ${org.slug} exactly to enable this.`}
+        actionLabel="Delete organization"
+        busy={deleting}
+        busyLabel="Deleting…"
+        error={failure}
+        onConfirm={remove}
+        onCancel={() => !deleting && onClose()}
+      />
+    );
+  }
   return (
-    <Dialog open onOpenChange={(v) => !v && !deleting && onClose()}>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader>
-          <DialogTitle>Delete “{org.name}” permanently</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog open onOpenChange={(v) => !v && !deleting && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Delete “{org.name}” permanently</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             This cannot be undone. Suspending can be reversed; deleting cannot.
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
         <div className="grid gap-3 text-[13px]">
           <div>
             <p className="font-medium">Deleted, forever:</p>
@@ -403,14 +448,14 @@ function DeleteOrgDialog({ org, actorArgs, onClose, onDone }: { org: OrgRow; act
             <Input value={typed} onChange={(e) => setTyped(e.target.value)} className="mt-1 rounded-sm font-mono" autoFocus autoComplete="off" spellCheck={false} />
           </div>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={deleting}>Cancel</Button>
           <Button variant="destructive" className="rounded-sm" onClick={remove} disabled={!matches || deleting}>
             {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete organization
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
@@ -439,10 +484,10 @@ function AddOrgDialog({ actorArgs, onCreated }: { actorArgs: () => any; onCreate
     toast.success(`Organization "${name.trim()}" created`); reset(); setOpen(false); onCreated();
   };
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
-      <DialogTrigger asChild><Button size="sm" className={cn('gap-1.5 rounded-sm', HDR_PRIMARY_BUTTON)}><Plus className="h-3.5 w-3.5" />Add organization</Button></DialogTrigger>
-      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-        <DialogHeader><DialogTitle>Add organization</DialogTitle></DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+      <ResponsiveDialogTrigger asChild><Button size="sm" className={cn('gap-1.5 rounded-sm', HDR_PRIMARY_BUTTON)}><Plus className="h-3.5 w-3.5" />Add organization</Button></ResponsiveDialogTrigger>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader><ResponsiveDialogTitle>Add organization</ResponsiveDialogTitle></ResponsiveDialogHeader>
         <div className="grid gap-3">
           <div><Label className="text-xs">Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-sm" placeholder="Acme Robotics" /></div>
           <div><Label className="text-xs">Slug (optional)</Label><Input value={slug} onChange={(e) => setSlug(e.target.value)} className="mt-1 rounded-sm font-mono" placeholder="auto-generated from name" /></div>
@@ -464,11 +509,11 @@ function AddOrgDialog({ actorArgs, onCreated }: { actorArgs: () => any; onCreate
             The period is counted from when the organization is created; after it ends its members cannot sign in (super admins excepted) until it is renewed — unless they also belong to another organization that is still current, which they are switched to.
           </p>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={create} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create organization</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

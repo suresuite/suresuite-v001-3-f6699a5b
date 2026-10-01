@@ -11,6 +11,7 @@
  * manual's `exporting-and-deleting` page publishes.
  */
 import { PROJECT_DELETION } from '@/components/docs/generated/policy.generated';
+import type { ConfirmFn } from '@/components/shared/confirm/useConfirm';
 
 const DETACHED_LABEL: Record<string, string> = {
   chat_threads: 'chat threads',
@@ -23,7 +24,7 @@ export function deletionConfirmMessage(name: string): string {
   const deleted = projectScoped - neither.length - detached.length;
   const detachedText = detached.map((t) => DETACHED_LABEL[t] ?? t).join(' and ');
   return [
-    `Delete project "${name}" and all of its data? This cannot be undone.`,
+    `${deletionConfirmTitle(name)} This cannot be undone.`,
     '',
     `Deleted: its data across ${deleted} tables — uploaded datasets, the network, ` +
       'disruption scenarios, policy decisions, simulation runs and their results.',
@@ -32,7 +33,17 @@ export function deletionConfirmMessage(name: string): string {
   ].join('\n');
 }
 
-/** `window.confirm` with the one message. */
-export function confirmProjectDeletion(name: string): boolean {
-  return window.confirm(deletionConfirmMessage(name));
+/** The message's leading question — the phone's ConfirmSheet title. */
+export function deletionConfirmTitle(name: string): string {
+  return `Delete project "${name}" and all of its data?`;
+}
+
+/** The one message, through `useConfirm()`: `window.confirm` on desktop, the
+ *  ConfirmSheet on a phone (mobile redesign §2.3). */
+export function confirmProjectDeletion(confirm: ConfirmFn, name: string): Promise<boolean> {
+  return confirm({
+    message: deletionConfirmMessage(name),
+    title: deletionConfirmTitle(name),
+    actionLabel: 'Delete project',
+  });
 }

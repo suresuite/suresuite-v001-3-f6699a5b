@@ -54,6 +54,12 @@ export { FROZEN_CELL, FROZEN_CELL_ON_TINT } from './frozenCell';
  * `md` it becomes a bottom sheet and at `md` it is handed straight back to the
  * primitive's centred geometry.
  *
+ * Every dialog a phone can open now renders through `ResponsiveDialog`
+ * (`./ResponsiveDialog.tsx`, mobile redesign §2.2), whose phone branch ignores
+ * this class string. Its `md:` half is still what those dialogs look like on
+ * desktop, so callers keep passing it; the phone half only reaches a dialog
+ * that has not moved over. A new dialog should use `ResponsiveDialog` instead.
+ *
  * Positioning is written as explicit `left`/`right` rather than `inset-x`,
  * because `inset-x-*` and `left-*` are one conflict group to tailwind-merge:
  * an `md:inset-x-auto` sitting beside an `md:left-[50%]` is silently dropped,

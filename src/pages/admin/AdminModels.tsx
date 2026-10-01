@@ -11,7 +11,8 @@ import { useIsMobile } from '@/hooks/use-is-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { useConfirm } from '@/components/shared/confirm/useConfirm';
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogHeader, ResponsiveDialogTitle, ResponsiveDialogTrigger, ResponsiveDialogFooter } from '@/components/shared/ResponsiveDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -45,6 +46,7 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+  const confirm = useConfirm();
 
   const toggle = async (row: Model) => {
     const next = !row.enabled;
@@ -53,7 +55,8 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
     setModels((prev) => prev.map((m) => (m.id === row.id ? { ...m, enabled: next } : m)));
   };
   const remove = async (row: Model) => {
-    if (!confirm(`Delete model ${row.code}?`)) return;
+    const message = `Delete model ${row.code}?`;
+    if (!(await confirm({ message, title: message, actionLabel: 'Delete model' }))) return;
     const { error } = await db.from('ai_models').delete().eq('id', row.id);
     if (error) return toast.error(error.message);
     setModels((prev) => prev.filter((m) => m.id !== row.id));
@@ -81,10 +84,10 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
       isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} title="AI Models"
       onRefresh={load} refreshLoading={loading}
       actions={
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button size="sm" className={cn('gap-1.5 rounded-sm', HDR_PRIMARY_BUTTON)}><Plus className="h-3.5 w-3.5" />Add model</Button></DialogTrigger>
-          <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
-            <DialogHeader><DialogTitle>Add AI model</DialogTitle></DialogHeader>
+        <ResponsiveDialog open={open} onOpenChange={setOpen}>
+          <ResponsiveDialogTrigger asChild><Button size="sm" className={cn('gap-1.5 rounded-sm', HDR_PRIMARY_BUTTON)}><Plus className="h-3.5 w-3.5" />Add model</Button></ResponsiveDialogTrigger>
+          <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+            <ResponsiveDialogHeader><ResponsiveDialogTitle>Add AI model</ResponsiveDialogTitle></ResponsiveDialogHeader>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(2,minmax(0,1fr))] [&>*]:min-w-0">
               <div className="min-w-0 md:col-span-2">
                 <Label className="text-xs">Provider</Label>
@@ -99,12 +102,12 @@ export default function AdminModels({ isCollapsed, setIsCollapsed }: Props) {
               <div><Label className="text-xs">Output $/1k</Label><Input type="number" step="0.0001" value={draft.output_cost_per_1k} onChange={(e) => setDraft({ ...draft, output_cost_per_1k: Number(e.target.value) })} className="mt-1 rounded-sm font-mono" /></div>
               <div className="min-w-0 md:col-span-2"><Label className="text-xs">Max context</Label><Input type="number" value={draft.max_context} onChange={(e) => setDraft({ ...draft, max_context: Number(e.target.value) })} className="mt-1 rounded-sm font-mono" /></div>
             </div>
-            <DialogFooter>
+            <ResponsiveDialogFooter>
               <Button variant="outline" className="rounded-sm" onClick={() => setOpen(false)}>Cancel</Button>
               <Button className="rounded-sm" onClick={create}>Add</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </ResponsiveDialogFooter>
+          </ResponsiveDialogContent>
+        </ResponsiveDialog>
       }
     >
       {isMobile ? (

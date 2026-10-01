@@ -48,6 +48,7 @@ import {
 } from '@/components/mobile';
 import { cn } from '@/lib/utils';
 import { confirmProjectDeletion } from '@/lib/projects/projectDeletion';
+import { useConfirm } from '@/components/shared/confirm/useConfirm';
 
 interface Project {
   id: string;
@@ -291,6 +292,7 @@ export function ProjectCard({
     </>
   );
   const isMobile = useIsMobile();
+  const confirm = useConfirm();
   const [sheet, setSheet] = useState(false);
 
   const fallbackDates = getFallbackSimulationDates(project.simulation_start, project.simulation_end);
@@ -531,10 +533,11 @@ export function ProjectCard({
             {action(
               'Delete project',
               () => {
-                if (confirmProjectDeletion(project.name)) {
+                void confirmProjectDeletion(confirm, project.name).then((ok) => {
+                  if (!ok) return;
                   onDelete(project);
                   setSheet(false);
-                }
+                });
               },
               'permanent',
               !owns,
@@ -815,7 +818,7 @@ export function ProjectCard({
                         disabled={!owns}
                         className="text-[#bf2330] focus:text-[#bf2330]"
                         onClick={() => {
-                          if (confirmProjectDeletion(project.name)) onDelete(project);
+                          void confirmProjectDeletion(confirm, project.name).then((ok) => ok && onDelete(project));
                         }}
                       >
                         <Trash2 className="mr-2 h-4 w-4" /> Delete project

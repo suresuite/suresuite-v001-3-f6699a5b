@@ -46,9 +46,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveDialog, ResponsiveDialogContent, ResponsiveDialogDescription, ResponsiveDialogFooter, ResponsiveDialogHeader, ResponsiveDialogTitle } from '@/components/shared/ResponsiveDialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -569,14 +567,14 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
   const dialogs = (
     <>
     {/* ── Create key dialog ─────────────────────────────────────────────── */}
-    <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetCreateForm(); }}>
-      <DialogContent className="max-w-lg rounded-sm">
-        <DialogHeader>
-          <DialogTitle>Create API key</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetCreateForm(); }}>
+      <ResponsiveDialogContent className="max-w-lg rounded-sm">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Create API key</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             The key is scoped to your organization. You'll see the secret once, right after creation.
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="key-name">Name</Label>
@@ -600,7 +598,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
           </div>
           <div className="space-y-1.5">
             <Label>Scopes (least privilege: pick only what the caller needs)</Label>
-            <div className="grid max-h-48 grid-cols-1 gap-1.5 overflow-y-auto rounded-sm border border-[--hair-border] p-3">
+            <div className="grid grid-cols-1 gap-1.5 rounded-sm border border-[--hair-border] p-3 md:max-h-48 md:overflow-y-auto">
               {SCOPES.map((s) => (
                 <label key={s.id} className="flex cursor-pointer items-start gap-2 text-sm">
                   <Checkbox
@@ -624,7 +622,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
               All projects in my organization
             </label>
             {!allProjects && (
-              <div className="max-h-36 space-y-1.5 overflow-y-auto rounded-sm border border-[--hair-border] p-3">
+              <div className="space-y-1.5 rounded-sm border border-[--hair-border] p-3 md:max-h-36 md:overflow-y-auto">
                 {projects.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No projects found.</p>
                 ) : (
@@ -654,25 +652,25 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
             </Select>
           </div>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={() => setCreateOpen(false)}>Cancel</Button>
           <Button className="rounded-sm" onClick={onCreate} disabled={creating}>
             {creating && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />} Create key
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
 
     {/* ── Show-once secret dialog ───────────────────────────────────────── */}
-    <Dialog open={!!mintedKey} onOpenChange={(o) => { if (!o) setMintedKey(null); }}>
-      <DialogContent className="max-w-lg rounded-sm">
-        <DialogHeader>
-          <DialogTitle>Copy your API key now</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog open={!!mintedKey} onOpenChange={(o) => { if (!o) setMintedKey(null); }}>
+      <ResponsiveDialogContent className="max-w-lg rounded-sm">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Copy your API key now</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             This is the only time the secret for “{mintedKey?.name}” is shown. Only a hash is
             stored — if you lose it, rotate the key to get a new one.
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
         <div className="flex items-center gap-2">
           <InlineCode className="flex-1 break-all rounded-sm border-[--hair-border] px-3 py-2 text-xs">
             {mintedKey?.plaintext}
@@ -686,49 +684,49 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
             <span className="font-mono">SURESUITE_API_KEY</span>). Never commit it to source control.
           </div>
         </div>
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button className="rounded-sm" onClick={() => setMintedKey(null)}>I've stored it safely</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
 
     {/* ── Rotate confirm ────────────────────────────────────────────────── */}
-    <Dialog open={!!rotateTarget} onOpenChange={(o) => { if (!o) setRotateTarget(null); }}>
-      <DialogContent className="rounded-sm">
-        <DialogHeader>
-          <DialogTitle>Rotate “{rotateTarget?.name}”?</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog open={!!rotateTarget} onOpenChange={(o) => { if (!o) setRotateTarget(null); }}>
+      <ResponsiveDialogContent className="rounded-sm">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Rotate “{rotateTarget?.name}”?</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             A new secret is minted and shown once. The current secret keeps working for a 72-hour
             overlap so you can roll it out, then stops automatically.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={() => setRotateTarget(null)}>Cancel</Button>
           <Button className="rounded-sm" onClick={onRotate} disabled={mutating}>
             {mutating && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />} Rotate key
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
 
     {/* ── Revoke confirm ────────────────────────────────────────────────── */}
-    <Dialog open={!!revokeTarget} onOpenChange={(o) => { if (!o) setRevokeTarget(null); }}>
-      <DialogContent className="rounded-sm">
-        <DialogHeader>
-          <DialogTitle>Revoke “{revokeTarget?.name}”?</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog open={!!revokeTarget} onOpenChange={(o) => { if (!o) setRevokeTarget(null); }}>
+      <ResponsiveDialogContent className="rounded-sm">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Revoke “{revokeTarget?.name}”?</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             This is immediate and cannot be undone — the key stops working on its next request.
             Any system still using it will start getting 401s.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
+        <ResponsiveDialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={() => setRevokeTarget(null)}>Cancel</Button>
           <Button variant="destructive" className="rounded-sm" onClick={onRevoke} disabled={mutating}>
             {mutating && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />} Revoke key
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
     </>
   );
   const openKey = keys.find((k) => k.id === openKeyId) ?? null;

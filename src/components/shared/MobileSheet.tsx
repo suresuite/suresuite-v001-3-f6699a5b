@@ -8,8 +8,8 @@
  * Behaviour the spec fixes and this owns so five sheets cannot drift apart:
  *  - the header IS the drag handle; a downward drag past DISMISS_PX closes,
  *    anything shorter springs back,
- *  - portrait caps at 76% height, landscape goes full-height (76% of a 402px
- *    landscape viewport leaves no usable content area),
+ *  - portrait caps at 76% height, landscape takes the full variant (all but
+ *    28px — 76% of a 390px landscape viewport leaves no usable content area),
  *  - the panel stops above the bottom tab bar rather than covering it, so the
  *    "you are here" signal and the one-tap route out both survive — the same
  *    rule the More panel follows,
@@ -29,7 +29,9 @@ import React, { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { ChevronLeft, X } from "lucide-react";
-import { MOBILE_TABBAR_BORDER, MOBILE_TABBAR_H, isMobileRootRoute } from "@/components/MobileNav";
+import { MOBILE_TABBAR_BORDER, MOBILE_TABBAR_H, MOBILE_TABBAR_H_LANDSCAPE, isMobileRootRoute } from "@/components/MobileNav";
+import { SHEET_SHADOW } from "@/components/shared/ResponsiveDialog";
+import { useCompactChrome } from "@/hooks/useViewport";
 import { cn } from "@/lib/utils";
 
 /** Drag distance that dismisses instead of springing back (spec §4.4). */
@@ -57,11 +59,15 @@ export function MobileSheet({ open, title, sub, onClose, onBack, footer, childre
   const startY = useRef<number | null>(null);
   const [dragY, setDragY] = useState(0);
   const { pathname } = useLocation();
+  const compact = useCompactChrome();
   // The bar is only there to stop above on a root route (D3-a: shown unless
   // the screen was pushed onto a stack) — on a pushed view it isn't rendered
   // at all, and reserving its height anyway leaves 59px of dead space
   // between the sheet and the bottom edge.
-  const tabBarOffset = isMobileRootRoute(pathname) ? MOBILE_TABBAR_H + MOBILE_TABBAR_BORDER : 0;
+  // A phone on its side wears the 52px compact bar, so the sheet stops above that.
+  const tabBarOffset = isMobileRootRoute(pathname)
+    ? (compact ? MOBILE_TABBAR_H_LANDSCAPE : MOBILE_TABBAR_H) + MOBILE_TABBAR_BORDER
+    : 0;
 
   // Without this, iOS/Android still let a touch that starts over the sheet
   // (the backdrop, or the header's drag handle) rubber-band the page
@@ -97,40 +103,52 @@ export function MobileSheet({ open, title, sub, onClose, onBack, footer, childre
   };
 
   const sheet = (
-    <div className="fixed inset-0 z-[45] flex flex-col justify-end bg-foreground/30 md:hidden" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[45] flex flex-col justify-end bg-black/[.32] md:hidden" role="dialog" aria-modal="true">
       <button type="button" aria-label="Close" onClick={onClose} className="min-h-11 flex-1" />
       <div
         // §7: 16px top corners, and the one shadow the skin has — the one
-        // under a bottom sheet. Borders separate everywhere else.
+        // under a bottom sheet (SHEET_SHADOW, shared with ResponsiveDialog so
+        // the two sheet styles cannot drift apart again). Borders separate
+        // everywhere else.
         className="flex max-h-[76%] shrink-0 flex-col rounded-t-[16px] bg-white
-                   landscape:max-h-full landscape:rounded-none"
+                   landscape:max-h-[calc(100%-28px)]"
         style={{
-          boxShadow: "0 -8px 28px rgba(0,0,0,.14)",
+          boxShadow: SHEET_SHADOW,
           transform: dragY ? "translateY(" + dragY + "px)" : undefined,
           transition: dragY ? "none" : "transform 0.2s cubic-bezier(0.2,0,0,1)",
           marginBottom: "calc(" + tabBarOffset + "px + env(safe-area-inset-bottom, 0px))",
         }}
       >
+        {/* The 20px grab zone (handoff §2.2); the header below drags too. */}
         <div
           onTouchStart={dragStart}
           onTouchMove={dragMove}
           onTouchEnd={dragEnd}
-          className="relative flex shrink-0 items-center gap-2 border-b border-[#d4d4d4] px-3 py-3.5 [touch-action:none]"
+          aria-hidden
+          className="flex h-5 shrink-0 items-center justify-center [touch-action:none]"
         >
-          <span className="absolute left-1/2 top-1.5 h-1 w-9 -translate-x-1/2 rounded-full bg-[#d4d4d4]" />
+          <span className="h-1 w-9 rounded-[2px] bg-[#d4d4d4]" />
+        </div>
+        <div
+          onTouchStart={dragStart}
+          onTouchMove={dragMove}
+          onTouchEnd={dragEnd}
+          className="flex shrink-0 items-start gap-2 border-b border-[#e8e8ea] pb-3 pl-[var(--m-gutter)] pr-1.5 [touch-action:none]"
+        >
           {onBack && (
             <button
               type="button"
               onClick={onBack}
               aria-label="Back"
               title="Back"
-              className="-ml-1.5 grid h-11 w-11 shrink-0 place-items-center text-[#18181b]"
+              className="-my-2.5 -ml-3 grid h-11 w-11 shrink-0 place-items-center text-[#18181b]"
             >
               <ChevronLeft className="h-[20px] w-[20px]" />
             </button>
           )}
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-[19px] font-semibold leading-tight tracking-[-0.019em] text-[#18181b]">
+          <div className="min-w-0 flex-1 pt-0.5">
+            {/* Wraps, never truncates: the title names the object. */}
+            <h2 className="text-[17px] font-semibold leading-[1.25] tracking-[-0.019em] text-[#171717] [overflow-wrap:anywhere]">
               {title}
             </h2>
             {/* The sheet is a screen of its own, so its one explanatory line
@@ -145,7 +163,7 @@ export function MobileSheet({ open, title, sub, onClose, onBack, footer, childre
             onClick={onClose}
             aria-label="Close"
             title="Close"
-            className="-mr-1.5 grid h-11 w-11 shrink-0 place-items-center text-[#525252]"
+            className="-mt-2.5 grid h-11 w-11 shrink-0 place-items-center text-[#525252]"
           >
             <X className="h-[18px] w-[18px]" />
           </button>
@@ -171,7 +189,7 @@ export function MobileSheet({ open, title, sub, onClose, onBack, footer, childre
           // itself then gets the OTHER half of §2.5: a flex child holding
           // caller-supplied content needs `min-w-0`, or a long button label
           // inside it widens the bar instead of truncating.
-          <div className="flex shrink-0 border-t border-[#ebebeb] px-3 py-2.5">
+          <div className="flex shrink-0 border-t border-[#e8e8ea] px-[var(--m-gutter)] py-[9px]">
             <div className="flex min-w-0 flex-1 gap-2">
               {footer}
             </div>

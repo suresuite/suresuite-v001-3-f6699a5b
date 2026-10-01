@@ -10,6 +10,7 @@
  * browser, what to do with a reuse candidate.
  */
 import { supabase } from "@/integrations/supabase/client";
+import type { ConfirmRequest } from "@/components/shared/confirm/useConfirm";
 
 /** One finding of a sim-command 422 — the §8.1 gate's typed shape. */
 export interface GateResponseFinding {
@@ -155,6 +156,23 @@ export async function dispatchExperiment(a: DispatchArgs): Promise<RunDispatchRe
     );
   }
   throw error;
+}
+
+/** The reuse-or-rerun question, through `useConfirm()` (mobile redesign §2.3):
+ *  desktop shows `reusePromptText` in `window.confirm` exactly as before; a
+ *  phone shows a two-choice sheet whose buttons are the two outcomes. It cannot
+ *  be dismissed, because here "no" is not "do nothing" — it re-runs. */
+export function reuseConfirmRequest(
+  c: Pick<ReuseCandidate, "ended_at" | "rep_count_done" | "code_version">,
+): ConfirmRequest {
+  return {
+    message: reusePromptText(c),
+    title: "Reuse the stored results?",
+    actionLabel: "Reuse results",
+    cancelLabel: "Re-run",
+    tone: "neutral",
+    dismissible: false,
+  };
 }
 
 /** The reuse-or-rerun question, worded once. OK reuses; Cancel re-runs. */
