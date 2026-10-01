@@ -116,7 +116,10 @@ BEGIN
 
   -- ══ §4 · identical submissions → one run ══
   v_base := jsonb_build_object('scenario_id', v_scen, 'project_id', v_proj, 'rep_count_target', 10,
-              'policy_hash', k_ph, 'graph_hash', k_gh, 'seed', 42,
+              -- WP 11.2: the key's graph term is the SIMULATION scope, which a run reads
+              -- from its snapshot or, with none (as here), from the caller. `k_gh` stands
+              -- for both, so the read tool's door below keys on the same value.
+              'policy_hash', k_ph, 'graph_hash', k_gh, 'hash_simulation', k_gh, 'seed', 42,
               'disruption_schedule', '[]'::jsonb);
   v_res := public.create_simulation_run(v_base, false, true, v_user);
   v_run1 := (v_res ->> 'run_id')::uuid;
@@ -162,7 +165,8 @@ BEGIN
      OR public.simulation_run_key(v_row.run_spec) IS DISTINCT FROM v_row.run_key
      OR v_row.run_spec -> 'engine' ->> 'code_version' IS DISTINCT FROM 'scsim-0.2.8'
      OR v_row.run_spec ->> 'policy_hash' IS DISTINCT FROM k_ph
-     OR v_row.run_spec ->> 'graph_hash' IS DISTINCT FROM k_gh
+     OR v_row.run_spec ->> 'simulation_hash' IS DISTINCT FROM k_gh   -- RunKey v2 (WP 11.2)
+     OR v_row.hash_simulation IS DISTINCT FROM k_gh
      OR (v_row.run_spec -> 'scenario' ->> 'horizon_days')::int IS DISTINCT FROM 364
      OR v_row.protocol_overrides IS DISTINCT FROM '{}'::jsonb
      OR v_row.exploratory IS NOT TRUE THEN

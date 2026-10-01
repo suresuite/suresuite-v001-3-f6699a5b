@@ -75,7 +75,7 @@ fields:
       Which level: `product` (item masters, customers, single-level BOM, lanes),
       `process` (the flow structure the lane graphs are rebuilt from), `firm` (the
       deep-tier topology and tier 2/3), or `simulation` (the tables the engine reads
-      — WP 11.2 registers it). The level rules are WP 10.1's; see
+      — the snapshot's `inputs` domain, registered since WP 11.2). The level rules are WP 10.1's; see
       `dataset_versions.hash_product` and its siblings.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
@@ -119,6 +119,8 @@ fields:
     meaning: >-
       The level rule the hash was computed under (1 since WP 10.1). It is inside each
       level digest, so a later rule makes new hashes and never collides with these.
+      NULL for `simulation`, whose hash is the `inputs` domain digest and carries no
+      level rule.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []

@@ -70,14 +70,24 @@ export interface ModelValidationCard {
   face_validation?: string | null;
   revoked_at?: string | null;
   revoke_reason?: string | null;
+  // ── WP 11.2 · §4 D259 — the scope the engine READS ────────────────────────
+  /** The simulation scope's hash (`hash_inputs` of the snapshot it was validated
+   *  on). NULL on a card no snapshot could teach — that card keeps the composite rule. */
+  hash_simulation?: string | null;
+  simulation_version_id?: string | null;
 }
 
 export type DriftComponent = "policy" | "data" | "scenario" | "engine";
 
+/** WP 11.2 — shown beside a badge, never a reason it is stale: `network` means the
+ *  composite moved and the simulation's inputs did not — the deep tier, tier 2/3 or
+ *  the multi-tier chain changed, none of which the engine reads. */
+export type CredibilityNote = "network";
+
 export type Credibility =
   | { state: "unvalidated" }
-  | { state: "validated"; card: ModelValidationCard }
-  | { state: "stale"; card: ModelValidationCard; drift: DriftComponent[] };
+  | { state: "validated"; card: ModelValidationCard; notes?: CredibilityNote[] }
+  | { state: "stale"; card: ModelValidationCard; drift: DriftComponent[]; notes?: CredibilityNote[] };
 
 /** The current context a card is compared against (all hashes read live).
  *
@@ -93,8 +103,12 @@ export interface CredibilityContext {
   policyVersionId?: string | null;
   /** Kept for callers; the policy component is decided by `policyHash` alone. */
   policyDirty?: boolean;
-  /** current_graph_hash (useDatasetVersion.currentHash) */
+  /** current_graph_hash (useDatasetVersion.currentHash) — the composite. Since WP
+   *  11.2 it decides `data` drift only for a card with no simulation hash. */
   graphHash: string | null;
+  /** WP 11.2 · the simulation scope's live hash (useDatasetVersion.currentInputs).
+   *  Undefined = not supplied (the hook's own is used); null = not loaded yet. */
+  simulationHash?: string | null;
   /** scenario_fingerprint_hash of the scenario in context; null = unknown */
   scenarioHash: string | null;
   /** advisory 4th component: a completed run's code_version (§2.4) — only
@@ -169,6 +183,23 @@ export async function fetchScenarioFingerprintHash(
   return (data as string | null) ?? null;
 }
 
+/**
+ * WP 11.2 · §4 D259 — are a card's INPUTS the live ones? A card binds the scope the
+ * engine reads (`hash_simulation`), so a deep-tier upload the engine never reads does
+ * not make it a different model. A card that could not learn that hash (no snapshot)
+ * keeps the composite rule. `null` = the live hash it needs is not loaded yet, which
+ * is never drift.
+ */
+export function cardInputsMatch(
+  card: Pick<ModelValidationCard, "hash_simulation" | "graph_hash">,
+  ctx: { graphHash: string | null; simulationHash?: string | null },
+): boolean | null {
+  if (card.hash_simulation) {
+    return ctx.simulationHash == null ? null : card.hash_simulation === ctx.simulationHash;
+  }
+  return ctx.graphHash === null ? null : card.graph_hash === ctx.graphHash;
+}
+
 /** Badge derivation (§2.4): one stored fact, three derived states.
  *
  *  By content (WP 10.2): the cards whose `policy_hash` IS the live policy hash
@@ -191,7 +222,7 @@ export function deriveCredibility(
   const exact = validated.filter((c) => c.policy_hash === policyHash);
   const pool = exact.length > 0 ? exact : validated;
   const score = (c: ModelValidationCard) =>
-    (ctx.graphHash !== null && c.graph_hash === ctx.graphHash ? 2 : 0) +
+    (cardInputsMatch(c, ctx) === true ? 2 : 0) +
     (ctx.scenarioHash !== null && c.scenario_hash === ctx.scenarioHash ? 1 : 0);
   // Stable: `pool` is newest-first, so equal scores keep the newest card.
   const card = pool.reduce((best, c) => (score(c) > score(best) ? c : best), pool[0]);
@@ -200,9 +231,15 @@ export function deriveCredibility(
   // comparisons rather than flashing a false stale state while loading.
   const drift: DriftComponent[] = [];
   if (exact.length === 0) drift.push("policy");
-  if (ctx.graphHash !== null && ctx.graphHash !== card.graph_hash) {
+  if (cardInputsMatch(card, ctx) === false) {
     drift.push("data");
   }
+  // The composite moved and the inputs did not: shown, never a reason to re-validate.
+  const notes: CredibilityNote[] =
+    card.hash_simulation && cardInputsMatch(card, ctx) === true &&
+      ctx.graphHash !== null && ctx.graphHash !== card.graph_hash
+      ? ["network"]
+      : [];
   if (ctx.scenarioHash !== null && ctx.scenarioHash !== card.scenario_hash) {
     drift.push("scenario");
   }
@@ -213,9 +250,10 @@ export function deriveCredibility(
   ) {
     drift.push("engine");
   }
+  const withNotes = notes.length > 0 ? { notes } : {};
   return drift.length === 0
-    ? { state: "validated", card }
-    : { state: "stale", card, drift };
+    ? { state: "validated", card, ...withNotes }
+    : { state: "stale", card, drift, ...withNotes };
 }
 
 export interface UseModelValidationResult {
@@ -225,6 +263,8 @@ export interface UseModelValidationResult {
   allCards: ModelValidationCard[];
   currentPolicyHash: string | null;
   currentGraphHash: string | null;
+  /** WP 11.2 · the simulation scope's live hash — what a card's inputs are matched on. */
+  currentSimulationHash: string | null;
   loading: boolean;
   refresh: () => Promise<void>;
   /** Derive the badge for a caller-supplied context (Run & Validate). */
@@ -272,6 +312,7 @@ export function useModelValidation(
   const [allCards, setAllCards] = useState<ModelValidationCard[]>([]);
   const [currentPolicyHash, setCurrentPolicyHash] = useState<string | null>(null);
   const [currentGraphHash, setCurrentGraphHash] = useState<string | null>(null);
+  const [currentSimulationHash, setCurrentSimulationHash] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // fingerprintKey(scenario) → scenario_hash (RPC result). A state map so a
   // resolved fingerprint re-renders every consumer of resolveScenario().
@@ -285,22 +326,26 @@ export function useModelValidation(
     const sb = supabase as any;
     // Direct SELECT (the table is SELECT-only to clients) — the full-row shape
     // list_model_validations trims is needed here (fingerprint, basis jsonb).
-    const [{ data: rows, error }, { data: pHash }, { data: gHash }] = await Promise.all([
+    // WP 11.2 — ONE stored-hash read gives the composite and the simulation scope
+    // together (`project_graph_hashes`), so the two cannot come from different worlds.
+    const [{ data: rows, error }, { data: pHash }, { data: hashes }] = await Promise.all([
       sb
         .from("model_validations")
         .select("*")
         .eq("project_id", projectId)
         .order("validated_at", { ascending: false }),
       sb.rpc("current_policy_hash", { p_project_id: projectId }),
-      sb.rpc("current_graph_hash", { p_project_id: projectId }),
+      sb.rpc("project_graph_hashes", { p_project_id: projectId }),
     ]);
+    const h = (hashes ?? {}) as { graph_hash?: string | null; hash_inputs?: string | null };
     if (error) {
       console.error("model_validations load failed", error);
     } else {
       setAllCards((rows ?? []) as ModelValidationCard[]);
     }
     setCurrentPolicyHash((pHash as string | null) ?? null);
-    setCurrentGraphHash((gHash as string | null) ?? null);
+    setCurrentGraphHash(h.graph_hash ?? null);
+    setCurrentSimulationHash(h.hash_inputs ?? null);
     setLoading(false);
   }, [projectId]);
 
@@ -309,6 +354,7 @@ export function useModelValidation(
       setAllCards([]);
       setCurrentPolicyHash(null);
       setCurrentGraphHash(null);
+      setCurrentSimulationHash(null);
       setFingerprints({});
       pendingFp.current.clear();
       return;
@@ -371,8 +417,9 @@ export function useModelValidation(
       deriveCredibility(allCards, {
         ...ctx,
         policyHash: ctx.policyHash === undefined ? currentPolicyHash : ctx.policyHash,
+        simulationHash: ctx.simulationHash === undefined ? currentSimulationHash : ctx.simulationHash,
       }),
-    [allCards, currentPolicyHash],
+    [allCards, currentPolicyHash, currentSimulationHash],
   );
 
   const ensureFingerprint = useCallback(
@@ -399,10 +446,11 @@ export function useModelValidation(
       return deriveCredibility(allCards, {
         policyHash: policyHash === undefined ? currentPolicyHash : policyHash,
         graphHash: currentGraphHash,
+        simulationHash: currentSimulationHash,
         scenarioHash,
       });
     },
-    [allCards, currentPolicyHash, currentGraphHash, fingerprints, ensureFingerprint],
+    [allCards, currentPolicyHash, currentGraphHash, currentSimulationHash, fingerprints, ensureFingerprint],
   );
 
   const resolveRun = useCallback<UseModelValidationResult["resolveRun"]>(
@@ -426,11 +474,12 @@ export function useModelValidation(
     async (scenario, policyHashArg) => {
       const policyHash = policyHashArg === undefined ? currentPolicyHash : policyHashArg;
       if (!policyHash || currentGraphHash === null) return null;
+      // Matched on the INPUTS (WP 11.2), as `apply_validation_to_scenario` re-checks.
       const candidates = cards.filter(
         (c) =>
           c.verdict === "validated" &&
           c.policy_hash === policyHash &&
-          c.graph_hash === currentGraphHash,
+          cardInputsMatch(c, { graphHash: currentGraphHash, simulationHash: currentSimulationHash }) === true,
       );
       if (candidates.length === 0) return null;
       const hash = await fetchScenarioFingerprintHash(scenario.id);
@@ -454,7 +503,7 @@ export function useModelValidation(
     // `user?.id` and not `user`: without it the callback closes over the person who
     // was signed in at first render, so a session change would attribute this write
     // to the previous one (WP 6.2 slice 12's lesson, ten arrays over).
-    [cards, currentPolicyHash, currentGraphHash, user?.id],
+    [cards, currentPolicyHash, currentGraphHash, currentSimulationHash, user?.id],
   );
 
   const record = useCallback(
@@ -535,6 +584,7 @@ export function useModelValidation(
       allCards,
       currentPolicyHash,
       currentGraphHash,
+      currentSimulationHash,
       loading,
       refresh,
       resolve,
@@ -550,6 +600,7 @@ export function useModelValidation(
       allCards,
       currentPolicyHash,
       currentGraphHash,
+      currentSimulationHash,
       loading,
       refresh,
       resolve,

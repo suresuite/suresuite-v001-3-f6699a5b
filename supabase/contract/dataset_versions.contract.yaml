@@ -20,7 +20,7 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc record_model_validation"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:464"
+    evidence: "src/hooks/useModelValidation.tsx:513"
     confirmed: true
   - page: "DeveloperApi.tsx"
     via: "rpc list_dataset_versions"
@@ -35,12 +35,12 @@ surfaces:
   - page: "ProjectPolicies.tsx"
     via: "rpc record_validated_model (Save Validated Model, WP 10.3)"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:492"
+    evidence: "src/hooks/useModelValidation.tsx:541"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "rpc record_model_validation"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:464"
+    evidence: "src/hooks/useModelValidation.tsx:513"
     confirmed: true
 
 governance:
@@ -462,3 +462,18 @@ fields:
     resolution: null
     note: >-
       NULL where `hash_firm` is NULL — every snapshot older than `schema_version` 3, which did not hold the deep-tier topology. A NULL here means the snapshot cannot say, never that the project had no deep tier.
+  simulation_version_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      This snapshot's SIMULATION scope version — the `graph_level_versions` row whose
+      content is this row's `hash_inputs`, the tables the engine reads (WP 11.2, §4 D259,
+      D264). The fourth element of the tuple; what a Validated Model and RunKey v2 bind.
+      NULL where `hash_inputs` is (a snapshot frozen before WP 4.1).
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

@@ -67,10 +67,10 @@ that gap is defect D21. A dash means the column has no CSV origin.
 |---|---|---|---|---|---|
 | `id` 🔑 | — | `uuid` | — | — | The level version's identity. A snapshot names it in `product_version_id`, `process_version_id` or `firm_version_id`. |
 | `project_id` | — | `uuid` | — | — | The project whose level this is. Cascades with the project. |
-| `level` | — | `text` | — | — | Which level: `product` (item masters, customers, single-level BOM, lanes), `process` (the flow structure the lane graphs are rebuilt from), `firm` (the deep-tier topology and tier 2/3), or `simulation` (the tables the engine reads — WP 11.2 registers it). The level rules are WP 10.1's; see `dataset_versions.hash_product` and its siblings. |
+| `level` | — | `text` | — | — | Which level: `product` (item masters, customers, single-level BOM, lanes), `process` (the flow structure the lane graphs are rebuilt from), `firm` (the deep-tier topology and tier 2/3), or `simulation` (the tables the engine reads — the snapshot's `inputs` domain, registered since WP 11.2). The level rules are WP 10.1's; see `dataset_versions.hash_product` and its siblings. |
 | `level_hash` | — | `text` | — | — | The level's content hash, exactly as its snapshot stores it. Unique per project and level: a reverted edit finds the earlier row (deduplicated against ANY earlier version of the level, not the latest). |
 | `version_no` | — | `integer` | — | — | "Product graph v3" — one number per content per project per LEVEL, in order of first appearance, assigned by a BEFORE INSERT trigger under a per-(project, level) lock. History was backfilled in each project's `created_at` order, so v1 is the first content the project ever froze at that level. |
-| `level_spec` | — | `integer` | — | — | The level rule the hash was computed under (1 since WP 10.1). It is inside each level digest, so a later rule makes new hashes and never collides with these. |
+| `level_spec` | — | `integer` | — | — | The level rule the hash was computed under (1 since WP 10.1). It is inside each level digest, so a later rule makes new hashes and never collides with these. NULL for `simulation`, whose hash is the `inputs` domain digest and carries no level rule. |
 | `first_dataset_version_id` | — | `uuid` | — | — | The snapshot that first carried this content — the frozen world a person can open to see it. NULL once that snapshot is deleted; the level version stays, because its content and number remain true of the project. |
 | `author_user_id` | — | `uuid` | — | — | Who froze the first snapshot — copied from it, not the session, so the backfill names the same person the live path would have. |
 | `created_at` | — | `timestamp with time zone` | — | — | When the project's level first had this content — the first snapshot's `created_at`, so a backfilled row is dated by its history, not by the migration. |
@@ -108,7 +108,7 @@ The project whose level this is. Cascades with the project.
 
 ### `level`
 
-Which level: `product` (item masters, customers, single-level BOM, lanes), `process` (the flow structure the lane graphs are rebuilt from), `firm` (the deep-tier topology and tier 2/3), or `simulation` (the tables the engine reads — WP 11.2 registers it). The level rules are WP 10.1's; see `dataset_versions.hash_product` and its siblings.
+Which level: `product` (item masters, customers, single-level BOM, lanes), `process` (the flow structure the lane graphs are rebuilt from), `firm` (the deep-tier topology and tier 2/3), or `simulation` (the tables the engine reads — the snapshot's `inputs` domain, registered since WP 11.2). The level rules are WP 10.1's; see `dataset_versions.hash_product` and its siblings.
 
 | | |
 |---|---|
@@ -150,7 +150,7 @@ The level's content hash, exactly as its snapshot stores it. Unique per project 
 
 ### `level_spec`
 
-The level rule the hash was computed under (1 since WP 10.1). It is inside each level digest, so a later rule makes new hashes and never collides with these.
+The level rule the hash was computed under (1 since WP 10.1). It is inside each level digest, so a later rule makes new hashes and never collides with these. NULL for `simulation`, whose hash is the `inputs` domain digest and carries no level rule.
 
 | | |
 |---|---|
@@ -207,6 +207,6 @@ When the project's level first had this content — the first snapshot's `create
 
 ---
 
-*Generated from data contract `faaaf76867b1`, engine `0.2.8`,
+*Generated from data contract `6a9e481d0649`, engine `0.2.8`,
 sidecar `supabase/contract/graph_level_versions.contract.yaml`, table created by `20261001000019_graph_level_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

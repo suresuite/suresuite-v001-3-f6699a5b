@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 383,
-  "migrations_applied": 375,
+  "migrations_found": 384,
+  "migrations_applied": 376,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000019_graph_level_versions.sql",
+  "last_migration": "20261001000020_simulation_scope.sql",
   "counts": {
     "tables": 92,
     "views": 8,
     "enums": 4,
-    "functions": 392,
+    "functions": 393,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -1465,26 +1465,6 @@
           "added_by": "20261001000007_graph_levels_compute_once.sql"
         },
         {
-          "name": "analysis_kinds_input_scope_check",
-          "kind": "CHECK",
-          "columns": [
-            "input_scope"
-          ],
-          "definition": "CHECK (input_scope IN ('product','process','firm','all'))",
-          "implicit": true,
-          "added_by": "20261001000007_graph_levels_compute_once.sql"
-        },
-        {
-          "name": "analysis_kinds_fallback_scope_check",
-          "kind": "CHECK",
-          "columns": [
-            "fallback_scope"
-          ],
-          "definition": "CHECK (fallback_scope IN ('product','process','firm','all'))",
-          "implicit": true,
-          "added_by": "20261001000007_graph_levels_compute_once.sql"
-        },
-        {
           "name": "analysis_kinds_fallback_rule_check",
           "kind": "CHECK",
           "columns": [
@@ -1493,6 +1473,20 @@
           "definition": "CHECK (fallback_rule IN ('deep_tier_incomplete'))",
           "implicit": true,
           "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "analysis_kinds_input_scope_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (input_scope IN ('product', 'process', 'firm', 'simulation', 'all'))",
+          "added_by": "20261001000020_simulation_scope.sql"
+        },
+        {
+          "name": "analysis_kinds_fallback_scope_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (fallback_scope IN ('product', 'process', 'firm', 'simulation', 'all'))",
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "indexes": [],
@@ -1915,6 +1909,25 @@
             "on_delete": "SET NULL"
           },
           "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "level_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "graph_level_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "constraints": [
@@ -1961,8 +1974,8 @@
           "name": "analysis_runs_input_scope_check",
           "kind": "CHECK",
           "columns": [],
-          "definition": "CHECK (input_scope IN ('product','process','firm','all'))",
-          "added_by": "20261001000007_graph_levels_compute_once.sql"
+          "definition": "CHECK (input_scope IN ('product', 'process', 'firm', 'simulation', 'all'))",
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "indexes": [
@@ -5526,6 +5539,25 @@
             "on_delete": "SET NULL"
           },
           "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "simulation_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "graph_level_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "constraints": [
@@ -10864,6 +10896,37 @@
           "unique": false,
           "references": null,
           "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "hash_simulation",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000020_simulation_scope.sql"
+        },
+        {
+          "name": "simulation_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "graph_level_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "constraints": [
@@ -10973,13 +11036,13 @@
           "columns": [
             "project_id",
             "policy_hash",
-            "graph_hash",
+            "(COALESCE(hash_simulation, graph_hash))",
             "scenario_hash"
           ],
           "nulls_not_distinct": false,
           "predicate": "status = 'active'",
           "partial": true,
-          "added_by": "20261001000006_policy_versions_by_content.sql"
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "rls": {
@@ -11015,7 +11078,7 @@
           "columns": [
             "project_id",
             "policy_hash",
-            "graph_hash",
+            "(COALESCE(hash_simulation, graph_hash))",
             "scenario_hash"
           ],
           "name": "model_validations_active_content_uq",
@@ -21304,6 +21367,37 @@
           "unique": false,
           "references": null,
           "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "hash_simulation",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000020_simulation_scope.sql"
+        },
+        {
+          "name": "simulation_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "graph_level_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "constraints": [
@@ -24019,7 +24113,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000019_graph_level_versions.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "_graph_level_state",
@@ -24147,7 +24241,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000008_validated_model.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "_jsonb_project",
@@ -24213,6 +24307,18 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20261001000012_capacity.sql"
+    },
+    {
+      "name": "_scope_hash_key",
+      "signature": "_scope_hash_key(text)",
+      "args": [
+        "p_scope text"
+      ],
+      "returns": "text LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "_simulation_run_derive",
@@ -24292,7 +24398,7 @@
       "signature": "_validated_model_hash(text, text, text, jsonb, text)",
       "args": [
         "p_policy_hash text",
-        "p_graph_hash text",
+        "p_simulation_hash text",
         "p_scenario_hash text",
         "p_protocol jsonb",
         "p_engine text"
@@ -24301,7 +24407,7 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "comment": null,
-      "defined_by": "20261001000008_validated_model.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "_validated_model_immutable",
@@ -24311,7 +24417,7 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "comment": null,
-      "defined_by": "20261001000009_engines_runkey.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "_validated_model_number",
@@ -24348,7 +24454,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000006_policy_versions_by_content.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "active_model_validation",
@@ -25160,7 +25266,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "analysis_latest_run",
@@ -25334,7 +25440,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000006_policy_versions_by_content.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "approved_users_derive_name_parts",
@@ -26144,7 +26250,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000012_capacity.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "create_user_file",
@@ -26224,7 +26330,7 @@
       "security_definer": true,
       "volatility": "VOLATILE",
       "comment": null,
-      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "current_policy_hash",
@@ -26554,7 +26660,7 @@
       "args": [
         "p_scenario_id uuid",
         "p_policy_hash text",
-        "p_graph_hash text",
+        "p_simulation_hash text",
         "p_replications integer",
         "p_engine_id uuid DEFAULT NULL",
         "p_protocol_overrides jsonb DEFAULT '{}'::jsonb",
@@ -26564,7 +26670,7 @@
       "security_definer": false,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000009_engines_runkey.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "freshness_of",
@@ -26725,7 +26831,7 @@
       "security_definer": true,
       "volatility": "VOLATILE",
       "comment": null,
-      "defined_by": "20261001000019_graph_level_versions.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "get_individual_scenario_results",
@@ -28599,7 +28705,7 @@
       "args": [
         "p_scenario_id uuid",
         "p_policy_hash text",
-        "p_graph_hash text",
+        "p_simulation_hash text",
         "p_engine_id uuid DEFAULT NULL",
         "p_protocol_overrides jsonb DEFAULT '{}'::jsonb"
       ],
@@ -28607,7 +28713,7 @@
       "security_definer": false,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000009_engines_runkey.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "snapshot_dataset",

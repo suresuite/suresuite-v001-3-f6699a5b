@@ -53,11 +53,11 @@ Written by the `_build_dataset_snapshot` database function, never by a page — 
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DataManager.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:464` | yes |
+| `DataManager.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:513` | yes |
 | `DeveloperApi.tsx` | rpc list_dataset_versions | `src/pages/DeveloperApi.tsx:311` | yes |
 | `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:28` | yes |
-| `ProjectPolicies.tsx` | rpc record_validated_model (Save Validated Model, WP 10.3) | `src/hooks/useModelValidation.tsx:492` | yes |
-| `SimulationLab.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:464` | yes |
+| `ProjectPolicies.tsx` | rpc record_validated_model (Save Validated Model, WP 10.3) | `src/hooks/useModelValidation.tsx:541` | yes |
+| `SimulationLab.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:513` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -89,6 +89,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `product_version_id` | — | `uuid` | — | — | This snapshot's PRODUCT level version — the `graph_level_versions` row whose content is this row's `hash_product` ("Product graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen. |
 | `process_version_id` | — | `uuid` | — | — | This snapshot's PROCESS level version — the `graph_level_versions` row whose content is this row's `hash_process` ("Process graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen. |
 | `firm_version_id` | — | `uuid` | — | — | This snapshot's FIRM level version — the `graph_level_versions` row whose content is this row's `hash_firm` ("Firm graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen. |
+| `simulation_version_id` | — | `uuid` | — | — | This snapshot's SIMULATION scope version — the `graph_level_versions` row whose content is this row's `hash_inputs`, the tables the engine reads (WP 11.2, §4 D259, D264). The fourth element of the tuple; what a Validated Model and RunKey v2 bind. NULL where `hash_inputs` is (a snapshot frozen before WP 4.1). |
 
 ## Each column in full
 
@@ -387,6 +388,21 @@ This snapshot's FIRM level version — the `graph_level_versions` row whose cont
 
 > NULL where `hash_firm` is NULL — every snapshot older than `schema_version` 3, which did not hold the deep-tier topology. A NULL here means the snapshot cannot say, never that the project had no deep tier.
 
+### `simulation_version_id`
+
+This snapshot's SIMULATION scope version — the `graph_level_versions` row whose content is this row's `hash_inputs`, the tables the engine reads (WP 11.2, §4 D259, D264). The fourth element of the tuple; what a Validated Model and RunKey v2 bind. NULL where `hash_inputs` is (a snapshot frozen before WP 4.1).
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20261001000020_simulation_scope.sql` |
+| References | `public.graph_level_versions(id)` ON DELETE SET NULL |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -396,6 +412,6 @@ This snapshot's FIRM level version — the `graph_level_versions` row whose cont
 
 ---
 
-*Generated from data contract `faaaf76867b1`, engine `0.2.8`,
+*Generated from data contract `6a9e481d0649`, engine `0.2.8`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

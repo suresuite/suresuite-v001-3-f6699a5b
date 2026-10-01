@@ -1,7 +1,7 @@
 -- §4 D258 · A VERSION PER LEVEL (WP 11.1).
 --
--- §1  a snapshot registers three level rows, each numbered 1, and the snapshot
---     names them (its tuple).
+-- §1  a snapshot registers its level rows (three, and since WP 11.2 the simulation
+--     scope as a fourth), each numbered 1, and the snapshot names them (its tuple).
 -- §2  a PRICE edit + capture moves PRODUCT to v2; process and firm stay v1 — the
 --     same rows, not copies (prices are not in the process level).
 -- §3  a BOM QUANTITY edit moves product AND process; firm stays v1.
@@ -62,9 +62,10 @@ BEGIN
   -- ══ §1 · one snapshot, three level rows numbered 1 ══
   v_d1 := public.snapshot_dataset(v_proj, 'first', v_user);
   SELECT * INTO v_dv FROM public.dataset_versions WHERE id = v_d1;
+  -- Four since WP 11.2: the simulation scope is the fourth level (`rehearsal/670`).
   SELECT count(*) INTO v_n FROM public.graph_level_versions WHERE project_id = v_proj;
-  IF v_n <> 3 THEN
-    RAISE EXCEPTION 'R660 §1: a snapshot registered % level rows, expected 3 (product, process, firm)', v_n;
+  IF v_n <> 4 THEN
+    RAISE EXCEPTION 'R660 §1: a snapshot registered % level rows, expected 4 (product, process, firm, simulation)', v_n;
   END IF;
   IF EXISTS (SELECT 1 FROM public.graph_level_versions WHERE project_id = v_proj AND version_no <> 1) THEN
     RAISE EXCEPTION 'R660 §1: a first snapshot''s level is not numbered 1';

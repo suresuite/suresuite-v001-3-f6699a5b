@@ -45,8 +45,9 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The level whose hash keys a run of this kind: `product`, `process`, `firm`, or
-      `all` (the composite).
+      The level whose hash keys a run of this kind: `product`, `process`, `firm`,
+      `simulation` (the tables the engine reads — WP 11.2), or `all` (the composite).
+      Which hash names each is stated once, in `_scope_hash_key`.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []

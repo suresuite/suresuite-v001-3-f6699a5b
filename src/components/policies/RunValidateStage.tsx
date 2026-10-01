@@ -631,6 +631,8 @@ export function RunValidateStage({
     policyVersionId: selectedVersionId,
     policyDirty,
     graphHash: dataset.currentHash,
+    // WP 11.2 · the simulation scope, from the same read as the composite.
+    simulationHash: dataset.currentInputs,
     scenarioHash,
   });
   // The run panel's badge adds the advisory engine check: a completed run
@@ -639,6 +641,7 @@ export function RunValidateStage({
     policyVersionId: selectedVersionId,
     policyDirty,
     graphHash: dataset.currentHash,
+    simulationHash: dataset.currentInputs,
     scenarioHash,
     runCodeVersion: latestRun?.status === "done" ? latestRun.code_version : null,
   });

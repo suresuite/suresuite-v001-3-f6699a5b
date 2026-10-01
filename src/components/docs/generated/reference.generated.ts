@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 966;
+export const REFERENCE_COLUMN_COUNT = 972;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -115,16 +115,16 @@ export const REFERENCE_TABLES: RefTable[] = [
         "definition": "CHECK (kind ~ '^[a-z][a-z0-9_]*$')"
       },
       {
+        "name": "analysis_kinds_fallback_rule_check",
+        "definition": "CHECK (fallback_rule IN ('deep_tier_incomplete'))"
+      },
+      {
         "name": "analysis_kinds_input_scope_check",
-        "definition": "CHECK (input_scope IN ('product','process','firm','all'))"
+        "definition": "CHECK (input_scope IN ('product', 'process', 'firm', 'simulation', 'all'))"
       },
       {
         "name": "analysis_kinds_fallback_scope_check",
-        "definition": "CHECK (fallback_scope IN ('product','process','firm','all'))"
-      },
-      {
-        "name": "analysis_kinds_fallback_rule_check",
-        "definition": "CHECK (fallback_rule IN ('deep_tier_incomplete'))"
+        "definition": "CHECK (fallback_scope IN ('product', 'process', 'firm', 'simulation', 'all'))"
       }
     ],
     "ingestDataset": null,
@@ -175,7 +175,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The level whose hash keys a run of this kind: `product`, `process`, `firm`, or `all` (the composite).",
+        "meaning": "The level whose hash keys a run of this kind: `product`, `process`, `firm`, `simulation` (the tables the engine reads — WP 11.2), or `all` (the composite). Which hash names each is stated once, in `_scope_hash_key`.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -513,7 +513,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       },
       {
         "name": "analysis_runs_input_scope_check",
-        "definition": "CHECK (input_scope IN ('product','process','firm','all'))"
+        "definition": "CHECK (input_scope IN ('product', 'process', 'firm', 'simulation', 'all'))"
       }
     ],
     "ingestDataset": null,
@@ -942,7 +942,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Which LEVEL of the graph `input_hash` is the hash of — `product`, `process`, `firm`, or `all` (the composite). Resolved by `analysis_get_or_start` from `analysis_kinds`, the one place each kind's scope is stated, including `network_metrics`'s fallback to the process level when the deep tier is incomplete (WP 10.1, §4 D235). Every run before WP 10.1 is `all`.",
+        "meaning": "Which LEVEL of the graph `input_hash` is the hash of — `product`, `process`, `firm`, `simulation` (the scope the engine reads, WP 11.2), or `all` (the composite). Resolved by `analysis_get_or_start` from `analysis_kinds`, the one place each kind's scope is stated, including `network_metrics`'s fallback to the process level when the deep tier is incomplete (WP 10.1, §4 D235). Every run before WP 10.1 is `all`.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -972,6 +972,37 @@ export const REFERENCE_TABLES: RefTable[] = [
         "references": {
           "schema": "public",
           "table": "dataset_versions",
+          "columns": [
+            "id"
+          ],
+          "onDelete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "level_version_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The VERSION of the level the run keyed on (\"Firm graph v5\") — the `graph_level_versions` row whose content is `input_hash` (WP 11.2, §4 D261). Filled by `analysis_get_or_start` from the level row the claim's snapshot has just registered; NULL for scope `all`, whose version is the snapshot (`dataset_version_id`). History learnt it from its own scope and hash where the project's level ever froze that content.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "graph_level_versions",
           "columns": [
             "id"
           ],
@@ -3118,7 +3149,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DataManager.tsx",
         "via": "rpc record_model_validation",
-        "evidence": "src/hooks/useModelValidation.tsx:464"
+        "evidence": "src/hooks/useModelValidation.tsx:513"
       },
       {
         "page": "DeveloperApi.tsx",
@@ -3133,12 +3164,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "rpc record_validated_model (Save Validated Model, WP 10.3)",
-        "evidence": "src/hooks/useModelValidation.tsx:492"
+        "evidence": "src/hooks/useModelValidation.tsx:541"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc record_model_validation",
-        "evidence": "src/hooks/useModelValidation.tsx:464"
+        "evidence": "src/hooks/useModelValidation.tsx:513"
       }
     ],
     "governance": {
@@ -3569,6 +3600,37 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "This snapshot's FIRM level version — the `graph_level_versions` row whose content is this row's `hash_firm` (\"Firm graph v3\"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "graph_level_versions",
+          "columns": [
+            "id"
+          ],
+          "onDelete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "simulation_version_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "This snapshot's SIMULATION scope version — the `graph_level_versions` row whose content is this row's `hash_inputs`, the tables the engine reads (WP 11.2, §4 D259, D264). The fourth element of the tuple; what a Validated Model and RunKey v2 bind. NULL where `hash_inputs` is (a snapshot frozen before WP 4.1).",
         "primaryKey": false,
         "unique": false,
         "references": {
@@ -6457,7 +6519,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Which level: `product` (item masters, customers, single-level BOM, lanes), `process` (the flow structure the lane graphs are rebuilt from), `firm` (the deep-tier topology and tier 2/3), or `simulation` (the tables the engine reads — WP 11.2 registers it). The level rules are WP 10.1's; see `dataset_versions.hash_product` and its siblings.",
+        "meaning": "Which level: `product` (item masters, customers, single-level BOM, lanes), `process` (the flow structure the lane graphs are rebuilt from), `firm` (the deep-tier topology and tier 2/3), or `simulation` (the tables the engine reads — the snapshot's `inputs` domain, registered since WP 11.2). The level rules are WP 10.1's; see `dataset_versions.hash_product` and its siblings.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -6529,7 +6591,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The level rule the hash was computed under (1 since WP 10.1). It is inside each level digest, so a later rule makes new hashes and never collides with these.",
+        "meaning": "The level rule the hash was computed under (1 since WP 10.1). It is inside each level digest, so a later rule makes new hashes and never collides with these. NULL for `simulation`, whose hash is the `inputs` domain digest and carries no level rule.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -10367,7 +10429,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       "id",
       "project_id",
       "policy_hash",
-      "graph_hash",
+      "(COALESCE(hash_simulation, graph_hash))",
       "scenario_hash"
     ],
     "naturalKeyIntended": null,
@@ -10406,12 +10468,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/useModelValidation.tsx:290"
+        "evidence": "src/hooks/useModelValidation.tsx:333"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/useModelValidation.tsx:290"
+        "evidence": "src/hooks/useModelValidation.tsx:333"
       }
     ],
     "governance": {
@@ -10577,7 +10639,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The graph content it was validated on — the data half of its identity.",
+        "meaning": "The composite graph it was validated on — the whole snapshot, kept beside `hash_simulation`. Since WP 11.2 it is the data half of a model's identity only for a card with no simulation hash (one no snapshot could teach); every other card is matched on its simulation inputs, so a deep-tier upload the engine never reads does not make it a different model (§4 D259).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -11143,7 +11205,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The Validated Model's identity: policy content, graph, scenario world, protocol hash and engine — what makes two models that would instruct different experiments two models.",
+        "meaning": "The Validated Model's identity: policy content, the SIMULATION'S inputs (`hash_simulation`, since WP 11.2 — the composite before), scenario world, protocol hash and engine — what makes two models that would instruct different experiments two models. Recomputed once for existing cards from their own snapshot, through the immutability trigger's completion rule; a card with no snapshot keeps the hash it had.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -11277,6 +11339,61 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "hash_simulation",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The hash of what the ENGINE reads — the simulation scope, the `inputs` domain of the snapshot it was validated on (WP 11.2, §4 D259). The model is stale when THIS moves, not when the composite does; the supersede, the active-model unique key, dispatch stamping and inheritance all compare it. NULL on a card whose snapshot cannot be read (no `dataset_version_id`), which keeps the composite rule — said, not defaulted.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "simulation_version_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The simulation scope's level version (\"simulation inputs v4\") — `graph_level_versions`, from the same snapshot. NULL exactly where `hash_simulation` is.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "graph_level_versions",
+          "columns": [
+            "id"
+          ],
+          "onDelete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
         "computedBy": null
       }
     ]
@@ -24742,7 +24859,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The composite graph hash of that version. Part of the RunKey.",
+        "meaning": "The composite graph hash of that version. It was part of the RunKey until WP 11.2; RunKey v2 hashes `hash_simulation` instead, and the composite stays on the row as the frozen world the run can be re-executed against.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -24917,7 +25034,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "Everything the RunKey hashes, as data: the engine (id, slug, version, code_version as registered at dispatch), `policy_hash`, `graph_hash`, the scenario row minus its identity and presentation columns, and `protocol_overrides`. Every binding of the run resolves from here with no live read. NULL for runs dispatched before WP 10.4.",
+        "meaning": "Everything the RunKey hashes, as data: the engine (id, slug, version, code_version as registered at dispatch), `policy_hash`, the graph term, the scenario row minus its identity and presentation columns, and `protocol_overrides`. Every binding of the run resolves from here with no live read. NULL for runs dispatched before WP 10.4. `run_key_version` says which graph term: 1 is `graph_hash` (the composite), 2 — every run since WP 11.2 — is `simulation_hash`, the scope the engine reads. A spec is never rewritten, so a v1 key never equals a v2 key.",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -25123,6 +25240,61 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "hash_simulation",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The simulation scope's hash — the `inputs` domain of the run's snapshot, what the engine read (WP 11.2, §4 D260). RunKey v2 hashes it, so a deep-tier upload no run reads does not make an identical simulation a new key. Read by `create_simulation_run` off the snapshot row itself; history learnt it from its own snapshot. NULL where the run has no snapshot that carries one.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "simulation_version_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The simulation scope's level version the run computed over (\"simulation inputs v4\", `graph_level_versions`). NULL exactly where `hash_simulation` names no version.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "graph_level_versions",
+          "columns": [
+            "id"
+          ],
+          "onDelete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
         "computedBy": null
       }
     ]
