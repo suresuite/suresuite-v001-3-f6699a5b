@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "c7120de73956";
+export const CONTRACT_VERSION = "79fc096780a7";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261001000010_result_tiers.sql";
+export const LAST_MIGRATION = "20261001000011_password_reset_requests.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 87,
-  "tablesDescribed": 70,
-  "columnsDescribed": 922,
+  "tablesInSchema": 88,
+  "tablesDescribed": 71,
+  "columnsDescribed": 928,
   "tablesUndescribed": 17
 } as const;
 
@@ -436,6 +436,12 @@ export const TIERS: GlanceTier[] = [
         "table": "organizations",
         "grain": "One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold.",
         "columns": 13,
+        "owner": "platform"
+      },
+      {
+        "table": "password_reset_requests",
+        "grain": "One \"Forgot password?\" request for one account, from the moment the person asks until a super admin resets the password or dismisses the request (PLAN.md §4 D251).",
+        "columns": 6,
         "owner": "platform"
       },
       {

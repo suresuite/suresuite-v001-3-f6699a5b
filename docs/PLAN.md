@@ -435,6 +435,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D248** | **Internal SECURITY DEFINER helpers were executable through the API, because a revoke from PUBLIC is not a revoke on Supabase — and the rehearsal could not see it.** Supabase grants EXECUTE on every new `public` function to `anon` and `authenticated` EXPLICITLY (default privileges), so `REVOKE … FROM PUBLIC` — the shape 63 statements in this repository take — leaves the function callable through PostgREST. Measured under a rehearsal that mirrors those defaults: fifteen `_`-prefixed SECURITY DEFINER functions were executable by `anon`. Six predate Phase 10 — `_build_policy_snapshot` and `_build_dataset_snapshot(_v2)` hand any project's policies or whole dataset to a caller who names its uuid, `_build_scenario_fingerprint` its scenario, and the three super-admin helpers answer and take locks for anyone. Eight were this branch's own, the worst `_insert_validated_model`, which writes a Validated Model past `record_validated_model`'s authorization and adoption rule (WP 10.3). The rehearsal answered `has_function_privilege('anon', …)` for a bare PostgreSQL, where the revoke from PUBLIC is the whole story, so WP 10.1 and 10.3's rehearsals passed over an exposure production would have had; `dataPlaneAudit.test.ts`'s REVOKE check accepted `FROM PUBLIC` alone. Every caller of every one of the fifteen is itself SECURITY DEFINER (measured), so the API roles lose nothing they use | `20260930000002_admin_delete_organization.sql:129-130`; `20261001000007_graph_levels_compute_once.sql:509-513`; `20261001000008_validated_model.sql:490`; `scripts/data-contract/rehearsal-schema.mjs:39-56` | **CLOSED ✅ WP 10.4.** The rehearsal prelude mirrors Supabase's default function privileges (and replays function grants made inside DO blocks, which it had skipped); Phase 10's helpers revoke from `PUBLIC, anon, authenticated` where they are defined; `20261001000009` revokes the six pre-existing ones. `rehearsal/590` §7 is the CLASS gate — no `_`-prefixed SECURITY DEFINER function in `public` may be executable by `anon` or `authenticated` — red with any one revoke removed; `dataPlaneAudit.test.ts` now requires the API roles in the revoke. `rehearsal/310` §8's "NULL proacl" assertion encoded bare PostgreSQL and was restated as "no grantee beyond PUBLIC, the owner and the API roles" |
 | **D249** | **A Validated Model's own evidence run reads as exploratory.** The evidence run is dispatched BEFORE the model exists — Run & Validate runs the replications, then saves the model — so its row names no model, and WP 10.4's class rule (`exploratory` is never false for a run with no model) marks it exploratory, by backfill and by derivation. The run that VALIDATED a model is therefore the one run a filter on `exploratory = false` drops: a comparison scoped to the model would not offer its own baseline, and WP 10.8's training view as specified would exclude every evidence run. The row is not wrong about its dispatch — no model was in force — so the fix is not to rewrite history but to let the model claim the run it names | `20261001000009_engines_runkey.sql:218-223`; `20261001000009_engines_runkey.sql:236`; `20261001000008_validated_model.sql:446-465` | WP 10.8 *(the comparison half is CLOSED by the Lab-flow package: `CompareScenariosPanel` attributes a run to the model whose `evidence_run_id` it is and never treats it as exploratory. The training half is the surrogate view's: it must take a model's runs as `model_validation_id = m.id` OR `id = m.evidence_run_id`)* |
 | **D250** | **The report's KPI comparison printed the run's metadata as a KPI row.** `reportTemplates` built its comparison from EVERY key of `aggregate_kpis`, and `_meta` — the run's engine notes and capacity binding, an object — rendered as a row reading "[object Object]"; the AI report tool listed `_meta` among a run's KPIs too. Found when WP 10.6 added a second underscore key (`_range`), which would have printed the same way | `supabase/functions/_shared/reportTemplates.ts:410-415`; `supabase/functions/project-ai-chat/reportTools.ts:246` | **CLOSED ✅ WP 10.6.** Both readers skip underscore keys, as the run-results export now does (which also gains `min`/`max` columns from `_range`) |
+| **D251** | **A person who forgot their password had no way to say so, and the reset the database already had was reachable from nowhere.** "Forgot password?" on the sign-in page was a link to `#` with a TODO. Sign-in is against `approved_users`, not Supabase Auth, so Supabase's reset e-mail cannot reach these accounts, and nothing in this repository sends e-mail. `admin_reset_user_password` had existed since July — bcrypt, `force_password_change`, an admin audit row — and no page called it, so the only reset was a super admin running SQL. It also wrote its own "90 days", the second statement of the expiry D206 had reduced to `password_max_age()`. Asked for by the owner: "if user forget there password, what should we do now for the most convenient and easy and easy to maintain", then "in the early stage, i think it is best to use the superadmin". | `src/pages/Auth.tsx` (the `href="#"` link); `supabase/migrations/20260711000003_admin_management_rpcs.sql` (`admin_reset_user_password`, no caller in `src/`) | **CLOSED ✅ (`20261001000011`), admin-assisted by the owner's choice — no e-mail provider, no reset tokens, nothing new to keep running.** "Forgot password?" opens a form for the sign-in email (`src/pages/AuthForgotPassword.tsx`); `request_password_reset` records ONE open `password_reset_requests` row for an ACTIVE account (partial unique index) and answers identically for a known, unknown, suspended or repeated email, so the form cannot enumerate accounts; nothing is stored for an unknown email; the first request writes `auth.password_reset_requested` on the access plane with the account as TARGET and no actor (`auth.sign_in_failed`'s reasoning). The table has RLS, no policy and no grant. /admin/users lists open requests (`admin_list_password_reset_requests`) with Reset and Dismiss (`admin_dismiss_password_reset_request`), and every row has "Reset password…". The dialog generates the temporary password in the browser (`src/lib/auth/temporaryPassword.ts`: 12 symbols, look-alikes removed, rejection-sampled), shows it to copy, and asks the super admin to confirm with the person through contact details already on file first. `admin_reset_user_password` keeps its signature and grants, closes the open request as `resolved` in the same transaction and names it in the audit row, and takes its expiry from `password_max_age()`; `force_password_change` still sends the person to /profile (D206). `rehearsal/610` §1–§9; mutation-tested (the reset no longer closing the request turns §6 red). NOT closed, stated: requests go to super admins only — the account's organization is read at list time, so routing to organization admins later changes who may LIST, not what a request records; the super admin is told only by looking at /admin/users (no notification); the temporary password travels outside the app, by whatever channel the super admin uses; the super admin's identity is D28's client assertion |
 
 ### 4.1 Code map — the data layer
 
@@ -21122,6 +21123,52 @@ the RPC rehearsed, but the canned harness holds no storage; item series are not 
 gap check found one more and closed it in the package: a deleted run's object would have outlived
 its row (a project delete, a scenario cascade), with nothing left to expire it by — an AFTER DELETE
 trigger on `simulation_runs` now removes it, whatever path deletes the run.
+
+### Account · "Forgot password?" asks a super admin · 2026-10-01 · `20261001000011`
+
+**Asked for.** "If user forget there password, what should we do now for the most convenient
+and easy and easy to maintain", and then, of the routing: "in the early stage, i think it is
+best to use the superadmin", and "how the superadmin could know or set the temporary password".
+
+**Promised versus found.** D206 made a forced password change real, and that is what made
+this cheap: a reset only has to set a temporary password and the flag, and the lock to /profile
+already holds. `admin_reset_user_password` had done exactly that since `20260711000003` and
+nothing called it (D251). The sign-in page's link went to `#`.
+
+**Decisions.** (1) Admin-assisted rather than e-mailed: this application does not use Supabase
+Auth, so a reset e-mail needs a provider, a secret, a token table and an edge function that R17
+would require deployed — four things to keep running for a platform whose accounts a super admin
+creates anyway. (2) A request is a NOTE, never an action: anyone can type anyone's email, so it
+changes nothing, answers the same for every input, and stores nothing for an address that is not
+an active account. (3) One open request per account, by index, so repeating the form adds no rows
+and a stranger cannot fill the table. (4) The temporary password is generated in the super
+admin's browser — an invented one tends to be the same easy word for everybody — and reaches the
+database only to be hashed. (5) The reset verb is EXTENDED, not duplicated: the same signature
+closes the request, so a reset from the user table also clears a pending request. (6) Super
+admins only, for now; the organization is read at list time so routing can widen without a
+change to the table.
+
+**Gap check.** (1) The super admin learns of a request only by opening /admin/users — there is no
+notification, which needs the e-mail path this change chose not to build. (2) The temporary
+password still expires on the `password_max_age()` clock, not sooner; it opens nothing but
+/profile, so an unused one is a standing credential to a single page until it is used or reset
+again. (3) Requests are kept after they close; nothing prunes them. (4) Identity is D28's client
+assertion on every admin verb, unchanged. No later package changes.
+
+**Measured locally.** `contract:rehearse`: the migration applies and every assertion file
+passes, `610` new; the mutation above red at §6. `npm test`, `typecheck` (15 held) and
+`audit:ui` green; eslint at main's count. Nothing reaches production until merge.
+
+**Merging `main`.** Phase 10 merged first holding D233–D250, migrations `20261001000006`–`10`
+and `rehearsal/560`–`600`, all of which this branch had used. This branch's are renumbered:
+§4 D251, `20261001000011_password_reset_requests.sql` (so it sorts after every migration main
+deploys), `rehearsal/610`. Generated files are taken from main and regenerated from the merged
+sources.
+
+**The bundle audit.** `bundle-audit.yml` is red on `main` itself (initial graph 166.3 kB against a
+163.4 kB ceiling, three merges running). This branch first added 0.9 kB to it, because /auth is in
+the initial graph; the panel is now `lazy()`-loaded, so it adds 0.1 kB. The ceiling is not
+re-recorded here — that is admitting a regression this branch did not cause.
 
 ## 17. Sequencing
 

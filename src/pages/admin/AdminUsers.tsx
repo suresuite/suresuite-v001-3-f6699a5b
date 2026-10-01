@@ -16,6 +16,12 @@
 // (Access / Suspend-Enable) instead of ghost buttons, and the primary
 // "Add user" lives in the PageHeader actions.
 //
+// §4 D251 — "Forgot password?" on the sign-in page records a request; open requests are
+// listed above the table, and "Reset password…" (from a request or from a row) sets a
+// temporary password generated in this browser, which the person must change at their
+// next sign-in. The request changes nothing by itself: anyone can type an email, so the
+// dialog asks the super admin to confirm with the person first.
+//
 // §4 D161/D213 — "Delete permanently…" is a DIFFERENT verb from Suspend, as on
 // /admin/organizations. `admin_delete_user` removes the account and its memberships;
 // what the person recorded (uploaded files, runs, lanes) is KEPT with its actor
@@ -36,9 +42,11 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { DIALOG_AS_SHEET, HDR_PRIMARY_BUTTON, HDR_SEARCH_INPUT } from '@/components/shared';
-import { Ban, Building2, Loader2, Plus, SlidersHorizontal, Star, Trash2, Undo2, X } from 'lucide-react';
+import { Ban, Building2, KeyRound, Loader2, Plus, SlidersHorizontal, Star, Trash2, Undo2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { planRefusal } from '@/lib/auth/organizationPlan';
+import { dismissResetRequest, listResetRequests, resetUserPassword, type ResetRequest } from '@/lib/auth/passwordReset';
+import { generateTemporaryPassword } from '@/lib/auth/temporaryPassword';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface OrgOption { id: string; name: string; }
@@ -77,6 +85,8 @@ const accessibleOrgNames = (r: Row) =>
 const ORG_ROLES = ['member', 'admin', 'owner'];
 
 const db = supabase as any;
+/** Who a reset is for — a table row or a request. */
+interface ResetTarget { user_id: string; email: string | null; name: string | null }
 const ROLES = ['user', 'modeler', 'admin', 'super_admin'];
 
 export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
@@ -90,16 +100,20 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
   const [q, setQ] = useState('');
   const [membershipsOf, setMembershipsOf] = useState<Row | null>(null);
   const [deleteOf, setDeleteOf] = useState<Row | null>(null);
+  const [resetOf, setResetOf] = useState<ResetTarget | null>(null);
+  const [requests, setRequests] = useState<ResetRequest[]>([]);
 
   const actorArgs = () => ({ p_actor_id: actor?.id, p_actor_email: actor?.email });
 
   const load = async () => {
     setLoading(true);
     setLoadError(null);
-    const [usage, orgRes] = await Promise.all([
+    const [usage, orgRes, resetRes] = await Promise.all([
       db.rpc('admin_list_users', actorArgs()),
       db.rpc('admin_list_organizations', actorArgs()),
+      listResetRequests(actorArgs()),
     ]);
+    setRequests(resetRes.data);
     // A refused read is not an empty platform: say which it is (D205, D203).
     if (usage.error) {
       setLoadError(usage.error.message === 'forbidden'
@@ -147,6 +161,13 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
     setRows((prev) => prev.map((r) => (r.user_id === row.user_id ? { ...r, role: next } : r)));
   };
 
+  const dismissRequest = async (r: ResetRequest) => {
+    const { error } = await dismissResetRequest(actorArgs(), r.id);
+    if (error) return toast.error(error);
+    toast.success(`Request from ${r.email} dismissed`);
+    setRequests((prev) => prev.filter((x) => x.id !== r.id));
+  };
+
   const toggleActive = async (row: Row) => {
     const next = !(row.is_active ?? true);
     const { error } = await db.rpc('admin_set_user_active', { ...actorArgs(), p_target_user_id: row.user_id, p_is_active: next });
@@ -179,6 +200,9 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
       }
       actions={<AddUserDialog orgs={orgs} actorArgs={actorArgs} onCreated={load} />}
     >
+      {requests.length > 0 && (
+        <ResetRequestsPanel requests={requests} onReset={(r) => setResetOf(r)} onDismiss={dismissRequest} />
+      )}
       {isMobile ? (
         <AdminMobileList
           label="Users"
@@ -228,6 +252,13 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                         label: active ? 'Suspend' : 'Enable',
                         tone: (active ? 'danger' : 'default') as 'danger' | 'default',
                         onClick: () => toggleActive(r),
+                      }]),
+                  ...(r.user_id === actor?.id
+                    ? []
+                    : [{
+                        label: 'Reset password…',
+                        sub: 'temporary password, changed at next sign-in',
+                        onClick: () => setResetOf(r),
                       }]),
                   ...ROLES.filter((role) => role !== r.role).map((role) => ({
                     label: `Change role to ${role}`,
@@ -323,6 +354,11 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                           <Building2 className="h-[15px] w-[15px]" />
                         </button>
                         {r.user_id !== actor?.id && (
+                          <button title="Reset password…" className="hover:text-foreground" onClick={() => setResetOf(r)}>
+                            <KeyRound className="h-[15px] w-[15px]" />
+                          </button>
+                        )}
+                        {r.user_id !== actor?.id && (
                           <button title={active ? 'Suspend' : 'Enable'} className={active ? 'hover:text-[#bf2330]' : 'hover:text-foreground'} onClick={() => toggleActive(r)}>
                             {active ? <Ban className="h-[15px] w-[15px]" /> : <Undo2 className="h-[15px] w-[15px]" />}
                           </button>
@@ -349,6 +385,10 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
       {deleteOf && (
         <DeleteUserDialog row={deleteOf} actorArgs={actorArgs}
           onClose={() => setDeleteOf(null)} onDone={load} />
+      )}
+      {resetOf && (
+        <ResetPasswordDialog target={resetOf} actorArgs={actorArgs}
+          onClose={() => setResetOf(null)} onDone={load} />
       )}
     </AdminLayout>
   );
@@ -616,6 +656,133 @@ function AddUserDialog({ orgs, actorArgs, onCreated }: {
         <DialogFooter>
           <Button variant="outline" className="rounded-sm" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
           <Button className="rounded-sm" onClick={create} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create user</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * §4 D251 — open "Forgot password?" requests. A request only says that somebody typed this
+ * email; it is the super admin who decides, after confirming with the person.
+ */
+function ResetRequestsPanel({ requests, onReset, onDismiss }: {
+  requests: ResetRequest[]; onReset: (r: ResetRequest) => void; onDismiss: (r: ResetRequest) => void;
+}) {
+  return (
+    <section className={cn(SURFACE, 'mb-4 p-4')} aria-label="Password reset requests">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="m-0 text-[14px] font-semibold">
+          Password reset requests <span className="font-mono text-[12px] text-muted-foreground">· {requests.length}</span>
+        </h2>
+        <p className="m-0 text-[12px] text-muted-foreground">
+          Anyone can type an email. Confirm with the person before you reset.
+        </p>
+      </div>
+      <ul className="mt-3 divide-y divide-[--hair-divider]">
+        {requests.map((r) => (
+          <li key={r.id} className="flex flex-col gap-2 py-2.5 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0 text-[13px]">
+              <div className="truncate font-medium">{r.name || r.email}</div>
+              <div className="truncate text-[12px] text-muted-foreground">
+                {r.email}{r.organization ? ` · ${r.organization}` : ''} · asked {new Date(r.requested_at).toLocaleString()}
+                {!r.is_active && ' · account suspended'}
+              </div>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <Button size="sm" variant="outline" className="min-h-11 rounded-sm md:min-h-0" onClick={() => onDismiss(r)}>Dismiss</Button>
+              <Button size="sm" className="min-h-11 gap-1.5 rounded-sm md:min-h-0" onClick={() => onReset(r)}>
+                <KeyRound className="h-3.5 w-3.5" />Reset password…
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * §4 D251 — set a temporary password. It is generated here, shown to the super admin to
+ * pass on, and stored only as a hash; `admin_reset_user_password` forces a change at the
+ * next sign-in and closes the person's open request.
+ */
+function ResetPasswordDialog({ target, actorArgs, onClose, onDone }: {
+  target: ResetTarget; actorArgs: () => { p_actor_id?: string; p_actor_email?: string };
+  onClose: () => void; onDone: () => void;
+}) {
+  const [password, setPassword] = useState(() => generateTemporaryPassword());
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+  const who = target.name || target.email || 'this user';
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(password);
+      toast.success('Temporary password copied');
+    } catch {
+      toast.error('Could not copy. Select the password and copy it by hand.');
+    }
+  };
+
+  const reset = async () => {
+    setSaving(true);
+    const { error } = await resetUserPassword(actorArgs(), target.user_id, password);
+    setSaving(false);
+    if (error) return toast.error(error);
+    setDone(true);
+    onDone();
+  };
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && !saving && onClose()}>
+      <DialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <DialogHeader>
+          <DialogTitle>{done ? 'Password reset' : `Reset password for “${who}”`}</DialogTitle>
+          <DialogDescription>
+            {done
+              ? `Send this temporary password to ${target.email ?? who} now. It will not be shown again.`
+              : 'Their current password stops working at once. They sign in with the temporary password below and must choose a new one before they can continue.'}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 text-[13px]">
+          <div>
+            <Label className="text-xs">Temporary password</Label>
+            <div className="mt-1 flex items-center gap-2">
+              <Input readOnly value={password} onFocus={(e) => e.currentTarget.select()}
+                className="rounded-sm font-mono tracking-[0.04em]" autoComplete="off" spellCheck={false} />
+              <Button type="button" variant="outline" size="sm" className="min-h-11 shrink-0 rounded-sm md:min-h-0" onClick={copy}>Copy</Button>
+            </div>
+            {!done && (
+              <button type="button" className="mt-1.5 text-[12px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                onClick={() => setPassword(generateTemporaryPassword())} disabled={saving}>
+                Generate another
+              </button>
+            )}
+          </div>
+          {done ? (
+            <p className="text-muted-foreground">
+              Send it through a channel you already know belongs to them — their registered email, phone or company chat.
+              If it gets lost, reset again.
+            </p>
+          ) : (
+            <p className="rounded-sm border border-[--hair-border] bg-[#fafafa] px-3 py-2 text-muted-foreground">
+              Before you reset: confirm the request came from {who}, using contact details you already have for them.
+              Never send the password to whoever asked without that check.
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          {done ? (
+            <Button className="rounded-sm" onClick={onClose}>Done</Button>
+          ) : (
+            <>
+              <Button variant="outline" className="rounded-sm" onClick={onClose} disabled={saving}>Cancel</Button>
+              <Button className="rounded-sm" onClick={reset} disabled={saving}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Reset password
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

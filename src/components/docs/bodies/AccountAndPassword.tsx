@@ -28,6 +28,23 @@ export default function AccountAndPassword() {
         </Key>
       </Section>
 
+      <Section id="forgot-password" title="If you forget your password">
+        <P>
+          Choose <em>Forgot password?</em> on the sign-in page and enter the email you sign in with.
+          That sends a request to the platform's administrator. It does not change your account, and
+          the page shows the same message whether or not the email has an account.
+        </P>
+        <P>
+          The administrator confirms with you through contact details already on file, then sends you
+          a temporary password. Sign in with it and you are taken to{" "}
+          <AppLink to="/profile">/profile</AppLink> to choose a new password before you can open
+          anything else.
+        </P>
+        <Key>
+          Nobody needs your current password to reset it. If someone asks you for it, do not give it.
+        </Key>
+      </Section>
+
       <Section id="columns" title="What your account record holds">
         <SuppliedAndComputed table={users} />
       </Section>

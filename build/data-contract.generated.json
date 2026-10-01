@@ -5,21 +5,21 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 374,
-      "migrations_applied": 366,
-      "last_migration": "20261001000010_result_tiers.sql"
+      "migrations_found": 375,
+      "migrations_applied": 367,
+      "last_migration": "20261001000011_password_reset_requests.sql"
     },
-    "sidecars": 70,
+    "sidecars": 71,
     "registry": {
       "engine_version": "0.2.8",
       "policies": 23
     }
   },
   "counts": {
-    "tables_in_schema": 87,
-    "tables_covered": 70,
-    "columns_covered": 922,
-    "check_constraints": 80,
+    "tables_in_schema": 88,
+    "tables_covered": 71,
+    "columns_covered": 928,
+    "check_constraints": 82,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
@@ -22259,6 +22259,302 @@
       "note": null,
       "analysis_kinds": null
     },
+    "password_reset_requests": {
+      "table": "password_reset_requests",
+      "schema_name": "public",
+      "tier": "G",
+      "tier_name": "governance — identity, capability, delegation, audit",
+      "grain": "One \"Forgot password?\" request for one account, from the moment the person asks until a super admin resets the password or dismisses the request (PLAN.md §4 D251).",
+      "owner": "platform",
+      "created_by": "20261001000011_password_reset_requests.sql",
+      "sidecar": "supabase/contract/password_reset_requests.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "password_reset_requests_pkey"
+        },
+        {
+          "source": "partial UNIQUE index",
+          "columns": [
+            "user_id"
+          ],
+          "name": "password_reset_requests_one_open",
+          "predicate": "status = 'open'"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": "super_admin",
+        "write": "super_admin",
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "RLS on, NO policy and no table grant: which accounts asked for a reset is not one PostgREST query away. The one writer for a NEW row is `request_password_reset(p_email)`, callable by anyone signed out — it records a row only for an ACTIVE account, at most one open per account, and answers identically in every case so it cannot be used to discover which emails exist; it writes an access-plane `auth.password_reset_requested` audit row naming the account as TARGET and no actor, because whoever typed the email is not proven to be its holder. A request changes nothing about the account. Super admins list open requests through `admin_list_password_reset_requests`, close one as `dismissed` through `admin_dismiss_password_reset_request`, and `admin_reset_user_password` closes the account's open request as `resolved`; both write an `admin_audit_logs` row. The super admin's identity is client-asserted (§4 D28)."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "password_reset_requests_closed_shape",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((status = 'open') = (closed_at IS NULL))",
+          "added_by": "20261001000011_password_reset_requests.sql"
+        },
+        {
+          "name": "password_reset_requests_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20261001000011_password_reset_requests.sql"
+        },
+        {
+          "name": "password_reset_requests_status",
+          "kind": "CHECK",
+          "columns": [
+            "status"
+          ],
+          "definition": "CHECK (status IN ('open', 'resolved', 'dismissed'))",
+          "implicit": true,
+          "added_by": "20261001000011_password_reset_requests.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "password_reset_requests_one_open",
+          "unique": true,
+          "columns": [
+            "user_id"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "status = 'open'",
+          "partial": true,
+          "added_by": "20261001000011_password_reset_requests.sql"
+        }
+      ],
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000011_password_reset_requests.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Surrogate id, `gen_random_uuid()`.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261001000011_password_reset_requests.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The account the request is for — the active `approved_users` row whose email was typed. Deleting the account deletes its requests (`ON DELETE CASCADE`).",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000011_password_reset_requests.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "`open` until a super admin acts; then `resolved` (the password was reset) or `dismissed` (the request was not genuine, or was handled another way). CHECK-constrained, and `closed_at` is set exactly when the status is not `open`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": "open | resolved | dismissed"
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "requested_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000011_password_reset_requests.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the person asked. Server-stamped.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000011_password_reset_requests.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When a super admin resolved or dismissed the request; NULL while it is open.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "closed_by",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000011_password_reset_requests.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The super admin who closed it; NULL while open, or once that account is deleted (`ON DELETE SET NULL`).",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
+      "analysis_kinds": null
+    },
     "policy_defaults": {
       "table": "policy_defaults",
       "schema_name": "public",
@@ -40526,5 +40822,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "c7120de73956"
+  "contract_version": "79fc096780a7"
 }
