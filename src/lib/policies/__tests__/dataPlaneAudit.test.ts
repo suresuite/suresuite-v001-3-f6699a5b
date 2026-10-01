@@ -399,7 +399,7 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
       "capabilities_for_user",
       "create_disruption_scenario_v2",
       // `create_project` (six overloads) and `update_project` (five) stood here
-      // until §4 D254: the deep-tier switch was added to one copy and the data
+      // until §4 D255: the deep-tier switch was added to one copy and the data
       // type to another, the page reached the copy without the switch, and the
       // setting never saved. One of each now takes both.
       "get_project_dataset_status",

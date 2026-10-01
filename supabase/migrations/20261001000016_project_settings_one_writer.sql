@@ -1,4 +1,4 @@
--- A project's settings have ONE writer per verb (PLAN.md §4 D254).
+-- A project's settings have ONE writer per verb (PLAN.md §4 D255).
 --
 -- "Enable Deep Tier Network Analysis" on /project-manager did not save. The switch was
 -- read into the form, and the Save button reported success, and the next load showed it

@@ -4,7 +4,7 @@
   "migrations_found": 379,
   "migrations_applied": 371,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000015_project_settings_one_writer.sql",
+  "last_migration": "20261001000016_project_settings_one_writer.sql",
   "counts": {
     "tables": 91,
     "views": 8,
@@ -25778,7 +25778,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000015_project_settings_one_writer.sql"
+      "defined_by": "20261001000016_project_settings_one_writer.sql"
     },
     {
       "name": "create_simulation_result",
@@ -28501,7 +28501,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000015_project_settings_one_writer.sql"
+      "defined_by": "20261001000016_project_settings_one_writer.sql"
     },
     {
       "name": "update_risk_alert_impact",

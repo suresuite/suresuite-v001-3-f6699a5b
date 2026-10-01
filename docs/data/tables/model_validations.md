@@ -616,6 +616,6 @@ Why, in their words.
 
 ---
 
-*Generated from data contract `0350f5c7b8ab`, engine `0.2.8`,
+*Generated from data contract `c9cd3ddb514e`, engine `0.2.8`,
 sidecar `supabase/contract/model_validations.contract.yaml`, table created by `20260710000001_model_validations.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

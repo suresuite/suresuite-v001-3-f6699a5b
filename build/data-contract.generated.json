@@ -7,7 +7,7 @@
       "generator": "scripts/data-contract/introspect.mjs",
       "migrations_found": 379,
       "migrations_applied": 371,
-      "last_migration": "20261001000015_project_settings_one_writer.sql"
+      "last_migration": "20261001000016_project_settings_one_writer.sql"
     },
     "sidecars": 74,
     "registry": {
@@ -42008,5 +42008,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "0350f5c7b8ab"
+  "contract_version": "c9cd3ddb514e"
 }
