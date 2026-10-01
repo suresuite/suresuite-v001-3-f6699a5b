@@ -28,7 +28,7 @@
 | Row-level security | enabled |
 | Policies on the table | 1 — **1 with no predicate** |
 
-Written by the `_build_dataset_snapshot` database function, never by a page — that is the INTENT, and `write: null` records it. **And since WP 11.1 the database enforces it** (§4 D264): from WP 2.4 to WP 11.1 the live policy `dataset_versions_insert_all` was `FOR INSERT ... WITH CHECK (true)` with an INSERT grant to `anon` and `authenticated`, pinned by `governanceEnforcement.test.ts` rather than changed. No path inserted a row directly, and from WP 11.1 a planted row would also have minted level versions, so the policy is dropped and the grant revoked; `snapshot_dataset` (SECURITY DEFINER) and the service role are the writers. Reads stay open to every API role (`dataset_versions_read_all`, part of D28's pinned list).
+Written by the `_build_dataset_snapshot` database function, never by a page — that is the INTENT, and `write: null` records it. **And since WP 11.1 the database enforces it** (§4 D265): from WP 2.4 to WP 11.1 the live policy `dataset_versions_insert_all` was `FOR INSERT ... WITH CHECK (true)` with an INSERT grant to `anon` and `authenticated`, pinned by `governanceEnforcement.test.ts` rather than changed. No path inserted a row directly, and from WP 11.1 a planted row would also have minted level versions, so the policy is dropped and the grant revoked; `snapshot_dataset` (SECURITY DEFINER) and the service role are the writers. Reads stay open to every API role (`dataset_versions_read_all`, part of D28's pinned list).
 
 > **What the database actually permits is wider than the row above.**
 > 1 policy here grants access with
@@ -55,7 +55,7 @@ Written by the `_build_dataset_snapshot` database function, never by a page — 
 |---|---|---|---|
 | `DataManager.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:464` | yes |
 | `DeveloperApi.tsx` | rpc list_dataset_versions | `src/pages/DeveloperApi.tsx:311` | yes |
-| `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:24` | yes |
+| `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:28` | yes |
 | `ProjectPolicies.tsx` | rpc record_validated_model (Save Validated Model, WP 10.3) | `src/hooks/useModelValidation.tsx:492` | yes |
 | `SimulationLab.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:464` | yes |
 
@@ -86,9 +86,9 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `hash_process` | — | `text` | — | — | SHA-256 over the PROCESS level (WP 10.1): `bom_multi_level` and `multi_tier_supply_chain` whole, plus the endpoints and quantities — not the prices — of the single-level BOM and the lanes, and the product ids. Exactly what `rebuild_supply_chain_lanes` builds the two lane graphs from, so the derived lane tables never enter an identity. NULL on a pre-v2 snapshot, which has no `network` domain. |
 | `hash_firm` | — | `text` | — | — | SHA-256 over the FIRM level (WP 10.1): the deep-tier topology (`network_nodes(uid, revenue)`, `network_edges(src_uid, dst_uid, relative_revenue)`) and the tier-2 / tier-3 supplier tables. NULL on a snapshot older than `schema_version` 3, which did not hash the deep tier — a level computed from it would hash an absence, which is not a fact. |
 | `version_no` | — | `integer` | — | — | "Graph v7" — one number per CONTENT (`graph_hash`) per project, in order of first appearance, assigned by a BEFORE INSERT trigger (WP 10.1, §4 D234). Since WP 10.1 `snapshot_dataset` returns the OLDEST version of a content, so a reverted edit is the earlier number again; rows that predate that and share a hash share the number. |
-| `product_version_id` | — | `uuid` | — | — | This snapshot's PRODUCT level version — the `graph_level_versions` row whose content is this row's `hash_product` ("Product graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen. |
-| `process_version_id` | — | `uuid` | — | — | This snapshot's PROCESS level version — the `graph_level_versions` row whose content is this row's `hash_process` ("Process graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen. |
-| `firm_version_id` | — | `uuid` | — | — | This snapshot's FIRM level version — the `graph_level_versions` row whose content is this row's `hash_firm` ("Firm graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen. |
+| `product_version_id` | — | `uuid` | — | — | This snapshot's PRODUCT level version — the `graph_level_versions` row whose content is this row's `hash_product` ("Product graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen. |
+| `process_version_id` | — | `uuid` | — | — | This snapshot's PROCESS level version — the `graph_level_versions` row whose content is this row's `hash_process` ("Process graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen. |
+| `firm_version_id` | — | `uuid` | — | — | This snapshot's FIRM level version — the `graph_level_versions` row whose content is this row's `hash_firm` ("Firm graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen. |
 
 ## Each column in full
 
@@ -338,14 +338,14 @@ SHA-256 over the FIRM level (WP 10.1): the deep-tier topology (`network_nodes(ui
 
 ### `product_version_id`
 
-This snapshot's PRODUCT level version — the `graph_level_versions` row whose content is this row's `hash_product` ("Product graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen.
+This snapshot's PRODUCT level version — the `graph_level_versions` row whose content is this row's `hash_product` ("Product graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen.
 
 | | |
 |---|---|
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000018_graph_level_versions.sql` |
+| Added by | `20261001000019_graph_level_versions.sql` |
 | References | `public.graph_level_versions(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -355,14 +355,14 @@ This snapshot's PRODUCT level version — the `graph_level_versions` row whose c
 
 ### `process_version_id`
 
-This snapshot's PROCESS level version — the `graph_level_versions` row whose content is this row's `hash_process` ("Process graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen.
+This snapshot's PROCESS level version — the `graph_level_versions` row whose content is this row's `hash_process` ("Process graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen.
 
 | | |
 |---|---|
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000018_graph_level_versions.sql` |
+| Added by | `20261001000019_graph_level_versions.sql` |
 | References | `public.graph_level_versions(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -372,14 +372,14 @@ This snapshot's PROCESS level version — the `graph_level_versions` row whose c
 
 ### `firm_version_id`
 
-This snapshot's FIRM level version — the `graph_level_versions` row whose content is this row's `hash_firm` ("Firm graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen.
+This snapshot's FIRM level version — the `graph_level_versions` row whose content is this row's `hash_firm` ("Firm graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen.
 
 | | |
 |---|---|
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000018_graph_level_versions.sql` |
+| Added by | `20261001000019_graph_level_versions.sql` |
 | References | `public.graph_level_versions(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -396,6 +396,6 @@ This snapshot's FIRM level version — the `graph_level_versions` row whose cont
 
 ---
 
-*Generated from data contract `242049f32e27`, engine `0.2.8`,
+*Generated from data contract `faaaf76867b1`, engine `0.2.8`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

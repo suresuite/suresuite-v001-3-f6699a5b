@@ -298,7 +298,10 @@ export function useVerifiableExports(
 
         // The Trust Report's own inputs (audit F-12): the real freshness payload
         // and ingest history. An empty `tables` map suppressed the two counted limits.
-        const { data: freshness } = await sb.rpc("project_freshness", { p_project_id: projectId });
+        const { data: freshness } = await sb.rpc("project_freshness", {
+          p_project_id: projectId,
+          p_user_id: user?.id ?? null,
+        });
         const { data: ingestRows } = await sb
           .from("ingest_runs")
           .select("id,source_kind,applied_at,applied_by_user_id,rows_fetched")
@@ -390,7 +393,7 @@ export function useVerifiableExports(
         setBusy(null);
       }
     },
-    [projectId, canExport, exportRefusal],
+    [projectId, canExport, exportRefusal, user?.id],
   );
 
   return { runs, refreshRuns, exportDataset, exportRunResults, busy, canExport, exportRefusal };

@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 382,
-  "migrations_applied": 374,
+  "migrations_found": 383,
+  "migrations_applied": 375,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000018_graph_level_versions.sql",
+  "last_migration": "20261001000019_graph_level_versions.sql",
   "counts": {
     "tables": 92,
     "views": 8,
@@ -5487,7 +5487,7 @@
             ],
             "on_delete": "SET NULL"
           },
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "process_version_id",
@@ -5506,7 +5506,7 @@
             ],
             "on_delete": "SET NULL"
           },
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "firm_version_id",
@@ -5525,7 +5525,7 @@
             ],
             "on_delete": "SET NULL"
           },
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         }
       ],
       "constraints": [
@@ -7656,7 +7656,7 @@
     {
       "name": "graph_level_versions",
       "schema": "public",
-      "created_by": "20261001000018_graph_level_versions.sql",
+      "created_by": "20261001000019_graph_level_versions.sql",
       "columns": [
         {
           "name": "id",
@@ -7668,7 +7668,7 @@
           "primary_key": true,
           "unique": false,
           "references": null,
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "project_id",
@@ -7687,7 +7687,7 @@
             ],
             "on_delete": "CASCADE"
           },
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "level",
@@ -7699,7 +7699,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "level_hash",
@@ -7711,7 +7711,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "version_no",
@@ -7723,7 +7723,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "level_spec",
@@ -7735,7 +7735,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "first_dataset_version_id",
@@ -7754,7 +7754,7 @@
             ],
             "on_delete": "SET NULL"
           },
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "author_user_id",
@@ -7766,7 +7766,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "created_at",
@@ -7778,7 +7778,7 @@
           "primary_key": false,
           "unique": false,
           "references": null,
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         }
       ],
       "constraints": [
@@ -7791,7 +7791,7 @@
             "level_hash"
           ],
           "definition": "UNIQUE (project_id, level, level_hash)",
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "graph_level_versions_number_key",
@@ -7802,7 +7802,7 @@
             "version_no"
           ],
           "definition": "UNIQUE (project_id, level, version_no)",
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "graph_level_versions_pkey",
@@ -7812,7 +7812,7 @@
           ],
           "definition": "PRIMARY KEY (id)",
           "implicit": true,
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         },
         {
           "name": "graph_level_versions_level_check",
@@ -7822,7 +7822,7 @@
           ],
           "definition": "CHECK (level IN ('product', 'process', 'firm', 'simulation'))",
           "implicit": true,
-          "added_by": "20261001000018_graph_level_versions.sql"
+          "added_by": "20261001000019_graph_level_versions.sql"
         }
       ],
       "indexes": [],
@@ -7836,13 +7836,13 @@
             "roles": [],
             "using": "public.has_project_access(project_id)",
             "with_check": "public.has_project_access(project_id)",
-            "added_by": "20261001000018_graph_level_versions.sql"
+            "added_by": "20261001000019_graph_level_versions.sql"
           }
         ],
         "determinate": true
       },
       "replica_identity": null,
-      "comment": "WP 11.1 · §4 D257. One row per (project, level, content): the first time a ",
+      "comment": "WP 11.1 · §4 D258. One row per (project, level, content): the first time a ",
       "natural_key_unique": [
         {
           "source": "UNIQUE constraint",
@@ -23997,7 +23997,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000018_graph_level_versions.sql"
+      "defined_by": "20261001000019_graph_level_versions.sql"
     },
     {
       "name": "_graph_level_register_snapshot",
@@ -24007,7 +24007,7 @@
       "security_definer": false,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000018_graph_level_versions.sql"
+      "defined_by": "20261001000019_graph_level_versions.sql"
     },
     {
       "name": "_graph_level_register",
@@ -24019,7 +24019,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000018_graph_level_versions.sql"
+      "defined_by": "20261001000019_graph_level_versions.sql"
     },
     {
       "name": "_graph_level_state",
@@ -24033,7 +24033,7 @@
       "security_definer": false,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000018_graph_level_versions.sql"
+      "defined_by": "20261001000019_graph_level_versions.sql"
     },
     {
       "name": "_graph_level_versions_immutable",
@@ -24043,7 +24043,7 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "comment": null,
-      "defined_by": "20261001000018_graph_level_versions.sql"
+      "defined_by": "20261001000019_graph_level_versions.sql"
     },
     {
       "name": "_graph_level_versions_number",
@@ -24053,7 +24053,7 @@
       "security_definer": false,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000018_graph_level_versions.sql"
+      "defined_by": "20261001000019_graph_level_versions.sql"
     },
     {
       "name": "_graph_state_mark",
@@ -26725,7 +26725,7 @@
       "security_definer": true,
       "volatility": "VOLATILE",
       "comment": null,
-      "defined_by": "20261001000018_graph_level_versions.sql"
+      "defined_by": "20261001000019_graph_level_versions.sql"
     },
     {
       "name": "get_individual_scenario_results",
@@ -27898,15 +27898,16 @@
     },
     {
       "name": "project_freshness",
-      "signature": "project_freshness(uuid)",
+      "signature": "project_freshness(uuid, uuid)",
       "args": [
-        "p_project_id uuid"
+        "p_project_id uuid",
+        "p_user_id uuid DEFAULT NULL"
       ],
-      "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
+      "returns": "jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path",
       "security_definer": true,
-      "volatility": "STABLE",
+      "volatility": "VOLATILE",
       "comment": "WP 4.4 · everything the freshness badge and the Trust Report's per-table ",
-      "defined_by": "20260917000008_one_staleness_rule.sql"
+      "defined_by": "20261001000018_project_freshness_names_its_reader.sql"
     },
     {
       "name": "project_graph_hashes",

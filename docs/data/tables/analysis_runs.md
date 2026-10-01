@@ -62,8 +62,8 @@ Read follows project reachability (`has_project_access`), uuid-only since WP 3.0
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:24` | yes |
-| `SimulationLab.tsx` | rpc project_freshness | `src/components/trust/useProjectFreshness.ts:24` | yes |
+| `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:28` | yes |
+| `SimulationLab.tsx` | rpc project_freshness | `src/components/trust/useProjectFreshness.ts:28` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -364,6 +364,6 @@ The graph version this run computed over (WP 10.1). Taken through `snapshot_data
 
 ---
 
-*Generated from data contract `242049f32e27`, engine `0.2.8`,
+*Generated from data contract `faaaf76867b1`, engine `0.2.8`,
 sidecar `supabase/contract/analysis_runs.contract.yaml`, table created by `20260917000006_analysis_store.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

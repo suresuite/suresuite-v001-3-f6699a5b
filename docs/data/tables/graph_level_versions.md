@@ -30,7 +30,7 @@ partially or get corrected — the write fails.
 
 | Constraint | Rule | Added by |
 |---|---|---|
-| `graph_level_versions_level_check` | `CHECK (level IN ('product', 'process', 'firm', 'simulation'))` | `20261001000018_graph_level_versions.sql` |
+| `graph_level_versions_level_check` | `CHECK (level IN ('product', 'process', 'firm', 'simulation'))` | `20261001000019_graph_level_versions.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
@@ -54,7 +54,7 @@ No page and no API role writes it — `anon`, `authenticated` and `service_role`
 
 | Policy | Command | Roles | Added by |
 |---|---|---|---|
-| graph_level_versions_select | SELECT | all | `20261001000018_graph_level_versions.sql` |
+| graph_level_versions_select | SELECT | all | `20261001000019_graph_level_versions.sql` |
 
 </details>
 
@@ -86,7 +86,7 @@ The level version's identity. A snapshot names it in `product_version_id`, `proc
 | Type | `uuid`, `NOT NULL`, default `gen_random_uuid()` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000018_graph_level_versions.sql` |
+| Added by | `20261001000019_graph_level_versions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -100,7 +100,7 @@ The project whose level this is. Cascades with the project.
 | Type | `uuid`, `NOT NULL` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000018_graph_level_versions.sql` |
+| Added by | `20261001000019_graph_level_versions.sql` |
 | References | `public.projects(id)` ON DELETE CASCADE |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -115,7 +115,7 @@ Which level: `product` (item masters, customers, single-level BOM, lanes), `proc
 | Type | `text`, `NOT NULL` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000018_graph_level_versions.sql` |
+| Added by | `20261001000019_graph_level_versions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -129,7 +129,7 @@ The level's content hash, exactly as its snapshot stores it. Unique per project 
 | Type | `text`, `NOT NULL` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000018_graph_level_versions.sql` |
+| Added by | `20261001000019_graph_level_versions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -143,7 +143,7 @@ The level's content hash, exactly as its snapshot stores it. Unique per project 
 | Type | `integer`, `NOT NULL` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000018_graph_level_versions.sql` |
+| Added by | `20261001000019_graph_level_versions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -157,7 +157,7 @@ The level rule the hash was computed under (1 since WP 10.1). It is inside each 
 | Type | `integer` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000018_graph_level_versions.sql` |
+| Added by | `20261001000019_graph_level_versions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -171,7 +171,7 @@ The snapshot that first carried this content — the frozen world a person can o
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000018_graph_level_versions.sql` |
+| Added by | `20261001000019_graph_level_versions.sql` |
 | References | `public.dataset_versions(id)` ON DELETE SET NULL |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
@@ -186,7 +186,7 @@ Who froze the first snapshot — copied from it, not the session, so the backfil
 | Type | `uuid` |
 | Grain | `identifier` |
 | Unit | dimensionless |
-| Added by | `20261001000018_graph_level_versions.sql` |
+| Added by | `20261001000019_graph_level_versions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
@@ -200,13 +200,13 @@ When the project's level first had this content — the first snapshot's `create
 | Type | `timestamp with time zone`, `NOT NULL`, default `now()` |
 | Grain | `metadata` |
 | Unit | dimensionless |
-| Added by | `20261001000018_graph_level_versions.sql` |
+| Added by | `20261001000019_graph_level_versions.sql` |
 | Read by the engine | **not traced** |
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
 ---
 
-*Generated from data contract `242049f32e27`, engine `0.2.8`,
-sidecar `supabase/contract/graph_level_versions.contract.yaml`, table created by `20261001000018_graph_level_versions.sql`. No wall-clock date: a generated
+*Generated from data contract `faaaf76867b1`, engine `0.2.8`,
+sidecar `supabase/contract/graph_level_versions.contract.yaml`, table created by `20261001000019_graph_level_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

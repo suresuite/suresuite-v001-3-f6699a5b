@@ -521,12 +521,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       }
     ],
     "governance": {
@@ -3128,7 +3128,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -3506,7 +3506,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "This snapshot's PRODUCT level version — the `graph_level_versions` row whose content is this row's `hash_product` (\"Product graph v3\"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen.",
+        "meaning": "This snapshot's PRODUCT level version — the `graph_level_versions` row whose content is this row's `hash_product` (\"Product graph v3\"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen.",
         "primaryKey": false,
         "unique": false,
         "references": {
@@ -3537,7 +3537,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "This snapshot's PROCESS level version — the `graph_level_versions` row whose content is this row's `hash_process` (\"Process graph v3\"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen.",
+        "meaning": "This snapshot's PROCESS level version — the `graph_level_versions` row whose content is this row's `hash_process` (\"Process graph v3\"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen.",
         "primaryKey": false,
         "unique": false,
         "references": {
@@ -3568,7 +3568,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "This snapshot's FIRM level version — the `graph_level_versions` row whose content is this row's `hash_firm` (\"Firm graph v3\"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen.",
+        "meaning": "This snapshot's FIRM level version — the `graph_level_versions` row whose content is this row's `hash_firm` (\"Firm graph v3\"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D258). Written by the registration trigger the moment the row is frozen.",
         "primaryKey": false,
         "unique": false,
         "references": {
@@ -11984,12 +11984,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       }
     ],
     "governance": {
@@ -12749,12 +12749,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       }
     ],
     "governance": {
@@ -13125,12 +13125,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "rpc project_freshness",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       }
     ],
     "governance": {
@@ -15860,7 +15860,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "ProjectIntelligence.tsx",
@@ -25517,7 +25517,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
-        "evidence": "src/components/trust/useProjectFreshness.ts:24"
+        "evidence": "src/components/trust/useProjectFreshness.ts:28"
       },
       {
         "page": "ProjectPolicies.tsx",
