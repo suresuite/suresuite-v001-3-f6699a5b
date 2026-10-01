@@ -186,11 +186,9 @@ export default function GettingAnApiKey() {
           not you can see this application's source repository.
         </P>
         <P>
-          <strong>Open in Colab</strong> loads the same notebook from GitHub instead, which means it
-          works only if you have access to that repository, and it gives you the{" "}
-          <em>unpatched</em> copy — the configuration cell is a blank template you fill in yourself.
-          If Colab shows you a “notebook not found” page, that is what happened; download it and
-          upload it to Colab instead.
+          <strong>Open in Colab</strong> saves the same pre-filled copy and opens Colab in a new
+          tab; choose <strong>File → Upload notebook</strong> there and pick the file you just
+          saved. Colab never reads the notebook from anywhere but your own download.
         </P>
         <P>
           The notebook is thirteen worked sections, in the order a real integration goes: connect
