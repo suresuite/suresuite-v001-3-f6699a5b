@@ -16,7 +16,7 @@
 | Columns | Source | Constraint |
 |---|---|---|
 | `id` | column PRIMARY KEY | `model_validations_pkey` |
-| `project_id` + `policy_hash` + `graph_hash` + `scenario_hash` | partial UNIQUE index | `model_validations_active_content_uq` |
+| `project_id` + `policy_hash` + `(COALESCE(hash_simulation, graph_hash))` + `scenario_hash` | partial UNIQUE index | `model_validations_active_content_uq` |
 
 ## Constraints
 
@@ -73,8 +73,8 @@ Tier 4 — a DECISION. Readable by every API role (`model_validations_read_all`,
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `SimulationLab.tsx` | table read | `src/hooks/useModelValidation.tsx:290` | yes |
-| `ProjectPolicies.tsx` | table read | `src/hooks/useModelValidation.tsx:290` | yes |
+| `SimulationLab.tsx` | table read | `src/hooks/useModelValidation.tsx:333` | yes |
+| `ProjectPolicies.tsx` | table read | `src/hooks/useModelValidation.tsx:333` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -94,7 +94,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `policy_version_id` | — | `uuid` | — | — | The policy version row it was recorded under — for display and the foreign key only. Matching is by `policy_hash` (WP 10.2, §4 D242). |
 | `policy_hash` | — | `text` | — | — | The policy CONTENT it was validated on — the policy half of its identity. |
 | `dataset_version_id` | — | `uuid` | — | — | The graph version ("Graph vN") it was validated on. Required on every model written since WP 10.3 (a BEFORE INSERT trigger); NULL only on cards older than that. |
-| `graph_hash` | — | `text` | — | — | The graph content it was validated on — the data half of its identity. |
+| `graph_hash` | — | `text` | — | — | The composite graph it was validated on — the whole snapshot, kept beside `hash_simulation`. Since WP 11.2 it is the data half of a model's identity only for a card with no simulation hash (one no snapshot could teach); every other card is matched on its simulation inputs, so a deep-tier upload the engine never reads does not make it a different model (§4 D259). |
 | `scenario_hash` | — | `text` | — | — | The baseline scenario fingerprint's hash (horizon, time step, demand model). NOT widened with the protocol: a new stress scenario is matched on it BEFORE it inherits the protocol, so widening it would end inheritance (§16 · WP 10.3). The protocol is in `model_hash` instead. |
 | `scenario_fingerprint` | — | `jsonb` | — | — | The fingerprint itself, so the world a model was validated in can be read without a hash. |
 | `engine_fingerprint` | — | `text` | — | — | The evidence run's engine `code_version`, when it had one. Advisory until the engine registry lands (WP 10.4). |
@@ -117,12 +117,14 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `version_no` | — | `integer` | — | — | "Model v3" — one number per model per project, assigned on insert. |
 | `protocol` | — | `jsonb` | — | — | THE RUN PROTOCOL — `replications`, `root_seed`, `crn`, `warmup_week`, `horizon_weeks`, `analysis_window_weeks`, `ci_level`, `ci_halfwidth_target`, `stopping_rule` (`fixed_horizon` \| `ci_halfwidth`). `validated_model_protocol_problems` is its one statement and a CHECK holds it. Cards older than WP 10.3 carry a BACKFILLED protocol (`"backfilled": true`) whose `unknown` list names what no column recorded — CRN and the stopping rule always, the seed where no evidence run stamped one. |
 | `protocol_hash` | — | `text` | — | — | SHA-256 of `protocol`. |
-| `model_hash` | — | `text` | — | — | The Validated Model's identity: policy content, graph, scenario world, protocol hash and engine — what makes two models that would instruct different experiments two models. |
+| `model_hash` | — | `text` | — | — | The Validated Model's identity: policy content, the SIMULATION'S inputs (`hash_simulation`, since WP 11.2 — the composite before), scenario world, protocol hash and engine — what makes two models that would instruct different experiments two models. Recomputed once for existing cards from their own snapshot, through the immutability trigger's completion rule; a card with no snapshot keeps the hash it had. |
 | `engine_id` | — | `uuid` | — | — | The engine it was validated on; its foreign key lands with the engine registry (WP 10.4). |
 | `face_validation` | — | `text` | — | — | The statement a face-validated model rests on; required for basis `face` since WP 10.3. |
 | `revoked_at` | — | `timestamp with time zone` | — | — | When it was revoked. |
 | `revoked_by` | — | `uuid` | — | — | Who revoked it. |
 | `revoke_reason` | — | `text` | — | — | Why, in their words. |
+| `hash_simulation` | — | `text` | — | — | The hash of what the ENGINE reads — the simulation scope, the `inputs` domain of the snapshot it was validated on (WP 11.2, §4 D259). The model is stale when THIS moves, not when the composite does; the supersede, the active-model unique key, dispatch stamping and inheritance all compare it. NULL on a card whose snapshot cannot be read (no `dataset_version_id`), which keeps the composite rule — said, not defaulted. |
+| `simulation_version_id` | — | `uuid` | — | — | The simulation scope's level version ("simulation inputs v4") — `graph_level_versions`, from the same snapshot. NULL exactly where `hash_simulation` is. |
 
 ## Each column in full
 
@@ -201,7 +203,7 @@ The graph version ("Graph vN") it was validated on. Required on every model writ
 
 ### `graph_hash`
 
-The graph content it was validated on — the data half of its identity.
+The composite graph it was validated on — the whole snapshot, kept beside `hash_simulation`. Since WP 11.2 it is the data half of a model's identity only for a card with no simulation hash (one no snapshot could teach); every other card is matched on its simulation inputs, so a deep-tier upload the engine never reads does not make it a different model (§4 D259).
 
 | | |
 |---|---|
@@ -525,7 +527,7 @@ SHA-256 of `protocol`.
 
 ### `model_hash`
 
-The Validated Model's identity: policy content, graph, scenario world, protocol hash and engine — what makes two models that would instruct different experiments two models.
+The Validated Model's identity: policy content, the SIMULATION'S inputs (`hash_simulation`, since WP 11.2 — the composite before), scenario world, protocol hash and engine — what makes two models that would instruct different experiments two models. Recomputed once for existing cards from their own snapshot, through the immutability trigger's completion rule; a card with no snapshot keeps the hash it had.
 
 | | |
 |---|---|
@@ -607,15 +609,44 @@ Why, in their words.
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `hash_simulation`
+
+The hash of what the ENGINE reads — the simulation scope, the `inputs` domain of the snapshot it was validated on (WP 11.2, §4 D259). The model is stale when THIS moves, not when the composite does; the supersede, the active-model unique key, dispatch stamping and inheritance all compare it. NULL on a card whose snapshot cannot be read (no `dataset_version_id`), which keeps the composite rule — said, not defaulted.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000020_simulation_scope.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `simulation_version_id`
+
+The simulation scope's level version ("simulation inputs v4") — `graph_level_versions`, from the same snapshot. NULL exactly where `hash_simulation` is.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20261001000020_simulation_scope.sql` |
+| References | `public.graph_level_versions(id)` ON DELETE SET NULL |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
 |---|---|---|---|
 | `model_validations_project_created` | `project_id`, `created_at DESC` | no | `20260710000001_model_validations.sql` |
-| `model_validations_active_content_uq` | `project_id`, `policy_hash`, `graph_hash`, `scenario_hash` | yes | `20261001000006_policy_versions_by_content.sql` |
+| `model_validations_active_content_uq` | `project_id`, `policy_hash`, `(COALESCE(hash_simulation, graph_hash))`, `scenario_hash` | yes | `20261001000020_simulation_scope.sql` |
 
 ---
 
-*Generated from data contract `4f37b56243cf`, engine `0.2.8`,
+*Generated from data contract `5801850de943`, engine `0.2.8`,
 sidecar `supabase/contract/model_validations.contract.yaml`, table created by `20260710000001_model_validations.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

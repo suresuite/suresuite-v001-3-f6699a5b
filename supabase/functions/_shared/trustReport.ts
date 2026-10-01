@@ -37,6 +37,7 @@
  */
 
 import type { GradedField, GradedFinding } from "./grading.ts";
+import { GRAPH_LEVELS, LEVEL_LABEL, type GraphLevel, type LevelStates } from "./graphLevels.ts";
 
 /** One table's classification, straight from `public.project_freshness`. */
 export interface TableFreshness {
@@ -89,6 +90,37 @@ export interface TrustReportInput {
   graded: GradedField[] | null;
   findings: GradedFinding[];
   ingestHistory: IngestEvent[];
+  /**
+   * WP 11.3 · §4 D263 — each graph level's version as the project holds it now
+   * (`get_graph_version_state.levels`). Optional: a caller without it reports the
+   * levels as not read, never as unsaved.
+   */
+  levels?: LevelStates | null;
+}
+
+/** One level's version line in the report's freshness block (T4). */
+export interface LevelVersionLine {
+  level: GraphLevel;
+  label: string;
+  versionNo: number | null;
+  hashShort: string | null;
+  unsaved: boolean;
+}
+
+/** The four levels as lines — NULL when the caller could not read them, which the
+ *  report states rather than leaving the block out. */
+export function levelVersionLines(levels: LevelStates | null | undefined): LevelVersionLine[] | null {
+  if (!levels || Object.keys(levels).length === 0) return null;
+  return GRAPH_LEVELS.map((l) => {
+    const s = levels[l];
+    return {
+      level: l,
+      label: LEVEL_LABEL[l],
+      versionNo: s?.currentVersion?.version_no ?? null,
+      hashShort: s?.hash ? s.hash.slice(0, 7) : null,
+      unsaved: s?.unsaved === true,
+    };
+  });
 }
 
 export interface CoverageLine {
@@ -118,6 +150,8 @@ export interface TrustReport {
   graphHash: string | null;
   graphHashShort: string;
   datasetVersion: Record<string, unknown> | null;
+  /** WP 11.3 — each level's version now; null = not read (said, not omitted). */
+  levelVersions: LevelVersionLine[] | null;
   measuredAt: string;
   coverage: CoverageLine[];
   blocking: GradedFinding[];
@@ -354,6 +388,7 @@ export function buildTrustReport(input: TrustReportInput): TrustReport {
     graphHash: input.freshness.graph_hash,
     graphHashShort: input.freshness.graph_hash_short,
     datasetVersion: input.freshness.dataset_version,
+    levelVersions: levelVersionLines(input.levels),
     measuredAt: input.freshness.measured_at,
     coverage,
     blocking,

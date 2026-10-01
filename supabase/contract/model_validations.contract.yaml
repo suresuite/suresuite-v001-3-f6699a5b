@@ -16,20 +16,20 @@ natural_key_unique:
   - source: "column PRIMARY KEY"
     columns: [id]
     name: "model_validations_pkey"
-  - source: "partial unique index 20261001000006_policy_versions_by_content.sql (WHERE status = 'active')"
-    columns: [project_id, policy_hash, graph_hash, scenario_hash]
+  - source: "partial unique index 20261001000020_simulation_scope.sql (WHERE status = 'active')"
+    columns: [project_id, policy_hash, "(COALESCE(hash_simulation, graph_hash))", scenario_hash]
     name: "model_validations_active_content_uq"
 
 surfaces:
   - page: "SimulationLab.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:290"
+    evidence: "src/hooks/useModelValidation.tsx:333"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:290"
+    evidence: "src/hooks/useModelValidation.tsx:333"
     confirmed: true
 
 governance:
@@ -115,8 +115,41 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The graph content it was validated on — the data half of its identity.
+      The composite graph it was validated on — the whole snapshot, kept beside
+      `hash_simulation`. Since WP 11.2 it is the data half of a model's identity only
+      for a card with no simulation hash (one no snapshot could teach); every other
+      card is matched on its simulation inputs, so a deep-tier upload the engine never
+      reads does not make it a different model (§4 D259).
     grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  hash_simulation:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The hash of what the ENGINE reads — the simulation scope, the `inputs` domain of the
+      snapshot it was validated on (WP 11.2, §4 D259). The model is stale when THIS moves,
+      not when the composite does; the supersede, the active-model unique key, dispatch
+      stamping and inheritance all compare it. NULL on a card whose snapshot cannot be read
+      (no `dataset_version_id`), which keeps the composite rule — said, not defaulted.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  simulation_version_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The simulation scope's level version ("simulation inputs v4") —
+      `graph_level_versions`, from the same snapshot. NULL exactly where `hash_simulation` is.
+    grain: identifier
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: false, validate: null}
@@ -402,8 +435,11 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The Validated Model's identity: policy content, graph, scenario world, protocol hash and
-      engine — what makes two models that would instruct different experiments two models.
+      The Validated Model's identity: policy content, the SIMULATION'S inputs
+      (`hash_simulation`, since WP 11.2 — the composite before), scenario world, protocol
+      hash and engine — what makes two models that would instruct different experiments two
+      models. Recomputed once for existing cards from their own snapshot, through the
+      immutability trigger's completion rule; a card with no snapshot keeps the hash it had.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []

@@ -229,7 +229,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const chosenEngineId = engineId ?? engines[0]?.id ?? null;
   const baselineScenario = scenarios.find((s) => isValidationBaseline(s)) ?? null;
   // The model's own credibility: judged with ITS policy hash, because a run of
-  // it uses its policy version — so only a newer graph or a changed world makes
+  // it uses its policy version — so only changed simulation inputs or a changed world make
   // it stale here, which is exactly when running it would not be faithful.
   const modelCredibility = chosenModel
     ? cred.resolveScenario(chosenModel.policy_hash, baselineScenario)
@@ -249,7 +249,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     : chosenModel.status !== "active"
       ? "This model is no longer in force — choose the one that is."
       : modelCredibility?.state === "stale"
-        ? "A newer graph or a changed world makes this model stale — re-validate it in Policies first."
+        ? "The simulation's inputs or the scenario's world changed since this model was validated — re-validate it in Policies first."
         : !canRunSimulations
           ? projectRights.refusal("simulation_lab") ?? "Running simulations isn't enabled for your account."
           : null;

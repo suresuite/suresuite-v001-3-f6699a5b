@@ -135,6 +135,17 @@ export interface ReproducibilityRecordInput {
   protocolOverrides?: Record<string, unknown> | null;
   /** `simulation_runs.exploratory`. */
   exploratory?: boolean | null;
+  // ── WP 11.3 · §4 D263 — WHICH LEVEL the figure came from (T4). Optional, so a
+  //    caller that predates them still compiles; absent = unbound, with its reason.
+  /** `simulation_runs.hash_simulation` — the inputs the engine read. */
+  simulationHash?: string | null;
+  /** That scope's level version number ("simulation inputs v4"). */
+  simulationVersionNo?: number | null;
+  /** The run's snapshot's product, process and firm level version numbers. */
+  levelVersions?: { product: number | null; process: number | null; firm: number | null } | null;
+  /** `run_spec.run_key_version`: 2 = dispatched under the simulation scope (WP 11.2),
+   *  for which the level bindings are REQUIRED; earlier runs could not carry them. */
+  runKeyVersion?: number | null;
   /** Every analysis whose output this project's screens display. */
   analyses: AnalysisBinding[];
   /** The Trust Report's own limits, verbatim — T3 rather than a second list. */
@@ -193,6 +204,43 @@ function canonical(v: unknown): string {
   return JSON.stringify(v);
 }
 
+function levelBindings(input: ReproducibilityRecordInput): Binding[] {
+  const scoped = (input.runKeyVersion ?? 0) >= 2;
+  const level: Binding["level"] = scoped ? "required" : "recommended";
+  const history =
+    "the run predates the simulation scope and level versions (WP 11.2), so what it read is " +
+    "bound only through the composite dataset hash above";
+  const v = (n: number | null | undefined) => (n == null ? null : `v${n}`);
+  const lv = input.levelVersions ?? null;
+  return [
+    bind(
+      "dataset.simulation_hash",
+      "Simulation inputs (hash)",
+      input.simulationHash ?? null,
+      "simulation_runs.hash_simulation (the run snapshot's inputs domain)",
+      level,
+      scoped ? "the run names no simulation inputs although it was keyed on them" : history,
+    ),
+    bind(
+      "dataset.simulation_version",
+      "Simulation inputs version",
+      v(input.simulationVersionNo),
+      "simulation_runs.simulation_version_id → graph_level_versions.version_no",
+      level,
+      scoped ? "the run's simulation inputs have no version number" : history,
+    ),
+    ...(["product", "process", "firm"] as const).map((l) =>
+      bind(
+        `dataset.${l}_version`,
+        `${l[0].toUpperCase()}${l.slice(1)} graph version`,
+        v(lv?.[l]),
+        `dataset_versions.${l}_version_id → graph_level_versions.version_no`,
+        level,
+        scoped ? `the run's snapshot names no ${l} level version` : history,
+      )),
+  ];
+}
+
 export function bindingsOf(input: ReproducibilityRecordInput): Binding[] {
   return [
     bind(
@@ -221,6 +269,11 @@ export function bindingsOf(input: ReproducibilityRecordInput): Binding[] {
       "without it the hash cannot be RECOMPUTED — the snapshot's shape has changed " +
         "three times, and the same data produces a different hash under each",
     ),
+    // WP 11.3 · §4 D263 — the levels. REQUIRED for a run dispatched under the
+    // simulation scope (RunKey v2), which carries them by construction; RECOMMENDED for
+    // history, which could not (WP 10.4's pattern: history is not made unreproducible
+    // by a column it could not have had).
+    ...levelBindings(input),
     bind(
       "policy.version_id",
       "Policy version",

@@ -60,6 +60,18 @@ export function trustReportSections(r: TrustReport): TrustSection[] {
           ? String((r.datasetVersion as { id?: unknown }).id ?? JSON.stringify(r.datasetVersion))
           : "no version row — the dataset is unversioned",
       ],
+      // WP 11.3 · §4 D263 — which version of each LEVEL the report describes.
+      ...(r.levelVersions ?? [{ label: "Graph level versions", versionNo: null, hashShort: null, unsaved: false, level: "product" as const }])
+        .map((l) => [
+          r.levelVersions ? `${l.label} version` : l.label,
+          !r.levelVersions
+            ? "not read for this report — the level versions are unknown, not absent"
+            : l.versionNo != null
+              ? `v${l.versionNo}${l.hashShort ? ` · ${l.hashShort}` : ""}`
+              : l.unsaved
+                ? `unsaved${l.hashShort ? ` · ${l.hashShort}` : ""} — no version carries this content yet`
+                : "no hash — the snapshot cannot support this level",
+        ]),
     ],
     emptyNote: "no verdict could be computed, which is itself the verdict",
   });

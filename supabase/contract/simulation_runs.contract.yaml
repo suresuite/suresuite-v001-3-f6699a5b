@@ -44,12 +44,12 @@ surfaces:
   - page: "SimulationLab.tsx"
     via: "hook useSimulationRun → select * from simulation_runs"
     grain: table
-    evidence: "src/hooks/useSimulationRun.tsx:100"
+    evidence: "src/hooks/useSimulationRun.tsx:105"
     confirmed: true
   - page: "ProjectPolicies.tsx"
     via: "useVerifiableExports → select * from simulation_runs"
     grain: table
-    evidence: "src/hooks/useVerifiableExports.tsx:234"
+    evidence: "src/hooks/useVerifiableExports.tsx:235"
     confirmed: true
     note: >-
       The run-results workbook, whose reproducibility sheet binds the run from
@@ -312,8 +312,39 @@ fields:
     unit: null
     unit_source: none
     meaning: >-
-      The composite graph hash of that version. Part of the RunKey.
+      The composite graph hash of that version. It was part of the RunKey until WP 11.2;
+      RunKey v2 hashes `hash_simulation` instead, and the composite stays on the row as
+      the frozen world the run can be re-executed against.
     grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  hash_simulation:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The simulation scope's hash — the `inputs` domain of the run's snapshot, what the
+      engine read (WP 11.2, §4 D260). RunKey v2 hashes it, so a deep-tier upload no run
+      reads does not make an identical simulation a new key. Read by
+      `create_simulation_run` off the snapshot row itself; history learnt it from its own
+      snapshot. NULL where the run has no snapshot that carries one.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  simulation_version_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The simulation scope's level version the run computed over ("simulation inputs v4",
+      `graph_level_versions`). NULL exactly where `hash_simulation` names no version.
+    grain: identifier
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: false, validate: null}
@@ -406,9 +437,12 @@ fields:
     unit_source: none
     meaning: >-
       Everything the RunKey hashes, as data: the engine (id, slug, version, code_version
-      as registered at dispatch), `policy_hash`, `graph_hash`, the scenario row minus its
-      identity and presentation columns, and `protocol_overrides`. Every binding of the
+      as registered at dispatch), `policy_hash`, the graph term, the scenario row minus
+      its identity and presentation columns, and `protocol_overrides`. Every binding of the
       run resolves from here with no live read. NULL for runs dispatched before WP 10.4.
+      `run_key_version` says which graph term: 1 is `graph_hash` (the composite), 2 —
+      every run since WP 11.2 — is `simulation_hash`, the scope the engine reads. A spec is
+      never rewritten, so a v1 key never equals a v2 key.
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []

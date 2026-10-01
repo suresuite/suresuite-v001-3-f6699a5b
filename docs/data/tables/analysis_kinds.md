@@ -26,9 +26,9 @@ partially or get corrected — the write fails.
 |---|---|---|
 | — | `CHECK ((fallback_scope IS NULL) = (fallback_rule IS NULL))` | `20261001000007_graph_levels_compute_once.sql` |
 | `analysis_kinds_kind_check` | `CHECK (kind ~ '^[a-z][a-z0-9_]*$')` | `20261001000007_graph_levels_compute_once.sql` |
-| `analysis_kinds_input_scope_check` | `CHECK (input_scope IN ('product','process','firm','all'))` | `20261001000007_graph_levels_compute_once.sql` |
-| `analysis_kinds_fallback_scope_check` | `CHECK (fallback_scope IN ('product','process','firm','all'))` | `20261001000007_graph_levels_compute_once.sql` |
 | `analysis_kinds_fallback_rule_check` | `CHECK (fallback_rule IN ('deep_tier_incomplete'))` | `20261001000007_graph_levels_compute_once.sql` |
+| `analysis_kinds_input_scope_check` | `CHECK (input_scope IN ('product', 'process', 'firm', 'simulation', 'all'))` | `20261001000020_simulation_scope.sql` |
+| `analysis_kinds_fallback_scope_check` | `CHECK (fallback_scope IN ('product', 'process', 'firm', 'simulation', 'all'))` | `20261001000020_simulation_scope.sql` |
 
 ## Governance
 
@@ -70,7 +70,7 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | Column | CSV header | Type | Unit | Required in CSV | Meaning |
 |---|---|---|---|---|---|
 | `kind` 🔑 | — | `text` | — | — | The analysis kind, as `analysis_runs.analysis_kind` names it. |
-| `input_scope` | — | `text` | — | — | The level whose hash keys a run of this kind: `product`, `process`, `firm`, or `all` (the composite). |
+| `input_scope` | — | `text` | — | — | The level whose hash keys a run of this kind: `product`, `process`, `firm`, `simulation` (the tables the engine reads — WP 11.2), or `all` (the composite). Which hash names each is stated once, in `_scope_hash_key`. |
 | `fallback_scope` | — | `text` | — | — | The level used instead when `fallback_rule` holds — today only `network_metrics`, which reads the lane graph (process level) when the deep tier is incomplete. NULL for a kind with no fallback. |
 | `fallback_rule` | — | `text` | — | — | When the fallback applies. `deep_tier_incomplete`: the project has no `network_nodes` or no `network_edges` — the same condition the analyzer used to test itself, now stated once and returned to it as `input_scope`. |
 | `description` | — | `text` | — | — | What the kind computes, over which table. |
@@ -94,7 +94,7 @@ The analysis kind, as `analysis_runs.analysis_kind` names it.
 
 ### `input_scope`
 
-The level whose hash keys a run of this kind: `product`, `process`, `firm`, or `all` (the composite).
+The level whose hash keys a run of this kind: `product`, `process`, `firm`, `simulation` (the tables the engine reads — WP 11.2), or `all` (the composite). Which hash names each is stated once, in `_scope_hash_key`.
 
 | | |
 |---|---|
@@ -164,6 +164,6 @@ When the row was first written.
 
 ---
 
-*Generated from data contract `4f37b56243cf`, engine `0.2.8`,
+*Generated from data contract `5801850de943`, engine `0.2.8`,
 sidecar `supabase/contract/analysis_kinds.contract.yaml`, table created by `20261001000007_graph_levels_compute_once.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

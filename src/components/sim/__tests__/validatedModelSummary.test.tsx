@@ -28,6 +28,8 @@ const card: ModelValidationCard = {
   policy_hash: "abc1234deadbeef",
   dataset_version_id: "dv1",
   graph_hash: "f00dbabcafe",
+  hash_simulation: "5a5a5a5a5a",
+  simulation_version_id: "sv1",
   scenario_hash: "5ce7a210",
   scenario_fingerprint: {},
   engine_fingerprint: "scsim 0.2.9",
@@ -63,14 +65,15 @@ const card: ModelValidationCard = {
   protocol_hash: "11aa",
   model_hash: "77bb88cc99",
 };
-const refs = { graphVersionNo: 7, policyVersionNo: 3 };
+const refs = { graphVersionNo: 7, policyVersionNo: 3, simulationVersionNo: 4 };
 
 describe("every figure on the card has a source", () => {
   const lines = validatedModelLines(card, refs);
 
-  it("shows the eleven lines the brief names", () => {
+  it("shows the lines the brief names — the simulation inputs first, the snapshot second (WP 11.3)", () => {
     expect(lines.map((l) => l.label)).toEqual([
-      "Graph",
+      "Simulation inputs",
+      "Snapshot",
       "Policy",
       "Engine",
       "Run",
@@ -103,7 +106,8 @@ describe("every figure on the card has a source", () => {
 
   it("reads the figures the protocol states", () => {
     const by = Object.fromEntries(lines.map((l) => [l.label, l.value]));
-    expect(by.Graph).toBe("Graph v7 · f00dbab");
+    expect(by["Simulation inputs"]).toBe("Simulation inputs v4 · 5a5a5a5");
+    expect(by.Snapshot).toBe("Snapshot v7 · f00dbab");
     expect(by.Policy).toBe("Policy v3 · abc1234");
     expect(by.Run).toBe("37 seeds · root seed 42 · CRN on");
     expect(by["Steady state from"]).toBe("week 13");
@@ -127,7 +131,7 @@ describe("what was never recorded is said, not defaulted", () => {
     const engine = lines.find((l) => l.label === "Engine")!;
     expect(engine.value).toBeNull();
     expect(engine.reason).toMatch(/not recorded/);
-    expect(lines.find((l) => l.label === "Graph")!.value).toBe("f00dbab (version number not loaded)");
+    expect(lines.find((l) => l.label === "Snapshot")!.value).toBe("f00dbab (version number not loaded)");
   });
 
   it("a face-validated model shows the statement it rests on", () => {
@@ -154,8 +158,8 @@ describe("the card's action and its staleness", () => {
 
   it("newer data never mutates the model — the card says re-validate", () => {
     const cred = { state: "stale" as const, card, drift: ["data" as const, "policy" as const] };
-    expect(staleMessage(cred)).toBe("a newer graph exists · a newer policy exists → re-validate");
-    expect(render(cred)).toContain("a newer graph exists · a newer policy exists → re-validate");
+    expect(staleMessage(cred)).toBe("the simulation's inputs changed · a newer policy exists → re-validate");
+    expect(render(cred)).toContain("the simulation&#x27;s inputs changed · a newer policy exists → re-validate");
     expect(staleMessage({ state: "validated", card })).toBeNull();
   });
 });
@@ -168,6 +172,30 @@ describe("the Lab names the model a ?model= link opened", () => {
     expect(openedModelLine({ ...card, status: "superseded" }, { state: "validated" })).toMatch(
       /superseded — a newer model is in force$/,
     );
-    expect(openedModelLine(card, { state: "stale", drift: ["data"] })).toMatch(/a newer graph exists → re-validate$/);
+    expect(openedModelLine(card, { state: "stale", drift: ["data"] })).toMatch(/the simulation's inputs changed → re-validate$/);
   });
 });
+
+// WP 11.3 · §4 D259 — the model binds the simulation's inputs; a deep-tier change is a
+// note the card SHOWS and never a reason to re-validate.
+describe("the simulation inputs, and a change the simulation does not read", () => {
+  it("a deep-tier change reads 'in force' with its note, never 're-validate'", () => {
+    const line = openedModelLine(card, { state: "validated", notes: ["network"] });
+    expect(line).toMatch(/in force \(the deep tier changed — not read by the simulation\)$/);
+    expect(line).not.toMatch(/re-validate/);
+    const html = renderToStaticMarkup(
+      createElement(MemoryRouter, null, createElement(ValidatedModelSummary, {
+        card, credibility: { state: "validated", card, notes: ["network"] }, projectId: "p1",
+      })),
+    );
+    expect(html).toContain("the deep tier changed — not read by the simulation — the model stays as validated");
+  });
+
+  it("a model with no simulation hash says why, rather than printing the snapshot as its inputs", () => {
+    const legacy = { ...card, hash_simulation: null, simulation_version_id: null };
+    const l = validatedModelLines(legacy, refs).find((x) => x.label === "Simulation inputs")!;
+    expect(l.value).toBeNull();
+    expect(l.reason).toMatch(/matched on its snapshot/);
+  });
+});
+

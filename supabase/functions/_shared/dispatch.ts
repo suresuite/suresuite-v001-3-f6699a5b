@@ -154,6 +154,10 @@ export interface ReuseIdentity {
   scenario: { id: string; updated_at?: unknown };
   policyHash: string;
   graphHash: string;
+  /** WP 11.2 · §4 D260 — the simulation scope's hash (`hash_inputs`): what the
+   * RunKey hashes since v2. Null when the caller could not read it; the key then
+   * names no inputs and matches nothing, which is the safe direction. */
+  simulationHash?: string | null;
   scenarioHash: string;
   replications: number;
   /** WP 10.4 — the engine the run would use (null = the single active one). */
@@ -183,10 +187,13 @@ export async function findReuseCandidates(
   // engine build and the seed spec are part of identity and a scenario rename is
   // not. The three-hash predicate below is the fallback for a database without
   // `20261001000009` (a function deployed ahead of its migration).
+  // WP 11.2 — the key's graph term is the simulation scope (RunKey v2); a database
+  // before `20261001000020` answers "function not found" to this argument name and
+  // takes the three-hash fallback below, which is the deploy window.
   const { data: keyed, error: keyErr } = await svc.rpc("find_reusable_runs", {
     p_scenario_id: identity.scenario.id,
     p_policy_hash: identity.policyHash,
-    p_graph_hash: identity.graphHash,
+    p_simulation_hash: identity.simulationHash ?? null,
     p_replications: identity.replications,
     p_engine_id: identity.engineId ?? null,
     p_protocol_overrides: identity.protocolOverrides ?? {},
@@ -336,6 +343,7 @@ export async function dispatchExperimentRun(
   // yet the run still dispatches, just without a dataset binding.
   let datasetVersionId: string | null = null;
   let graphHash: string | null = null;
+  let simulationHash: string | null = null;
   try {
     // deno-lint-ignore no-explicit-any
     const { data: dsId, error: dsErr } = await (sb as any).rpc("snapshot_dataset", {
@@ -347,10 +355,14 @@ export async function dispatchExperimentRun(
       // deno-lint-ignore no-explicit-any
       const { data: dv } = await (sb as any)
         .from("dataset_versions")
-        .select("graph_hash")
+        .select("graph_hash,hash_inputs")
         .eq("id", datasetVersionId)
         .maybeSingle();
       graphHash = (dv?.graph_hash as string | null) ?? null;
+      // WP 11.2 · §4 D260 — the simulation scope of the same snapshot, which the
+      // RunKey hashes. `create_simulation_run` reads it off the snapshot row itself;
+      // it travels here only for a database that cannot (the deploy window).
+      simulationHash = (dv?.hash_inputs as string | null) ?? null;
     }
   } catch (e) {
     console.error("snapshot_dataset failed (run continues unbound)", e);
@@ -460,6 +472,7 @@ export async function dispatchExperimentRun(
     policy_hash: policyHash,
     dataset_version_id: datasetVersionId,
     graph_hash: graphHash,
+    hash_simulation: simulationHash,
     created_by: userId,
     scenario_hash: scenarioHash,
     model_validation_id: modelValidationId,

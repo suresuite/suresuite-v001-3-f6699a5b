@@ -41,6 +41,7 @@ duplicated facts stated here, which is the defect this plan exists to end.)*
 | 18 | Phase 8 — The graph layer |
 | 19 | Phase 9 — Results: inventory over time, and the result binding |
 | 20 | Phase 10 — Versions you can choose |
+| 21 | Phase 11 — One graph, three levels |
 
 ---
 
@@ -441,7 +442,15 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D254** | **The Lab's Surrogate card counted a shared run once per model.** `surrogate_training_runs` lists a run under every Validated Model that cites it — right for lineage, since a model's training set is its own — and `surrogate_training_summary` groups it per model, which is right per model. The card SUMMED those groups, so a run several models cite counted several times. Production holds exactly that shape (§15 run `36863326325`, probe 16): one project's set is ONE run with ONE replication, the evidence run three versions of one model share, which the card would have stated as "3 replications · 3 runs" (T1) | `supabase/migrations/20261001000013_surrogate_training_set.sql:80`; `src/lib/sim/surrogateTraining.ts:36` | **CLOSED ✅ WP 10.9** (`20261001000015`). `surrogate_training_totals` states the set's size with distinct counts (runs, (run, replication) pairs, models, graph versions) and the card reads it; the per-model summary stays for whatever trains per model. `rehearsal/620` §7 records a second model on one evidence run — red with `count(*)`, green with the distinct counts — and the card's test reproduces production's shape: the pre-fix logic said "3 replications · 3 runs", the fix "1 replication · 1 run" |
 | **D255** | **The deep-tier switch on a project's edit form did not save, because the page reached a copy of `update_project` that has no deep-tier parameter.** `update_project` carried five live overloads and `create_project` six. `20250906113204` added `p_deep_tier_enabled` to one ten-argument copy of `update_project`, `20250923105656` to one of `create_project`, and `20250923120308` added `p_data_type` to ANOTHER ten-argument copy of each. /project-manager sends `p_data_type`, so PostgREST resolved the `text` overloads, which never write `deep_tier_enabled`: the edit form showed the switch, Save reported success, and the next load read it off again. Creating a project dropped the switch the same way, and Duplicate sent neither setting. Sending the parameter from the page could not have fixed it — no overload took both names, so the call would have stopped resolving. A fix that landed in one of two writers of one column (D145's class, and D150's). Reported by an owner of the ACCURATE-Aumovio project | `supabase/migrations/20250906113204_aa42c052-0d52-4c76-a6d1-806beb3af9cc.sql` (the `boolean` overload); `supabase/migrations/20250923120308_4bbb560c-69c8-415c-970c-48b6ff7ce13a.sql` (the `text` overloads); `src/pages/DataManager.tsx` (`handleUpdateProject`, `handleCreateProject`, `handleDuplicateProject`) | **CLOSED ✅ (`20261001000016`).** Every overload of both names is dropped and ONE of each created, taking `p_data_type` and `p_deep_tier_enabled`; `update_project` keeps a setting the caller does not name (`COALESCE`), so a caller predating a setting cannot reset it by omission. The page sends the switch on edit and create, and Duplicate copies dates, data type and the switch. `rehearsal/630` asserts one overload each, the edit form's exact call storing the switch on and then off, and omission keeping both settings — mutation-tested (removing the `deep_tier_enabled` assignment turns §3 red). `dataPlaneAudit.test.ts`'s list of overloaded names shrinks by both |
 | **D256** | **A `super_admin` could not upload a data file, because 27 functions spelt "the project's owner or an app admin" as a comparison to the literal `'admin'`.** `app_role` has four values and `super_admin` is not `admin`, so the account with the most authority was refused by every gate built for the one beneath it. `ingest_land_file` (and the promotion) applies `has_project_access`, which read `modeler_id = caller OR role = 'admin'`; `project_rights_for_user` mirrored it as `v_land`, so the screen and the server agreed on the wrong answer; and the same test was written inline in twenty-five readers and writers (the `bulk_insert_*` family, `upload_node_list_data`, `rebuild_node_list`, `combine_project_into_supply_chain`, `delete_project_dataset`, the scenario and simulation-result functions, `ai_can_access_project`). The browser's copies (`useProjectRights`' `ownerOrAdmin`, `ProjectCard`'s `owns`) and the `combine-project` edge function compared the same literal. *I1 `single-source`, one layer down: one predicate authored twenty-nine times, nothing comparing the copies.* | `has_project_access`, `project_rights_for_user`, the twenty-five inline copies (`20261001000017` lists them), `src/hooks/useProjectRights.tsx`, `src/components/ProjectCard.tsx`, `supabase/functions/combine-project/index.ts` | **CLOSED ✅ (`20261001000017`).** Each function is its live definition with the one role test widened to `IN ('admin', 'super_admin')`; no other line of any body moves, and every signature is kept so the grants are. **The organization test stays**, by decision: a super admin working in another organization is refused exactly as an admin there is (`delete_project`'s "admin of its organization" included). Skipping it is a separate decision about who may write into any customer's data and was declined. Left alone on purpose: the 11-argument `create_disruption_scenario_v2` (`20250902084844` drops it; nothing in `src/` calls either overload, D228) and the two membership-label triggers, which name an `admin` account an organization admin and are not a write gate. `rehearsal/640` asserts the upload gate for owner / admin / super admin / non-owner modeler, the browser's copy agreeing, one writer admitting a super admin of the project's organization and refusing one active in another, and that no function in the list still tests the bare literal. **Written without a database to run it against** — the rehearsal is unrun until CI's `postgres:16` job. **D66's two-predicates question is not answered by this**: `combine_project_into_supply_chain`'s "UNCHANGED, deliberately" note named that predicate as D66's, and this widens it by one role at the owner's instruction |
-| **D257** | **`project_freshness` was refused for every caller in a real browser, so the freshness badge and the Trust Report's per-table section read "unavailable" for everyone.** The function asks `has_project_access`, which learns the caller from the session or the `app.current_user_id` setting. The browser calls as `anon`, no session names anybody (D28, D155) and the setting is LOCAL to the statement that sets it, so the call arrived unidentified and PostgREST answered 401. `rehearsal/140` set the setting by hand before each call and so could not notice — D169's shape, a read that works for a caller who is already identified and for no one else. The three callers (`useProjectFreshness`, `useVerifiableExports`, the `get_data_trust_report` tool) passed no user. | `project_freshness` in `20260917000008`; `src/components/trust/useProjectFreshness.ts`, `src/hooks/useVerifiableExports.tsx`, `supabase/functions/_shared/trustReportTool.ts` | **CLOSED ✅ (`20261001000018`).** `project_freshness(p_project_id, p_user_id DEFAULT NULL)` sets the actor for its own transaction and then applies the SAME `has_project_access` rule — who may read freshness does not widen — and a NULL name leaves an already-set actor alone, so every one-argument call still resolves. It is VOLATILE now, because it sets a setting; its body is `20260917000008`'s byte for byte. All three callers pass the user. `rehearsal/650` calls it AS anon with nothing set beforehand: owner, admin and super admin answered; a modeler who is not the owner and an unnamed caller refused; omission not blanking an actor; grants explicit. **Attribution is client-asserted (D28)**: anyone holding the anon key who knows a user id can read that user's project's per-table COUNTS; the upload RPCs already work this way. **Written without a database to run `rehearsal/650` against** — it is unrun until CI's `postgres:16` job. **Other RPCs gated on `has_project_access` or the session with no user parameter fail the same way for the browser; this entry fixes one and does not audit the class** |
+| **D257** | **`project_freshness` was refused for every caller in a real browser, so the freshness badge and the Trust Report's per-table section read "unavailable" for everyone.** The function asks `has_project_access`, which learns the caller from the session or the `app.current_user_id` setting. The browser calls as `anon`, no session names anybody (D28, D155) and the setting is LOCAL to the statement that sets it, so the call arrived unidentified and PostgREST answered 401. `rehearsal/140` set the setting by hand before each call and so could not notice — D169's shape, a read that works for a caller who is already identified and for no one else. The three callers (`useProjectFreshness`, `useVerifiableExports`, the `get_data_trust_report` tool) passed no user. | `project_freshness` in `20260917000008`; `src/components/trust/useProjectFreshness.ts`, `src/hooks/useVerifiableExports.tsx`, `supabase/functions/_shared/trustReportTool.ts` | **CLOSED ✅ (`20261001000018`).** `project_freshness(p_project_id, p_user_id DEFAULT NULL)` sets the actor for its own transaction and then applies the SAME `has_project_access` rule — who may read freshness does not widen — and a NULL name leaves an already-set actor alone, so every one-argument call still resolves. It is VOLATILE now, because it sets a setting; its body is `20260917000008`'s byte for byte. All three callers pass the user. `rehearsal/650` calls it AS anon with nothing set beforehand: owner, admin and super admin answered; a modeler who is not the owner and an unnamed caller refused; omission not blanking an actor; grants explicit. **Attribution is client-asserted (D28)**: anyone holding the anon key who knows a user id can read that user's project's per-table COUNTS; the upload RPCs already work this way. **Written without a database to run `rehearsal/650` against** — first run at WP 11.1's base merge, where §4 was red on its own precondition (the runner wraps a file in one transaction, so §2's actor was still set) and was corrected in the rehearsal; the migration was right (§16 · WP 11.1 base merge). **Other RPCs gated on `has_project_access` or the session with no user parameter fail the same way for the browser; this entry fixes one and does not audit the class** |
+| **D258** | **A graph level has a hash and no number, so every level page names the COMPOSITE.** WP 10.1 gave the product, process and firm levels each a hash and stored all three on every `dataset_versions` row, but only the composite is numbered (`dataset_versions_assign_number` keys on `graph_hash`), nothing lists a level's history, and `get_graph_version_state` resolves "the version the live data is" by the composite alone. The product, process and firm pages all print `Graph v{composite}` through one chip. So a deep-tier upload — firm level only — makes the PRODUCT page read "Graph unsaved" and then a new number, although nothing that page shows moved; "Product graph v3" is not a sentence the system can produce | `supabase/migrations/20261001000007_graph_levels_compute_once.sql:169-191`; `supabase/migrations/20261001000007_graph_levels_compute_once.sql:745-774`; `src/components/trust/GraphVersionChip.tsx:24-46`; `src/hooks/useDatasetVersion.tsx:141-146` | **CLOSED ✅ WP 11.3** (`20261001000019`, `20261001000021`). The store: `graph_level_versions` numbers product, process, firm and the simulation inputs per project PER LEVEL, deduplicated against any earlier version of the level; every snapshot names its tuple; history backfilled in order; `get_graph_version_state` returns each level's version (`rehearsal/660`, five mutations red). The pages: `GraphVersionChip` takes the page's level and prints `Product graph v3 · <level hash>`, "unsaved" per level, and the snapshot's tuple as its title (`graphLevels.test.ts`). Walkthrough (§16 · WP 11.3): after a deep-tier-only change the product and process chips read v3 and v2 as before and the firm chip moved to unsaved |
+| **D259** | **A Validated Model binds the composite graph, so a deep-tier upload the engine never reads makes every model stale, unappliable and unstamped.** The simulation's inputs have had a hash of their own since WP 4.1 — `hash_inputs`, "the tier-2 tables a SIMULATION reads", the snapshot's `inputs` domain — and no model reads it. `_validated_model_hash` digests the composite; the insert path reads the composite from the snapshot row and supersedes on it; the active-model unique index, `active_model_validation_by_content` (dispatch stamping) and `apply_validation_to_scenario` (inheritance, which REFUSES a mismatch) all compare it; and the browser marks `data` drift and matches cards on it. A firm-level change therefore (1) reads "stale — a newer graph exists → re-validate" on every model whose inputs are byte-identical, (2) refuses inheritance onto a new scenario, and (3) leaves a run dispatched outside the Lab's model picker unstamped, which WP 10.4's rule then calls exploratory and WP 10.8's view drops from training | `supabase/migrations/20261001000008_validated_model.sql:150-160`; `supabase/migrations/20261001000008_validated_model.sql:416-441`; `supabase/migrations/20261001000006_policy_versions_by_content.sql:272-292`; `supabase/migrations/20261001000006_policy_versions_by_content.sql:463-466`; `src/hooks/useModelValidation.tsx:193-205`; `src/hooks/useModelValidation.tsx:428-434`; `supabase/functions/_shared/dispatch.ts:382-387` | **CLOSED ✅ WP 11.3** (`20261001000020`, `20261001000021`). The binding is done by `20261001000020`: `model_validations` binds `hash_simulation` and its version beside its snapshot, `model_hash` digests it (existing cards recomputed once from their own snapshot, through an immutability completion that admits only that), and the supersede, the active-model unique key, `active_model_validation_by_content` — which resolves the composite dispatch passes to its snapshot's simulation hash, so the dispatcher needed no change to stamp — and `apply_validation_to_scenario` all match on it; a card no snapshot could teach keeps the composite rule. The browser's `cardInputsMatch` is the one rule the badge, the card ranking and inheritance ask, a deep-tier change is a `network` note and never drift, and the agent's own copy of the badge rule (`vvTools.ts`, found on the way) follows it, through a widened `list_model_validations`. `rehearsal/670` §1–§5, §7; four mutations red The cards: the summary card, the Lab's Model step and `openedModelLine` print "simulation inputs v4" first and the snapshot second, `data` drift reads "the simulation's inputs changed", and a deep-tier change is the note "the deep tier changed — not read by the simulation" beside "in force" — never re-validate (`validatedModelSummary.test.tsx`, `labModelStep.test.tsx`; the Lab walkthrough in §16) |
+| **D260** | **The RunKey hashes the composite, so a deep-tier change makes identical simulations distinct.** `simulation_run_spec` puts the composite `graph_hash` in the spec, `create_simulation_run` passes the one the dispatcher read off the snapshot row, and `find_reusable_runs` keys the AI read tool's lookup the same way. A firm-only upload therefore moves the key of every simulation whose inputs did not move: the safe direction WP 10.4 chose (a needless re-run, never a false reuse), but it defeats "compute once" for the engine, which the owner asked for in Phase 10 §1. A run row records the composite and its snapshot and no version of the inputs it computed over | `supabase/migrations/20261001000009_engines_runkey.sql:264-295`; `supabase/migrations/20261001000009_engines_runkey.sql:307-331`; `supabase/migrations/20261001000012_capacity.sql:487-488`; `supabase/functions/_shared/dispatch.ts:346-352`; `supabase/functions/_shared/dispatch.ts:462` | **CLOSED ✅ WP 11.2** (`20261001000020`). RunKey v2: `simulation_run_spec` and `find_reusable_runs` take `p_simulation_hash` and the spec's graph term is `simulation_hash`; `create_simulation_run` reads it off the snapshot row it is handed (the caller's value only without one), and the run row gains `hash_simulation` and `simulation_version_id` (history learnt both from its own snapshot; its `run_spec` is never rewritten, so a v1 key never equals a v2 one and the first identical submission after the merge re-runs once). The dispatcher and the AI read tool pass the simulation hash. `rehearsal/670` §2–§5 and §8 (a deep-tier or multi-tier edit is offered for reuse; a price or `bom_multi_level` edit is a new key); mutation — the key on the composite — red; `590` moved to the v2 spec in place |
+| **D261** | **An analysis run names its level's HASH and the composite's VERSION.** `analysis_get_or_start` keys a run on its level hash (WP 10.1) and records `dataset_version_id`, the composite snapshot; nothing on the row says which version of its LEVEL it computed — a reader can say "firm hash abc123" and not "Firm graph v5". `surrogate_feature_spec`, keyed on the PRODUCT level, reports the composite's `version_no` as its `graph_version_no`, so a deep-tier upload changes the number printed beside features that did not change | `supabase/migrations/20261001000007_graph_levels_compute_once.sql:912-920`; `supabase/migrations/20261001000013_surrogate_training_set.sql:178-180` | **CLOSED ✅ WP 11.4** (`20261001000020`, `20261001000022`). The column is done by `20261001000020`: `analysis_runs.level_version_id`, filled by `analysis_get_or_start` from the level row its claim's snapshot registered, NULL for scope `all`, history learnt from each run's own scope and hash — `rehearsal/670` §6 The feature number: `surrogate_feature_spec` returns the PRODUCT level's version (`level_version_id`, `product_version_no`) — the world the features are keyed on — and the composite's number under its own name, `snapshot_version_no`; `graph_version_no` is gone from its answer (`rehearsal/620` §8) |
+| **D262** | **The surrogate training set groups KPIs by the composite snapshot and features by the product level, and nothing says the two are different grains.** `surrogate_training_runs` exposes `graph_version_id` = the run's composite `dataset_version_id`; `surrogate_training_summary` groups on it and `surrogate_training_totals` counts it. Two snapshots that differ only in the deep tier — which the engine does not read — split one simulation world into two groups, and the Surrogate card's "graph versions" count grows with every deep-tier upload. A surrogate joining KPIs to `feature_spec` joins a composite-keyed set to a product-keyed one with no stated key | `supabase/migrations/20261001000013_surrogate_training_set.sql:42-44`; `supabase/migrations/20261001000013_surrogate_training_set.sql:84-91`; `supabase/migrations/20261001000015_surrogate_training_totals.sql:22-26` | **CLOSED ✅ WP 11.4** (`20261001000022`). `surrogate_training_runs` exposes `simulation_version_id`, its number and `hash_simulation` (appended; the composite `graph_version_id` stays for lineage); `surrogate_training_summary` groups by Validated Model and simulation version and counts the composites inside; `surrogate_training_totals` counts `simulation_versions`; the Surrogate card says "… · N simulation-input versions". A run inserted without naming its inputs now learns them from its snapshot (`_simulation_run_derive`), so a writer other than `create_simulation_run` cannot fall out of the grouping. `rehearsal/620` §8 (two snapshots differing only in the deep tier → one group, one version; the shared evidence run still counts once); mutations — grouped by the composite, the derivation removed — red |
+| **D263** | **Exports name the composite and no level (T4).** The Reproducibility Record binds `dataset.graph_hash` and the snapshot id; the Trust Report's freshness block carries the composite hash and version. Neither says which version of the simulation's inputs a run computed over, nor the product, process and firm versions a reader of a network figure would need — so a figure leaving the system cannot be matched to the level page it came from | `src/lib/trust/reproducibilityRecord.ts:197-213`; `supabase/functions/_shared/trustReport.ts:55-57` | **CLOSED ✅ WP 11.3** (`20261001000021`). The record binds `dataset.simulation_hash`, `dataset.simulation_version` and the product, process and firm versions, each REQUIRED for a run dispatched under RunKey v2 and recommended for history, which could not carry them (WP 10.4's pattern) — a v2 run that lost its simulation hash is not reproducible and says so (`reproducibilityRecord.test.ts`). The Trust Report carries each level's version in its verdict section and on its page, and says "not read" rather than "unsaved" when its caller could not read them (`trustReportSections.test.ts`); the panel and the agent's tool read the same state. The numbers come through `dataset_version_tuple`, one SECURITY DEFINER read the browser can reach, which `list_dataset_versions` now returns per snapshot (`rehearsal/670` §9, mutation red) |
+| **D264** | **The simulation's read set is authored twice and nothing compares the two.** The worker's datamap reads eight tables; the snapshot's `inputs` domain hashes eight tables under a comment saying they are "the tables a SIMULATION reads". The two lists agree today, by care: a table added to the engine's reads without the snapshot would leave every model, RunKey and staleness check blind to it — D11's shape exactly (the anchor once hashed the BOM table the run did not read). And the scope has no NAME the store can key on: `analysis_kinds.input_scope` and `current_level_hash` know `product`, `process`, `firm` and `all` | `sim-worker/sim_worker/datamap.py:278-306`; `supabase/migrations/20260917000009_topology_in_the_anchor.sql:101-219`; `supabase/migrations/20261001000007_graph_levels_compute_once.sql:565-576`; `supabase/migrations/20261001000007_graph_levels_compute_once.sql:781` | **CLOSED ✅ WP 11.2** (`20261001000020`). The scope is NAMED, not minted: `simulation` joins the scope vocabulary and ONE function, `_scope_hash_key`, maps it to `hash_inputs` for `current_level_hash`, `analysis_get_or_start` and the level state; it is registered as a fourth level. `simulationScopeParity.test.ts` PARSES both lists — `datamap.py`'s reads and the snapshot's `inputs` domain — and fails when either gains a table the other lacks (red both ways, by a datamap read added and by a later migration dropping `customers` from the domain); `rehearsal/670` §1 holds the hash to the domain's digest and every stored hash to a fresh rebuild, `level_spec` 1 |
+| **D265** | **Any holder of the public key could plant a graph snapshot — and from WP 11.1 a planted snapshot would mint level versions.** `dataset_versions` has carried `dataset_versions_insert_all` (`FOR INSERT … WITH CHECK (true)`) and an INSERT grant to `anon` and `authenticated` since it was created. WP 2.4 measured it and pinned it rather than change it, on the reasoning that the app runs as `anon`; but nothing inserts a snapshot directly — every writer is `snapshot_dataset` (SECURITY DEFINER) or the service role. A planted row carries whatever hash it states, so `snapshot_dataset`, which dedupes onto any row with the live composite, would hand its id to a run, a model or an analysis as the frozen world; and WP 11.1's registration trigger would mint level versions from it. Measured on a rehearsal base: the policy present, `has_table_privilege('anon', …, 'INSERT')` true | `supabase/migrations/20260703000001_dataset_versions.sql:54`; `supabase/migrations/20260703000001_dataset_versions.sql:62-63`; `src/lib/policies/__tests__/governanceEnforcement.test.ts:94` | **CLOSED ✅ WP 11.1** (`20261001000019`). The policy is dropped and INSERT revoked from both API roles; `rehearsal/660` §9 asserts neither role may insert and no INSERT policy names them — red with the drop removed. `governanceEnforcement.test.ts`'s pinned unconditional-write list shrinks from seven tables to six; reads stay open (D28's list) |
 
 ### 4.1 Code map — the data layer
 
@@ -21416,6 +21425,339 @@ green; `rehearsal/620` §7 mutation red.
 **Gap check.** WP 10.9 stays open on one deliverable: the drop, after a network-metrics or
 prominence analysis has run in production. Nothing else in Phase 10 is owed.
 
+### WP 11.0 — One graph, three levels, planned · 2026-10-01 · no migration
+
+**Asked for.** Phase 11 (§21): a version per graph level, and every consumer — page, analysis,
+Validated Model, run, training set, export — bound to the level it actually reads. The product
+owner took the four decisions (per-level versions; the composite kept as the frozen tuple; a
+named `simulation` scope bound by models, RunKeys and the training set; transparency as before);
+this package records them and plans the rest.
+
+**Promised versus found.** WP 10.9 closed saying nothing in Phase 10 was owed but D240's drop,
+and that held. The brief's §2 was read claim by claim and its line numbers re-verified against
+`main` after #338; every cited line still says what the brief said. Four claims did not hold, and
+the first one changes the design. (1) **"No hash names the simulation scope today" is wrong.**
+`20260917000002` split the anchor into two domains in WP 4.1 and called the first one "the tier-2
+tables a SIMULATION reads"; the v3 builder kept that block byte-identical. Its eight tables are
+exactly the eight the worker's datamap reads (suppliers, materials, products, customers, the two
+lane tables, both BOMs), and `hash_inputs` — its digest — is on every snapshot since. So WP 11.2
+NAMES the scope (`simulation → hash_inputs`, one mapping) rather than folding a second digest of
+the same tables into `_dataset_level_hashes`: two hashes of one fact is the `single-source` defect
+this plan keeps closing, and the `level_spec` 2 bump the brief tied to that fold is not taken —
+no stored hash moves by construction, as WP 10.1's composite did not. What WAS missing is the
+name, a gate comparing the two read lists (D264 — today they agree by care), and every binding
+(D259, D260). (2) `dataset_versions` is immutable by convention, not by trigger:
+`snapshot_dataset` updates an old row's level hashes. The brief's "immutable (trigger, as
+`dataset_versions`)" therefore describes a pattern that does not exist; the new table gets a real
+trigger and §21 says so. (3) /project-manager has no version list — `list_dataset_versions` has
+one reader, the Developer API page's notebook config — so WP 11.3 widens the RPC and renders the
+tuple where versions are already shown. (4) D256 and rehearsals `630`/`640` were taken by the two
+merges after #336; this phase starts at D258 and `660` — renumbered at WP 11.1, when a third
+merge took D257, `20261001000018` and `650` (§16 · WP 11.1).
+
+Also found on the reading and folded into D259 rather than left to WP 11.2 to discover: the
+composite is compared in FIVE SQL places, not the two browser lines the brief named — the
+supersede, the active-model unique index, the content lookup dispatch stamps through, and the
+inheritance RPC, which REFUSES a mismatch. So a deep-tier upload does not only paint a badge
+stale: it blocks inheritance onto a new scenario, and a run dispatched outside the Lab's model
+picker goes unstamped — exploratory by WP 10.4's rule, and out of WP 10.8's training set.
+
+**Decisions.** (a) D258–D264, seven rows, each citing the lines it was verified at. (b) The
+`simulation` scope's hash is `hash_inputs`; the scope is declared in one SQL mapping and gated
+against datamap by a parity test. (c) The browser's new informational drift is named `network`,
+not the brief's `firm`: what the composite can tell apart from the inputs is the snapshot's
+`network` domain, which also holds `multi_tier_supply_chain` (process level) — calling all of it
+"firm" would be a label the data does not support (T1). (d) The RunKey moves to version 2 rather
+than re-keying history: a stored `run_spec` is the identity a run was dispatched under. (e) The
+blueprint's §8.4, §9.2, §9.5 and §11.4 carry "Phase 11 refinement" notes citing §4 by D-number
+and no file:line, so `check:docs` keeps one owner per fact.
+
+**Gap check.** Nothing here changes code; `contract:check` (R16: D264 highest, D265 next free;
+R8 sees §21's packages as the owners of D258–D264) and `check:docs` green. Not done, named: no §15
+reading — WP 11.5's probes travel in their own push after the code has merged.
+
+### WP 11.1 — A version per level · 2026-10-01 · `20261001000019`
+
+**Asked for.** "Product graph v3", "Process graph v2", "Firm graph v5": a numbered history per
+level, a change to one level moving that level's number and no other, a revert returning the
+earlier number, and a snapshot that IS its tuple of level versions (§21, D258).
+
+**Promised versus found.** WP 11.0 promised a store, a registration trigger on every capture
+point, an ordered backfill and a per-level state; all four hold as planned, with three things
+the plan did not say. (1) **The backfill is a function, not a `DO` block** (`_graph_level_backfill`,
+which the migration calls once): a `DO` block's numbering rule cannot be rehearsed except by a copy,
+and `rehearsal/660` §7 plants a history inserted newest-first with registration disabled and runs
+the migration's own function over it — numbers follow `created_at`, a NULL firm hash registers
+nothing, and a second pass mints nothing. (2) **The registration names the snapshot's author when
+the statement named nobody.** It runs inside the statement that froze the snapshot, which has
+set its actor; a backfill or a direct insert has not, and `_graph_level_register` then sets the
+GUC to the snapshot's own author, so the actor ratchet sees an attributing writer rather than a
+new exemption (`dataPlaneAudit.test.ts` passes unchanged; §9 reads the audit row back with the
+session actor blanked first). (3) **A door this package widened, closed — D265.** Reading the
+grants for §9 found `dataset_versions` still carries WP 2.4's pinned `dataset_versions_insert_all`
+(`WITH CHECK (true)`, INSERT granted to `anon` and `authenticated`). Nothing inserts a snapshot
+directly, and from this package a planted row would mint level versions as well as be the row
+`snapshot_dataset` dedupes onto and hands to a run. WP 2.4 kept it "because the app runs as anon",
+which is true of the app and irrelevant here: every writer is `snapshot_dataset` (SECURITY DEFINER)
+or the service role. The policy is dropped and the grant revoked; `governanceEnforcement.test.ts`'s
+unconditional-write list goes from seven tables to six, and its no-predicate-write pin from one
+name to none.
+
+**Decisions.** (a) `level_spec` is a column on the level row, NULL-able because WP 11.2's
+`simulation` level is the `inputs` domain digest and carries no level rule. (b) The level row's
+`created_at` and author are the FIRST snapshot's, so a backfilled row is dated by its history and
+names the person the live path would have named. (c) Immutability allows exactly one change — the
+`ON DELETE SET NULL` that forgets a deleted first snapshot — because a level version's content and
+number stay true of the project whichever snapshot first carried them. (d) `service_role` gets
+SELECT only: no edge function has a reason to mint a level version.
+
+**Gate results.** `rehearsal/660` (nine sections) red on the base (the table does not exist) and
+green with the migration; five mutations, each red at its own assertion — dedupe against the latest
+only (red on the unique key, and with the key removed red at §5: "did not return Firm v1 (got
+version 3)"), numbering per project rather than per level (§1), the registering trigger removed
+(§1: "registered 0 level rows"), a firm row from a NULL hash (§7), and D265's door left open (§9).
+`contract:rehearse` plain, `--fixtures` and `--since HEAD` green; `contract:check` green (75
+sidecars, R1/R9/R12 updated by the new table); `npm test` 1 481 passed (`graphLevels.test.ts`
+new, five); `npm run lint`: typecheck 15/15, audit:ui and check:docs pass, eslint at its baseline of 295
+errors and 110 warnings.
+
+**Renumbered before the merge.** While this package was being written, `main` merged the
+`project_freshness` fix as §4 D257, migration `20261001000018` and `rehearsal/650` — the three
+numbers this branch had used. Everything here moved up one place (D257–D264 → D258–D265, the
+migration to `20261001000019`, the rehearsal to `660`, WP 11.2's to `670`) in one commit before
+`main` was merged, which is WP 10.7–10.9's renumber (D251) done the same way: the base's numbers
+are kept and the branch's move.
+
+**Gap check.** WP 11.2 inherits two concrete edits: `_graph_level_register` gains the fourth level
+(and `dataset_versions.simulation_version_id`), and `_graph_level_backfill` is re-run so the
+simulation level's numbers follow history too — §21 updated. WP 11.3 gains `useDatasetVersion`'s
+`levels`, already read from the one state call. Not done, named: the eval harness test
+`db_stage23_test.ts` inserts a `dataset_versions` row directly as the database owner — unaffected
+by the revoke, and not an API path. Production is unmeasured: everything here deploys on merge,
+and the level counts and highest numbers per project are WP 11.5's reading.
+
+### WP 11.1 base merge — `main`'s D257 beside Phase 11, and its rehearsal run for the first time · 2026-10-01 · no migration
+
+**What the merge brought.** `main` merged the `project_freshness` fix as §4 D257 with migration
+`20261001000018` and `rehearsal/650` while WP 11.1 was being written — the three numbers this
+branch had used. The branch renumbered first (D258–D265, `20261001000019`, `660`, and WP 11.2's
+`670`) and then merged; §4's one conflict was two sets of rows appended after D256, resolved by
+keeping `main`'s row first. `contract:check` and `npm test` ran before anything else (D39): the
+generated artifacts needed a second `contract:generate` pass to settle, and then held.
+
+**What the first run of `main`'s rehearsal found.** D257's row says its rehearsal was written
+without a database to run it against. Run here, `rehearsal/650` was red on `main` alone (a
+worktree at `origin/main`, the same failure): §4 — "an unnamed anon caller was answered". The
+migration is right; the rehearsal's header assumed each `DO` block is its own transaction, and
+the runner wraps a whole file in one (`BEGIN` … `ROLLBACK`), so the actor §2's calls set LOCAL
+was still set when §4 asked its unnamed question. §4 now clears the setting first, so "nothing
+set" is a fact rather than an assumption; the header says why. Nothing else in the file moved,
+and CI's `postgres:16` job would have been red on `main` and on every branch from it without it.
+
+**And one of this branch's own.** `contract:rehearse --since HEAD` builds Supabase's bootstrap
+grant (ALL on every `public` table), and on that base `rehearsal/660` §9 was red: the API roles
+held INSERT on `graph_level_versions` at the grant level. RLS refuses the write (no write policy),
+but the grant is a claim and this table's claim is that only a snapshot mints a version; the
+migration now revokes the write privileges explicitly. Plain and `--fixtures` could not see it —
+their base creates the table after the bootstrap grant — which is why the third mode exists.
+
+**Gate results.** `contract:rehearse` plain, `--fixtures` and `--since HEAD` all green with both
+`650` and `660`; `contract:check` green (R16: D265 highest).
+
+### WP 11.2 — The simulation scope, and the bindings · 2026-10-01 · `20261001000020`
+
+**Asked for.** A named `simulation` scope declared once and gated against the worker's reads; a
+Validated Model stale when THAT changed and not when the deep tier did; a RunKey that a
+deep-tier upload cannot defeat; an analysis run that names its level's version (§21, D259,
+D260, D261's column, D264).
+
+**Promised versus found.** WP 11.0 promised to NAME the scope rather than mint it, and that held:
+`simulation → hash_inputs`, one mapping, no new digest, `level_spec` 1, and `rehearsal/670` §1
+holds the hash to the digest of the snapshot's `inputs` domain and every stored hash to a fresh
+rebuild. Five things the plan did not say. (1) **A third copy of the badge rule.** The agent's
+`get_validation_status` and the reuse lookup's badge column derive a card's badge in the edge
+function (`vvTools.ts`), from `list_model_validations`, which returned the composite and nothing
+else — so after a deep-tier upload the agent would have said "stale (data drift)" while the Lab
+said validated. The list is widened (DROP + CREATE, two columns appended, grant restated) and the
+agent's rule follows the browser's; `vv_simulation_scope_test.ts` (four, under Deno) red with the
+rule mutated back to the composite. (2) **The dispatcher needed no change to STAMP.** It passes
+the composite of the snapshot it just took; `active_model_validation_by_content` now resolves that
+composite to its snapshot's simulation hash, so a dispatcher already deployed stamps by inputs the
+moment the migration runs. It passes `hash_simulation` only so `create_simulation_run` has one
+when a run has no snapshot. (3) **The backfill could not disable the immutability trigger**: the
+introspector does not parse `ALTER TABLE … DISABLE TRIGGER` (two unparsed statements on the first
+draft). It takes WP 10.4's shape instead — `_validated_model_immutable` admits one more
+COMPLETION: a model with no simulation hash may learn its OWN snapshot's, with that version and the
+`model_hash` it implies, and nothing else (`670` §7: a foreign hash refused, its own admitted).
+(4) **`model_hash`'s engine term had two spellings.** WP 10.3's backfill computed it with
+`COALESCE(engine_id::text, engine_fingerprint)` — `engine_fingerprint` then, because `engine_id`
+was empty until WP 10.4 — while the insert path has always passed `engine_fingerprint`.
+Recomputing with WP 10.3's expression now would have used `engine_id` and given an existing model
+a hash its own insert path would never produce. The recompute uses `engine_fingerprint`.
+(5) **Two older rehearsals encoded the composite key** and were moved in place, each saying why:
+`590` §4–§5 (its run carries a simulation hash and its spec is v2) and `660` §1 (four levels).
+
+**Decisions.** (a) Models that differ only in the composite are ONE model under the new key: the
+newest stays active and the others are superseded (linked, never deleted) before the unique key is
+rebuilt on `(project, policy, COALESCE(hash_simulation, graph_hash), scenario)`. (b) A card no
+snapshot could teach (no `dataset_version_id`) keeps the composite rule everywhere — SQL and both
+badge copies — and is not given a guessed simulation hash. (c) The browser's informational drift is
+`network` (§16 · WP 11.0 (c)): composite moved, inputs did not; shown, never stale. (d) RunKey
+history is not re-keyed: `run_key_version` 2, and the first identical submission after the merge
+re-runs once. (e) A pre-11.2 database answers "function not found" to `p_simulation_hash`, which
+`findReuseCandidates` already treats as the deploy window (the three-hash fallback).
+
+**Gate results.** `rehearsal/670` (eight sections) red on the base (no `simulation` scope) and
+green with the migration; four SQL mutations, each red — the scope mapped to the composite (§1,
+and `560`), the key on the composite (§2: "not offered for reuse"), stamping on the composite (§2,
+and `560` §4), inheritance on the composite (§2). `simulationScopeParity.test.ts` red both ways (a
+datamap read added; a later migration dropping `customers` from the domain).
+`simulationScopeCredibility.test.ts` (seven) — three red with the drift compared on the composite.
+`contract:rehearse` plain, `--fixtures` and `--since HEAD` green; `contract:check` green (R12
+re-pointed three lineage lines the hook's edits moved); `npm test` 1 493 passed; the agent eval
+suite 295 passed under Deno 2.9.6 (CI pins 2.9.7; remote imports are blocked here, so `deno check`
+of the two edge files could not resolve them — the eval run type-checks the local modules it
+imports); `npm run lint`: typecheck 15/15, audit:ui and check:docs pass, eslint at its baseline of
+295 errors and 110 warnings.
+
+**Gap check.** WP 11.3 inherits: `useModelValidation` exposes `currentSimulationHash` and a
+credibility's `notes`; a card carries `simulation_version_id`, which `useModelVersionRefs` must
+resolve to a number to print "simulation inputs vN"; the Lab's chooser should rank by inputs as the
+badge does. WP 11.4 is unchanged. Not done, named: `analysis_kinds` declares no kind at scope
+`simulation` today — the vocabulary exists for the first analysis that reads the engine's inputs.
+Production is unmeasured: how many active models the new key supersedes, and how many cards could
+not learn a simulation hash, are WP 11.5's reading.
+
+### WP 11.3 — The surfaces · 2026-10-01 · `20261001000021`
+
+**Asked for.** Every figure says which level and which version it is of (T1), an unsaved level
+says unsaved (T2), and exports carry the per-level versions (T4): the three page chips, the
+Validated Model's lines, the snapshot list, the Reproducibility Record and the Trust Report
+(§21, D258's page half, D259's card half, D263).
+
+**Promised versus found.** §21 said "no migration", and one was needed. The browser cannot read
+`graph_level_versions`: its policy is `has_project_access`, which learns the caller from the
+session or the actor setting, and the browser calls as `anon` with neither — D257's shape, one
+table along. The page chips were unaffected (`get_graph_version_state` is SECURITY DEFINER), but
+"simulation inputs v4" on a model and the level numbers of a run's snapshot are not the CURRENT
+state, so they need a read by id. `dataset_version_tuple` is that read (a snapshot's own number
+and its four level versions), and `list_dataset_versions` — the version list, whose only reader
+is the Developer API page, as WP 11.0 found — returns it per row, so the tuple's shape is
+authored once (`rehearsal/670` §9, mutation red). It exposes nothing `dataset_versions` does not:
+that table is readable by every API role and carries each level hash. Three things the plan did
+not say. (1) **The level vocabulary moved to `_shared/`** (`graphLevels.ts`, re-exported from
+`src/lib/trust/`, the `trustReport.ts` precedent), because the Trust Report is computed in the
+browser AND by the agent's tool and both must name a level with the pages' code. (2) **A fourth
+copy of drift WORDING** — the credibility badge's tooltip said "network data changed since
+validation (graph hash drifted)" — now says the simulation's inputs changed, and shows a deep-tier
+change as a note that says the model stays as validated; the Lab's run-refusal sentence and
+`driftReasons` say the same. (3) **"Graph v7" survives where it is true**: a chip with no level
+(none today) still prints the composite, and a database before `20261001000019` — no `levels`
+block — prints the composite rather than calling a level unsaved that it cannot number.
+
+**Decisions.** (a) The level bindings in the Reproducibility Record are REQUIRED for a run whose
+`run_spec` is RunKey v2 (it carries them by construction) and recommended for history, which
+could not — the `run.key` precedent. A v2 run with no simulation hash is not reproducible and the
+record says which binding is missing. (b) The Trust Report says "not read for this report" when
+its caller could not read the levels, never "unsaved" — unknown is not a state (D70). The levels
+are rows in the existing verdict section, not a new section, so `TRUST_REPORT_SECTION_IDS` and
+every document built from it are unchanged. (c) A snapshot's tuple is written "P3 · R2 · F5 · S4"
+(R for pRocess, so P stays Product) and a missing level is "?", never dropped. (d) The model
+card's first line is "Simulation inputs", the old "Graph" line is "Snapshot": what the model binds
+first, the frozen world second.
+
+**Walkthrough** (Vite dev server, Playwright on the pre-installed Chromium, every Supabase call
+answered from a canned project in two worlds: BEFORE, everything saved; AFTER a deep-tier-only
+upload — firm moved, product, process and the simulation inputs did not). Product page:
+"Product graph v3 · ppppppp" in both worlds. Process page: "Process graph v2 · rrrrrrr" in both.
+Firm page: "Firm graph v4 · fffffff" before, "Firm graph unsaved · ggggggg" after. Chip titles:
+"Snapshot v9 · P3 · R2 · F4 · S4" before, "Snapshot unsaved · P3 · R2 · F? · S4 — unsaved: firm
+graph" after. Lab (`?project=…&model=m1`): "simulation inputs v4 · snapshot v9 · policy v3 ·
+validated 10/1/2026 · in force" before, and after the same plus "the deep tier changed — not read
+by the simulation" — still in force, no re-validate. No analyzer was invoked on the process or
+firm pages; the product page invoked one because the canned project holds no stored metrics row,
+which is the canned data, not this change.
+
+**Gate results.** `npm test` 1 506 passed (chip and tuple: `graphLevels.test.ts`; record:
+three new; Trust Report: two new; the model card and Model step tests moved to the new wording);
+the agent eval suite 295 passed under Deno; `contract:check` green (R12: 24 lineage citations
+re-pointed mechanically by matching each cited line's text, 13 of them flagged); `npm run lint`:
+typecheck 15/15, audit:ui and check:docs pass, eslint at its baseline of 295 errors and 110
+warnings (a second non-component export from the chip file raised it to 111; the helper moved to
+`graphLevels.ts`); `contract:rehearse` plain, `--fixtures` and `--since HEAD` green.
+
+**Gap check.** WP 11.4 is unchanged: the training set's grouping is SQL, and the Surrogate card's
+line is its to change. Not done, named: the walkthrough is a canned harness in the session's
+scratchpad, as WP 10.1's and 10.5's were, and is not committed; the agent's own badge lines
+(`get_validation_status`) still print `graph_hash` beside a card — it now decides drift on the
+simulation hash (WP 11.2) but does not print it. Production is unmeasured (WP 11.5).
+
+### WP 11.4 — Lineage · 2026-10-01 · `20261001000022`
+
+**Asked for.** The training set's KPIs grouped and counted by the world they came from — the
+simulation-input version — and the structural features by theirs — the product version — with
+the join key between them stated (§21, D261's number, D262).
+
+**Promised versus found.** The regrouping was as planned: the view gains the simulation version
+(appended, so every existing column keeps its place), the summary groups on it and counts the
+composites inside each group, the totals count it, and the Surrogate card says "… · N
+simulation-input versions" (falling back to the composite count on a database before the
+migration, under the composite's own name). Two things the plan did not say. (1) **A run's
+inputs depended on who wrote the run.** `create_simulation_run` states `hash_simulation` (WP
+11.2), but `rehearsal/620` inserts its runs directly — the shape D252's direct-insert door also
+has — and such a run named no simulation version, so a grouping by it would have dropped the run
+from its own model's group. `_simulation_run_derive`, the BEFORE trigger that already names a
+run's class and engine, now names its inputs from its snapshot when the writer stated none, and
+the view falls back to the snapshot's version for any older row. (2) **The view runs as its
+caller, and the caller cannot read the level table.** `graph_level_versions` admits a reader
+through `has_project_access`, which refuses the browser (WP 11.3's finding), so the version
+NUMBER comes through `graph_level_version_no`, a SECURITY DEFINER read by id — deliberately not
+`_`-prefixed, because an invoker view calls it as the API role and D248's class rule keeps `_`
+helpers from those roles.
+
+**Decisions.** (a) The composite stays in the set as lineage (`graph_version_id`, and a
+`graph_versions` count per group and in the totals): it is the frozen world a run can be
+re-executed against, it is just not the grouping key. (b) `surrogate_feature_spec` stops
+returning `graph_version_no` — the composite's number beside product-keyed features was D261's
+whole complaint — and returns `level_version_id` and `product_version_no`, with the snapshot's
+number as `snapshot_version_no`. Nothing in `src/` or the edge functions read the old key. (c)
+The join key between KPIs and features is the run's snapshot: its tuple names both versions
+(blueprint §11.4, Phase 11 note, which now carries an "as built" line).
+
+**Gate results.** `rehearsal/620` §8 red on the base and green with the migration; two mutations,
+each red — the summary grouped by the composite as well ("split into 2 groups"), and the run
+derivation removed ("did not learn them from its snapshot"). `contract:rehearse` plain,
+`--fixtures` and `--since HEAD` green; `contract:check` green; `npm test` 1 508 passed (the card's
+line: two new); `npm run lint`: typecheck 15/15, audit:ui and check:docs pass, eslint at its
+baseline of 295 errors and 110 warnings.
+
+**Gap check.** WP 11.5 owns the reading. Not done, named: no surrogate is trained, by design
+(WP 10.8); the summary's groups carry the simulation version's number through a definer read
+that returns it to any caller holding a level version's id — a number, which the tuple read
+already serves.
+
+### WP 11.5 (probes) — Phase 11's §15 probes, in their own push · 2026-10-01 · no migration
+
+**What.** `phase11Levels()`, nine probes, one per claim WP 11.1–11.4 made about production: the
+level versions per project and level, with the highest number (D258); snapshot tuples with a
+NULL, split by whether the hash was there to register (D258); Validated Models by which hash
+they bind, and any that could have learnt the simulation hash and did not (D259); runs by RunKey
+version and simulation binding (D260); analysis runs by scope and level version (D261); the
+stored simulation hash against the newest snapshot and whether the live one is a version (D264);
+the training set by simulation version against composites (D262); the doors D265 closed and the
+tuple read opened; and the `network_metrics` / `prominence` runs keyed on a level that D240's
+drop waits for.
+
+**How it was checked.** Every probe was executed against the rehearsal database built by
+`contract:rehearse -- --since HEAD`, which carries `20261001000019`–`22`: nine of nine ran. They
+travel in their own push — the migrations were pushed with WP 11.1–11.4 — so the §15 run this
+push fires does not race a deploy. **It is not the reading**: migrations deploy on merge, so on
+this branch the nine error by construction (as Phase 10's probes 14–16 did), and that is a fact
+about the sequence.
+
+**Owed.** The reading, in the push after the merge (D153), quoted here with its run id and fence
+check; and, if probe 9 shows a level-keyed `network_metrics` or `prominence` run, D240's drop.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -21431,6 +21773,7 @@ prominence analysis has run in production. Nothing else in Phase 10 is owed.
 | **8** | **8.0 – 8.5** | **the graph layer — one node type, one graph layer** | — | **8.0 ✅** the seven §15 probes, and the numbers are NOT in yet: the package deliberately measures and changes nothing, because the diagnosis branches on a BOM depth no work-package session can read. Thirteen defects opened, **D127–D142**, two of which the measurement then CORRECTED from over-claims to latent (D129, D141). The root cause is in the contract already — there is **no type column on either edge table**, so **eight** classifiers each infer one at render time and disagree by construction, and the single `level` column carries **three** incompatible meanings between its writer, its contract and its reader. Two defects silently destroy data (**D128** a dedup guard testing a key it never writes; **D129** an edge emitted to `''` where the BOM root should be) and one label is fabricated outright (**D139** "work station", from `level === 1`, with no routing table anywhere in the contract). It also found **D138** — §16's last twenty-one entries sat AFTER §17 and so outside the slice every gate reads — and the numbering collision that made this Phase 8 rather than Phase 7 (§14 already owns `WP 7.1`, and D28 is owned by it). `check.mjs` now reads its roadmap from two ranges so a Phase 8 package is gated like a Phase 3 one, proved by making R7 fail with the package named. **AND THE SECOND §15 RUN IS WHY THE PACKAGE MATTERED**: the reported project's BOM is exactly four levels deep, so the ladder defect the brief predicted is LATENT there — and the map is wrong anyway, because **two live ETLs write both edge tables with different `level` rules** (**D140**, the finding of the package, and it rescopes WP 8.2 onto the SQL RPC because the edge function the brief named is the undeployed half). Also **D141** (the RPC invents a node called `ROOT`) and **D142** (nothing rebuilds the lane when its sources change, and every timestamp reports it fresh because a DELETE moves no `updated_at` — D12's lesson in a second place). **WP 8.1 ✅** — one classifier, and it found **D143**: the trigger that keeps the typed node projection in sync with the graph reads `NEW` in a STATEMENT-level context, so it has never fired once since 2025-08-29. Fixing it made two rehearsals go red with `forbidden`, because `rebuild_node_list` AUTHORIZES and a derivation running inside somebody else's INSERT can only refuse a writer the database already allowed — D66's shape in a derivation, closed by splitting discovery from authorization. **D132 closed**; **D127**'s data half landed. **WP 8.3 PARTIAL** — `src/lib/graph/` lands with 85 tests: one palette where there were five, encodings that carry data (area-scaled size, log-scaled width, position from the ECHELON and never from `level`), and the subgraph engine EXTRACTED from the orphaned fourth page under a parity suite that runs the original verbatim as a frozen witness. **Taken before WP 8.2 deliberately**: after WP 8.1 a page reading `echelon` and `bom_depth` is independent of `level` entirely, so the layer fixes the reported map without the ETL changing, and WP 8.2 can then alter `level` with nothing reading it. Found **D144** (`includeTerminals` is inverted, so the terminal-stop mechanism has never bounded a walk) and **D145** (a fixed `RETURNS TABLE` is a SECOND authoring of the schema — `get_node_list` could not carry WP 8.1's three columns, so a type that was authored, backfilled and constrained was invisible to every page). **The pages still classify**, and the two gates are RATCHETS that say so in numbers: 6 classifiers, 11/32/13/16/18 colour literals, each may only fall. **WP 8.5 PARTIAL** — the fabricated label is gone: `getDisplayNodeType` no longer returns "work station" (**D139**, a noun on screen no table in this database can produce), the title and empty state say **multi-level bill of materials**, the legend says **Echelons**, and the node panel labels the lane ordinate as the raw column it is. `material level N` went too, because on the measured project that string called 260 materials and 66 products "material level 2" at once. The ROUTE, the sidebar and eight manual bodies keep the old name deliberately — renaming those is D104's class and is named follow-up. **WP 8.2 ✅ — ONE ETL, and the decision was the package's first act.** The SQL RPC lives and the edge function's lane build is deleted; the demand walk was PORTED into SQL as a `WITH RECURSIVE`, because a loop over `level` assumes that column is a topological order and D140 is the finding that it is not. **The rescope's own evidence was stale**: `combine-project` has had a deploy step since WP 6.3 and the Combine BUTTON invokes it, so both writers were live across five call sites — worse than measured, and the structural reason the RPC wins stands either way (the completion trigger cannot call an edge function, and D142's rebuild needs a trigger). `bom_depth` is read from `bom_multi_level.level`; `level` carries the same value as a deprecated alias for one release. **Closed D129, D130, D133, D134, D136's hardcoded zero, D140, D141 and D142's rebuild half**, the last with a statement-level trigger on all four source lanes — which made four existing rehearsals go red, every one because it wrote a DERIVED table by hand and then touched its source, and each was repaired by following its own assertion rather than weakening it. Opened **D149** (a fallback read that raises on every call, for two independent reasons, found by DROPPING D133's column) and **D150** (**D2 was closed in the edge function and never in the RPC**, so the deployed writer read every lane `volume` raw for another year — a fix applied to one of two writers is not a fix). `rehearsal/310`, ten sections, six mutations verified red. **AND IT DOES NOT BACKFILL**: the fix changes what a combine WRITES, so `Project AA - ver3` must have Combine re-run after this deploys. **WP 8.3 + 8.4 THEN MADE IT VISIBLE**, after a reader said the one thing that mattered — *no differences in the result*. They were right: the migration deploys on MERGE, no page referenced `echelon`, and nothing imported the layer at all. Now both pages read the data. Process-level takes depth from `bom_multi_level` (so a 4-deep BOM renders as 5 columns instead of 1) and type from the lane roles; Product-level is the four echelons the reader specified — Supplier → purchased Material → finished Product → Customer — with the BOM COLLAPSED and the flow PROPAGATED down the tree rather than one hop of it, plus edge width by flow and arrowheads. **Four classifiers deleted, ratchet 6 → 4 → 2.** **D128, D135, D136 closed** (D136 by inverting it: the collapse is the view's intent, drawing the tree was the bug). **BOTH HALVES ARE NOW IN ONE PLACE, WHICH NEITHER BRANCH COULD SAY.** WP 8.2 wrote the ETL that WP 8.3 + 8.4's pages were computing for themselves, and each branch's §17 row ended by naming the other as what remained. What is left of the phase is the RATCHET's last two classifiers (6 → 4 → 2, and `oneClassifier.test.ts` fails if the list shrinks without the baseline shrinking with it) and WP 8.5's named follow-up — the ROUTE rename with a redirect, the eight manual bodies and the registry entry, in one commit. **And nothing in this phase is in production**: the three migrations behind it never deployed, because `main` carried two migration versions twice (§4 D151, closed here with `contract:check` R20). |
 | **9** | **9.1 – 9.4** | **results: inventory over time, capacity, the result binding, and the Lab surface** | — | **9.4 ✅** the Lab builds on the validated baseline: `scenarios.role`, one seeding module, one run gate, one planning unit, one disruption-event model exported by the engine, one network dialog (§4 D147, D219–D228 closed). **9.1 ✅** the weekly-series vocabulary is authored ONCE (`WEEKLY_SERIES`, scsim/core/context.py) and the engine's six copies derive from it — which is how §4 D164 was found and closed: `fg_value`, finished-goods inventory, had been computed on every replication since the trace was written and published by nothing, so the chart captioned "Inventory dynamics" showed MATERIAL stock and called it inventory. Materials and finished goods now both reach a user, in units or value, on BOTH result surfaces, on ordinary multi-replication runs. It also describes `run_replications` — the first of the nine run/result tables to leave the deferral — and re-homes the other eight, whose owner (WP 6.3) had shipped, which is the state R8 exists to refuse. **9.2** is what those eight owe and 9.1 does not pay: `result-binding` — every result binds dataset + policy + scenario + engine version. A5's Reproducibility Record (WP 6.3) assembles that at EXPORT time from rows that could each have been written by a different world; the invariant asks for it on the ROW, and D88 is the precondition — 8 577 derived rows predate provenance  **9.3 ✅** capacity becomes a recorded datum at both ends — §4 D167. The chain `products.production_capacity` declares was already machine-readable and the display layer could not walk it (`resolveEffective.ts` ended on a comment true of the logistics tables and false of the engine), so the plant grid showed nothing for the one number the run was certain to use; and `capacity_utilization` read a `full_debug`-only matrix, so it was NaN on every run a user ever made and the sanity tile printed "not recorded" — while D113's own closing note told the next reader the measure rendered, and `test_item_series.py`'s behaviour-neutrality gate carried a written exemption for the one KPI that was not behaviour-neutral. Closed with one author per fact (`EmptyMeaning`, `shadowed_by`, `derivedFallbackDetails`) and four always-on weekly capacity series plus per-entity binding measured against the UNCLIPPED want. **9.2** remains what the eight deferred run/result tables owe and neither 9.1 nor 9.3 pays |
 | **10** | **10.0 – 10.9** | **versions you can choose: graph versions per level, compute-once metrics, policy versions by content, the Validated Model, engines and RunKey, the Lab flow, result tiers, capacity, the surrogate training set** | — | **10.0 ✅** the plan (§20), §4 D233–D247 registered from a verified reading, WP 9.2's tables re-homed to WP 10.4 and `model_validations` to WP 10.3, the blueprint refined (§8.4, §9.2, §9.5, §11.4). **10.2 ✅** a policy version is its content: saves deduplicate by `policy_hash` with a per-project number, cards are matched by content everywhere including dispatch stamping and inheritance, and the version in force is derived, so a fresh Lab reads *validated* (D241, D242 closed). **10.1 ✅** graph versions per level and metrics computed once: three level hashes with the composite unchanged, a stored current hash, a numbered version per upload deduplicated against any, analyses keyed on the level they read, and three pages that read before they compute (D233–D239 closed; D240's last shim is WP 10.4's). **10.3 ✅** the Validated Model: a complete run protocol checked by one SQL function, `model_hash` as its identity, immutable, numbered and named, with its evidence in a row of its own; Student-t throughout Run & Validate, the warm-up the maximum over the selected KPIs, adoption only when every selected KPI passes or a statement is recorded, and Save Validated Model ending in **Open in Simulation Lab** (D243, D244 closed; the fingerprint deliberately not widened). **10.4 ✅** the binding on the row: an engine registry (scsim active, legacy retired), a RunKey computed once in SQL over engine build, graph, policy, the scenario's run spec and deviations, one insert path under which identical submissions make one run, the worker refusing a run bound to an engine it does not run, and all eight run/result tables described — plus **D248**, found by making the rehearsal mirror Supabase's default function grants: fifteen internal SECURITY DEFINER helpers had been callable through the API (D245, D248 closed; `network_topology_hash`'s drop moved to the new **WP 10.9**, which takes the after-merge readings). **10.5 ✅** the Lab starts from a choice of Validated Model: Model → Engine → Scenario → Settings → Run, the protocol locked behind "Advanced" with every deviation recorded as `protocol_overrides`, a run of the model dispatching the model's own policy version, "Run this model" seeding a scenario from it in one click, an editor's badged exploratory path, the run's size before it runs, and comparisons scoped to the model — which found **D249** (a model's evidence run reads as exploratory; the comparison half closed, the training half WP 10.8's). **10.6 ✅** result tiers: a worker run's weekly series in one zstd Parquet object per run in a private bucket, rows keeping their KPIs (and the min/max range the worker used to drop), one loader that hydrates rows so every chart reads what it always read, standard / pinned / evidence retention with a sweep that removes series only and says so with the RunKey — Postgres per run 165 KB → 23 KB at 30 × 52 (D246, D250 closed; the browser path keeps JSONB under the same retention). **10.7 ✅** capacity: an organization pool (monthly replication-weeks, series storage, replications per run, runs in flight, retention) and each project role's share of it, admitted in ONE place inside `create_simulation_run` after the RunKey lookup — a reuse or an attach consumes nothing, and the Lab, `/v1` and agent-apply are refused alike with 402/403/429 and the numbers; a ledger of reservation, actual and release; the Run card forecasting the answer and the super admin's usage table (D247 closed; **D252** — the share binds whom the caller names — WP 7.1's). **10.8 ✅** the surrogate-ready training set: one view stating which replications may train a surrogate — a validated model's faithful, completed runs, its evidence run included (D249 closed), nothing exploratory, deviating, gate-skipped or revoked — grouped by Validated Model and Graph Version with the RunKey and each replication's KPIs; structural features of the sourcing network computed once per product-level hash through the analysis store; the Lab's Surrogate card counting the set. No model is trained. **10.9 first half** the after-merge reading of WP 10.0–10.6 (§15 run `36857125032`): D248 closed in production, scsim reported by the worker, every graph and policy version numbered — and **D253**, retention inert in production (no pg_cron) with object removal by SQL that could break a run delete, closed by `20261001000014`. **10.9 second reading** the after-merge reading of WP 10.7–10.9a (§15 run `36863326325`): every migrated relation present, the role shares seeded, every organization at 90 days, the worker's first sweep run — and **D254**, the Surrogate card summing per-model groups, closed by `20261001000015`. **Still owed: the `network_topology_hash` drop, after a network-metrics or prominence analysis has run in production.** |
+| **11** | **11.0 – 11.5** | **one graph, three levels: a version per level, and every consumer bound to the level it reads** | — | **11.0 ✅** the plan (§21), §4 D258–D264 registered from a verified reading, the blueprint refined (§8.4, §9.2, §9.5, §11.4). The reading changed the design: the simulation's read set already HAS a hash — `hash_inputs`, the snapshot's `inputs` domain, whose eight tables are exactly the worker's eight reads — so the `simulation` scope is named and gated rather than minted, and `level_spec` stays 1. **11.1 ✅** a version per level: `graph_level_versions` numbers product, process and firm per project, deduplicated against any earlier version of the level; every snapshot names its tuple; history is backfilled in order; the state returns each level's version (D258's store half). It also closed **D265**: `anon` could insert a snapshot row directly, which from this package would have minted level versions. **11.2 ✅** the simulation scope NAMED (`simulation → hash_inputs`, one mapping, no new digest) and gated against the worker's reads; a Validated Model binds it, RunKey v2 hashes it, an analysis run names its level version; the agent's own copy of the badge rule follows (D260, D264 closed). **11.3 ✅** the surfaces: each network page names its level's version ("Product graph v3"), the Validated Model reads "simulation inputs v4" with a deep-tier change as a note and never re-validate, the snapshot list shows its tuple, the Reproducibility Record and Trust Report carry the levels (D258, D259, D263 closed; one read migration, `dataset_version_tuple`, because the browser cannot read the level table). **11.4 ✅** lineage: the training set groups and counts KPIs by simulation-input version and keeps the composite as lineage; the features name their product version; a run names its inputs whoever wrote it (D261, D262 closed). **11.5** the probes are pushed (`phase11Levels()`, nine, each executed against a rehearsal database first); the reading and D240's drop are owed in the push after the merge. |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -23102,3 +23445,221 @@ its level has run in production (`process_structure`, scope `process`, with a gr
 the two analyzers that called the shim — `network_metrics` and `prominence` — have not run since
 either merge, so nothing yet proves their published builds no longer call it.
 
+
+## 21. Phase 11 — One graph, three levels: a version per level, and every consumer bound to the level it reads
+
+**The ask, and the decisions already taken (2026-10-01).** Phase 10's WP 10.1 gave the graph
+three named levels — product, process, firm — and a HASH for each, but a NUMBER only to the
+composite snapshot, and every consumer still binds to the composite. The product owner decided
+four things; this section records them so no package re-opens them.
+
+1. **A graph version is per level.** Product, process and firm each have a numbered history
+   ("Product graph v3", "Process graph v2", "Firm graph v5"). A change to one level moves that
+   level's number and no other; reverting a level returns its earlier number (dedupe against
+   ANY earlier version of that level, as WP 10.1 does for the composite).
+2. **The composite snapshot stays, as the frozen world.** A `dataset_versions` row remains the
+   immutable snapshot a run can be re-executed against (blueprint §8.4 refinement (b) still needs
+   it). It is no longer the number a person is shown first: it is the TUPLE of its level
+   versions, and its own number is kept for history and the reproducibility record.
+3. **Every consumer binds to the level it reads, stated once.** The three level pages show their
+   level's version and hash. A network analysis keys on its level (WP 10.1) and records the level
+   VERSION it ran against. The simulation engine's read set is a named scope, **`simulation`**,
+   declared once and gated against the worker's own read list; a **Validated Model** binds it and
+   is stale when IT changed, not when the deep tier changed; the **RunKey** hashes it, so a
+   deep-tier upload never defeats reuse of a simulation whose inputs did not move. The
+   **surrogate training set** groups KPIs by the simulation-scope version and the structural
+   `feature_spec` keys on the product-level version, both stated on the row.
+4. **Transparency as before.** Every figure says which level and version it is of (T1); an
+   unsaved level says "unsaved" (T2); exports and the Trust Report carry the per-level versions
+   (T4). No stored hash and no `schema_version` moves.
+
+**What was already true** — §4 D258–D264, each verified by reading before it was written. Four
+of the brief's claims were corrected on the way, and the first changes the design:
+
+- **The simulation scope already has a hash.** The brief said "no hash names it today". The
+  snapshot's `inputs` domain is, by its own comment since WP 4.1, "the tier-2 tables a
+  SIMULATION reads", and its eight tables are exactly the eight the worker's datamap reads;
+  `hash_inputs` is its digest, stored on every snapshot since WP 4.1. So the `simulation` scope
+  is NAMED, not minted: its hash IS `hash_inputs`. Folding a second digest of the same eight
+  tables into `_dataset_level_hashes` would author one fact twice (`single-source`), and the
+  brief made the `level_spec` 2 bump conditional on that fold — so `level_spec` stays 1 and no
+  stored hash moves. What was missing is the name, a gate (D264) and the bindings (D259, D260).
+- **`dataset_versions` is immutable by convention, not by trigger.** No trigger refuses an
+  UPDATE (`snapshot_dataset` itself fills NULL level hashes on an old row). The new level table
+  gets a real one; `dataset_versions` is not changed by this phase.
+- **/project-manager has no version list.** The only reader of `list_dataset_versions` is the
+  Developer API page's notebook config. WP 11.3 widens the RPC with the tuple and renders it
+  where versions are already shown, rather than inventing a page.
+- **Numbers.** D256 and D257 were taken by the `super_admin` fix and the `project_freshness`
+  fix, so this phase registers from D258; rehearsals `630`–`650` and migration `20261001000018`
+  are taken, so this phase's rehearsals are `660` and `670` (and `620` §8) and its migrations
+  start at `20261001000019`. (Renumbered at WP 11.1, when the third of those merges landed
+  mid-package — §16 · WP 11.1.)
+
+**The target model.**
+
+```
+dataset_versions (the frozen world; composite graph_hash; "snapshot v9")
+   │  AFTER INSERT / level-hash backfill → registers one row per level, deduped against ANY
+   ▼
+graph_level_versions (project, level ∈ product · process · firm · simulation, level_hash,
+                      version_no per (project, level), first snapshot)    "Product graph v3"
+   │  dataset_versions.{product,process,firm,simulation}_version_id — a snapshot IS its tuple
+   ▼
+consumers bind the level they read:
+   level pages        → their level's version + hash
+   analysis_runs      → input_scope + input_hash (WP 10.1) + level_version_id
+   Validated Model    → hash_simulation + simulation_version_id (composite kept beside)
+   RunKey (v2)        → H(engine ∥ simulation hash ∥ policy ∥ scenario spec ∥ overrides)
+   training set       → KPIs by simulation version; features by product version
+   exports            → the tuple, each binding required for new runs, recommended for history
+```
+
+**Order.** 11.0 → 11.1 → 11.2 → 11.3 → 11.4 → 11.5. Commit convention:
+`Phase 11 / WP 11.N / <blueprint §ref · gap or D-number>: <title>`. Every package ends with a
+gap check, a §16 entry, edits to later packages here in the same commit when a finding changes
+them, and its ✅ here and in §17.
+
+### WP 11.0 — The plan ✅ *(docs only — done)*
+
+This section; §17's Phase 11 row; §4 D258–D264; "Phase 11 refinement" notes under blueprint
+§8.4 (the version is per level; the composite is the frozen tuple), §9.2 (the RunKey hashes the
+simulation scope), §9.5 (a model binds the simulation scope) and §11.4 (lineage = the
+simulation-scope version for KPIs, the product-level version for features).
+
+### WP 11.1 — A version per level ✅ *(blueprint §8.4 · gate `single-source` · D258's store half, D265 closed — done `20261001000019`)*
+
+**Deliverables.**
+
+1. **Store.** `graph_level_versions(id, project_id, level CHECK IN ('product', 'process',
+   'firm', 'simulation'), level_hash, version_no, level_spec, first_dataset_version_id →
+   dataset_versions, author_user_id, created_at)`, `UNIQUE (project_id, level, level_hash)` and
+   `UNIQUE (project_id, level, version_no)`; immutable by trigger (only the cascade that nulls
+   `first_dataset_version_id` when its snapshot is deleted may touch a row); tier 3, audited
+   (`audit_tier_write('3')` ×3); a sidecar. A row is the FIRST time a project's level had that
+   content; `version_no` is per project per level, assigned on insert under a per-(project,
+   level) advisory lock (`dataset_versions_assign_number` is the pattern).
+2. **Registration.** A row trigger on `dataset_versions` — AFTER INSERT, and AFTER UPDATE OF the
+   level hashes (the backfill path `snapshot_dataset` takes for a row frozen before WP 10.1) —
+   upserts the level rows and does nothing when the content exists, so every capture point WP
+   10.1 built registers levels for free and no second capture path exists. `dataset_versions`
+   gains `product_version_id`, `process_version_id`, `firm_version_id` (nullable FKs) filled by
+   the same function, so a snapshot IS its tuple. The function is internal: revoked from
+   `PUBLIC, anon, authenticated` (D248).
+3. **Backfill.** Every existing snapshot, in `(project_id, created_at, id)` order, so numbers
+   follow history. A NULL level hash (firm before snapshot v3; every level before WP 4.1) gets no
+   row and the snapshot's id for that level stays NULL — said in the sidecar, not defaulted.
+4. **State.** `get_graph_version_state` returns, beside what it returns today, `levels.{product,
+   process, firm}`: `{hash, current_version {id, version_no, created_at} | null, latest_version,
+   version_count, unsaved}`. `useDatasetVersion` exposes `levels`. One read, as D233 requires.
+
+**Exit.** `rehearsal/660`: (1) a snapshot registers three level rows numbered 1; (2) a price
+edit + capture moves PRODUCT to v2 and leaves process and firm at v1; (3) a BOM quantity edit
+moves product AND process; (4) a deep-tier edit moves firm only, and the state says product and
+process are current and firm unsaved until the capture; (5) reverting it returns Firm v1, no new
+row; (6) the snapshot's tuple names the three ids; (7) backfill order on a planted history;
+(8) immutability; (9) doors — no API role writes the table, the registering function is not
+executable by `anon` or `authenticated`. Mutations, each red: dedupe against the latest only;
+number per project, not per level; the registering trigger removed; a firm row registered from
+a NULL hash. `contract:rehearse` green all three ways.
+
+### WP 11.2 — The simulation scope, and the bindings ✅ *(blueprint §9.2, §9.5 · gates `single-source`, `result-binding` · D260 and D264 closed, D259's binding and D261's column done — done `20261001000020`)*
+
+**Deliverables.**
+
+1. **Name the scope once.** `simulation` joins the scope vocabulary: `analysis_kinds`'
+   `input_scope`/`fallback_scope` and `analysis_runs.input_scope` CHECKs, and ONE scope → hash
+   mapping (`_scope_hash_key`) that `current_level_hash`, `analysis_get_or_start` and the level
+   registration all read, with `simulation → hash_inputs`. Registered as a fourth level in WP
+   11.1's table (`dataset_versions.simulation_version_id`) by widening `_graph_level_register`
+   to a fourth level and re-running `_graph_level_backfill`, so its numbers follow history.
+   `level_spec` stays 1 and `rehearsal/670` §1 proves every stored and current hash
+   byte-identical across the migration.
+2. **Gate it** (`single-source`). `simulationScopeParity.test.ts` on `analysisKindsParity`'s
+   pattern: the tables the snapshot's `inputs` domain hashes must equal the tables datamap reads
+   (both PARSED — no hand-copied list), and the mapping must send `simulation` to `hash_inputs`.
+   A table added to the engine without the hash, or to the hash without the engine, fails CI.
+3. **Validated Model.** `model_validations` gains `hash_simulation` and `simulation_version_id`,
+   read from the snapshot by the one insert path; `graph_hash` and `dataset_version_id` STAY (the
+   snapshot is still what it was validated on). `model_hash` digests the simulation hash —
+   which changes which models are "the same content", so existing rows are backfilled from their
+   own snapshot, past the immutability trigger, once (as WP 10.3 did) and §16 says how many could
+   not be. Content matching moves to the simulation hash wherever it is done — the supersede, the
+   active-model unique index, `active_model_validation_by_content` (which resolves the composite
+   the dispatcher passes to its snapshot's simulation hash, so no dispatcher change is needed to
+   stamp), and `apply_validation_to_scenario`. A card with no simulation hash (no snapshot to read
+   it from) keeps matching on the composite and says so. In the browser `deriveCredibility`
+   compares the simulation hash for `data` drift and adds a separate, informational `network`
+   note — the composite moved and the inputs did not — shown and never marking the model stale.
+4. **RunKey v2.** `simulation_run_spec` and `find_reusable_runs` take `p_simulation_hash` (DROP +
+   CREATE, grants restated) and the spec carries `run_key_version` 2 with `simulation_hash` in
+   place of `graph_hash`. `create_simulation_run` reads the simulation hash from the snapshot row
+   it is handed (falling back to one the caller names), and `simulation_runs` gains
+   `hash_simulation` and `simulation_version_id`, backfilled for history from each run's own
+   snapshot; the composite stays on the row. A v1 key never equals a v2 key, so the first
+   identical submission after the merge re-runs once — the safe direction, said in §16. The
+   dispatcher reads `hash_inputs` beside `graph_hash` and the AI read tool's identity gains it;
+   the pre-WP-10.4 fallback path is unchanged.
+5. **Analyses.** `analysis_runs.level_version_id → graph_level_versions`, filled by
+   `analysis_get_or_start` from the level row of the hash it keyed on (NULL for scope `all`,
+   whose version is the snapshot); the analyzers change nothing.
+
+**Exit.** `rehearsal/670`: (1) every hash unchanged across the migration; (2) a model validated,
+then a deep-tier edit → the model still current by content, `model_hash` unchanged, an identical
+submission offered for reuse; (3) a price edit → a new key, no reuse, the model no longer matches;
+(4) a `bom_multi_level` edit → the same (the engine reads it); (5) a `multi_tier_supply_chain`
+edit → current (it does not); (6) an analysis run records its level version; (7) inheritance
+refuses a stale model and accepts one whose only change is the deep tier. Mutations: the
+simulation hash mapped to the composite (red in the rehearsal); the drift compared on the
+composite (red in the hook's test); the parity test's list hand-edited (red in the test).
+
+### WP 11.3 — The surfaces ✅ *(one read migration · D258, D259 and D263 closed · T1, T2, T4 — done `20261001000021`)*
+
+**Deliverables.** `GraphVersionChip` takes the page's level and prints `Product graph v3 ·
+<level hash 7>` (process, firm likewise), "unsaved" per level, and the snapshot tuple in its
+title; `graphVersionText` keeps its tests and gains level ones. The Validated Model surfaces
+(summary card, `LabModelStep`, `openedModelLine`, the Lab run card) print "simulation inputs vN"
+with the snapshot secondary, and the drift line distinguishes "inputs changed → re-validate" from
+"deep tier changed — not read by the simulation". `list_dataset_versions` returns each
+snapshot's tuple (P · R · F · S numbers), and its reader shows it. The Reproducibility Record
+binds `dataset.simulation_hash`, `dataset.simulation_version` and the three level versions, each
+`required` for a run that carries them and `recommended` for history (WP 10.4's pattern); the
+Trust Report's freshness block carries the per-level versions.
+
+**Exit.** `npm test` with the chip, credibility and record tests; a walkthrough (the canned
+Playwright harness): the three pages after a deep-tier-only change — product and process chips
+unchanged, the firm chip moved; the Lab after the same change — the model still validated;
+eslint not grown; `audit:ui` clean; R12's lineage lines re-pointed.
+
+### WP 11.4 — Lineage ✅ *(blueprint §11.4 · G12 · D261 and D262 closed — done `20261001000022`)*
+
+**Deliverables.** `surrogate_training_runs` exposes `simulation_version_id` and
+`simulation_version_no` (the KPIs' world) beside the composite it keeps;
+`surrogate_training_summary` and `surrogate_training_totals` group and count by the simulation
+version; the Surrogate card says "… · N simulation-input versions". `surrogate_feature_spec`
+returns the PRODUCT level's version number and id (the features' world), through WP 11.2's
+column. Blueprint §11.4 states the join key between the two.
+
+**Exit.** `rehearsal/620` §8: two snapshots differing only in the deep tier → ONE simulation
+version in the summary and the totals; a shared run counts once (D254's rule holds across the
+regrouping). Mutation — group by the composite — red.
+
+### WP 11.5 — After the merge *(§15 · D153 — needs the merges; no branch can take it)*
+
+§15 probes in their OWN push: per project, level version counts and the highest number per
+level; snapshots whose tuple has a NULL, by level; models by which hash they bind (simulation or
+composite only); runs carrying `simulation_version_id`; analysis runs carrying
+`level_version_id`; `hash_inputs` on `project_graph_state` against the newest snapshot's. The
+reading is taken in the push AFTER the merge (D153) and quoted in §16 with its run id and fence
+check. If D240's drop of `network_topology_hash` is still owed (it waits for a `network_metrics`
+or `prominence` run in production), it is taken here when the reading allows.
+
+**Exit.** The report quoted in §16, ledger fence unmoved.
+
+*(Progress — §16 · WP 11.5, probes.)* The nine probes are `phase11Levels()` in
+`verification-sql.mjs`, pushed alone after WP 11.4. Each was executed against a rehearsal
+database carrying `20261001000019`–`22` before it was pushed. On a branch every one of them errors
+by construction — the tables and columns deploy on merge — so the run that push fires measures
+production without Phase 11 and is not the reading. The reading is owed in the push after the
+merge, and the drop of `network_topology_hash` (D240) with it if probe 9 shows a
+`network_metrics` or `prominence` run keyed on a level.

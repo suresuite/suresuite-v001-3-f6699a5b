@@ -31,7 +31,7 @@ surfaces:
   - page: "SimulationLab.tsx"
     via: "table read"
     grain: table
-    evidence: "src/components/trust/TrustReportPanel.tsx:41"
+    evidence: "src/components/trust/TrustReportPanel.tsx:44"
     confirmed: true
 
 governance:
@@ -76,7 +76,7 @@ fields:
       - page: "SimulationLab.tsx"
         via: "table read"
         grain: column
-        evidence: "src/components/trust/TrustReportPanel.tsx:41"
+        evidence: "src/components/trust/TrustReportPanel.tsx:44"
         confirmed: true
     resolution: null
   project_id:
@@ -131,7 +131,7 @@ fields:
       - page: "SimulationLab.tsx"
         via: "table read"
         grain: column
-        evidence: "src/components/trust/TrustReportPanel.tsx:41"
+        evidence: "src/components/trust/TrustReportPanel.tsx:44"
         confirmed: true
     resolution: null
     note: >-
@@ -209,7 +209,7 @@ fields:
       - page: "SimulationLab.tsx"
         via: "table read"
         grain: column
-        evidence: "src/components/trust/TrustReportPanel.tsx:41"
+        evidence: "src/components/trust/TrustReportPanel.tsx:44"
         confirmed: true
     resolution: null
   rows_new:
@@ -402,7 +402,7 @@ fields:
       - page: "SimulationLab.tsx"
         via: "table read"
         grain: column
-        evidence: "src/components/trust/TrustReportPanel.tsx:41"
+        evidence: "src/components/trust/TrustReportPanel.tsx:44"
         confirmed: true
     resolution: null
   applied_by_user_id:
@@ -422,7 +422,7 @@ fields:
       - page: "SimulationLab.tsx"
         via: "table read"
         grain: column
-        evidence: "src/components/trust/TrustReportPanel.tsx:41"
+        evidence: "src/components/trust/TrustReportPanel.tsx:44"
         confirmed: true
     resolution: null
   error_detail:

@@ -56,3 +56,17 @@ describe("SurrogateCard · the training set (WP 10.8)", () => {
     expect(withSet).not.toMatch(/<button|<a |onclick/i);
   });
 });
+
+// WP 11.4 · §4 D262 — the set is counted by the world its KPIs came from: two
+// snapshots that differ only in the deep tier are ONE simulation-input version.
+describe("the training set counts simulation-input versions (WP 11.4)", () => {
+  it("names simulation-input versions when the database reports them", () => {
+    expect(trainingSetLine({ runs: 3, replications: 4, models: 1, graph_versions: 2, simulation_versions: 1 }))
+      .toBe("Training set: 4 replications · 3 runs · 1 Validated Model · 1 simulation-input version");
+  });
+  it("a database before the regrouping keeps the composite count, under its own name", () => {
+    expect(trainingSetLine({ runs: 3, replications: 4, models: 1, graph_versions: 2 }))
+      .toMatch(/2 graph versions$/);
+  });
+});
+

@@ -5262,6 +5262,102 @@ async function phase10Versions() {
     (rows) => { out("**(16) the training set (empty is a true reading until a Validated Model's runs complete after the merge):**"); out(...table(rows)); });
 }
 
+// ── Phase 11 · WP 11.5 — the levels, read after the merge (§21) ───────────
+//
+// Every query here reads tables and columns `20261001000019`–`22` create, so before
+// the merge each one errors — a fact about the sequence (migrations deploy on merge),
+// not a finding. The reading is taken in the push AFTER the merge (D153).
+async function phase11Levels() {
+  section("Phase 11 · WP 11.1–11.4 — a version per level, the simulation scope, the bindings, the lineage");
+
+  report("(1) D258 — level versions per project: how many, and the highest number per level",
+    await tryQ(`
+      select project_id::text as project_id, level,
+             count(*) as versions, max(version_no) as highest_no,
+             count(*) filter (where first_dataset_version_id is null) as first_snapshot_gone
+        from public.graph_level_versions group by 1, 2 order by 1, 2`),
+    (rows) => { out("**(1) level versions per project and level (numbers are per LEVEL; a project with history has every level from v1):**"); out(...table(rows)); });
+
+  report("(2) D258 — snapshots whose tuple has a NULL, by level",
+    await tryQ(`
+      select count(*) as snapshots,
+             count(*) filter (where product_version_id is null) as no_product,
+             count(*) filter (where process_version_id is null) as no_process,
+             count(*) filter (where firm_version_id is null) as no_firm,
+             count(*) filter (where simulation_version_id is null) as no_simulation,
+             count(*) filter (where firm_version_id is null and hash_firm is not null) as firm_hash_unregistered,
+             count(*) filter (where simulation_version_id is null and hash_inputs is not null) as sim_hash_unregistered
+        from public.dataset_versions`),
+    (rows) => { out("**(2) snapshot tuples (a NULL is right only where the hash is NULL; the two `_unregistered` columns must be 0):**"); out(...table(rows)); });
+
+  report("(3) D259 — Validated Models by which hash they bind",
+    await tryQ(`
+      select status,
+             count(*) as models,
+             count(hash_simulation) as bind_simulation_scope,
+             count(*) filter (where hash_simulation is null) as composite_only,
+             count(*) filter (where hash_simulation is null and dataset_version_id is not null) as could_have_learnt
+        from public.model_validations group by 1 order by 1`),
+    (rows) => { out("**(3) Validated Models (`could_have_learnt` must be 0 — the backfill read every model's own snapshot):**"); out(...table(rows)); });
+
+  report("(4) D260 — runs by RunKey version and whether they bind the simulation scope",
+    await tryQ(`
+      select coalesce(run_spec ->> 'run_key_version', 'none') as run_key_version,
+             count(*) as runs,
+             count(hash_simulation) as with_simulation_hash,
+             count(simulation_version_id) as with_simulation_version,
+             count(*) filter (where created_at > now() - interval '1 day') as last_day
+        from public.simulation_runs group by 1 order by 1`),
+    (rows) => { out("**(4) runs (every run dispatched after the merge is RunKey v2 with a simulation version):**"); out(...table(rows)); });
+
+  report("(5) D261 — analysis runs by scope and whether they name their level version",
+    await tryQ(`
+      select input_scope, status, count(*) as runs,
+             count(level_version_id) as with_level_version
+        from public.analysis_runs group by 1, 2 order by 1, 2`),
+    (rows) => { out("**(5) analysis runs (scope `all` names no level version by design):**"); out(...table(rows)); });
+
+  report("(6) D264 — the stored simulation hash agrees with the newest snapshot that carries it",
+    await tryQ(`
+      select s.project_id::text as project_id,
+             s.dirty,
+             (s.hash_inputs = dv.hash_inputs) as stored_equals_newest,
+             (select count(*) from public.graph_level_versions g
+               where g.project_id = s.project_id and g.level = 'simulation' and g.level_hash = s.hash_inputs) as live_is_a_version
+        from public.project_graph_state s
+        left join lateral (select hash_inputs from public.dataset_versions d
+                            where d.project_id = s.project_id order by created_at desc, id desc limit 1) dv on true
+       order by 1`),
+    (rows) => { out("**(6) the simulation scope now vs the newest snapshot (`false` with `dirty` true is an edit not yet captured, not a fault):**"); out(...table(rows)); });
+
+  report("(7) D262 — the training set by simulation version, per project",
+    await tryQ(`
+      select project_id::text as project_id,
+             count(distinct simulation_version_id) as simulation_versions,
+             count(distinct graph_version_id) as composites,
+             count(distinct run_id) as runs,
+             count(*) as replications
+        from public.surrogate_training_runs group by 1 order by 5 desc`),
+    (rows) => { out("**(7) the training set (simulation versions ≤ composites; equal when no deep-tier-only change separated two runs):**"); out(...table(rows)); });
+
+  report("(8) D265 + the reads — doors after the merge",
+    await tryQ(`
+      select has_table_privilege('anon', 'public.dataset_versions', 'INSERT') as anon_inserts_snapshot,
+             has_table_privilege('anon', 'public.graph_level_versions', 'INSERT') as anon_inserts_level,
+             has_function_privilege('anon', 'public._graph_level_register(uuid)', 'EXECUTE') as anon_registers,
+             has_function_privilege('anon', 'public.dataset_version_tuple(uuid)', 'EXECUTE') as anon_reads_tuple,
+             (select count(*) from pg_policies where tablename = 'dataset_versions' and cmd = 'INSERT') as insert_policies`),
+    (rows) => { out("**(8) doors (the first three and `insert_policies` must be false/0; the tuple read must be true):**"); out(...table(rows)); });
+
+  report("(9) D240 — network-keyed analyses since the merge (the shim's drop waits for one)",
+    await tryQ(`
+      select analysis_kind, input_scope, count(*) as runs, max(started_at) as latest
+        from public.analysis_runs
+       where analysis_kind in ('network_metrics', 'prominence') and input_scope in ('firm', 'process')
+       group by 1, 2 order by 1, 2`),
+    (rows) => { out("**(9) `network_metrics` / `prominence` runs keyed on a level (any row here is what D240's drop waits for):**"); out(...table(rows)); });
+}
+
 async function main() {
   out(`# PLAN.md §15 — verification SQL, executed`);
   out("");
@@ -5276,6 +5372,7 @@ async function main() {
   await d205AdminUsers();
   await wp94ScenarioRole();
   await phase10Versions();
+  await phase11Levels();
 
   await schemaProbe();
   await viewSecurity();

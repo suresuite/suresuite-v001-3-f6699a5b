@@ -500,22 +500,30 @@ async function resolveRunIdentity(
   projectId: string,
   scenario: ScenarioRow,
   version: { policy_hash?: unknown; snapshot?: unknown },
-): Promise<{ policyHash: string; graphHash: string; scenarioHash: string } | null> {
+): Promise<{ policyHash: string; graphHash: string; simulationHash: string | null; scenarioHash: string } | null> {
   const snapshot = (version.snapshot ?? {}) as Record<string, unknown>;
   const policyHash: string = (version.policy_hash as string | null) ??
     (await sha256Hex(canonicalJson(snapshot)));
   let graphHash = "";
+  let simulationHash: string | null = null;
   let scenarioHash = "";
   try {
     const { data } = await db.rpc("current_graph_hash", { p_project_id: projectId });
     if (typeof data === "string" && data) graphHash = data;
   } catch { /* reported as unavailable below */ }
+  // WP 11.2 · §4 D260 — what RunKey v2 hashes: the simulation scope. A database
+  // without the scope answers nothing here, and the reuse lookup then falls back to
+  // the three-hash predicate on the composite (the deploy window).
+  try {
+    const { data } = await db.rpc("current_level_hash", { p_project_id: projectId, p_scope: "simulation" });
+    if (typeof data === "string" && data) simulationHash = data;
+  } catch { /* the composite fallback still applies */ }
   try {
     const { data } = await db.rpc("scenario_fingerprint_hash", { p_scenario_id: scenario.id });
     if (typeof data === "string" && data) scenarioHash = data;
   } catch { /* reported as unavailable below */ }
   if (!graphHash || !scenarioHash) return null;
-  return { policyHash, graphHash, scenarioHash };
+  return { policyHash, graphHash, simulationHash, scenarioHash };
 }
 
 /** §19.5/§22.5 disambiguation shape (as tools.ts::ambiguousEnvelope): the ≤5
@@ -653,6 +661,7 @@ async function findCompletedRun(
       scenario: { id: String(scenario.id), updated_at: scenario.updated_at },
       policyHash: identity.policyHash,
       graphHash: identity.graphHash,
+      simulationHash: identity.simulationHash,
       scenarioHash: identity.scenarioHash,
       replications,
     }, { limit: 5 });
@@ -953,6 +962,7 @@ async function draftExperimentSpec(
             scenario: { id: String(scenario.id), updated_at: scenario.updated_at },
             policyHash: identity.policyHash,
             graphHash: identity.graphHash,
+            simulationHash: identity.simulationHash,
             scenarioHash: identity.scenarioHash,
             replications,
           }, { limit: 1 });

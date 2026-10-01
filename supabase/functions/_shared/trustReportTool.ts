@@ -30,6 +30,7 @@ import { gradeDataset, loadPolicyDefaults } from "./itemMasterCandidates.ts";
 import { flattenFindings } from "./grading.ts";
 import { buildTrustReport, type FreshnessPayload, type IngestEvent } from "./trustReport.ts";
 import { trustReportSections, type TrustSection } from "./trustReportSections.ts";
+import { parseLevelStates, type LevelStates } from "./graphLevels.ts";
 
 /**
  * The client surface this module uses, narrowed rather than `any`.
@@ -140,12 +141,22 @@ export async function buildTrustSections(
   }
 
   const ingestHistory = await loadIngestHistory(sb, projectId);
+  // WP 11.3 · §4 D263 — each level's version, from the state the pages read. A failed
+  // read leaves `levels` null, which the report STATES rather than omitting.
+  let levels: LevelStates | null = null;
+  try {
+    const { data: state } = await sb.rpc("get_graph_version_state", { p_project_id: projectId });
+    levels = parseLevelStates((state as { levels?: unknown } | null)?.levels);
+  } catch {
+    levels = null;
+  }
   const report = buildTrustReport({
     projectName: String((project as { name?: unknown })?.name ?? projectId),
     freshness,
     graded,
     findings,
     ingestHistory: ingestHistory ?? [],
+    levels,
   });
   return { sections: trustReportSections(report), coverageComputed: (graded ?? []).length > 0 };
 }

@@ -47,6 +47,11 @@ const COMPLETE: ReproducibilityRecordInput = {
   runKey: "d".repeat(64),
   protocolOverrides: {},
   exploratory: false,
+  // WP 11.3 — the levels a run dispatched under the simulation scope carries.
+  runKeyVersion: 2,
+  simulationHash: "e".repeat(64),
+  simulationVersionNo: 4,
+  levelVersions: { product: 3, process: 2, firm: 5 },
   analyses: [],
   limits: [],
   measuredAt: "2026-09-19T00:00:00.000Z",
@@ -61,6 +66,10 @@ const PRE_RUNKEY: ReproducibilityRecordInput = {
   runKey: undefined,
   protocolOverrides: undefined,
   exploratory: undefined,
+  runKeyVersion: undefined,
+  simulationHash: undefined,
+  simulationVersionNo: undefined,
+  levelVersions: undefined,
 };
 
 const analysis = (over: Partial<AnalysisBinding> = {}): AnalysisBinding => ({
@@ -376,5 +385,36 @@ describe("A5 · the scenario binding names what ran", () => {
     const r = buildReproducibilityRecord({ ...COMPLETE, scenarioSeed: null,
       scenarioSeedReason: "the scenario was edited after this run" });
     expect(r.bindings.find((x) => x.key === "scenario.seed")?.absentBecause).toMatch(/edited after this run/);
+  });
+});
+
+// WP 11.3 · §4 D263 — a figure says which LEVEL it came from. Required for a run
+// dispatched under the simulation scope (RunKey v2), which carries the levels by
+// construction; recommended for history, which could not (WP 10.4's pattern).
+describe("A5 · the level versions (WP 11.3)", () => {
+  const SCOPED = COMPLETE;
+
+  it("a v2 run binds its simulation inputs and its three level versions", () => {
+    const r = buildReproducibilityRecord(SCOPED);
+    expect(r.reproducible).toBe(true);
+    const by = Object.fromEntries(r.bindings.map((b) => [b.key, b]));
+    expect(by["dataset.simulation_version"].value).toBe("v4");
+    expect(by["dataset.product_version"].value).toBe("v3");
+    expect(by["dataset.firm_version"].value).toBe("v5");
+    expect(by["dataset.simulation_hash"].level).toBe("required");
+  });
+
+  it("a v2 run that lost its simulation inputs is NOT reproducible, and says so", () => {
+    const r = buildReproducibilityRecord({ ...SCOPED, simulationHash: null });
+    expect(r.reproducible).toBe(false);
+    expect(r.missing).toEqual(["dataset.simulation_hash"]);
+  });
+
+  it("history is not made unreproducible by a column it could not have had", () => {
+    const r = buildReproducibilityRecord(PRE_RUNKEY);   // no runKeyVersion, no levels
+    expect(r.reproducible).toBe(true);
+    const sim = r.bindings.find((b) => b.key === "dataset.simulation_hash")!;
+    expect(sim.level).toBe("recommended");
+    expect(sim.absentBecause).toMatch(/predates the simulation scope/);
   });
 });

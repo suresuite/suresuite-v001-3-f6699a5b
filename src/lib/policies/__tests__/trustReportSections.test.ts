@@ -33,7 +33,7 @@ const TOOL = readFileSync(
 );
 
 const empty: TrustReport = {
-  projectName: "Acme", graphHash: null, graphHashShort: "—", datasetVersion: null,
+  projectName: "Acme", graphHash: null, graphHashShort: "—", datasetVersion: null, levelVersions: null,
   measuredAt: "2026-09-19T00:00:00Z",
   coverage: [], blocking: [], substitutions: [], freshness: {}, latestRuns: [],
   ingestHistory: [], knownLimits: [],
@@ -180,5 +180,39 @@ describe("§5.4 A3 · the template carries every section", () => {
   it("a grading failure degrades to a DECLARED limit, not an empty coverage table", () => {
     expect(TOOL).toMatch(/DECLARED limit rather than an empty coverage table/);
     expect(TOOL).toMatch(/graded = null;/);
+  });
+});
+
+// WP 11.3 · §4 D263 — the report names the version of each LEVEL it describes, and
+// says when it could not read them rather than leaving the rows out (T3).
+import { buildTrustReport as buildReport } from "@/lib/trust/trustReport";
+import { parseLevelStates as parseLevels } from "@/lib/trust/graphLevels";
+describe("the verdict section carries the level versions (WP 11.3)", () => {
+  const freshness = {
+    project_id: "p", graph_hash: "a".repeat(64), graph_hash_short: "aaaaaaa", dataset_version: null,
+    tables: {}, latest_runs: [], measured_at: "2026-10-01T00:00:00Z",
+  };
+  const rows = (levels: unknown) => {
+    const r = buildReport({ projectName: "Acme", freshness, graded: null, findings: [], ingestHistory: [],
+      levels: levels === undefined ? undefined : parseLevels(levels) });
+    return trustReportSections(r).find((s) => s.id === "headline")!.rows;
+  };
+
+  it("one row per level, current or unsaved", () => {
+    const r = rows({
+      product: { hash: "p".repeat(64), current_version: { id: "x", version_no: 3, created_at: "" }, latest_version: null, version_count: 3, unsaved: false },
+      process: { hash: "r".repeat(64), current_version: { id: "y", version_no: 2, created_at: "" }, latest_version: null, version_count: 2, unsaved: false },
+      firm: { hash: "f".repeat(64), current_version: null, latest_version: null, version_count: 4, unsaved: true },
+      simulation: { hash: "s".repeat(64), current_version: { id: "z", version_no: 4, created_at: "" }, latest_version: null, version_count: 4, unsaved: false },
+    });
+    expect(r).toContainEqual(["Product graph version", "v3 · ppppppp"]);
+    expect(r).toContainEqual(["Simulation inputs version", "v4 · sssssss"]);
+    expect(r.find((x) => x[0] === "Firm graph version")![1]).toMatch(/^unsaved · fffffff — no version carries/);
+  });
+
+  it("a caller that did not read them says so — never 'unsaved'", () => {
+    expect(rows(undefined)).toContainEqual([
+      "Graph level versions", "not read for this report — the level versions are unknown, not absent",
+    ]);
   });
 });

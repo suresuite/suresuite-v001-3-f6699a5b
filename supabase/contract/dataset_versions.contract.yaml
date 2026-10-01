@@ -20,12 +20,12 @@ surfaces:
   - page: "DataManager.tsx"
     via: "rpc record_model_validation"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:464"
+    evidence: "src/hooks/useModelValidation.tsx:513"
     confirmed: true
   - page: "DeveloperApi.tsx"
     via: "rpc list_dataset_versions"
     grain: table
-    evidence: "src/pages/DeveloperApi.tsx:311"
+    evidence: "src/pages/DeveloperApi.tsx:321"
     confirmed: true
   - page: "ProductLevelNetwork.tsx"
     via: "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)"
@@ -35,12 +35,12 @@ surfaces:
   - page: "ProjectPolicies.tsx"
     via: "rpc record_validated_model (Save Validated Model, WP 10.3)"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:492"
+    evidence: "src/hooks/useModelValidation.tsx:541"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "rpc record_model_validation"
     grain: table
-    evidence: "src/hooks/useModelValidation.tsx:464"
+    evidence: "src/hooks/useModelValidation.tsx:513"
     confirmed: true
 
 governance:
@@ -56,15 +56,15 @@ governance:
   rls_enabled: true
   note: >-
     Written by the `_build_dataset_snapshot` database function, never by a page —
-    that is the INTENT, and `write: null` records it.
-    **The enforcement does not match, and WP 2.4 measured it.** The live policy
-    `dataset_versions_insert_all` is `FOR INSERT ... WITH CHECK (true)`, and
-    `20260610000002` grants `anon` SELECT and INSERT, so any holder of the public
-    anon key may insert a snapshot row. The contract reads narrower than the
-    database, which is the exact class §9 asks this package to find. It is pinned
-    by `governanceEnforcement.test.ts` rather than silently fixed: the app runs AS
-    anon with no auth session, so revoking is a Phase 3 migration with an auth
-    model behind it, and the decision taken was to document. See PLAN.md D28.
+    that is the INTENT, and `write: null` records it. **And since WP 11.1 the
+    database enforces it** (§4 D265): from WP 2.4 to WP 11.1 the live policy
+    `dataset_versions_insert_all` was `FOR INSERT ... WITH CHECK (true)` with an
+    INSERT grant to `anon` and `authenticated`, pinned by
+    `governanceEnforcement.test.ts` rather than changed. No path inserted a row
+    directly, and from WP 11.1 a planted row would also have minted level versions,
+    so the policy is dropped and the grant revoked; `snapshot_dataset` (SECURITY
+    DEFINER) and the service role are the writers. Reads stay open to every API
+    role (`dataset_versions_read_all`, part of D28's pinned list).
 
 fields:
   id:
@@ -87,7 +87,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:145"
+        evidence: "src/hooks/useVerifiableExports.tsx:146"
         confirmed: true
     resolution: null
   project_id:
@@ -128,7 +128,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:145"
+        evidence: "src/hooks/useVerifiableExports.tsx:146"
         confirmed: true
     resolution: null
     note: >-
@@ -155,7 +155,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:145"
+        evidence: "src/hooks/useVerifiableExports.tsx:146"
         confirmed: true
     resolution: null
     note: >-
@@ -193,7 +193,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:145"
+        evidence: "src/hooks/useVerifiableExports.tsx:146"
         confirmed: true
     resolution: null
     note: >-
@@ -233,7 +233,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:145"
+        evidence: "src/hooks/useVerifiableExports.tsx:146"
         confirmed: true
     resolution: null
     note: >-
@@ -266,7 +266,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:145"
+        evidence: "src/hooks/useVerifiableExports.tsx:146"
         confirmed: true
     resolution: null
     note: >-
@@ -343,7 +343,7 @@ fields:
       - page: "ProjectPolicies.tsx"
         via: "table read"
         grain: column
-        evidence: "src/hooks/useVerifiableExports.tsx:145"
+        evidence: "src/hooks/useVerifiableExports.tsx:146"
         confirmed: true
     resolution: null
   hash_product:
@@ -406,6 +406,72 @@ fields:
       edit is the earlier number again; rows that predate that and share a hash share
       the number.
     grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  product_version_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      This snapshot's PRODUCT level version — the `graph_level_versions` row whose
+      content is this row's `hash_product` ("Product graph v3"). With its two
+      siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1,
+      §4 D258). Written by the registration trigger the moment the row is frozen.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NULL only where `hash_product` is NULL — a snapshot frozen before WP 4.1, whose level the snapshot cannot support. Never defaulted.
+  process_version_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      This snapshot's PROCESS level version — the `graph_level_versions` row whose
+      content is this row's `hash_process` ("Process graph v3"). With its two
+      siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1,
+      §4 D258). Written by the registration trigger the moment the row is frozen.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NULL only where `hash_process` is NULL (a snapshot frozen before WP 4.1).
+  firm_version_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      This snapshot's FIRM level version — the `graph_level_versions` row whose
+      content is this row's `hash_firm` ("Firm graph v3"). With its two
+      siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1,
+      §4 D258). Written by the registration trigger the moment the row is frozen.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      NULL where `hash_firm` is NULL — every snapshot older than `schema_version` 3, which did not hold the deep-tier topology. A NULL here means the snapshot cannot say, never that the project had no deep tier.
+  simulation_version_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      This snapshot's SIMULATION scope version — the `graph_level_versions` row whose
+      content is this row's `hash_inputs`, the tables the engine reads (WP 11.2, §4 D259,
+      D264). The fourth element of the tuple; what a Validated Model and RunKey v2 bind.
+      NULL where `hash_inputs` is (a snapshot frozen before WP 4.1).
+    grain: identifier
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: false, validate: null}

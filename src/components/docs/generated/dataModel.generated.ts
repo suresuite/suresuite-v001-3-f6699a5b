@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "4f37b56243cf";
+export const CONTRACT_VERSION = "5801850de943";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261001000018_project_freshness_names_its_reader.sql";
+export const LAST_MIGRATION = "20261001000022_training_set_by_simulation_version.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 91,
-  "tablesDescribed": 74,
-  "columnsDescribed": 954,
+  "tablesInSchema": 92,
+  "tablesDescribed": 75,
+  "columnsDescribed": 972,
   "tablesUndescribed": 17
 } as const;
 
@@ -171,13 +171,19 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "analysis_runs",
         "grain": "One execution of one analysis for one project, identified by the world it ran against (`input_hash`), the parameters it ran with (`params_hash`) and the code that ran (`code_version`). Two runs carrying the same five-part key ARE the same run by definition, which is what makes serving a stored answer sound rather than a bet on how recently a timestamp moved.",
-        "columns": 18,
+        "columns": 19,
         "owner": "analysis"
       },
       {
         "table": "dataset_versions",
         "grain": "One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot.",
-        "columns": 14,
+        "columns": 18,
+        "owner": "platform"
+      },
+      {
+        "table": "graph_level_versions",
+        "grain": "One row per (project, level, content): the FIRST time a project's product, process, firm or simulation level had that hash. Numbered per project PER LEVEL, so \"Product graph v3\" and \"Firm graph v5\" are both sentences the system can say, and a change to one level moves that level's number and no other. A snapshot (`dataset_versions`) names its level versions — its tuple.",
+        "columns": 9,
         "owner": "platform"
       },
       {
@@ -273,7 +279,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "model_validations",
         "grain": "One VALIDATED MODEL: a decision about how a project's model may be used, bound to the exact policy content, graph version and scenario world it was established on and stating the run protocol every decision-grade run must follow — how many seeds, the week steady state begins, horizon, analysis window, CI level and stopping rule — with who validated it and when. Immutable: only its lifecycle (status, supersession, revocation) changes. Matched by CONTENT, never by id (WP 10.2).",
-        "columns": 34,
+        "columns": 36,
         "owner": "policy-ui"
       },
       {
@@ -393,7 +399,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "simulation_runs",
         "grain": "One simulation run: what it was bound to (engine, graph version, policy version, scenario run spec, Validated Model, deviations), its status, and the run-level KPIs. Tier 5 — a RESULT. Its replications are `run_replications`. Since WP 10.4 every binding of a NEW run resolves from this row alone (`run_spec`, `run_key`, `engine_id`, `model_validation_id`, `protocol_overrides`, `exploratory`); runs dispatched earlier carry the three content hashes, the seed and the schedule, and say so in the record.",
-        "columns": 36,
+        "columns": 38,
         "owner": "engine"
       }
     ]

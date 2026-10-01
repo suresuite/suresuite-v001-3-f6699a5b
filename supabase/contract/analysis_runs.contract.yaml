@@ -511,7 +511,8 @@ fields:
     unit_source: none
     meaning: >-
       Which LEVEL of the graph `input_hash` is the hash of — `product`, `process`,
-      `firm`, or `all` (the composite). Resolved by `analysis_get_or_start` from
+      `firm`, `simulation` (the scope the engine reads, WP 11.2), or `all` (the
+      composite). Resolved by `analysis_get_or_start` from
       `analysis_kinds`, the one place each kind's scope is stated, including
       `network_metrics`'s fallback to the process level when the deep tier is
       incomplete (WP 10.1, §4 D235). Every run before WP 10.1 is `all`.
@@ -530,6 +531,23 @@ fields:
       `snapshot_dataset` at claim time, which returns the existing version of the
       current content, so this names "Graph vN" rather than a hash a person cannot
       read. NULL on every run before WP 10.1.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  level_version_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The VERSION of the level the run keyed on ("Firm graph v5") — the
+      `graph_level_versions` row whose content is `input_hash` (WP 11.2, §4 D261). Filled
+      by `analysis_get_or_start` from the level row the claim's snapshot has just
+      registered; NULL for scope `all`, whose version is the snapshot (`dataset_version_id`).
+      History learnt it from its own scope and hash where the project's level ever froze that
+      content.
     grain: identifier
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []

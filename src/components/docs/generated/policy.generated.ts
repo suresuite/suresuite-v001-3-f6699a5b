@@ -3592,8 +3592,8 @@ export type ProjectDeletion = {
 };
 
 export const PROJECT_DELETION: ProjectDeletion = {
-  "projectScoped": 53,
-  "cascade": 42,
+  "projectScoped": 54,
+  "cascade": 43,
   "detached": [
     "chat_threads",
     "user_files"
@@ -3700,7 +3700,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 74,
+  "described": 75,
   "open": [
     {
       "table": "analysis_kinds",

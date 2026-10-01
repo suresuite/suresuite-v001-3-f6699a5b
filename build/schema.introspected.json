@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 382,
-  "migrations_applied": 374,
+  "migrations_found": 386,
+  "migrations_applied": 378,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000018_project_freshness_names_its_reader.sql",
+  "last_migration": "20261001000022_training_set_by_simulation_version.sql",
   "counts": {
-    "tables": 91,
+    "tables": 92,
     "views": 8,
     "enums": 4,
-    "functions": 386,
+    "functions": 395,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -1465,26 +1465,6 @@
           "added_by": "20261001000007_graph_levels_compute_once.sql"
         },
         {
-          "name": "analysis_kinds_input_scope_check",
-          "kind": "CHECK",
-          "columns": [
-            "input_scope"
-          ],
-          "definition": "CHECK (input_scope IN ('product','process','firm','all'))",
-          "implicit": true,
-          "added_by": "20261001000007_graph_levels_compute_once.sql"
-        },
-        {
-          "name": "analysis_kinds_fallback_scope_check",
-          "kind": "CHECK",
-          "columns": [
-            "fallback_scope"
-          ],
-          "definition": "CHECK (fallback_scope IN ('product','process','firm','all'))",
-          "implicit": true,
-          "added_by": "20261001000007_graph_levels_compute_once.sql"
-        },
-        {
           "name": "analysis_kinds_fallback_rule_check",
           "kind": "CHECK",
           "columns": [
@@ -1493,6 +1473,20 @@
           "definition": "CHECK (fallback_rule IN ('deep_tier_incomplete'))",
           "implicit": true,
           "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "analysis_kinds_input_scope_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (input_scope IN ('product', 'process', 'firm', 'simulation', 'all'))",
+          "added_by": "20261001000020_simulation_scope.sql"
+        },
+        {
+          "name": "analysis_kinds_fallback_scope_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (fallback_scope IN ('product', 'process', 'firm', 'simulation', 'all'))",
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "indexes": [],
@@ -1915,6 +1909,25 @@
             "on_delete": "SET NULL"
           },
           "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "level_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "graph_level_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "constraints": [
@@ -1961,8 +1974,8 @@
           "name": "analysis_runs_input_scope_check",
           "kind": "CHECK",
           "columns": [],
-          "definition": "CHECK (input_scope IN ('product','process','firm','all'))",
-          "added_by": "20261001000007_graph_levels_compute_once.sql"
+          "definition": "CHECK (input_scope IN ('product', 'process', 'firm', 'simulation', 'all'))",
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "indexes": [
@@ -5469,6 +5482,82 @@
           "unique": false,
           "references": null,
           "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "product_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "graph_level_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "process_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "graph_level_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "firm_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "graph_level_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "simulation_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "graph_level_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "constraints": [
@@ -5517,17 +5606,6 @@
           {
             "name": "dataset_versions_read_all",
             "command": "SELECT",
-            "roles": [
-              "anon",
-              "authenticated"
-            ],
-            "using": "true",
-            "with_check": "true",
-            "added_by": "20260703000001_dataset_versions.sql"
-          },
-          {
-            "name": "dataset_versions_insert_all",
-            "command": "INSERT",
             "roles": [
               "anon",
               "authenticated"
@@ -7604,6 +7682,224 @@
             "md5(triple::text)"
           ],
           "name": "external_evidence_dedupe_uq"
+        }
+      ]
+    },
+    {
+      "name": "graph_level_versions",
+      "schema": "public",
+      "created_by": "20261001000019_graph_level_versions.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "project_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "level",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "level_hash",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "version_no",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "level_spec",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "first_dataset_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "dataset_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "author_user_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000019_graph_level_versions.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "graph_level_versions_content_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "project_id",
+            "level",
+            "level_hash"
+          ],
+          "definition": "UNIQUE (project_id, level, level_hash)",
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "graph_level_versions_number_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "project_id",
+            "level",
+            "version_no"
+          ],
+          "definition": "UNIQUE (project_id, level, version_no)",
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "graph_level_versions_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20261001000019_graph_level_versions.sql"
+        },
+        {
+          "name": "graph_level_versions_level_check",
+          "kind": "CHECK",
+          "columns": [
+            "level"
+          ],
+          "definition": "CHECK (level IN ('product', 'process', 'firm', 'simulation'))",
+          "implicit": true,
+          "added_by": "20261001000019_graph_level_versions.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "graph_level_versions_select",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.has_project_access(project_id)",
+            "with_check": "public.has_project_access(project_id)",
+            "added_by": "20261001000019_graph_level_versions.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": "WP 11.1 · §4 D258. One row per (project, level, content): the first time a ",
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "project_id",
+            "level",
+            "level_hash"
+          ],
+          "name": "graph_level_versions_content_key"
+        },
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "project_id",
+            "level",
+            "version_no"
+          ],
+          "name": "graph_level_versions_number_key"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "graph_level_versions_pkey"
         }
       ]
     },
@@ -10600,6 +10896,37 @@
           "unique": false,
           "references": null,
           "added_by": "20261001000008_validated_model.sql"
+        },
+        {
+          "name": "hash_simulation",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000020_simulation_scope.sql"
+        },
+        {
+          "name": "simulation_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "graph_level_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "constraints": [
@@ -10709,13 +11036,13 @@
           "columns": [
             "project_id",
             "policy_hash",
-            "graph_hash",
+            "(COALESCE(hash_simulation, graph_hash))",
             "scenario_hash"
           ],
           "nulls_not_distinct": false,
           "predicate": "status = 'active'",
           "partial": true,
-          "added_by": "20261001000006_policy_versions_by_content.sql"
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "rls": {
@@ -10751,7 +11078,7 @@
           "columns": [
             "project_id",
             "policy_hash",
-            "graph_hash",
+            "(COALESCE(hash_simulation, graph_hash))",
             "scenario_hash"
           ],
           "name": "model_validations_active_content_uq",
@@ -21040,6 +21367,37 @@
           "unique": false,
           "references": null,
           "added_by": "20261001000010_result_tiers.sql"
+        },
+        {
+          "name": "hash_simulation",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000020_simulation_scope.sql"
+        },
+        {
+          "name": "simulation_version_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "graph_level_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000020_simulation_scope.sql"
         }
       ],
       "constraints": [
@@ -23415,7 +23773,7 @@
       "security_invoker": true
     },
     "surrogate_training_runs": {
-      "defined_by": "20261001000013_surrogate_training_set.sql",
+      "defined_by": "20261001000022_training_set_by_simulation_version.sql",
       "materialized": false,
       "security_invoker": false
     },
@@ -23724,6 +24082,74 @@
       "defined_by": "20261001000013_surrogate_training_set.sql"
     },
     {
+      "name": "_graph_level_backfill",
+      "signature": "_graph_level_backfill(uuid)",
+      "args": [
+        "p_project_id uuid DEFAULT NULL"
+      ],
+      "returns": "integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000019_graph_level_versions.sql"
+    },
+    {
+      "name": "_graph_level_register_snapshot",
+      "signature": "_graph_level_register_snapshot()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000019_graph_level_versions.sql"
+    },
+    {
+      "name": "_graph_level_register",
+      "signature": "_graph_level_register(uuid)",
+      "args": [
+        "p_dataset_version_id uuid"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000020_simulation_scope.sql"
+    },
+    {
+      "name": "_graph_level_state",
+      "signature": "_graph_level_state(uuid, text, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_level text",
+        "p_hash text"
+      ],
+      "returns": "jsonb LANGUAGE sql STABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000019_graph_level_versions.sql"
+    },
+    {
+      "name": "_graph_level_versions_immutable",
+      "signature": "_graph_level_versions_immutable()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000019_graph_level_versions.sql"
+    },
+    {
+      "name": "_graph_level_versions_number",
+      "signature": "_graph_level_versions_number()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000019_graph_level_versions.sql"
+    },
+    {
       "name": "_graph_state_mark",
       "signature": "_graph_state_mark(uuid[])",
       "args": [
@@ -23815,7 +24241,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000008_validated_model.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "_jsonb_project",
@@ -23883,6 +24309,18 @@
       "defined_by": "20261001000012_capacity.sql"
     },
     {
+      "name": "_scope_hash_key",
+      "signature": "_scope_hash_key(text)",
+      "args": [
+        "p_scope text"
+      ],
+      "returns": "text LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261001000020_simulation_scope.sql"
+    },
+    {
       "name": "_simulation_run_derive",
       "signature": "_simulation_run_derive()",
       "args": [],
@@ -23890,7 +24328,7 @@
       "security_definer": false,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000009_engines_runkey.sql"
+      "defined_by": "20261001000022_training_set_by_simulation_version.sql"
     },
     {
       "name": "_simulation_run_drop_series",
@@ -23960,7 +24398,7 @@
       "signature": "_validated_model_hash(text, text, text, jsonb, text)",
       "args": [
         "p_policy_hash text",
-        "p_graph_hash text",
+        "p_simulation_hash text",
         "p_scenario_hash text",
         "p_protocol jsonb",
         "p_engine text"
@@ -23969,7 +24407,7 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "comment": null,
-      "defined_by": "20261001000008_validated_model.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "_validated_model_immutable",
@@ -23979,7 +24417,7 @@
       "security_definer": false,
       "volatility": "IMMUTABLE",
       "comment": null,
-      "defined_by": "20261001000009_engines_runkey.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "_validated_model_number",
@@ -24016,7 +24454,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000006_policy_versions_by_content.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "active_model_validation",
@@ -24828,7 +25266,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "analysis_latest_run",
@@ -25002,7 +25440,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000006_policy_versions_by_content.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "approved_users_derive_name_parts",
@@ -25812,7 +26250,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000012_capacity.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "create_user_file",
@@ -25892,7 +26330,7 @@
       "security_definer": true,
       "volatility": "VOLATILE",
       "comment": null,
-      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "current_policy_hash",
@@ -25905,6 +26343,18 @@
       "volatility": "STABLE",
       "comment": null,
       "defined_by": "20260612000001_policy_version_snapshots.sql"
+    },
+    {
+      "name": "dataset_version_tuple",
+      "signature": "dataset_version_tuple(uuid)",
+      "args": [
+        "p_dataset_version_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000021_level_version_reads.sql"
     },
     {
       "name": "dataset_versions_assign_number",
@@ -26222,7 +26672,7 @@
       "args": [
         "p_scenario_id uuid",
         "p_policy_hash text",
-        "p_graph_hash text",
+        "p_simulation_hash text",
         "p_replications integer",
         "p_engine_id uuid DEFAULT NULL",
         "p_protocol_overrides jsonb DEFAULT '{}'::jsonb",
@@ -26232,7 +26682,7 @@
       "security_definer": false,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000009_engines_runkey.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "freshness_of",
@@ -26393,7 +26843,7 @@
       "security_definer": true,
       "volatility": "VOLATILE",
       "comment": null,
-      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "get_individual_scenario_results",
@@ -26882,6 +27332,18 @@
       "defined_by": "20260915000005_project_membership_and_delegation.sql"
     },
     {
+      "name": "graph_level_version_no",
+      "signature": "graph_level_version_no(uuid)",
+      "args": [
+        "p_level_version_id uuid"
+      ],
+      "returns": "integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000022_training_set_by_simulation_version.sql"
+    },
+    {
       "name": "has_project_access",
       "signature": "has_project_access(uuid)",
       "args": [
@@ -27237,11 +27699,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "TABLE ( id uuid, label text, graph_hash text, author_email text, created_at timestamptz )",
+      "returns": "TABLE ( id uuid, label text, graph_hash text, author_email text, created_at timestamptz, version_no integer, tuple jsonb )",
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260703000001_dataset_versions.sql"
+      "defined_by": "20261001000021_level_version_reads.sql"
     },
     {
       "name": "list_model_validations",
@@ -27249,11 +27711,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "TABLE ( id uuid, policy_version_id uuid, policy_hash text, dataset_version_id uuid, graph_hash text, scenario_hash text, engine_fingerprint text, adopted_warmup_days integer, warmup_method text, recommended_replications integer, verdict text, basis text, status text, evidence_run_id uuid, author_email text, validated_at timestamptz )",
+      "returns": "TABLE ( id uuid, policy_version_id uuid, policy_hash text, dataset_version_id uuid, graph_hash text, scenario_hash text, engine_fingerprint text, adopted_warmup_days integer, warmup_method text, recommended_replications integer, verdict text, basis text, status text, evidence_run_id uuid, author_email text, validated_at timestamptz, hash_simulation text, simulation_version_id uuid )",
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260710000001_model_validations.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "list_my_organizations",
@@ -28267,7 +28729,7 @@
       "args": [
         "p_scenario_id uuid",
         "p_policy_hash text",
-        "p_graph_hash text",
+        "p_simulation_hash text",
         "p_engine_id uuid DEFAULT NULL",
         "p_protocol_overrides jsonb DEFAULT '{}'::jsonb"
       ],
@@ -28275,7 +28737,7 @@
       "security_definer": false,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000009_engines_runkey.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "snapshot_dataset",
@@ -28346,7 +28808,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000013_surrogate_training_set.sql"
+      "defined_by": "20261001000022_training_set_by_simulation_version.sql"
     },
     {
       "name": "surrogate_training_summary",
@@ -28358,7 +28820,7 @@
       "security_definer": false,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000013_surrogate_training_set.sql"
+      "defined_by": "20261001000022_training_set_by_simulation_version.sql"
     },
     {
       "name": "surrogate_training_totals",
@@ -28370,7 +28832,7 @@
       "security_definer": false,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000015_surrogate_training_totals.sql"
+      "defined_by": "20261001000022_training_set_by_simulation_version.sql"
     },
     {
       "name": "sweep_expired_files",

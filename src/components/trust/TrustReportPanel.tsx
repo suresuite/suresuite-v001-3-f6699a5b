@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useProjectFreshness } from "./useProjectFreshness";
+import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { ProjectTrustReport } from "./ProjectTrustReport";
 import { buildTrustReport, type IngestEvent } from "@/lib/trust/trustReport";
 import type { GradedFinding } from "@/lib/trust/gradingTypes";
@@ -34,6 +35,8 @@ export function TrustReportPanel({ projectId, projectName, findings }: Props) {
   const canExport = rights.can("export");
   const exportRefusal = rights.refusal("export");
   const [ingest, setIngest] = useState<IngestEvent[] | null>(null);
+  // WP 11.3 · §4 D263 — each level's version, from the ONE state read (D233).
+  const { levels } = useDatasetVersion(projectId);
 
   useEffect(() => {
     if (!projectId) return;
@@ -85,6 +88,7 @@ export function TrustReportPanel({ projectId, projectName, findings }: Props) {
       reason: f.reason ?? "",
     })) as GradedFinding[],
     ingestHistory: ingest ?? [],
+    levels,
   });
 
   return <ProjectTrustReport report={report} canDownload={canExport} downloadRefusal={exportRefusal} />;

@@ -1086,6 +1086,7 @@ export default function ProcessLevelNetwork({ isCollapsed, setIsCollapsed }: Net
         {globalSelectedProjectId && (
           <div className="mb-3 hidden md:flex">
             <GraphVersionChip
+              level="process"
               projectId={globalSelectedProjectId}
               metricsComputedAt={structure?.computedAt ?? null}
               outcome={structure ? (structure.cacheHit ? 'reused' : 'computed') : null}

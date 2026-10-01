@@ -1071,6 +1071,7 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                 }
               />
               <GraphVersionChip
+                level="product"
                 projectId={globalSelectedProjectId}
                 metricsComputedAt={metricsMetadata?.lastCalculated ?? null}
                 outcome={metricsOutcome}

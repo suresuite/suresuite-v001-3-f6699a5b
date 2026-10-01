@@ -69,8 +69,8 @@ partially or get corrected — the write fails.
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `SimulationLab.tsx` | hook useSimulationRun → select * from simulation_runs | `src/hooks/useSimulationRun.tsx:100` | yes |
-| `ProjectPolicies.tsx` | useVerifiableExports → select * from simulation_runs | `src/hooks/useVerifiableExports.tsx:234` | yes |
+| `SimulationLab.tsx` | hook useSimulationRun → select * from simulation_runs | `src/hooks/useSimulationRun.tsx:105` | yes |
+| `ProjectPolicies.tsx` | useVerifiableExports → select * from simulation_runs | `src/hooks/useVerifiableExports.tsx:235` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -105,14 +105,14 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `policy_version_id` | — | `uuid` | — | — | The saved policy version the run used. The run never reads live policies. |
 | `mapping_warnings` | — | `jsonb` | — | — | What the project-to-engine mapper could not map, as the engine reported it. |
 | `dataset_version_id` | — | `uuid` | — | — | The graph version the run was bound to (`dataset_versions`), snapshotted at dispatch. |
-| `graph_hash` | — | `text` | — | — | The composite graph hash of that version. Part of the RunKey. |
+| `graph_hash` | — | `text` | — | — | The composite graph hash of that version. It was part of the RunKey until WP 11.2; RunKey v2 hashes `hash_simulation` instead, and the composite stays on the row as the frozen world the run can be re-executed against. |
 | `gate_skipped` | — | `boolean` | — | — | The pre-run required-data gate could not load its data and dispatch proceeded unchecked. |
 | `scenario_hash` | — | `text` | — | — | The scenario's baseline fingerprint hash (horizon, time step, demand model) at dispatch — what a Validated Model is matched on. |
 | `model_validation_id` | — | `uuid` | — | — | The Validated Model the run follows: the one the caller chose (WP 10.4 — it must be this project's and not revoked), else the one in force for this policy, graph and scenario by content. NULL = the run followed no model, and is then exploratory. This is the binding the brief called `validated_model_id`; it is not a second column (§16 · WP 10.4). |
 | `seed` | — | `bigint` | — | — | The root seed that ran, stamped at dispatch (audit WP 8). |
 | `disruption_schedule` | — | `jsonb` | — | — | The disruption schedule that ran, stamped at dispatch (audit WP 8). |
 | `engine_id` | — | `uuid` | — | — | The registered engine the run was dispatched to (`sim_engines`). Dispatch refuses a retired engine and defaults to the single active one; the worker refuses a run bound to an engine it does not run. Backfilled for history from `code_version`, and derived the same way for a writer that does not state it. |
-| `run_spec` | — | `jsonb` | — | — | Everything the RunKey hashes, as data: the engine (id, slug, version, code_version as registered at dispatch), `policy_hash`, `graph_hash`, the scenario row minus its identity and presentation columns, and `protocol_overrides`. Every binding of the run resolves from here with no live read. NULL for runs dispatched before WP 10.4. |
+| `run_spec` | — | `jsonb` | — | — | Everything the RunKey hashes, as data: the engine (id, slug, version, code_version as registered at dispatch), `policy_hash`, the graph term, the scenario row minus its identity and presentation columns, and `protocol_overrides`. Every binding of the run resolves from here with no live read. NULL for runs dispatched before WP 10.4. `run_key_version` says which graph term: 1 is `graph_hash` (the composite), 2 — every run since WP 11.2 — is `simulation_hash`, the scope the engine reads. A spec is never rewritten, so a v1 key never equals a v2 key. |
 | `run_key` | — | `text` | — | — | sha256 of `run_spec` — the run's identity. Identical submissions share it: `create_simulation_run` offers a completed run with this key for reuse and attaches a second submission to one in flight. NULL before WP 10.4. |
 | `protocol_overrides` | — | `jsonb` | — | — | Deviations from the Validated Model's protocol, as the caller stated them; `{}` = faithful. Part of the RunKey, and shown on results and exports (T2, T4). |
 | `exploratory` | — | `boolean` | — | — | The run followed no Validated Model, or was dispatched explicitly as exploratory. Never false for a run with no model. Badged everywhere and excluded from surrogate training (WP 10.5, 10.8). Backfilled as `model_validation_id IS NULL`. |
@@ -121,6 +121,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `retention` | — | `text` | — | — | `standard` (the series expire after `run_series_retention`), `pinned` (an editor or owner keeps them — `set_run_retention`), or `evidence` (the run a Validated Model rests on — set when the model is saved, never released here). |
 | `series_expires_at` | — | `timestamp with time zone` | — | — | When a standard run's series expire — set when the run completes. NULL for pinned and evidence runs (a CHECK holds it so). |
 | `series_expired_at` | — | `timestamp with time zone` | — | — | When `sweep_expired_run_series` removed the series (object, JSONB, per-item rows). The run row, its aggregates and every replication's KPI row are kept; the screen says the series expired and which RunKey reproduces them. |
+| `hash_simulation` | — | `text` | — | — | The simulation scope's hash — the `inputs` domain of the run's snapshot, what the engine read (WP 11.2, §4 D260). RunKey v2 hashes it, so a deep-tier upload no run reads does not make an identical simulation a new key. Read by `create_simulation_run` off the snapshot row itself; history learnt it from its own snapshot. NULL where the run has no snapshot that carries one. |
+| `simulation_version_id` | — | `uuid` | — | — | The simulation scope's level version the run computed over ("simulation inputs v4", `graph_level_versions`). NULL exactly where `hash_simulation` names no version. |
 
 ## Each column in full
 
@@ -411,7 +413,7 @@ The graph version the run was bound to (`dataset_versions`), snapshotted at disp
 
 ### `graph_hash`
 
-The composite graph hash of that version. Part of the RunKey.
+The composite graph hash of that version. It was part of the RunKey until WP 11.2; RunKey v2 hashes `hash_simulation` instead, and the composite stays on the row as the frozen world the run can be re-executed against.
 
 | | |
 |---|---|
@@ -510,7 +512,7 @@ The registered engine the run was dispatched to (`sim_engines`). Dispatch refuse
 
 ### `run_spec`
 
-Everything the RunKey hashes, as data: the engine (id, slug, version, code_version as registered at dispatch), `policy_hash`, `graph_hash`, the scenario row minus its identity and presentation columns, and `protocol_overrides`. Every binding of the run resolves from here with no live read. NULL for runs dispatched before WP 10.4.
+Everything the RunKey hashes, as data: the engine (id, slug, version, code_version as registered at dispatch), `policy_hash`, the graph term, the scenario row minus its identity and presentation columns, and `protocol_overrides`. Every binding of the run resolves from here with no live read. NULL for runs dispatched before WP 10.4. `run_key_version` says which graph term: 1 is `graph_hash` (the composite), 2 — every run since WP 11.2 — is `simulation_hash`, the scope the engine reads. A spec is never rewritten, so a v1 key never equals a v2 key.
 
 | | |
 |---|---|
@@ -634,6 +636,35 @@ When `sweep_expired_run_series` removed the series (object, JSONB, per-item rows
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `hash_simulation`
+
+The simulation scope's hash — the `inputs` domain of the run's snapshot, what the engine read (WP 11.2, §4 D260). RunKey v2 hashes it, so a deep-tier upload no run reads does not make an identical simulation a new key. Read by `create_simulation_run` off the snapshot row itself; history learnt it from its own snapshot. NULL where the run has no snapshot that carries one.
+
+| | |
+|---|---|
+| Type | `text` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000020_simulation_scope.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `simulation_version_id`
+
+The simulation scope's level version the run computed over ("simulation inputs v4", `graph_level_versions`). NULL exactly where `hash_simulation` names no version.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20261001000020_simulation_scope.sql` |
+| References | `public.graph_level_versions(id)` ON DELETE SET NULL |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -645,6 +676,6 @@ When `sweep_expired_run_series` removed the series (object, JSONB, per-item rows
 
 ---
 
-*Generated from data contract `4f37b56243cf`, engine `0.2.8`,
+*Generated from data contract `5801850de943`, engine `0.2.8`,
 sidecar `supabase/contract/simulation_runs.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
