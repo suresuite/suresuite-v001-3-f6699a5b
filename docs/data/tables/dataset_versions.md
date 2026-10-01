@@ -344,6 +344,6 @@ SHA-256 over the FIRM level (WP 10.1): the deep-tier topology (`network_nodes(ui
 
 ---
 
-*Generated from data contract `083a537bdadc`, engine `0.2.8`,
+*Generated from data contract `bb20efb6a588`, engine `0.2.8`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

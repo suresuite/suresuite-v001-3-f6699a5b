@@ -313,7 +313,7 @@ First day of the horizon the project simulates.
 | Validated at ingest | — |
 | Rendered at | `[object Object]`, `[object Object]`, `[object Object]` |
 
-**Rendered on** `FirmLevelNetwork.tsx` (`src/components/network/NetworkDisruptionDialog.tsx:421`), `ProcessLevelNetwork.tsx` (`src/components/network/NetworkDisruptionDialog.tsx:421`), `ProductLevelNetwork.tsx` (`src/components/network/NetworkDisruptionDialog.tsx:421`) —
+**Rendered on** `FirmLevelNetwork.tsx` (`src/components/network/NetworkDisruptionDialog.tsx:414`), `ProcessLevelNetwork.tsx` (`src/components/network/NetworkDisruptionDialog.tsx:414`), `ProductLevelNetwork.tsx` (`src/components/network/NetworkDisruptionDialog.tsx:414`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -441,6 +441,6 @@ The owning organization by uuid. This is what the public /v1 API authorizes on (
 
 ---
 
-*Generated from data contract `083a537bdadc`, engine `0.2.8`,
+*Generated from data contract `bb20efb6a588`, engine `0.2.8`,
 sidecar `supabase/contract/projects.contract.yaml`, table created by `20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
