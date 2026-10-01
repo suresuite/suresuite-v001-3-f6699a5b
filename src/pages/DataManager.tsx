@@ -275,6 +275,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
         p_simulation_start: formatDateForDatabase(simulationStart),
         p_simulation_end: formatDateForDatabase(simulationEnd),
         p_data_type: dataType,
+        p_deep_tier_enabled: deepTierEnabled,
       });
 
       if (error) throw error;
@@ -362,6 +363,10 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
         p_user_id: user.id,
         p_user_email: user.email,
         p_user_name: user.name,
+        p_simulation_start: project.simulation_start ?? null,
+        p_simulation_end: project.simulation_end ?? null,
+        p_data_type: project.data_type ?? null,
+        p_deep_tier_enabled: project.deep_tier_enabled ?? false,
       });
 
       if (error) throw error;
@@ -389,6 +394,7 @@ const DataManager = ({ isCollapsed, setIsCollapsed }: DataManagerProps) => {
         p_simulation_start: editSimulationStart ? editSimulationStart.toISOString().split('T')[0] : null,
         p_simulation_end: editSimulationEnd ? editSimulationEnd.toISOString().split('T')[0] : null,
         p_data_type: editDataType,
+        p_deep_tier_enabled: editDeepTierEnabled,
       });
 
       if (error) throw error;
