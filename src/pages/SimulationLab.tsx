@@ -48,6 +48,7 @@ import { useValidatedBaseline } from "@/hooks/useValidatedBaseline";
 import { LabModelStep } from "@/components/sim/LabModelStep";
 import { useSimEngines } from "@/hooks/useSimEngines";
 import { useMyCapacity } from "@/hooks/useMyCapacity";
+import { useSurrogateTrainingSet } from "@/hooks/useSurrogateTrainingSet";
 import { dispatchExperiment } from "@/lib/sim/dispatch";
 import {
   defaultModel,
@@ -137,6 +138,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   );
   const { latestRun, reps, cancelRun, addReps } = useSimulationRun(selectedId);
   const capacity = useMyCapacity(projectId, user?.id, latestRun ? `${latestRun.id}:${latestRun.status}` : null);
+  const trainingSet = useSurrogateTrainingSet(projectId, latestRun ? `${latestRun.id}:${latestRun.status}` : null);
   // The validated baseline is Run & Validate's: the Lab shows it and reuses its
   // run, and never edits or dispatches it (§4 D227).
   const baselineSelected = isValidationBaseline(selected);
@@ -738,6 +740,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           compareModelId={usingModel ? chosenModel?.id ?? null : null}
           settingsLockReason={settingsLockReason}
           modelStep={modelStep}
+          trainingSet={trainingSet}
           runEstimate={runSize ? runSize.line + (runSize.refusal ? ` · Over capacity: ${runSize.refusal}` : "") : null}
         />
         <NewScenarioDialog
@@ -819,7 +822,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   onToggle={() => setStressOpen((v) => !v)}
                 />
                 {stressOpen ? <StressTestDrawer onLaunch={launchStress} /> : null}
-                <SurrogateCard />
+                <SurrogateCard training={trainingSet} />
                 <ScenarioList
                   scenarios={scenarios}
                   selectedId={selectedId}

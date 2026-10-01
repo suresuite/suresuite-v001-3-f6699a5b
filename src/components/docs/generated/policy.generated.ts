@@ -1474,6 +1474,21 @@ export const ANALYSIS_KINDS: AnalysisKind[] = [
     ]
   },
   {
+    "kind": "feature_spec",
+    "computedBy": "public.surrogate_feature_spec (SQL, WP 10.8)",
+    "codeVersion": "feature_spec-1",
+    "entityType": "graph",
+    "note": "The structural features a surrogate reads per Graph Version (blueprint §11.3): over `inbound_logistics`, out-degree and weekly-volume-weighted out-degree per supplier (`entity_type` supplier), suppliers per material (`material`), and one `graph`/`summary` row with the counts, means, the single-sourced count and the multi-source rate. Keyed on the PRODUCT level hash, so it is computed once per sourcing network and a revert is the first run again (`rehearsal/620`). No model is trained.",
+    "params": [
+      {
+        "name": "feature_spec_version",
+        "type": "integer",
+        "default": 1,
+        "meaning": "Which feature definition the run computed. Part of the key, so a changed definition is a new run over the same graph rather than a stale hit."
+      }
+    ]
+  },
+  {
     "kind": "network_metrics",
     "computedBy": "calculate-network-science-metrics (migrated in WP 4.3)",
     "codeVersion": "network_metrics@wp43.1",

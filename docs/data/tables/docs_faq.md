@@ -229,6 +229,6 @@ The super admin who last changed it; NULL for the seeded answers.
 
 ---
 
-*Generated from data contract `4e06bcb25735`, engine `0.2.8`,
+*Generated from data contract `6aca18c287df`, engine `0.2.8`,
 sidecar `supabase/contract/docs_faq.contract.yaml`, table created by `20261001000002_docs_release_and_questions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -967,6 +967,12 @@ Surrogates are models with lifecycles, so they get the same discipline as polici
 > structural `feature_spec` is computed once per Graph Version through the analysis store, keyed
 > on its level hash like any other analysis. Validity scoping follows: a surrogate serves only
 > requests whose Validated Model and graph family match its lineage.
+>
+> **As built (WP 10.8):** the view also takes each model's EVIDENCE run, which names no model on
+> its own row (PLAN.md §4 D249), and leaves out runs of a rejected or revoked model and runs
+> dispatched past the required-data gate, which computed on substituted defaults. The features
+> are keyed on the PRODUCT level hash — they read the sourcing lanes — so a revert of the
+> sourcing network is the first stored run again. No model is trained (PLAN.md §16 · WP 10.8).
 
 ### 11.5 Orchestration: stress testing as a digital-twin analysis job
 

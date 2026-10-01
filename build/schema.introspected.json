@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 375,
-  "migrations_applied": 367,
+  "migrations_found": 376,
+  "migrations_applied": 368,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000011_capacity.sql",
+  "last_migration": "20261001000012_surrogate_training_set.sql",
   "counts": {
     "tables": 89,
-    "views": 7,
+    "views": 8,
     "enums": 4,
-    "functions": 388,
+    "functions": 391,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -23169,6 +23169,11 @@
       "materialized": false,
       "security_invoker": true
     },
+    "surrogate_training_runs": {
+      "defined_by": "20261001000012_surrogate_training_set.sql",
+      "materialized": false,
+      "security_invoker": false
+    },
     "v_admin_user_usage": {
       "defined_by": "20260916000009_security_invoker_v_admin_user_usage.sql",
       "materialized": false,
@@ -23460,6 +23465,18 @@
       "volatility": "STABLE",
       "comment": null,
       "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "_feature_spec_compute",
+      "signature": "_feature_spec_compute(uuid)",
+      "args": [
+        "p_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000012_surrogate_training_set.sql"
     },
     {
       "name": "_graph_state_mark",
@@ -28123,6 +28140,31 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260715000001_agent_proposals.sql"
+    },
+    {
+      "name": "surrogate_feature_spec",
+      "signature": "surrogate_feature_spec(uuid, uuid)",
+      "args": [
+        "p_project_id uuid",
+        "_actor_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000012_surrogate_training_set.sql"
+    },
+    {
+      "name": "surrogate_training_summary",
+      "signature": "surrogate_training_summary(uuid)",
+      "args": [
+        "p_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000012_surrogate_training_set.sql"
     },
     {
       "name": "sweep_expired_files",
