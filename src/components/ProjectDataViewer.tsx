@@ -10,7 +10,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { AlertCircle, RefreshCw, Download, X } from 'lucide-react';
+import { useProjectRights } from '@/hooks/useProjectRights';
+import { useConfirm } from '@/components/shared/confirm/useConfirm';
+import {
+  DATASET_DELETE_TARGETS,
+  confirmDatasetDeletion,
+  datasetDeleteLabel,
+  datasetDeletedMessage,
+  deletableCount as countDeletable,
+} from '@/lib/projects/datasetDeletion';
+import { AlertCircle, RefreshCw, Download, Trash2, X } from 'lucide-react';
 
 // Define the type that includes all possible tab keys  
 type TabKey = 'bom' | 'inbound' | 'outbound' | 'nodeList' | 'deepNodes' | 'deepEdges' | 'deepSummary';
@@ -70,8 +79,15 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
   const [activeTab, setActiveTab] = useState<TabKey>('bom');
   const [rowLimit, setRowLimit] = useState<number | 'all'>(10);
 
+  const [deleting, setDeleting] = useState(false);
+
   const { toast } = useToast();
   const { user } = useAuth();
+  const confirm = useConfirm();
+  // The server's rule is the project's owner or an admin of its organization;
+  // "Edit Input Data" is the browser's copy of it (`v_land`, D230/D256).
+  const rights = useProjectRights(project.id, { modelerId: project.modeler_id });
+  const mayDelete = rights.can('data_edit_inputs');
 
   useEffect(() => {
     loadProjectData();
@@ -250,6 +266,48 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
     a.download = `${headerTitle.toLowerCase()}_data.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // §4 D266 — the trash button empties the dataset on this tab (or, on Node List,
+  // clears the uploaded fields), so a wrong upload can be replaced.
+  const target = current ? DATASET_DELETE_TARGETS[current.key] : undefined;
+  const deletableCount = current ? countDeletable(current.key, currentData) : 0;
+  const deleteLabel = current ? datasetDeleteLabel(current.key, current.label) : '';
+
+  const deleteCurrentDataset = async () => {
+    if (!current || !target || !user?.id || !user?.email) return;
+    const ok = await confirmDatasetDeletion(confirm, {
+      tab: current.key,
+      label: current.label,
+      projectName: project.name,
+      count: deletableCount,
+    });
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      const { data: count, error } = await supabase.rpc('delete_project_dataset', {
+        p_project_id: project.id,
+        p_dataset: target.dataset,
+        p_user_id: user.id,
+        p_user_email: user.email,
+      });
+      if (error) throw error;
+      toast({
+        title: target.clears ? `${current.label} fields cleared` : `${current.label} data deleted`,
+        description: datasetDeletedMessage(current.key, project.name, Number(count ?? 0)),
+      });
+      await loadProjectData();
+      onDataDeleted();
+    } catch (error) {
+      toast({
+        title: `Could not ${deleteLabel.charAt(0).toLowerCase()}${deleteLabel.slice(1)}`,
+        description: `${error instanceof Error ? error.message : (error as { message?: string })?.message ?? 'unknown error'}. Nothing was changed.`,
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const renderEmpty = (msg: string) => (
@@ -457,6 +515,20 @@ const ProjectDataViewer = ({ project, onClose, onDataDeleted }: ProjectDataViewe
             <Download className="h-4 w-4" />
             <span className="sr-only">Download CSV</span>
           </Button>
+
+          {mayDelete && target && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive hover:text-destructive"
+              onClick={deleteCurrentDataset}
+              disabled={deleting || deletableCount === 0}
+              title={deletableCount === 0 ? 'Nothing to delete' : `${deleteLabel}…`}
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="sr-only">{deleteLabel}</span>
+            </Button>
+          )}
 
           <Button
             variant="ghost"
