@@ -78,7 +78,7 @@ async function runETLLogic(supabase: any, project_id: string, user_id: string, u
     // performs under `set_current_user_context(user_id, …)` — a context this
     // function supplies. A gate you hand the answer to is not a gate.
     if (!sameOrganization(userData, projectData)) return { success: false, error: 'Forbidden: Organization mismatch' };
-    if (projectData.modeler_id !== user_id && userData.role !== 'admin') return { success: false, error: 'Forbidden: Not project owner or admin' };
+    if (projectData.modeler_id !== user_id && !['admin', 'super_admin'].includes(userData.role)) return { success: false, error: 'Forbidden: Not project owner or admin' };
 
     // Product mapping — DELETED in Phase 1 / WP 1.4 (D3), and the note stays.
     //

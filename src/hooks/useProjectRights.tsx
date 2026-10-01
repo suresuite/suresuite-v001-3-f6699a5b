@@ -79,7 +79,7 @@ export function useProjectRights(
   const modelerId = opts.modelerId;
   const role = user?.role;
 
-  const ownerOrAdmin = !!user?.id && (modelerId === user.id || role === 'admin');
+  const ownerOrAdmin = !!user?.id && (modelerId === user.id || role === 'admin' || role === 'super_admin');
 
   const can = useCallback((right: ProjectRight): boolean => {
     if (!current) return false;

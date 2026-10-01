@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 380,
-  "migrations_applied": 372,
+  "migrations_found": 381,
+  "migrations_applied": 373,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000016_project_settings_one_writer.sql",
+  "last_migration": "20261001000017_super_admin_acts_as_admin.sql",
   "counts": {
     "tables": 91,
     "views": 8,
@@ -24755,7 +24755,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "analysis_apply_node_metrics",
@@ -25274,7 +25274,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "bulk_insert_bom_single_level",
@@ -25288,7 +25288,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "bulk_insert_inbound_logistics",
@@ -25302,7 +25302,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "bulk_insert_multi_tier_supply_chain",
@@ -25316,7 +25316,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "bulk_insert_network_edges",
@@ -25332,7 +25332,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "bulk_insert_network_nodes",
@@ -25348,7 +25348,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "bulk_insert_network_summary",
@@ -25364,7 +25364,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20250905160724_8fa65aa0-2b2c-4652-aee8-82b53ecc9d2a.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "bulk_insert_outbound_logistics",
@@ -25378,7 +25378,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "bulk_insert_tier2_suppliers",
@@ -25393,7 +25393,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "bulk_insert_tier3_suppliers",
@@ -25408,7 +25408,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "bulk_move_chat_threads",
@@ -25621,7 +25621,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "WP 8.2 · §4 D140. The AUTHORIZING wrapper over `rebuild_supply_chain_lanes`. ",
-      "defined_by": "20261001000007_graph_levels_compute_once.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "create_agent_proposal",
@@ -25714,7 +25714,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20250828005114_4c7e88dc-9c73-4538-ab14-fe93b22d07dc.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "create_disruption_scenario_v2",
@@ -25756,7 +25756,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "create_project",
@@ -25797,7 +25797,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "create_simulation_run",
@@ -25928,7 +25928,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "delete_chat_folder",
@@ -25968,7 +25968,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "delete_policy_override",
@@ -26012,7 +26012,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "delete_project",
@@ -26026,7 +26026,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": "D170 — deletes ONE project and everything scoped to it in a single transaction: ",
-      "defined_by": "20260930000002_admin_delete_organization.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "delete_simulation_result",
@@ -26040,7 +26040,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "delete_simulation_results_batch",
@@ -26054,7 +26054,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "delete_user_file",
@@ -26791,7 +26791,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "get_supply_chain_data_multi_tier",
@@ -26891,7 +26891,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260829120000_erp_connector_phase1_2.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "http_post",
@@ -27609,7 +27609,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": "D230, D231 — one person's rights on one project, as the app applies them while the person ",
-      "defined_by": "20261001000004_project_rights_in_the_project.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "project_role_rank",
@@ -27683,7 +27683,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260920000001_one_node_classifier.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "rebuild_supply_chain_lanes",
@@ -28048,7 +28048,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "set_current_user_context",
@@ -28576,7 +28576,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260915000004_org_identity_dual_read.sql"
+      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
     },
     {
       "name": "upsert_chat_plan",
