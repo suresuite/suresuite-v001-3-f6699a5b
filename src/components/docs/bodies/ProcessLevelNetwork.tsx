@@ -110,8 +110,9 @@ export default function ProcessLevelNetwork() {
         <P>
           Select a node and <strong>Add disruption event</strong> saves an event to a scenario's
           disruption schedule — a new scenario started from the validated baseline, or one you
-          already have. The event names the disrupted node, its effect (a full outage, or a
-          capacity reduction by a share), its onset week and its duration in simulation weeks.
+          already have. The event names the disrupted node, its effect (a lead-time delay, or
+          a capacity reduction by a share), the disruption event start time and the disruption
+          event duration, both in simulation weeks.
           The engine disrupts a supplier of this project or
           the plant. A material or sub-assembly node is shown with that reason, and its connected
           suppliers are offered instead: at this depth you can see which supplier feeds the stage

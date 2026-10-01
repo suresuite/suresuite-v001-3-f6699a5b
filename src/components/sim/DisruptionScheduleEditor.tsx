@@ -12,7 +12,7 @@ import {
   DISRUPTION_TERMS,
   addBlockedReason,
   describeEvent,
-  isFullOutage,
+  isLeadTimeDelay,
   judgeTarget,
   newEvent,
   targetChoices,
@@ -40,7 +40,7 @@ interface Props {
  * A target is PICKED from what the engine can disrupt — the plant or one of the
  * project's suppliers (`_map_events`' own test) — rather than typed as free text
  * the mapper would then skip. Start and duration are whole weeks. The effect is
- * a full outage or a capacity reduction BY a share, which is what `magnitude_pct`
+ * a lead-time delay or a capacity reduction BY a share, which is what `magnitude_pct`
  * means to the engine; every label is `DISRUPTION_TERMS`. "Add" stops at the engine's event cap and says why. The network pages'
  * dialog builds its event with the same module, so both doors write one shape.
  */
@@ -84,7 +84,7 @@ export function DisruptionScheduleEditor({
       {local.map((d, i) => {
         const { target, reason } = judgeTarget(d.target, supplierIds);
         const outageOnly =
-          !isFullOutage(d.magnitude_pct) && target.kind === "supplier" && uncapacitated.includes(target.id);
+          !isLeadTimeDelay(d.magnitude_pct) && target.kind === "supplier" && uncapacitated.includes(target.id);
         return (
           <div key={i} className="rounded-sm border border-border">
             <div className="flex items-center gap-2 border-b border-border px-2 py-1">
@@ -120,9 +120,9 @@ export function DisruptionScheduleEditor({
                 <EffectControl value={d.magnitude_pct} onChange={(v) => patchNow(i, { magnitude_pct: v })} />
               </div>
               <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
-                <Label className="text-[10px]">{DISRUPTION_TERMS.onset}</Label>
+                <Label className="text-[10px]">{DISRUPTION_TERMS.startTime} (week)</Label>
                 <WeeksInput
-                  ariaLabel="Onset week"
+                  ariaLabel="Disruption event start time, in weeks"
                   className="h-8 min-h-11 w-full md:min-h-0"
                   days={d.start_day}
                   min={DISRUPTION_RULE.start_week_min}
@@ -132,7 +132,7 @@ export function DisruptionScheduleEditor({
               <div className="col-span-1 flex flex-col gap-1 md:col-span-2">
                 <Label className="text-[10px]">{DISRUPTION_TERMS.duration} (weeks)</Label>
                 <WeeksInput
-                  ariaLabel="Duration in weeks"
+                  ariaLabel="Disruption event duration, in weeks"
                   className="h-8 min-h-11 w-full md:min-h-0"
                   days={d.duration_days}
                   min={DISRUPTION_RULE.duration_weeks_min}
@@ -150,7 +150,7 @@ export function DisruptionScheduleEditor({
                 <p className="col-span-2 text-[10px] text-[#b3261e] md:col-span-12">{reason}</p>
               ) : outageOnly ? (
                 <p className="col-span-2 text-[10px] text-[--warn-ink,#92400e] md:col-span-12">
-                  This supplier has no weekly capacity, so the engine runs a capacity reduction as a full outage.
+                  This supplier has no weekly capacity, so the engine runs a capacity reduction as a lead-time delay.
                 </p>
               ) : null}
             </div>
@@ -264,10 +264,10 @@ export function TargetSelect({
   );
 }
 
-/** Full outage, or a capacity reduction BY a share — the engine's reading of `magnitude_pct`. */
+/** Lead-time delay, or a capacity reduction BY a share — the engine's reading of `magnitude_pct`. */
 export function EffectControl({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const full = DISRUPTION_RULE.full_outage_pct;
-  const partial = !isFullOutage(value);
+  const partial = !isLeadTimeDelay(value);
   const [text, setText] = useState(String(partial ? value : 50));
   useEffect(() => {
     if (value < full) setText(String(value));
@@ -276,13 +276,13 @@ export function EffectControl({ value, onChange }: { value: number; onChange: (v
     <span className="flex flex-wrap items-center gap-1.5">
       <Segmented
         ariaLabel={DISRUPTION_TERMS.effect}
-        value={partial ? "partial" : "outage"}
+        value={partial ? "partial" : "delay"}
         options={[
-          { value: "outage", label: DISRUPTION_TERMS.fullOutage },
+          { value: "delay", label: DISRUPTION_TERMS.leadTimeDelay },
           { value: "partial", label: DISRUPTION_TERMS.capacityReduction },
         ]}
         onChange={(v) =>
-          onChange(v === "outage" ? full : Math.min(full - 1, Math.max(1, Number(text) || 50)))
+          onChange(v === "delay" ? full : Math.min(full - 1, Math.max(1, Number(text) || 50)))
         }
       />
       {partial ? (

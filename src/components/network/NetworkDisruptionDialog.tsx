@@ -275,9 +275,9 @@ function Body({
         <Row label="Timing">
           <span className="flex flex-wrap items-end gap-3">
             <label className="flex flex-col gap-1">
-              <span className="text-[11.5px] text-[#71717a]">{DISRUPTION_TERMS.onset}</span>
+              <span className="text-[11.5px] text-[#71717a]">{DISRUPTION_TERMS.startTime} (week)</span>
               <WeeksInput
-                ariaLabel="Onset week"
+                ariaLabel="Disruption event start time, in weeks"
                 days={ev.start_day}
                 min={DISRUPTION_RULE.start_week_min}
                 onDays={(d) => setEvent((e) => ({ ...e, start_day: d }))}
@@ -286,7 +286,7 @@ function Body({
             <label className="flex flex-col gap-1">
               <span className="text-[11.5px] text-[#71717a]">{DISRUPTION_TERMS.duration} (weeks)</span>
               <WeeksInput
-                ariaLabel="Duration in weeks"
+                ariaLabel="Disruption event duration, in weeks"
                 days={ev.duration_days}
                 min={DISRUPTION_RULE.duration_weeks_min}
                 max={DISRUPTION_RULE.duration_weeks_max}

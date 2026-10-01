@@ -50,11 +50,11 @@ describe("one disruption-event model (WP 9.4 slice 6 · §4 D226)", () => {
     for (const c of choices) expect(judgeTarget(c.value, ids).reason).toBeNull();
   });
 
-  it("a new event is a whole-week full outage after the warm-up", () => {
+  it("a new event is a whole-week lead-time delay after the warm-up", () => {
     const e = newEvent("node:plant", 105);
     expect(e.start_day % 7).toBe(0);
     expect(e.duration_days % 7).toBe(0);
-    expect(effectLabel(e.magnitude_pct)).toBe("Full outage");
+    expect(effectLabel(e.magnitude_pct)).toBe("Lead-time delay");
     expect(effectLabel(30)).toBe("Capacity reduction 30%");
   });
 
