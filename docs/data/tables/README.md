@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-74 of 91 tables are covered,
-954 columns in all. A table that is not here is listed
+75 of 92 tables are covered,
+966 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -21,7 +21,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`bom_single_level`](bom_single_level.md) | 2 | `data-ingestion` | 10 | One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`) — a re-upload updates the line rather than repeating it (D5 closed). |
 | [`capabilities`](capabilities.md) | G | `platform` | 7 | One thing a user may or may not be permitted to do — a page they may open or a feature they may use. The CATALOG: it says what rights exist, never who holds them. The four grant tables answer that. |
 | [`customers`](customers.md) | 2 | `data-ingestion` | 10 | One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows. |
-| [`dataset_versions`](dataset_versions.md) | 3 | `platform` | 14 | One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot. |
+| [`dataset_versions`](dataset_versions.md) | 3 | `platform` | 17 | One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot. |
 | [`delegation_grants`](delegation_grants.md) | G | `platform` | 9 | One temporary, subtractive grant of project access from one person to another. `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the grantor holds, and it always ends. |
 | [`disruption_scenario_effects`](disruption_scenario_effects.md) | 4 | `policy-ui` | 9 | One effect for one profile: WHAT the disruption does to whatever it hits. A capacity reduction or a time delay, with a magnitude and the unit that magnitude is in. |
 | [`disruption_scenario_profiles`](disruption_scenario_profiles.md) | 4 | `policy-ui` | 13 | One disruption profile for one project — the HEADER of the normalised disruption model. What it hits lives in `_targets`, what it does in `_effects`, and how it is simulated in `_settings`; all three cascade from this row. |
@@ -32,6 +32,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`docs_section_releases`](docs_section_releases.md) | G | `platform` | 4 | One section of the /docs manual and who may read it. A row per registry section KEY; a section with no row is read as confidential by the database and the client alike, so a section added later is closed until a super admin opens it. |
 | [`experiments`](experiments.md) | 5 | `engine` | 10 | One designed experiment over a project: a name, a design (full factorial or Latin hypercube), the factors and levels it varies, and the `scenarios` it cloned — one per design row — to run. A design a person authors, grouping runs that were MADE to be compared. UNREACHABLE TODAY: the only screen that writes or reads it, `ExperimentDesigner.tsx`, is mounted by no route (§4 D115), so although `useExperiments` reads and writes the table, no page a user can open reaches that code. |
 | [`external_evidence`](external_evidence.md) | 4 | `platform` | 9 | One retrieved external claim about a supply chain, as a subject–predicate–object triple with the source it came from, the confidence attached to it and the hash of the content it was read from. The network cartographer's evidence store: what an agent FOUND, kept apart from what a person entered. |
+| [`graph_level_versions`](graph_level_versions.md) | 3 | `platform` | 9 | One row per (project, level, content): the FIRST time a project's product, process, firm or simulation level had that hash. Numbered per project PER LEVEL, so "Product graph v3" and "Firm graph v5" are both sentences the system can say, and a change to one level moves that level's number and no other. A snapshot (`dataset_versions`) names its level versions — its tuple. |
 | [`inbound_logistics`](inbound_logistics.md) | 2 | `data-ingestion` | 14 | One supply arc as the user uploaded it: this supplier can deliver this material to this plant, at this price and lead time, in this volume. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`): a second upload of the same arc UPDATES it rather than adding a row, and the promotion is the upsert that does so (D5 closed). |
 | [`ingest_files`](ingest_files.md) | 0 | `data-ingestion` | 11 | One file as received, in one run: the manifest for bytes held in storage — where they are, how many there were, and the SHA-256 of exactly the sequence received. Write-once: the row records an event that has already happened and cannot be edited into a different one. |
 | [`ingest_runs`](ingest_runs.md) | 1 | `data-ingestion` | 23 | One ingestion attempt, from any source — a connector sync, a CSV upload or an API push — with the counts and the mapping report it produced. The unit a person reviews and approves: staged rows belong to a run, and promotion is a decision about a run rather than about a row. |
@@ -89,4 +90,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `ce1d4e91513a`, engine `0.2.8`.*
+*Generated from data contract `242049f32e27`, engine `0.2.8`.*

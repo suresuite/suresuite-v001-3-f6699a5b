@@ -26,28 +26,26 @@
 | Minimum project role | `viewer` |
 | Tier transitions audited | yes |
 | Row-level security | enabled |
-| Policies on the table | 2 — **2 with no predicate** |
+| Policies on the table | 1 — **1 with no predicate** |
 
-Written by the `_build_dataset_snapshot` database function, never by a page — that is the INTENT, and `write: null` records it. **The enforcement does not match, and WP 2.4 measured it.** The live policy `dataset_versions_insert_all` is `FOR INSERT ... WITH CHECK (true)`, and `20260610000002` grants `anon` SELECT and INSERT, so any holder of the public anon key may insert a snapshot row. The contract reads narrower than the database, which is the exact class §9 asks this package to find. It is pinned by `governanceEnforcement.test.ts` rather than silently fixed: the app runs AS anon with no auth session, so revoking is a Phase 3 migration with an auth model behind it, and the decision taken was to document. See PLAN.md D28.
+Written by the `_build_dataset_snapshot` database function, never by a page — that is the INTENT, and `write: null` records it. **And since WP 11.1 the database enforces it** (§4 D264): from WP 2.4 to WP 11.1 the live policy `dataset_versions_insert_all` was `FOR INSERT ... WITH CHECK (true)` with an INSERT grant to `anon` and `authenticated`, pinned by `governanceEnforcement.test.ts` rather than changed. No path inserted a row directly, and from WP 11.1 a planted row would also have minted level versions, so the policy is dropped and the grant revoked; `snapshot_dataset` (SECURITY DEFINER) and the service role are the writers. Reads stay open to every API role (`dataset_versions_read_all`, part of D28's pinned list).
 
 > **What the database actually permits is wider than the row above.**
-> 2 policies here grant access with
+> 1 policy here grants access with
 > **no predicate at all** (`USING (true)`), so the capability named above is what the
 > product intends to check, not what the database enforces:
 >
 > - `dataset_versions_read_all` — `SELECT` to `anon`, `authenticated`
-> - `dataset_versions_insert_all` — `INSERT` to `anon`, `authenticated`
 >
-> Some of these permit **writes**. See PLAN.md D28: the application runs as the
+> See PLAN.md D28: the application runs as the
 > `anon` role with no auth session and the anon key ships in the frontend bundle, so
 > closing these is a migration with an auth model behind it rather than a policy edit.
 
-<details><summary>2 RLS policies</summary>
+<details><summary>1 RLS policy</summary>
 
 | Policy | Command | Roles | Added by |
 |---|---|---|---|
 | dataset_versions_read_all | SELECT | anon, authenticated | `20260703000001_dataset_versions.sql` |
-| dataset_versions_insert_all | INSERT | anon, authenticated | `20260703000001_dataset_versions.sql` |
 
 </details>
 
@@ -88,6 +86,9 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `hash_process` | — | `text` | — | — | SHA-256 over the PROCESS level (WP 10.1): `bom_multi_level` and `multi_tier_supply_chain` whole, plus the endpoints and quantities — not the prices — of the single-level BOM and the lanes, and the product ids. Exactly what `rebuild_supply_chain_lanes` builds the two lane graphs from, so the derived lane tables never enter an identity. NULL on a pre-v2 snapshot, which has no `network` domain. |
 | `hash_firm` | — | `text` | — | — | SHA-256 over the FIRM level (WP 10.1): the deep-tier topology (`network_nodes(uid, revenue)`, `network_edges(src_uid, dst_uid, relative_revenue)`) and the tier-2 / tier-3 supplier tables. NULL on a snapshot older than `schema_version` 3, which did not hash the deep tier — a level computed from it would hash an absence, which is not a fact. |
 | `version_no` | — | `integer` | — | — | "Graph v7" — one number per CONTENT (`graph_hash`) per project, in order of first appearance, assigned by a BEFORE INSERT trigger (WP 10.1, §4 D234). Since WP 10.1 `snapshot_dataset` returns the OLDEST version of a content, so a reverted edit is the earlier number again; rows that predate that and share a hash share the number. |
+| `product_version_id` | — | `uuid` | — | — | This snapshot's PRODUCT level version — the `graph_level_versions` row whose content is this row's `hash_product` ("Product graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen. |
+| `process_version_id` | — | `uuid` | — | — | This snapshot's PROCESS level version — the `graph_level_versions` row whose content is this row's `hash_process` ("Process graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen. |
+| `firm_version_id` | — | `uuid` | — | — | This snapshot's FIRM level version — the `graph_level_versions` row whose content is this row's `hash_firm` ("Firm graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen. |
 
 ## Each column in full
 
@@ -335,6 +336,57 @@ SHA-256 over the FIRM level (WP 10.1): the deep-tier topology (`network_nodes(ui
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `product_version_id`
+
+This snapshot's PRODUCT level version — the `graph_level_versions` row whose content is this row's `hash_product` ("Product graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20261001000018_graph_level_versions.sql` |
+| References | `public.graph_level_versions(id)` ON DELETE SET NULL |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+> NULL only where `hash_product` is NULL — a snapshot frozen before WP 4.1, whose level the snapshot cannot support. Never defaulted.
+
+### `process_version_id`
+
+This snapshot's PROCESS level version — the `graph_level_versions` row whose content is this row's `hash_process` ("Process graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20261001000018_graph_level_versions.sql` |
+| References | `public.graph_level_versions(id)` ON DELETE SET NULL |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+> NULL only where `hash_process` is NULL (a snapshot frozen before WP 4.1).
+
+### `firm_version_id`
+
+This snapshot's FIRM level version — the `graph_level_versions` row whose content is this row's `hash_firm` ("Firm graph v3"). With its two siblings it is the snapshot's TUPLE: a snapshot IS its level versions (WP 11.1, §4 D257). Written by the registration trigger the moment the row is frozen.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20261001000018_graph_level_versions.sql` |
+| References | `public.graph_level_versions(id)` ON DELETE SET NULL |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+> NULL where `hash_firm` is NULL — every snapshot older than `schema_version` 3, which did not hold the deep-tier topology. A NULL here means the snapshot cannot say, never that the project had no deep tier.
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -344,6 +396,6 @@ SHA-256 over the FIRM level (WP 10.1): the deep-tier topology (`network_nodes(ui
 
 ---
 
-*Generated from data contract `ce1d4e91513a`, engine `0.2.8`,
+*Generated from data contract `242049f32e27`, engine `0.2.8`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "ce1d4e91513a";
+export const CONTRACT_VERSION = "242049f32e27";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261001000017_super_admin_acts_as_admin.sql";
+export const LAST_MIGRATION = "20261001000018_graph_level_versions.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 91,
-  "tablesDescribed": 74,
-  "columnsDescribed": 954,
+  "tablesInSchema": 92,
+  "tablesDescribed": 75,
+  "columnsDescribed": 966,
   "tablesUndescribed": 17
 } as const;
 
@@ -177,7 +177,13 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "dataset_versions",
         "grain": "One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot.",
-        "columns": 14,
+        "columns": 17,
+        "owner": "platform"
+      },
+      {
+        "table": "graph_level_versions",
+        "grain": "One row per (project, level, content): the FIRST time a project's product, process, firm or simulation level had that hash. Numbered per project PER LEVEL, so \"Product graph v3\" and \"Firm graph v5\" are both sentences the system can say, and a change to one level moves that level's number and no other. A snapshot (`dataset_versions`) names its level versions — its tuple.",
+        "columns": 9,
         "owner": "platform"
       },
       {

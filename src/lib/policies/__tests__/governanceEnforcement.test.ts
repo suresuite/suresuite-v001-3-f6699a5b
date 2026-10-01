@@ -75,8 +75,10 @@ describe("every described table's governance block is checked against real polic
     //
     // What is NOT consistent is a policy with no predicate at all: that permits
     // any holder of the table grant to write, which is a user-facing write path
-    // whether or not a page uses it. That is the version worth gating, and
-    // `dataset_versions` fails it today — see §16's WP 2.4 entry.
+    // whether or not a page uses it. That is the version worth gating.
+    // `dataset_versions` failed it from WP 2.4 (§16) until WP 11.1 closed the door
+    // (§4 D264): no writer inserted a snapshot directly, and a planted row would
+    // have minted level versions as well as a hash `snapshot_dataset` dedupes onto.
     const S = schema();
     const offenders: string[] = [];
     for (const doc of sidecars()) {
@@ -91,7 +93,7 @@ describe("every described table's governance block is checked against real polic
       offenders,
       "a table declaring no user-facing write path has a write policy with no " +
         "predicate. Either the policy should be scoped or the sidecar is wrong.",
-    ).toEqual(["dataset_versions :: \"dataset_versions_insert_all\" [INSERT]"]);
+    ).toEqual([]);
   });
 });
 
@@ -177,7 +179,7 @@ describe("D28 — the truth table of what is actually unconditional", () => {
     expect(stale, "these are no longer unconditional — remove them from the list").toEqual([]);
   });
 
-  it("unconditional WRITE is the subset that matters most, and it is seven tables", () => {
+  it("unconditional WRITE is the subset that matters most, and it is six tables", () => {
     // Read-everything is a confidentiality problem. Write-everything is an
     // integrity one, and anon holds INSERT/UPDATE (and DELETE on scenarios) on
     // exactly these — see §16's WP 2.4 entry for the grant inventory.
@@ -188,8 +190,9 @@ describe("D28 — the truth table of what is actually unconditional", () => {
         if (unconditional(p) && WRITE_CMDS.has((p.command ?? "").toUpperCase())) writable.add(t.name);
       }
     }
+    // `dataset_versions` left this list in WP 11.1 (§4 D264).
     expect([...writable].sort()).toEqual([
-      "dataset_versions", "experiments", "policy_versions", "run_item_series",
+      "experiments", "policy_versions", "run_item_series",
       "run_replications", "scenarios", "simulation_runs",
     ]);
   });

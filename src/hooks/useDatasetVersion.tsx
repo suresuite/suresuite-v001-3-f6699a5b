@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { parseLevelStates, type LevelStates } from "@/lib/trust/graphLevels";
 
 // Dataset (graph + economics) versioning — Phase A / G5 / §8.4; one read and
 // numbered graph versions since WP 10.1.
@@ -33,6 +34,10 @@ export interface DatasetVersion {
   hash_firm?: string | null;
   /** "Graph v7" — one number per content per project (WP 10.1). */
   version_no?: number | null;
+  /** WP 11.1 · the snapshot's TUPLE — its level versions (`graph_level_versions`). */
+  product_version_id?: string | null;
+  process_version_id?: string | null;
+  firm_version_id?: string | null;
   author_email: string | null;
   created_at: string;
 }
@@ -56,6 +61,9 @@ interface UseDatasetVersionResult {
   /** The saved version whose content IS the live data ("Graph v7"), or null. */
   currentVersion: { id: string; version_no: number | null; label: string | null; created_at: string } | null;
   current: GraphHashes | null;
+  /** WP 11.1 · §4 D257 — each level's own version ("Product graph v3"), from the
+   *  same read. Empty on a database before WP 11.1. */
+  levels: LevelStates;
   currentHash: string | null;
   currentInputs: string | null;
   currentNetwork: string | null;
@@ -73,6 +81,7 @@ type StateRow = {
   current?: Partial<GraphHashes> | null;
   current_version?: UseDatasetVersionResult["currentVersion"];
   latest?: DatasetVersion | null;
+  levels?: unknown;
 };
 
 /**
@@ -100,6 +109,7 @@ export function useDatasetVersion(
   const [latest, setLatest] = useState<DatasetVersion | null>(null);
   const [current, setCurrent] = useState<GraphHashes | null>(null);
   const [currentVersion, setCurrentVersion] = useState<UseDatasetVersionResult["currentVersion"]>(null);
+  const [levels, setLevels] = useState<LevelStates>({});
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -118,6 +128,7 @@ export function useDatasetVersion(
     } : null);
     setLatest(row?.latest ?? null);
     setCurrentVersion(row?.current_version ?? null);
+    setLevels(parseLevelStates(row?.levels));
     setLoading(false);
   }, [projectId]);
 
@@ -163,7 +174,7 @@ export function useDatasetVersion(
   })();
 
   return {
-    latest, currentVersion, current, currentHash, currentInputs, currentNetwork,
+    latest, currentVersion, current, levels, currentHash, currentInputs, currentNetwork,
     isDirty, dirtyDomain, neverSnapshotted, loading, refresh, snapshot,
   };
 }
