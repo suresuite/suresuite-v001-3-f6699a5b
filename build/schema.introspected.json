@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 378,
-  "migrations_applied": 370,
+  "migrations_found": 379,
+  "migrations_applied": 371,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000014_series_sweep_via_storage_api.sql",
+  "last_migration": "20261001000015_surrogate_training_totals.sql",
   "counts": {
     "tables": 91,
     "views": 8,
     "enums": 4,
-    "functions": 394,
+    "functions": 395,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -28449,6 +28449,18 @@
       "volatility": "STABLE",
       "comment": null,
       "defined_by": "20261001000013_surrogate_training_set.sql"
+    },
+    {
+      "name": "surrogate_training_totals",
+      "signature": "surrogate_training_totals(uuid)",
+      "args": [
+        "p_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000015_surrogate_training_totals.sql"
     },
     {
       "name": "sweep_expired_files",
