@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "79fc096780a7";
+export const CONTRACT_VERSION = "a9625dbc0ec9";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261001000011_password_reset_requests.sql";
+export const LAST_MIGRATION = "20261001000014_series_sweep_via_storage_api.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 88,
-  "tablesDescribed": 71,
-  "columnsDescribed": 928,
+  "tablesInSchema": 91,
+  "tablesDescribed": 74,
+  "columnsDescribed": 954,
   "tablesUndescribed": 17
 } as const;
 
@@ -277,6 +277,12 @@ export const TIERS: GlanceTier[] = [
         "owner": "policy-ui"
       },
       {
+        "table": "plan_role_allowances",
+        "grain": "One project role's share of an organization's capacity pool: the percentage of the month's compute and of the series storage a member holding that role may use, and how many runs that member may have in flight. A row with no organization is the platform default; a row naming one overrides it for that organization alone.",
+        "columns": 8,
+        "owner": "platform"
+      },
+      {
         "table": "policy_defaults",
         "grain": "One row per project: the policy each family runs with unless a specific node overrides it. The bundle, in other words — and the thing a policy_override is a patch against.",
         "columns": 15,
@@ -340,6 +346,18 @@ export const TIERS: GlanceTier[] = [
         "table": "run_replications",
         "grain": "One replication of one simulation run: the seed it used, the KPI row the engine computed for it, and its weekly series. A run has as many rows here as it has replications, and `rep_index` orders them. Tier 5 — a RESULT, derived from a tier-2 dataset by a named engine version, never an input to anything. Nothing downstream reads it except the result surfaces; a row is superseded by re-running, never edited.",
         "columns": 12,
+        "owner": "engine"
+      },
+      {
+        "table": "run_series_orphans",
+        "grain": "One series object in the `run-results` bucket whose run no longer exists, waiting to be removed. A deleted run queues its object here instead of deleting a storage row with SQL — which would orphan the stored file, and which hosted Supabase refuses — and the next series sweep hands the path to the worker, which removes it through the Storage API.",
+        "columns": 4,
+        "owner": "engine"
+      },
+      {
+        "table": "run_usage",
+        "grain": "One capacity event of one run: its reservation when it was dispatched (`dispatch`), what it actually used when it finished (`complete`), or the release of its series storage when the sweep expired them (`expire`). The ledger a month's compute is read from.",
+        "columns": 9,
         "owner": "engine"
       },
       {
@@ -435,7 +453,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "organizations",
         "grain": "One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold.",
-        "columns": 13,
+        "columns": 18,
         "owner": "platform"
       },
       {

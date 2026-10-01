@@ -5115,7 +5115,7 @@ async function d170DeleteStillFails() {
 // is the expected shape, not a finding); taken in the push AFTER the merge (D153)
 // they are the after-reading §16 owes. Every project, never one (D42).
 async function phase10Versions() {
-  section("Phase 10 · WP 10.1–10.4 — versions by content, the stored graph state, Validated Models, engines and RunKeys, D248");
+  section("Phase 10 · WP 10.1–10.8 — versions by content, the stored graph state, Validated Models, engines and RunKeys, D248, result tiers, capacity, the training set");
 
   report("(1) D241 — policy versions vs distinct contents, every project",
     await tryQ(`
@@ -5204,6 +5204,62 @@ async function phase10Versions() {
               or has_function_privilege('authenticated', p.oid, 'EXECUTE'))
        order by 1`),
     (rows) => { out("**(10) D248 — `_`-prefixed SECURITY DEFINER functions the API roles can execute:**"); out(...table(rows)); });
+
+  // WP 10.6–10.8. Before the merge each of these errors or reads empty — the
+  // bucket, the columns, the tables and the view deploy with it (CLAUDE.md: a
+  // branch's §15 reading measures production WITHOUT the branch). WP 10.9 reads
+  // them in the push after the merge (D153).
+  report("(11) D246 — the run-results bucket (must exist and be private)",
+    await tryQ(`select id, public, file_size_limit from storage.buckets where id = 'run-results'`),
+    (rows) => { out("**(11) the `run-results` bucket:**"); out(...table(rows)); });
+
+  report("(12) D246 — the series sweep's schedule",
+    await tryQ(`select jobname, schedule, active from cron.job where jobname = 'run-series-sweep'`),
+    (rows) => { out("**(12) `cron.job` — the series sweep (no row and no error: pg_cron present, job missing):**"); out(...table(rows)); });
+
+  report("(13) D246 — where runs keep their series, and for how long",
+    await tryQ(`
+      select retention,
+             count(*) as runs,
+             count(series_object) as in_parquet,
+             count(series_expires_at) as with_expiry,
+             count(series_expired_at) as expired,
+             coalesce(sum(series_bytes) filter (where series_object is not null), 0) as parquet_bytes,
+             coalesce(sum(series_bytes) filter (where series_object is null and series_expired_at is null), 0) as jsonb_bytes
+        from public.simulation_runs where status = 'done' group by 1 order by 1`),
+    (rows) => { out("**(13) completed runs by retention — Parquet objects against JSONB-era series:**"); out(...table(rows)); });
+
+  report("(14) D247 — the organization plans' capacity columns",
+    await tryQ(`
+      select count(*) as organizations,
+             count(compute_quota_rep_weeks_month) as with_compute_quota,
+             count(storage_quota_bytes) as with_storage_quota,
+             count(max_concurrent_runs) as with_concurrency_cap,
+             count(*) filter (where series_retention_days = 90) as retention_90_days,
+             count(*) filter (where series_retention_days is null) as retention_unlimited
+        from public.organizations`),
+    (rows) => { out("**(14) organization plans (after the merge every organization starts at 90 days):**"); out(...table(rows)); });
+
+  report("(15) D247 — the role shares and the usage ledger",
+    await tryQ(`
+      select 'plan_role_allowances' as source, coalesce(org_id::text, 'default') as scope, project_role as kind,
+             count(*) as rows, null::bigint as rep_weeks
+        from public.plan_role_allowances group by 1, 2, 3
+      union all
+      select 'run_usage', 'all', kind, count(*), sum(rep_weeks) from public.run_usage group by 1, 2, 3
+      order by 1, 2, 3`),
+    (rows) => { out("**(15) role shares, and the ledger by kind (a post-merge run with no `dispatch` row skipped admission — D252):**"); out(...table(rows)); });
+
+  report("(16) D249 — the surrogate training set, per project, and the feature kind",
+    await tryQ(`
+      select t.project_id::text as project_id,
+             count(distinct t.validated_model_id) as models,
+             count(distinct t.graph_version_id) as graph_versions,
+             count(distinct t.run_id) as runs,
+             count(*) as replications,
+             (select count(*) from public.analysis_kinds where kind = 'feature_spec') as feature_kind_seeded
+        from public.surrogate_training_runs t group by 1 order by 5 desc`),
+    (rows) => { out("**(16) the training set (empty is a true reading until a Validated Model's runs complete after the merge):**"); out(...table(rows)); });
 }
 
 async function main() {

@@ -135,12 +135,17 @@ describe("D28 — the truth table of what is actually unconditional", () => {
    * AND `sim_engines` — WP 10.4 (§4 D245): the engine registry. Which engines exist
    * and which build the worker runs is not tenant data, carries no project id, and
    * the Lab's engine selector reads it. SELECT only; no API role writes it.
+   *
+   * AND `plan_role_allowances` — WP 10.7 (§4 D247): each project role's share of an
+   * organization's capacity pool. The plan, not tenant data: a percentage per role,
+   * no project id. SELECT only; the one writer is the super admin's
+   * `admin_set_role_allowance`. (`run_usage`, the ledger, has RLS and NO policy.)
    */
   const EXPECTED_UNCONDITIONAL = [
     "ai_models", "ai_providers", "analysis_kinds", "approved_users", "bom_multi_level", "bom_single_level",
     "capabilities", "chat_plans", "customers", "dataset_versions", "docs_section_releases", "experiments",
     "external_evidence", "inbound_logistics", "materials", "model_validations",
-    "outbound_logistics", "policy_defaults", "policy_overrides", "policy_presets",
+    "outbound_logistics", "plan_role_allowances", "policy_defaults", "policy_overrides", "policy_presets",
     "policy_versions", "products", "project_memory", "project_role_capabilities",
     "proposals", "recovery_playbooks", "risk_data", "role_capabilities",
     "run_item_series", "run_replications", "scenarios", "sim_engines", "simulation_runs", "suppliers",

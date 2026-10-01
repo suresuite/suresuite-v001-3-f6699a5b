@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 375,
-  "migrations_applied": 367,
+  "migrations_found": 378,
+  "migrations_applied": 370,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000011_password_reset_requests.sql",
+  "last_migration": "20261001000014_series_sweep_via_storage_api.sql",
   "counts": {
-    "tables": 88,
-    "views": 7,
+    "tables": 91,
+    "views": 8,
     "enums": 4,
-    "functions": 381,
+    "functions": 394,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -12850,6 +12850,66 @@
           "unique": false,
           "references": null,
           "added_by": "20260929000004_organization_plan.sql"
+        },
+        {
+          "name": "storage_quota_bytes",
+          "quoted": false,
+          "type": "bigint",
+          "type_raw": "bigint",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "compute_quota_rep_weeks_month",
+          "quoted": false,
+          "type": "bigint",
+          "type_raw": "bigint",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "max_replications_per_run",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "max_concurrent_runs",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "series_retention_days",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": "90",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
         }
       ],
       "constraints": [
@@ -12913,6 +12973,13 @@
           "columns": [],
           "definition": "CHECK (user_limit IN (1, 2, 3, 5, 10, 20, 50, 100))",
           "added_by": "20260930000012_organization_limit_options.sql"
+        },
+        {
+          "name": "organizations_capacity_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ( (storage_quota_bytes IS NULL OR storage_quota_bytes > 0) AND (compute_quota_rep_weeks_month IS NULL OR compute_quota_rep_weeks_month > 0) AND (max_replications_per_run IS NULL OR max_replications_per_run BETWEEN 1 AND 200) AND (max_concurrent_runs IS NULL OR max_concurrent_runs > 0) AND (series_retention_days IS NULL OR series_retention_days > 0))",
+          "added_by": "20261001000012_capacity.sql"
         }
       ],
       "indexes": [],
@@ -13416,6 +13483,216 @@
           ],
           "name": "password_reset_requests_one_open",
           "predicate": "status = 'open'"
+        }
+      ]
+    },
+    {
+      "name": "plan_role_allowances",
+      "schema": "public",
+      "created_by": "20261001000012_capacity.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "org_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "organizations",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "project_role",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "compute_share_pct",
+          "quoted": false,
+          "type": "numeric(5,2)",
+          "type_raw": "numeric(5,2)",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "storage_share_pct",
+          "quoted": false,
+          "type": "numeric(5,2)",
+          "type_raw": "numeric(5,2)",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "max_concurrent",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "created_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "updated_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "plan_role_allowances_org_role_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "org_id",
+            "project_role"
+          ],
+          "definition": "UNIQUE NULLS NOT DISTINCT (org_id, project_role)",
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "plan_role_allowances_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "plan_role_allowances_project_role_check",
+          "kind": "CHECK",
+          "columns": [
+            "project_role"
+          ],
+          "definition": "CHECK (project_role IN ('owner','editor','analyst','viewer'))",
+          "implicit": true,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "plan_role_allowances_compute_share_pct_check",
+          "kind": "CHECK",
+          "columns": [
+            "compute_share_pct"
+          ],
+          "definition": "CHECK (compute_share_pct BETWEEN 0 AND 100)",
+          "implicit": true,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "plan_role_allowances_storage_share_pct_check",
+          "kind": "CHECK",
+          "columns": [
+            "storage_share_pct"
+          ],
+          "definition": "CHECK (storage_share_pct BETWEEN 0 AND 100)",
+          "implicit": true,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "plan_role_allowances_max_concurrent_check",
+          "kind": "CHECK",
+          "columns": [
+            "max_concurrent"
+          ],
+          "definition": "CHECK (max_concurrent IS NULL OR max_concurrent >= 0)",
+          "implicit": true,
+          "added_by": "20261001000012_capacity.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "plan_role_allowances_read",
+            "command": "SELECT",
+            "roles": [
+              "anon",
+              "authenticated"
+            ],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20261001000012_capacity.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": null,
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "org_id",
+            "project_role"
+          ],
+          "name": "plan_role_allowances_org_role_key"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "plan_role_allowances_pkey"
         }
       ]
     },
@@ -17673,6 +17950,310 @@
             "rep_index"
           ],
           "name": "run_replications_run_rep_uniq"
+        }
+      ]
+    },
+    {
+      "name": "run_series_orphans",
+      "schema": "public",
+      "created_by": "20261001000014_series_sweep_via_storage_api.sql",
+      "columns": [
+        {
+          "name": "path",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000014_series_sweep_via_storage_api.sql"
+        },
+        {
+          "name": "run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000014_series_sweep_via_storage_api.sql"
+        },
+        {
+          "name": "project_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000014_series_sweep_via_storage_api.sql"
+        },
+        {
+          "name": "queued_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000014_series_sweep_via_storage_api.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "run_series_orphans_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "path"
+          ],
+          "definition": "PRIMARY KEY (path)",
+          "implicit": true,
+          "added_by": "20261001000014_series_sweep_via_storage_api.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": null,
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "path"
+          ],
+          "name": "run_series_orphans_pkey"
+        }
+      ]
+    },
+    {
+      "name": "run_usage",
+      "schema": "public",
+      "created_by": "20261001000012_capacity.sql",
+      "columns": [
+        {
+          "name": "id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "org_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "organizations",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "user_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "project_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "simulation_runs",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "rep_weeks",
+          "quoted": false,
+          "type": "bigint",
+          "type_raw": "bigint",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "bytes",
+          "quoted": false,
+          "type": "bigint",
+          "type_raw": "bigint",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "kind",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000012_capacity.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "run_usage_run_kind_key",
+          "kind": "UNIQUE",
+          "columns": [
+            "run_id",
+            "kind"
+          ],
+          "definition": "UNIQUE (run_id, kind)",
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "run_usage_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "definition": "PRIMARY KEY (id)",
+          "implicit": true,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "run_usage_kind_check",
+          "kind": "CHECK",
+          "columns": [
+            "kind"
+          ],
+          "definition": "CHECK (kind IN ('dispatch', 'complete', 'expire'))",
+          "implicit": true,
+          "added_by": "20261001000012_capacity.sql"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "run_usage_org_at",
+          "unique": false,
+          "columns": [
+            "org_id",
+            "at"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20261001000012_capacity.sql"
+        },
+        {
+          "name": "run_usage_user_at",
+          "unique": false,
+          "columns": [
+            "user_id",
+            "at"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20261001000012_capacity.sql"
+        }
+      ],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": null,
+      "natural_key_unique": [
+        {
+          "source": "UNIQUE constraint",
+          "columns": [
+            "run_id",
+            "kind"
+          ],
+          "name": "run_usage_run_kind_key"
+        },
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "id"
+          ],
+          "name": "run_usage_pkey"
         }
       ]
     },
@@ -22833,6 +23414,11 @@
       "materialized": false,
       "security_invoker": true
     },
+    "surrogate_training_runs": {
+      "defined_by": "20261001000013_surrogate_training_set.sql",
+      "materialized": false,
+      "security_invoker": false
+    },
     "v_admin_user_usage": {
       "defined_by": "20260916000009_security_invoker_v_admin_user_usage.sql",
       "materialized": false,
@@ -22974,6 +23560,36 @@
       "defined_by": "20260710000001_model_validations.sql"
     },
     {
+      "name": "_capacity_admit",
+      "signature": "_capacity_admit(uuid, uuid, integer, bigint, bigint, jsonb)",
+      "args": [
+        "p_project_id uuid",
+        "p_user_id uuid",
+        "p_replications integer",
+        "p_rep_weeks bigint",
+        "p_bytes bigint",
+        "p_limits jsonb DEFAULT '{}'::jsonb"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000012_capacity.sql"
+    },
+    {
+      "name": "_capacity_state",
+      "signature": "_capacity_state(uuid, uuid)",
+      "args": [
+        "p_project_id uuid",
+        "p_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000012_capacity.sql"
+    },
+    {
       "name": "_chat_assert_thread_owner",
       "signature": "_chat_assert_thread_owner(uuid, uuid)",
       "args": [
@@ -22995,6 +23611,19 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260726000001_chat_plans.sql"
+    },
+    {
+      "name": "_compute_used",
+      "signature": "_compute_used(uuid, uuid)",
+      "args": [
+        "p_org_id uuid",
+        "p_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "bigint LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000012_capacity.sql"
     },
     {
       "name": "_dataset_all_hashes",
@@ -23081,6 +23710,18 @@
       "volatility": "STABLE",
       "comment": null,
       "defined_by": "20261001000009_engines_runkey.sql"
+    },
+    {
+      "name": "_feature_spec_compute",
+      "signature": "_feature_spec_compute(uuid)",
+      "args": [
+        "p_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000013_surrogate_training_set.sql"
     },
     {
       "name": "_graph_state_mark",
@@ -23222,6 +23863,26 @@
       "defined_by": "20260715000001_agent_proposals.sql"
     },
     {
+      "name": "_run_usage_complete",
+      "signature": "_run_usage_complete()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000012_capacity.sql"
+    },
+    {
+      "name": "_run_usage_expire",
+      "signature": "_run_usage_expire()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000012_capacity.sql"
+    },
+    {
       "name": "_simulation_run_derive",
       "signature": "_simulation_run_derive()",
       "args": [],
@@ -23239,7 +23900,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000010_result_tiers.sql"
+      "defined_by": "20261001000014_series_sweep_via_storage_api.sql"
     },
     {
       "name": "_simulation_run_retention",
@@ -23250,6 +23911,19 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20261001000010_result_tiers.sql"
+    },
+    {
+      "name": "_storage_used",
+      "signature": "_storage_used(uuid, uuid)",
+      "args": [
+        "p_org_id uuid",
+        "p_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "bigint LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000012_capacity.sql"
     },
     {
       "name": "_validated_model_engine",
@@ -23635,6 +24309,19 @@
       "defined_by": "20260930000009_account_default_organization.sql"
     },
     {
+      "name": "admin_org_capacity_usage",
+      "signature": "admin_org_capacity_usage(uuid, text)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text"
+      ],
+      "returns": "TABLE (org_id uuid, org_name text, compute_used_rep_weeks bigint, compute_quota_rep_weeks_month bigint, storage_used_bytes bigint, storage_quota_bytes bigint, active_runs bigint, max_concurrent_runs integer, series_retention_days integer)",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000012_capacity.sql"
+    },
+    {
       "name": "admin_platform_overview",
       "signature": "admin_platform_overview(uuid, text)",
       "args": [
@@ -23790,6 +24477,25 @@
       "defined_by": "20260929000004_organization_plan.sql"
     },
     {
+      "name": "admin_set_org_capacity",
+      "signature": "admin_set_org_capacity(uuid, text, uuid, bigint, bigint, integer, integer, integer)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_org_id uuid",
+        "p_storage_quota_bytes bigint",
+        "p_compute_quota_rep_weeks_month bigint",
+        "p_max_replications_per_run integer",
+        "p_max_concurrent_runs integer",
+        "p_series_retention_days integer"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000012_capacity.sql"
+    },
+    {
       "name": "admin_set_org_limits",
       "signature": "admin_set_org_limits(uuid, text, uuid, integer, integer)",
       "args": [
@@ -23837,6 +24543,24 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260930000005_admin_user_memberships.sql"
+    },
+    {
+      "name": "admin_set_role_allowance",
+      "signature": "admin_set_role_allowance(uuid, text, uuid, text, numeric, numeric, integer)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_org_id uuid",
+        "p_project_role text",
+        "p_compute_share_pct numeric",
+        "p_storage_share_pct numeric",
+        "p_max_concurrent integer"
+      ],
+      "returns": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000012_capacity.sql"
     },
     {
       "name": "admin_set_user_active",
@@ -25179,7 +25903,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000009_engines_runkey.sql"
+      "defined_by": "20261001000012_capacity.sql"
     },
     {
       "name": "create_user_file",
@@ -25825,6 +26549,19 @@
       "volatility": "STABLE",
       "comment": null,
       "defined_by": "20260711000002_unified_access_control.sql"
+    },
+    {
+      "name": "get_my_capacity",
+      "signature": "get_my_capacity(uuid, uuid)",
+      "args": [
+        "p_project_id uuid",
+        "_actor_user_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000012_capacity.sql"
     },
     {
       "name": "get_my_organization_access",
@@ -27308,11 +28045,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "interval LANGUAGE sql STABLE SET search_path TO",
-      "security_definer": false,
+      "returns": "interval LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000010_result_tiers.sql"
+      "defined_by": "20261001000012_capacity.sql"
     },
     {
       "name": "save_policy_defaults",
@@ -27689,6 +28426,31 @@
       "defined_by": "20260715000001_agent_proposals.sql"
     },
     {
+      "name": "surrogate_feature_spec",
+      "signature": "surrogate_feature_spec(uuid, uuid)",
+      "args": [
+        "p_project_id uuid",
+        "_actor_user_id uuid DEFAULT NULL"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000013_surrogate_training_set.sql"
+    },
+    {
+      "name": "surrogate_training_summary",
+      "signature": "surrogate_training_summary(uuid)",
+      "args": [
+        "p_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path TO",
+      "security_definer": false,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000013_surrogate_training_set.sql"
+    },
+    {
       "name": "sweep_expired_files",
       "signature": "sweep_expired_files(uuid)",
       "args": [
@@ -27710,7 +28472,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000010_result_tiers.sql"
+      "defined_by": "20261001000014_series_sweep_via_storage_api.sql"
     },
     {
       "name": "switch_my_organization",

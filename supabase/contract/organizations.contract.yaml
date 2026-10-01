@@ -38,7 +38,7 @@ governance:
     `write: super_admin` is enforced, not aspirational: every mutation goes
     through `admin_create_organization` / `admin_update_organization` /
     `admin_set_org_status` / `admin_set_org_access_period` / `admin_set_org_limits` /
-    `admin_delete_organization`, each of which opens with `_assert_super_admin` and
+    `admin_set_org_capacity` (WP 10.7) / `admin_delete_organization`, each of which opens with `_assert_super_admin` and
     closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that
     takes the organization's projects and accounts with it, and is a different verb
     from suspension — since §4 D210 only the accounts that belong to NO other
@@ -261,6 +261,86 @@ fields:
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
     ingest: {csv_header: null, required: false, validate: "one of 1 / 2 / 3 / 5 / 10 / 20 / 50 / 100, or NULL"}
+    surfaces: []
+    resolution: null
+  storage_quota_bytes:
+    type: bigint
+    unit: null
+    unit_source: none
+    meaning: >-
+      The simulation-result storage the organization's plan grants, in bytes: the
+      `series_bytes` of its runs whose series are still kept (expired runs free
+      theirs). NULL is unlimited. Enforced at dispatch by `create_simulation_run`
+      (WP 10.7 · §4 D247), which refuses a run whose expected bytes overflow it
+      with SQLSTATE P0402 and the numbers; a role's share of it is
+      `plan_role_allowances.storage_share_pct`.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "> 0, or NULL"}
+    surfaces: []
+    resolution: null
+  compute_quota_rep_weeks_month:
+    type: bigint
+    unit: null
+    unit_source: none
+    meaning: >-
+      The simulation compute the plan grants per calendar month, in
+      replication-weeks (replications × ceil(horizon days / 7)): counted from
+      `run_usage`, each run at its settled actual if it finished, else at its
+      reservation. NULL is unlimited. A run that would exceed it, or the member's
+      `compute_share_pct` of it, is refused at dispatch (P0402).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "> 0, or NULL"}
+    surfaces: []
+    resolution: null
+  max_replications_per_run:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      The most replications one run may ask for, under the global clamp of 200.
+      NULL is unlimited. /v1's key-scoped `max_replications` folds into it inside
+      `create_simulation_run` — the stricter wins — and a run over it is refused
+      with SQLSTATE P0403 (HTTP 403).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "1 – 200, or NULL"}
+    surfaces: []
+    resolution: null
+  max_concurrent_runs:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      The most runs the organization may have queued or running at once. NULL is
+      unlimited, and then a role's `max_concurrent` does not bind either — the
+      role's allowance is a share of this one. /v1's key-scoped cap folds in; a
+      run over it is refused with SQLSTATE P0429 (HTTP 429).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "> 0, or NULL"}
+    surfaces: []
+    resolution: null
+  series_retention_days:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      How long a standard run keeps its weekly series after it completes, read by
+      `run_series_retention` when the run completes. Every organization starts at
+      90 (the column default — WP 10.6's period); NULL keeps series without limit.
+      A change re-dates the organization's standard runs
+      (`admin_set_org_capacity`); a pinned run or a Validated Model's evidence
+      run has no expiry whatever the plan says.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: "> 0, or NULL"}
     surfaces: []
     resolution: null
 

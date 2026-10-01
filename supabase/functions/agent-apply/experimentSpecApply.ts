@@ -36,6 +36,7 @@
 
 import {
   dispatchExperimentRun,
+  CapacityRefusal,
   ReuseAvailable,
   ValidationRejection,
   canonicalJson,
@@ -272,6 +273,8 @@ export async function applyExperimentSpec(
       const result = await readRunStamps(db, e.candidate.run_id, { scenarioId, policyVersionId, replications });
       return { ...result, reused: true };
     }
+    // WP 10.7 · §4 D247: the organization's capacity refused it, with its numbers.
+    if (e instanceof CapacityRefusal) throw new ApplyFailure("quota_exceeded", e.message);
     if (e instanceof ApplyFailure) throw e;
     throw new ApplyFailure("rpc_error", e instanceof Error ? e.message : "experiment dispatch failed");
   }

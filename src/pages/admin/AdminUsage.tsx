@@ -3,7 +3,9 @@
 // `admin_usage_log_read` (PLAN.md §4 D205): the page used to read `ai_usage_logs`
 // and `approved_users` directly, and as anon it got no rows and no names. Also the
 // optional model-capability matrix (get_model_capability_matrix) and the
-// optional per-org file-workspace rollup (admin_org_file_usage). Status is a
+// optional per-org file-workspace rollup (admin_org_file_usage), and beside it
+// the simulation capacity each organization's plan grants and uses
+// (`admin_org_capacity_usage`, WP 10.7 · §4 D247). Status is a
 // dot (success=teal, error=red, blocked=grey); Export CSV preserved verbatim.
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +23,7 @@ import { aggregateMatrixByModel, type ModelCapabilityRow, type ModelMatrixAggreg
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface LogRow { id: string; user_id: string | null; model_code: string | null; provider_code: string | null; prompt_tokens: number; completion_tokens: number; total_tokens: number; cost_usd: number; latency_ms: number | null; status: string; created_at: string; user_name?: string; }
+interface OrgCapacityRow { org_id: string; org_name: string | null; compute_used_rep_weeks: number; compute_quota_rep_weeks_month: number | null; storage_used_bytes: number; storage_quota_bytes: number | null; active_runs: number; max_concurrent_runs: number | null; series_retention_days: number | null; }
 interface OrgFileUsageRow { org_id: string | null; org_name: string | null; file_count: number; total_bytes: number; retained_bytes: number; expiring_7d: number; }
 
 const humanBytes = (n: number): string => {
@@ -40,6 +43,7 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
   const [allUsageOpen, setAllUsageOpen] = useState(false);
   const [rows, setRows] = useState<LogRow[]>([]);
   const [fileRows, setFileRows] = useState<OrgFileUsageRow[]>([]);
+  const [capacityRows, setCapacityRows] = useState<OrgCapacityRow[]>([]);
   const [matrixRows, setMatrixRows] = useState<ModelMatrixAggregate[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -60,6 +64,10 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
       const { data: usage, error } = await db.from('admin_org_file_usage').select('*');
       setFileRows(!error && Array.isArray(usage) ? (usage as OrgFileUsageRow[]) : []);
     } catch { setFileRows([]); }
+    try {
+      const { data: cap, error } = await db.rpc('admin_org_capacity_usage', { p_actor_id: actor?.id, p_actor_email: actor?.email });
+      setCapacityRows(!error && Array.isArray(cap) ? (cap as OrgCapacityRow[]) : []);
+    } catch { setCapacityRows([]); }
     try {
       const { data: matrix, error } = await db.rpc('get_model_capability_matrix');
       setMatrixRows(!error && Array.isArray(matrix) ? aggregateMatrixByModel(matrix as ModelCapabilityRow[]) : []);
@@ -223,6 +231,35 @@ export default function AdminUsage({ isCollapsed, setIsCollapsed }: Props) {
                     <td className={`${TD} text-right font-mono text-[12px] tabular-nums`}>{humanBytes(Number(r.total_bytes))}</td>
                     <td className={`${TD} text-right font-mono text-[12px] tabular-nums`}>{humanBytes(Number(r.retained_bytes))}</td>
                     <td className={`${TD} text-right`}>{Number(r.expiring_7d) > 0 ? <MonoChip>{r.expiring_7d}</MonoChip> : <span className="font-mono text-[12px] text-muted-foreground">0</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="px-4 pb-2 pt-1.5 text-[11.5px] text-muted-foreground md:hidden">
+            swipe the table sideways for the remaining columns
+          </p>
+        </TableBlock>
+      )}
+      {capacityRows.length > 0 && (
+        // WP 10.7: each organization's pool — this month's compute, the series
+        // storage kept, runs in flight — against its plan; "—" is unlimited.
+        <TableBlock
+          className="mt-5"
+          name="Simulation capacity by organization (G15)"
+          count={capacityRows.length}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead><tr><th className={`${TH} ${FROZEN_CELL_ON_TINT}`}>Organization</th><th className={`${TH} text-right`}>Compute this month</th><th className={`${TH} text-right`}>Series storage</th><th className={`${TH} text-right`}>Runs in flight</th><th className={`${TH} text-right`}>Retention</th></tr></thead>
+              <tbody>
+                {capacityRows.map((r) => (
+                  <tr key={r.org_id} className={ROW_HOVER}>
+                    <td className={`${TD} ${FROZEN_CELL} text-[13px]`}>{r.org_name || r.org_id.slice(0, 8)}</td>
+                    <td className={`${TD} text-right font-mono text-[12px] tabular-nums`}>{Number(r.compute_used_rep_weeks).toLocaleString()} / {r.compute_quota_rep_weeks_month != null ? Number(r.compute_quota_rep_weeks_month).toLocaleString() : '—'} rep-wk</td>
+                    <td className={`${TD} text-right font-mono text-[12px] tabular-nums`}>{humanBytes(Number(r.storage_used_bytes))} / {r.storage_quota_bytes != null ? humanBytes(Number(r.storage_quota_bytes)) : '—'}</td>
+                    <td className={`${TD} text-right font-mono text-[12px] tabular-nums`}>{Number(r.active_runs)} / {r.max_concurrent_runs ?? '—'}</td>
+                    <td className={`${TD} text-right font-mono text-[12px] tabular-nums`}>{r.series_retention_days != null ? `${r.series_retention_days} d` : 'unlimited'}</td>
                   </tr>
                 ))}
               </tbody>

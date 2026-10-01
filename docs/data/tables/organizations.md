@@ -32,6 +32,7 @@ partially or get corrected — the write fails.
 | `organizations_access_period_start_check` | `CHECK ((access_period IS NULL) = (access_valid_from IS NULL))` | `20260929000004_organization_plan.sql` |
 | `organizations_project_limit_check` | `CHECK (project_limit IN (1, 2, 3, 5, 10, 20, 50, 100))` | `20260930000012_organization_limit_options.sql` |
 | `organizations_user_limit_check` | `CHECK (user_limit IN (1, 2, 3, 5, 10, 20, 50, 100))` | `20260930000012_organization_limit_options.sql` |
+| `organizations_capacity_check` | `CHECK ( (storage_quota_bytes IS NULL OR storage_quota_bytes > 0) AND (compute_quota_rep_weeks_month IS NULL OR compute_quota_rep_weeks_month > 0) AND (max_replications_per_run IS NULL OR max_replications_per_run BETWEEN 1 AND 200) AND (max_concurrent_runs IS NULL OR max_concurrent_runs > 0) AND (series_retention_days IS NULL OR series_retention_days > 0))` | `20261001000012_capacity.sql` |
 
 ## Governance
 
@@ -44,7 +45,7 @@ partially or get corrected — the write fails.
 | Row-level security | enabled |
 | Policies on the table | 2 — all carry a predicate |
 
-`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status` / `admin_set_org_access_period` / `admin_set_org_limits` / `admin_delete_organization`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that takes the organization's projects and accounts with it, and is a different verb from suspension — since §4 D210 only the accounts that belong to NO other organization; an account that also belongs elsewhere loses this membership and keeps the rest. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first.
+`write: super_admin` is enforced, not aspirational: every mutation goes through `admin_create_organization` / `admin_update_organization` / `admin_set_org_status` / `admin_set_org_access_period` / `admin_set_org_limits` / `admin_set_org_capacity` (WP 10.7) / `admin_delete_organization`, each of which opens with `_assert_super_admin` and closes with `log_admin_action`. The last is §4 D208: a PERMANENT delete that takes the organization's projects and accounts with it, and is a different verb from suspension — since §4 D210 only the accounts that belong to NO other organization; an account that also belongs elsewhere loses this membership and keeps the rest. This is one of the few tables where `audited: true` is literally true today — WP 2.3 is what makes the claim general. Read is open to any member of the org via the self-bridge policy below, which WP 2.1 rewrote: it matched the caller's TEXT org against `name` or `slug`, so renaming an organization revoked its own members' read on the row that had just been renamed. It now bridges on `id` first.
 
 <details><summary>2 RLS policies</summary>
 
@@ -87,6 +88,11 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `access_valid_until` | — | `timestamp with time zone` | — | — | When the access period ends. DERIVED by `trg_organizations_access_valid_until` from the two columns above; a write that names it is overwritten. At or after this instant `authenticate_approved_user` refuses every member except a super admin, `get_my_profile` reports `access_expired`, and no project can be added to the organization (D207). |
 | `project_limit` | — | `integer` | — | — | The most projects the organization may hold, counted by `projects.organization_id` — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four added by §4 D218), CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `projects`. Lowering it deletes nothing; no project can be added until under it. |
 | `user_limit` | — | `integer` | — | — | The most accounts the organization may have, counted as its `organization_members` rows — an account may belong to several organizations and takes a seat in each (§4 D210; between D207 and D210 it counted `approved_users.organization_id`) — 1, 2, 3, 5, 10, 20, 50 or 100 (D207; the last four added by §4 D218), CHECK-constrained; NULL is unlimited. Enforced on every writer by `trg_tenant_allowance` on `organization_members`, which every path that adds an account to an organization goes through; switching to an organization the account already belongs to takes no seat. Lowering it removes nobody; no account can be added until under it. |
+| `storage_quota_bytes` | — | `bigint` | — | — | The simulation-result storage the organization's plan grants, in bytes: the `series_bytes` of its runs whose series are still kept (expired runs free theirs). NULL is unlimited. Enforced at dispatch by `create_simulation_run` (WP 10.7 · §4 D247), which refuses a run whose expected bytes overflow it with SQLSTATE P0402 and the numbers; a role's share of it is `plan_role_allowances.storage_share_pct`. |
+| `compute_quota_rep_weeks_month` | — | `bigint` | — | — | The simulation compute the plan grants per calendar month, in replication-weeks (replications × ceil(horizon days / 7)): counted from `run_usage`, each run at its settled actual if it finished, else at its reservation. NULL is unlimited. A run that would exceed it, or the member's `compute_share_pct` of it, is refused at dispatch (P0402). |
+| `max_replications_per_run` | — | `integer` | — | — | The most replications one run may ask for, under the global clamp of 200. NULL is unlimited. /v1's key-scoped `max_replications` folds into it inside `create_simulation_run` — the stricter wins — and a run over it is refused with SQLSTATE P0403 (HTTP 403). |
+| `max_concurrent_runs` | — | `integer` | — | — | The most runs the organization may have queued or running at once. NULL is unlimited, and then a role's `max_concurrent` does not bind either — the role's allowance is a share of this one. /v1's key-scoped cap folds in; a run over it is refused with SQLSTATE P0429 (HTTP 429). |
+| `series_retention_days` | — | `integer` | — | — | How long a standard run keeps its weekly series after it completes, read by `run_series_retention` when the run completes. Every organization starts at 90 (the column default — WP 10.6's period); NULL keeps series without limit. A change re-dates the organization's standard runs (`admin_set_org_capacity`); a pinned run or a Validated Model's evidence run has no expiry whatever the plan says. |
 
 ## Each column in full
 
@@ -277,8 +283,78 @@ The most accounts the organization may have, counted as its `organization_member
 | Validated at ingest | one of 1 / 2 / 3 / 5 / 10 / 20 / 50 / 100, or NULL |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `storage_quota_bytes`
+
+The simulation-result storage the organization's plan grants, in bytes: the `series_bytes` of its runs whose series are still kept (expired runs free theirs). NULL is unlimited. Enforced at dispatch by `create_simulation_run` (WP 10.7 · §4 D247), which refuses a run whose expected bytes overflow it with SQLSTATE P0402 and the numbers; a role's share of it is `plan_role_allowances.storage_share_pct`.
+
+| | |
+|---|---|
+| Type | `bigint` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000012_capacity.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | > 0, or NULL |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `compute_quota_rep_weeks_month`
+
+The simulation compute the plan grants per calendar month, in replication-weeks (replications × ceil(horizon days / 7)): counted from `run_usage`, each run at its settled actual if it finished, else at its reservation. NULL is unlimited. A run that would exceed it, or the member's `compute_share_pct` of it, is refused at dispatch (P0402).
+
+| | |
+|---|---|
+| Type | `bigint` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000012_capacity.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | > 0, or NULL |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `max_replications_per_run`
+
+The most replications one run may ask for, under the global clamp of 200. NULL is unlimited. /v1's key-scoped `max_replications` folds into it inside `create_simulation_run` — the stricter wins — and a run over it is refused with SQLSTATE P0403 (HTTP 403).
+
+| | |
+|---|---|
+| Type | `integer` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000012_capacity.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | 1 – 200, or NULL |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `max_concurrent_runs`
+
+The most runs the organization may have queued or running at once. NULL is unlimited, and then a role's `max_concurrent` does not bind either — the role's allowance is a share of this one. /v1's key-scoped cap folds in; a run over it is refused with SQLSTATE P0429 (HTTP 429).
+
+| | |
+|---|---|
+| Type | `integer` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000012_capacity.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | > 0, or NULL |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `series_retention_days`
+
+How long a standard run keeps its weekly series after it completes, read by `run_series_retention` when the run completes. Every organization starts at 90 (the column default — WP 10.6's period); NULL keeps series without limit. A change re-dates the organization's standard runs (`admin_set_org_capacity`); a pinned run or a Validated Model's evidence run has no expiry whatever the plan says.
+
+| | |
+|---|---|
+| Type | `integer`, default `90` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000012_capacity.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | > 0, or NULL |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ---
 
-*Generated from data contract `79fc096780a7`, engine `0.2.8`,
+*Generated from data contract `a9625dbc0ec9`, engine `0.2.8`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

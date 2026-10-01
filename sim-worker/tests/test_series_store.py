@@ -97,3 +97,46 @@ def test_the_run_row_keeps_the_range_the_bridge_computes():
                             "replications": []}, 0)
     assert upd["aggregate_kpis"]["fill_rate"] == 0.9
     assert upd["aggregate_kpis"]["_range"] == {"fill_rate": {"min": 0.8, "max": 0.97}}
+
+
+# WP 10.9 · §4 D253 — production ships no pg_cron, so the worker runs the sweep,
+# and objects go through the Storage API (a SQL delete orphans the stored file).
+def test_the_sweep_removes_returned_paths_through_the_storage_api():
+    seen: list[tuple[str, str, dict]] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        body = json.loads(req.content or b"{}")
+        seen.append((req.method, req.url.path, body))
+        if req.url.path.endswith("/rpc/sweep_expired_run_series"):
+            return httpx.Response(200, json={"runs": 2, "objects": 1, "bytes": 10,
+                                             "paths": ["p/r1/series.parquet", "p/r9/series.parquet"]})
+        return httpx.Response(200, json=[])
+
+    out = asyncio.run(_worker(handler)._sweep_series())
+    assert out["removed"] == 2
+    assert seen[0][:2] == ("POST", "/rest/v1/rpc/sweep_expired_run_series")
+    assert seen[0][2] == {"p_limit": 500}
+    assert seen[1][0] == "DELETE" and seen[1][1] == f"/storage/v1/object/{series_store.BUCKET}"
+    assert seen[1][2] == {"prefixes": ["p/r1/series.parquet", "p/r9/series.parquet"]}
+
+
+def test_a_sweep_with_nothing_due_touches_no_object():
+    calls: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        calls.append(req.method)
+        return httpx.Response(200, json={"runs": 0, "objects": 0, "bytes": 0, "paths": []})
+
+    assert asyncio.run(_worker(handler)._sweep_series())["removed"] == 0
+    assert calls == ["POST"]
+
+
+def test_a_failed_sweep_never_stops_the_worker():
+    def refuse(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"message": "function not found"})
+
+    def explode(req: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("down")
+
+    assert asyncio.run(_worker(refuse)._sweep_series()) == {}
+    assert asyncio.run(_worker(explode)._sweep_series()) == {}

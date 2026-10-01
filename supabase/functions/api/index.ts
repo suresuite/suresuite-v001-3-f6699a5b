@@ -31,6 +31,7 @@ import {
   dispatchExperimentCancel,
   dispatchExperimentRun,
   enqueueEnvelope,
+  CapacityRefusal,
   ReuseAvailable,
   ValidationRejection,
 } from "../_shared/dispatch.ts";
@@ -718,31 +719,12 @@ const createRun: Handler = async (ctx) => {
     }
   }
 
-  // §7.2 compute quota — the real DoS guard: cap concurrent queued/running
-  // runs per org before any compute is enqueued. Fails closed.
-  const { data: active, error: activeErr } = await svc.rpc("api_count_active_runs", {
-    p_org_id: p.orgId,
-  });
-  if (activeErr) throw new ApiError(503, "quota_unavailable", "compute quota check unavailable");
-  if (Number(active) >= ctx.limits.max_concurrent_runs) {
-    throw new ApiError(429, "concurrent_runs_exceeded",
-      `organization already has ${active} queued/running runs (limit ${ctx.limits.max_concurrent_runs})`,
-      undefined, { "Retry-After": "60" });
-  }
-  // Optional per-org replication ceiling under the global clamp of 200 (§7.2).
-  if (ctx.limits.max_replications != null) {
-    const { data: scenario } = await svc
-      .from("scenarios")
-      .select("replications,project_id")
-      .eq("id", body.scenario_id)
-      .eq("project_id", projectId) // no reads (or error details) across projects
-      .maybeSingle();
-    if (scenario && Number(scenario.replications) > ctx.limits.max_replications) {
-      throw new ApiError(403, "replications_exceeded",
-        `scenario requests ${scenario.replications} replications (limit ${ctx.limits.max_replications})`);
-    }
-  }
-
+  // §7.2 compute quota — since WP 10.7 (§4 D247) ONE enforcement point for
+  // every front door: the key-scoped concurrency and replication caps are passed
+  // to the shared dispatcher, which folds them into the organization plan's
+  // inside `create_simulation_run` (the stricter wins) and refuses only a run
+  // that will actually be computed — a reuse or an attach consumes nothing.
+  // rpm/rpd stay here, at the gateway.
   let result: { run_id: string };
   try {
     // The reader is the service client: this request's tenancy was already
@@ -757,8 +739,20 @@ const createRun: Handler = async (ctx) => {
         acknowledge_warnings: body.acknowledge_warnings,
         force_rerun: body.force_rerun,
       },
-    }, null);
+    }, null, {
+      limits: {
+        max_concurrent_runs: ctx.limits.max_concurrent_runs,
+        max_replications: ctx.limits.max_replications,
+      },
+    });
   } catch (e) {
+    if (e instanceof CapacityRefusal) {
+      if (e.status === 429) {
+        throw new ApiError(429, "concurrent_runs_exceeded", `${e.message}`, undefined, { "Retry-After": "60" });
+      }
+      if (e.status === 403) throw new ApiError(403, "replications_exceeded", `${e.message}`);
+      throw new ApiError(402, "quota_exceeded", `${e.message}`);
+    }
     if (e instanceof ValidationRejection) {
       throw new ApiError(422, "validation_failed",
         "run rejected by the required-data manifest", {

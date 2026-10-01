@@ -102,6 +102,25 @@ analysis_kinds:
       downstream and upstream, transitively, over `supply_chain_data_multi_tier`.
       Computed where the data is; the process page reads it instead of walking the
       graph in the browser on every selection (§4 D239).
+  feature_spec:
+    computed_by: "public.surrogate_feature_spec (SQL, WP 10.8)"
+    code_version: "feature_spec-1"
+    entity_type: graph
+    params:
+      feature_spec_version:
+        type: integer
+        default: 1
+        meaning: >-
+          Which feature definition the run computed. Part of the key, so a changed
+          definition is a new run over the same graph rather than a stale hit.
+    note: >-
+      The structural features a surrogate reads per Graph Version (blueprint
+      §11.3): over `inbound_logistics`, out-degree and weekly-volume-weighted
+      out-degree per supplier (`entity_type` supplier), suppliers per material
+      (`material`), and one `graph`/`summary` row with the counts, means, the
+      single-sourced count and the multi-source rate. Keyed on the PRODUCT level
+      hash, so it is computed once per sourcing network and a revert is the
+      first run again (`rehearsal/620`). No model is trained.
   combine_etl:
     computed_by: "combine-project (migrated in WP 4.3, as §11 names it)"
     code_version: "combine_etl@wp43.1"

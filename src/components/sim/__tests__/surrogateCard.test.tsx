@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SurrogateCard } from "../SurrogateCard";
+import { trainingSetLine, type TrainingGroup } from "@/lib/sim/surrogateTraining";
 
 describe("SurrogateCard", () => {
   const html = renderToStaticMarkup(createElement(SurrogateCard));
@@ -18,5 +19,32 @@ describe("SurrogateCard", () => {
   it("offers nothing to click and prints no figure (T1)", () => {
     expect(html).not.toMatch(/<button|<a |onclick/i);
     expect(html.replace(/<[^>]+>/g, "")).not.toMatch(/\d/);
+  });
+});
+
+// WP 10.8 · §4 D249 — one figure, and it is a count of what exists.
+describe("SurrogateCard · the training set (WP 10.8)", () => {
+  const g = (over: Partial<TrainingGroup> = {}): TrainingGroup => ({
+    validated_model_id: "m1", model_name: "Q4", model_version_no: 2, graph_version_id: "g1",
+    graph_version_no: 7, runs: 2, replications: 3, includes_evidence_run: true, ...over,
+  });
+
+  it("counts replications, runs, models and graph versions across the groups", () => {
+    expect(trainingSetLine([g(), g({ graph_version_id: "g2", runs: 1, replications: 30 }), g({ validated_model_id: "m2", runs: 1, replications: 1 })]))
+      .toBe("Training set: 34 replications · 4 runs · 2 Validated Models · 2 graph versions");
+    expect(trainingSetLine([g({ runs: 1, replications: 1 })]))
+      .toBe("Training set: 1 replication · 1 run · 1 Validated Model · 1 graph version");
+  });
+
+  it("an empty set says what counts; an unread one says nothing", () => {
+    expect(trainingSetLine([])).toMatch(/empty — only faithful runs of a Validated Model count; exploratory runs never do/);
+    expect(trainingSetLine(null)).toBeNull();
+  });
+
+  it("renders the count on the card, still with nothing to click", () => {
+    const withSet = renderToStaticMarkup(createElement(SurrogateCard, { training: [g()] }));
+    expect(withSet).toContain("Training set: 3 replications");
+    expect(withSet).toContain("coming soon");
+    expect(withSet).not.toMatch(/<button|<a |onclick/i);
   });
 });

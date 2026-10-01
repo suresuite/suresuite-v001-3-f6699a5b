@@ -6,8 +6,14 @@
 // → credibility stamp → queued run row → Upstash enqueue. One code path, two
 // authenticated front doors (docs/design/public-api-and-access-control.md §3.1).
 //
-// Callers own authentication/authorization/quotas; this module assumes the
-// command has already been authorized for its project.
+// Callers own authentication and authorization; this module assumes the
+// command has already been authorized for its project. CAPACITY is not the
+// caller's since WP 10.7 (§4 D247): `create_simulation_run` admits or refuses
+// every run that will actually be computed against the organization's pool and
+// the member's role share, and a refusal leaves here as a `CapacityRefusal`
+// carrying its HTTP status (402 quota, 403 replications per run, 429 in flight).
+// A caller with caps of its own (/v1's key-scoped limits) passes them in
+// `opts.limits`; they can only tighten the plan's.
 
 import {
   loadGateDataset,
@@ -108,6 +114,24 @@ export class ValidationRejection extends Error {
   constructor(public gate: GateResult) {
     super(`run rejected by the required-data manifest (${gate.status})`);
   }
+}
+
+/** A run the organization's capacity does not admit (WP 10.7 · §4 D247). The
+ *  database names the numbers; the status is the SQLSTATE's: P0402 a quota
+ *  (compute or storage) → 402, P0403 replications per run → 403, P0429 runs in
+ *  flight → 429. */
+export class CapacityRefusal extends Error {
+  constructor(public status: 402 | 403 | 429, message: string) {
+    super(message);
+  }
+}
+
+const CAPACITY_STATUS: Record<string, 402 | 403 | 429> = { P0402: 402, P0403: 403, P0429: 429 };
+
+/** A caller's own caps, folded into the plan's inside the database. */
+export interface DispatchLimits {
+  max_concurrent_runs?: number | null;
+  max_replications?: number | null;
 }
 
 /** A completed run identical to the requested one (reuse-or-rerun, §9.2). */
@@ -224,6 +248,7 @@ export async function dispatchExperimentRun(
   deps: DispatchDeps,
   cmd: DispatchCommand,
   userId: string | null,
+  opts: { limits?: DispatchLimits } = {},
 ): Promise<{ run_id: string; attached?: boolean }> {
   const { reader: sb, svc, upstash } = deps;
   if (!cmd.scenario_id) throw new Error("experiment.run requires scenario_id");
@@ -405,6 +430,16 @@ export async function dispatchExperimentRun(
     modelValidationId = String(m.id);
   }
   const exploratory = payload.exploratory === true || !modelValidationId;
+  // Whose share this run draws on: the app's asserted user (D28 — the app
+  // authenticates against `approved_users`, so `userId`, the Supabase Auth
+  // user, is usually null), and the bytes its series are expected to keep.
+  const isUuid = (v: unknown): v is string =>
+    typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  const actorUserId = isUuid(payload.actor_user_id) ? payload.actor_user_id : userId;
+  const bytesEstimate =
+    typeof payload.bytes_estimate === "number" && Number.isFinite(payload.bytes_estimate) && payload.bytes_estimate > 0
+      ? Math.round(payload.bytes_estimate)
+      : 0;
 
   // Reuse-or-rerun (G17, §9.2) and the run row, in ONE statement since WP 10.4:
   // `create_simulation_run` computes the RunKey from engine ∥ graph ∥ policy ∥ the
@@ -432,6 +467,9 @@ export async function dispatchExperimentRun(
     engine_id: engineId,
     protocol_overrides: protocolOverrides,
     exploratory,
+    actor_user_id: actorUserId,
+    bytes_estimate: bytesEstimate,
+    limits: opts.limits ?? {},
   };
   // `svc` is the dispatcher's service client (typed loosely in DispatchDeps).
   const created = await svc.rpc("create_simulation_run", {
@@ -460,6 +498,8 @@ export async function dispatchExperimentRun(
     }
     run = { id: String(res.run_id) };
     engine = (res.engine as Record<string, unknown> | null) ?? null;
+  } else if (CAPACITY_STATUS[String(created.error.code ?? "")]) {
+    throw new CapacityRefusal(CAPACITY_STATUS[String(created.error.code)], String(created.error.message ?? ""));
   } else if (!isMissingFunction(created.error)) {
     // An engine refusal (retired, unknown, ambiguous) is the caller's to see.
     throw new Error(`run not created: ${created.error.message ?? created.error}`);

@@ -1474,6 +1474,21 @@ export const ANALYSIS_KINDS: AnalysisKind[] = [
     ]
   },
   {
+    "kind": "feature_spec",
+    "computedBy": "public.surrogate_feature_spec (SQL, WP 10.8)",
+    "codeVersion": "feature_spec-1",
+    "entityType": "graph",
+    "note": "The structural features a surrogate reads per Graph Version (blueprint §11.3): over `inbound_logistics`, out-degree and weekly-volume-weighted out-degree per supplier (`entity_type` supplier), suppliers per material (`material`), and one `graph`/`summary` row with the counts, means, the single-sourced count and the multi-source rate. Keyed on the PRODUCT level hash, so it is computed once per sourcing network and a revert is the first run again (`rehearsal/620`). No model is trained.",
+    "params": [
+      {
+        "name": "feature_spec_version",
+        "type": "integer",
+        "default": 1,
+        "meaning": "Which feature definition the run computed. Part of the key, so a changed definition is a new run over the same graph rather than a stale hit."
+      }
+    ]
+  },
+  {
     "kind": "network_metrics",
     "computedBy": "calculate-network-science-metrics (migrated in WP 4.3)",
     "codeVersion": "network_metrics@wp43.1",
@@ -2046,6 +2061,12 @@ export const API_ERRORS: ApiErrorCode[] = [
     "sites": 1
   },
   {
+    "code": "quota_exceeded",
+    "status": 402,
+    "message": "${e.message}",
+    "sites": 1
+  },
+  {
     "code": "missing_scope",
     "status": 403,
     "message": "this key does not have the ${scope} scope",
@@ -2054,7 +2075,7 @@ export const API_ERRORS: ApiErrorCode[] = [
   {
     "code": "replications_exceeded",
     "status": 403,
-    "message": "scenario requests ${scenario.replications} replications (limit ${ctx.limits.max_replications})",
+    "message": "${e.message}",
     "sites": 1
   },
   {
@@ -2102,7 +2123,7 @@ export const API_ERRORS: ApiErrorCode[] = [
   {
     "code": "concurrent_runs_exceeded",
     "status": 429,
-    "message": "organization already has ${active} queued/running runs (limit ${ctx.limits.max_concurrent_runs})",
+    "message": "${e.message}",
     "sites": 1
   },
   {
@@ -2145,12 +2166,6 @@ export const API_ERRORS: ApiErrorCode[] = [
     "code": "authz_unavailable",
     "status": 503,
     "message": "authorization backend unavailable",
-    "sites": 1
-  },
-  {
-    "code": "quota_unavailable",
-    "status": 503,
-    "message": "compute quota check unavailable",
     "sites": 1
   },
   {
@@ -3577,8 +3592,8 @@ export type ProjectDeletion = {
 };
 
 export const PROJECT_DELETION: ProjectDeletion = {
-  "projectScoped": 51,
-  "cascade": 41,
+  "projectScoped": 53,
+  "cascade": 42,
   "detached": [
     "chat_threads",
     "user_files"
@@ -3593,7 +3608,8 @@ export const PROJECT_DELETION: ProjectDeletion = {
   "neither": [
     "ai_chat_events",
     "ai_usage_logs",
-    "api_request_logs"
+    "api_request_logs",
+    "run_series_orphans"
   ],
   "asynchronous": false
 };
@@ -3684,7 +3700,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 71,
+  "described": 74,
   "open": [
     {
       "table": "analysis_kinds",
@@ -3775,6 +3791,13 @@ export const READ_EXPOSURE: ReadExposure = {
     },
     {
       "table": "outbound_logistics",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "plan_role_allowances",
       "roles": [
         "anon",
         "authenticated"
@@ -3897,6 +3920,7 @@ export const READ_EXPOSURE: ReadExposure = {
     "materials",
     "model_validations",
     "outbound_logistics",
+    "plan_role_allowances",
     "policy_defaults",
     "policy_overrides",
     "policy_presets",

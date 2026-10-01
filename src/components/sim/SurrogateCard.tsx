@@ -6,14 +6,21 @@
  * network most — and labels each entry "simulated" or "predicted", with an
  * interval, falling back to simulation where the prediction is not reliable.
  *
- * Deliberately inert: no button, no figure, no preset. A placeholder that
+ * Deliberately inert: no button, no prediction, no preset. A placeholder that
  * printed a ranking would be an invented number on the surface that decides
  * what to simulate (T1). It is NOT the network pages' "Nexus node prediction"
  * panel, which reads a different function and a different model.
  *
  * Neutral palette on purpose — teal is the stress-test card's, which is live.
+ *
+ * WP 10.8 (§4 D249) gives it ONE figure, and it is a count, not a prediction:
+ * how many replications the training set already holds, from
+ * `surrogate_training_summary`. Absent until it is read.
  */
-export function SurrogateCard() {
+import { trainingSetLine, type TrainingGroup } from "@/lib/sim/surrogateTraining";
+
+export function SurrogateCard({ training = null }: { training?: TrainingGroup[] | null } = {}) {
+  const line = trainingSetLine(training);
   return (
     <section
       aria-label="Surrogate model: nexus node detection, coming soon"
@@ -31,6 +38,11 @@ export function SurrogateCard() {
         </span>
         <span className="text-[11.5px] text-[#71717a]">criticality ranking from a sample of runs</span>
       </span>
+      {line ? (
+        <span className="text-[11.5px] text-[#52525b] [text-wrap:pretty]" data-testid="surrogate-training-set">
+          {line}
+        </span>
+      ) : null}
     </section>
   );
 }

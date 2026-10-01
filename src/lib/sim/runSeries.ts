@@ -12,8 +12,8 @@
  * reproduces them — rather than rendering empty charts (T1).
  *
  * The object is read through a short-lived signed URL `sim-command` mints
- * (`run.series_url`); the Parquet reader is imported on demand, so it costs the
- * first page nothing.
+ * (`run.series_url`); the Parquet reader and its zstd codec are imported on
+ * demand, so they cost the first page nothing.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { formatBytes } from "./labModel";
@@ -46,12 +46,13 @@ export function seriesFromRows(rows: Array<Record<string, unknown>>): SeriesByRe
   return out;
 }
 
-/** Parse a series object's bytes. */
+/** Parse a series object's bytes. The worker writes zstd and nothing else
+ *  (`series_store.write`), so the one codec loaded is `fzstd` — the full
+ *  `hyparquet-compressors` set carried a ~120 kB brotli dictionary for codecs no
+ *  object of ours uses. */
 export async function parseSeriesObject(buf: ArrayBuffer): Promise<SeriesByRep> {
-  const [{ parquetReadObjects }, { compressors }] = await Promise.all([
-    import("hyparquet"),
-    import("hyparquet-compressors"),
-  ]);
+  const [{ parquetReadObjects }, { decompress }] = await Promise.all([import("hyparquet"), import("fzstd")]);
+  const compressors = { ZSTD: (input: Uint8Array) => decompress(input) };
   const rows = (await parquetReadObjects({ file: buf, compressors })) as Array<Record<string, unknown>>;
   return seriesFromRows(rows);
 }

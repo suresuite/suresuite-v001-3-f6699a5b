@@ -47,6 +47,8 @@ import { buildScenarioSeed, uniqueName, worldOf } from "@/lib/sim/scenarioSeed";
 import { useValidatedBaseline } from "@/hooks/useValidatedBaseline";
 import { LabModelStep } from "@/components/sim/LabModelStep";
 import { useSimEngines } from "@/hooks/useSimEngines";
+import { useMyCapacity } from "@/hooks/useMyCapacity";
+import { useSurrogateTrainingSet } from "@/hooks/useSurrogateTrainingSet";
 import { dispatchExperiment } from "@/lib/sim/dispatch";
 import {
   defaultModel,
@@ -57,6 +59,7 @@ import {
   protocolDeviations,
   replicationWeeks,
   storageEstimate,
+  capacityVerdict,
 } from "@/lib/sim/labModel";
 import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/validationBaseline";
 import { runGateState } from "@/lib/sim/runGate";
@@ -134,6 +137,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     [scenarios, selectedId],
   );
   const { latestRun, reps, cancelRun, addReps } = useSimulationRun(selectedId);
+  const capacity = useMyCapacity(projectId, user?.id, latestRun ? `${latestRun.id}:${latestRun.status}` : null);
+  const trainingSet = useSurrogateTrainingSet(projectId, latestRun ? `${latestRun.id}:${latestRun.status}` : null);
   // The validated baseline is Run & Validate's: the Lab shows it and reuses its
   // run, and never edits or dispatches it (§4 D227).
   const baselineSelected = isValidationBaseline(selected);
@@ -309,6 +314,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
         acknowledgeWarnings: ackWarnings,
         forceRerun,
         engineId: chosenEngineId,
+        actorUserId: user?.id ?? null,
+        bytesEstimate: storageEstimate(target.replications, target.horizon_days).bytes,
         ...(followModel
           ? {
               validatedModelId: chosenModel!.id,
@@ -572,26 +579,37 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
   // WP 10.5 — the run's size before it is dispatched: replication-weeks (what
   // WP 10.7 will meter) and the storage its replications take, with the basis.
+  // WP 10.7 — against what the plan leaves: the pool and this member's share,
+  // forecast in the dispatcher's own order (the database stays the authority).
   const runSize = selected
     ? (() => {
         const est = storageEstimate(selected.replications, selected.horizon_days);
+        const repWeeks = replicationWeeks(selected.replications, selected.horizon_days);
+        const verdict = capacityVerdict(capacity, { replications: selected.replications, repWeeks, bytes: est.bytes });
         return {
           line:
             `${selected.replications} replication(s) × ${Math.ceil(selected.horizon_days / 7)} weeks = ` +
-            `${replicationWeeks(selected.replications, selected.horizon_days).toLocaleString()} replication-weeks · ` +
-            `expected storage ≈ ${formatBytes(est.bytes)} · remaining quota is shown from WP 10.7`,
+            `${repWeeks.toLocaleString()} replication-weeks · ` +
+            `expected storage ≈ ${formatBytes(est.bytes)} · ${verdict.line}`,
+          refusal: verdict.refusal,
+          bytes: est.bytes,
           basis: est.basis,
         };
       })()
     : null;
   const runEstimate = runSize ? (
-    <p
+    <div
       className="rounded-sm border border-[--hair-rule] bg-white px-3 py-[7px] font-mono text-[11.5px] text-[#52525b]"
       title={`storage estimate: ${runSize.basis}`}
       data-testid="run-estimate"
     >
-      {runSize.line}
-    </p>
+      <p>{runSize.line}</p>
+      {runSize.refusal ? (
+        <p className="mt-1 font-sans text-[12px] text-[#b45309]" data-testid="run-capacity-refusal">
+          Over capacity: {runSize.refusal}.
+        </p>
+      ) : null}
+    </div>
   ) : null;
   // The Settings pane is LOCKED to the model's protocol until "Advanced" is open
   // (the recovery pane — the experiment's own events — never is).
@@ -722,7 +740,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           compareModelId={usingModel ? chosenModel?.id ?? null : null}
           settingsLockReason={settingsLockReason}
           modelStep={modelStep}
-          runEstimate={runSize?.line ?? null}
+          trainingSet={trainingSet}
+          runEstimate={runSize ? runSize.line + (runSize.refusal ? ` · Over capacity: ${runSize.refusal}` : "") : null}
         />
         <NewScenarioDialog
           open={newOpen}
@@ -803,7 +822,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   onToggle={() => setStressOpen((v) => !v)}
                 />
                 {stressOpen ? <StressTestDrawer onLaunch={launchStress} /> : null}
-                <SurrogateCard />
+                <SurrogateCard training={trainingSet} />
                 <ScenarioList
                   scenarios={scenarios}
                   selectedId={selectedId}
