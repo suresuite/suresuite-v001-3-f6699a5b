@@ -2046,6 +2046,12 @@ export const API_ERRORS: ApiErrorCode[] = [
     "sites": 1
   },
   {
+    "code": "quota_exceeded",
+    "status": 402,
+    "message": "${e.message}",
+    "sites": 1
+  },
+  {
     "code": "missing_scope",
     "status": 403,
     "message": "this key does not have the ${scope} scope",
@@ -2054,7 +2060,7 @@ export const API_ERRORS: ApiErrorCode[] = [
   {
     "code": "replications_exceeded",
     "status": 403,
-    "message": "scenario requests ${scenario.replications} replications (limit ${ctx.limits.max_replications})",
+    "message": "${e.message}",
     "sites": 1
   },
   {
@@ -2102,7 +2108,7 @@ export const API_ERRORS: ApiErrorCode[] = [
   {
     "code": "concurrent_runs_exceeded",
     "status": 429,
-    "message": "organization already has ${active} queued/running runs (limit ${ctx.limits.max_concurrent_runs})",
+    "message": "${e.message}",
     "sites": 1
   },
   {
@@ -2145,12 +2151,6 @@ export const API_ERRORS: ApiErrorCode[] = [
     "code": "authz_unavailable",
     "status": 503,
     "message": "authorization backend unavailable",
-    "sites": 1
-  },
-  {
-    "code": "quota_unavailable",
-    "status": 503,
-    "message": "compute quota check unavailable",
     "sites": 1
   },
   {
@@ -3577,8 +3577,8 @@ export type ProjectDeletion = {
 };
 
 export const PROJECT_DELETION: ProjectDeletion = {
-  "projectScoped": 51,
-  "cascade": 41,
+  "projectScoped": 52,
+  "cascade": 42,
   "detached": [
     "chat_threads",
     "user_files"
@@ -3684,7 +3684,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 70,
+  "described": 72,
   "open": [
     {
       "table": "analysis_kinds",
@@ -3775,6 +3775,13 @@ export const READ_EXPOSURE: ReadExposure = {
     },
     {
       "table": "outbound_logistics",
+      "roles": [
+        "anon",
+        "authenticated"
+      ]
+    },
+    {
+      "table": "plan_role_allowances",
       "roles": [
         "anon",
         "authenticated"
@@ -3897,6 +3904,7 @@ export const READ_EXPOSURE: ReadExposure = {
     "materials",
     "model_validations",
     "outbound_logistics",
+    "plan_role_allowances",
     "policy_defaults",
     "policy_overrides",
     "policy_presets",

@@ -818,6 +818,8 @@ export function RunValidateStage({
       compute: computeClient ? "client" : undefined,
       inspection,
       forceRerun,
+      // WP 10.7: whose role share the run draws on (client-asserted, D28).
+      actorUserId: user?.id ?? null,
     });
     if (result.queued) {
       if (!result.runId) throw new Error("sim-command did not return a run_id");

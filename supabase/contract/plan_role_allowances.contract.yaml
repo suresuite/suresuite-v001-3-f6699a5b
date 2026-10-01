@@ -1,0 +1,165 @@
+# AUTHORED — the data contract's sidecar for `plan_role_allowances`.
+# WP 10.7 · §4 D247 · blueprint G15. Edit this file; docs/data/tables/*.md is
+# generated from it.
+table: plan_role_allowances
+tier: '4'
+schema_name: public
+grain: >-
+  One project role's share of an organization's capacity pool: the percentage of
+  the month's compute and of the series storage a member holding that role may
+  use, and how many runs that member may have in flight. A row with no
+  organization is the platform default; a row naming one overrides it for that
+  organization alone.
+owner: platform
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "plan_role_allowances_pkey"
+  - source: "table constraint 20261001000011_capacity.sql"
+    columns: [org_id, project_role]
+    name: "plan_role_allowances_org_role_key"
+
+natural_key_intended: [org_id, project_role]
+
+governance:
+  read: null
+  write: super_admin
+  min_project_role: viewer
+  audited: true
+  rls_enabled: true
+  note: >-
+    The plan, not tenant data: readable by everyone (`plan_role_allowances_read`,
+    `USING (true)`, select only) and written by no API role except through
+    `admin_set_role_allowance`, which opens with `_assert_super_admin`, names the
+    admin to the audit trigger (`app.current_user_id`) and closes with
+    `log_admin_action`. The four defaults (owner 100 %, editor 60 %, analyst 25 %,
+    viewer 0 % of compute and storage; 3 and 1 runs in flight for editor and
+    analyst) are seeded by the migration. Read by `_capacity_state`, which both
+    the admission check inside `create_simulation_run` and the Lab's
+    `get_my_capacity` call, so the Run card and the dispatcher read one answer.
+    The actor the share is resolved for is the app's asserted user (D28).
+
+surfaces:
+  - page: "SimulationLab.tsx"
+    via: "hook useMyCapacity → rpc get_my_capacity (the Run card's remaining line, WP 10.7)"
+    grain: table
+    evidence: "src/hooks/useMyCapacity.ts:25"
+    confirmed: true
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The row's surrogate id.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  org_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The organization this share overrides the default for; NULL is the platform
+      default every organization without an override reads.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_role:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The project role the share applies to — owner, editor, analyst or viewer, as
+      `effective_project_role` resolves it (membership or a live delegation; a super
+      admin is an owner everywhere).
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  compute_share_pct:
+    type: "numeric(5,2)"
+    unit: "percent of the pool"
+    unit_source: fixed
+    meaning: >-
+      The percentage of the organization's monthly compute pool
+      (`organizations.compute_quota_rep_weeks_month`) one member holding this role may
+      use, floored to whole replication-weeks. Binds only where the pool has a quota.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Not an engine input: read by the dispatcher's admission check
+      (`_capacity_admit`) before a run exists, never by the simulation.
+  storage_share_pct:
+    type: "numeric(5,2)"
+    unit: "percent of the pool"
+    unit_source: fixed
+    meaning: >-
+      The percentage of the organization's series storage
+      (`organizations.storage_quota_bytes`) one member holding this role may keep.
+      Binds only where the pool has a quota.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Not an engine input: read by the dispatcher's admission check
+      (`_capacity_admit`) before a run exists, never by the simulation.
+  max_concurrent:
+    type: "integer"
+    unit: "runs"
+    unit_source: fixed
+    meaning: >-
+      How many runs one member holding this role may have queued or running. NULL
+      is no role limit. A share of the organization's `max_concurrent_runs`: it binds
+      only where the plan caps concurrency, so an organization with no plan keeps no
+      limits (D207's rule) — whether a role may run at all is the project role's to say.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Not an engine input: read by the dispatcher's admission check
+      (`_capacity_admit`) before a run exists, never by the simulation.
+  created_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the row was created.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  updated_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When `admin_set_role_allowance` last changed it.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

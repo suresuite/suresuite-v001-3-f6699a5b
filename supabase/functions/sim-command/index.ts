@@ -15,6 +15,7 @@ import {
   dispatchExperimentCancel,
   dispatchExperimentRun,
   enqueueEnvelope,
+  CapacityRefusal,
   ReuseAvailable,
   ValidationRejection,
 } from "../_shared/dispatch.ts";
@@ -205,6 +206,22 @@ Deno.serve(async (req) => {
         // Reuse-or-rerun (G17 / §9.2 read-path slice): identical completed
         // results exist. Reuse is a USER choice — the client either surfaces
         // the candidate run or re-dispatches with payload.force_rerun=true.
+        // WP 10.7 · §4 D247: the organization's capacity refused the run —
+        // 402 a quota, 403 replications per run, 429 runs in flight — and the
+        // reason carries the numbers, so the Lab says what is left.
+        if (e instanceof CapacityRefusal) {
+          return new Response(
+            JSON.stringify({ error: e.message, capacity: true, status: e.status }),
+            {
+              status: e.status,
+              headers: {
+                ...corsHeaders,
+                "Content-Type": "application/json",
+                ...(e.status === 429 ? { "Retry-After": "60" } : {}),
+              },
+            },
+          );
+        }
         if (e instanceof ReuseAvailable) {
           return new Response(
             JSON.stringify({

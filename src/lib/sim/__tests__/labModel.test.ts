@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 
 import {
+  capacityVerdict,
+  type CapacityState,
   compareScope,
   defaultModel,
   formatBytes,
@@ -110,5 +112,72 @@ describe("a comparison defaults to the same model; an exploratory run is never t
     expect(s.labelOf(cands[2])).toBe("different model");
     expect(s.labelOf(cands[3])).toBe("exploratory");
     expect(s.labelOf(cands[0])).toBeNull();
+  });
+});
+
+// WP 10.7 · §4 D247 — the Run card's estimate against what the plan leaves. The
+// figures mirror `rehearsal/610`, so the card and the database agree on them.
+describe("capacityVerdict (WP 10.7)", () => {
+  const state = (over: Partial<CapacityState["pool"]> = {}, share: Partial<NonNullable<CapacityState["share"]>> | null = {}): CapacityState => ({
+    org_id: "o",
+    role: "analyst",
+    pool: {
+      compute_quota_rep_weeks_month: 100,
+      compute_used_rep_weeks: 69,
+      storage_quota_bytes: null,
+      storage_used_bytes: 0,
+      max_concurrent_runs: 10,
+      active_runs: 0,
+      max_replications_per_run: 50,
+      ...over,
+    },
+    share: share === null ? null : {
+      compute_share_pct: 25,
+      storage_share_pct: 25,
+      max_concurrent: 1,
+      compute_used_rep_weeks: 6,
+      storage_used_bytes: 0,
+      active_runs: 0,
+      ...share,
+    },
+  });
+
+  it("an under-share run fits, and the line names the share that binds", () => {
+    const v = capacityVerdict(state(), { replications: 6, repWeeks: 18, bytes: 0 });
+    expect(v.refusal).toBeNull();
+    expect(v.line).toBe("19 of 25 replication-weeks left this month (your analyst share)");
+  });
+
+  it("an over-share run is forecast refused with the database's numbers", () => {
+    const v = capacityVerdict(state(), { replications: 7, repWeeks: 21, bytes: 0 });
+    expect(v.refusal).toBe("this run needs 21 replication-weeks; 19 are left");
+  });
+
+  it("the pool binds when it is tighter than the share", () => {
+    const v = capacityVerdict(state({}, { compute_share_pct: 100, compute_used_rep_weeks: 0 }), { replications: 12, repWeeks: 36, bytes: 0 });
+    expect(v.line).toBe("31 of 100 replication-weeks left this month");
+    expect(v.refusal).toBe("this run needs 36 replication-weeks; 31 are left");
+  });
+
+  it("checks in the database's order: replications, in flight, compute, storage", () => {
+    expect(capacityVerdict(state(), { replications: 51, repWeeks: 999, bytes: 0 }).refusal).toMatch(/limit is 50 per run/);
+    expect(capacityVerdict(state({}, { active_runs: 1 }), { replications: 1, repWeeks: 999, bytes: 0 }).refusal)
+      .toBe("you have 1 runs queued or running; your analyst role allows 1");
+    const st = state({ compute_quota_rep_weeks_month: null, storage_quota_bytes: 1000, storage_used_bytes: 600 }, { storage_used_bytes: 0 });
+    expect(capacityVerdict(st, { replications: 1, repWeeks: 3, bytes: 300 }).refusal).toMatch(/expected to keep 300 B; 250 B is left/);
+  });
+
+  it("the role's in-flight allowance binds only where the plan caps concurrency", () => {
+    const v = capacityVerdict(state({ max_concurrent_runs: null }, { active_runs: 3 }), { replications: 1, repWeeks: 3, bytes: 0 });
+    expect(v.refusal).toBeNull();
+  });
+
+  it("no plan reads as no limit; an unreadable plan says so rather than inventing a figure", () => {
+    const free = state({ compute_quota_rep_weeks_month: null, max_concurrent_runs: null, max_replications_per_run: null }, null);
+    expect(capacityVerdict(free, { replications: 200, repWeeks: 10400, bytes: 1e9 })).toEqual({
+      line: "no compute or storage limit on this plan",
+      refusal: null,
+    });
+    expect(capacityVerdict(null, { replications: 1, repWeeks: 1, bytes: 1 }).line).toMatch(/could not be read/);
   });
 });

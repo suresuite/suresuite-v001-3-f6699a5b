@@ -1,0 +1,176 @@
+# AUTHORED — the data contract's sidecar for `run_usage`.
+# WP 10.7 · §4 D247 · blueprint G15. Edit this file; docs/data/tables/*.md is
+# generated from it.
+table: run_usage
+tier: "5"
+schema_name: public
+grain: >-
+  One capacity event of one run: its reservation when it was dispatched
+  (`dispatch`), what it actually used when it finished (`complete`), or the
+  release of its series storage when the sweep expired them (`expire`). The
+  ledger a month's compute is read from.
+owner: engine
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [id]
+    name: "run_usage_pkey"
+  - source: "table constraint 20261001000011_capacity.sql"
+    columns: [run_id, kind]
+    name: "run_usage_run_kind_key"
+
+natural_key_intended: [run_id, kind]
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    No API role reads or writes it: RLS is on with no policy. Written only by
+    SECURITY DEFINER code — `create_simulation_run` (the reservation, in the same
+    statement as the run row it reserves for), the `simulation_runs_usage_complete`
+    trigger (the actual, once per run) and `simulation_runs_usage_expire` (the
+    release) — and read only through `get_my_capacity` and the super admin's
+    `admin_org_capacity_usage` (the super admin's usage view,
+    `src/pages/admin/AdminUsage.tsx` — an admin page, outside §5.1's lineage).
+    NOT AUDITED: tier 5 is output, append-only by its
+    `(run_id, kind)` key, and each row names the member and the run itself.
+    Compute used is the ledger's, so deleting runs does not hand a month's compute
+    back; storage used is derived from the live runs, so a deleted run frees its
+    bytes whatever deleted it.
+
+surfaces:
+  - page: "SimulationLab.tsx"
+    via: "hook useMyCapacity → rpc get_my_capacity (what this member has used)"
+    grain: table
+    evidence: "src/hooks/useMyCapacity.ts:25"
+    confirmed: true
+
+fields:
+  id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The row's surrogate id.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  org_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The organization whose pool the run drew on — its project's
+      `organization_id` when it was dispatched. NULL for an account with no
+      organization, which has no plan.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  user_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The member whose role share the run drew on: the app's asserted user the
+      dispatcher passed in (D28 — client-asserted, `approved_users.id`). NULL when the
+      caller named nobody (/v1, whose principal is an API key); such a run is held to
+      the pool alone.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run's project.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  run_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The run. Kept as NULL when the run is deleted, so the month's compute it used
+      stays counted.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  rep_weeks:
+    type: "bigint"
+    unit: "replication-weeks"
+    unit_source: fixed
+    meaning: >-
+      Compute, in replication-weeks: at `dispatch` the reservation (replications ×
+      ceil(horizon days / 7)); at `complete` what actually ran (replications done ×
+      the same weeks — a cancelled or failed run counts what it computed); 0 at
+      `expire`. A month's use counts each run once, at its actual if it completed.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Not an engine input: what a run COST, read by the admission check and
+      the usage views, never by the simulation.
+  bytes:
+    type: "bigint"
+    unit: "bytes"
+    unit_source: fixed
+    meaning: >-
+      Series storage: 0 at `dispatch`; at `complete` the bytes a finished run keeps
+      (`simulation_runs.series_bytes`); at `expire` the negative of what the sweep
+      released. A record — storage in use is read from the live runs.
+    grain: level
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+    note: >-
+      Not an engine input: what a run COST, read by the admission check and
+      the usage views, never by the simulation.
+  kind:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      `dispatch`, `complete` or `expire`, at most one of each per run.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the event happened; the month a reservation counts in.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

@@ -707,6 +707,20 @@ A **`run_cache`** consults the key before dispatch: an exact hit returns stored 
 > One SQL path computes it for the dispatcher and for the AI read tool alike; identical
 > submissions make one run (a completed one is offered, an in-flight one is attached); and the
 > worker refuses a run bound to an engine it does not run (PLAN.md §16 · WP 10.4).
+>
+> **Phase 10 (PLAN.md §20, WP 10.7): capacity is admitted where the run is created (G15).**
+> A run is compute and stored series, so it is metered against the organization's plan — a
+> monthly pool of replication-weeks, a series-storage quota, a per-run replication cap, a
+> concurrency cap and a retention period — and against the share of that pool the member's
+> project role holds (`plan_role_allowances`, a default per role, overridable per
+> organization). The check lives in ONE place, inside `create_simulation_run`, after the RunKey
+> lookup: a reuse or an attach consumes nothing, and every front door (the Lab, `/v1`,
+> agent-apply) is refused the same way — 402 for a quota, 403 for the replication cap, 429 for
+> concurrency, each with its numbers. `/v1`'s key-scoped caps fold in as the stricter of two.
+> A run's reservation, its settled actual and its release on expiry are a ledger
+> (`run_usage`); storage in use is read from the live runs. The share is resolved for the
+> app's asserted user, so it inherits D28's limit until identity is server-verified
+> (PLAN.md §4 D247, §16 · WP 10.7).
 
 ### 9.3 Comparison semantics
 

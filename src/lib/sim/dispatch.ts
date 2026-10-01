@@ -53,6 +53,7 @@ interface ErrorBody {
   findings?: GateResponseFinding[];
   reuse_available?: boolean;
   reuse_candidate?: ReuseCandidate;
+  capacity?: boolean;
 }
 
 export interface DispatchArgs {
@@ -75,6 +76,20 @@ export interface DispatchArgs {
   protocolOverrides?: Record<string, unknown>;
   /** an explicitly exploratory run — badged, never a comparison baseline (WP 10.5, 10.8) */
   exploratory?: boolean;
+  // ── WP 10.7 · §4 D247 — capacity ──
+  /** the signed-in user, whose role share the run draws on (client-asserted, D28) */
+  actorUserId?: string | null;
+  /** the bytes this run's series are expected to keep (`storageEstimate`) */
+  bytesEstimate?: number;
+}
+
+/** The organization's capacity refused the run (402 a quota, 403 replications
+ *  per run, 429 runs in flight). The message is the database's, with its numbers. */
+export class CapacityExceededError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = "CapacityExceededError";
+  }
 }
 
 export async function dispatchExperiment(a: DispatchArgs): Promise<RunDispatchResult> {
@@ -95,6 +110,8 @@ export async function dispatchExperiment(a: DispatchArgs): Promise<RunDispatchRe
           ? { protocol_overrides: a.protocolOverrides }
           : {}),
         ...(a.exploratory ? { exploratory: true } : {}),
+        ...(a.actorUserId ? { actor_user_id: a.actorUserId } : {}),
+        ...(a.bytesEstimate && a.bytesEstimate > 0 ? { bytes_estimate: Math.round(a.bytesEstimate) } : {}),
       },
       client_ts: Date.now(),
     },
@@ -121,6 +138,10 @@ export async function dispatchExperiment(a: DispatchArgs): Promise<RunDispatchRe
   // §9.2 reuse-or-rerun (409): identical completed results exist.
   if (body?.reuse_available && body.reuse_candidate) {
     return { queued: false, status: "reuse_available", reuseCandidate: body.reuse_candidate };
+  }
+  // WP 10.7: over capacity — the database's reason, as the user should read it.
+  if (body?.capacity && ctx) {
+    throw new CapacityExceededError(ctx.status, typeof body.error === "string" ? body.error : "over capacity");
   }
   // An operational failure: the server's own words, not the SDK's "non-2xx".
   if (ctx) {

@@ -75,10 +75,17 @@ support/audit correlation:
 ```
 
 Notable codes: `invalid_key`, `expired_key`, `revoked_key` (401) ·
-`missing_scope` (403) · `project_not_found`, `run_not_found`, `route_not_found`
-(404) · `validation_failed` (422, includes the data-gate findings) ·
-`rate_limited`, `daily_quota_exceeded`, `concurrent_runs_exceeded` (429) ·
-`payload_too_large` (413).
+`quota_exceeded` (402 — the organization's monthly compute or its series storage,
+or the member's share of either) · `missing_scope`, `replications_exceeded` (403) ·
+`project_not_found`, `run_not_found`, `route_not_found` (404) · `validation_failed`
+(422, includes the data-gate findings) · `rate_limited`, `daily_quota_exceeded`,
+`concurrent_runs_exceeded` (429) · `payload_too_large` (413).
+
+`POST …/runs` is admitted against the organization's plan in the database, the same
+check the app's own runs go through: the key's `max_concurrent_runs` and
+`max_replications` fold into the plan's (the stricter wins), a refusal's `message`
+carries the numbers, and a reuse (`409 reuse_available`) or an identical run already
+in flight consumes nothing.
 
 ## Endpoints
 

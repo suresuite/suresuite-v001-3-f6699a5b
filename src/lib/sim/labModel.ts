@@ -173,3 +173,88 @@ export function compareScope(
       c.exploratory ? "exploratory" : modelId !== null && c.modelId !== modelId ? "different model" : null,
   };
 }
+
+// ── what the plan leaves (WP 10.7 · §4 D247) ─────────────────────────────────
+
+/** `get_my_capacity`'s answer: the organization's pool and the member's role
+ *  share, with what each has used. NULL quota = unlimited. */
+export interface CapacityState {
+  org_id: string | null;
+  role: string | null;
+  pool: {
+    compute_quota_rep_weeks_month: number | null;
+    compute_used_rep_weeks: number;
+    storage_quota_bytes: number | null;
+    storage_used_bytes: number;
+    max_concurrent_runs: number | null;
+    active_runs: number;
+    max_replications_per_run: number | null;
+  };
+  share: {
+    compute_share_pct: number | null;
+    storage_share_pct: number | null;
+    max_concurrent: number | null;
+    compute_used_rep_weeks: number;
+    storage_used_bytes: number;
+    active_runs: number;
+  } | null;
+}
+
+export interface CapacityVerdict {
+  /** what is left, in words, for the Run card */
+  line: string;
+  /** the refusal the database will give this run, forecast in its own order — null when it fits */
+  refusal: string | null;
+}
+
+/** A quota and its use → what is left of the pool and of the role's share.
+ *  The share is a percentage OF the pool, floored as the database floors it. */
+function leftOf(quota: number | null, poolUsed: number, pct: number | null | undefined, shareUsed: number | undefined) {
+  if (quota == null) return null;
+  const pool = Math.max(0, quota - poolUsed);
+  if (pct == null || shareUsed == null) return { left: pool, by: "organization" as const, cap: quota };
+  const cap = Math.floor((quota * pct) / 100);
+  const share = Math.max(0, cap - shareUsed);
+  return share < pool ? { left: share, by: "share" as const, cap } : { left: pool, by: "organization" as const, cap: quota };
+}
+
+/** The Run card's forecast of `_capacity_admit`, which stays the authority: the
+ *  same checks in the same order, so the card says before the click what the
+ *  dispatcher would answer after it. */
+export function capacityVerdict(
+  s: CapacityState | null,
+  run: { replications: number; repWeeks: number; bytes: number },
+): CapacityVerdict {
+  if (!s) return { line: "capacity unknown — the plan could not be read", refusal: null };
+  const p = s.pool;
+  const sh = s.share;
+  const role = s.role ?? "member";
+  const compute = leftOf(p.compute_quota_rep_weeks_month, p.compute_used_rep_weeks, sh?.compute_share_pct, sh?.compute_used_rep_weeks);
+  const storage = leftOf(p.storage_quota_bytes, p.storage_used_bytes, sh?.storage_share_pct, sh?.storage_used_bytes);
+  const parts: string[] = [];
+  if (compute) {
+    parts.push(
+      `${compute.left.toLocaleString()} of ${compute.cap.toLocaleString()} replication-weeks left this month` +
+        (compute.by === "share" ? ` (your ${role} share)` : ""),
+    );
+  }
+  if (storage) {
+    parts.push(`${formatBytes(storage.left)} of ${formatBytes(storage.cap)} storage left` + (storage.by === "share" ? ` (your ${role} share)` : ""));
+  }
+  const line = parts.length > 0 ? parts.join(" · ") : "no compute or storage limit on this plan";
+
+  let refusal: string | null = null;
+  const inFlightCap = p.max_concurrent_runs;
+  if (p.max_replications_per_run != null && run.replications > p.max_replications_per_run) {
+    refusal = `this run asks for ${run.replications} replications; the limit is ${p.max_replications_per_run} per run`;
+  } else if (inFlightCap != null && p.active_runs >= inFlightCap) {
+    refusal = `the organization has ${p.active_runs} runs queued or running; the limit is ${inFlightCap}`;
+  } else if (inFlightCap != null && sh?.max_concurrent != null && sh.active_runs >= sh.max_concurrent) {
+    refusal = `you have ${sh.active_runs} runs queued or running; your ${role} role allows ${sh.max_concurrent}`;
+  } else if (compute && run.repWeeks > compute.left) {
+    refusal = `this run needs ${run.repWeeks.toLocaleString()} replication-weeks; ${compute.left.toLocaleString()} are left`;
+  } else if (storage && run.bytes > storage.left) {
+    refusal = `this run is expected to keep ${formatBytes(run.bytes)}; ${formatBytes(storage.left)} is left — release pinned runs or let runs expire`;
+  }
+  return { line, refusal };
+}

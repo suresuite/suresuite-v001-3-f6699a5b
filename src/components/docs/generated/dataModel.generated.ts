@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "c7120de73956";
+export const CONTRACT_VERSION = "4e06bcb25735";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261001000010_result_tiers.sql";
+export const LAST_MIGRATION = "20261001000011_capacity.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 87,
-  "tablesDescribed": 70,
-  "columnsDescribed": 922,
+  "tablesInSchema": 89,
+  "tablesDescribed": 72,
+  "columnsDescribed": 944,
   "tablesUndescribed": 17
 } as const;
 
@@ -277,6 +277,12 @@ export const TIERS: GlanceTier[] = [
         "owner": "policy-ui"
       },
       {
+        "table": "plan_role_allowances",
+        "grain": "One project role's share of an organization's capacity pool: the percentage of the month's compute and of the series storage a member holding that role may use, and how many runs that member may have in flight. A row with no organization is the platform default; a row naming one overrides it for that organization alone.",
+        "columns": 8,
+        "owner": "platform"
+      },
+      {
         "table": "policy_defaults",
         "grain": "One row per project: the policy each family runs with unless a specific node overrides it. The bundle, in other words — and the thing a policy_override is a patch against.",
         "columns": 15,
@@ -340,6 +346,12 @@ export const TIERS: GlanceTier[] = [
         "table": "run_replications",
         "grain": "One replication of one simulation run: the seed it used, the KPI row the engine computed for it, and its weekly series. A run has as many rows here as it has replications, and `rep_index` orders them. Tier 5 — a RESULT, derived from a tier-2 dataset by a named engine version, never an input to anything. Nothing downstream reads it except the result surfaces; a row is superseded by re-running, never edited.",
         "columns": 12,
+        "owner": "engine"
+      },
+      {
+        "table": "run_usage",
+        "grain": "One capacity event of one run: its reservation when it was dispatched (`dispatch`), what it actually used when it finished (`complete`), or the release of its series storage when the sweep expired them (`expire`). The ledger a month's compute is read from.",
+        "columns": 9,
         "owner": "engine"
       },
       {
@@ -435,7 +447,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "organizations",
         "grain": "One tenant. Every project, every dataset and every simulation result in the product belongs to exactly one of these rows, and the boundary between two of them is the boundary the whole access layer is built to hold.",
-        "columns": 13,
+        "columns": 18,
         "owner": "platform"
       },
       {
