@@ -121,7 +121,7 @@ interface Props {
   defaults: PolicyBundle;
   overrides: OverrideRow[];
   fulfillmentStrategy: FulfillmentStrategy;
-  saveSnapshot: (label?: string) => Promise<string | null>;
+  saveSnapshot: (label?: string, notes?: string, opts?: { quiet?: boolean }) => Promise<string | null>;
   /** The policy leg of the card's provenance triple (usePolicies): the
    *  selected version and whether live edits have drifted from it. */
   selectedVersionId: string | null;
@@ -1036,8 +1036,10 @@ export function RunValidateStage({
     setSubmitting("single");
     try {
       // saveSnapshot / scenario are best-effort — a run must not be blocked by
-      // a DB write; it computes in the browser regardless.
-      const versionId = await saveSnapshot(`Validate single — ${new Date().toLocaleString()}`);
+      // a DB write; it computes in the browser regardless. Since WP 10.2 the save
+      // is deduplicated by content (§4 D241): an unchanged policy set returns the
+      // version already in force and nothing new is minted, so it runs quietly.
+      const versionId = await saveSnapshot(`Validate single — ${new Date().toLocaleString()}`, undefined, { quiet: true });
       const scenarioId =
         (await ensureValidationScenario({
           replications: 1,
@@ -1085,7 +1087,7 @@ export function RunValidateStage({
         toast.warning("Provide at least one seed.");
         return;
       }
-      const versionId = await saveSnapshot(`Validate ×${seeds.length} — ${new Date().toLocaleString()}`);
+      const versionId = await saveSnapshot(`Validate ×${seeds.length} — ${new Date().toLocaleString()}`, undefined, { quiet: true });
       const scenarioId =
         (await ensureValidationScenario({
           replications: seeds.length,

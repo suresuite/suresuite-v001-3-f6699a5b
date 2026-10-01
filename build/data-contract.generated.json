@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 369,
-      "migrations_applied": 361,
-      "last_migration": "20261001000005_analyst_runs_only.sql"
+      "migrations_found": 370,
+      "migrations_applied": 362,
+      "last_migration": "20261001000006_policy_versions_by_content.sql"
     },
     "sidecars": 57,
     "registry": {
@@ -18,7 +18,7 @@
   "counts": {
     "tables_in_schema": 83,
     "tables_covered": 57,
-    "columns_covered": 712,
+    "columns_covered": 713,
     "check_constraints": 60,
     "engine_requirements": 7,
     "orphans": 0,
@@ -19627,21 +19627,21 @@
           "page": "ProjectIntelligence.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:167",
+          "evidence": "src/hooks/usePolicies.tsx:181",
           "confirmed": true
         },
         {
           "page": "ProjectPolicies.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:167",
+          "evidence": "src/hooks/usePolicies.tsx:181",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:167",
+          "evidence": "src/hooks/usePolicies.tsx:181",
           "confirmed": true
         }
       ],
@@ -20267,21 +20267,21 @@
           "page": "ProjectIntelligence.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:168",
+          "evidence": "src/hooks/usePolicies.tsx:182",
           "confirmed": true
         },
         {
           "page": "ProjectPolicies.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:168",
+          "evidence": "src/hooks/usePolicies.tsx:182",
           "confirmed": true
         },
         {
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:168",
+          "evidence": "src/hooks/usePolicies.tsx:182",
           "confirmed": true
         }
       ],
@@ -21194,7 +21194,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/hooks/usePolicies.tsx:496",
+          "evidence": "src/hooks/usePolicies.tsx:510",
           "confirmed": true
         },
         {
@@ -21277,6 +21277,18 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260609000002_policy_versions.sql"
+        },
+        {
+          "name": "policy_versions_project_hash",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "policy_hash"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20261001000006_policy_versions_by_content.sql"
         }
       ],
       "columns": [
@@ -21659,7 +21671,7 @@
           "unit_source": "none",
           "unit_column": null,
           "normalize_at_promotion": null,
-          "meaning": "The hash of `snapshot`. What a reproducibility record carries so a reader can check that a bundle they hold is the one a run used, without trusting the id.",
+          "meaning": "The hash of `snapshot`. What a reproducibility record carries so a reader can check that a bundle they hold is the one a run used, without trusting the id. SINCE WP 10.2 IT IS THE VERSION'S IDENTITY: `snapshot_policy` returns the existing row when the project already has this hash (§4 D241), and a model card is matched by it, never by `id` (D242).",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -21692,6 +21704,38 @@
           "unit_column": null,
           "normalize_at_promotion": null,
           "meaning": "Free text a person wrote about why. The only column here that carries a REASON rather than a state, and nothing reads it today.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "version_no",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000006_policy_versions_by_content.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "\"Policy v4\" — one number per CONTENT per project, in order of first appearance, assigned by a BEFORE INSERT trigger (so a direct insert numbers too). Rows saved before WP 10.2 that share a `policy_hash` share the number, because they are one model saved twice (§4 D241).",
           "grain": "metadata",
           "computed_by": null,
           "engine": {
@@ -32078,5 +32122,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "387128bfb1f6"
+  "contract_version": "630b256a2427"
 }

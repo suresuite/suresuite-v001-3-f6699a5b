@@ -182,7 +182,23 @@ fields:
     unit_source: none
     meaning: >-
       The hash of `snapshot`. What a reproducibility record carries so a reader can check that a
-      bundle they hold is the one a run used, without trusting the id.
+      bundle they hold is the one a run used, without trusting the id. SINCE WP 10.2 IT IS THE
+      VERSION'S IDENTITY: `snapshot_policy` returns the existing row when the project already
+      has this hash (§4 D241), and a model card is matched by it, never by `id` (D242).
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  version_no:
+    type: integer
+    unit: null
+    unit_source: none
+    meaning: >-
+      "Policy v4" — one number per CONTENT per project, in order of first appearance, assigned
+      by a BEFORE INSERT trigger (so a direct insert numbers too). Rows saved before WP 10.2 that
+      share a `policy_hash` share the number, because they are one model saved twice (§4 D241).
     grain: metadata
     engine: {consumed_by: null, transform: null, missing_default: null}
     substitutions: []
@@ -207,7 +223,7 @@ surfaces:
   - page: "ProjectPolicies.tsx"
     via: "table read"
     grain: table
-    evidence: "src/hooks/usePolicies.tsx:496"
+    evidence: "src/hooks/usePolicies.tsx:510"
     confirmed: true
   - page: "SimulationLab.tsx"
     via: "table read"

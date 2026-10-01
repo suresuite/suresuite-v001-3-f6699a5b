@@ -45,7 +45,7 @@ interface Props {
   bulkUpsertOverrides: (rows: OverrideRow[]) => Promise<void>;
   deleteOverride?: (scope: "node" | "edge", targetKey: string, family: PolicyFamily) => Promise<void>;
   clearActivePreset: () => Promise<void>;
-  saveSnapshot: (label?: string) => Promise<string | null>;
+  saveSnapshot: (label?: string, notes?: string, opts?: { quiet?: boolean }) => Promise<string | null>;
   /** Policy-version context for the Run & Validate credibility card (§9.5). */
   selectedVersionId: string | null;
   policyDirty: boolean;

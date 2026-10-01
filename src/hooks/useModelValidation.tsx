@@ -64,11 +64,20 @@ export type Credibility =
   | { state: "validated"; card: ModelValidationCard }
   | { state: "stale"; card: ModelValidationCard; drift: DriftComponent[] };
 
-/** The current context a card is compared against (all hashes read live). */
+/** The current context a card is compared against (all hashes read live).
+ *
+ *  WP 10.2 · §4 D242 — a card is matched by CONTENT: `policyHash`, not
+ *  `policyVersionId`. Two version rows with one hash are one model, and matching
+ *  by id is what made a freshly opened Lab read every validated model as
+ *  unvalidated. */
 export interface CredibilityContext {
-  policyVersionId: string | null;
-  /** live policy edits diverge from the selected version (usePolicies.isDirty) */
-  policyDirty: boolean;
+  /** current_policy_hash of the policies in context; null = not loaded yet. When
+   *  omitted, the hook's own `currentPolicyHash` is used. */
+  policyHash?: string | null;
+  /** For display only — never compared. */
+  policyVersionId?: string | null;
+  /** Kept for callers; the policy component is decided by `policyHash` alone. */
+  policyDirty?: boolean;
   /** current_graph_hash (useDatasetVersion.currentHash) */
   graphHash: string | null;
   /** scenario_fingerprint_hash of the scenario in context; null = unknown */
@@ -124,26 +133,37 @@ export async function fetchScenarioFingerprintHash(
   return (data as string | null) ?? null;
 }
 
-/** Badge derivation (§2.4): one stored fact, three derived states. */
+/** Badge derivation (§2.4): one stored fact, three derived states.
+ *
+ *  By content (WP 10.2): the cards whose `policy_hash` IS the live policy hash
+ *  are this model's; among them the one matching the most of graph and scenario
+ *  wins. When the live policies match NO card, the newest validated card is
+ *  still reported — as STALE with `policy` drift, which is what "you changed the
+ *  policies since validating" means — so an edit reads stale, not unvalidated. */
 export function deriveCredibility(
   cards: ModelValidationCard[],
   ctx: CredibilityContext,
 ): Credibility {
-  if (!ctx.policyVersionId) return { state: "unvalidated" };
-  // Cards are looked up by the exact version (or the version dirty edits
-  // branch from — same id, dirty just adds policy drift).
-  const card = cards.find(
-    (c) =>
-      c.status === "active" &&
-      c.verdict === "validated" &&
-      c.policy_version_id === ctx.policyVersionId,
-  );
-  if (!card) return { state: "unvalidated" };
+  const policyHash = ctx.policyHash ?? null;
+  // Null means "not loaded yet": no badge rather than a flash of a wrong one.
+  if (!policyHash) return { state: "unvalidated" };
+  const validated = cards
+    .filter((c) => c.status === "active" && c.verdict === "validated")
+    .sort((a, b) => (a.validated_at < b.validated_at ? 1 : a.validated_at > b.validated_at ? -1 : 0));
+  if (validated.length === 0) return { state: "unvalidated" };
+
+  const exact = validated.filter((c) => c.policy_hash === policyHash);
+  const pool = exact.length > 0 ? exact : validated;
+  const score = (c: ModelValidationCard) =>
+    (ctx.graphHash !== null && c.graph_hash === ctx.graphHash ? 2 : 0) +
+    (ctx.scenarioHash !== null && c.scenario_hash === ctx.scenarioHash ? 1 : 0);
+  // Stable: `pool` is newest-first, so equal scores keep the newest card.
+  const card = pool.reduce((best, c) => (score(c) > score(best) ? c : best), pool[0]);
 
   // null current hashes mean "not loaded yet", not drift — skip those
   // comparisons rather than flashing a false stale state while loading.
   const drift: DriftComponent[] = [];
-  if (ctx.policyDirty) drift.push("policy");
+  if (exact.length === 0) drift.push("policy");
   if (ctx.graphHash !== null && ctx.graphHash !== card.graph_hash) {
     drift.push("data");
   }
@@ -174,15 +194,15 @@ export interface UseModelValidationResult {
   /** Derive the badge for a caller-supplied context (Run & Validate). */
   resolve: (ctx: CredibilityContext) => Credibility;
   /**
-   * Lab-side badge derivation (§2.4): exact active-card triple match and not
-   * dirty → validated; a card on this policy version with any component
-   * mismatched → stale (drift names which); no card → unvalidated. Scenario
-   * fingerprints are fetched lazily and cached so this stays synchronous.
+   * Lab-side badge derivation (§2.4), by content (WP 10.2): the live policy
+   * hash, the current graph hash and this scenario's fingerprint against the
+   * project's cards — `deriveCredibility`, with the scenario fingerprint fetched
+   * lazily and cached so this stays synchronous. `policyHash` undefined = use
+   * the hook's own `currentPolicyHash`.
    */
   resolveScenario: (
-    policyVersionId: string | null | undefined,
+    policyHash: string | null | undefined,
     scenario: ScenarioFingerprintInput | null | undefined,
-    opts?: { dirty?: boolean },
   ) => Credibility;
   /** Immutable-history badge for a completed run (stamped card + engine check). */
   resolveRun: (run: {
@@ -190,15 +210,14 @@ export interface UseModelValidationResult {
     code_version?: string | null;
   } | null | undefined) => Credibility;
   /**
-   * Inheritance (§2.6): if the exact active triple (policy version ×
-   * current graph × this scenario's baseline fingerprint) is validated and
-   * the policy is not dirty, apply the card to the scenario via the ONE
-   * server-side inheritance RPC. Returns the applied card id, or null.
+   * Inheritance (§2.6): if the exact active CONTENT triple (live policy hash ×
+   * current graph × this scenario's baseline fingerprint) is validated, apply
+   * the card to the scenario via the ONE server-side inheritance RPC, which
+   * re-checks the same triple. Returns the applied card id, or null.
    */
   applyIfValidated: (
     scenario: ScenarioFingerprintInput,
-    policyVersionId: string | null | undefined,
-    opts?: { dirty?: boolean },
+    policyHash: string | null | undefined,
   ) => Promise<string | null>;
   /** record_model_validation RPC — supersedes the same-triple active card. */
   record: (args: RecordValidationArgs) => Promise<string>;
@@ -286,6 +305,18 @@ export function useModelValidation(
         },
         () => void refresh(),
       )
+      // Overrides are half of the policy content the card is matched on (WP 10.2):
+      // without this, a node-level edit left the badge on the old hash.
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "policy_overrides",
+          filter: `project_id=eq.${projectId}`,
+        },
+        () => void refresh(),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -298,8 +329,12 @@ export function useModelValidation(
   );
 
   const resolve = useCallback(
-    (ctx: CredibilityContext) => deriveCredibility(allCards, ctx),
-    [allCards],
+    (ctx: CredibilityContext) =>
+      deriveCredibility(allCards, {
+        ...ctx,
+        policyHash: ctx.policyHash === undefined ? currentPolicyHash : ctx.policyHash,
+      }),
+    [allCards, currentPolicyHash],
   );
 
   const ensureFingerprint = useCallback(
@@ -317,35 +352,19 @@ export function useModelValidation(
   );
 
   const resolveScenario = useCallback<UseModelValidationResult["resolveScenario"]>(
-    (policyVersionId, scenario, opts) => {
-      if (!policyVersionId) return { state: "unvalidated" };
-      const active = cards.filter(
-        (c) => c.verdict === "validated" && c.policy_version_id === policyVersionId,
-      );
-      if (active.length === 0) return { state: "unvalidated" };
-
+    (policyHash, scenario) => {
       let scenarioHash: string | null = null;
       if (scenario) {
         scenarioHash = fingerprints[fingerprintKey(scenario)] ?? null;
         if (scenarioHash === null) ensureFingerprint(scenario);
       }
-
-      const dirty = opts?.dirty === true;
-      // Prefer the card matching the most components (exact triple first).
-      const score = (c: ModelValidationCard) =>
-        (currentGraphHash !== null && c.graph_hash === currentGraphHash ? 2 : 0) +
-        (scenarioHash !== null && c.scenario_hash === scenarioHash ? 1 : 0);
-      const card = [...active].sort((a, b) => score(b) - score(a))[0];
-
-      const drift: DriftComponent[] = [];
-      if (dirty) drift.push("policy");
-      if (currentGraphHash !== null && card.graph_hash !== currentGraphHash) drift.push("data");
-      if (scenarioHash !== null && card.scenario_hash !== scenarioHash) drift.push("scenario");
-
-      if (drift.length === 0) return { state: "validated", card };
-      return { state: "stale", card, drift };
+      return deriveCredibility(allCards, {
+        policyHash: policyHash === undefined ? currentPolicyHash : policyHash,
+        graphHash: currentGraphHash,
+        scenarioHash,
+      });
     },
-    [cards, currentGraphHash, fingerprints, ensureFingerprint],
+    [allCards, currentPolicyHash, currentGraphHash, fingerprints, ensureFingerprint],
   );
 
   const resolveRun = useCallback<UseModelValidationResult["resolveRun"]>(
@@ -366,12 +385,13 @@ export function useModelValidation(
   );
 
   const applyIfValidated = useCallback<UseModelValidationResult["applyIfValidated"]>(
-    async (scenario, policyVersionId, opts) => {
-      if (!policyVersionId || opts?.dirty === true || currentGraphHash === null) return null;
+    async (scenario, policyHashArg) => {
+      const policyHash = policyHashArg === undefined ? currentPolicyHash : policyHashArg;
+      if (!policyHash || currentGraphHash === null) return null;
       const candidates = cards.filter(
         (c) =>
           c.verdict === "validated" &&
-          c.policy_version_id === policyVersionId &&
+          c.policy_hash === policyHash &&
           c.graph_hash === currentGraphHash,
       );
       if (candidates.length === 0) return null;
@@ -396,7 +416,7 @@ export function useModelValidation(
     // `user?.id` and not `user`: without it the callback closes over the person who
     // was signed in at first render, so a session change would attribute this write
     // to the previous one (WP 6.2 slice 12's lesson, ten arrays over).
-    [cards, currentGraphHash, user?.id],
+    [cards, currentPolicyHash, currentGraphHash, user?.id],
   );
 
   const record = useCallback(

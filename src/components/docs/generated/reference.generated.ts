@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 712;
+export const REFERENCE_COLUMN_COUNT = 713;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -12658,17 +12658,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectIntelligence.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:167"
+        "evidence": "src/hooks/usePolicies.tsx:181"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:167"
+        "evidence": "src/hooks/usePolicies.tsx:181"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:167"
+        "evidence": "src/hooks/usePolicies.tsx:181"
       }
     ],
     "governance": {
@@ -13081,17 +13081,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectIntelligence.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:168"
+        "evidence": "src/hooks/usePolicies.tsx:182"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:168"
+        "evidence": "src/hooks/usePolicies.tsx:182"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:168"
+        "evidence": "src/hooks/usePolicies.tsx:182"
       }
     ],
     "governance": {
@@ -13620,7 +13620,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "table read",
-        "evidence": "src/hooks/usePolicies.tsx:496"
+        "evidence": "src/hooks/usePolicies.tsx:510"
       }
     ],
     "governance": {
@@ -13923,7 +13923,7 @@ export const REFERENCE_TABLES: RefTable[] = [
         "csvHeader": null,
         "required": false,
         "validate": null,
-        "meaning": "The hash of `snapshot`. What a reproducibility record carries so a reader can check that a bundle they hold is the one a run used, without trusting the id.",
+        "meaning": "The hash of `snapshot`. What a reproducibility record carries so a reader can check that a bundle they hold is the one a run used, without trusting the id. SINCE WP 10.2 IT IS THE VERSION'S IDENTITY: `snapshot_policy` returns the existing row when the project already has this hash (§4 D241), and a model card is matched by it, never by `id` (D242).",
         "primaryKey": false,
         "unique": false,
         "references": null,
@@ -13948,6 +13948,30 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "Free text a person wrote about why. The only column here that carries a REASON rather than a state, and nothing reads it today.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "version_no",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "\"Policy v4\" — one number per CONTENT per project, in order of first appearance, assigned by a BEFORE INSERT trigger (so a direct insert numbers too). Rows saved before WP 10.2 that share a `policy_hash` share the number, because they are one model saved twice (§4 D241).",
         "primaryKey": false,
         "unique": false,
         "references": null,

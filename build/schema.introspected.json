@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 369,
-  "migrations_applied": 361,
+  "migrations_found": 370,
+  "migrations_applied": 362,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000005_analyst_runs_only.sql",
+  "last_migration": "20261001000006_policy_versions_by_content.sql",
   "counts": {
     "tables": 83,
     "views": 7,
     "enums": 4,
-    "functions": 337,
+    "functions": 340,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -10095,19 +10095,6 @@
       ],
       "indexes": [
         {
-          "name": "model_validations_active_triple_uq",
-          "unique": true,
-          "columns": [
-            "policy_version_id",
-            "graph_hash",
-            "scenario_hash"
-          ],
-          "nulls_not_distinct": false,
-          "predicate": "status = 'active'",
-          "partial": true,
-          "added_by": "20260710000001_model_validations.sql"
-        },
-        {
           "name": "model_validations_project_created",
           "unique": false,
           "columns": [
@@ -10118,6 +10105,20 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260710000001_model_validations.sql"
+        },
+        {
+          "name": "model_validations_active_content_uq",
+          "unique": true,
+          "columns": [
+            "project_id",
+            "policy_hash",
+            "graph_hash",
+            "scenario_hash"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": "status = 'active'",
+          "partial": true,
+          "added_by": "20261001000006_policy_versions_by_content.sql"
         }
       ],
       "rls": {
@@ -10151,11 +10152,12 @@
         {
           "source": "partial UNIQUE index",
           "columns": [
-            "policy_version_id",
+            "project_id",
+            "policy_hash",
             "graph_hash",
             "scenario_hash"
           ],
-          "name": "model_validations_active_triple_uq",
+          "name": "model_validations_active_content_uq",
           "predicate": "status = 'active'"
         }
       ]
@@ -13622,6 +13624,18 @@
           "unique": false,
           "references": null,
           "added_by": "20260711000005_policy_version_notes_delete.sql"
+        },
+        {
+          "name": "version_no",
+          "quoted": false,
+          "type": "integer",
+          "type_raw": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000006_policy_versions_by_content.sql"
         }
       ],
       "constraints": [
@@ -13648,6 +13662,18 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260609000002_policy_versions.sql"
+        },
+        {
+          "name": "policy_versions_project_hash",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "policy_hash"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20261001000006_policy_versions_by_content.sql"
         }
       ],
       "rls": {
@@ -21716,6 +21742,18 @@
       "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
+      "name": "_policy_version_hash",
+      "signature": "_policy_version_hash(uuid)",
+      "args": [
+        "p_policy_version_id uuid"
+      ],
+      "returns": "text LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
+    },
+    {
       "name": "_proposals_touch",
       "signature": "_proposals_touch()",
       "args": [],
@@ -21738,6 +21776,21 @@
       "defined_by": "20260929000003_account_self_service_names_its_user.sql"
     },
     {
+      "name": "active_model_validation_by_content",
+      "signature": "active_model_validation_by_content(uuid, text, text, text)",
+      "args": [
+        "p_project_id uuid",
+        "p_policy_hash text",
+        "p_graph_hash text",
+        "p_scenario_hash text"
+      ],
+      "returns": "SETOF",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
+    },
+    {
       "name": "active_model_validation",
       "signature": "active_model_validation(uuid, text, text)",
       "args": [
@@ -21749,7 +21802,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260710000001_model_validations.sql"
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
     },
     {
       "name": "admin_add_org_member",
@@ -22619,7 +22672,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260919000007_decision_plane_actor.sql"
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
     },
     {
       "name": "approved_users_derive_name_parts",
@@ -24884,11 +24937,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "TABLE ( id uuid, label text, notes text, author_email text, author_name text, parent_version_id uuid, policy_hash text, created_at timestamptz, run_count bigint, card_count bigint )",
+      "returns": "TABLE ( id uuid, label text, notes text, author_email text, author_name text, parent_version_id uuid, policy_hash text, created_at timestamptz, run_count bigint, card_count bigint, version_no integer )",
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260711000005_policy_version_notes_delete.sql"
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
     },
     {
       "name": "list_projects",
@@ -25141,6 +25194,16 @@
       "defined_by": "20260929000003_account_self_service_names_its_user.sql"
     },
     {
+      "name": "policy_versions_assign_number",
+      "signature": "policy_versions_assign_number()",
+      "args": [],
+      "returns": "trigger LANGUAGE plpgsql SET search_path TO",
+      "security_definer": false,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
+    },
+    {
       "name": "project_access_read",
       "signature": "project_access_read(uuid)",
       "args": [
@@ -25360,7 +25423,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260710000001_model_validations.sql"
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
     },
     {
       "name": "record_proposal_viewed",
@@ -25773,7 +25836,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260919000007_decision_plane_actor.sql"
+      "defined_by": "20261001000006_policy_versions_by_content.sql"
     },
     {
       "name": "split_person_name",

@@ -75,9 +75,9 @@ partially or get corrected — the write fails.
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:270` | yes |
-| `ProjectIntelligence.tsx` | table read | `src/hooks/usePolicies.tsx:168` | yes |
-| `ProjectPolicies.tsx` | table read | `src/hooks/usePolicies.tsx:168` | yes |
-| `SimulationLab.tsx` | table read | `src/hooks/usePolicies.tsx:168` | yes |
+| `ProjectIntelligence.tsx` | table read | `src/hooks/usePolicies.tsx:182` | yes |
+| `ProjectPolicies.tsx` | table read | `src/hooks/usePolicies.tsx:182` | yes |
+| `SimulationLab.tsx` | table read | `src/hooks/usePolicies.tsx:182` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -266,6 +266,6 @@ WP 4.4 · the `current_graph_hash` of the moment this override was SEEDED from p
 
 ---
 
-*Generated from data contract `387128bfb1f6`, engine `0.2.8`,
+*Generated from data contract `630b256a2427`, engine `0.2.8`,
 sidecar `supabase/contract/policy_overrides.contract.yaml`, table created by `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -94,6 +94,15 @@ export async function sha256Hex(text: string): Promise<string> {
     .join("");
 }
 
+/** PostgREST's answer when a function (or this overload of it) is not in the
+ *  schema yet — a function deployed ahead of its migration. */
+export function isMissingFunction(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "PGRST202" || error.code === "42883") return true;
+  const msg = (error.message ?? "").toLowerCase();
+  return msg.includes("could not find the function") || (msg.includes("function") && msg.includes("does not exist"));
+}
+
 /** Carries a §8.1 gate result out of dispatchExperimentRun as a 422 response. */
 export class ValidationRejection extends Error {
   constructor(public gate: GateResult) {
@@ -309,12 +318,27 @@ export async function dispatchExperimentRun(
     if (shErr) throw shErr;
     scenarioHash = (sh as string | null) ?? null;
     if (scenarioHash && graphHash) {
+      // WP 10.2 · §4 D242 — matched by CONTENT: the card whose policy_hash is this
+      // version's, whichever version row it was recorded under. Matching by id is
+      // what left every run dispatched after a "Save version & run" unstamped.
+      // The id-keyed RPC is the fallback for the window in which this function is
+      // deployed ahead of `20261001000006` (it too matches by content once that
+      // migration has run).
       // deno-lint-ignore no-explicit-any
-      const { data: card, error: cardErr } = await (sb as any).rpc("active_model_validation", {
-        p_policy_version_id: policyVersionId,
+      const rpc = (fn: string, args: Record<string, unknown>) => (sb as any).rpc(fn, args);
+      let { data: card, error: cardErr } = await rpc("active_model_validation_by_content", {
+        p_project_id: scenario.project_id,
+        p_policy_hash: policyHash,
         p_graph_hash: graphHash,
         p_scenario_hash: scenarioHash,
       });
+      if (cardErr && isMissingFunction(cardErr)) {
+        ({ data: card, error: cardErr } = await rpc("active_model_validation", {
+          p_policy_version_id: policyVersionId,
+          p_graph_hash: graphHash,
+          p_scenario_hash: scenarioHash,
+        }));
+      }
       if (cardErr) throw cardErr;
       const row = Array.isArray(card) ? card[0] : card;
       modelValidationId = (row?.id as string | null) ?? null;

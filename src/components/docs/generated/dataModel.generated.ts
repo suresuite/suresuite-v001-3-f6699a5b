@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "387128bfb1f6";
+export const CONTRACT_VERSION = "630b256a2427";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261001000005_analyst_runs_only.sql";
+export const LAST_MIGRATION = "20261001000006_policy_versions_by_content.sql";
 
 export const COUNTS = {
   "tablesInSchema": 83,
   "tablesDescribed": 57,
-  "columnsDescribed": 712,
+  "columnsDescribed": 713,
   "tablesUndescribed": 26
 } as const;
 
@@ -279,7 +279,7 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "policy_versions",
         "grain": "One saved snapshot of a project's whole policy bundle, with the bundle it replaced and the hash of both. The audit trail of the /policies grid: what the policies WERE at a moment somebody chose to record, which is what makes a simulation result reproducible from the policy side.",
-        "columns": 13,
+        "columns": 14,
         "owner": "policy-ui"
       },
       {

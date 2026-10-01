@@ -149,7 +149,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
     versions,
     isDirty,
     selectedVersionId,
-    setSelectedVersionId,
+    currentVersion,
     restoreVersion,
     saveDefault,
     clearActivePreset,
@@ -241,7 +241,6 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
     setPolicyQuery("");
   };
 
-  const currentVersion = versions.find((v) => v.id === selectedVersionId) ?? null;
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
@@ -479,7 +478,6 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
           onOpenChange={setHistoryOpen}
           versions={versions}
           selectedVersionId={selectedVersionId}
-          onSelect={setSelectedVersionId}
           onRestore={restoreVersion}
           onExport={exportVersion}
           onDelete={deleteVersion}

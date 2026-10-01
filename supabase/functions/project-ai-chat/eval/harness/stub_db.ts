@@ -498,8 +498,16 @@ export function makeAgentRpcs(tables: Record<string, Row[]>, opts?: { graphHash?
         else oStore.push({ project_id: args.p_project_id, scope: o.scope, target_key: o.target_key, family: o.family, patch: o.patch ?? {} });
       }
       const vStore = tables.policy_versions ?? (tables.policy_versions = []);
-      const id = nextUuid();
       const hash = policyHash();
+      // WP 10.2 (20261001000006): snapshot_policy returns the OLDEST version that
+      // already carries this content instead of minting a second one.
+      const same = vStore
+        .filter((v) => String(v.project_id) === String(args.p_project_id) && v.policy_hash === hash)
+        .sort((a, b) => Number(a.created_at ?? 0) - Number(b.created_at ?? 0))[0];
+      if (same) {
+        return { policy_version_id: same.id, policy_hash: hash, overrides_applied: ((args.p_overrides ?? []) as Row[]).length };
+      }
+      const id = nextUuid();
       vStore.push({
         id,
         project_id: args.p_project_id,
@@ -579,9 +587,23 @@ export function makeAgentRpcs(tables: Record<string, Row[]>, opts?: { graphHash?
       });
       return id;
     },
-    active_model_validation: (args) =>
+    // WP 10.2 (SQL original: 20261001000006) — matched by CONTENT: the id is
+    // resolved to its policy_hash and any card with that hash is this model's.
+    active_model_validation: (args) => {
+      const v = (tables.policy_versions ?? []).find((x) => String(x.id) === String(args.p_policy_version_id));
+      const hash = v?.policy_hash ?? null;
+      return (tables.model_validations ?? []).filter((c) =>
+        (hash !== null
+          ? String(c.policy_hash) === String(hash)
+          : String(c.policy_version_id) === String(args.p_policy_version_id)) &&
+        String(c.graph_hash) === String(args.p_graph_hash) &&
+        String(c.scenario_hash) === String(args.p_scenario_hash) &&
+        c.status === "active" && c.verdict === "validated");
+    },
+    active_model_validation_by_content: (args) =>
       (tables.model_validations ?? []).filter((c) =>
-        String(c.policy_version_id) === String(args.p_policy_version_id) &&
+        String(c.project_id) === String(args.p_project_id) &&
+        String(c.policy_hash) === String(args.p_policy_hash) &&
         String(c.graph_hash) === String(args.p_graph_hash) &&
         String(c.scenario_hash) === String(args.p_scenario_hash) &&
         c.status === "active" && c.verdict === "validated"),

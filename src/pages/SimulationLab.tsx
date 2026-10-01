@@ -49,6 +49,7 @@ import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/valida
 import { runGateState } from "@/lib/sim/runGate";
 import { reusePromptText } from "@/lib/sim/dispatch";
 import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
+import { versionDisplayName } from "@/components/policies/PolicyVersionSheets";
 import {
   compileGateFindings,
   gateFindingsToFindings,
@@ -77,6 +78,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     overrides: policyOverrides,
     versions: policyVersions,
     selectedVersionId: policyVersionId,
+    currentVersion: currentPolicyVersion,
+    currentHash: policyHash,
     isDirty: policyDirty,
     saveSnapshot: savePolicySnapshot,
   } = usePolicies(projectId);
@@ -190,8 +193,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
   // ── B0b credibility (Phase B0 / G13 / §9.5) ───────────────────────────────
   const cred = useModelValidation(projectId);
-  const credibility = cred.resolveScenario(policyVersionId, selected, { dirty: policyDirty });
-  const validated = useValidatedBaseline({ scenarios, cred, policyVersionId, dirty: policyDirty });
+  const credibility = cred.resolveScenario(policyHash, selected);
+  const validated = useValidatedBaseline({ scenarios, cred, policyHash });
   const [newOpen, setNewOpen] = useState(false);
   const [newStart, setNewStart] = useState<NewScenarioStart>("baseline");
   const newName = uniqueName(
@@ -208,10 +211,10 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     if (selected.warmup_mode !== "auto") return; // hand-set → never override
     if (inheritTried.current.has(selected.id)) return;
     inheritTried.current.add(selected.id);
-    void cred.applyIfValidated(selected, policyVersionId).then((cardId) => {
+    void cred.applyIfValidated(selected, policyHash).then((cardId) => {
       if (cardId) toast.message("Warm-up & replications inherited from the model validation.");
     });
-  }, [selected, policyVersionId, policyDirty, cred, baselineSelected]);
+  }, [selected, policyVersionId, policyHash, policyDirty, cred, baselineSelected]);
 
   const dispatchRun = async (versionId: string, forceRerun = false) => {
     if (!projectId || !selected) return;
@@ -322,7 +325,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   // world (scenarioSeed.ts, §4 D219), so inheritance can match its card.
   const inherit = (s: (typeof scenarios)[number]) => {
     inheritTried.current.add(s.id);
-    void cred.applyIfValidated(s, policyVersionId, { dirty: policyDirty }).then((cardId) => {
+    void cred.applyIfValidated(s, policyHash).then((cardId) => {
       if (cardId) toast.message("Warm-up & replications inherited from the model validation.");
     });
   };
@@ -424,18 +427,18 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     toast.success(`Stress test ready: ${preset.name.replace(/^\[Stress\]\s*/, "")}`);
   };
 
+  const runVersion = latestRun?.policy_version_id
+    ? policyVersions.find((v) => v.id === latestRun.policy_version_id) ?? null
+    : null;
   const runVersionLabel = latestRun?.policy_version_id
-    ? (policyVersions.find((v) => v.id === latestRun.policy_version_id)?.label ??
-      latestRun.policy_version_id.slice(0, 8))
+    ? (runVersion ? versionDisplayName(runVersion) : latestRun.policy_version_id.slice(0, 8))
     : null;
-  const currentVersionLabel = policyVersionId
-    ? (policyVersions.find((v) => v.id === policyVersionId)?.label ?? policyVersionId.slice(0, 8))
-    : null;
-  const versionText = !policyVersionId
-    ? "No saved model version"
-    : policyDirty
-      ? `Changed since ${currentVersionLabel}`
-      : `Model ${currentVersionLabel}`;
+  // The version in force is the one whose CONTENT is live (WP 10.2, §4 D242) —
+  // the same answer /policies gives, so a validated model never reads as missing
+  // here just because this page has not saved anything yet.
+  const versionText = !currentPolicyVersion
+    ? "Unsaved policy edits — they match no saved version"
+    : `Model ${versionDisplayName(currentPolicyVersion)}`;
 
   // What capacity this run will use, and whether it is real (§4 D167) — one
   // line with details on demand; the same node on desktop and phone (D224).
@@ -481,7 +484,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           scenariosLoading={loading}
           selected={selected}
           selectedId={selectedId}
-          credibilityFor={(s) => cred.resolveScenario(policyVersionId, s, { dirty: policyDirty })}
+          credibilityFor={(s) => cred.resolveScenario(policyHash, s)}
           onSelectScenario={setSelectedId}
           onCreateScenario={createScenario}
           onDuplicateScenario={duplicateScenario}
@@ -496,7 +499,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           onSaveScenario={(patch) => selected && !baselineSelected && update(selected.id, patch)}
           projectRecovery={projectRecovery}
           effectiveRecovery={effectiveRecovery}
-          policyVersionLabel={currentVersionLabel}
+          policyVersionLabel={currentPolicyVersion ? versionDisplayName(currentPolicyVersion) : null}
           policyDirty={policyDirty}
           credibility={credibility}
           runCredibility={cred.resolveRun(latestRun)}
@@ -604,7 +607,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   scenarios={scenarios}
                   selectedId={selectedId}
                   loading={loading}
-                  credibilityFor={(s) => cred.resolveScenario(policyVersionId, s, { dirty: policyDirty })}
+                  credibilityFor={(s) => cred.resolveScenario(policyHash, s)}
                   onSelect={setSelectedId}
                   onBrowseSaved={() => setLibraryOpen(true)}
                   onCreate={createScenario}
