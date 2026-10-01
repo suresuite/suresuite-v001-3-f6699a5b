@@ -944,8 +944,8 @@ export default function NetworkVisualization({ isCollapsed, setIsCollapsed }: Ne
                       HDR_ICON_BUTTON,
                       'md:text-[#ea580c] md:hover:text-[#ea580c]',
                     )}
-                    aria-label="Add Disruption"
-                    title="Add Disruption"
+                    aria-label="Add disruption event"
+                    title="Add disruption event"
                   >
                     <AlertTriangle className="h-4 w-4" />
                   </Button>

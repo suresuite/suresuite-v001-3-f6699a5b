@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { DIALOG_AS_SHEET } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -11,9 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { WeeksInput } from "./WeeksInput";
+import { FIELD_BOX, FIELD_H, WeeksStepper, choiceChip } from "./DisruptionFields";
 import { KPI_OPTIONS } from "./ScenarioSetupForm";
-import { STRESS_TESTS } from "./StressTestCard";
+import { STRESS_TESTS, scheduleLine } from "./StressTestCard";
 import { stressPresetUnavailableReason } from "@/lib/sim/stressTargets";
 import { HORIZON_WEEKS, formatDuration } from "@/lib/sim/planningTime";
 import type { SeedWorld } from "@/lib/sim/scenarioSeed";
@@ -124,10 +123,11 @@ export function NewScenarioDialog({
 
         <div className="flex flex-col gap-4 text-[12.5px]">
           <Row label="Name">
-            <Input
+            <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-9 min-h-11 md:min-h-0"
+              aria-label="Scenario name"
+              className={cn("w-full px-2.5 outline-none", FIELD_H, FIELD_BOX)}
               autoFocus
             />
           </Row>
@@ -141,13 +141,7 @@ export function NewScenarioDialog({
                   disabled={!!o.disabled}
                   title={o.disabled}
                   onClick={() => setStart(o.value)}
-                  className={cn(
-                    "min-h-11 rounded-sm border px-3 py-1 md:min-h-0",
-                    start === o.value
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-[--hair-rule] text-[#3f3f46] hover:border-foreground",
-                    o.disabled && "cursor-not-allowed opacity-50 hover:border-[--hair-rule]",
-                  )}
+                  className={choiceChip(start === o.value, !!o.disabled)}
                 >
                   {o.label}
                 </button>
@@ -158,7 +152,7 @@ export function NewScenarioDialog({
                   onOpenChange(false);
                   onBrowseLibrary();
                 }}
-                className="min-h-11 px-2 text-[#52525b] underline-offset-2 hover:text-foreground hover:underline md:min-h-0"
+                className={cn("px-2 text-[12.5px] text-[#52525b] underline-offset-2 hover:text-foreground hover:underline", FIELD_H)}
               >
                 Library ›
               </button>
@@ -167,7 +161,7 @@ export function NewScenarioDialog({
 
           {start === "stress" ? (
             <Row label="Stress test">
-              <div className="flex max-h-48 flex-col overflow-y-auto rounded-sm border border-[--hair-rule]">
+              <div className="max-h-56 overflow-y-auto rounded-sm border border-input">
                 {presets.map(({ t, reason }) => (
                   <button
                     key={t.id}
@@ -179,12 +173,13 @@ export function NewScenarioDialog({
                       if (!name.trim() || name === defaultName) setName(t.scenario.name);
                     }}
                     className={cn(
-                      "min-h-11 border-b border-[--sim-divider] px-3 py-1.5 text-left last:border-b-0 md:min-h-0",
-                      presetId === t.id ? "bg-[#f4f4f5] font-medium" : "hover:bg-[#fafafa]",
+                      "flex w-full min-h-11 flex-col gap-0.5 border-b border-[--sim-divider] px-3 py-2 text-left last:border-b-0",
+                      presetId === t.id ? "bg-[#f4f4f5]" : "hover:bg-[#fafafa]",
                       reason !== null && "cursor-not-allowed opacity-50",
                     )}
                   >
-                    {t.label}
+                    <span className={cn(presetId === t.id && "font-medium")}>{t.label}</span>
+                    <span className="text-[11px] tabular-nums text-[#71717a]">{scheduleLine(t.scenario)}</span>
                   </button>
                 ))}
               </div>
@@ -193,20 +188,21 @@ export function NewScenarioDialog({
 
           <Row label="Horizon">
             <div className="flex flex-wrap items-center gap-2">
-              <WeeksInput
-                ariaLabel="Horizon in weeks"
-                days={locked ? world.horizon_days : horizon}
-                min={HORIZON_WEEKS.min}
-                max={HORIZON_WEEKS.max}
-                disabled={locked}
-                onDays={setHorizon}
-              />
-              <span className="text-[#52525b]">weeks</span>
+              <div className="w-[168px]">
+                <WeeksStepper
+                  ariaLabel="Horizon"
+                  days={locked ? world.horizon_days : horizon}
+                  min={HORIZON_WEEKS.min}
+                  max={HORIZON_WEEKS.max}
+                  disabled={locked}
+                  onDays={setHorizon}
+                />
+              </div>
               {locked ? (
                 <button
                   type="button"
                   onClick={() => setUnlocked(true)}
-                  className="min-h-11 text-[#52525b] underline-offset-2 hover:text-foreground hover:underline md:min-h-0"
+                  className={cn("text-[12.5px] text-[#52525b] underline-offset-2 hover:text-foreground hover:underline", FIELD_H)}
                 >
                   change
                 </button>
@@ -227,12 +223,7 @@ export function NewScenarioDialog({
                   key={k.value}
                   type="button"
                   onClick={() => setKpi(k.value)}
-                  className={cn(
-                    "min-h-11 rounded-sm border px-2.5 py-1 md:min-h-0",
-                    kpi === k.value
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-[--hair-rule] text-[#3f3f46] hover:border-foreground",
-                  )}
+                  className={choiceChip(kpi === k.value)}
                 >
                   {k.label}
                 </button>
@@ -241,7 +232,7 @@ export function NewScenarioDialog({
           </Row>
 
           <Row label="Warm-up · reps">
-            <span className="tabular-nums text-[#3f3f46]">
+            <span className="block tabular-nums text-[#3f3f46] md:pt-[10px]">
               {card && start !== "defaults" && !unlocked
                 ? `${formatDuration(card.adopted_warmup_days)} · ${card.recommended_replications} reps — from the validation`
                 : `detected at run time · ${SCENARIO_ENGINE_DEFAULTS.replications} reps — engine defaults`}
@@ -250,10 +241,10 @@ export function NewScenarioDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="min-h-11 md:min-h-0">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className={cn(FIELD_H, "px-4")}>
             Cancel
           </Button>
-          <Button onClick={() => void submit()} disabled={!canCreate} className="min-h-11 md:min-h-0">
+          <Button onClick={() => void submit()} disabled={!canCreate} className={cn(FIELD_H, "px-4")}>
             {busy ? "Creating…" : "Create"}
           </Button>
         </DialogFooter>
@@ -265,7 +256,7 @@ export function NewScenarioDialog({
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-1 gap-1.5 md:grid-cols-[120px_minmax(0,1fr)] md:items-start md:gap-3">
-      <span className="pt-1.5 text-[12px] font-medium text-[#52525b]">{label}</span>
+      <span className="text-[12px] font-medium leading-4 text-[#3f3f46] md:pt-[10px]">{label}</span>
       <div className="min-w-0">{children}</div>
     </div>
   );

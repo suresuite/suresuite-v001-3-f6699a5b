@@ -7,11 +7,15 @@ import {
   DISRUPTION_RULE,
   PLANT_TARGET,
   addBlockedReason,
+  describeEvent,
   effectLabel,
+  effectMeaning,
+  eventWindow,
   judgeTarget,
   newEvent,
   supplierTarget,
   targetChoices,
+  targetLabel,
 } from "../disruptionEvents";
 import { disruptionWeeks } from "../runWindow";
 
@@ -46,12 +50,23 @@ describe("one disruption-event model (WP 9.4 slice 6 · §4 D226)", () => {
     for (const c of choices) expect(judgeTarget(c.value, ids).reason).toBeNull();
   });
 
-  it("a new event is a whole-week full outage after the warm-up", () => {
+  it("a new event is a whole-week lead-time delay after the warm-up", () => {
     const e = newEvent("node:plant", 105);
     expect(e.start_day % 7).toBe(0);
     expect(e.duration_days % 7).toBe(0);
-    expect(effectLabel(e.magnitude_pct)).toBe("Full outage");
-    expect(effectLabel(30)).toBe("Cut by 30%");
+    expect(effectLabel(e.magnitude_pct)).toBe("Lead-time delay");
+    expect(effectLabel(30)).toBe("Capacity reduction 30%");
+  });
+
+  it("names an event in the engine's terms (DISRUPTION_TERMS)", () => {
+    const e = { target: supplierTarget("S1"), start_day: 133, duration_days: 28, magnitude_pct: 30 };
+    const { startWeek } = disruptionWeeks(e.start_day, e.duration_days);
+    expect(targetLabel(PLANT_TARGET)).toBe("Plant");
+    expect(targetLabel(supplierTarget("S1"))).toBe("Supplier S1");
+    expect(eventWindow(e.start_day, e.duration_days)).toBe(`weeks ${startWeek}–${startWeek + 3}`);
+    expect(eventWindow(e.start_day, 7)).toBe(`week ${startWeek}`);
+    expect(describeEvent(e)).toBe(`Capacity reduction 30% · Supplier S1 · weeks ${startWeek}–${startWeek + 3}`);
+    expect(effectMeaning(30)).toMatch(/^70% of the node's weekly capacity remains/);
   });
 
   it("stops at the engine's cap and says so", () => {
