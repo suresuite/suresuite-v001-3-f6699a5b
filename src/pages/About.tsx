@@ -272,12 +272,12 @@ export default function About() {
             <img
               src="/logo-mark.png"
               alt="SuReSuite — Supply Chain Resilience Suite"
-              className="h-[19px] w-auto object-contain md:hidden"
+              className="h-[15px] w-auto object-contain md:hidden"
             />
             <img
               src="/logo-lockup.png"
               alt="SuReSuite — Supply Chain Resilience Suite"
-              className="hidden h-[58px] object-contain md:block"
+              className="hidden h-[42px] object-contain md:block"
             />
           </Link>
           <nav className="flex items-center gap-1 whitespace-nowrap md:gap-2">
