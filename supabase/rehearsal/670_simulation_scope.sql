@@ -120,6 +120,11 @@ BEGIN
                                                                      k_proto, v_mrow.engine_fingerprint) THEN
     RAISE EXCEPTION 'R670 §1: model_hash is not over the simulation hash';
   END IF;
+  -- …and the list the AI tools derive their badge from carries it (`vvTools.ts`).
+  IF (SELECT l.hash_simulation FROM public.list_model_validations(v_proj) l WHERE l.id = v_m1)
+       IS DISTINCT FROM v_dv.hash_inputs THEN
+    RAISE EXCEPTION 'R670 §1: list_model_validations does not return the model''s simulation hash';
+  END IF;
   v_res := public.create_simulation_run(jsonb_build_object(
              'scenario_id', v_scen, 'project_id', v_proj, 'rep_count_target', 10,
              'policy_hash', v_ph, 'dataset_version_id', v_ds1, 'graph_hash', v_dv.graph_hash,

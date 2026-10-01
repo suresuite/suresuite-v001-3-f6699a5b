@@ -241,8 +241,11 @@ export async function loadPersistedTests(
 
 /** Exported for the §20.2 find_completed_run badge column (Phase H2) — one
  * derivation, one reader of the hash RPCs. */
-export async function currentHashes(db: Db, projectId: string): Promise<{ policy: string; graph: string }> {
-  const out = { policy: "unknown", graph: "unknown" };
+export async function currentHashes(
+  db: Db,
+  projectId: string,
+): Promise<{ policy: string; graph: string; simulation: string }> {
+  const out = { policy: "unknown", graph: "unknown", simulation: "unknown" };
   try {
     const { data } = await db.rpc("current_policy_hash", { p_project_id: projectId });
     if (typeof data === "string" && data) out.policy = data;
@@ -250,6 +253,11 @@ export async function currentHashes(db: Db, projectId: string): Promise<{ policy
   try {
     const { data } = await db.rpc("current_graph_hash", { p_project_id: projectId });
     if (typeof data === "string" && data) out.graph = data;
+  } catch { /* shown as unknown */ }
+  // WP 11.2 · §4 D259 — the scope the engine READS, which a card's inputs are matched on.
+  try {
+    const { data } = await db.rpc("current_level_hash", { p_project_id: projectId, p_scope: "simulation" });
+    if (typeof data === "string" && data) out.simulation = data;
   } catch { /* shown as unknown */ }
   return out;
 }
@@ -354,13 +362,20 @@ export async function buildVvContext(
  * find_completed_run "Validated" column (Phase H2). */
 export function deriveValidationBadge(
   c: Record<string, unknown>,
-  hashes: { policy: string; graph: string },
+  hashes: { policy: string; graph: string; simulation?: string },
 ): string {
   let badge = "unvalidated";
   if (c.status === "active" && c.verdict === "validated") {
     const drift: string[] = [];
     if (hashes.policy !== "unknown" && String(c.policy_hash) !== hashes.policy) drift.push("policy");
-    if (hashes.graph !== "unknown" && String(c.graph_hash) !== hashes.graph) drift.push("data");
+    // WP 11.2 · §4 D259 — the browser's rule (`cardInputsMatch`): a card that binds the
+    // simulation scope drifts when THAT moves, never when only the deep tier did; a card
+    // with no simulation hash keeps the composite rule. Unknown is never drift.
+    const sim = typeof c.hash_simulation === "string" && c.hash_simulation ? c.hash_simulation : null;
+    if (sim !== null) {
+      const live = hashes.simulation ?? "unknown";
+      if (live !== "unknown" && sim !== live) drift.push("data");
+    } else if (hashes.graph !== "unknown" && String(c.graph_hash) !== hashes.graph) drift.push("data");
     badge = drift.length === 0 ? "validated" : `stale (${drift.join("+")} drift)`;
   }
   return badge;

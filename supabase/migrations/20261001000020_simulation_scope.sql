@@ -649,6 +649,45 @@ BEGIN
 END;
 $$;
 
+-- The list the AI tools read the badge from (`get_validation_status`, the reuse
+-- lookup's badge column). It returned the composite and nothing else, so the agent's
+-- copy of the badge rule could only say "stale (data drift)" after a deep-tier upload
+-- the engine never reads. RETURNS TABLE cannot widen in place: DROP + CREATE, with the
+-- two columns appended so positional readers are unchanged, and the grant restated.
+DROP FUNCTION IF EXISTS public.list_model_validations(uuid);
+CREATE FUNCTION public.list_model_validations(p_project_id uuid)
+RETURNS TABLE (
+  id                       uuid,
+  policy_version_id        uuid,
+  policy_hash              text,
+  dataset_version_id       uuid,
+  graph_hash               text,
+  scenario_hash            text,
+  engine_fingerprint       text,
+  adopted_warmup_days      integer,
+  warmup_method            text,
+  recommended_replications integer,
+  verdict                  text,
+  basis                    text,
+  status                   text,
+  evidence_run_id          uuid,
+  author_email             text,
+  validated_at             timestamptz,
+  hash_simulation          text,
+  simulation_version_id    uuid
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+AS $$
+  SELECT id, policy_version_id, policy_hash, dataset_version_id, graph_hash,
+         scenario_hash, engine_fingerprint, adopted_warmup_days, warmup_method,
+         recommended_replications, verdict, basis, status, evidence_run_id,
+         author_email, validated_at, hash_simulation, simulation_version_id
+  FROM public.model_validations
+  WHERE project_id = p_project_id
+  ORDER BY validated_at DESC;
+$$;
+GRANT EXECUTE ON FUNCTION public.list_model_validations(uuid) TO anon, authenticated, service_role;
+
 -- ── 5 · RunKey v2 hashes the simulation scope (D260) ─────────────────────
 
 ALTER TABLE public.simulation_runs

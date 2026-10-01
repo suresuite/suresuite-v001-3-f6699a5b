@@ -27687,11 +27687,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "TABLE ( id uuid, policy_version_id uuid, policy_hash text, dataset_version_id uuid, graph_hash text, scenario_hash text, engine_fingerprint text, adopted_warmup_days integer, warmup_method text, recommended_replications integer, verdict text, basis text, status text, evidence_run_id uuid, author_email text, validated_at timestamptz )",
+      "returns": "TABLE ( id uuid, policy_version_id uuid, policy_hash text, dataset_version_id uuid, graph_hash text, scenario_hash text, engine_fingerprint text, adopted_warmup_days integer, warmup_method text, recommended_replications integer, verdict text, basis text, status text, evidence_run_id uuid, author_email text, validated_at timestamptz, hash_simulation text, simulation_version_id uuid )",
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260710000001_model_validations.sql"
+      "defined_by": "20261001000020_simulation_scope.sql"
     },
     {
       "name": "list_my_organizations",
