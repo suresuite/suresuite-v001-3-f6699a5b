@@ -21165,6 +21165,11 @@ and `rehearsal/560`–`600`, all of which this branch had used. This branch's ar
 deploys), `rehearsal/610`. Generated files are taken from main and regenerated from the merged
 sources.
 
+**The bundle audit.** `bundle-audit.yml` is red on `main` itself (initial graph 166.3 kB against a
+163.4 kB ceiling, three merges running). This branch first added 0.9 kB to it, because /auth is in
+the initial graph; the panel is now `lazy()`-loaded, so it adds 0.1 kB. The ceiling is not
+re-recorded here — that is admitting a regression this branch did not cause.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |

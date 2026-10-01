@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,7 +10,9 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { useToast } from '@/hooks/use-toast';
 import { Check } from 'lucide-react';
 import AuthHeroStrip from '@/components/AuthHeroStrip';
-import ForgotPasswordPanel from '@/pages/AuthForgotPassword';
+
+// Loaded on demand: /auth is in the initial graph, and the panel is rarely opened.
+const ForgotPasswordPanel = lazy(() => import('@/pages/AuthForgotPassword'));
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -84,7 +86,9 @@ const Auth = () => {
 
         <div className="my-auto flex w-full max-w-[400px] flex-col gap-[22px] py-7">
           {forgot ? (
-            <ForgotPasswordPanel initialEmail={form.getValues('email')} onBack={() => setForgot(false)} />
+            <Suspense fallback={null}>
+              <ForgotPasswordPanel initialEmail={form.getValues('email')} onBack={() => setForgot(false)} />
+            </Suspense>
           ) : (
           <>
           <h1 className="m-0 text-[31px] font-semibold leading-[1.1] tracking-[-0.022em]">
