@@ -25937,7 +25937,7 @@
           "grain": "table",
           "evidence": "src/hooks/useVerifiableExports.tsx:234",
           "confirmed": true,
-          "note": "The run-results workbook. This is the path by which a replication row leaves the system, so it is the one A5's Reproducibility Record has to bind (`result-binding`, still owed — WP 9.2)."
+          "note": "The run-results workbook. This is the path by which a replication row leaves the system, so it is the one A5's Reproducibility Record has to bind (`result-binding`, still owed — WP 10.4, which absorbed WP 9.2)."
         }
       ],
       "governance": {
@@ -32078,5 +32078,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "20a2eadf01bb"
+  "contract_version": "387128bfb1f6"
 }

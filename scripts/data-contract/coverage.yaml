@@ -66,8 +66,12 @@ pages_without_project_data:
                              # and deliberately does not guess at (see §16).
 
 deferred:
-  - wp: "6.3"
+  - wp: "10.3"
     why: >-
+      RE-HOMED FROM WP 6.3 BY WP 10.0 (2026-10-01). WP 10.3 EXTENDS this
+      table into the Validated Model (protocol, version number, immutability,
+      evidence) and is the package that has to say what every column means —
+      describing it anywhere else would describe a table about to change.
       MOVED FROM WP 4.4 BY WP 4.4 ITSELF, and the reason is a correction rather
       than a deferral. This row said the table's subject is "whether a card has
       gone stale, which is the one staleness rule WP 4.4 lands" — and WP 4.4
@@ -92,9 +96,14 @@ deferred:
     audited:
       model_validations: false
 
-  - wp: "9.2"
+  - wp: "10.4"
     why: >-
-      Runs and results (tier 5). Invariant `result-binding` is the claim these
+      Runs and results (tier 5).
+      RE-HOMED FROM WP 9.2 BY WP 10.0 (2026-10-01). Phase 10 absorbs WP 9.2:
+      the binding lands ON THE ROW in WP 10.4, together with the engine
+      registry and the RunKey it is built from, and WP 10.4 writes the
+      sidecars. WP 9.2 never started, so this is a move to the package that
+      will do the work, not a rescue from one that finished. Invariant `result-binding` is the claim these
       tables have to satisfy — every result binds dataset + policy + scenario +
       engine version.
       RE-HOMED FROM WP 6.3 BY WP 9.1, AND THIS IS THE SECOND TIME THIS ROW HAS

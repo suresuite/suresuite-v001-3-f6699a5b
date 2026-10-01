@@ -102,7 +102,7 @@ surfaces:
     note: >-
       The run-results workbook. This is the path by which a replication row
       leaves the system, so it is the one A5's Reproducibility Record has to
-      bind (`result-binding`, still owed — WP 9.2).
+      bind (`result-binding`, still owed — WP 10.4, which absorbed WP 9.2).
 
 fields:
   id:
