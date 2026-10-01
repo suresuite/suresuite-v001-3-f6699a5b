@@ -52,3 +52,14 @@ const PUSHED_ROUTE_PATTERNS: RegExp[] = [
 export function isMobileRootRoute(pathname: string): boolean {
   return !PUSHED_ROUTE_PATTERNS.some((re) => re.test(pathname));
 }
+
+/** The tabs this account may open, in order — the sidebar's rule
+ *  (`canAccessPage`, via `filterVisibleSections`) applied to the tab bar, so a
+ *  restricted account is never offered a tab that only bounces it to
+ *  /forbidden. More is not a route and is never filtered. */
+export function visibleTabs<T extends { to: string }>(
+  tabs: readonly T[],
+  canAccessPage: (to: string) => boolean,
+): T[] {
+  return tabs.filter((tab) => canAccessPage(tab.to));
+}

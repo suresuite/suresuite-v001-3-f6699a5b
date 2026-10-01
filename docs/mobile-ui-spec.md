@@ -399,6 +399,14 @@ unclipped. If a header stops pinning, look at that class first.
 Five roots, fixed: **Home · Policies · Lab · AI · More**. Everything else lives under
 More. `More` shows the SuReSuite logo at the top of its sheet, not a bare list.
 
+**A root the account may not open is left out**, by the sidebar's rule —
+`canAccessPage`, the call `filterVisibleSections` makes for the desktop sidebar and the
+More sheet (`visibleTabs` in `src/components/mobileRootRoutes.ts`). The remaining tabs
+and More share the width (`repeat(n, minmax(0, 1fr))`); **More is always present**. A
+tab that only bounces a restricted account to `/forbidden` is not a destination, and
+every bounce fetched another route chunk — after a deploy, the one that failed. With
+full access the bar is the five roots above, unchanged.
+
 ```jsx
 <nav className="flex shrink-0 items-stretch border-t border-border bg-background
                 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden">

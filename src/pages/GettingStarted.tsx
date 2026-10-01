@@ -1,9 +1,11 @@
 import { PageLayout } from "@/components/shared/PageLayout";
 import { MobileGettingStarted } from "@/components/home/MobileGettingStarted";
 import { useIsMobile } from "@/hooks/use-is-mobile";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { Link } from "react-router-dom";
 import { YouTubeEmbed } from "@/components/shared";
-import { Suspense, lazy, useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
+import { lazyChunk } from "@/lib/lazyChunk";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { WhenVisible } from "@/components/WhenVisible";
@@ -11,7 +13,7 @@ import { WhenVisible } from "@/components/WhenVisible";
 // Behind a tab, below the fold, and three.js underneath it. Lazy keeps it out
 // of this page's chunk; WhenVisible keeps the GL context from starting until
 // someone has actually scrolled to it.
-const NetworkVisualization3D = lazy(() => import("@/components/NetworkVisualization3D"));
+const NetworkVisualization3D = lazyChunk(() => import("@/components/NetworkVisualization3D"));
 import {
   Network,
   FileSpreadsheet,
@@ -105,6 +107,10 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
   // `hidden md:block`. The branch itself sits below every hook in this
   // component so the hook order is identical on both platforms.
   const isMobile = useIsMobile();
+  // The three "start" buttons lead to the Project Manager; an account that may
+  // not open it is not offered them (the sidebar's rule, `canAccessPage`).
+  const { canAccessPage } = useCapabilities();
+  const canOpenProjectManager = canAccessPage("/project-manager");
 
   // Default selected sub-block
   const [activeTech, setActiveTech] = useState<TechKey>('network');
@@ -213,12 +219,14 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 mb-12">
-                <Button size="lg" className="text-lg px-6" asChild>
-                  <Link to="/project-manager">
-                    <FileSpreadsheet className="mr-2 h-5 w-5" />
-                    Start Analysis
-                  </Link>
-                </Button>
+                {canOpenProjectManager && (
+                  <Button size="lg" className="text-lg px-6" asChild>
+                    <Link to="/project-manager">
+                      <FileSpreadsheet className="mr-2 h-5 w-5" />
+                      Start Analysis
+                    </Link>
+                  </Button>
+                )}
                 <Button variant="outline" size="lg" className="text-lg px-6">
                   <PlayCircle className="mr-2 h-5 w-5" />
                   View Demo
@@ -339,9 +347,11 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
               <h3 className="text-2xl font-bold text-white mb-2">Ready to strengthen your supply chain?</h3>
               <p className="text-white/70 text-lg">Upload data → Analyze vulnerabilities → Simulate strategies</p>
             </div>
-            <Button asChild variant="outline" size="lg" className="rounded-sm bg-background/10 border-white/20 text-white hover:bg-background/20 transition-all duration-200 hover:scale-105">
-              <Link to="/project-manager">Launch SuReSuite <ArrowRight className="ml-2 h-4 w-4" /></Link>
-            </Button>
+            {canOpenProjectManager && (
+              <Button asChild variant="outline" size="lg" className="rounded-sm bg-background/10 border-white/20 text-white hover:bg-background/20 transition-all duration-200 hover:scale-105">
+                <Link to="/project-manager">Launch SuReSuite <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              </Button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
@@ -496,16 +506,18 @@ const GettingStarted = ({ isCollapsed, setIsCollapsed }: GettingStartedProps) =>
             <p className="text-xl font-semibold text-white md:flex-1 md:mb-8">
               Ready to boost the resilience of your supply chain?
             </p>
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="rounded-sm bg-background/10 border-white/20 text-white hover:bg-background/20 shrink-0 whitespace-nowrap md:self-start md:ml-auto md:-mt-2"
-            >
-              <Link to="/project-manager">
-                Start now <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            {canOpenProjectManager && (
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="rounded-sm bg-background/10 border-white/20 text-white hover:bg-background/20 shrink-0 whitespace-nowrap md:self-start md:ml-auto md:-mt-2"
+              >
+                <Link to="/project-manager">
+                  Start now <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            )}
           </div>
         </DarkSection>
 

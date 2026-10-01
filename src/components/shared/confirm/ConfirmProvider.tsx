@@ -9,13 +9,14 @@
  */
 import * as React from 'react';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { lazyChunk } from '@/lib/lazyChunk';
 import { confirmBullets } from './confirmBullets';
 import { ConfirmContext, type ConfirmFn, type ConfirmRequest } from './useConfirm';
 
 // Lazy: the provider sits in App, so anything it imports statically lands in the
 // initial bundle (scripts/audit-bundle-size.mjs). The sheet pulls in the dialog
 // primitives and the mobile chrome, and only a phone that asks a question needs it.
-const ConfirmSheet = React.lazy(() => import('./ConfirmSheet').then((m) => ({ default: m.ConfirmSheet })));
+const ConfirmSheet = lazyChunk(() => import('./ConfirmSheet').then((m) => ({ default: m.ConfirmSheet })));
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();

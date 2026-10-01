@@ -25,7 +25,7 @@ import { useCompactChrome } from '@/hooks/useViewport';
 import { useGlobalProject } from '@/hooks/useGlobalProject';
 import { useProposals } from '@/hooks/useProposals';
 import { hasUnreadRaisedFlag } from './intelligence/mobile/viewedFlags';
-import { MOBILE_TAB_ROUTES } from './mobileRootRoutes';
+import { MOBILE_TAB_ROUTES, visibleTabs } from './mobileRootRoutes';
 
 /** Bottom-chrome geometry, in px, published so PageLayout reserves space FROM
  *  these rather than from a hand-summed literal. Change a height here and the
@@ -72,6 +72,10 @@ export function MobileTabBar({
 }) {
   const { pathname } = useLocation();
   const compact = useCompactChrome();
+  // Only the tabs this account may open (spec §4.2) — the sidebar's rule. The
+  // remaining tabs and More share the width.
+  const { canAccessPage } = useCapabilities();
+  const tabs = visibleTabs(TABS, canAccessPage);
   // The unprompted-flag surface's dot (SC Intelligences handoff): a raised
   // (thread-less) proposal that hasn't been opened yet, scoped to whichever
   // project the app has selected — the same scope the SC Intel root uses.
@@ -97,12 +101,15 @@ export function MobileTabBar({
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 items-stretch
+      className="fixed inset-x-0 bottom-0 z-50 grid items-stretch
                  border-t border-[#d4d4d4] bg-white md:hidden"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      style={{
+        gridTemplateColumns: `repeat(${tabs.length + 1}, minmax(0, 1fr))`,
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
       aria-label="Primary"
     >
-      {TABS.map(({ to, label, icon: Icon }) => {
+      {tabs.map(({ to, label, icon: Icon }) => {
         // D3-a: a root with no tab of its own (a network lens, Developer
         // API, Super Admin, …) shows this bar but matches none of the four
         // routes below — every item, More included, is simply inactive.

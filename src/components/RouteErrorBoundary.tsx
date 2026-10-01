@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { isChunkLoadError } from '@/lib/lazyChunk';
 
 interface FallbackProps {
   error: Error;
@@ -10,8 +11,35 @@ interface FallbackProps {
  * Full-page fallback shown when a route's component tree throws during render.
  * Kept intentionally dependency-light so it can render even when app-level
  * providers/hooks are the thing that failed.
+ *
+ * A page whose code could not be DOWNLOADED gets its own copy and one button.
+ * `lazyChunk` already reloaded the tab once for it (a deploy replaced the
+ * chunks this tab knew about); reaching here means that reload was spent in
+ * the last minute or the browser is offline, so "try again" in place cannot
+ * work — React.lazy remembers the failure — and a reload is the only move.
  */
-function RouteErrorFallback({ error, onReset }: FallbackProps) {
+export function RouteErrorFallback({ error, onReset }: FallbackProps) {
+  if (isChunkLoadError(error)) {
+    return (
+      <div className="min-h-dvh bg-background flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center space-y-4">
+          <h1 className="text-lg font-semibold text-foreground">This page could not be loaded</h1>
+          <p className="text-sm text-muted-foreground">
+            SuReSuite may have been updated since this tab opened, or the connection dropped.
+            Reload to continue.
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Reload
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-dvh bg-background flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center space-y-4">

@@ -1,5 +1,6 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
-import { Suspense, lazy, useEffect, useState, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useState, useMemo, useRef } from 'react';
+import { lazyChunk } from '@/lib/lazyChunk';
 import { Node, Edge } from '@xyflow/react';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +35,7 @@ import { NetworkDisruptionDialog } from '@/components/network/NetworkDisruptionD
 // mapbox-gl and its CSS are ~200 kB gzipped and only reachable from here and
 // /network/product-level — and then only once the user switches to map view.
 // Lazy keeps it out of this page's chunk entirely for anyone who never does.
-const MapView = lazy(() => import('@/components/MapView'));
+const MapView = lazyChunk(() => import('@/components/MapView'));
 import { FROZEN_CELL } from '@/components/shared';
 import { MobileGroup, MobilePageHeader, ProjectChip } from '@/components/mobile';
 import { RiskDataNotice } from '@/components/network/RiskDataNotice';
