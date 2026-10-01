@@ -5115,7 +5115,7 @@ async function d170DeleteStillFails() {
 // is the expected shape, not a finding); taken in the push AFTER the merge (D153)
 // they are the after-reading §16 owes. Every project, never one (D42).
 async function phase10Versions() {
-  section("Phase 10 · WP 10.2 / 10.1 — policy and graph versions by content, the stored graph state");
+  section("Phase 10 · WP 10.1–10.4 — versions by content, the stored graph state, Validated Models, engines and RunKeys, D248");
 
   report("(1) D241 — policy versions vs distinct contents, every project",
     await tryQ(`
@@ -5165,6 +5165,45 @@ async function phase10Versions() {
              count(dataset_version_id) as with_graph_version
         from public.analysis_runs group by 1, 2, 3 order by 1, 2, 3`),
     (rows) => { out("**(6) analysis runs by kind and level:**"); out(...table(rows)); });
+
+  report("(7) D243 — Validated Models: protocols, backfilled ones and their unknown keys",
+    await tryQ(`
+      select status,
+             count(*) as models,
+             count(protocol) as with_protocol,
+             count(*) filter (where protocol ? 'backfilled') as backfilled,
+             coalesce(sum(jsonb_array_length(protocol -> 'unknown')) filter (where protocol ? 'unknown'), 0)
+               as unknown_keys_total,
+             count(engine_id) as with_engine
+        from public.model_validations group by 1 order by 1`),
+    (rows) => { out("**(7) Validated Models (before the merge this errors: the columns deploy with it):**"); out(...table(rows)); });
+
+  report("(8) D245 — the engine registry and what the worker reported",
+    await tryQ(`select slug, status, version, code_version, reported_at from public.sim_engines order by slug`),
+    (rows) => { out("**(8) `sim_engines` (after the merge, scsim should carry the worker's build):**"); out(...table(rows)); });
+
+  report("(9) D245 — runs carrying the binding on the row",
+    await tryQ(`
+      select count(*) as runs,
+             count(engine_id) as with_engine,
+             count(run_key) as with_run_key,
+             count(*) filter (where exploratory) as exploratory,
+             count(*) filter (where protocol_overrides <> '{}'::jsonb) as with_overrides,
+             count(*) filter (where created_at > now() - interval '7 days') as last_7_days
+        from public.simulation_runs`),
+    (rows) => { out("**(9) run rows and their bindings (history has no RunKey by design):**"); out(...table(rows)); });
+
+  report("(10) D248 — internal SECURITY DEFINER helpers executable through the API (must be none after the merge)",
+    await tryQ(`
+      select p.oid::regprocedure::text as function,
+             has_function_privilege('anon', p.oid, 'EXECUTE') as anon,
+             has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated
+        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.prosecdef and p.proname like '\\_%'
+         and (has_function_privilege('anon', p.oid, 'EXECUTE')
+              or has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+       order by 1`),
+    (rows) => { out("**(10) D248 — `_`-prefixed SECURITY DEFINER functions the API roles can execute:**"); out(...table(rows)); });
 }
 
 async function main() {
