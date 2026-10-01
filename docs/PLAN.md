@@ -451,6 +451,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D263** | **Exports name the composite and no level (T4).** The Reproducibility Record binds `dataset.graph_hash` and the snapshot id; the Trust Report's freshness block carries the composite hash and version. Neither says which version of the simulation's inputs a run computed over, nor the product, process and firm versions a reader of a network figure would need — so a figure leaving the system cannot be matched to the level page it came from | `src/lib/trust/reproducibilityRecord.ts:197-213`; `supabase/functions/_shared/trustReport.ts:55-57` | **CLOSED ✅ WP 11.3** (`20261001000021`). The record binds `dataset.simulation_hash`, `dataset.simulation_version` and the product, process and firm versions, each REQUIRED for a run dispatched under RunKey v2 and recommended for history, which could not carry them (WP 10.4's pattern) — a v2 run that lost its simulation hash is not reproducible and says so (`reproducibilityRecord.test.ts`). The Trust Report carries each level's version in its verdict section and on its page, and says "not read" rather than "unsaved" when its caller could not read them (`trustReportSections.test.ts`); the panel and the agent's tool read the same state. The numbers come through `dataset_version_tuple`, one SECURITY DEFINER read the browser can reach, which `list_dataset_versions` now returns per snapshot (`rehearsal/670` §9, mutation red) |
 | **D264** | **The simulation's read set is authored twice and nothing compares the two.** The worker's datamap reads eight tables; the snapshot's `inputs` domain hashes eight tables under a comment saying they are "the tables a SIMULATION reads". The two lists agree today, by care: a table added to the engine's reads without the snapshot would leave every model, RunKey and staleness check blind to it — D11's shape exactly (the anchor once hashed the BOM table the run did not read). And the scope has no NAME the store can key on: `analysis_kinds.input_scope` and `current_level_hash` know `product`, `process`, `firm` and `all` | `sim-worker/sim_worker/datamap.py:278-306`; `supabase/migrations/20260917000009_topology_in_the_anchor.sql:101-219`; `supabase/migrations/20261001000007_graph_levels_compute_once.sql:565-576`; `supabase/migrations/20261001000007_graph_levels_compute_once.sql:781` | **CLOSED ✅ WP 11.2** (`20261001000020`). The scope is NAMED, not minted: `simulation` joins the scope vocabulary and ONE function, `_scope_hash_key`, maps it to `hash_inputs` for `current_level_hash`, `analysis_get_or_start` and the level state; it is registered as a fourth level. `simulationScopeParity.test.ts` PARSES both lists — `datamap.py`'s reads and the snapshot's `inputs` domain — and fails when either gains a table the other lacks (red both ways, by a datamap read added and by a later migration dropping `customers` from the domain); `rehearsal/670` §1 holds the hash to the domain's digest and every stored hash to a fresh rebuild, `level_spec` 1 |
 | **D265** | **Any holder of the public key could plant a graph snapshot — and from WP 11.1 a planted snapshot would mint level versions.** `dataset_versions` has carried `dataset_versions_insert_all` (`FOR INSERT … WITH CHECK (true)`) and an INSERT grant to `anon` and `authenticated` since it was created. WP 2.4 measured it and pinned it rather than change it, on the reasoning that the app runs as `anon`; but nothing inserts a snapshot directly — every writer is `snapshot_dataset` (SECURITY DEFINER) or the service role. A planted row carries whatever hash it states, so `snapshot_dataset`, which dedupes onto any row with the live composite, would hand its id to a run, a model or an analysis as the frozen world; and WP 11.1's registration trigger would mint level versions from it. Measured on a rehearsal base: the policy present, `has_table_privilege('anon', …, 'INSERT')` true | `supabase/migrations/20260703000001_dataset_versions.sql:54`; `supabase/migrations/20260703000001_dataset_versions.sql:62-63`; `src/lib/policies/__tests__/governanceEnforcement.test.ts:94` | **CLOSED ✅ WP 11.1** (`20261001000019`). The policy is dropped and INSERT revoked from both API roles; `rehearsal/660` §9 asserts neither role may insert and no INSERT policy names them — red with the drop removed. `governanceEnforcement.test.ts`'s pinned unconditional-write list shrinks from seven tables to six; reads stay open (D28's list) |
+| **D266** | **A wrong upload could not be replaced, and the deep tier could not be deleted at all short of deleting the project.** `bulk_insert_network_nodes` is a plain INSERT, so `network_nodes_natural_key` refuses every uid a second upload repeats; `bulk_insert_network_edges` has no key, so a second upload sits BESIDE the first. `delete_project_dataset` covered the lane sources and `multi_tier_supply_chain` only, and no surface called it — the page's "Delete all data" handler has no button. The only function that removed `network_nodes` or `network_edges` was `delete_project`. Reported by a project owner who had uploaded the wrong deep-tier network | `supabase/migrations/20261001000017_super_admin_acts_as_admin.sql:806`; `supabase/migrations/20261001000017_super_admin_acts_as_admin.sql:589`; `supabase/migrations/20261001000017_super_admin_acts_as_admin.sql:668`; `src/pages/DataManager.tsx:696` | **CLOSED ✅ (`20261001000024`).** `delete_project_dataset` gains `network_nodes`, `network_edges`, `network_summary`, `deep_tier` and `node_list_uploads` (which clears the four columns `upload_node_list_data` writes and keeps the derived rows); the preamble, the signature and `'all'` are unchanged. The project data viewer has a trash button on each tab, gated on "Edit Input Data" (the browser's copy of the same owner-or-admin rule), with what each tab sends authored once in `src/lib/projects/datasetDeletion.ts`. `rehearsal/690` proves each branch, project isolation, both refusals and the audit actor — red with the migration removed; `datasetDeletion.test.ts` fails if a tab sends a name the live function has no branch for |
 
 ### 4.1 Code map — the data layer
 
@@ -21821,6 +21822,50 @@ things remain, and none is a branch's to take:
 - **RunKey v2 in production.** It is unexercised until someone dispatches a simulation (probe 4).
 - **A product-scope analysis.** No product-scope run exists yet, so D261's product half is proven
   only by rehearsal (probe 5).
+
+### Data manager · one dataset at a time · 2026-10-01 · `20261001000024`
+
+**Asked for.** A project owner uploaded the wrong deep-tier network and asked how to delete it so
+the corrected one could be uploaded. There was no way short of deleting the project (D266). The
+owner chose, from a mock: a trash button on each tab of the project data viewer, covering BOM,
+inbound, outbound, the three deep-tier tables and the node list's uploaded fields; item masters
+out of scope; no "replace" mode in the upload wizard.
+
+**What was found before writing.**
+
+- **No foreign key joins `network_edges` to `network_nodes`** (`build/schema.introspected.json`),
+  so deleting nodes alone cannot fail. The confirmation says that the edges stay, rather than the
+  server refusing.
+- **`network_summary` is not orphaned by a project delete.** It looked that way from
+  `delete_project`'s body, which never names it, but `network_summary_project_fk` cascades
+  (`20260919000005`).
+- **Nothing downstream needed code.** The lane sources' statement triggers rebuild
+  `supply_chain_data` and then `node_list`; `graph_state_touch_del` moves the stored hashes, so
+  earlier analyses read as stale; every table carries its `audit_*_delete` trigger.
+
+**What changed.** `20261001000024` is `20261001000017`'s live `delete_project_dataset` with five new
+branches. Its preamble, signature and `'all'` are untouched, because two seed scripts call `'all'`
+and expect exactly the lane sources gone. `node_list_uploads` CLEARS rather than deletes: the rows
+are `node_list_discover`'s, derived from the lanes, so deleting them would only bring them back
+without anything the user had uploaded. The viewer's button reads its target, wording and count
+from `src/lib/projects/datasetDeletion.ts`, so the dataset names live in one place in the browser.
+
+**Gate results.** `contract:check` green, with its two standing warnings (R10, R13). `npm test`
+1534 of 1534, including `datasetDeletion.test.ts` (15). `contract:rehearse` plain, `--fixtures`
+and `--since HEAD` green, and `690` is red with the migration removed (`invalid_dataset` at §1).
+`npm run lint`: typecheck 15 of 15, `audit:ui` and `check:docs` pass. eslint is red repo-wide as
+before; `ProjectDataViewer.tsx` carries the same 15 problems it had at the base, and the two new
+files carry none. One sidecar line moved: `network_summary`'s surface evidence follows
+`get_deep_tier_datasets` from `:110` to `:126` (R12).
+
+**Gap check.**
+
+- **The migration deploys on merge**, so the button refuses with `invalid_dataset` on the deep-tier
+  and node-list tabs until then. Lane tabs work at once, because their branches already exist.
+- **"Delete all data" still has no button** (line ~19000's note stands). It was offered and not
+  taken.
+- **A deep-tier upload is still append-only.** Replacing a network is delete-then-upload, two
+  actions. A replace mode would be the upload wizard's, and was declined.
 
 ## 17. Sequencing
 

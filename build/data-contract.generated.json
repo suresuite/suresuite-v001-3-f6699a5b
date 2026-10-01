@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 387,
-      "migrations_applied": 379,
-      "last_migration": "20261001000023_drop_network_topology_hash.sql"
+      "migrations_found": 388,
+      "migrations_applied": 380,
+      "last_migration": "20261001000024_delete_project_dataset_per_dataset.sql"
     },
     "sidecars": 75,
     "registry": {
@@ -19692,7 +19692,7 @@
           "page": "DataManager.tsx",
           "via": "rpc get_deep_tier_datasets",
           "grain": "table",
-          "evidence": "src/components/ProjectDataViewer.tsx:110",
+          "evidence": "src/components/ProjectDataViewer.tsx:126",
           "confirmed": true
         },
         {
@@ -42746,5 +42746,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "278f5355176f"
+  "contract_version": "4a6b5c7ea5b5"
 }
