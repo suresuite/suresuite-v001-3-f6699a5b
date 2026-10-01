@@ -240,11 +240,19 @@ export function adoptionDecision(input: {
  *  Lab. Newer data or policy never mutates a model; it makes it stale. */
 export function driftReasons(drift: string[]): string[] {
   return [
-    drift.includes("data") ? "a newer graph exists" : null,
+    // WP 11.2 · §4 D259 — `data` is the simulation's INPUTS (the scope the engine
+    // reads); a deep-tier change is a note, never this.
+    drift.includes("data") ? "the simulation's inputs changed" : null,
     drift.includes("policy") ? "a newer policy exists" : null,
     drift.includes("scenario") ? "the scenario's world changed" : null,
     drift.includes("engine") ? "the engine changed" : null,
   ].filter((x): x is string => x !== null);
+}
+
+/** WP 11.3 — what a credibility's informational notes SAY. Never a reason to
+ *  re-validate: `network` is a change the simulation does not read. */
+export function noteReasons(notes: string[] | undefined): string[] {
+  return (notes ?? []).map((n) => (n === "network" ? "the deep tier changed — not read by the simulation" : n));
 }
 
 /** What the Lab says about the model a `?model=` link opened: its name and
@@ -257,7 +265,7 @@ export function openedModelLine(
     status: "active" | "superseded" | "revoked";
     protocol?: Partial<ValidatedModelProtocol> | null;
   },
-  credibility: { state: "validated" | "stale" | "unvalidated"; drift?: string[] },
+  credibility: { state: "validated" | "stale" | "unvalidated"; drift?: string[]; notes?: string[] },
 ): string {
   const head = `${card.name ?? "Validated model"}${card.version_no != null ? ` v${card.version_no}` : ""}`;
   const proto = card.protocol
@@ -274,7 +282,10 @@ export function openedModelLine(
     state = `${driftReasons(credibility.drift ?? []).join(" · ") || "stale"} → re-validate`;
   } else if (credibility.state === "unvalidated") {
     state = "not matched to the live policy, graph and scenario";
-  } else state = "in force";
+  } else {
+    const notes = noteReasons(credibility.notes);
+    state = notes.length ? `in force (${notes.join("; ")})` : "in force";
+  }
   return `Model ${head} · ${proto} · ${state}`;
 }
 
@@ -290,8 +301,11 @@ export interface SummaryLine {
 }
 
 export interface VersionRefs {
+  /** The snapshot's own number (`dataset_versions.version_no`) — "snapshot v9". */
   graphVersionNo: number | null;
   policyVersionNo: number | null;
+  /** WP 11.3 — the simulation scope's level version, "simulation inputs v4". */
+  simulationVersionNo?: number | null;
 }
 
 export const shortHash = (h: string | null | undefined) => (h ? h.slice(0, 7) : null);
@@ -320,11 +334,23 @@ export function validatedModelLines(card: ModelValidationCard, refs: VersionRefs
   };
 
   const lines: SummaryLine[] = [
+    // WP 11.3 · §4 D259 — what the model BINDS first: the simulation's inputs, the
+    // scope the engine reads. The snapshot it was validated on is kept, second.
     {
-      label: "Graph",
+      label: "Simulation inputs",
+      value: card.hash_simulation
+        ? refs.simulationVersionNo != null
+          ? `Simulation inputs v${refs.simulationVersionNo} · ${short(card.hash_simulation)}`
+          : `${short(card.hash_simulation)} (version number not loaded)`
+        : null,
+      source: "model_validations.simulation_version_id → graph_level_versions.version_no · hash_simulation",
+      reason: "not recorded — the model has no snapshot to read its simulation inputs from, so it is matched on its snapshot",
+    },
+    {
+      label: "Snapshot",
       value:
         refs.graphVersionNo != null
-          ? `Graph v${refs.graphVersionNo} · ${short(card.graph_hash)}`
+          ? `Snapshot v${refs.graphVersionNo} · ${short(card.graph_hash)}`
           : card.graph_hash
             ? `${short(card.graph_hash)} (version number not loaded)`
             : null,

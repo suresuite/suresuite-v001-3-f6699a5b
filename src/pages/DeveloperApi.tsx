@@ -60,6 +60,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { FROZEN_CELL, FROZEN_CELL_ON_TINT } from '@/components/shared';
+import { tupleNumbers, tupleText } from '@/lib/trust/graphLevels';
 
 interface Props {
   isCollapsed: boolean;
@@ -115,7 +116,16 @@ interface NbDatasetVersion {
   label: string | null;
   graph_hash: string | null;
   created_at: string;
+  /** WP 11.3 — the snapshot's own number and its level-version tuple. */
+  version_no?: number | null;
+  tuple?: unknown;
 }
+
+/** "v9 · P3 · R2 · F5 · S4" — a snapshot is its level versions (WP 11.3, §4 D258). */
+const snapshotTuple = (v: NbDatasetVersion) => {
+  const t = tupleNumbers(v.tuple);
+  return `${v.version_no != null ? `v${v.version_no}` : 'v?'} · ${tupleText(t)}`;
+};
 
 const db = supabase as any;
 const SUPABASE_URL: string =
@@ -1058,7 +1068,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
                   key={v.id}
                   chevron={false}
                   label={v.label ?? 'unlabelled'}
-                  sub={`${v.id} · graph ${(v.graph_hash ?? '').slice(0, 12)}… · ${new Date(v.created_at).toLocaleDateString()}`}
+                  sub={`${snapshotTuple(v)} · ${v.id} · graph ${(v.graph_hash ?? '').slice(0, 12)}… · ${new Date(v.created_at).toLocaleDateString()}`}
                 />
               ))
             )}
@@ -1516,6 +1526,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
                               <thead>
                                 <tr>
                                   <th className={TH}>Label</th>
+                                  <th className={TH} title="The snapshot's number and its level versions: Product · pRocess · Firm · Simulation inputs">Version</th>
                                   <th className={TH}>ID</th>
                                   <th className={TH}>policy_hash</th>
                                   <th className={TH}>Runs</th>
@@ -1526,6 +1537,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
                                 {nbPolicyVersions.slice(0, 8).map((v) => (
                                   <tr key={v.id} className="hover:bg-[#fcfcfc]">
                                     <td className={`${TD} text-xs font-medium`}>{v.label ?? 'unlabelled'}</td>
+                                    <td className={`${TD} whitespace-nowrap font-mono text-[11px]`}>{snapshotTuple(v)}</td>
                                     <td className={TD}><IdCell value={v.id} /></td>
                                     <td className={`${TD} font-mono text-[11px] text-muted-foreground`}>{(v.policy_hash ?? '').slice(0, 12)}…</td>
                                     <td className={`${TD} text-xs`}>{v.run_count}</td>

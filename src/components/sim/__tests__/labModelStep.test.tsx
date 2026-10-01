@@ -89,7 +89,14 @@ describe("the exploratory path is an editor's, and it is badged", () => {
 describe("staleness and the run-the-model action", () => {
   it("a stale model says re-validate", () => {
     const t = text(html(base({ credibility: { state: "stale", card: model(), drift: ["data"] } })));
-    expect(t).toContain("a newer graph exists → re-validate");
+    // WP 11.2 — `data` drift is the simulation's INPUTS, which is what it now says.
+    expect(t).toContain("the simulation's inputs changed → re-validate");
+  });
+  it("a deep-tier change is a note beside 'in force', never 're-validate' (WP 11.3)", () => {
+    const t = text(html(base({ credibility: { state: "validated", card: model(), notes: ["network"] } })));
+    expect(t).toContain("in force");
+    expect(t).toContain("the deep tier changed — not read by the simulation");
+    expect(t).not.toContain("re-validate");
   });
   it("Run this model is offered on the baseline, and disabled with its reason", () => {
     const ok = html(base({ onRunModel: () => {} }));

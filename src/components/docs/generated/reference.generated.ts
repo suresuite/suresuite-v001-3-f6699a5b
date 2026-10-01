@@ -1044,7 +1044,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DeveloperApi.tsx",
         "via": "rpc list_api_keys",
-        "evidence": "src/pages/DeveloperApi.tsx:261"
+        "evidence": "src/pages/DeveloperApi.tsx:271"
       },
       {
         "page": "Profile.tsx",
@@ -3154,7 +3154,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DeveloperApi.tsx",
         "via": "rpc list_dataset_versions",
-        "evidence": "src/pages/DeveloperApi.tsx:311"
+        "evidence": "src/pages/DeveloperApi.tsx:321"
       },
       {
         "page": "ProductLevelNetwork.tsx",
@@ -7518,7 +7518,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "SimulationLab.tsx",
         "via": "table read",
-        "evidence": "src/components/trust/TrustReportPanel.tsx:41"
+        "evidence": "src/components/trust/TrustReportPanel.tsx:44"
       }
     ],
     "governance": {
@@ -14216,7 +14216,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DeveloperApi.tsx",
         "via": "rpc list_api_keys",
-        "evidence": "src/pages/DeveloperApi.tsx:261"
+        "evidence": "src/pages/DeveloperApi.tsx:271"
       }
     ],
     "governance": {
@@ -18676,7 +18676,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "DeveloperApi.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/DeveloperApi.tsx:263"
+        "evidence": "src/pages/DeveloperApi.tsx:273"
       },
       {
         "page": "FirmLevelNetwork.tsx",
@@ -20195,17 +20195,17 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProjectPolicies.tsx",
         "via": "hook useSimulationRun → select * from run_replications",
-        "evidence": "src/hooks/useSimulationRun.tsx:110"
+        "evidence": "src/hooks/useSimulationRun.tsx:115"
       },
       {
         "page": "SimulationLab.tsx",
         "via": "hook useSimulationRun::loadReps → select * from run_replications",
-        "evidence": "src/hooks/useSimulationRun.tsx:225"
+        "evidence": "src/hooks/useSimulationRun.tsx:230"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "useVerifiableExports → select * from run_replications",
-        "evidence": "src/hooks/useVerifiableExports.tsx:245"
+        "evidence": "src/hooks/useVerifiableExports.tsx:246"
       }
     ],
     "governance": {
@@ -24314,12 +24314,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "SimulationLab.tsx",
         "via": "hook useSimulationRun → select * from simulation_runs",
-        "evidence": "src/hooks/useSimulationRun.tsx:100"
+        "evidence": "src/hooks/useSimulationRun.tsx:105"
       },
       {
         "page": "ProjectPolicies.tsx",
         "via": "useVerifiableExports → select * from simulation_runs",
-        "evidence": "src/hooks/useVerifiableExports.tsx:234"
+        "evidence": "src/hooks/useVerifiableExports.tsx:235"
       }
     ],
     "governance": {

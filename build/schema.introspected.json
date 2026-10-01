@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 384,
-  "migrations_applied": 376,
+  "migrations_found": 385,
+  "migrations_applied": 377,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000020_simulation_scope.sql",
+  "last_migration": "20261001000021_level_version_reads.sql",
   "counts": {
     "tables": 92,
     "views": 8,
     "enums": 4,
-    "functions": 393,
+    "functions": 394,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -26345,6 +26345,18 @@
       "defined_by": "20260612000001_policy_version_snapshots.sql"
     },
     {
+      "name": "dataset_version_tuple",
+      "signature": "dataset_version_tuple(uuid)",
+      "args": [
+        "p_dataset_version_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261001000021_level_version_reads.sql"
+    },
+    {
       "name": "dataset_versions_assign_number",
       "signature": "dataset_versions_assign_number()",
       "args": [],
@@ -27675,11 +27687,11 @@
       "args": [
         "p_project_id uuid"
       ],
-      "returns": "TABLE ( id uuid, label text, graph_hash text, author_email text, created_at timestamptz )",
+      "returns": "TABLE ( id uuid, label text, graph_hash text, author_email text, created_at timestamptz, version_no integer, tuple jsonb )",
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260703000001_dataset_versions.sql"
+      "defined_by": "20261001000021_level_version_reads.sql"
     },
     {
       "name": "list_model_validations",

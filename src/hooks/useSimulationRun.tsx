@@ -52,6 +52,11 @@ export interface SimulationRun {
   series_expires_at?: string | null;
   /** When the sweep removed the series; the KPIs and aggregates are kept. */
   series_expired_at?: string | null;
+  // ── WP 11.2 · §4 D260 — what the engine READ (`20261001000020`) ──
+  /** The simulation scope's hash — the run snapshot's `inputs` domain; RunKey v2 hashes it. */
+  hash_simulation?: string | null;
+  /** That scope's level version (`graph_level_versions`). */
+  simulation_version_id?: string | null;
   // ── WP 10.4 · §4 D245 — the binding on the row (`20261001000009`) ──
   /** The registered engine the run was dispatched to (`sim_engines.id`). */
   engine_id?: string | null;

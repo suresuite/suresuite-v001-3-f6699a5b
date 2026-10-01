@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 384,
-      "migrations_applied": 376,
-      "last_migration": "20261001000020_simulation_scope.sql"
+      "migrations_found": 385,
+      "migrations_applied": 377,
+      "last_migration": "20261001000021_level_version_reads.sql"
     },
     "sidecars": 75,
     "registry": {
@@ -1520,7 +1520,7 @@
           "page": "DeveloperApi.tsx",
           "via": "rpc list_api_keys",
           "grain": "table",
-          "evidence": "src/pages/DeveloperApi.tsx:261",
+          "evidence": "src/pages/DeveloperApi.tsx:271",
           "confirmed": true
         },
         {
@@ -5047,7 +5047,7 @@
           "page": "DeveloperApi.tsx",
           "via": "rpc list_dataset_versions",
           "grain": "table",
-          "evidence": "src/pages/DeveloperApi.tsx:311",
+          "evidence": "src/pages/DeveloperApi.tsx:321",
           "confirmed": true
         },
         {
@@ -5170,7 +5170,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:145",
+              "evidence": "src/hooks/useVerifiableExports.tsx:146",
               "confirmed": true
             }
           ],
@@ -5249,7 +5249,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:145",
+              "evidence": "src/hooks/useVerifiableExports.tsx:146",
               "confirmed": true
             }
           ],
@@ -5289,7 +5289,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:145",
+              "evidence": "src/hooks/useVerifiableExports.tsx:146",
               "confirmed": true
             }
           ],
@@ -5329,7 +5329,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:145",
+              "evidence": "src/hooks/useVerifiableExports.tsx:146",
               "confirmed": true
             }
           ],
@@ -5433,7 +5433,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:145",
+              "evidence": "src/hooks/useVerifiableExports.tsx:146",
               "confirmed": true
             }
           ],
@@ -5473,7 +5473,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:145",
+              "evidence": "src/hooks/useVerifiableExports.tsx:146",
               "confirmed": true
             }
           ],
@@ -5513,7 +5513,7 @@
               "page": "ProjectPolicies.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/hooks/useVerifiableExports.tsx:145",
+              "evidence": "src/hooks/useVerifiableExports.tsx:146",
               "confirmed": true
             }
           ],
@@ -11742,7 +11742,7 @@
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/components/trust/TrustReportPanel.tsx:41",
+          "evidence": "src/components/trust/TrustReportPanel.tsx:44",
           "confirmed": true
         }
       ],
@@ -11887,7 +11887,7 @@
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/trust/TrustReportPanel.tsx:41",
+              "evidence": "src/components/trust/TrustReportPanel.tsx:44",
               "confirmed": true
             }
           ],
@@ -12062,7 +12062,7 @@
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/trust/TrustReportPanel.tsx:41",
+              "evidence": "src/components/trust/TrustReportPanel.tsx:44",
               "confirmed": true
             }
           ],
@@ -12390,7 +12390,7 @@
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/trust/TrustReportPanel.tsx:41",
+              "evidence": "src/components/trust/TrustReportPanel.tsx:44",
               "confirmed": true
             }
           ],
@@ -12430,7 +12430,7 @@
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/trust/TrustReportPanel.tsx:41",
+              "evidence": "src/components/trust/TrustReportPanel.tsx:44",
               "confirmed": true
             }
           ],
@@ -12573,7 +12573,7 @@
               "page": "SimulationLab.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/components/trust/TrustReportPanel.tsx:41",
+              "evidence": "src/components/trust/TrustReportPanel.tsx:44",
               "confirmed": true
             }
           ],
@@ -21720,7 +21720,7 @@
           "page": "DeveloperApi.tsx",
           "via": "rpc list_api_keys",
           "grain": "table",
-          "evidence": "src/pages/DeveloperApi.tsx:261",
+          "evidence": "src/pages/DeveloperApi.tsx:271",
           "confirmed": true
         }
       ],
@@ -25398,7 +25398,7 @@
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "column",
-          "evidence": "src/hooks/useVerifiableExports.tsx:242",
+          "evidence": "src/hooks/useVerifiableExports.tsx:243",
           "confirmed": true
         }
       ],
@@ -28640,7 +28640,7 @@
           "page": "DeveloperApi.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/DeveloperApi.tsx:263",
+          "evidence": "src/pages/DeveloperApi.tsx:273",
           "confirmed": true
         },
         {
@@ -31069,7 +31069,7 @@
           "page": "ProjectPolicies.tsx",
           "via": "hook useSimulationRun → select * from run_replications",
           "grain": "table",
-          "evidence": "src/hooks/useSimulationRun.tsx:110",
+          "evidence": "src/hooks/useSimulationRun.tsx:115",
           "confirmed": true,
           "note": "Both result surfaces reach this table through the SAME hook, so the evidence is the hook's read rather than either page's render. Run & Validate reads every replication of the newest run: the weekly series charts, the financial statement, the per-seed explorer and the inventory chart all render from these rows."
         },
@@ -31077,14 +31077,14 @@
           "page": "SimulationLab.tsx",
           "via": "hook useSimulationRun::loadReps → select * from run_replications",
           "grain": "table",
-          "evidence": "src/hooks/useSimulationRun.tsx:225",
+          "evidence": "src/hooks/useSimulationRun.tsx:230",
           "confirmed": true
         },
         {
           "page": "ProjectPolicies.tsx",
           "via": "useVerifiableExports → select * from run_replications",
           "grain": "table",
-          "evidence": "src/hooks/useVerifiableExports.tsx:245",
+          "evidence": "src/hooks/useVerifiableExports.tsx:246",
           "confirmed": true,
           "note": "The run-results workbook. This is the path by which a replication row leaves the system, so it is the one A5's Reproducibility Record has to bind (`result-binding`, still owed — WP 10.4, which absorbed WP 9.2)."
         }
@@ -32815,7 +32815,7 @@
           "page": "SimulationLab.tsx",
           "via": "table read",
           "grain": "column",
-          "evidence": "src/hooks/useVerifiableExports.tsx:240",
+          "evidence": "src/hooks/useVerifiableExports.tsx:241",
           "confirmed": true
         }
       ],
@@ -37177,14 +37177,14 @@
           "page": "SimulationLab.tsx",
           "via": "hook useSimulationRun → select * from simulation_runs",
           "grain": "table",
-          "evidence": "src/hooks/useSimulationRun.tsx:100",
+          "evidence": "src/hooks/useSimulationRun.tsx:105",
           "confirmed": true
         },
         {
           "page": "ProjectPolicies.tsx",
           "via": "useVerifiableExports → select * from simulation_runs",
           "grain": "table",
-          "evidence": "src/hooks/useVerifiableExports.tsx:234",
+          "evidence": "src/hooks/useVerifiableExports.tsx:235",
           "confirmed": true,
           "note": "The run-results workbook, whose reproducibility sheet binds the run from this row (WP 10.4)."
         }
@@ -42746,5 +42746,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "6a9e481d0649"
+  "contract_version": "470ed071bc82"
 }

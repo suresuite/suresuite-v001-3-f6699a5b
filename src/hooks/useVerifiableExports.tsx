@@ -25,6 +25,7 @@ import {
 import { knownLimits, type FreshnessPayload } from "@/lib/trust/trustReport";
 import { analysesAtRun, exportTrustInput, ingestHistoryFrom } from "@/lib/trust/exportTrustInputs";
 import { resolveRunScenarioBinding, scheduleDigest } from "@/lib/trust/runScenarioBinding";
+import { tupleNumbers } from "@/lib/trust/graphLevels";
 import { seriesNotice, withRunSeries } from "@/lib/sim/runSeries";
 import { INGEST_DATASETS } from "../../supabase/functions/_shared/ingestSpec.generated";
 
@@ -278,6 +279,12 @@ export function useVerifiableExports(
           .select("id,graph_hash,schema_version")
           .eq("id", runRow.dataset_version_id ?? "00000000-0000-0000-0000-000000000000")
           .maybeSingle();
+        // WP 11.3 · §4 D263 — the snapshot's tuple: its product, process, firm and
+        // simulation-inputs versions, through the one read the browser can reach.
+        const { data: tupleRaw } = runRow.dataset_version_id
+          ? await sb.rpc("dataset_version_tuple", { p_dataset_version_id: runRow.dataset_version_id })
+          : { data: null };
+        const tuple = tupleNumbers(tupleRaw);
         const { data: analysisRows } = await sb
           .from("analysis_runs")
           .select("id,analysis_kind,code_version,input_hash,params_hash,finished_at,status")
@@ -348,6 +355,11 @@ export function useVerifiableExports(
           runKey: (run as SimulationRun).run_key ?? null,
           protocolOverrides: (run as SimulationRun).protocol_overrides,
           exploratory: (run as SimulationRun).exploratory ?? null,
+          // WP 11.3 — which LEVEL the figure came from, read from the run and its snapshot.
+          simulationHash: (run as SimulationRun).hash_simulation ?? null,
+          simulationVersionNo: (run as SimulationRun).simulation_version_id ? tuple.simulation ?? null : null,
+          levelVersions: { product: tuple.product ?? null, process: tuple.process ?? null, firm: tuple.firm ?? null },
+          runKeyVersion: Number((run as SimulationRun).run_spec?.run_key_version ?? 0) || null,
           browserEngineVersion,
           analyses: analysesBound,
           // The Trust Report's own computation over the Trust Report's own inputs

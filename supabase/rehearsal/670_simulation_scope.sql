@@ -17,6 +17,7 @@
 -- §7  a card that could not learn its simulation hash still matches on the composite,
 --     and the immutability trigger lets a model learn only its own snapshot's hash.
 -- §8  the run row binds the simulation hash and version; RunKey is v2.
+-- §9  (WP 11.3) the snapshot's tuple, through the one read the browser can reach.
 
 DO $g670$
 DECLARE
@@ -305,6 +306,23 @@ BEGIN
   IF (SELECT graph_hash FROM public.simulation_runs WHERE id = v_run1)
        IS DISTINCT FROM (SELECT graph_hash FROM public.dataset_versions WHERE id = v_ds1) THEN
     RAISE EXCEPTION 'R670 §8: the composite left the run row';
+  END IF;
+
+  -- ══ §9 · the tuple a person reads (WP 11.3) ══
+  -- `dataset_version_tuple` is the one read the browser can reach (the level table's
+  -- own policy refuses an unidentified `anon`); the version list carries the same.
+  v_h := public.dataset_version_tuple(v_ds1);
+  IF (v_h #>> '{simulation,version_no}')::int IS DISTINCT FROM 1
+     OR (v_h #>> '{simulation,hash}') IS DISTINCT FROM (SELECT hash_inputs FROM public.dataset_versions WHERE id = v_ds1)
+     OR (v_h ->> 'version_no')::int IS DISTINCT FROM (SELECT version_no FROM public.dataset_versions WHERE id = v_ds1)
+     OR (v_h #>> '{firm,version_no}') IS NULL THEN
+    RAISE EXCEPTION 'R670 §9: the tuple of the first snapshot is wrong: %', v_h;
+  END IF;
+  IF (SELECT l.tuple FROM public.list_dataset_versions(v_proj) l WHERE l.id = v_ds1) IS DISTINCT FROM v_h THEN
+    RAISE EXCEPTION 'R670 §9: the version list and the tuple read disagree';
+  END IF;
+  IF NOT has_function_privilege('anon', 'public.dataset_version_tuple(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'R670 §9: the browser cannot read the tuple';
   END IF;
 
   RAISE NOTICE 'R670: the simulation scope is named and bound — a deep-tier edit keeps the model and the key; an input edit moves both';

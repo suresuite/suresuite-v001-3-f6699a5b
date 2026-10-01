@@ -13,7 +13,7 @@ import type { Credibility, ModelValidationCard } from "@/hooks/useModelValidatio
 import type { SimEngine } from "@/hooks/useSimEngines";
 import { useVersionRefs } from "@/hooks/useModelVersionRefs";
 import { modelOptionLabel, type Deviation } from "@/lib/sim/labModel";
-import { driftReasons, protocolLine } from "@/lib/sim/validatedModel";
+import { driftReasons, noteReasons, protocolLine } from "@/lib/sim/validatedModel";
 
 const SELECT =
   "h-7 min-h-11 w-full min-w-0 rounded-sm border border-[#d4d4d8] bg-white px-2 text-[12.5px] text-[#18181b] " +
@@ -54,18 +54,30 @@ function ChosenFacts({ card, credibility }: { card: ModelValidationCard; credibi
           ? `${driftReasons(credibility.drift).join(" · ") || "stale"} → re-validate`
           : credibility?.state === "validated"
             ? "in force"
-            : "not matched to the live policy, graph and scenario";
+            : "not matched to the live policy, simulation inputs and scenario";
+  // WP 11.3 — shown, never a reason to re-validate (the simulation does not read it).
+  const notes = credibility && credibility.state !== "unvalidated" ? noteReasons(credibility.notes) : [];
   const stale = card.status !== "active" || credibility?.state === "stale";
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-[#52525b]" data-testid="model-facts">
-      <span title="model_validations.dataset_version_id → dataset_versions.version_no">
-        graph {refs.graphVersionNo != null ? `v${refs.graphVersionNo}` : card.graph_hash.slice(0, 7)}
+      {/* WP 11.3 · §4 D259 — what the model binds: the simulation's inputs; the
+          snapshot it was validated on is secondary. */}
+      <span title="model_validations.simulation_version_id → graph_level_versions.version_no · hash_simulation">
+        {card.hash_simulation
+          ? `simulation inputs ${refs.simulationVersionNo != null ? `v${refs.simulationVersionNo}` : card.hash_simulation.slice(0, 7)}`
+          : "simulation inputs not recorded"}
+      </span>
+      <span title="model_validations.dataset_version_id → dataset_versions.version_no" className="text-[#71717a]">
+        snapshot {refs.graphVersionNo != null ? `v${refs.graphVersionNo}` : card.graph_hash.slice(0, 7)}
       </span>
       <span title="model_validations.policy_version_id → policy_versions.version_no">
         policy {refs.policyVersionNo != null ? `v${refs.policyVersionNo}` : card.policy_hash.slice(0, 7)}
       </span>
       <span title="model_validations.validated_at">validated {new Date(card.validated_at).toLocaleDateString()}</span>
       <span style={{ color: stale ? LAYER.firm : LAYER.process }}>{status}</span>
+      {notes.length > 0 ? (
+        <span className="text-[#71717a]" data-testid="model-notes">{notes.join(" · ")}</span>
+      ) : null}
     </div>
   );
 }

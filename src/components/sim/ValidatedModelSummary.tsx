@@ -15,6 +15,7 @@ import { useVersionRefs } from "@/hooks/useModelVersionRefs";
 import {
   modelDeepLink,
   shortHash,
+  noteReasons,
   staleMessage,
   validatedModelLines,
 } from "@/lib/sim/validatedModel";
@@ -31,6 +32,8 @@ export function ValidatedModelSummary({
   const refs = useVersionRefs(card);
   const lines = validatedModelLines(card, refs);
   const stale = staleMessage(credibility);
+  // WP 11.3 — a deep-tier change the simulation does not read: said, never "stale".
+  const notes = credibility.state !== "unvalidated" ? noteReasons(credibility.notes) : [];
   return (
     <div className={cn(SURFACE, "flex flex-col")} data-testid="validated-model-summary">
       <div className="flex flex-wrap items-center gap-2 border-b border-[--hair-border] bg-[#fafafa] px-2.5 py-1.5">
@@ -52,6 +55,11 @@ export function ValidatedModelSummary({
       {stale && (
         <div className="border-b border-[--hair-border] px-2.5 py-1.5 font-mono text-[11px]" role="status">
           {stale}
+        </div>
+      )}
+      {notes.length > 0 && (
+        <div className="border-b border-[--hair-border] px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground" data-testid="model-notes">
+          {notes.join(" · ")} — the model stays as validated
         </div>
       )}
       <table className="w-full">

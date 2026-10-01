@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/sim/planningTime";
+import { noteReasons } from "@/lib/sim/validatedModel";
 import type {
   Credibility,
   DriftComponent,
@@ -39,7 +40,8 @@ const STATE_META = {
 
 const DRIFT_LABEL: Record<DriftComponent, string> = {
   policy: "policy settings changed since validation",
-  data: "network data changed since validation (graph hash drifted)",
+  // WP 11.2 · §4 D259 — the inputs the ENGINE reads; a deep-tier change is a note below.
+  data: "the simulation's inputs changed since validation (the data the engine reads)",
   scenario: "baseline scenario changed since validation",
   engine: "engine version differs from the validation evidence run",
 };
@@ -71,8 +73,9 @@ function CardFacts({ card }: { card: ModelValidationCard }) {
         )}
       </div>
       <div className="font-mono text-[10px] opacity-70">
-        policy {card.policy_hash.slice(0, 8)} · graph {card.graph_hash.slice(0, 8)} ·
-        scenario {card.scenario_hash.slice(0, 8)}
+        policy {card.policy_hash.slice(0, 8)} ·{" "}
+        {card.hash_simulation ? <>inputs {card.hash_simulation.slice(0, 8)} · </> : null}
+        snapshot {card.graph_hash.slice(0, 8)} · scenario {card.scenario_hash.slice(0, 8)}
       </div>
     </div>
   );
@@ -113,6 +116,11 @@ export function CredibilityBadge({
                 <div className="border-t pt-1.5 text-amber-700 dark:text-amber-300">
                   ⚠ {credibility.drift.map((d) => DRIFT_LABEL[d]).join("; ")}.
                   Re-validate to trust results.
+                </div>
+              )}
+              {credibility.notes && credibility.notes.length > 0 && (
+                <div className="border-t pt-1.5 text-muted-foreground">
+                  {noteReasons(credibility.notes).join("; ")} — the model stays as validated.
                 </div>
               )}
             </div>

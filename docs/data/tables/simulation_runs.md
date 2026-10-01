@@ -69,8 +69,8 @@ partially or get corrected — the write fails.
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `SimulationLab.tsx` | hook useSimulationRun → select * from simulation_runs | `src/hooks/useSimulationRun.tsx:100` | yes |
-| `ProjectPolicies.tsx` | useVerifiableExports → select * from simulation_runs | `src/hooks/useVerifiableExports.tsx:234` | yes |
+| `SimulationLab.tsx` | hook useSimulationRun → select * from simulation_runs | `src/hooks/useSimulationRun.tsx:105` | yes |
+| `ProjectPolicies.tsx` | useVerifiableExports → select * from simulation_runs | `src/hooks/useVerifiableExports.tsx:235` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -676,6 +676,6 @@ The simulation scope's level version the run computed over ("simulation inputs v
 
 ---
 
-*Generated from data contract `6a9e481d0649`, engine `0.2.8`,
+*Generated from data contract `470ed071bc82`, engine `0.2.8`,
 sidecar `supabase/contract/simulation_runs.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

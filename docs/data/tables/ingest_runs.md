@@ -62,7 +62,7 @@ RLS keys on the run's own `project_id` — `has_project_access(project_id)` — 
 |---|---|---|---|
 | `DataManager.tsx` | table read | `src/hooks/useErpConnections.tsx:65` | yes |
 | `DataManager.tsx` | rpc ingest_run_review | `src/hooks/useIngestRun.tsx:69` | yes |
-| `SimulationLab.tsx` | table read | `src/components/trust/TrustReportPanel.tsx:41` | yes |
+| `SimulationLab.tsx` | table read | `src/components/trust/TrustReportPanel.tsx:44` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -117,7 +117,7 @@ Surrogate key. Not the grain: a run is identified by what it did, and nothing jo
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:41`) —
+**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:44`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -198,7 +198,7 @@ Row counts pulled from the source, per entity — {"products": 1007, "bom_versio
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:41`) —
+**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:44`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -346,7 +346,7 @@ When the staged rows were promoted to tier 2. NULL for every run that has not be
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:41`) —
+**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:44`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -364,7 +364,7 @@ Who approved the promotion, in `auth.users`. NULL when the link's auto-apply thr
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:41`) —
+**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:44`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -427,7 +427,7 @@ Where this run's rows came from: csv, orbit-mrp or api. CHECK-constrained, so a 
 | Validated at ingest | — |
 | Rendered at | `[object Object]` |
 
-**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:41`) —
+**Rendered on** `SimulationLab.tsx` (`src/components/trust/TrustReportPanel.tsx:44`) —
 each of these names this column in an explicit `select` list, so the claim
 is about the column and not only about the table.
 
@@ -472,6 +472,6 @@ Staged rows that a LATER line of the same file repeats on the natural key. The p
 
 ---
 
-*Generated from data contract `6a9e481d0649`, engine `0.2.8`,
+*Generated from data contract `470ed071bc82`, engine `0.2.8`,
 sidecar `supabase/contract/ingest_runs.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

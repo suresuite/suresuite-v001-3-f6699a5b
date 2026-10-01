@@ -74,6 +74,14 @@ export function ProjectTrustReport({ report, canDownload = true, downloadRefusal
           <p className={report.blocking.length ? "font-medium text-destructive" : "font-medium"}>
             {report.headline}
           </p>
+          {/* WP 11.3 · §4 D263 — which version of each level this report describes. */}
+          <p className="font-mono text-[11px] text-muted-foreground" data-testid="trust-level-versions">
+            {report.levelVersions
+              ? report.levelVersions
+                  .map((l) => `${l.label} ${l.versionNo != null ? `v${l.versionNo}` : l.unsaved ? "unsaved" : "—"}`)
+                  .join(" · ")
+              : "Graph level versions were not read for this report."}
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"

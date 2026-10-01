@@ -1396,6 +1396,7 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
             {globalSelectedProjectId && (
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <GraphVersionChip
+                  level="firm"
                   projectId={globalSelectedProjectId}
                   metricsComputedAt={storedDecision?.computedAt ?? null}
                   outcome={metricsOutcome ?? (storedDecision?.state === 'current' ? 'reused' : null)}

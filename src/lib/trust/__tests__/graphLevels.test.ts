@@ -54,3 +54,52 @@ describe("graph level versions: the state's levels block", () => {
     expect(src.match(/\.rpc\(/g)?.length ?? 0).toBe(2); // the state read and the snapshot
   });
 });
+
+// WP 11.3 · §4 D258 — each page names ITS level. A deep-tier upload moves the firm
+// chip and leaves the product and process chips where they were.
+import { vi } from "vitest";
+vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
+import { graphVersionText } from "@/components/trust/GraphVersionChip";
+import { levelVersionText, snapshotTupleTitle, tupleNumbers, tupleText } from "../graphLevels";
+
+describe("the chip names the level the page shows", () => {
+  const afterDeepTier = parseLevelStates({
+    product: { hash: "aaaaaaa1", current_version: { id: "p3", version_no: 3, created_at: "" }, latest_version: null, version_count: 3, unsaved: false },
+    process: { hash: "bbbbbbb2", current_version: { id: "r2", version_no: 2, created_at: "" }, latest_version: null, version_count: 2, unsaved: false },
+    firm: { hash: "ccccccc3", current_version: null, latest_version: { id: "f4", version_no: 4, created_at: "" }, version_count: 4, unsaved: true },
+    simulation: { hash: "ddddddd4", current_version: { id: "s4", version_no: 4, created_at: "" }, latest_version: null, version_count: 4, unsaved: false },
+  });
+
+  it("the composite text is unchanged when no level is named (WP 10.1's chip)", () => {
+    expect(graphVersionText({ versionNo: 7, graphHash: "f00dbab99", metricsComputedAt: null })).toBe(
+      "Graph v7 · f00dbab · no stored metrics",
+    );
+    expect(graphVersionText({ versionNo: null, graphHash: null })).toBe("Graph unsaved · no stored metrics");
+  });
+
+  it("a level page says its level's version and hash", () => {
+    expect(graphVersionText({ level: "product", versionNo: 3, graphHash: "aaaaaaa1", outcome: "reused" }))
+      .toBe("Product graph v3 · aaaaaaa · no stored metrics · reused");
+    expect(levelVersionText("product", afterDeepTier.product)).toBe("Product graph v3");
+    expect(levelVersionText("process", afterDeepTier.process)).toBe("Process graph v2");
+  });
+
+  it("only the firm level reads unsaved after a deep-tier upload", () => {
+    expect(levelVersionText("firm", afterDeepTier.firm)).toBe("Firm graph unsaved");
+    expect(graphVersionText({ level: "firm", versionNo: null, graphHash: "ccccccc3" }))
+      .toBe("Firm graph unsaved · ccccccc · no stored metrics");
+  });
+
+  it("the title is the snapshot and its whole tuple, naming what is unsaved", () => {
+    expect(snapshotTupleTitle(null, afterDeepTier)).toBe(
+      "Snapshot unsaved · P3 · R2 · F? · S4 — unsaved: firm graph",
+    );
+    expect(snapshotTupleTitle(9, parseLevelStates({}))).toBe("Snapshot v9 · P? · R? · F? · S?");
+  });
+
+  it("a tuple payload reads to its numbers; a missing level is '?', never dropped", () => {
+    const t = tupleNumbers({ version_no: 9, product: { version_no: 3 }, process: { version_no: 2 }, firm: null, simulation: { version_no: 4 } });
+    expect(t).toEqual({ snapshot: 9, product: 3, process: 2, firm: null, simulation: 4 });
+    expect(tupleText(t)).toBe("P3 · R2 · F? · S4");
+  });
+});
