@@ -21250,6 +21250,26 @@ package to call; the gate-skipped exclusion is asserted in §2 but not mutation-
 Phase 10 ends here on the branch: WP 10.9 is the after-merge reading and the last shim, which no
 branch can take.
 
+### WP 10.6 follow-up — the Parquet reader loads one codec · 2026-10-01 · no migration
+
+**Found.** PR #332 merged WP 10.0–10.6 while WP 10.7 and 10.8 were on the branch; rebasing them
+onto `main` and reading the PR's checks, the bundle audit (red on `main` before this phase — the
+initial graph 166.2 kB against a 163.4 kB ceiling, total JS 2 002.0 kB against 1 942.6 kB) had
+grown to 2 123.4 kB total. The growth was WP 10.6's: `hyparquet-compressors` bundles every
+Parquet codec, brotli's ~120 kB dictionary among them, for objects the worker only ever writes
+as zstd (`series_store.write`). The WP 10.6 entry above names that package; it is superseded here
+rather than edited, because §16 is append-only.
+
+**Done.** The loader imports `hyparquet` and `fzstd` (the zstd decoder the package itself used)
+on demand and passes ZSTD alone. Total JS 2 123.4 → 2 057.9 kB; the initial graph unchanged at
+166.3 kB (the loader was never on it). The Python-written fixture in `runSeries.test.ts` still
+reads back to the same series, so the codec is proved on a real worker object, not a mock.
+
+**Not done, named.** The audit stays red, as it was on `main`: the initial graph's 0.1 kB and the
+remaining ~56 kB of total growth are Phase 10's Lab and Run & Validate code, and the larger excess
+over the ceilings predates the phase. Re-recording the baseline would bless growth this package
+did not measure; that is the audit's owner's decision, said on the PR.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
