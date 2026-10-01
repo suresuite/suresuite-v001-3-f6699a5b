@@ -130,7 +130,7 @@ export function scheduleFindings(
         policy: "engine",
         rows: [t.id],
         message:
-          `Capacity reduction of ${magnitude}% on supplier "${t.id}": the supplier has no ` +
+          `Capacity reduction by ${magnitude}% on supplier "${t.id}": the supplier has no ` +
           `weekly capacity (capacity_per_week), so the engine runs this event as a lead-time delay.`,
         reason:
           "A capacity reduction throttles a finite weekly capacity; without one the mapper " +
