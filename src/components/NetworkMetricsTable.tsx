@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { formatMoneyCompact } from '@/lib/sim/money';
+import { rowFreshnessLabel } from '@/lib/network/storedMetrics';
 
 interface NetworkMetric {
   id: string;
@@ -318,6 +319,13 @@ export function NetworkMetricsTable({ metrics, loading = false }: NetworkMetrics
                 <TableRow key={metric.id}>
                   <TableCell className="font-medium">
                     {metric.name || metric.uid}
+                    {/* WP 10.1 · freshness PER ROW, beside the number (T2): only a
+                        current stored figure goes unmarked. */}
+                    {rowFreshnessLabel(metric) !== 'current' && (
+                      <span className="ml-1.5 font-mono text-[10.5px] font-normal text-muted-foreground">
+                        {rowFreshnessLabel(metric)}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     {metric.connection_count}

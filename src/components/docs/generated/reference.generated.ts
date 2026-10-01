@@ -92,9 +92,203 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 713;
+export const REFERENCE_COLUMN_COUNT = 738;
 
 export const REFERENCE_TABLES: RefTable[] = [
+  {
+    "table": "analysis_kinds",
+    "tier": "reference",
+    "tierName": "project-independent, versioned by vintage rather than by project",
+    "owner": "analysis",
+    "grain": "One row per analysis kind: which LEVEL of the graph it reads. The one place that is stated — `analysis_get_or_start` reads it to choose the hash a run is keyed on, so a price edit does not invalidate a centrality. What each kind's parameters mean is stated in `analysis_runs.contract.yaml`'s catalog; `analysisKindsParity.test.ts` fails when the two disagree about which kinds exist.",
+    "naturalKey": [
+      "kind"
+    ],
+    "naturalKeyIntended": null,
+    "checks": [
+      {
+        "name": null,
+        "definition": "CHECK ((fallback_scope IS NULL) = (fallback_rule IS NULL))"
+      },
+      {
+        "name": "analysis_kinds_kind_check",
+        "definition": "CHECK (kind ~ '^[a-z][a-z0-9_]*$')"
+      },
+      {
+        "name": "analysis_kinds_input_scope_check",
+        "definition": "CHECK (input_scope IN ('product','process','firm','all'))"
+      },
+      {
+        "name": "analysis_kinds_fallback_scope_check",
+        "definition": "CHECK (fallback_scope IN ('product','process','firm','all'))"
+      },
+      {
+        "name": "analysis_kinds_fallback_rule_check",
+        "definition": "CHECK (fallback_rule IN ('deep_tier_incomplete'))"
+      }
+    ],
+    "ingestDataset": null,
+    "surfaces": [],
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 1
+    },
+    "columns": [
+      {
+        "name": "kind",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The analysis kind, as `analysis_runs.analysis_kind` names it.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "input_scope",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The level whose hash keys a run of this kind: `product`, `process`, `firm`, or `all` (the composite).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "fallback_scope",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The level used instead when `fallback_rule` holds — today only `network_metrics`, which reads the lane graph (process level) when the deep tier is incomplete. NULL for a kind with no fallback.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "fallback_rule",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the fallback applies. `deep_tier_incomplete`: the project has no `network_nodes` or no `network_edges` — the same condition the analyzer used to test itself, now stated once and returned to it as `input_scope`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "What the kind computes, over which table.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the row was first written.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      }
+    ]
+  },
   {
     "table": "analysis_results",
     "tier": "3",
@@ -316,14 +510,18 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "name": "analysis_runs_status_check",
         "definition": "CHECK (status IN ('running','succeeded','failed'))"
+      },
+      {
+        "name": "analysis_runs_input_scope_check",
+        "definition": "CHECK (input_scope IN ('product','process','firm','all'))"
       }
     ],
     "ingestDataset": null,
     "surfaces": [
       {
         "page": "ProductLevelNetwork.tsx",
-        "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
+        "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
+        "evidence": "src/components/trust/useProjectFreshness.ts:24"
       },
       {
         "page": "SimulationLab.tsx",
@@ -734,6 +932,61 @@ export const REFERENCE_TABLES: RefTable[] = [
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "input_scope",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Which LEVEL of the graph `input_hash` is the hash of — `product`, `process`, `firm`, or `all` (the composite). Resolved by `analysis_get_or_start` from `analysis_kinds`, the one place each kind's scope is stated, including `network_metrics`'s fallback to the process level when the deep tier is incomplete (WP 10.1, §4 D235). Every run before WP 10.1 is `all`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "dataset_version_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The graph version this run computed over (WP 10.1). Taken through `snapshot_dataset` at claim time, which returns the existing version of the current content, so this names \"Graph vN\" rather than a hash a person cannot read. NULL on every run before WP 10.1.",
+        "primaryKey": false,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "dataset_versions",
+          "columns": [
+            "id"
+          ],
+          "onDelete": "SET NULL"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
         "computedBy": null
       }
     ]
@@ -1711,7 +1964,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProcessLevelNetwork.tsx",
         "via": "table read",
-        "evidence": "src/pages/ProcessLevelNetwork.tsx:383"
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:382"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -2874,8 +3127,8 @@ export const REFERENCE_TABLES: RefTable[] = [
       },
       {
         "page": "ProductLevelNetwork.tsx",
-        "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
+        "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
+        "evidence": "src/components/trust/useProjectFreshness.ts:24"
       },
       {
         "page": "ProjectPolicies.tsx",
@@ -3144,6 +3397,102 @@ export const REFERENCE_TABLES: RefTable[] = [
         "engineField": "current_hash_network() -> staleness display; not read by the engine",
         "engineMissingDefault": null,
         "engineTransform": "sha256 over snapshot->'network', computed inside snapshot_dataset",
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "hash_product",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "SHA-256 over the PRODUCT level (WP 10.1, §4 D235): suppliers, materials, products, customers, the single-level BOM and the inbound / outbound lanes — every column the `inputs` domain hashes except the multi-level BOM. A projection of facts already hashed; the composite does not include it, so adding it moved no `graph_hash`. NULL never — computed for every snapshot that has `inputs`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "hash_process",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "SHA-256 over the PROCESS level (WP 10.1): `bom_multi_level` and `multi_tier_supply_chain` whole, plus the endpoints and quantities — not the prices — of the single-level BOM and the lanes, and the product ids. Exactly what `rebuild_supply_chain_lanes` builds the two lane graphs from, so the derived lane tables never enter an identity. NULL on a pre-v2 snapshot, which has no `network` domain.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "hash_firm",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "SHA-256 over the FIRM level (WP 10.1): the deep-tier topology (`network_nodes(uid, revenue)`, `network_edges(src_uid, dst_uid, relative_revenue)`) and the tier-2 / tier-3 supplier tables. NULL on a snapshot older than `schema_version` 3, which did not hash the deep tier — a level computed from it would hash an absence, which is not a fact.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "version_no",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "\"Graph v7\" — one number per CONTENT (`graph_hash`) per project, in order of first appearance, assigned by a BEFORE INSERT trigger (WP 10.1, §4 D234). Since WP 10.1 `snapshot_dataset` returns the OLDEST version of a content, so a reverted edit is the earlier number again; rows that predate that and share a hash share the number.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
         "unitColumn": null,
         "normalizeAtPromotion": null,
         "quantityGrain": "metadata",
@@ -9372,7 +9721,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc get_network_metrics_for_materials",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:284"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:272"
       }
     ],
     "governance": {
@@ -9776,8 +10125,8 @@ export const REFERENCE_TABLES: RefTable[] = [
       },
       {
         "page": "ProductLevelNetwork.tsx",
-        "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
+        "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
+        "evidence": "src/components/trust/useProjectFreshness.ts:24"
       },
       {
         "page": "SimulationLab.tsx",
@@ -10541,8 +10890,8 @@ export const REFERENCE_TABLES: RefTable[] = [
       },
       {
         "page": "ProductLevelNetwork.tsx",
-        "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
+        "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
+        "evidence": "src/components/trust/useProjectFreshness.ts:24"
       },
       {
         "page": "SimulationLab.tsx",
@@ -10917,8 +11266,8 @@ export const REFERENCE_TABLES: RefTable[] = [
       },
       {
         "page": "ProductLevelNetwork.tsx",
-        "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
+        "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
+        "evidence": "src/components/trust/useProjectFreshness.ts:24"
       },
       {
         "page": "SimulationLab.tsx",
@@ -13075,8 +13424,8 @@ export const REFERENCE_TABLES: RefTable[] = [
     "surfaces": [
       {
         "page": "ProductLevelNetwork.tsx",
-        "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
+        "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
+        "evidence": "src/components/trust/useProjectFreshness.ts:24"
       },
       {
         "page": "ProjectIntelligence.tsx",
@@ -14968,6 +15317,354 @@ export const REFERENCE_TABLES: RefTable[] = [
     ]
   },
   {
+    "table": "project_graph_state",
+    "tier": "3",
+    "tierName": "derived — a pure function of tier 2",
+    "owner": "analysis",
+    "grain": "One row per project: every hash of the project's LIVE data — the composite `graph_hash`, its two domains and the three levels — stored, so a page that asks \"has this project's graph changed?\" reads a row instead of rebuilding a snapshot of thirteen tables. A CACHE of a pure function of tier 2, safe to drop: the next read rebuilds it.",
+    "naturalKey": [
+      "project_id"
+    ],
+    "naturalKeyIntended": null,
+    "checks": [],
+    "ingestDataset": null,
+    "surfaces": [],
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": true,
+      "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 1,
+      "unrestricted": 0
+    },
+    "columns": [
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The project these hashes describe. Cascades with the project.",
+        "primaryKey": true,
+        "unique": false,
+        "references": {
+          "schema": "public",
+          "table": "projects",
+          "columns": [
+            "id"
+          ],
+          "onDelete": "CASCADE"
+        },
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "schema_version",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The snapshot rule the stored hashes were computed under (3 since WP 5.3; WP 10.1 did not bump it — the levels are projections, not new facts).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "level_spec",
+        "type": "integer",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The level rule the three level hashes were computed under (1 since WP 10.1). A stored row on another spec is recomputed on read rather than trusted.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "graph_hash",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The composite — identical to `current_graph_hash` and to a `dataset_versions` row of the same content.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "hash_inputs",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The `inputs` domain hash (WP 4.1).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "hash_network",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The `network` domain hash (WP 4.1, deep tier since WP 5.3).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "hash_product",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The PRODUCT level — see `dataset_versions.hash_product`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "hash_process",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The PROCESS level — see `dataset_versions.hash_process`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "hash_firm",
+        "type": "text",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The FIRM level — see `dataset_versions.hash_firm`.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "dirty",
+        "type": "boolean",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "True when a hashed table changed since the stored hashes were computed. It means \"recompute before answering\", NEVER \"stale\": a write of a row's own value back raises it and the recomputed hash is unchanged (`rehearsal/140` §6 holds that line).",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "generation",
+        "type": "bigint",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "Incremented by every touch. The store step updates only if it still matches the value read before computing — the race guard a boolean alone cannot be.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "computed_at",
+        "type": "timestamp with time zone",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the stored hashes were last computed. NULL while a row has only ever been dirtied.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      },
+      {
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the row last changed for any reason.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      }
+    ]
+  },
+  {
     "table": "project_members",
     "tier": "G",
     "tierName": "governance — identity, capability, delegation, audit",
@@ -15432,7 +16129,7 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "FirmLevelNetwork.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/FirmLevelNetwork.tsx:258"
+        "evidence": "src/pages/FirmLevelNetwork.tsx:271"
       },
       {
         "page": "InteractiveNetworkSpace.tsx",
@@ -15442,12 +16139,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "ProcessLevelNetwork.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/ProcessLevelNetwork.tsx:282"
+        "evidence": "src/pages/ProcessLevelNetwork.tsx:283"
       },
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "rpc list_projects",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:239"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:247"
       },
       {
         "page": "ProjectIntelligence.tsx",
@@ -16273,12 +16970,12 @@ export const REFERENCE_TABLES: RefTable[] = [
       {
         "page": "FirmLevelNetwork.tsx",
         "via": "table read",
-        "evidence": "src/pages/FirmLevelNetwork.tsx:315"
+        "evidence": "src/pages/FirmLevelNetwork.tsx:328"
       },
       {
         "page": "ProductLevelNetwork.tsx",
         "via": "table read",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:559"
+        "evidence": "src/pages/ProductLevelNetwork.tsx:363"
       }
     ],
     "governance": {
@@ -18458,8 +19155,8 @@ export const REFERENCE_TABLES: RefTable[] = [
       },
       {
         "page": "ProductLevelNetwork.tsx",
-        "via": "rpc project_freshness",
-        "evidence": "src/pages/ProductLevelNetwork.tsx:270"
+        "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
+        "evidence": "src/components/trust/useProjectFreshness.ts:24"
       },
       {
         "page": "ProjectPolicies.tsx",

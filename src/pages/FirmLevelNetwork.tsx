@@ -38,6 +38,8 @@ const MapView = lazy(() => import('@/components/MapView'));
 import { FROZEN_CELL } from '@/components/shared';
 import { MobileGroup, MobilePageHeader, ProjectChip } from '@/components/mobile';
 import { RiskDataNotice } from '@/components/network/RiskDataNotice';
+import { GraphVersionChip, type MetricsOutcome } from '@/components/trust/GraphVersionChip';
+import { analyzerOutcome, storedMetricsDecision, type StoredDecision } from '@/lib/network/storedMetrics';
 import {
   LensChip,
   LensHowToRead,
@@ -100,6 +102,11 @@ interface NetworkNode {
   is_seed: boolean | null;
   prominence: number | null;
   prominence_updated_at: string | null;
+  // WP 10.1 · the stored prominence's provenance, from `get_network_nodes` (T1/T2).
+  metrics_source?: 'store' | 'column' | 'none' | null;
+  metrics_run_id?: string | null;
+  metrics_computed_at?: string | null;
+  hash_is_current?: boolean | null;
 }
 
 interface NetworkEdge {
@@ -205,6 +212,8 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
   // networkSummary state removed - no longer needed
   const [networkNodes, setNetworkNodes] = useState<NetworkNode[]>([]);
   const [networkEdges, setNetworkEdges] = useState<NetworkEdge[]>([]);
+  const [storedDecision, setStoredDecision] = useState<StoredDecision | null>(null);
+  const [metricsOutcome, setMetricsOutcome] = useState<MetricsOutcome>(null);
   const [prominenceStats, setProminenceStats] = useState<{
     count: number;
     min: number;
@@ -234,14 +243,17 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
 
       if (error) throw error;
 
-      console.log('✅ Prominence recalculation complete:', data);
-      
-      // Update prominence stats
-      setProminenceStats(data.statistics);
-      
-      toast.success(`Recalculated prominence for ${data.updated_count} nodes`);
-      
-      // Refresh the network data to get updated prominence values
+      // WP 10.1 · §4 D239 — a cache hit is a no-op that SAYS so. The store returns
+      // the stored answer when the firm level has not moved, with no statistics
+      // (nothing was computed); the page re-reads the stored figures either way and
+      // derives its statistics from them, which is the one source both paths share.
+      const outcome = analyzerOutcome(data);
+      setMetricsOutcome(outcome);
+      toast.success(outcome === 'reused'
+        ? 'Prominence reused — this graph was already computed, nothing recalculated'
+        : `Recalculated prominence for ${data?.updated_count ?? 0} nodes`);
+
+      // Refresh the network data to get the stored prominence values
       await fetchData();
       
     } catch (error: any) {
@@ -354,6 +366,15 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
             setNetworkNodes(fetchedNodes);
             setNetworkEdges(fetchedEdges);
 
+            // WP 10.1 · §4 D239 — `get_network_nodes` returns the STORED prominence
+            // and where it came from. It never returned prominence at all, so the
+            // local approximation below stood in for EVERY node as if it were the
+            // stored figure. Now it stands in only when nothing is stored, and the
+            // page says it is an approximation (T1).
+            const decision = storedMetricsDecision(fetchedNodes);
+            setStoredDecision(decision);
+            const useApproximation = decision.state === 'missing';
+
       // ✅ calculateNodeImportance uses fetchedNodes and fetchedEdges directly
       const calculateNodeImportance = (data: NodeData, nodeId: string) => {
         const nodeData = fetchedNodes.find((n) => n.uid === nodeId);
@@ -361,6 +382,10 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
 
         if (typeof nodeData?.prominence === 'number' && !Number.isNaN(nodeData.prominence)) {
           prominence = nodeData.prominence;
+        } else if (!useApproximation) {
+          // A stored run exists and did not score this node: NOT computed, said as
+          // the smallest node rather than invented as a mid-sized one.
+          prominence = 0;
         } else {
           // In the else branch (no stored prominence):
           const totalConnections    = data.incoming + data.outgoing;
@@ -1367,6 +1392,26 @@ export default function FirmLevelNetwork({ isCollapsed, setIsCollapsed }: FirmLe
           <div className="hidden md:block">
             {globalSelectedProjectId && riskDataError && (
               <RiskDataNotice reason={riskDataError} />
+            )}
+            {globalSelectedProjectId && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <GraphVersionChip
+                  projectId={globalSelectedProjectId}
+                  metricsComputedAt={storedDecision?.computedAt ?? null}
+                  outcome={metricsOutcome ?? (storedDecision?.state === 'current' ? 'reused' : null)}
+                  approximation={storedDecision?.state === 'missing' && networkNodes.length > 0}
+                />
+                {storedDecision?.state === 'missing' && networkNodes.length > 0 && (
+                  <span className="text-[12px] text-muted-foreground">
+                    Prominence shown is a local approximation (connections, revenue, balance) — nothing is stored for this graph yet. Recalculate computes and stores it once.
+                  </span>
+                )}
+                {storedDecision?.state === 'stale' && (
+                  <span className="text-[12px] text-muted-foreground">
+                    Stored prominence was computed on an earlier version of this network. Recalculate to compute it for this one.
+                  </span>
+                )}
+              </div>
             )}
           </div>
           <div className="hidden md:grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">

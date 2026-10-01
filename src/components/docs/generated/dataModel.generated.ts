@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "630b256a2427";
+export const CONTRACT_VERSION = "423c10335cf8";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261001000006_policy_versions_by_content.sql";
+export const LAST_MIGRATION = "20261001000007_graph_levels_compute_once.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 83,
-  "tablesDescribed": 57,
-  "columnsDescribed": 713,
+  "tablesInSchema": 85,
+  "tablesDescribed": 59,
+  "columnsDescribed": 738,
   "tablesUndescribed": 26
 } as const;
 
@@ -171,13 +171,13 @@ export const TIERS: GlanceTier[] = [
       {
         "table": "analysis_runs",
         "grain": "One execution of one analysis for one project, identified by the world it ran against (`input_hash`), the parameters it ran with (`params_hash`) and the code that ran (`code_version`). Two runs carrying the same five-part key ARE the same run by definition, which is what makes serving a stored answer sound rather than a bet on how recently a timestamp moved.",
-        "columns": 16,
+        "columns": 18,
         "owner": "analysis"
       },
       {
         "table": "dataset_versions",
         "grain": "One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot.",
-        "columns": 10,
+        "columns": 14,
         "owner": "platform"
       },
       {
@@ -202,6 +202,12 @@ export const TIERS: GlanceTier[] = [
         "table": "node_list",
         "grain": "One node of one project's supply chain, derived from BOTH edge tables — `supply_chain_data` AND `supply_chain_data_multi_tier` — by `refresh_node_list_for_project`. The multi-tier half is WP 8.1's widening: until then the derivation read the flat table only, so 104 deep-tier nodes had no row here and therefore no type any page could read (D132). Like `network_nodes` it is two things (D56): the derivation and the geocoder write some columns, the criticality prediction others. SCOPE LIMIT, stated because `supply_tier` makes it visible: this is the projection of the two EDGE tables, so a firm that appears only in `tier2_suppliers` / `tier3_suppliers` is not a node here and its tier is reachable only through `node_supply_tier`. Folding the deep-tier FIRM graph in is a different node universe (`network_nodes.uid` against material ids is D137) and is owned by no package yet.",
         "columns": 22,
+        "owner": "analysis"
+      },
+      {
+        "table": "project_graph_state",
+        "grain": "One row per project: every hash of the project's LIVE data — the composite `graph_hash`, its two domains and the three levels — stored, so a page that asks \"has this project's graph changed?\" reads a row instead of rebuilding a snapshot of thirteen tables. A CACHE of a pure function of tier 2, safe to drop: the next read rebuilds it.",
+        "columns": 13,
         "owner": "analysis"
       },
       {
@@ -420,6 +426,12 @@ export const TIERS: GlanceTier[] = [
     "tier": "reference",
     "name": "project-independent, versioned by vintage rather than by project",
     "tables": [
+      {
+        "table": "analysis_kinds",
+        "grain": "One row per analysis kind: which LEVEL of the graph it reads. The one place that is stated — `analysis_get_or_start` reads it to choose the hash a run is keyed on, so a price edit does not invalidate a centrality. What each kind's parameters mean is stated in `analysis_runs.contract.yaml`'s catalog; `analysisKindsParity.test.ts` fails when the two disagree about which kinds exist.",
+        "columns": 6,
+        "owner": "analysis"
+      },
       {
         "table": "risk_data",
         "grain": "One country's current risk class, as one named publisher graded it in one named edition. NOT project-scoped: two projects sourcing from the same country see the same row, which is the point — a per-project copy drifts.",

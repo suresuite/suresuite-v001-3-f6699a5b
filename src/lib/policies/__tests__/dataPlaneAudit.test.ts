@@ -49,7 +49,7 @@ const sql = () =>
 const auditMigration = () => readFileSync(MIGRATION, "utf8");
 const squash = (s: string) => s.replace(/\s+/g, " ").trim();
 
-type LiveDef = { name: string; sql: string };
+type LiveDef = { name: string; sql: string; migration?: string };
 const live = () => liveDefinitions() as { policies: Map<string, LiveDef>; functions: Map<string, LiveDef> };
 const fn = (name: string): LiveDef => {
   const d = live().functions.get(name);
@@ -270,6 +270,8 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
     // table's WRITERS from every rule scoped to the contract. Five of the six took
     // the line in `20260919000007`; this is the sixth.
     "sync_disruption_to_sim_scenario",
+    // WP 10.1 — the stored graph hash (§4 D233). See INTERNAL_CACHE_WRITERS.
+    "_graph_state_mark", "_graph_state_store",
   ];
 
   /**
@@ -299,6 +301,18 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
   const TRIGGER_FUNCTIONS = new Set([
     "create_default_policy_defaults", "sync_disruption_to_sim_scenario",
   ]);
+
+  /**
+   * WP 10.1 · the THIRD justified category: an internal helper that writes a
+   * tier-3 CACHE row and that no API role can call. `_graph_state_mark` raises the
+   * dirty flag from inside the statement triggers on the thirteen hashed tables;
+   * `_graph_state_store` writes a recomputed hash from inside a read. Neither has a
+   * caller of its own to take an actor from — the statement it runs inside already
+   * set whichever actor it has, which is the same reason a trigger function is
+   * exempt. What makes the exemption safe is that nobody else can reach them, and
+   * the test below holds that: both are REVOKEd from PUBLIC in their migration.
+   */
+  const INTERNAL_CACHE_WRITERS = new Set(["_graph_state_mark", "_graph_state_store"]);
 
   const VIA_SHARED_PREAMBLE = new Set([
     "analysis_mark_critical_nodes", "etl_replace_supply_chain", "mrp_apply_staged_products",
@@ -380,7 +394,8 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
     for (const f of art.functions) counts.set(f.name, (counts.get(f.name) ?? 0) + 1);
     const overloaded = [...counts.entries()].filter(([, n]) => n > 1).map(([n]) => n).sort();
     expect(overloaded).toEqual([
-      "analysis_mark_critical_nodes",
+      // `analysis_mark_critical_nodes` stood here until WP 10.1 dropped its
+      // two-argument deploy-window shim (§4 D240).
       "capabilities_for_user",
       "create_disruption_scenario_v2",
       "create_project",
@@ -480,7 +495,7 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
     // list is either attributing through a shared preamble or a trigger
     // function, and both are justified above rather than owed.
     const owed = UNATTRIBUTED.filter(
-      (n) => !VIA_SHARED_PREAMBLE.has(n) && !TRIGGER_FUNCTIONS.has(n),
+      (n) => !VIA_SHARED_PREAMBLE.has(n) && !TRIGGER_FUNCTIONS.has(n) && !INTERNAL_CACHE_WRITERS.has(n),
     );
     expect(
       owed,
@@ -496,13 +511,29 @@ describe("the actor reaches the trigger — a ratchet on the class D36 was one s
     // categories — which is the assertion above stated from the other side, and
     // it is what stops the next writer being added to the list instead of fixed.
     const unjustified = UNATTRIBUTED.filter(
-      (n) => !VIA_SHARED_PREAMBLE.has(n) && !TRIGGER_FUNCTIONS.has(n),
+      (n) => !VIA_SHARED_PREAMBLE.has(n) && !TRIGGER_FUNCTIONS.has(n) && !INTERNAL_CACHE_WRITERS.has(n),
     );
     expect(unjustified).toEqual([]);
     expect(
-      [...VIA_SHARED_PREAMBLE, ...TRIGGER_FUNCTIONS].every((n) => UNATTRIBUTED.includes(n)),
+      [...VIA_SHARED_PREAMBLE, ...TRIGGER_FUNCTIONS, ...INTERNAL_CACHE_WRITERS].every((n) => UNATTRIBUTED.includes(n)),
       "a justification names a function that is no longer on the list — delete the justification too",
     ).toBe(true);
+  });
+
+  it("an internal cache writer is unreachable from the API — its exemption rests on that", () => {
+    for (const name of INTERNAL_CACHE_WRITERS) {
+      const def = fn(name);
+      expect(def, `${name} is gone — remove it from INTERNAL_CACHE_WRITERS`).toBeDefined();
+      const src = readFileSync(join(ROOT, "supabase", "migrations", def!.migration ?? ""), "utf8");
+      expect(
+        new RegExp(`REVOKE\\s+ALL\\s+ON\\s+FUNCTION\\s+public\\.${name}\\([^)]*\\)\\s+FROM\\s+PUBLIC`, "i").test(src),
+        `${name} is not REVOKEd from PUBLIC, so any API role can write the cache it fills`,
+      ).toBe(true);
+      expect(
+        new RegExp(`GRANT\\s+EXECUTE\\s+ON\\s+FUNCTION\\s+public\\.${name}\\b[^;]*\\b(anon|authenticated)\\b`, "i").test(src),
+        `${name} is granted to an API role`,
+      ).toBe(false);
+    }
   });
 
   it("the trigger function is still a trigger function", () => {

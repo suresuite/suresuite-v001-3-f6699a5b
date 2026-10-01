@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
-  applyNodeMetrics, completeRun, failRun, getOrStart, topologyDigest,
+  applyNodeMetrics, completeRun, failRun, getOrStart,
 } from "../_shared/analysisStore.ts";
 
 /**
@@ -84,13 +84,12 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // WP 4.3 · claim the key BEFORE reading the graph, so the digest and the
-    // read describe the same moment as closely as one process can manage.
-    const digest = await topologyDigest(supabaseClient, project_id);
+    // WP 4.3 · claim the key BEFORE reading the graph. WP 10.1 · keyed on the FIRM
+    // level (`analysis_kinds`), which is what this reads — a price edit is a hit.
     const run = await getOrStart(supabaseClient, {
       projectId: project_id,
       analysisKind: 'prominence',
-      params: { config, topology_digest: digest },
+      params: { config },
       codeVersion: CODE_VERSION,
       actorUserId: uploaded_by,
     });
@@ -106,6 +105,8 @@ serve(async (req) => {
         cache_hit: true,
         run_id: run.runId,
         input_hash: run.inputHash,
+        input_scope: run.inputScope,
+        dataset_version_id: run.datasetVersionId,
         code_version: run.codeVersion,
         updated_count: (run.rowCounts as { nodes?: number } | undefined)?.nodes ?? 0,
         config_used: config,
@@ -139,13 +140,14 @@ serve(async (req) => {
     console.log(`📦 Nodes result:`, { data: nodesResult.data?.length, error: nodesResult.error });
     console.log(`🔗 Edges result:`, { data: edgesResult.data?.length, error: edgesResult.error });
 
-    if (nodesResult.error) {
-      console.error('❌ Error fetching nodes:', nodesResult.error);
-      throw nodesResult.error;
-    }
-    if (edgesResult.error) {
-      console.error('❌ Error fetching edges:', edgesResult.error);
-      throw edgesResult.error;
+    // §4 D236 — a failed read FAILS THE RUN before it throws. The outer catch
+    // answered 500 and left the claim `running`, owning its key for good.
+    if (nodesResult.error || edgesResult.error) {
+      const err = nodesResult.error ?? edgesResult.error;
+      console.error('Error fetching the graph:', err);
+      await failRun(supabaseClient, run.runId, uploaded_by,
+        [{ code: 'read_failed', message: String(err?.message ?? err) }]);
+      throw err;
     }
 
     const nodes: Node[] = nodesResult.data || [];
@@ -233,6 +235,8 @@ serve(async (req) => {
       cache_hit: false,
       run_id: run.runId,
       input_hash: run.inputHash,
+      input_scope: run.inputScope,
+      dataset_version_id: run.datasetVersionId,
       code_version: run.codeVersion,
       updated_count: updatedCount,
       statistics: stats,

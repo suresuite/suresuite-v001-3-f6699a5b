@@ -31,6 +31,7 @@ partially or get corrected — the write fails.
 |---|---|---|
 | `analysis_runs_analysis_kind_check` | `CHECK (analysis_kind ~ '^[a-z][a-z0-9_]*$')` | `20260917000006_analysis_store.sql` |
 | `analysis_runs_status_check` | `CHECK (status IN ('running','succeeded','failed'))` | `20260917000006_analysis_store.sql` |
+| `analysis_runs_input_scope_check` | `CHECK (input_scope IN ('product','process','firm','all'))` | `20261001000007_graph_levels_compute_once.sql` |
 
 | Constraint | Kind | Definition |
 |---|---|---|
@@ -61,7 +62,7 @@ Read follows project reachability (`has_project_access`), uuid-only since WP 3.0
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `ProductLevelNetwork.tsx` | rpc project_freshness | `src/pages/ProductLevelNetwork.tsx:270` | yes |
+| `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:24` | yes |
 | `SimulationLab.tsx` | rpc project_freshness | `src/components/trust/useProjectFreshness.ts:24` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
@@ -93,6 +94,8 @@ that gap is defect D21. A dash means the column has no CSV origin.
 | `actor_user_id` | — | `uuid` | — | — | WHO asked for this run. Required when the run is CREATED — a BEFORE INSERT trigger, `analysis_runs_actor_required`, refuses a run that cannot name its actor, the same stance `assert_writer_may_act` takes for the RPC writers (`20260917000005`). NULL only afterwards, when that person's account is deleted: the key is `ON DELETE SET NULL` and the identity guard admits exactly that change, so the run is kept and its actor becomes unknown (WP 7.2 (a), §4 D213). Until `20260930000007` the column was NOT NULL with no ON DELETE rule, so nobody who had ever run an analysis could be deleted. Note what attribution means here: the application authenticates against `approved_users` and not Supabase Auth, so the id is CLIENT-ASSERTED (D28) — the database refuses a write into a project the user cannot reach, which is a real constraint, but it is not proof of identity. |
 | `created_at` | — | `timestamp with time zone` | — | — | Row insert time, maintained by the database. |
 | `updated_at` | — | `timestamp with time zone` | — | — | Last lifecycle change. The IDENTITY columns are frozen by `analysis_runs_identity_is_immutable`; only status, finish and reporting columns move, which is the line between what a run IS and what it is DOING. |
+| `input_scope` | — | `text` | — | — | Which LEVEL of the graph `input_hash` is the hash of — `product`, `process`, `firm`, or `all` (the composite). Resolved by `analysis_get_or_start` from `analysis_kinds`, the one place each kind's scope is stated, including `network_metrics`'s fallback to the process level when the deep tier is incomplete (WP 10.1, §4 D235). Every run before WP 10.1 is `all`. |
+| `dataset_version_id` | — | `uuid` | — | — | The graph version this run computed over (WP 10.1). Taken through `snapshot_dataset` at claim time, which returns the existing version of the current content, so this names "Graph vN" rather than a hash a person cannot read. NULL on every run before WP 10.1. |
 
 ## Each column in full
 
@@ -323,6 +326,35 @@ Last lifecycle change. The IDENTITY columns are frozen by `analysis_runs_identit
 | Validated at ingest | — |
 | Rendered at | *not yet recorded (WP 5.1)* |
 
+### `input_scope`
+
+Which LEVEL of the graph `input_hash` is the hash of — `product`, `process`, `firm`, or `all` (the composite). Resolved by `analysis_get_or_start` from `analysis_kinds`, the one place each kind's scope is stated, including `network_metrics`'s fallback to the process level when the deep tier is incomplete (WP 10.1, §4 D235). Every run before WP 10.1 is `all`.
+
+| | |
+|---|---|
+| Type | `text`, `NOT NULL`, default `'all'` |
+| Grain | `metadata` |
+| Unit | dimensionless |
+| Added by | `20261001000007_graph_levels_compute_once.sql` |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
+### `dataset_version_id`
+
+The graph version this run computed over (WP 10.1). Taken through `snapshot_dataset` at claim time, which returns the existing version of the current content, so this names "Graph vN" rather than a hash a person cannot read. NULL on every run before WP 10.1.
+
+| | |
+|---|---|
+| Type | `uuid` |
+| Grain | `identifier` |
+| Unit | dimensionless |
+| Added by | `20261001000007_graph_levels_compute_once.sql` |
+| References | `public.dataset_versions(id)` ON DELETE SET NULL |
+| Read by the engine | **not traced** |
+| Validated at ingest | — |
+| Rendered at | *not yet recorded (WP 5.1)* |
+
 ## Indexes
 
 | Index | Columns | Unique | Added by |
@@ -332,6 +364,6 @@ Last lifecycle change. The IDENTITY columns are frozen by `analysis_runs_identit
 
 ---
 
-*Generated from data contract `630b256a2427`, engine `0.2.8`,
+*Generated from data contract `423c10335cf8`, engine `0.2.8`,
 sidecar `supabase/contract/analysis_runs.contract.yaml`, table created by `20260917000006_analysis_store.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

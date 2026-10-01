@@ -5,22 +5,23 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-57 of 83 tables are covered,
-713 columns in all. A table that is not here is listed
+59 of 85 tables are covered,
+738 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
 | Table | Tier | Owner | Columns | One row is |
 |---|---|---|---|---|
+| [`analysis_kinds`](analysis_kinds.md) | reference | `analysis` | 6 | One row per analysis kind: which LEVEL of the graph it reads. The one place that is stated — `analysis_get_or_start` reads it to choose the hash a run is keyed on, so a price edit does not invalidate a centrality. What each kind's parameters mean is stated in `analysis_runs.contract.yaml`'s catalog; `analysisKindsParity.test.ts` fails when the two disagree about which kinds exist. |
 | [`analysis_results`](analysis_results.md) | 3 | `analysis` | 6 | One entity's metrics from one run. `metrics` is jsonb rather than a column per measure on purpose: the set of measures is the analysis's business and adding one must not be a migration — which is the same argument the open `analysis_kind` enum makes, applied to the output side. |
-| [`analysis_runs`](analysis_runs.md) | 3 | `analysis` | 16 | One execution of one analysis for one project, identified by the world it ran against (`input_hash`), the parameters it ran with (`params_hash`) and the code that ran (`code_version`). Two runs carrying the same five-part key ARE the same run by definition, which is what makes serving a stored answer sound rather than a bet on how recently a timestamp moved. |
+| [`analysis_runs`](analysis_runs.md) | 3 | `analysis` | 18 | One execution of one analysis for one project, identified by the world it ran against (`input_hash`), the parameters it ran with (`params_hash`) and the code that ran (`code_version`). Two runs carrying the same five-part key ARE the same run by definition, which is what makes serving a stored answer sound rather than a bet on how recently a timestamp moved. |
 | [`approved_users`](approved_users.md) | G | `platform` | 19 | One person who may sign in. This is the authentication table: the product does not use Supabase Auth for its own users, so a row here IS an account — credential, role, tenant and profile in one. |
 | [`audit_logs`](audit_logs.md) | G | `platform` | 14 | One recorded action, on one plane. `admin` is what a super admin did, `data` is a tier transition — a write to tier 2, 3 or 4 — and `access` is a governed decision such as an export being allowed or refused. |
 | [`bom_multi_level`](bom_multi_level.md) | 2 | `data-ingestion` | 11 | One child-to-parent line of a deep bill of materials: this material is consumed by this higher-level component, at this level of the tree. Collapsed to effective product-to-material arcs before the engine sees it. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`), and the index is NULLS NOT DISTINCT because a ROOT line has no parent — without that clause the constraint would hold every line except the roots (D5 closed). |
 | [`bom_single_level`](bom_single_level.md) | 2 | `data-ingestion` | 10 | One product-to-material line of the bill of materials: making one unit of this product consumes this much of this material. UNIQUE on `natural_key_intended` since WP 3.3 (`20260916000018`) — a re-upload updates the line rather than repeating it (D5 closed). |
 | [`capabilities`](capabilities.md) | G | `platform` | 7 | One thing a user may or may not be permitted to do — a page they may open or a feature they may use. The CATALOG: it says what rights exist, never who holds them. The four grant tables answer that. |
 | [`customers`](customers.md) | 2 | `data-ingestion` | 10 | One customer of one project — the demand-side counterpart of `suppliers`. The key is the customer's identifier AS THE SOURCE FILE SPELLS IT, scoped to the project, so the same company appearing in two projects is two rows and stays two rows. |
-| [`dataset_versions`](dataset_versions.md) | 3 | `platform` | 10 | One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot. |
+| [`dataset_versions`](dataset_versions.md) | 3 | `platform` | 14 | One frozen snapshot of a project's tier-2 data, with the hash that identifies it. The trust anchor: a run that names a dataset_version can be reproduced, and one that does not cannot. |
 | [`delegation_grants`](delegation_grants.md) | G | `platform` | 9 | One temporary, subtractive grant of project access from one person to another. `subtractive-delegation` (§2.1 G3) made real: a grant may never exceed what the grantor holds, and it always ends. |
 | [`disruption_scenario_effects`](disruption_scenario_effects.md) | 4 | `policy-ui` | 9 | One effect for one profile: WHAT the disruption does to whatever it hits. A capacity reduction or a time delay, with a magnitude and the unit that magnitude is in. |
 | [`disruption_scenario_profiles`](disruption_scenario_profiles.md) | 4 | `policy-ui` | 13 | One disruption profile for one project — the HEADER of the normalised disruption model. What it hits lives in `_targets`, what it does in `_effects`, and how it is simulated in `_settings`; all three cascade from this row. |
@@ -53,6 +54,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`policy_versions`](policy_versions.md) | 4 | `policy-ui` | 14 | One saved snapshot of a project's whole policy bundle, with the bundle it replaced and the hash of both. The audit trail of the /policies grid: what the policies WERE at a moment somebody chose to record, which is what makes a simulation result reproducible from the policy side. |
 | [`products`](products.md) | 2 | `data-ingestion` | 18 | One finished product in one project: the economics and the demand shape the simulation reads for it. Where this row is silent the engine derives price and demand from the outbound arcs. |
 | [`project_erp_links`](project_erp_links.md) | G | `data-ingestion` | 15 | One authorized link between one project and one company in one external system: project ownership proved on this side, company membership proved on that side by the linking user's own OAuth consent. One link is one credential and one project — never shared, so revoking one project's link cannot be bypassed by a sibling. |
+| [`project_graph_state`](project_graph_state.md) | 3 | `analysis` | 13 | One row per project: every hash of the project's LIVE data — the composite `graph_hash`, its two domains and the three levels — stored, so a page that asks "has this project's graph changed?" reads a row instead of rebuilding a snapshot of thirteen tables. A CACHE of a pure function of tier 2, safe to drop: the next read rebuilds it. |
 | [`project_members`](project_members.md) | G | `platform` | 8 | One person's standing on one project. This is the level of access the platform did not have until WP 2.2 — between "in the organization" (sees every project) and "not in it" (sees none). |
 | [`project_role_capabilities`](project_role_capabilities.md) | G | `platform` | 5 | What one project role may do — one row per (project_role, capability). The project layer of the four-layer resolver, shaped exactly like `role_capabilities` so all four layers read the same way. |
 | [`projects`](projects.md) | G | `platform` | 19 | One modelling project: a named supply chain, owned by one modeller, belonging to one organization. It is the scope every other project-scoped table hangs off `project_id`, and it is the row almost every RLS policy in the schema reaches through to decide whether the caller may see anything at all. |
@@ -72,4 +74,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `630b256a2427`, engine `0.2.8`.*
+*Generated from data contract `423c10335cf8`, engine `0.2.8`.*

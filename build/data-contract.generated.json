@@ -5,26 +5,327 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 370,
-      "migrations_applied": 362,
-      "last_migration": "20261001000006_policy_versions_by_content.sql"
+      "migrations_found": 371,
+      "migrations_applied": 363,
+      "last_migration": "20261001000007_graph_levels_compute_once.sql"
     },
-    "sidecars": 57,
+    "sidecars": 59,
     "registry": {
       "engine_version": "0.2.8",
       "policies": 23
     }
   },
   "counts": {
-    "tables_in_schema": 83,
-    "tables_covered": 57,
-    "columns_covered": 713,
-    "check_constraints": 60,
+    "tables_in_schema": 85,
+    "tables_covered": 59,
+    "columns_covered": 738,
+    "check_constraints": 66,
     "engine_requirements": 7,
     "orphans": 0,
     "phantom_tables": 0
   },
   "tables": {
+    "analysis_kinds": {
+      "table": "analysis_kinds",
+      "schema_name": "public",
+      "tier": "reference",
+      "tier_name": "project-independent, versioned by vintage rather than by project",
+      "grain": "One row per analysis kind: which LEVEL of the graph it reads. The one place that is stated — `analysis_get_or_start` reads it to choose the hash a run is keyed on, so a price edit does not invalidate a centrality. What each kind's parameters mean is stated in `analysis_runs.contract.yaml`'s catalog; `analysisKindsParity.test.ts` fails when the two disagree about which kinds exist.",
+      "owner": "analysis",
+      "created_by": "20261001000007_graph_levels_compute_once.sql",
+      "sidecar": "supabase/contract/analysis_kinds.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "kind"
+          ],
+          "name": "analysis_kinds_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "Reference data authored in a migration and read by everyone; no API role writes it. Not project-scoped. Not audited: a change to a kind's scope is a migration, and the migration is the record."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "analysis_kinds_read",
+            "command": "SELECT",
+            "roles": [],
+            "using": "true",
+            "with_check": "true",
+            "added_by": "20261001000007_graph_levels_compute_once.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": null,
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK ((fallback_scope IS NULL) = (fallback_rule IS NULL))",
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "analysis_kinds_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "kind"
+          ],
+          "definition": "PRIMARY KEY (kind)",
+          "implicit": true,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "analysis_kinds_kind_check",
+          "kind": "CHECK",
+          "columns": [
+            "kind"
+          ],
+          "definition": "CHECK (kind ~ '^[a-z][a-z0-9_]*$')",
+          "implicit": true,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "analysis_kinds_input_scope_check",
+          "kind": "CHECK",
+          "columns": [
+            "input_scope"
+          ],
+          "definition": "CHECK (input_scope IN ('product','process','firm','all'))",
+          "implicit": true,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "analysis_kinds_fallback_scope_check",
+          "kind": "CHECK",
+          "columns": [
+            "fallback_scope"
+          ],
+          "definition": "CHECK (fallback_scope IN ('product','process','firm','all'))",
+          "implicit": true,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        },
+        {
+          "name": "analysis_kinds_fallback_rule_check",
+          "kind": "CHECK",
+          "columns": [
+            "fallback_rule"
+          ],
+          "definition": "CHECK (fallback_rule IN ('deep_tier_incomplete'))",
+          "implicit": true,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The analysis kind, as `analysis_runs.analysis_kind` names it.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "input_scope",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The level whose hash keys a run of this kind: `product`, `process`, `firm`, or `all` (the composite).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fallback_scope",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The level used instead when `fallback_rule` holds — today only `network_metrics`, which reads the lane graph (process level) when the deep tier is incomplete. NULL for a kind with no fallback.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "fallback_rule",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the fallback applies. `deep_tier_incomplete`: the project has no `network_nodes` or no `network_edges` — the same condition the analyzer used to test itself, now stated once and returned to it as `input_scope`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "What the kind computes, over which table.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row was first written.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
+      "analysis_kinds": null
+    },
     "analysis_results": {
       "table": "analysis_results",
       "schema_name": "public",
@@ -364,9 +665,9 @@
       "surfaces": [
         {
           "page": "ProductLevelNetwork.tsx",
-          "via": "rpc project_freshness",
+          "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
+          "evidence": "src/components/trust/useProjectFreshness.ts:24",
           "confirmed": true
         },
         {
@@ -439,6 +740,13 @@
           ],
           "definition": "FOREIGN KEY (actor_user_id) REFERENCES public.approved_users(id) ON DELETE SET NULL",
           "added_by": "20260930000007_admin_delete_user.sql"
+        },
+        {
+          "name": "analysis_runs_input_scope_check",
+          "kind": "CHECK",
+          "columns": [],
+          "definition": "CHECK (input_scope IN ('product','process','firm','all'))",
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
         }
       ],
       "indexes": [
@@ -990,6 +1298,77 @@
           "resolution": null,
           "note": null,
           "engine_requirement": null
+        },
+        {
+          "name": "input_scope",
+          "type": "text",
+          "nullable": false,
+          "default": "'all'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Which LEVEL of the graph `input_hash` is the hash of — `product`, `process`, `firm`, or `all` (the composite). Resolved by `analysis_get_or_start` from `analysis_kinds`, the one place each kind's scope is stated, including `network_metrics`'s fallback to the process level when the deep tier is incomplete (WP 10.1, §4 D235). Every run before WP 10.1 is `all`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "dataset_version_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "dataset_versions",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The graph version this run computed over (WP 10.1). Taken through `snapshot_dataset` at claim time, which returns the existing version of the current content, so this names \"Graph vN\" rather than a hash a person cannot read. NULL on every run before WP 10.1.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
         }
       ],
       "note": null,
@@ -1003,11 +1382,6 @@
               "type": "boolean",
               "default": true,
               "meaning": "Weight edges by `relative_revenue` rather than treating the graph as unweighted."
-            },
-            "topology_digest": {
-              "type": "string",
-              "default": null,
-              "meaning": "`public.network_topology_hash(project)` — a digest of the six columns `get_network_nodes_for_prominence` and `get_network_edges_for_prominence` return. IT IS AN INPUT TRAVELLING IN A PARAMETER AND THAT IS DECLARED HERE RATHER THAN HIDDEN: `current_graph_hash` covers eleven tier-2 tables and NOT `network_nodes`/`network_edges`, so without this the key cannot tell two different graphs apart and a re-uploaded network is served the previous graph's centralities as a hit. It belongs in `hash_network`; moving it there is a `schema_version` bump and a bump is unsafe until D70 lands, so WP 4.4 moves it and deletes this entry."
             }
           }
         },
@@ -1020,11 +1394,6 @@
               "type": "object",
               "default": null,
               "meaning": "The caller's `ProminenceConfig` — the four weights and the two caps. It is part of the key because two configs produce two different scores over one graph. `null` means the analyzer's `defaultConfig`, which the function fills in before the digest is taken, so a stored run always records the config it actually used rather than the word \"default\"."
-            },
-            "topology_digest": {
-              "type": "string",
-              "default": null,
-              "meaning": "See `network_metrics.topology_digest` — the same digest, for the same reason."
             }
           }
         },
@@ -1040,6 +1409,13 @@
             }
           },
           "note": "NO `topology_digest`, and the absence is a statement: this analyzer reads `supply_chain_data`, which is `combine-project`'s output over the eleven tier-2 tables `current_graph_hash` already covers. Its inputs ARE in the anchor. The `threshold` parameter this block used to declare DOES NOT EXIST — `predictCriticalNodes` takes no threshold and the entry was authored from the plan rather than from the code. Removed in WP 4.3 rather than carried: an undeclared default is `declared-fallback` (I6) broken, and a DECLARED parameter that no code reads is the same defect pointing the other way."
+        },
+        "process_structure": {
+          "computed_by": "public.process_structure (SQL, WP 10.1)",
+          "code_version": "process_structure@wp101.1",
+          "entity_type": "node",
+          "params": {},
+          "note": "For every level-1 node of the process network, the nodes it reaches downstream and upstream, transitively, over `supply_chain_data_multi_tier`. Computed where the data is; the process page reads it instead of walking the graph in the browser on every selection (§4 D239)."
         },
         "combine_etl": {
           "computed_by": "combine-project (migrated in WP 4.3, as §11 names it)",
@@ -2716,7 +3092,7 @@
           "page": "ProcessLevelNetwork.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/ProcessLevelNetwork.tsx:383",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:382",
           "confirmed": true
         },
         {
@@ -3037,7 +3413,7 @@
               "page": "ProcessLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/ProcessLevelNetwork.tsx:383",
+              "evidence": "src/pages/ProcessLevelNetwork.tsx:382",
               "confirmed": true
             }
           ],
@@ -4630,9 +5006,9 @@
         },
         {
           "page": "ProductLevelNetwork.tsx",
-          "via": "rpc project_freshness",
+          "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
+          "evidence": "src/components/trust/useProjectFreshness.ts:24",
           "confirmed": true
         },
         {
@@ -4711,6 +5087,19 @@
           "predicate": null,
           "partial": false,
           "added_by": "20260703000001_dataset_versions.sql"
+        },
+        {
+          "name": "dataset_versions_project_hash",
+          "unique": false,
+          "columns": [
+            "project_id",
+            "graph_hash",
+            "created_at"
+          ],
+          "nulls_not_distinct": false,
+          "predicate": null,
+          "partial": false,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
         }
       ],
       "columns": [
@@ -5095,6 +5484,134 @@
           ],
           "resolution": null,
           "note": "THIS TEXT SAID THREE TABLES UNTIL WP 5.2f, AND `20260917000009` HAD ADDED TWO MORE. WP 5.3 folded the deep-tier topology in to close §4 D75 — a re-uploaded network was being served the previous graph's centralities as a cache hit, because the anchor could not see the tables the two centrality analyzers read. The sidecar was not updated with the migration, and the manual renders this sentence, so the drift would have been published. The original three source tables hold ZERO rows in production (§15); the two deep-tier tables do not, so the domain is no longer the digest of an empty set on every project. NULL before WP 4.1, and not backfillable, for the same reason as `hash_inputs`.",
+          "engine_requirement": null
+        },
+        {
+          "name": "hash_product",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "SHA-256 over the PRODUCT level (WP 10.1, §4 D235): suppliers, materials, products, customers, the single-level BOM and the inbound / outbound lanes — every column the `inputs` domain hashes except the multi-level BOM. A projection of facts already hashed; the composite does not include it, so adding it moved no `graph_hash`. NULL never — computed for every snapshot that has `inputs`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "hash_process",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "SHA-256 over the PROCESS level (WP 10.1): `bom_multi_level` and `multi_tier_supply_chain` whole, plus the endpoints and quantities — not the prices — of the single-level BOM and the lanes, and the product ids. Exactly what `rebuild_supply_chain_lanes` builds the two lane graphs from, so the derived lane tables never enter an identity. NULL on a pre-v2 snapshot, which has no `network` domain.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "hash_firm",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "SHA-256 over the FIRM level (WP 10.1): the deep-tier topology (`network_nodes(uid, revenue)`, `network_edges(src_uid, dst_uid, relative_revenue)`) and the tier-2 / tier-3 supplier tables. NULL on a snapshot older than `schema_version` 3, which did not hash the deep tier — a level computed from it would hash an absence, which is not a fact.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "version_no",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "\"Graph v7\" — one number per CONTENT (`graph_hash`) per project, in order of first appearance, assigned by a BEFORE INSERT trigger (WP 10.1, §4 D234). Since WP 10.1 `snapshot_dataset` returns the OLDEST version of a content, so a reverted edit is the earlier number again; rows that predate that and share a hash share the number.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
           "engine_requirement": null
         }
       ],
@@ -14644,7 +15161,7 @@
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc get_network_metrics_for_materials",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:284",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:272",
           "confirmed": true
         }
       ],
@@ -15246,9 +15763,9 @@
         },
         {
           "page": "ProductLevelNetwork.tsx",
-          "via": "rpc project_freshness",
+          "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
+          "evidence": "src/components/trust/useProjectFreshness.ts:24",
           "confirmed": true
         },
         {
@@ -16360,9 +16877,9 @@
         },
         {
           "page": "ProductLevelNetwork.tsx",
-          "via": "rpc project_freshness",
+          "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
+          "evidence": "src/components/trust/useProjectFreshness.ts:24",
           "confirmed": true
         },
         {
@@ -16911,9 +17428,9 @@
         },
         {
           "page": "ProductLevelNetwork.tsx",
-          "via": "rpc project_freshness",
+          "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
+          "evidence": "src/components/trust/useProjectFreshness.ts:24",
           "confirmed": true
         },
         {
@@ -20258,9 +20775,9 @@
       "surfaces": [
         {
           "page": "ProductLevelNetwork.tsx",
-          "via": "rpc project_freshness",
+          "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
+          "evidence": "src/components/trust/useProjectFreshness.ts:24",
           "confirmed": true
         },
         {
@@ -23310,6 +23827,491 @@
       "note": "NOT RENAMED BY WP 3.1, AND THAT IS A DECISION. The four tables around it became `ingest_*` because they hold rows from ANY source; this one holds the credential and the consent for ONE source, and calling it `ingest_links` would promise a generality it does not have — a CSV upload has nothing to link. When a second connector arrives, the question to ask is whether it shares this shape (a per-user delegated token proving membership of an external tenant) or needs its own; `ingest_runs.source_kind` already carries the distinction that matters to everything downstream. ITS SIDECAR IS HERE BECAUSE WP 3.1 IS WHERE IT WAS DUE. The table was deferred under this package in `coverage.yaml` since WP 1.4, and a deferral is a commitment: carrying it forward to the next open package would have been the same move that produced D41 — an owner who has gone home, indistinguishable from an owner.",
       "analysis_kinds": null
     },
+    "project_graph_state": {
+      "table": "project_graph_state",
+      "schema_name": "public",
+      "tier": "3",
+      "tier_name": "derived — a pure function of tier 2",
+      "grain": "One row per project: every hash of the project's LIVE data — the composite `graph_hash`, its two domains and the three levels — stored, so a page that asks \"has this project's graph changed?\" reads a row instead of rebuilding a snapshot of thirteen tables. A CACHE of a pure function of tier 2, safe to drop: the next read rebuilds it.",
+      "owner": "analysis",
+      "created_by": "20261001000007_graph_levels_compute_once.sql",
+      "sidecar": "supabase/contract/project_graph_state.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "project_id"
+          ],
+          "name": "project_graph_state_pkey"
+        }
+      ],
+      "natural_key_intended": null,
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "viewer",
+        "audited": true,
+        "rls_enabled": true,
+        "note": "No page and no API role writes it. Two writers, both SECURITY DEFINER and both inside somebody else's statement: the statement triggers on the thirteen hashed tables (`_graph_state_touch_*`) raise `dirty`, and `project_graph_hashes` stores a recomputed set — only when `generation` has not moved since it read the row, so a reader that started before a write cannot store the pre-write hash over the flag the write raised. Read through `has_project_access`. Audited at statement grain like every tier-3 table; its audit rows name whoever made the edit that dirtied it."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [
+          {
+            "name": "project_graph_state_select",
+            "command": "SELECT",
+            "roles": [],
+            "using": "public.has_project_access(project_id)",
+            "with_check": "public.has_project_access(project_id)",
+            "added_by": "20261001000007_graph_levels_compute_once.sql"
+          }
+        ],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "project_graph_state_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "project_id"
+          ],
+          "definition": "PRIMARY KEY (project_id)",
+          "implicit": true,
+          "added_by": "20261001000007_graph_levels_compute_once.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": false,
+          "default": null,
+          "primary_key": true,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "projects",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "CASCADE"
+          },
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The project these hashes describe. Cascades with the project.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "schema_version",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The snapshot rule the stored hashes were computed under (3 since WP 5.3; WP 10.1 did not bump it — the levels are projections, not new facts).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "level_spec",
+          "type": "integer",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The level rule the three level hashes were computed under (1 since WP 10.1). A stored row on another spec is recomputed on read rather than trusted.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "graph_hash",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The composite — identical to `current_graph_hash` and to a `dataset_versions` row of the same content.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "hash_inputs",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The `inputs` domain hash (WP 4.1).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "hash_network",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The `network` domain hash (WP 4.1, deep tier since WP 5.3).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "hash_product",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The PRODUCT level — see `dataset_versions.hash_product`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "hash_process",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The PROCESS level — see `dataset_versions.hash_process`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "hash_firm",
+          "type": "text",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The FIRM level — see `dataset_versions.hash_firm`.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "dirty",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "True when a hashed table changed since the stored hashes were computed. It means \"recompute before answering\", NEVER \"stale\": a write of a row's own value back raises it and the recomputed hash is unchanged (`rehearsal/140` §6 holds that line).",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "generation",
+          "type": "bigint",
+          "nullable": false,
+          "default": "0",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "Incremented by every touch. The store step updates only if it still matches the value read before computing — the race guard a boolean alone cannot be.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "computed_at",
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the stored hashes were last computed. NULL while a row has only ever been dirtied.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000007_graph_levels_compute_once.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the row last changed for any reason.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
+      "analysis_kinds": null
+    },
     "project_members": {
       "table": "project_members",
       "schema_name": "public",
@@ -23965,7 +24967,7 @@
           "page": "FirmLevelNetwork.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/FirmLevelNetwork.tsx:258",
+          "evidence": "src/pages/FirmLevelNetwork.tsx:271",
           "confirmed": true
         },
         {
@@ -23979,14 +24981,14 @@
           "page": "ProcessLevelNetwork.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/ProcessLevelNetwork.tsx:282",
+          "evidence": "src/pages/ProcessLevelNetwork.tsx:283",
           "confirmed": true
         },
         {
           "page": "ProductLevelNetwork.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:239",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:247",
           "confirmed": true
         },
         {
@@ -25250,14 +26252,14 @@
           "page": "FirmLevelNetwork.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/FirmLevelNetwork.tsx:315",
+          "evidence": "src/pages/FirmLevelNetwork.tsx:328",
           "confirmed": true
         },
         {
           "page": "ProductLevelNetwork.tsx",
           "via": "table read",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:559",
+          "evidence": "src/pages/ProductLevelNetwork.tsx:363",
           "confirmed": true
         }
       ],
@@ -25400,14 +26402,14 @@
               "page": "FirmLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/FirmLevelNetwork.tsx:315",
+              "evidence": "src/pages/FirmLevelNetwork.tsx:328",
               "confirmed": true
             },
             {
               "page": "ProductLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/ProductLevelNetwork.tsx:559",
+              "evidence": "src/pages/ProductLevelNetwork.tsx:363",
               "confirmed": true
             }
           ],
@@ -25454,14 +26456,14 @@
               "page": "FirmLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/FirmLevelNetwork.tsx:315",
+              "evidence": "src/pages/FirmLevelNetwork.tsx:328",
               "confirmed": true
             },
             {
               "page": "ProductLevelNetwork.tsx",
               "via": "table read",
               "grain": "column",
-              "evidence": "src/pages/ProductLevelNetwork.tsx:559",
+              "evidence": "src/pages/ProductLevelNetwork.tsx:363",
               "confirmed": true
             }
           ],
@@ -28559,9 +29561,9 @@
         },
         {
           "page": "ProductLevelNetwork.tsx",
-          "via": "rpc project_freshness",
+          "via": "rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1)",
           "grain": "table",
-          "evidence": "src/pages/ProductLevelNetwork.tsx:270",
+          "evidence": "src/components/trust/useProjectFreshness.ts:24",
           "confirmed": true
         },
         {
@@ -32122,5 +33124,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "630b256a2427"
+  "contract_version": "423c10335cf8"
 }

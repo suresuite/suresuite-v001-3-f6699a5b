@@ -126,9 +126,14 @@ describe("D28 — the truth table of what is actually unconditional", () => {
    * or confidential. The /docs gate must read it BEFORE sign-in to know whether a
    * public section may render, and its rows name sections whose titles are already
    * in the bundle. Its sibling `docs_faq` has RLS on and no policy at all.
+   *
+   * AND ONE MORE, ALSO NOT TENANT DATA — WP 10.1 (§4 D235): `analysis_kinds` says
+   * which level of the graph each analysis kind reads. It is a catalog authored in a
+   * migration, carries no project id, and a page reads it to say what a stored
+   * metric was keyed on. Same standing as `capabilities` above.
    */
   const EXPECTED_UNCONDITIONAL = [
-    "ai_models", "ai_providers", "approved_users", "bom_multi_level", "bom_single_level",
+    "ai_models", "ai_providers", "analysis_kinds", "approved_users", "bom_multi_level", "bom_single_level",
     "capabilities", "chat_plans", "customers", "dataset_versions", "docs_section_releases", "experiments",
     "external_evidence", "inbound_logistics", "materials", "model_validations",
     "outbound_logistics", "policy_defaults", "policy_overrides", "policy_presets",

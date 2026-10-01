@@ -1485,14 +1485,16 @@ export const ANALYSIS_KINDS: AnalysisKind[] = [
         "type": "boolean",
         "default": true,
         "meaning": "Weight edges by `relative_revenue` rather than treating the graph as unweighted."
-      },
-      {
-        "name": "topology_digest",
-        "type": "string",
-        "default": null,
-        "meaning": "`public.network_topology_hash(project)` — a digest of the six columns `get_network_nodes_for_prominence` and `get_network_edges_for_prominence` return. IT IS AN INPUT TRAVELLING IN A PARAMETER AND THAT IS DECLARED HERE RATHER THAN HIDDEN: `current_graph_hash` covers eleven tier-2 tables and NOT `network_nodes`/`network_edges`, so without this the key cannot tell two different graphs apart and a re-uploaded network is served the previous graph's centralities as a hit. It belongs in `hash_network`; moving it there is a `schema_version` bump and a bump is unsafe until D70 lands, so WP 4.4 moves it and deletes this entry."
       }
     ]
+  },
+  {
+    "kind": "process_structure",
+    "computedBy": "public.process_structure (SQL, WP 10.1)",
+    "codeVersion": "process_structure@wp101.1",
+    "entityType": "node",
+    "note": "For every level-1 node of the process network, the nodes it reaches downstream and upstream, transitively, over `supply_chain_data_multi_tier`. Computed where the data is; the process page reads it instead of walking the graph in the browser on every selection (§4 D239).",
+    "params": []
   },
   {
     "kind": "prominence",
@@ -1506,12 +1508,6 @@ export const ANALYSIS_KINDS: AnalysisKind[] = [
         "type": "object",
         "default": null,
         "meaning": "The caller's `ProminenceConfig` — the four weights and the two caps. It is part of the key because two configs produce two different scores over one graph. `null` means the analyzer's `defaultConfig`, which the function fills in before the digest is taken, so a stored run always records the config it actually used rather than the word \"default\"."
-      },
-      {
-        "name": "topology_digest",
-        "type": "string",
-        "default": null,
-        "meaning": "See `network_metrics.topology_digest` — the same digest, for the same reason."
       }
     ]
   }
@@ -3581,8 +3577,8 @@ export type ProjectDeletion = {
 };
 
 export const PROJECT_DELETION: ProjectDeletion = {
-  "projectScoped": 49,
-  "cascade": 39,
+  "projectScoped": 50,
+  "cascade": 40,
   "detached": [
     "chat_threads",
     "user_files"
@@ -3688,8 +3684,14 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 57,
+  "described": 59,
   "open": [
+    {
+      "table": "analysis_kinds",
+      "roles": [
+        "public"
+      ]
+    },
     {
       "table": "approved_users",
       "roles": [
@@ -3848,6 +3850,7 @@ export const READ_EXPOSURE: ReadExposure = {
     }
   ],
   "signedOut": [
+    "analysis_kinds",
     "approved_users",
     "bom_multi_level",
     "bom_single_level",
