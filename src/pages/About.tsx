@@ -256,7 +256,19 @@ export default function About() {
       {/* Top bar — same as Landing */}
       <header className="sticky top-0 z-40 border-b border-[--hair-rule] bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-[min(100%,1152px)] min-[1920px]:max-w-[1320px] min-[2560px]:max-w-[1500px] items-center justify-between px-5 md:h-16 md:px-6">
-          <Link to="/" className="flex items-center">
+          {/* ACCURATE first, then SuReSuite — the project logo leads. */}
+          <Link to="/" className="flex items-center gap-2.5 md:gap-4">
+            <img
+              src="/logo1.png"
+              alt="ACCURATE"
+              className="h-[22px] w-auto object-contain md:hidden"
+            />
+            <img
+              src="/logo.png"
+              alt="ACCURATE"
+              className="hidden h-8 w-auto object-contain md:block"
+            />
+            <span aria-hidden className="h-5 w-px bg-border md:h-9" />
             <img
               src="/logo-mark.png"
               alt="SuReSuite — Supply Chain Resilience Suite"

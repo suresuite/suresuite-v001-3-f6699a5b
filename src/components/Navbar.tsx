@@ -197,11 +197,11 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
             <>
               <div className="absolute left-2 right-10 top-0 h-full flex items-center justify-center">
                 <img
-                  src="/logo-mark.png"
-                  alt="SuReSuite"
-                  className="object-contain h-5 w-auto"
-                  width={108}
-                  height={20}
+                  src="/logo.png"
+                  alt="ACCURATE"
+                  className="object-contain h-6 w-auto"
+                  width={105}
+                  height={24}
                 />
               </div>
               <div className="absolute right-2 top-0 h-full flex items-center">
@@ -224,9 +224,9 @@ const Navbar = ({ isCollapsed, setIsCollapsed }: NavbarProps) => {
                 className="group relative p-2 rounded-md hover:bg-muted hover:text-foreground"
               >
                 <img
-                  src="/logo-icon.png"
-                  alt="SuReSuite compact"
-                  className="h-5 w-5 object-contain transition-opacity group-hover:opacity-0"
+                  src="/logo1.png"
+                  alt="ACCURATE compact"
+                  className="h-6 w-6 object-contain transition-opacity group-hover:opacity-0"
                 />
                 <ChevronRight
                   size={14}
