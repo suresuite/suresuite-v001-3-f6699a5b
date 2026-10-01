@@ -162,6 +162,10 @@ PROJECT_DISCOVERY_KEY = "sim.active_projects"  # set populated by edge function 
 # first-ever stream — streams persist, so repeat runs are unaffected.
 DEFAULT_PROJECTS_REFRESH = 30.0  # seconds
 EVICT_INTERVAL = 60.0
+# The series sweep (WP 10.9 · §4 D252): production ships no pg_cron, so the
+# worker is what runs retention — once at boot (every wake from scale-to-zero)
+# and then daily while it stays up.
+SERIES_SWEEP_INTERVAL = 24 * 60 * 60
 XREAD_BLOCK_MS = 30000
 
 
@@ -218,6 +222,7 @@ class SimWorker:
     async def run(self) -> None:
         await self._report_engine()
         self._tasks.append(asyncio.create_task(self._discover_loop()))
+        self._tasks.append(asyncio.create_task(self._series_sweep_loop()))
         self._tasks.append(asyncio.create_task(self._evict_loop()))
         if self._idle_shutdown > 0 and self._on_idle is not None:
             self._tasks.append(asyncio.create_task(self._idle_monitor()))
@@ -745,6 +750,59 @@ class SimWorker:
             {"series_object": path, "series_bytes": len(data)},
             [{**rep, "time_series": {}} for rep in reps],
         )
+
+    async def _series_sweep_loop(self) -> None:
+        while True:
+            await self._sweep_series()
+            await asyncio.sleep(SERIES_SWEEP_INTERVAL)
+
+    async def _sweep_series(self) -> dict[str, Any]:
+        """Expire due series (WP 10.6 retention) and remove their objects.
+
+        The database marks the runs and hands back every object path to remove —
+        the expired runs' and those queued by deleted runs — and the objects go
+        through the Storage API, which is the only way that frees the stored
+        bytes (a SQL delete on `storage.objects` drops the row and orphans the
+        file, and hosted Supabase refuses it). Never fatal: a failure is logged
+        with the paths, and the next sweep starts afresh."""
+        headers = {
+            "apikey": self._service_role_key,
+            "Authorization": f"Bearer {self._service_role_key}",
+            "Content-Type": "application/json",
+        }
+        try:
+            r = await self._http.post(
+                f"{self._supabase_url}/rest/v1/rpc/sweep_expired_run_series",
+                headers=headers, json={"p_limit": 500},
+            )
+            if r.status_code >= 300:
+                log.warning("series sweep failed %s %s", r.status_code, r.text[:200])
+                return {}
+            result = r.json() or {}
+        except Exception:
+            log.exception("series sweep failed")
+            return {}
+        paths = [p for p in (result.get("paths") or []) if isinstance(p, str) and p]
+        removed = 0
+        for i in range(0, len(paths), 100):
+            chunk = paths[i:i + 100]
+            try:
+                d = await self._http.request(
+                    "DELETE",
+                    f"{self._supabase_url}/storage/v1/object/{series_store.BUCKET}",
+                    headers=headers, json={"prefixes": chunk},
+                )
+                if d.status_code >= 300:
+                    log.warning("series objects not removed %s %s: %s",
+                                d.status_code, d.text[:200], chunk)
+                else:
+                    removed += len(chunk)
+            except Exception:
+                log.exception("series objects not removed: %s", chunk)
+        if result.get("runs") or paths:
+            log.info("series sweep: %s run(s) expired, %d of %d object(s) removed",
+                     result.get("runs", 0), removed, len(paths))
+        return {**result, "removed": removed}
 
     async def _report_engine(self) -> None:
         """Tell the engine registry which build this worker runs (WP 10.4). Never

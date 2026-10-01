@@ -25,14 +25,14 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "6aca18c287df";
+export const CONTRACT_VERSION = "cd592a2762e3";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261001000012_surrogate_training_set.sql";
+export const LAST_MIGRATION = "20261001000013_series_sweep_via_storage_api.sql";
 
 export const COUNTS = {
-  "tablesInSchema": 89,
-  "tablesDescribed": 72,
-  "columnsDescribed": 944,
+  "tablesInSchema": 90,
+  "tablesDescribed": 73,
+  "columnsDescribed": 948,
   "tablesUndescribed": 17
 } as const;
 
@@ -346,6 +346,12 @@ export const TIERS: GlanceTier[] = [
         "table": "run_replications",
         "grain": "One replication of one simulation run: the seed it used, the KPI row the engine computed for it, and its weekly series. A run has as many rows here as it has replications, and `rep_index` orders them. Tier 5 — a RESULT, derived from a tier-2 dataset by a named engine version, never an input to anything. Nothing downstream reads it except the result surfaces; a row is superseded by re-running, never edited.",
         "columns": 12,
+        "owner": "engine"
+      },
+      {
+        "table": "run_series_orphans",
+        "grain": "One series object in the `run-results` bucket whose run no longer exists, waiting to be removed. A deleted run queues its object here instead of deleting a storage row with SQL — which would orphan the stored file, and which hosted Supabase refuses — and the next series sweep hands the path to the worker, which removes it through the Storage API.",
+        "columns": 4,
         "owner": "engine"
       },
       {

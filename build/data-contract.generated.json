@@ -5,20 +5,20 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 376,
-      "migrations_applied": 368,
-      "last_migration": "20261001000012_surrogate_training_set.sql"
+      "migrations_found": 377,
+      "migrations_applied": 369,
+      "last_migration": "20261001000013_series_sweep_via_storage_api.sql"
     },
-    "sidecars": 72,
+    "sidecars": 73,
     "registry": {
       "engine_version": "0.2.8",
       "policies": 23
     }
   },
   "counts": {
-    "tables_in_schema": 89,
-    "tables_covered": 72,
-    "columns_covered": 944,
+    "tables_in_schema": 90,
+    "tables_covered": 73,
+    "columns_covered": 948,
     "check_constraints": 86,
     "engine_requirements": 7,
     "orphans": 0,
@@ -30614,6 +30614,189 @@
       "note": null,
       "analysis_kinds": null
     },
+    "run_series_orphans": {
+      "table": "run_series_orphans",
+      "schema_name": "public",
+      "tier": "5",
+      "tier_name": "results — pinned to dataset + policy + engine version",
+      "grain": "One series object in the `run-results` bucket whose run no longer exists, waiting to be removed. A deleted run queues its object here instead of deleting a storage row with SQL — which would orphan the stored file, and which hosted Supabase refuses — and the next series sweep hands the path to the worker, which removes it through the Storage API.",
+      "owner": "engine",
+      "created_by": "20261001000013_series_sweep_via_storage_api.sql",
+      "sidecar": "supabase/contract/run_series_orphans.contract.yaml",
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "path"
+          ],
+          "name": "run_series_orphans_pkey"
+        }
+      ],
+      "natural_key_intended": [
+        "path"
+      ],
+      "ingest_dataset": null,
+      "surfaces": [],
+      "governance": {
+        "read": null,
+        "write": null,
+        "min_project_role": "viewer",
+        "audited": false,
+        "rls_enabled": true,
+        "note": "No API role reads or writes it: RLS is on with no policy. Written only by the `simulation_runs_drop_series` trigger (SECURITY DEFINER) and drained only by `sweep_expired_run_series`, which is executable by the service role alone. NOT AUDITED: a work queue for one kind of cleanup, each row living from a run's delete to the next sweep; the delete itself is the audited event."
+      },
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [],
+        "determinate": true
+      },
+      "constraints": [
+        {
+          "name": "run_series_orphans_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "path"
+          ],
+          "definition": "PRIMARY KEY (path)",
+          "implicit": true,
+          "added_by": "20261001000013_series_sweep_via_storage_api.sql"
+        }
+      ],
+      "indexes": [],
+      "columns": [
+        {
+          "name": "path",
+          "type": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000013_series_sweep_via_storage_api.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The object's path in the `run-results` bucket (`<project_id>/<run_id>/series.parquet`), as the run's `series_object` held it.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000013_series_sweep_via_storage_api.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The deleted run's id — a record, not a reference: the run is gone.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "project_id",
+          "type": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000013_series_sweep_via_storage_api.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "The deleted run's project — also a record; the project may be gone too.",
+          "grain": "identifier",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        },
+        {
+          "name": "queued_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000013_series_sweep_via_storage_api.sql",
+          "unit": null,
+          "unit_source": "none",
+          "unit_column": null,
+          "normalize_at_promotion": null,
+          "meaning": "When the run was deleted; the sweep hands objects over oldest first.",
+          "grain": "metadata",
+          "computed_by": null,
+          "engine": {
+            "consumed_by": null,
+            "transform": null,
+            "missing_default": null
+          },
+          "substitutions": [],
+          "ingest": {
+            "csv_header": null,
+            "required": false,
+            "validate": null
+          },
+          "surfaces": [],
+          "resolution": null,
+          "note": null,
+          "engine_requirement": null
+        }
+      ],
+      "note": null,
+      "analysis_kinds": null
+    },
     "run_usage": {
       "table": "run_usage",
       "schema_name": "public",
@@ -41529,5 +41712,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "6aca18c287df"
+  "contract_version": "cd592a2762e3"
 }

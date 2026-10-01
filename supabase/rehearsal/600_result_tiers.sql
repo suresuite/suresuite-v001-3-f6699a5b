@@ -10,13 +10,22 @@
 -- §4 pinning is an editor's or owner's, never a viewer's; evidence cannot be
 --    released; an expired run cannot be pinned back to life.
 -- §5 the sweep and the evidence trigger are not API doors.
--- §6 a deleted run takes its series object with it (where the storage schema exists).
+-- §6 a deleted run QUEUES its series object, and the next sweep hands it over for
+--    removal through the Storage API — neither ever deletes a `storage.objects`
+--    row with SQL, which orphans the file and which hosted Supabase refuses
+--    (WP 10.9 · §4 D252; the stand-in below refuses it the same way).
 
 -- Supabase's `storage.objects`, reduced to the two columns the sweep and the
 -- delete trigger read. The prelude creates the schema and not the table, so
 -- without this every object path in §2 and §6 would skip on its guard and pass
 -- for the wrong reason.
 CREATE TABLE IF NOT EXISTS storage.objects (bucket_id text, name text);
+-- Hosted Supabase refuses a direct delete on its storage tables; so does this.
+CREATE OR REPLACE FUNCTION storage._r600_refuse_delete() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN RAISE EXCEPTION 'Direct deletion from storage tables is not allowed. Use the Storage API instead.'; END $$;
+DROP TRIGGER IF EXISTS r600_refuse_delete ON storage.objects;
+CREATE TRIGGER r600_refuse_delete BEFORE DELETE ON storage.objects
+  FOR EACH ROW EXECUTE FUNCTION storage._r600_refuse_delete();
 
 DO $rt600$
 DECLARE
@@ -147,18 +156,23 @@ BEGIN
     RAISE EXCEPTION 'R600 §5: the sweep is executable through the API';
   END IF;
 
-  -- ══ §6 · a deleted run takes its object with it ══
-  IF to_regclass('storage.objects') IS NOT NULL THEN
-    EXECUTE 'INSERT INTO storage.objects (bucket_id, name) VALUES ($1, $2)'
-      USING 'run-results', v_proj::text || '/' || v_pin::text || '/series.parquet';
-    UPDATE public.simulation_runs SET series_object = v_proj::text || '/' || v_pin::text || '/series.parquet'
-     WHERE id = v_pin;
-    DELETE FROM public.simulation_runs WHERE id = v_pin;
-    EXECUTE 'SELECT count(*) FROM storage.objects WHERE bucket_id = $1 AND name LIKE $2'
-      INTO v_n USING 'run-results', v_proj::text || '/' || v_pin::text || '/%';
-    IF v_n <> 0 THEN
-      RAISE EXCEPTION 'R600 §6: a deleted run''s series object outlived it';
-    END IF;
+  -- ══ §6 · a deleted run queues its object; the sweep hands it over ══
+  EXECUTE 'INSERT INTO storage.objects (bucket_id, name) VALUES ($1, $2)'
+    USING 'run-results', v_proj::text || '/' || v_pin::text || '/series.parquet';
+  UPDATE public.simulation_runs SET series_object = v_proj::text || '/' || v_pin::text || '/series.parquet'
+   WHERE id = v_pin;
+  -- Must not raise: a run delete never touches a storage row.
+  DELETE FROM public.simulation_runs WHERE id = v_pin;
+  IF NOT EXISTS (SELECT 1 FROM public.run_series_orphans
+                  WHERE path = v_proj::text || '/' || v_pin::text || '/series.parquet' AND run_id = v_pin) THEN
+    RAISE EXCEPTION 'R600 §6: a deleted run''s series object was not queued for removal';
+  END IF;
+  v_res := public.sweep_expired_run_series(100);
+  IF NOT (v_res -> 'paths') ? (v_proj::text || '/' || v_pin::text || '/series.parquet') THEN
+    RAISE EXCEPTION 'R600 §6: the sweep did not hand over the orphaned object: %', v_res;
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.run_series_orphans WHERE run_id = v_pin) THEN
+    RAISE EXCEPTION 'R600 §6: a handed-over object stayed queued';
   END IF;
 
   RAISE NOTICE 'R600 ok — expiry on completion, the sweep keeps the summary, evidence and pins kept, who may pin';

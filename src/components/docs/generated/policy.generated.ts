@@ -3592,7 +3592,7 @@ export type ProjectDeletion = {
 };
 
 export const PROJECT_DELETION: ProjectDeletion = {
-  "projectScoped": 52,
+  "projectScoped": 53,
   "cascade": 42,
   "detached": [
     "chat_threads",
@@ -3608,7 +3608,8 @@ export const PROJECT_DELETION: ProjectDeletion = {
   "neither": [
     "ai_chat_events",
     "ai_usage_logs",
-    "api_request_logs"
+    "api_request_logs",
+    "run_series_orphans"
   ],
   "asynchronous": false
 };
@@ -3699,7 +3700,7 @@ export type ReadExposure = {
 };
 
 export const READ_EXPOSURE: ReadExposure = {
-  "described": 72,
+  "described": 73,
   "open": [
     {
       "table": "analysis_kinds",

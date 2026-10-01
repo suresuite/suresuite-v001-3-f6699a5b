@@ -1,12 +1,12 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 376,
-  "migrations_applied": 368,
+  "migrations_found": 377,
+  "migrations_applied": 369,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000012_surrogate_training_set.sql",
+  "last_migration": "20261001000013_series_sweep_via_storage_api.sql",
   "counts": {
-    "tables": 89,
+    "tables": 90,
     "views": 8,
     "enums": 4,
     "functions": 391,
@@ -17794,6 +17794,91 @@
       ]
     },
     {
+      "name": "run_series_orphans",
+      "schema": "public",
+      "created_by": "20261001000013_series_sweep_via_storage_api.sql",
+      "columns": [
+        {
+          "name": "path",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": null,
+          "primary_key": true,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000013_series_sweep_via_storage_api.sql"
+        },
+        {
+          "name": "run_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000013_series_sweep_via_storage_api.sql"
+        },
+        {
+          "name": "project_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000013_series_sweep_via_storage_api.sql"
+        },
+        {
+          "name": "queued_at",
+          "quoted": false,
+          "type": "timestamp with time zone",
+          "type_raw": "timestamptz",
+          "nullable": false,
+          "default": "now()",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261001000013_series_sweep_via_storage_api.sql"
+        }
+      ],
+      "constraints": [
+        {
+          "name": "run_series_orphans_pkey",
+          "kind": "PRIMARY KEY",
+          "columns": [
+            "path"
+          ],
+          "definition": "PRIMARY KEY (path)",
+          "implicit": true,
+          "added_by": "20261001000013_series_sweep_via_storage_api.sql"
+        }
+      ],
+      "indexes": [],
+      "rls": {
+        "enabled": true,
+        "forced": false,
+        "policies": [],
+        "determinate": true
+      },
+      "replica_identity": null,
+      "comment": null,
+      "natural_key_unique": [
+        {
+          "source": "column PRIMARY KEY",
+          "columns": [
+            "path"
+          ],
+          "name": "run_series_orphans_pkey"
+        }
+      ]
+    },
+    {
       "name": "run_usage",
       "schema": "public",
       "created_by": "20261001000011_capacity.sql",
@@ -23655,7 +23740,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000010_result_tiers.sql"
+      "defined_by": "20261001000013_series_sweep_via_storage_api.sql"
     },
     {
       "name": "_simulation_run_retention",
@@ -28188,7 +28273,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000010_result_tiers.sql"
+      "defined_by": "20261001000013_series_sweep_via_storage_api.sql"
     },
     {
       "name": "switch_my_organization",

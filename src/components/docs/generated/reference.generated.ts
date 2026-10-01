@@ -92,7 +92,7 @@ export type RefTable = {
   columns: RefColumn[];
 };
 
-export const REFERENCE_COLUMN_COUNT = 944;
+export const REFERENCE_COLUMN_COUNT = 948;
 
 export const REFERENCE_TABLES: RefTable[] = [
   {
@@ -19828,6 +19828,133 @@ export const REFERENCE_TABLES: RefTable[] = [
         "required": false,
         "validate": null,
         "meaning": "When the row was inserted.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "metadata",
+        "computedBy": null
+      }
+    ]
+  },
+  {
+    "table": "run_series_orphans",
+    "tier": "5",
+    "tierName": "results — pinned to dataset + policy + engine version",
+    "owner": "engine",
+    "grain": "One series object in the `run-results` bucket whose run no longer exists, waiting to be removed. A deleted run queues its object here instead of deleting a storage row with SQL — which would orphan the stored file, and which hosted Supabase refuses — and the next series sweep hands the path to the worker, which removes it through the Storage API.",
+    "naturalKey": [
+      "path"
+    ],
+    "naturalKeyIntended": [
+      "path"
+    ],
+    "checks": [],
+    "ingestDataset": null,
+    "surfaces": [],
+    "governance": {
+      "read": null,
+      "write": null,
+      "minProjectRole": "viewer",
+      "audited": false,
+      "rlsEnabled": true
+    },
+    "rls": {
+      "enabled": true,
+      "determinate": true,
+      "policies": 0,
+      "unrestricted": 0
+    },
+    "columns": [
+      {
+        "name": "path",
+        "type": "text",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The object's path in the `run-results` bucket (`<project_id>/<run_id>/series.parquet`), as the run's `series_object` held it.",
+        "primaryKey": true,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "run_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The deleted run's id — a record, not a reference: the run is gone.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "project_id",
+        "type": "uuid",
+        "nullable": true,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "The deleted run's project — also a record; the project may be gone too.",
+        "primaryKey": false,
+        "unique": false,
+        "references": null,
+        "substitutions": [],
+        "engineChain": null,
+        "engineLevel": null,
+        "blank": null,
+        "engineField": null,
+        "engineMissingDefault": null,
+        "engineTransform": null,
+        "unitColumn": null,
+        "normalizeAtPromotion": null,
+        "quantityGrain": "identifier",
+        "computedBy": null
+      },
+      {
+        "name": "queued_at",
+        "type": "timestamp with time zone",
+        "nullable": false,
+        "unit": null,
+        "csvHeader": null,
+        "required": false,
+        "validate": null,
+        "meaning": "When the run was deleted; the sweep hands objects over oldest first.",
         "primaryKey": false,
         "unique": false,
         "references": null,

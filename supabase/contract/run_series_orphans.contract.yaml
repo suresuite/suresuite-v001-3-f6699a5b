@@ -1,0 +1,85 @@
+# AUTHORED — the data contract's sidecar for `run_series_orphans`.
+# WP 10.9 · §4 D252. Edit this file; docs/data/tables/*.md is generated from it.
+table: run_series_orphans
+tier: "5"
+schema_name: public
+grain: >-
+  One series object in the `run-results` bucket whose run no longer exists,
+  waiting to be removed. A deleted run queues its object here instead of
+  deleting a storage row with SQL — which would orphan the stored file, and
+  which hosted Supabase refuses — and the next series sweep hands the path to
+  the worker, which removes it through the Storage API.
+owner: engine
+
+natural_key_unique:
+  - source: "column PRIMARY KEY"
+    columns: [path]
+    name: "run_series_orphans_pkey"
+
+natural_key_intended: [path]
+
+governance:
+  read: null
+  write: null
+  min_project_role: viewer
+  audited: false
+  rls_enabled: true
+  note: >-
+    No API role reads or writes it: RLS is on with no policy. Written only by the
+    `simulation_runs_drop_series` trigger (SECURITY DEFINER) and drained only by
+    `sweep_expired_run_series`, which is executable by the service role alone.
+    NOT AUDITED: a work queue for one kind of cleanup, each row living from a
+    run's delete to the next sweep; the delete itself is the audited event.
+
+surfaces: []
+
+fields:
+  path:
+    type: "text"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The object's path in the `run-results` bucket
+      (`<project_id>/<run_id>/series.parquet`), as the run's `series_object` held it.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  run_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The deleted run's id — a record, not a reference: the run is gone.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  project_id:
+    type: "uuid"
+    unit: null
+    unit_source: none
+    meaning: >-
+      The deleted run's project — also a record; the project may be gone too.
+    grain: identifier
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null
+  queued_at:
+    type: "timestamp with time zone"
+    unit: null
+    unit_source: none
+    meaning: >-
+      When the run was deleted; the sweep hands objects over oldest first.
+    grain: metadata
+    engine: {consumed_by: null, transform: null, missing_default: null}
+    substitutions: []
+    ingest: {csv_header: null, required: false, validate: null}
+    surfaces: []
+    resolution: null

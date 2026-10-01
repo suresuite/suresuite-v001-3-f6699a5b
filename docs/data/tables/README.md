@@ -5,8 +5,8 @@
 > **GENERATED** — one page per table the data contract covers. Edit the sidecars in
 > `supabase/contract/`, not these pages.
 
-72 of 89 tables are covered,
-944 columns in all. A table that is not here is listed
+73 of 90 tables are covered,
+948 columns in all. A table that is not here is listed
 with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data-contract/coverage.yaml);
 `npm run contract:check` fails on a table that is in neither.
 
@@ -67,6 +67,7 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 | [`role_capabilities`](role_capabilities.md) | G | `platform` | 5 | One grant or denial, for one role and one capability. The OUTERMOST layer: what a role gets before any org, project or user says otherwise. |
 | [`run_item_series`](run_item_series.md) | 5 | `engine` | 7 | One item's weekly series from one INSPECTION run: a material or a product of the project, and a map of named weekly arrays for it (on-hand, in-transit and orders for a material; demand, production, fulfillment, backlog and lost units for a product). Written ONLY for an inspection run — exactly one replication, user-chosen seed, engine trace raised to full debug — because per-item evidence at multi-replication scale is deliberately not exposed; every other run has no rows here. Tier 5 — a RESULT of one run, input to nothing; a row is superseded by re-running, never edited. |
 | [`run_replications`](run_replications.md) | 5 | `engine` | 12 | One replication of one simulation run: the seed it used, the KPI row the engine computed for it, and its weekly series. A run has as many rows here as it has replications, and `rep_index` orders them. Tier 5 — a RESULT, derived from a tier-2 dataset by a named engine version, never an input to anything. Nothing downstream reads it except the result surfaces; a row is superseded by re-running, never edited. |
+| [`run_series_orphans`](run_series_orphans.md) | 5 | `engine` | 4 | One series object in the `run-results` bucket whose run no longer exists, waiting to be removed. A deleted run queues its object here instead of deleting a storage row with SQL — which would orphan the stored file, and which hosted Supabase refuses — and the next series sweep hands the path to the worker, which removes it through the Storage API. |
 | [`run_usage`](run_usage.md) | 5 | `engine` | 9 | One capacity event of one run: its reservation when it was dispatched (`dispatch`), what it actually used when it finished (`complete`), or the release of its series storage when the sweep expired them (`expire`). The ledger a month's compute is read from. |
 | [`scenario_templates`](scenario_templates.md) | 4 | `engine` | 15 | One shipped starting point for a scenario: a named disruption shape with its schedule, its suggested playbook and the run settings that go with it. A template is not a scenario — applying one WRITES a scenario, and the two diverge from that moment. |
 | [`scenarios`](scenarios.md) | 4 | `engine` | 23 | One what-if a person set up and can run: the horizon, the warm-up, the replications, the seed, the demand model, the disruption schedule and the recovery overrides. The scenario half of `result-binding` (I8) — a run cites one of these rows, and the export reads it back whole. |
@@ -87,4 +88,4 @@ with its reason in [`scripts/data-contract/coverage.yaml`](../../../scripts/data
 
 ---
 
-*Generated from data contract `6aca18c287df`, engine `0.2.8`.*
+*Generated from data contract `cd592a2762e3`, engine `0.2.8`.*
