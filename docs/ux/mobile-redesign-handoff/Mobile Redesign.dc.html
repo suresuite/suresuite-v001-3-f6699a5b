@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/suresuite-design-system-1b90e896-e2f4-4c23-a38e-f9a3483c7409/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/suresuite-design-system-1b90e896-e2f4-4c23-a38e-f9a3483c7409/tokens/colors.css">
+<link rel="stylesheet" href="_ds/suresuite-design-system-1b90e896-e2f4-4c23-a38e-f9a3483c7409/tokens/typography.css">
+<link rel="stylesheet" href="_ds/suresuite-design-system-1b90e896-e2f4-4c23-a38e-f9a3483c7409/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/suresuite-design-system-1b90e896-e2f4-4c23-a38e-f9a3483c7409/tokens/elevation.css">
+<link rel="stylesheet" href="_ds/suresuite-design-system-1b90e896-e2f4-4c23-a38e-f9a3483c7409/tokens/base.css">
+<link rel="stylesheet" href="_ds/suresuite-design-system-1b90e896-e2f4-4c23-a38e-f9a3483c7409/styles.css">
+<script src="_ds/suresuite-design-system-1b90e896-e2f4-4c23-a38e-f9a3483c7409/_ds_bundle.js"></script>
+<style>body{margin:0;background:#f4f4f4;font-family:'Inter Variable','DejaVu Sans','Segoe UI Symbol','Apple Symbols',sans-serif;-webkit-font-smoothing:antialiased;color:#171717} a{color:#171717;text-underline-offset:3px} a:hover{color:#bf2330}</style>
+</helmet>
+<header style="padding:56px 56px 32px;display:flex;flex-direction:column;gap:14px;max-width:1100px">
+<div style="font-family:'JetBrains Mono Variable','DejaVu Sans Mono','DejaVu Sans','Segoe UI Symbol',monospace;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#525252;display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:3px;background:#bf2330"></span>SuReSuite · mobile redesign spec</div>
+<h1 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.022em;line-height:1.15">Phone experience — below 768 px and phones held sideways. Desktop does not move a pixel.</h1>
+<p style="margin:0;font-size:15px;line-height:1.55;color:#525252;max-width:820px">Every screen extends the existing mobile skin: 93% canvas, 4 px panels, mono micro-labels, 44 px rows, 58 px tab bar, 64 px pinned action. Each section shows 390 × 844 first, then 320 × 568, then a one-line map from every control to the action it already calls, and how it stays off desktop.</p>
+<nav style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+<sc-for list="{{ sections }}" as="s" hint-placeholder-count="10"><a href="#{{ s.id }}" style="min-height:36px;display:flex;align-items:center;padding:0 12px;border:1px solid #d4d4d4;border-radius:4px;background:#fff;font-size:13px;font-weight:500;text-decoration:none;gap:8px"><span style="font-family:'JetBrains Mono Variable','DejaVu Sans Mono','DejaVu Sans','Segoe UI Symbol',monospace;font-size:10.5px;color:#525252">{{ s.k }}</span>{{ s.short }}</a></sc-for>
+</nav>
+</header>
+<sc-for list="{{ sections }}" as="s" hint-placeholder-count="3">
+<section id="{{ s.id }}" style="padding:44px 56px 56px;border-top:1px solid #d4d4d4;display:flex;flex-direction:column;gap:14px">
+<div style="font-family:'JetBrains Mono Variable','DejaVu Sans Mono','DejaVu Sans','Segoe UI Symbol',monospace;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#525252">{{ s.k }}</div>
+<h2 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.019em">{{ s.title }}</h2>
+<sc-if value="{{ s.hasProblem }}" hint-placeholder-val="{{ true }}"><p style="margin:0;font-size:14.5px;line-height:1.55;color:#525252;max-width:860px">{{ s.problem }}</p></sc-if>
+<sc-if value="{{ s.hasMech }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:10px;align-items:flex-start;max-width:860px"><span style="flex:none;font-family:'JetBrains Mono Variable','DejaVu Sans Mono','DejaVu Sans','Segoe UI Symbol',monospace;font-size:10px;padding:3px 7px;border-radius:3px;background:#18181b;color:#fff;letter-spacing:0.06em">desktop unchanged</span><span style="font-size:13px;line-height:1.5;color:#171717">{{ s.mech }}</span></div></sc-if>
+<div data-frames="{{ s.id }}" style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start;margin-top:14px"></div>
+<sc-if value="{{ s.hasCards }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-top:10px;max-width:1500px">
+<sc-for list="{{ s.cards }}" as="c" hint-placeholder-count="3"><div style="border:1px solid #d4d4d4;border-radius:4px;background:#fff;overflow:hidden"><div style="display:flex;justify-content:space-between;gap:10px;padding:9px 14px;background:#fafafa;border-bottom:1px solid #e8e8ea;font-family:'JetBrains Mono Variable','DejaVu Sans Mono','DejaVu Sans','Segoe UI Symbol',monospace;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#525252"><span>{{ c.title }}</span><span style="letter-spacing:0.04em;text-transform:none">{{ c.tag }}</span></div><div style="padding:12px 14px;display:flex;flex-direction:column;gap:7px"><sc-for list="{{ c.lines }}" as="l" hint-placeholder-count="3"><div style="display:flex;gap:8px;font-size:13px;line-height:1.5;color:#171717"><span style="color:#8a8a8a">·</span><span>{{ l }}</span></div></sc-for></div></div></sc-for>
+</div>
+</sc-if>
+</section>
+</sc-for>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;show320&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;View&quot;},&quot;showMaps&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;View&quot;}}">
+class Component extends DCLogic {
+  componentDidMount(){this.inject();}
+  componentDidUpdate(){this.inject();}
+  inject(){const m=this._html||{};document.querySelectorAll('[data-frames]').forEach(el=>{const k=el.getAttribute('data-frames');if(m[k]!=null&&el.__h!==m[k]){el.innerHTML=m[k];el.__h=m[k];}});}
+  data() {
+    const LYON = 'Lyon Stamping Plant — FY27 resilience study';
+    const R=(label,o={})=>({k:'row',label,...o});
+    const F=(field,input,o={})=>({k:'field',field,input,...o});
+    const B=(label,dot='ink')=>({k:'bullet',label,dot});
+    const S=()=>({k:'skel'});
+    const P=(label,count,rows,o={})=>({kind:'panel',label,count,rows,...o});
+    const NOTE=t=>({kind:'note',text:t}), LBL=t=>({kind:'label',text:t}), LINK=t=>({kind:'link',text:t});
+    const SEARCH=t=>({kind:'search',text:t}), PROJ=()=>({kind:'project',text:LYON});
+    const SEG=(items,active,cols)=>({kind:'seg',items,active,cols});
+    const CHIPS=(items,active)=>({kind:'chips',items,active});
+    const TOOL=(text,ctrls)=>({kind:'toolbar',text,ctrls});
+    const INTRO=(title,italic,text)=>({kind:'intro',title,italic,text});
+
+    const users = [SEARCH('Search name, email, organization'), P('Users','7',[
+      R('Camille Laurent',{dot:'teal',sub:'super_admin · ★ Northwind Industrial Manufacturing',sub2:'$48.12 this month',c:1}),
+      R('Rahul Venkataraman-Iyer',{dot:'teal',sub:'admin · ★ Northwind · now in Contoso · +1 org',sub2:'$7.90 this month',c:1}),
+      R('Sofia Marchetti',{dot:'teal',sub:'modeler · ★ Fabrikam · +2 orgs',sub2:'$1.44 of $25 this month · until 6/30/2027',c:1}),
+      R('Jonas Björklund',{dot:'teal',sub:'no platform role · ★ Northwind',sub2:'$0.00 this month',c:1}),
+      R('Aiko Tanaka',{dot:'grey',sub:'user · suspended · ★ Northwind · now in Contoso',c:1}),
+      R('Mateo Fernández García',{dot:'teal',sub:'modeler · ★ Northwind · now in Fabrikam',sub2:'$21.37 this month',c:1}),
+      R('Grace Okonkwo',{dot:'teal',sub:'no platform role · ★ Northwind',sub2:'$0.20 this month',c:1})],{full:1})];
+    const usersScr = {title:'Users',caret:1,icons:['↻'],tab:'More',items:users};
+    const projects = [SEARCH('Search name, organization, owner'), P('Projects','4',[
+      R(LYON,{dot:'grey',sub:'Northwind Industrial Manufacturing',sub2:'owner Camille Laurent',chip:'draft',c:1}),
+      R('Ingolstadt e-Axle supply network',{dot:'teal',sub:'Contoso Automotive Components GmbH',sub2:'owner Rahul Venkataraman-Iyer',chip:'done',c:1}),
+      R('Cork catheter line (Class III) dual-sourcing',{dot:'grey',sub:'Northwind Industrial Manufacturing',sub2:'owner Sofia Marchetti',chip:'draft',c:1})])];
+    const projScr = {title:'Projects',caret:1,icons:['↻'],tab:'More',items:projects};
+    const orgs = [P('Organizations','4',[
+      R('Northwind Industrial Manufacturing',{dot:'teal',sub:'4 members · 2 projects',sub2:'annual · until 6/30/2027',c:1}),
+      R('Contoso Automotive Components GmbH',{dot:'teal',sub:'2 members · 1 project',sub2:'until 6/30/2027',c:1}),
+      R('Fabrikam Medical Devices',{dot:'teal',sub:'2 members · 1 project',sub2:'until 6/30/2027',c:1})])];
+    const hub = [
+      P(null,null,[R('Sofia Marchetti',{sub:'s.marchetti@fabrikam-med.com',sub2:'★ Fabrikam Medical Devices — every sign-in lands here',chip:'modeler'})]),
+      P('Access','6',[
+        R('Organizations',{sub:'default Fabrikam Medical Devices',value:'3',c:1}),
+        R('Projects',{sub:'editor · owner · 1 via organization',value:'3',c:1}),
+        R('Pages',{sub:'Developer API denied · Super Admin off by default',value:'9 of 11',c:1}),
+        R('Features',{sub:'AI Assistant Button off',value:'6 of 7',c:1}),
+        R('AI models',{sub:'default Claude Sonnet · fallback Claude Haiku',value:'2',c:1}),
+        R('Budget',{sub:'$1.44 of $25.00 this month',sub2:'$0.12 of $3.00 today',c:1})]),
+      P(null,null,[R('Show preview',{sub:'the navigation and abilities she sees on her next login',c:1})])];
+    const hubScr = {title:'User access',back:1,tab:'More',items:hub};
+    const seg3 = (a)=>({value:['Inherit','Allow','Deny'][a],c:1});
+    const legend = {title:'What each role grants',sub:'Project roles · read-only',items:[P(null,null,[
+      R('Owner',{sub:'all 8 rights, including manage members',ticks:[1,1,1,1,1,1,1,1]}),
+      R('Editor',{sub:'7 of 8 · everything but manage members',ticks:[1,1,1,1,1,1,1,0]}),
+      R('Analyst',{sub:'5 of 8 · no input data, policies or members',ticks:[1,1,1,0,0,1,1,0]}),
+      R('Viewer',{sub:'2 of 8 · sees the project and views data',ticks:[1,0,1,0,0,0,0,0]})]),
+      NOTE('Order of ticks: sees project · edits settings · view data · edit input data · edit policies · run simulations · export · manage members.')],primary:'Done'};
+    const members = [P('With a project role','4',[
+      R('Camille Laurent · Owner',{sub:'fixed · owner of Northwind Industrial Manufacturing',sub2:'8 of 8 rights',c:1}),
+      R('Rahul Venkataraman-Iyer · Editor',{sub:'via Northwind · granted by Camille Laurent',sub2:'7 of 8 rights',c:1}),
+      R('Sofia Marchetti · Analyst · until 11/15/2026',{sub:'delegated by Rahul Venkataraman-Iyer',sub2:'5 of 8 rights',c:1}),
+      R('Jonas Björklund · Viewer · until 12/31/2026',{sub:'via Northwind',sub2:'2 of 8 rights',c:1})]),
+      P('No project role','1',[R('Grace Okonkwo',{sub:'sees it while working in Northwind',sub2:'Viewer rights · 2 of 8',c:1})]),
+      LINK('What each role grants')];
+    const profileItems = [
+      SEG(['Profile','My access','My organization','Change password'],0,2),
+      P('You can edit','3',[R('Avatar colour',{dot:'teal',value:'teal',c:1}),F('User name','Camille',{hint:'Shown in the navigation and account menu. Leave blank to use your full name.'}),F('Phone','+33 6 12 34 56 78')]),
+      P('Account',null,[R('User ID',{sub:'11111111-1111-4111-8111-111111111111',btn:'Copy'}),R('Name',{value:'Camille Laurent',reason:'Changed only by an administrator.'}),R('Email',{sub:'camille.laurent@northwind-industrial.com'}),R('Role',{value:'Super admin'})]),
+      P('Your organizations','3',[R('Northwind Industrial Manufacturing',{sub:'owner · ★ default · current'}),R('Contoso Automotive Components GmbH',{sub:'admin',btn:'Switch'}),R('Fabrikam Medical Devices',{sub:'member',btn:'Switch'})]),
+      P('Plan',null,[R('Valid for',{value:'annual, from Jan 1, 2026'}),R('Valid until',{value:'Jun 30, 2027',reason:'Does not apply to super admins.'}),R('Organization users',{value:'7 of 50'}),R('Organization projects',{value:'4 of 25'})])];
+    const switchSheet = {title:'Switch organization',sub:'You work in one organization at a time',items:[P(null,null,[
+      R('Northwind Industrial Manufacturing',{sub:'owner · ★ default',chip:'current',tone:'ink'}),
+      R('Contoso Automotive Components GmbH',{sub:'admin',btn:'Switch'}),
+      R('Fabrikam Medical Devices',{sub:'member',btn:'Switch'})]),
+      NOTE('Switching reloads the app. Each sign-in starts in your default organization, set by an administrator.')],second:'Close'};
+    const pmBg = [SEARCH('Find a project'), P('Last opened','just now',[R(LYON,{sub:'draft — BOM, inbound, outbound missing',subTone:'amb'})],{dark:1}), P(LYON,'0 / 5',[R('Datasets',{dot:'red',sub:'BOM ✗ · Inbound ✗ · Outbound ✗ · Deep node ✗',value:'0/5'}),R('Project actions',{sub:'data, item master, combine, edit, delete',value:'6',c:1})])];
+    const rec = (n,a,b,q,l)=>P(`Record ${n} of 6`,null,[R('Parent item',{value:a}),R('Component',{value:b}),R('Qty / assy',{value:q}),R('BOM level',{value:l}),R('Plant',{value:'Lyon Saint-Priest'})]);
+    const viewData = {title:'View data',sub:LYON,full:1,items:[CHIPS(['BOM','Inbound','Outbound','Node list','Deep tier'],0),TOOL('6 records · page 1 of 1',[{t:'10 rows ▾'},{t:'↻'}]),rec(1,'A-100','P-40210','2','1'),rec(2,'P-40210','P-40211','4','2')],primary:'Download CSV',second:'Close'};
+    const dataMap = [PROJ(), SEG(['Policies','Guide','Data map'],2), SEG(['Policies page','Uploaded data → engine'],0),
+      P('Columns by effect','42',[R('Changes the run',{dot:'teal',value:'24'}),R('Only when…',{dot:'amb',value:'6',reason:'Changes the run only under the condition named on its card.'}),R('Shown ≠ run',{dot:'red',value:'2'}),R('Ignored by the run',{dot:'red',value:'3'}),R('Disabled',{dot:'grey',value:'4'}),R('Information',{dot:'grey',value:'3'})]),
+      NOTE('Read from the grid’s own specification. Counted in production on 2026-09-29, across every project.'),
+      P(null,null,[R('All 42 columns',{sub:'one card per column — what it shows, where an edit is saved, what the engine uses',c:1})])];
+    const stageTree = [PROJ(), P('Configure SC policies','2 / 4 ready',[R('Supplier',{num:'1',numDark:1,dot:'red',sub:'6 lines · 6 need input',c:1})],{dark:1}),
+      P('Supplier · BOM tree','6 lines',[
+        R('A-100 · Stamped bracket assembly',{sub:'level 0 · finished good · Lyon Saint-Priest'}),
+        R('P-40210',{indent:1,dot:'red',sub:'level 1 · in A-100',sub2:'needs supplier',value:'2 per assy',c:1}),
+        R('P-40211',{indent:2,dot:'red',sub:'level 2 · in P-40210',sub2:'needs supplier',value:'4 per assy',c:1}),
+        R('P-40212',{indent:2,dot:'red',sub:'level 2 · in P-40210',sub2:'needs supplier',value:'1 per assy',c:1}),
+        R('P-40213',{indent:1,dot:'red',sub:'level 1 · in A-100',sub2:'needs supplier',value:'6 per assy',c:1})]),
+      NOTE('Indent = BOM level (16 px per level). Qty / assy is the right-aligned value; it never moves into the sub-line.')];
+    const T = {
+      home:'M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z',
+      pol:'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
+      lab:'M9 3h6M10 3v6l-5 9.5A1.7 1.7 0 0 0 6.5 21h11a1.7 1.7 0 0 0 1.5-2.5L14 9V3M7.5 15h9',
+      int:'M12 4a4 4 0 0 0-4 4 4 4 0 0 0-2 7 4 4 0 0 0 6 5 4 4 0 0 0 6-5 4 4 0 0 0-2-7 4 4 0 0 0-4-4zM12 4v16',
+      more:'M4 7h16M4 12h16M4 17h16'};
+    this.tabIcons = T;
+
+    return [
+    {id:'delta',k:'01',short:'System delta',title:'Mobile system delta — what is added or changed',
+     problem:'Seven components. Every one is either new and mounted only by the mobile shell, or an existing desktop component wrapped by useIsMobile() so the desktop branch is the untouched original.',
+     screens:[
+      {spec:1,w:360,cap:'List row v2 · states',items:[P('Users','6 states',[
+        R('Sofia Marchetti',{dot:'teal',sub:'modeler · ★ Fabrikam · +2 orgs',sub2:'$1.44 of $25 this month',c:1}),
+        R('Pressed',{sub:'background #f4f4f5 · 120 ms',pressed:1,c:1}),
+        R('Delete project',{muted:1,reason:'Only the project owner can delete it.'}),
+        S(),
+        R('Couldn’t load users',{dot:'red',sub:'the request failed — nothing was changed',btn:'Retry'})],{}),
+        P('Users','0',[],{empty:'No users match “lyo”.',emptyBtn:'Clear search'})]},
+      {spec:1,w:360,cap:'Rights summary · More account block',items:[
+        P('Rights summary',null,[R('Rahul Venkataraman-Iyer · Editor',{sub:'7 of 8 rights · via Northwind',ticks:[1,1,1,1,1,1,1,0],c:1}),R('Sofia Marchetti · Analyst · until 11/15/2026',{sub:'5 of 8 rights · delegated',ticks:[1,1,1,0,0,1,1,0],c:1})]),
+        P('Account',null,[R('Camille',{sub:'super_admin',btn:'Sign out'}),R('Northwind Industrial Manufacturing',{sub:'current organization · ★ default'}),R('Switch organization',{value:'3',c:1})])]},
+     ],
+     cards:[
+      {title:'List row v2',tag:'MobileRow',lines:['Dot · label · up to two mono sub-lines · value · chip · trailing (chevron, 44 px icon, Switch, segmented).','Text wraps, never truncates. 44 px one line, 52 px with sub-lines.','States: default · pressed #f4f4f5 · disabled = #a3a3a3 label + visible 12 px reason · loading = skeleton at row height · error = red dot + Retry · empty = one sentence + next action.','Mechanism: rendered only inside mobile Panel (already mobile-only).']},
+      {title:'ConfirmSheet',tag:'useConfirm()',lines:['Title names the object with a question mark. Consequences are the existing confirm() message split into bullets — no new wording.','Red #bf2330 primary verb + Cancel. Typed-name variant: field present, never auto-focused; primary disabled with a visible reason until the name matches.','Loading: primary shows “Deleting…” and is disabled; error: red 12 px line above the buttons, sheet stays open.','Mechanism: useConfirm() returns window.confirm on desktop (unchanged) and opens ConfirmSheet when useIsMobile().']},
+      {title:'DataTableSheet',tag:'mobile only',lines:['Full-height sheet: dataset chips (wrap, 44 px), toolbar with “6 records”, rows-per-page, Refresh; records as label/value cards.','Download CSV pinned. No horizontal scroll anywhere.','Mechanism: ProjectViewData renders <DataTableSheet> when useIsMobile(); the inline 256 px desktop table is the else branch, untouched.']},
+      {title:'Unified bottom sheet',tag:'MobileSheet',lines:['16 px top radius · 36 × 4 grab bar · drag to dismiss · left-aligned 17 px title + 12 px sub · 44 px ✕.','Max 76% of the area above the tab bar (full-height variant for data); stops above the tab bar; safe-area padding; the only shadow in the app.','Footer: optional secondary + one primary, 46 px. No input focuses on open (onOpenAutoFocus → preventDefault).','Mechanism: ResponsiveDialog = useIsMobile() ? MobileSheet : the existing Dialog. Replaces the 12 px-radius dialog skin on mobile only.']},
+      {title:'Admin header title-switcher',tag:'MobileAdminHeader',lines:['Title becomes a 44 px button: “Users ▾”. Opens a sheet of the 8 super-admin sections (same routes as the desktop tab strip).','Removes the 190 px “Super admin · tap to switch section” panel — that panel is already mobile-only.']},
+      {title:'Rights summary',tag:'RightsSummary',lines:['“5 of 8 rights” counted from the capability list the row already receives, plus eight 2 px ticks in a fixed order.','Tap opens the full list (✓ / ⊘ rows). Desktop keeps its chip grid.']},
+      {title:'More-menu account block',tag:'MobileNavDrawer',lines:['Avatar · user name · role · Sign out (44 px).','Current organization row (★ when it is the default) and “Switch organization ›” — calls the same switchOrganization() as My profile.','MobileNavDrawer exists only in the mobile shell.']}]},
+
+    {id:'p0-1',k:'P0-1',short:'User access hub',title:'Admin → a user’s access page becomes a hub',
+     problem:'One panel of summary rows replaces the 6 000 px page. Each row opens its own sheet; the role switch moves out of the list into the organization’s sheet.',
+     mech:'AdminUserAccess renders <MobileUserHub> when useIsMobile(); the desktop long-form page is the untouched else branch. Sheets reuse the same handlers.',
+     screens:[
+      {...hubScr,small:1,cap:'Hub',action:{label:'Add to a project'},map:['Organizations › → organizations sheet','Projects › → projects sheet (change role, remove)','Pages / Features › → allow · deny · inherit sheet','AI models › → allowed, default, fallback models','Budget › → budget sheet','Show preview → show / hide preview','Add to a project → existing add with role, end date, reason']},
+      {...hubScr,small:1,cap:'Organizations sheet',sheet:{title:'Organizations',sub:'Sofia Marchetti · 3',items:[P(null,null,[
+        R('Fabrikam Medical Devices',{sub:'member · ★ default · active',sub2:'until 6/30/2027',c:1}),
+        R('Northwind Industrial Manufacturing',{sub:'member · 4 members · 2 projects',sub2:'until 6/30/2027',c:1}),
+        R('Contoso Automotive Components GmbH',{sub:'admin · 2 members · 1 project',sub2:'until 6/30/2027',c:1})]),
+        NOTE('Its projects are visible when she switches to that organization.')],second:'Add to organization',primary:'Done'},
+        map:['Row › → that organization’s sheet','Add to organization → add with role','Done → close']},
+      {...hubScr,cap:'One organization',sheet:{title:'Contoso Automotive Components GmbH',sub:'Sofia Marchetti in this organization',items:[LBL('Role'),SEG(['Owner','Admin','Member'],1),
+        P(null,null,[R('Default organization',{sub:'every sign-in lands in the default',star:'off'}),R('2 members · 1 project',{sub:'access until 6/30/2027'})]),
+        P(null,null,[R('Remove from organization…',{danger:1,dot:'red',c:1})])],primary:'Done'},
+        map:['Owner / Admin / Member → change role (applies at once, as on desktop)','☆ → set default · ★ → clear default','Remove… → ConfirmSheet → remove']},
+      {...hubScr,small:1,cap:'Budget & limits',sheet:{title:'Budget & limits',sub:'Sofia Marchetti',full:1,items:[
+        P('This month',null,[R('Cost this month',{value:'$1.44 of $25.00'}),R('Cost today',{value:'$0.12 of $3.00'}),R('Requests this month',{value:'77'}),R('Requests today',{value:'6 of 400'})]),
+        P('Budgets & limits',null,[F('Monthly budget (USD)','25'),F('Daily budget (USD)','3'),F('Monthly token limit','2000000'),F('Requests / min','20'),F('Requests / day','400')])],primary:'Save budgets & limits'},
+        map:['Fields → same budget inputs','Save budgets & limits → existing save']},
+      {...hubScr,cap:'Pages',sheet:{title:'Pages',sub:'9 of 11 · allow, deny or inherit the role default',full:1,items:[P(null,null,[
+        R('Getting Started',{sub:'default allow · on',...seg3(0)}),R('Project Manager',{sub:'default allow · on',...seg3(0)}),R('Policies',{sub:'default allow · on',...seg3(0)}),R('Simulation Lab',{sub:'default allow · on',...seg3(0)}),R('Developer API',{sub:'default allow · off',...seg3(2)}),R('My Profile',{sub:'always available',muted:1}),R('Super Admin',{sub:'default deny · off',...seg3(0)})])],primary:'Done'},
+        map:['Row › → Inherit / Allow / Deny picker → existing page-access toggle','My Profile has no control — always available (as desktop)']}]},
+
+    {id:'p0-2',k:'P0-2',short:'Organizations sheet',title:'Admin → Users → “Organizations” sheet fits the phone',
+     problem:'Full-width list, name on line 1, “owner · default · current” on line 2, ★ and remove as 44 px targets. The explanation is one line plus a link; the add form is behind a button.',
+     mech:'The sheet already renders through the mobile actions sheet; its content component branches on useIsMobile(). Desktop dialog content is unchanged.',
+     screens:[
+      {...usersScr,small:1,cap:'Camille Laurent',sheet:{title:'Organizations',sub:'Camille Laurent',items:[P(null,null,[R('Northwind Industrial Manufacturing',{sub:'owner · default · current',star:'on',rm:1})]),NOTE('Every sign-in lands in the default organization (★).'),LINK('What’s the default?')],second:'Add to organization',primary:'Done'},
+       map:['★ → set / clear default','✕ → ConfirmSheet → remove from organization','What’s the default? → small explainer sheet','Add to organization → add sheet','Done → close']},
+      {...usersScr,cap:'Rahul · 2 organizations',sheet:{title:'Organizations',sub:'Rahul Venkataraman-Iyer',items:[P(null,null,[R('Northwind Industrial Manufacturing',{sub:'admin · default',star:'on',rm:1}),R('Contoso Automotive Components GmbH',{sub:'member · current',star:'off',rm:1})]),NOTE('Every sign-in lands in the default organization (★).'),LINK('What’s the default?')],second:'Add to organization',primary:'Done'}},
+      {...usersScr,small:1,cap:'Add to organization',sheet:{title:'Add to organization',sub:'Camille Laurent',items:[P(null,null,[R('Organization',{value:'Choose…',c:1})]),LBL('Role there'),SEG(['Owner','Admin','Member'],2)],second:'Back',primary:'Add',disabled:1,reason:'Choose an organization first.'},
+       map:['Organization › → picker sheet (existing list)','Role → existing role select','Add → add with role']},
+      {...usersScr,cap:'What’s the default?',sheet:{title:'What’s the default?',items:[P(null,null,[B('Every sign-in lands in the default organization (★).'),B('Between sign-ins they can switch from the account menu; that does not change the default.'),B('With no default set, they sign in where they last worked.'),B('Removing the organization they are working in moves them to their default, else to their next organization.')])],primary:'Got it'},
+       map:['Same sentences as today’s 4-line paragraph, one per bullet']}]},
+
+    {id:'p0-3',k:'P0-3',short:'Landscape',title:'Phone held sideways — mobile shell at 844 × 390',
+     problem:'52 px tab bar, 44 px header that absorbs the primary action, two columns where the list allows. No icon sidebar, no credit footer, no floating AI bubble.',
+     mech:'Mobile detection adds (pointer: coarse) and (max-height: 500px). At ≥ 768 px with a mouse nothing matches, so D1–D4 render as today.',
+     screens:[
+      {land:1,cap:'Home',title:'Getting started',tab:'Home',icons:['C'],hdrAction:'Continue',items:[
+        P('Where you left off',null,[R(LYON,{sub:'Lyon Saint-Priest · Make-To-Order · multi · deep tier',c:1})],{dark:1}),
+        P('Quick start','3',[R('Import supply chain data',{num:'1',yel:1,sub:'CSV · nodes, edges, BOM',c:1}),R('Discover critical vulnerabilities',{num:'2',yel:1,sub:'nexus nodes · single-source exposure',c:1}),R('Simulate resilience strategies',{num:'3',yel:1,sub:'replications · ±95 % CI',c:1})],{grow:'span 2'})],
+       map:['Continue → same as portrait Continue','Avatar → profile']},
+      {land:1,cap:'Policies',title:'Policies',tab:'Policies',hdrProject:1,hdrAction:'Save model version',items:[
+        P('Model version','Live',[R('Current (live working copy)',{dot:'amb',value:'unsaved'}),R('Version history',{sub:'every saved model version',value:'4',c:1})]),
+        P('Configure SC policies','2 / 4 ready',[R('Supplier',{num:'1',numDark:1,dot:'red',sub:'6 lines · 6 need input',c:1}),R('Focal plant',{num:'2',dot:'teal',sub:'0 lines resolved',c:1}),R('Customer',{num:'3',dot:'teal',sub:'0 lines resolved',c:1}),R('Run & validate',{num:'4',dot:'grey',sub:'6 lines blocking',c:1})],{dark:1,grow:'span 2'}),
+        P('Planning unit','week',[R('Week',{sub:'fixed to weeks',value:'364 days · 52.0 weeks'})])]},
+      {land:1,cap:'Simulation Lab',title:'Simulation Lab',tab:'Lab',hdrSeg:[['Setup','Events','Run','Results','Compare'],0],hdrAction:'Save version & run',hdrDisabled:1,items:[
+        {...NOTE('Unsaved policy state — saving a version binds the run to it.'),full:1},
+        P('Required-data gate','2 blocking',[R('Run rejected — 2 blocking gaps',{dot:'red',sub:'blocking findings must be fixed before the run',c:1})],{dark:1}),
+        P('Experiment design','8',[R('Horizon',{sub:'simulated period',value:'1250 d',c:1}),R('Replications',{sub:'adopted n* · from model validation',value:'1250',c:1}),R('Warm-up',{sub:'adopted · detection Lyon Saint-Priest',value:'1250 d',c:1})],{grow:'span 2'}),
+        P('Scenario','6',[R('Baseline FY27',{dot:'grey',sub:'model unvalidated',c:1})])],
+       map:['Disabled primary keeps its reason visible as the first line of content']},
+      {land:1,cap:'Admin users',title:'Users',caret:1,tab:'More',icons:['↻'],hdrAction:'Add user',items:[{...users[0],full:1},{...users[1],two:1}]}]},
+
+    {id:'p1-1',k:'P1-1',short:'ConfirmSheet',title:'One ConfirmSheet for every destructive action',
+     problem:'Replaces the browser confirm() box on mobile. Bullets are split from the existing message text; the red verb names the action.',
+     mech:'useConfirm() calls window.confirm() exactly as today when !useIsMobile(); on mobile it resolves the same promise from ConfirmSheet.',
+     screens:[
+      {...projScr,cap:'Delete project',sheet:{title:`Delete ${LYON}?`,items:[P(null,null,[B('The project and its data are deleted permanently.','red'),B('Every member loses access.','red'),B('This cannot be undone.','red')])],second:'Cancel',primary:'Delete project',danger:1},
+       map:['Delete project → existing delete','Cancel → resolve false']},
+      {...hubScr,cap:'Remove from organization',sheet:{title:'Remove Sofia Marchetti from Contoso Automotive Components GmbH?',items:[P(null,null,[B('She loses access to the organization and the projects she sees through it.','red'),B('If she is working in it, she moves to her default organization, Fabrikam Medical Devices.','amb')])],second:'Cancel',primary:'Remove',danger:1},
+       map:['Remove → existing remove-from-organization']},
+      {title:'Policies',tab:'Policies',cap:'Delete policy version',items:[PROJ(),P('Version history','4',[R('v12',{sub:'Sep 29 · Camille Laurent',chip:'in use',c:1}),R('v11',{sub:'Sep 23 · Rahul Venkataraman-Iyer',chip:'in use',c:1}),R('v10',{sub:'Sep 18 · Camille Laurent',c:1})])],
+       sheet:{title:'Delete version v10?',items:[P(null,null,[B('v10 and its note are removed from version history.','red'),B('This cannot be undone.','red')])],second:'Cancel',primary:'Delete version',danger:1},
+       map:['Delete version → existing delete version']},
+      {title:'Organizations',caret:1,tab:'More',icons:['↻'],items:orgs,small:1,cap:'Typed-name deletion',sheet:{title:'Delete Contoso Automotive Components GmbH permanently?',items:[P(null,null,[B('The organization is deleted permanently.','red'),B('This cannot be undone.','red')]),P(null,null,[F('Type the organization name to confirm','Contoso Automotive Components GmbH',{ph:1,hint:'Not focused on open — the keyboard appears only when you tap.'})])],second:'Cancel',primary:'Delete organization',danger:1,disabled:1,reason:'Type the name exactly to enable this.'},
+       map:['Same typed-name check as desktop; user deletion uses the same layout']}]},
+
+    {id:'p1-2',k:'P1-2',short:'Admin lists',title:'Admin lists — one row per record',
+     problem:'Two sub-lines carry platform role, ★ default, other organizations, validity and spend. Tapping the row opens its actions sheet. The section switcher lives in the title.',
+     mech:'AdminUsers/Projects/Organizations already render a mobile list behind useIsMobile(); only that branch changes. The super-admin panel is removed from the mobile branch only.',
+     screens:[
+      {...usersScr,small:1,cap:'Users',action:{label:'Add user'},map:['Row → that user’s actions sheet','Users ▾ → section switcher','↻ → refresh','Add user → existing add-user dialog, as a sheet']},
+      {...usersScr,cap:'User actions',sheet:{title:'Sofia Marchetti',sub:'modeler · ★ Fabrikam Medical Devices · +2 orgs',items:[P(null,null,[R('Manage access',{sub:'organizations, projects, pages, features, models, budget',c:1}),R('Organizations…',{value:'3',c:1}),R('Change role…',{value:'modeler',c:1}),R('Suspend',{dot:'red',danger:1,c:1})])]},
+       map:['Every row = the existing action of the same name; remaining rows keep today’s order']},
+      {...usersScr,small:1,cap:'Section switcher',sheet:{title:'Super admin',sub:'8 sections',items:[P(null,null,['Dashboard','Users','Role Defaults','Organizations','Projects','AI Models','AI Usage','Audit Log'].map(t=>R(t,t==='Users'?{dot:'ink',value:'here'}:{c:1})))]},
+       map:['Each row → the same route as the desktop tab strip']},
+      {title:'Organizations',caret:1,tab:'More',icons:['↻'],items:orgs,cap:'Organization actions',action:{label:'Add organization'},sheet:{title:'Contoso Automotive Components GmbH',sub:'2 members · 1 project',items:[P(null,null,[R('Rename…',{c:1}),R('Access defaults…',{c:1}),R('Access period…',{value:'until 6/30/2027',c:1}),R('Limits…',{c:1}),R('Suspend',{dot:'red',danger:1,c:1}),R('Delete permanently…',{dot:'red',danger:1,c:1})])]},
+       map:['Access period… → picker holding the five existing validity actions']},
+      {title:'Organizations',caret:1,tab:'More',icons:['↻'],items:orgs,cap:'Access period picker',sheet:{title:'Access period',sub:'Contoso Automotive Components GmbH · until 6/30/2027',items:[P(null,null,[R('Valid for 1 week',{c:1}),R('Valid for 1 month',{c:1}),R('Valid for 1 quarter',{c:1}),R('Valid for 1 year',{c:1}),R('Remove expiry',{c:1})])],second:'Back'},
+       map:['Each row → the existing action with that exact label']}]},
+
+    {id:'p1-3',k:'P1-3',short:'Members & access',title:'Members & access — the list comes first',
+     problem:'One row per person with a rights summary. The add form and the role legend each move to their own sheet. One scroll container: the sheet body.',
+     mech:'ProjectMembersDialog renders through ResponsiveDialog; the mobile content branch is new, the desktop dialog body is unchanged.',
+     screens:[
+      {...projScr,small:1,cap:'Members',sheet:{title:'Members & access',sub:LYON,full:1,items:[NOTE('Super admins are owner on every project and appear only when recorded here.'),...members],second:'Add member',primary:'Done'},
+       map:['Row → member sheet','What each role grants → legend sheet','Add member → add sheet','Done → close']},
+      {...projScr,cap:'One member',sheet:{title:'Sofia Marchetti',sub:'Analyst · until 11/15/2026 · delegated by Rahul Venkataraman-Iyer',full:1,items:[LBL('Project role'),SEG(['Owner','Editor','Analyst','Viewer'],2,2),
+        P('Rights','5 of 8',[R('Sees project',{value:'✓'}),R('Edits project settings',{value:'✓'}),R('View data',{value:'✓'}),R('Edit input data',{value:'⊘',muted:1}),R('Edit policies',{value:'⊘',muted:1}),R('Run simulations',{value:'✓'}),R('Export',{value:'✓'}),R('Manage members',{value:'⊘',muted:1})]),
+        P(null,null,[R('Remove from project…',{dot:'red',danger:1,c:1})])],primary:'Done'},
+       map:['Role → change role','Remove… → ConfirmSheet → remove']},
+      {...projScr,small:1,cap:'Add member',sheet:{title:'Add member',sub:LYON,items:[P(null,null,[R('Person',{value:'Choose a person…',c:1}),R('End date',{sub:'empty = standing membership',value:'none',c:1})]),LBL('Role'),SEG(['Owner','Editor','Analyst','Viewer'],3,2),P(null,null,[F('Why (optional)','',{ph:1})]),NOTE('Someone outside Northwind Industrial Manufacturing is recorded but does not see the project until they belong to it.')],second:'Back',primary:'Add',disabled:1,reason:'Choose a person first.'},
+       map:['Add → add member (person, role, end date, reason)']},
+      {...projScr,cap:'Role legend',sheet:legend}]},
+
+    {id:'p1-4',k:'P1-4',short:'My profile',title:'My profile — panel skin, pinned Save, organization switch in More',
+     problem:'2 × 2 segmented replaces the sideways tab strip. Editable fields sit in one panel; read-only facts are rows; Switch lives in rows and in the More menu.',
+     mech:'Profile renders <MobileProfile> when useIsMobile(); desktop cards untouched. The account block is inside MobileNavDrawer only.',
+     screens:[
+      {title:'My profile',tab:'More',small:1,cap:'Profile',items:profileItems,action:{label:'Save changes'},
+       map:['Segments → the 4 existing tabs','Avatar colour › → swatch sheet','Copy → copy user ID','Switch → switchOrganization()','Save changes → existing save']},
+      {title:'My profile',tab:'More',cap:'My organization',items:[SEG(['Profile','My access','My organization','Change password'],2,2),P('Northwind Industrial Manufacturing','your default',[R('Camille Laurent · You',{sub:'owner · super admin account'}),R('Jonas Björklund',{sub:'member · analyst account'}),R('Grace Okonkwo',{sub:'member · viewer account'}),R('Rahul Venkataraman-Iyer',{sub:'admin · admin account'})]),NOTE('Read-only — an administrator makes changes.'),PROJ(),P('With a project role','4',[R('Camille Laurent · Owner',{sub:'8 of 8 rights',c:1}),R('Rahul Venkataraman-Iyer · Editor',{sub:'7 of 8 rights',c:1})]),LINK('What each project role grants')],
+       map:['Project ▾ → existing project picker','Row → rights sheet (read-only)']},
+      {title:'More',tab:'More',small:1,cap:'More · account block',items:[P(null,null,[R('Getting Started',{c:1}),R('Project Manager',{c:1}),R('Product-Level',{c:1}),R('Process-Level',{c:1}),R('Firm-Level',{c:1})]),P(null,null,[R('Policies',{c:1}),R('Simulation Lab',{c:1}),R('Project Intelligence',{c:1}),R('Developer API',{c:1}),R('Super Admin',{c:1})]),P('Account',null,[R('Camille',{sub:'super_admin',btn:'Sign out'}),R('Northwind Industrial Manufacturing',{sub:'current organization · ★ default'}),R('Switch organization',{value:'3',c:1})])],
+       map:['Switch organization → same sheet and switchOrganization() as Profile','Sign out → existing sign-out']},
+      {title:'More',tab:'More',cap:'Switch organization',items:[],sheet:switchSheet}]},
+
+    {id:'p1-5',k:'P1-5',short:'View data',title:'Project Manager → View data in a full-height sheet',
+     problem:'Dataset chips wrap; each record is a label/value card. Download is pinned. Nothing scrolls sideways.',
+     mech:'DataTableSheet behind useIsMobile(); desktop keeps the inline table.',
+     screens:[
+      {title:'Project Manager',tab:'Home',small:1,cap:'View data',items:pmBg,sheet:viewData,
+       map:['Chips → switch dataset','10 rows ▾ → rows per page','↻ → refresh','Download CSV → download','Close / ✕ → close']},
+      {title:'Project Manager',tab:'Home',cap:'Project actions',items:pmBg,sheet:{title:LYON,sub:'Every action this project has',items:[P(null,null,[R('View data',{sub:'the datasets loaded into this project',c:1}),R('Upload data',{sub:'the upload wizard',c:1}),R('Edit item master',{sub:'materials, products and suppliers',c:1}),R('Generate node list',{muted:1,reason:'Upload BOM, inbound and outbound first — the node list is combined from them.'}),R('Combine datasets',{c:1}),R('Edit project',{sub:'name, plant, model, BOM level, dates',c:1}),R('Delete project',{dot:'red',danger:1,sub:'permanent',c:1})])]},
+       map:['Page title reads “Project Manager” on mobile, matching the menu']}]},
+
+    {id:'p1-6',k:'P1-6',short:'Data map',title:'Dense reference tables — summary first, cards in a sheet',
+     problem:'Rule: defer, never truncate. The Data map shows counts per effect; the full list opens as one card per column. The role legend follows the same rule (see P1-3).',
+     mech:'DataMap renders <MobileDataMap> when useIsMobile(); desktop table untouched.',
+     screens:[
+      {title:'Policies',tab:'Policies',small:1,cap:'Data map summary',items:dataMap,map:['Effect row → sheet filtered to that effect','All 42 columns → full card sheet','Segments → the two existing views']},
+      {title:'Policies',tab:'Policies',cap:'Column cards',items:dataMap,sheet:{title:'Changes the run',sub:'24 columns',full:1,items:[CHIPS(['Changes the run','Only when…','Shown ≠ run','Ignored'],0),
+        P('Safety stock',null,[R('Shows',{sub:'days of cover per material'}),R('Edit saved to',{sub:'policy version'}),R('Engine uses',{sub:'reorder trigger'}),R('Changes the run',{dot:'teal',value:'yes'})]),
+        P('Lead time',null,[R('Shows',{sub:'weeks, from uploaded data'}),R('Edit saved to',{sub:'policy version'}),R('Changes the run',{dot:'teal',value:'yes'})])],second:'Close'}}]},
+
+    {id:'p1-7',k:'P1-7',short:'About & Docs',title:'About and Docs keep the tab bar',
+     problem:'Signed-in users get “Open app”. Docs has one header; the section tree is a sheet.',
+     mech:'About/Help render inside the mobile shell when useIsMobile(); the public layout above 768 px is unchanged.',
+     screens:[
+      {title:'About',tab:'More',small:1,cap:'About · signed in',items:[INTRO('Built inside a research lab,','shipped as a product.','SuReSuite is built at the Digital-AI Supply Chain Lab at HWR Berlin.'),P('Home',null,[R('Digital-AI Supply Chain Lab',{sub:'HWR Berlin · Campus Schöneberg'})]),P('Funded by',null,[R('Horizon Europe · ACCURATE',{sub:'GA 101138269 · 01/12/2023 → 30/11/2026',chip:'running',tone:'red'})]),P('Key people',null,[R('Phu Nguyen',{sub:'technical lead & product',c:1}),R('Prof. Dr. Dr. habil. Dmitry Ivanov',{sub:'scientific lead',c:1})])],action:{label:'Open app'},
+       map:['Open app → /app (signed in) · signed out keeps Get started']},
+      {title:'Documentation',tab:'More',icons:['⌕','≡'],small:1,cap:'Docs',items:[INTRO('How SuReSuite works —','written down.','The whole manual is public and needs no account.'),P('Start here','4',[R('What SuReSuite is',{sub:'what is this?',c:1}),R('How SuReSuite is designed',{sub:'how is it put together?',c:1}),R('Your first project',{sub:'how do I start?',c:1}),R('Known limits',{sub:'what does it not do?',c:1})])],action:{label:'Start reading'},
+       map:['⌕ → existing docs search','≡ → section tree sheet','Start reading → existing link']},
+      {title:'Documentation',tab:'More',icons:['⌕','≡'],cap:'Section tree',items:[],sheet:{title:'Sections',sub:'15 sections',full:1,items:[P(null,null,[['01','Overview & architecture','7 of 7'],['02','Getting started','3 of 3'],['03','Input tables','12 of 12'],['04','Computed tables','4 of 4'],['05','Policies','9 of 9'],['06','Verification','3 of 3'],['07','Experiments & scenarios','7 of 7'],['08','Networks','5 of 5'],['09','Project Intelligence','4 of 4']].map(([n,t,v])=>R(t,{sub:n,value:v,c:1})))]}}]},
+
+    {id:'p1-8',k:'P1-8',short:'Touch targets',title:'Touch-target and label pass',
+     problem:'Every icon, chip, checkbox and link gets a 44 × 44 hit area; visible size may stay smaller. Short labels mean the same as desktop.',
+     mech:'Size changes are base Tailwind classes reset at md: (e.g. h-11 w-11 md:h-8 md:w-8); short labels render from a mobileLabel prop only when useIsMobile().',
+     screens:[
+      {spec:1,w:316,cap:'Segmented at 320',items:[LBL('Developer API'),SEG(['Keys','Quickstart','Notebook'],0),LBL('Audit log'),SEG(['All','Sign-ins','Data','Admin'],0),LBL('Simulation Lab'),SEG(['Setup','Events','Run','Results','Compare'],0)]},
+      {spec:1,w:360,cap:'Checkbox · version note',items:[P('Scopes','1 of 4',[R('read:data',{check:'on',sub:'List/read projects, item masters, dataset versions'}),R('write:data',{check:'off',sub:'Freeze dataset versions'})]),P('Versions','4',[R('v11',{sub:'Sep 23 · Rahul Venkataraman-Iyer',sub2:'Dual-sourced the A-221 wire harness',btn:'Edit note'})])]}],
+     cards:[{title:'Fixed components',tag:'below md',lines:['Header icon buttons (Refresh, avatar, Back): 32 → 44.','Project chip: 26 → 44 tall; wraps instead of truncating.','Version history Export / Load / Select: 28 → 44, moved into the version row’s sheet.','Data map tabs: 20 → 44 segmented.','Create API key checkboxes: 16 px box inside a 44 px hit area; whole row toggles.','Version-note “edit”: 10 px link → “Edit note” 44 px button.','Rows-per-page select and View-data icons: 24–28 → 44.']},
+      {title:'Shorter mobile labels',tag:'same meaning',lines:['Developer: “API keys” → “Keys”, “Quickstart” kept whole.','Audit: “Sign-ins & exports” → “Sign-ins”, “Data changes” → “Data”.','Lab: 13 px labels with 2 px padding fit “Compare” at 288 px content width.','Tab: “SC Intel” → “Intelligence” (see P2).']}]},
+
+    {id:'p2',k:'P2',short:'Consistency',title:'Consistency — one sheet, toasts, names, BOM tree',
+     mech:'All mobile-only: MobileSheet, Sonner toaster offset read from the mobile shell, labels via mobile nav config.',
+     screens:[
+      {title:'Policies',tab:'Policies',cap:'BOM tree in the stage list',items:stageTree,action:{label:'Save model version'},map:['Rows → existing stage line editor (unchanged)']},
+      {title:'Project Intelligence',tab:'Intelligence',small:1,cap:'Toast above the tab bar',items:[PROJ(),P(null,null,[R('Ask about this project',{c:1})]),P('Open','0',[],{empty:'No questions yet. Ask about this project above.'}),P(null,null,[R('Manage all chats',{value:'5',c:1})])],toast:'Loaded 13 records for project',
+       map:['Ask about this project → new chat','✕ 44 px → dismiss toast']}],
+     cards:[{title:'One sheet style',tag:'MobileSheet',lines:['The restyled dialog (centred title, 12 px radius, covers the tab bar, no grab bar) is retired on mobile: every Dialog goes through ResponsiveDialog → MobileSheet.']},
+      {title:'Toasts',tag:'mobile',lines:['Sit 8 px above the tab bar (and above the action bar when one is pinned); 44 px ✕; border only, no shadow.']},
+      {title:'Names',tag:'mobile labels',lines:['AI area: tab “Intelligence”, page title and menu “Project Intelligence” — same words as desktop.','Project Manager: mobile page title “Project Manager”, matching the menu.']},
+      {title:'Hover-only reasons',tag:'visible 12 px',lines:['Why Delete is disabled, data freshness and result credibility become a 12 px line under the control — see the disabled row in the system delta and “Generate node list” in P1-5.']}]},
+
+    {id:'states',k:'States',short:'Empty · loading · error',title:'Empty, loading and error states',
+     screens:[
+      {spec:1,w:300,cap:'Admin lists',items:[P('Users','…',[S(),S(),S()]),P('Users','0',[],{empty:'No users match “lyo”.',emptyBtn:'Clear search'}),P('Users',null,[R('Couldn’t load users',{dot:'red',sub:'the request failed — nothing was changed',btn:'Retry'})])]},
+      {spec:1,w:300,cap:'View data',items:[TOOL('Loading BOM…',[{t:'↻'}]),P('Record',null,[S(),S()]),P('Inbound','0 records',[],{empty:'No Inbound records yet. Upload data to add them.',emptyBtn:'Upload data'}),P('BOM',null,[R('Couldn’t load BOM',{dot:'red',sub:'the request failed',btn:'Refresh'})])]},
+      {spec:1,w:300,cap:'Members & access',items:[P('With a project role','…',[S(),S()]),P('With a project role','0',[],{empty:'No one holds a project role yet.',emptyBtn:'Add member'}),P('Members',null,[R('Couldn’t load members',{dot:'red',sub:'the request failed',btn:'Retry'})])]}]},
+
+    {id:'ideas',k:'Out of scope',short:'Ideas needing logic',title:'Ideas that would need logic — not part of this design',
+     cards:[{title:'Would need new data or API',tag:'out of scope',lines:['“Last active” on each user row.','Search and filter inside View data records.','Per-user spend history over time.','Undo after a removal (needs a restore endpoint).','Push notification when a run finishes.','Column counts per effect computed for the selected project only (today the counts describe all projects).']}]}
+    ];
+  }
+  renderVals() {
+    const key=String(this.props.show320)+String(this.props.showMaps);
+    if(this._ck===key&&this._cv) return this._cv;
+    const C={red:'#bf2330',amb:'#e0930b',teal:'#14b8c4',vio:'#7c3aed',grey:'#d4d4d4',ink:'#18181b'};
+    const show320 = this.props.show320 ?? false, showMaps = this.props.showMaps ?? true;
+    const secs = this.data(); const T=this.tabIcons;
+    const segI=(items,a,dark)=>items.map((t,i)=>({t,bg:i===a?C.ink:'#fff',c:i===a?'#fff':'#171717',bd:i===a?C.ink:'#d4d4d4'}));
+    const tone={out:['#d4d4d4','#fff','#525252'],ink:[C.ink,C.ink,'#fff'],red:[C.red,'#fff',C.red]};
+    const nr=r=>{const t=tone[r.tone||'out'];return {...r,isRow:r.k==='row',isField:r.k==='field',isBullet:r.k==='bullet',isSkel:r.k==='skel',
+      hasDot:!!r.dot,dot:C[r.dot]||'#171717',hasNum:r.num!=null,numBg:r.yel?'#F8D448':r.numDark?C.ink:'#fff',numC:r.numDark?'#fff':'#171717',numBd:r.yel?'#F8D448':r.numDark?C.ink:'#d4d4d4',
+      lc:r.danger?C.red:r.muted?'#a3a3a3':'#171717',fs:r.sub||r.sub2?14.5:15,bg:r.pressed?'#f4f4f5':'#fff',minH:(r.sub||r.sub2)?52:44,padL:14+(r.indent||0)*16,
+      hasSub:!!r.sub,hasSub2:!!r.sub2,hasReason:!!r.reason,reasonC:'#525252',hasValue:!!r.value,vc:r.muted?'#a3a3a3':'#171717',
+      hasChip:!!r.chip,chipBd:t[0],chipBg:t[1],chipC:t[2],segRow:null,hasSeg:false,...(r.segRow?Object.fromEntries(segI(r.segRow,r.segA).flatMap((g,i)=>[['sg'+i+'t',g.t],['sg'+i+'bg',g.bg],['sg'+i+'c',g.c]])):{}),
+      hasToggle:r.toggle!=null,tgBg:r.toggle?C.ink:'#d4d4d4',tgJ:r.toggle?'flex-end':'flex-start',hasBtn:!!r.btn,
+      hasStar:!!r.star,starG:r.star==='on'?'★':'☆',starC:r.star==='on'?'#171717':'#737373',hasRm:!!r.rm,hasChev:!!r.c,
+      hasTicks:!!r.ticks,ticks:(r.ticks||[]).map(o=>({c:o?C.ink:'#e4e4e4'})),hasCheck:!!r.check,chk:r.check==='on'?'✓':'',chkBg:r.check==='on'?C.ink:'#fff',chkBd:r.check==='on'?C.ink:'#8a8a8a',
+      ic:r.ph?'#a3a3a3':'#171717',input:r.input||'Type here',hasHint:!!r.hint}};
+    const ni=(it,land)=>{const o={...it,span:land&&it.full?'1 / -1':'auto',grow:land&&it.grow?it.grow:'auto',
+      isPanel:it.kind==='panel',isNote:it.kind==='note',isLabel:it.kind==='label',isLink:it.kind==='link',isSearch:it.kind==='search',isProject:it.kind==='project',isSeg:it.kind==='seg',isChips:it.kind==='chips',isToolbar:it.kind==='toolbar',isIntro:it.kind==='intro'};
+      if(o.isSeg||o.isChips){o.segI=segI(it.items,it.active);o.segCols=`repeat(${it.cols||it.items.length},minmax(0,1fr))`;}
+      if(o.isPanel){o.rows=(it.rows||[]).map(nr);o.hasHead=!!it.label;o.count=it.count||'';o.bc=it.dark?C.ink:'#d4d4d4';o.hbg=it.dark?C.ink:'#fafafa';o.hc=it.dark?'#fff':'#525252';
+        o.rcols=it.two&&land?'repeat(2,minmax(0,1fr))':'minmax(0,1fr)';o.hasEmpty=!!it.empty;o.hasEmptyBtn=!!it.emptyBtn;}
+      return o;};
+    const tabs=(active,land)=>[['Home','home'],['Policies','pol'],['Lab','lab'],['Intelligence','int'],['More','more']].map(([l,k])=>({label:l,d:T[k],c:l===active?'#171717':'#8a8a8a',fw:l===active?600:500,dir:land?'row':'column',gap:land?6:3}));
+    const frame=(s,w,h,first)=>{const land=!!s.land,spec=!!s.spec,gut=w<=320?12:16,tabH=land?52:58;const sh=s.sheet;
+      const act=s.action||(s.hdrAction?{label:s.hdrAction,disabled:s.hdrDisabled}:null);
+      return {w,cap:s.cap,dim:spec?'component':`${w} × ${h}`,hcss:spec?'auto':h+'px',chrome:!spec,gut,padT:spec?14:(land?6:8),hdrH:land?44:46,tabH,titleSize:land||w<=320?17:19,
+        title:s.title||'',hasBack:!!s.back,hasCaret:!!s.caret,project:'Lyon Stamping Plant — FY27 …',hasHdrProject:!!s.hdrProject,hasHdrSeg:!!s.hdrSeg,hdrSeg:s.hdrSeg?segI(s.hdrSeg[0],s.hdrSeg[1]):[],
+        icons:(s.icons||[]).map(t=>t==='C'?{t,d:32,bg:C.ink,c:'#fff',fs:13}:{t,d:44,bg:'transparent',c:'#171717',fs:t==='⌕'?22:20}),
+        hasHdrAction:land&&!!act,hasAction:!land&&!spec&&!!act&&!sh,actLabel:act?act.label:'',actBg:act&&act.disabled?'#a1a1aa':C.ink,hasActReason:!!(act&&act.reason),actReason:act&&act.reason||'',hasAct2:!!(act&&act.second),act2:act&&act.second||'',
+        cols:land?'repeat(2,minmax(0,1fr))':'minmax(0,1fr)',items:(s.items||[]).map(it=>ni(it,land)),tabs:tabs(s.tab,land),
+        hasToast:!!s.toast,toast:s.toast||'',toastB:tabH+8,hasSheet:!!sh,
+        sh:sh?{title:sh.title,sub:sh.sub||'',hasSub:!!sh.sub,max:sh.full?'calc(100% - 28px)':'76%',h:sh.full?'calc(100% - 28px)':'auto',items:(sh.items||[]).map(it=>ni(it,false)),
+          hasFoot:!!(sh.primary||sh.second),hasPrimary:!!sh.primary,primary:sh.primary||'',pBg:sh.disabled?'#a1a1aa':sh.danger?C.red:C.ink,hasSecond:!!sh.second,second:sh.second||'',hasReason:!!sh.reason,reason:sh.reason||''}:{},
+        hasMap:showMaps&&first&&!!s.map,map:s.map||[]};};
+
+    const FR='__fr';const UL={fontWeight:1,lineHeight:1,flex:1,opacity:1,zIndex:1};
+    const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const kb=k=>k.replace(/[A-Z]/g,m=>'-'+m.toLowerCase());
+    const css=o=>Object.entries(o).filter(([k,v])=>k!=='key'&&v!=null&&v!==false).map(([k,v])=>kb(k)+':'+(typeof v==='number'&&!UL[k]&&v!==0?v+'px':v)).join(';');
+    const kids=a=>a.flat(Infinity).filter(c=>c!==false&&c!=null&&c!=='').map(c=>typeof c==='string'&&c.startsWith('\u0001')?c.slice(1):esc(c)).join('');
+    const h=(tag,props,...ch)=>{const inner=kids(ch);if(tag===FR)return '\u0001'+inner;let at='';props=props||{};
+      for(const [k,v] of Object.entries(props)){if(k==='key'||v==null)continue;if(k==='style'){if(v)at+=' style="'+esc(css(v))+'"';}else at+=' '+(k==='viewBox'?k:kb(k))+'="'+esc(v)+'"';}
+      return '\u0001<'+tag+at+'>'+inner+'</'+tag+'>';};
+    const React={Fragment:FR};
+    const M="'JetBrains Mono Variable','DejaVu Sans Mono','DejaVu Sans','Segoe UI Symbol',monospace";
+    const sp=(st,...k)=>h('span',{style:st},...k), dv=(st,...k)=>h('div',{style:st},...k);
+    const box44={width:44,height:44,flex:'none',display:'flex',alignItems:'center',justifyContent:'center'};
+    const rowEl=(r,i)=>{const bt='1px solid #e8e8ea';
+      if(r.isSkel)return dv({key:i,minHeight:52,padding:'10px 14px',borderTop:bt,display:'flex',flexDirection:'column',justifyContent:'center',gap:7,boxSizing:'border-box'},sp({width:'55%',height:11,borderRadius:2,background:'#ececee'}),sp({width:'78%',height:8,borderRadius:2,background:'#f2f2f3'}));
+      if(r.isField)return dv({padding:'10px 14px',borderTop:bt,display:'flex',flexDirection:'column',gap:6},sp({fontSize:12.5,fontWeight:500,color:'#525252'},r.field),dv({minHeight:44,border:'1px solid #d4d4d4',borderRadius:4,display:'flex',alignItems:'center',padding:'6px 12px',boxSizing:'border-box',fontSize:15,color:r.ic,background:'#fff',fontVariantNumeric:'tabular-nums'},r.input),r.hasHint&&sp({fontSize:12,color:'#525252',lineHeight:1.4},r.hint));
+      if(r.isBullet)return dv({display:'flex',gap:10,padding:'11px 14px',borderTop:bt,fontSize:14.5,lineHeight:1.45,color:'#171717'},sp({width:6,height:6,borderRadius:3,background:r.dot,marginTop:8,flex:'none'}),sp(null,r.label));
+      const sub=t=>sp({fontFamily:M,fontSize:10.5,lineHeight:1.45,color:'#525252',fontVariantNumeric:'tabular-nums'},t);
+      return dv({display:'flex',alignItems:'center',gap:10,minHeight:r.minH,padding:'7px 6px 7px '+r.padL+'px',borderTop:bt,background:r.bg,boxSizing:'border-box',minWidth:0},
+        r.hasCheck&&sp({...box44,margin:'-6px -8px -6px -12px'},sp({width:20,height:20,borderRadius:3,border:'1.5px solid '+r.chkBd,background:r.chkBg,color:'#fff',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',boxSizing:'border-box'},r.chk)),
+        r.hasDot&&sp({width:6,height:6,borderRadius:3,background:r.dot,flex:'none'}),
+        r.hasNum&&sp({width:20,height:20,borderRadius:3,background:r.numBg,color:r.numC,border:'1px solid '+r.numBd,fontFamily:M,fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',flex:'none',boxSizing:'border-box'},r.num),
+        dv({flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2},
+          sp({fontSize:r.fs,fontWeight:500,color:r.lc,lineHeight:1.3},r.label),
+          r.hasSub&&sub(r.sub),r.hasSub2&&sub(r.sub2),
+          r.hasTicks&&sp({display:'flex',gap:3,marginTop:4},...r.ticks.map((t,j)=>sp({key:j,width:14,height:2,background:t.c}))),
+          r.hasReason&&sp({fontSize:12,lineHeight:1.4,color:r.reasonC},r.reason)),
+        r.hasValue&&sp({flex:'none',textAlign:'right',fontFamily:M,fontSize:12.5,fontWeight:500,color:r.vc,fontVariantNumeric:'tabular-nums',paddingRight:4},r.value),
+        r.hasChip&&sp({flex:'none',fontFamily:M,fontSize:10,padding:'2px 6px',borderRadius:3,border:'1px solid '+r.chipBd,background:r.chipBg,color:r.chipC,whiteSpace:'nowrap'},r.chip),
+        r.hasBtn&&sp({flex:'none',minHeight:44,padding:'0 14px',boxSizing:'border-box',border:'1px solid #d4d4d4',borderRadius:4,background:'#fff',display:'flex',alignItems:'center',fontSize:13.5,fontWeight:500,color:'#171717'},r.btn),
+        r.hasStar&&sp({...box44,fontSize:19,color:r.starC},r.starG),
+        r.hasRm&&sp({...box44,fontSize:15,color:'#525252'},'✕'),
+        r.hasChev&&sp({width:20,flex:'none',textAlign:'center',fontSize:18,color:'#8a8a8a'},'›'));};
+    const segEl=(it)=>dv({display:'grid',gridTemplateColumns:it.segCols,gap:4,padding:4,border:'1px solid #d4d4d4',borderRadius:5,background:'#fff'},...it.segI.map((g,j)=>dv({key:j,minHeight:40,display:'flex',alignItems:'center',justifyContent:'center',textAlign:'center',borderRadius:3,fontSize:13,fontWeight:500,padding:'0 2px',background:g.bg,color:g.c},g.t)));
+    const blockEl=(it,i,extra)=>{const w=(...k)=>dv({key:i,minWidth:0,...(extra||{})},...k);
+      if(it.isLabel)return w(dv({fontFamily:M,fontSize:10,letterSpacing:'0.14em',textTransform:'uppercase',color:'#525252',paddingTop:4},it.text));
+      if(it.isNote)return w(dv({fontSize:12,lineHeight:1.45,color:'#525252'},it.text));
+      if(it.isLink)return w(dv({minHeight:44,display:'flex',alignItems:'center',gap:6,fontSize:14,fontWeight:500,color:'#171717'},sp({textDecoration:'underline',textUnderlineOffset:3,textDecorationColor:'#a3a3a3'},it.text),sp({color:'#737373'},'›')));
+      if(it.isIntro)return w(dv({display:'flex',flexDirection:'column',gap:8,padding:'4px 0'},dv({fontSize:21,fontWeight:600,letterSpacing:'-0.022em',lineHeight:1.2,color:'#171717'},it.title+' ',sp({fontFamily:"Georgia,'Times New Roman',serif",fontStyle:'italic',fontWeight:400},it.italic)),dv({fontSize:14.5,lineHeight:1.5,color:'#525252'},it.text)));
+      if(it.isSearch)return w(dv({minHeight:44,border:'1px solid #d4d4d4',borderRadius:4,background:'#fff',display:'flex',alignItems:'center',gap:10,padding:'0 12px',fontSize:15,color:'#a3a3a3'},h('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'#737373',strokeWidth:2},h('circle',{cx:11,cy:11,r:7}),h('path',{d:'m20 20-3.5-3.5'})),it.text));
+      if(it.isProject)return w(dv({minHeight:44,border:'1px solid #d4d4d4',borderRadius:4,background:'#fff',display:'flex',alignItems:'center',gap:8,padding:'6px 12px',fontFamily:M,fontSize:11.5,color:'#171717',boxSizing:'border-box'},sp({width:6,height:6,borderRadius:3,background:'#e0930b',flex:'none'}),sp({flex:1,minWidth:0,lineHeight:1.4},it.text),sp({color:'#525252'},'▾')));
+      if(it.isSeg)return w(segEl(it));
+      if(it.isChips)return w(dv({display:'flex',flexWrap:'wrap',gap:6},...it.segI.map((g,j)=>dv({key:j,minHeight:44,display:'flex',alignItems:'center',padding:'0 14px',border:'1px solid '+g.bd,borderRadius:4,fontSize:13.5,fontWeight:500,background:g.bg,color:g.c,boxSizing:'border-box'},g.t))));
+      if(it.isToolbar)return w(dv({display:'flex',alignItems:'center',gap:6,minHeight:44},sp({flex:1,minWidth:0,fontFamily:M,fontSize:11,color:'#525252'},it.text),...it.ctrls.map((c,j)=>sp({key:j,minWidth:44,height:44,padding:'0 10px',boxSizing:'border-box',border:'1px solid #d4d4d4',borderRadius:4,background:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:500,color:'#171717',whiteSpace:'nowrap'},c.t))));
+      if(it.isPanel)return w(dv({border:'1px solid '+it.bc,borderRadius:4,background:'#fff',overflow:'hidden'},
+        it.hasHead&&dv({display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,minHeight:32,padding:'7px 12px',boxSizing:'border-box',background:it.hbg,fontFamily:M,fontSize:10,letterSpacing:'0.14em',textTransform:'uppercase',color:it.hc,lineHeight:1.4},sp(null,it.label),sp({letterSpacing:'0.04em',textTransform:'none',whiteSpace:'nowrap'},it.count)),
+        dv({display:'grid',gridTemplateColumns:it.rcols},...it.rows.map((r,j)=>h(React.Fragment,{key:j},rowEl(r,j)))),
+        it.hasEmpty&&dv({borderTop:'1px solid #e8e8ea',padding:'28px 16px',display:'flex',flexDirection:'column',alignItems:'center',gap:12,textAlign:'center'},sp({fontSize:14,color:'#525252',lineHeight:1.45},it.empty),it.hasEmptyBtn&&sp({minHeight:44,padding:'0 16px',border:'1px solid #d4d4d4',borderRadius:4,display:'flex',alignItems:'center',fontSize:14,fontWeight:500,color:'#171717'},it.emptyBtn))));
+      return null;};
+    const btn=(label,bg,flex)=>sp({height:46,flex:1,padding:'0 12px',borderRadius:4,background:bg,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:600,textAlign:'center'},label);
+    const btn2=(label)=>sp({height:46,flex:1,padding:'0 12px',border:'1px solid #d4d4d4',borderRadius:4,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:500,color:'#171717',textAlign:'center',boxSizing:'border-box'},label);
+    const frameEl=(f,i)=>{const sh=f.sh;
+      const header=f.chrome&&dv({height:f.hdrH,flex:'none',display:'flex',alignItems:'center',gap:6,padding:'0 6px 0 '+f.gut+'px',background:'#ededed'},
+        f.hasBack&&sp({...box44,marginLeft:-14,fontSize:24,color:'#171717'},'‹'),
+        dv({flex:1,minWidth:0,display:'flex',alignItems:'center',gap:6,minHeight:44},sp({fontSize:f.titleSize,fontWeight:600,letterSpacing:'-0.019em',lineHeight:1.2,color:'#171717'},f.title),f.hasCaret&&sp({fontSize:12,color:'#525252'},'▾')),
+        f.hasHdrProject&&sp({height:32,padding:'0 10px',border:'1px solid #d4d4d4',borderRadius:4,background:'#fff',display:'flex',alignItems:'center',gap:6,fontFamily:M,fontSize:11,whiteSpace:'nowrap'},sp({width:6,height:6,borderRadius:3,background:'#e0930b'}),f.project+' ▾'),
+        f.hasHdrSeg&&sp({display:'flex',gap:2,padding:2,border:'1px solid #d4d4d4',borderRadius:5,background:'#fff'},...f.hdrSeg.map((g,j)=>sp({key:j,height:34,padding:'0 10px',display:'flex',alignItems:'center',borderRadius:3,fontSize:12.5,fontWeight:500,background:g.bg,color:g.c},g.t))),
+        ...f.icons.map((ic,j)=>sp({key:'i'+j,...box44,fontSize:ic.fs,color:'#171717'},sp({width:ic.d,height:ic.d,borderRadius:'50%',background:ic.bg,color:ic.c,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:600},ic.t))),
+        f.hasHdrAction&&sp({height:36,margin:'0 6px 0 4px',padding:'0 16px',borderRadius:4,background:f.actBg,color:'#fff',display:'flex',alignItems:'center',fontSize:13.5,fontWeight:600,whiteSpace:'nowrap'},f.actLabel));
+      const content=dv({flex:1,minHeight:0,overflow:'hidden',padding:f.padT+'px '+f.gut+'px 16px',display:'grid',gridTemplateColumns:f.cols,gap:12,alignContent:'start'},...f.items.map((it,j)=>blockEl(it,j,{gridColumn:it.span,gridRow:it.grow})));
+      const action=f.hasAction&&dv({flex:'none',background:'#fff',borderTop:'1px solid #dcdcdc',padding:'9px '+f.gut+'px',display:'flex',flexDirection:'column',gap:6},f.hasActReason&&sp({fontSize:12,lineHeight:1.4,color:'#525252'},f.actReason),dv({display:'flex',gap:8},f.hasAct2&&btn2(f.act2),btn(f.actLabel,f.actBg)));
+      const tabbar=f.chrome&&dv({height:f.tabH,flex:'none',background:'#fff',borderTop:'1px solid #dcdcdc',display:'grid',gridTemplateColumns:'repeat(5,minmax(0,1fr))'},...f.tabs.map((t,j)=>dv({key:j,display:'flex',flexDirection:t.dir,alignItems:'center',justifyContent:'center',gap:t.gap,color:t.c,fontSize:11,fontWeight:t.fw},h('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},h('path',{d:t.d})),sp(null,t.label))));
+      const toast=f.hasToast&&dv({position:'absolute',left:f.gut,right:f.gut,bottom:f.toastB,background:'#fff',border:'1px solid #d4d4d4',borderRadius:4,display:'flex',alignItems:'center',gap:10,paddingLeft:14,minHeight:48},sp({width:6,height:6,borderRadius:3,background:'#14b8c4'}),sp({flex:1,fontSize:14,color:'#171717'},f.toast),sp({...box44,fontSize:14,color:'#525252'},'✕'));
+      const sheet=f.hasSheet&&dv({position:'absolute',left:0,right:0,top:0,bottom:f.tabH,background:'rgba(0,0,0,0.32)',display:'flex',flexDirection:'column',justifyContent:'flex-end'},
+        dv({background:'#fff',borderRadius:'16px 16px 0 0',maxHeight:sh.max,height:sh.h,display:'flex',flexDirection:'column',boxShadow:'0 -6px 24px rgba(0,0,0,0.14)',overflow:'hidden'},
+          dv({height:20,flex:'none',display:'flex',alignItems:'center',justifyContent:'center'},sp({width:36,height:4,borderRadius:2,background:'#d4d4d4'})),
+          dv({flex:'none',display:'flex',alignItems:'flex-start',gap:6,padding:'0 4px 10px '+f.gut+'px',borderBottom:'1px solid #e8e8ea'},dv({flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:3,paddingTop:2},sp({fontSize:17,fontWeight:600,letterSpacing:'-0.019em',lineHeight:1.25,color:'#171717'},sh.title),sh.hasSub&&sp({fontSize:12,lineHeight:1.4,color:'#525252'},sh.sub)),sp({...box44,fontSize:15,color:'#525252'},'✕')),
+          dv({flex:1,minHeight:0,overflow:'hidden',padding:'12px '+f.gut+'px',display:'flex',flexDirection:'column',gap:12,background:'#f4f4f5'},...sh.items.map((it,j)=>blockEl(it,j,{flex:'none'}))),
+          sh.hasFoot&&dv({flex:'none',borderTop:'1px solid #e8e8ea',padding:'9px '+f.gut+'px 10px',display:'flex',flexDirection:'column',gap:6,background:'#fff'},sh.hasReason&&sp({fontSize:12,lineHeight:1.4,color:'#525252'},sh.reason),dv({display:'flex',gap:8},sh.hasSecond&&btn2(sh.second),sh.hasPrimary&&btn(sh.primary,sh.pBg)))));
+      return dv({key:i,display:'flex',flexDirection:'column',gap:10,width:f.w},
+        dv({fontFamily:M,fontSize:11,color:'#525252',display:'flex',justifyContent:'space-between',gap:8},sp(null,f.cap),sp({whiteSpace:'nowrap'},f.dim)),
+        dv({width:f.w,height:f.hcss,background:'#ededed',border:'1px solid #bdbdbd',borderRadius:6,overflow:'hidden',display:'flex',flexDirection:'column',position:'relative'},header,content,action,tabbar,toast,sheet),
+        f.hasMap&&dv({display:'flex',flexDirection:'column',gap:5,padding:'12px 14px',border:'1px solid #d4d4d4',borderRadius:4,background:'#fff'},sp({fontFamily:M,fontSize:10,letterSpacing:'0.14em',textTransform:'uppercase',color:'#525252'},'Control → existing action'),...f.map.map((m,j)=>sp({key:j,fontSize:12.5,lineHeight:1.45,color:'#171717'},m))));};
+    const html={};this._html=html;
+    const sections=secs.map(sec=>{const frames=[];(sec.screens||[]).forEach(s=>{
+      if(s.spec)frames.push(frame(s,s.w,0,true));else if(s.land)frames.push(frame(s,844,390,true));
+      else{frames.push(frame(s,390,844,true));if(s.small&&show320)frames.push(frame(s,320,568,false));}});
+      html[sec.id]=frames.map(frameEl).map(x=>x.slice(1)).join('');return {...sec,hasProblem:!!sec.problem,hasMech:!!sec.mech,hasCards:!!sec.cards,cards:sec.cards||[]};});
+    this._ck=key; this._cv={sections};
+    return this._cv;
+  }
+}
+</script>
+</body>
+</html>
