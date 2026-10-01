@@ -232,7 +232,7 @@ export function NewScenarioDialog({
           </Row>
 
           <Row label="Warm-up · reps">
-            <span className="tabular-nums text-[#3f3f46]">
+            <span className="block tabular-nums text-[#3f3f46] md:pt-[10px]">
               {card && start !== "defaults" && !unlocked
                 ? `${formatDuration(card.adopted_warmup_days)} · ${card.recommended_replications} reps — from the validation`
                 : `detected at run time · ${SCENARIO_ENGINE_DEFAULTS.replications} reps — engine defaults`}
@@ -241,10 +241,10 @@ export function NewScenarioDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="min-h-11 md:min-h-0">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className={cn(FIELD_H, "px-4")}>
             Cancel
           </Button>
-          <Button onClick={() => void submit()} disabled={!canCreate} className="min-h-11 md:min-h-0">
+          <Button onClick={() => void submit()} disabled={!canCreate} className={cn(FIELD_H, "px-4")}>
             {busy ? "Creating…" : "Create"}
           </Button>
         </DialogFooter>

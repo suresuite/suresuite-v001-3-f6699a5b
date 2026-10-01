@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import { disruptionWeeks } from "@/lib/sim/runWindow";
 import { AUTO_WARMUP_RULE, warmupNote } from "@/lib/sim/disruptionTiming";
 import { engineWeeks, isWholeWeeks } from "@/lib/sim/planningTime";
@@ -20,6 +21,7 @@ import type { Scenario } from "@/hooks/useScenarios";
 import {
   CapacityLostStepper,
   EffectControl,
+  FIELD_H,
   Field,
   TargetSelect,
   WeeksStepper,
@@ -95,7 +97,7 @@ export function DisruptionScheduleEditor({
           !isLeadTimeDelay(d.magnitude_pct) && target.kind === "supplier" && uncapacitated.includes(target.id);
         return (
           <div key={i} className="rounded-sm border border-border">
-            <div className="flex items-center gap-2 border-b border-border px-2 py-1">
+            <div className="flex items-center gap-2 border-b border-border px-3 py-1">
               <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
                 Event {i + 1}
               </span>
@@ -107,7 +109,7 @@ export function DisruptionScheduleEditor({
                 variant="ghost"
                 aria-label={`Remove event ${i + 1}`}
                 title="Remove this event"
-                className="h-7 w-7 min-h-11 min-w-11 shrink-0 text-destructive md:min-h-0 md:min-w-0"
+                className="h-11 w-11 shrink-0 text-destructive md:h-9 md:w-9"
                 onClick={() => commit(local.filter((_, j) => j !== i))}
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -171,8 +173,7 @@ export function DisruptionScheduleEditor({
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="outline"
-          size="sm"
-          className="gap-1"
+          className={cn(FIELD_H, "gap-1.5 px-4")}
           onClick={add}
           disabled={!!blocked}
           title={blocked ?? undefined}

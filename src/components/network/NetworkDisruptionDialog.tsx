@@ -256,7 +256,8 @@ function Body({
                   onClick={() => setTarget(supplierTarget(n))}
                   aria-pressed={target === supplierTarget(n)}
                   className={cn(
-                    "h-11 rounded-sm border px-2.5 md:h-7",
+                    "rounded-sm border px-3 text-[12.5px]",
+                    FIELD_H,
                     target === supplierTarget(n)
                       ? "border-foreground bg-foreground text-background"
                       : "border-[--hair-rule] bg-background hover:border-foreground",
@@ -393,10 +394,10 @@ function Body({
       </div>
 
       <DialogFooter className="gap-2">
-        <Button variant="outline" onClick={() => onOpenChange(false)} className="min-h-11 md:min-h-0">
+        <Button variant="outline" onClick={() => onOpenChange(false)} className={cn(FIELD_H, "px-4")}>
           Cancel
         </Button>
-        <Button onClick={() => void submit()} disabled={!!blocker || busy} className="min-h-11 md:min-h-0">
+        <Button onClick={() => void submit()} disabled={!!blocker || busy} className={cn(FIELD_H, "px-4")}>
           {busy ? "Saving…" : dest === "new" ? "Create scenario with event" : "Add event to scenario"}
         </Button>
       </DialogFooter>
