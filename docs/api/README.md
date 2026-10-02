@@ -95,11 +95,13 @@ in flight consumes nothing.
 | `GET /projects/{id}` | read:data | one project |
 | `POST /projects/{id}/datasets:freeze` | write:data | `201` dataset version + `graph_hash` (deduped server-side) |
 | `GET /projects/{id}/dataset-versions` | read:data | provenance history |
+| `GET /projects/{id}/dataset-versions/{version}` | read:data | one frozen dataset version **with its rows** (`snapshot`: v2 `inputs` = what a simulation reads, `network` = what the analyses read); `{version}` is an id or `latest`; `?tables=suppliers,inbound` narrows it; gzip when the client accepts it |
 | `GET /projects/{id}/policy-catalog` | read:policies | engine policy catalog (registry export — the same contract the UI forms use) |
 | `GET /projects/{id}/policies` | read:policies | policy defaults + per-node overrides |
 | `PUT /projects/{id}/policies` | write:policies | update defaults (`{"defaults":{"inventory":{…}},"overrides":[…]}`) via the same RPCs the UI uses |
 | `POST /projects/{id}/policy-versions` | write:policies | `201` immutable snapshot + `policy_hash` |
 | `GET /projects/{id}/policy-versions` | read:policies | snapshot history |
+| `GET /projects/{id}/policy-versions/{version}` | read:policies | one frozen policy version with its `snapshot` and `policy_hash`; `{version}` is an id or `latest` |
 | `GET /projects/{id}/scenarios` | read:runs | scenarios (paginated) |
 | `POST /projects/{id}/scenarios` | write:runs | `201` new scenario (horizon, replications, seed, disruptions…) |
 | `POST /projects/{id}/runs` | write:runs | `202 {run_id, status, policy_hash, graph_hash, gate_skipped}`; body `{"scenario_id","policy_version_id","acknowledge_warnings"?,"force_rerun"?}` |

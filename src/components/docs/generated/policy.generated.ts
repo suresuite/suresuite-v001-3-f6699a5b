@@ -1635,6 +1635,12 @@ export const API_ROUTES: ApiRoute[] = [
   },
   {
     "method": "GET",
+    "path": "/v1/projects/{id}/dataset-versions/{version}",
+    "scope": "read:data",
+    "handler": "getDatasetVersion"
+  },
+  {
+    "method": "GET",
     "path": "/v1/projects/{id}/policy-catalog",
     "scope": "read:policies",
     "handler": "getPolicyCatalog"
@@ -1662,6 +1668,12 @@ export const API_ROUTES: ApiRoute[] = [
     "path": "/v1/projects/{id}/policy-versions",
     "scope": "read:policies",
     "handler": "listPolicyVersions"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/projects/{id}/policy-versions/{version}",
+    "scope": "read:policies",
+    "handler": "getPolicyVersion"
   },
   {
     "method": "GET",
@@ -2040,7 +2052,7 @@ export const API_ERRORS: ApiErrorCode[] = [
     "code": "invalid_request",
     "status": 400,
     "message": "request body failed validation",
-    "sites": 1
+    "sites": 2
   },
   {
     "code": "expired_key",
@@ -2085,9 +2097,21 @@ export const API_ERRORS: ApiErrorCode[] = [
     "sites": 1
   },
   {
+    "code": "dataset_version_not_found",
+    "status": 404,
+    "message": "no such dataset version in this project",
+    "sites": 1
+  },
+  {
     "code": "key_not_found",
     "status": 404,
     "message": "key not found",
+    "sites": 1
+  },
+  {
+    "code": "policy_version_not_found",
+    "status": 404,
+    "message": "no such policy version in this project",
     "sites": 1
   },
   {
@@ -2184,7 +2208,7 @@ export const API_ERRORS: ApiErrorCode[] = [
     "code": "read_failed",
     "status": 503,
     "message": "run read failed",
-    "sites": 9
+    "sites": 11
   }
 ];
 
