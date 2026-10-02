@@ -638,7 +638,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
             </p>
           ) : null}
           {runStatus === "queued" ? (
-            <p className="text-[12.5px] leading-snug text-[#525252]">Queued — waiting for a worker</p>
+            <p className="text-[12.5px] leading-snug text-[#525252]">Queued</p>
           ) : null}
 
           <MobileButtonRow>
@@ -673,7 +673,7 @@ export function MobileSimulationLab(props: MobileSimulationLabProps) {
           {reps.length === 0 ? (
             <EmptyBody>
               <span className="text-[13px] leading-relaxed text-[#525252]">
-                Waiting for first replication…
+                Starting…
               </span>
             </EmptyBody>
           ) : (

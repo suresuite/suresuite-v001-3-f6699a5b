@@ -54,27 +54,32 @@ function ChosenFacts({ card, credibility }: { card: ModelValidationCard; credibi
           ? `${driftReasons(credibility.drift).join(" · ") || "stale"} → re-validate`
           : credibility?.state === "validated"
             ? "in force"
-            : "not matched to the live policy, simulation inputs and scenario";
+            : "not matched";
   // WP 11.3 — shown, never a reason to re-validate (the simulation does not read it).
   const notes = credibility && credibility.state !== "unvalidated" ? noteReasons(credibility.notes) : [];
   const stale = card.status !== "active" || credibility?.state === "stale";
+  const unmatched = card.status === "active" && credibility?.state !== "stale" && credibility?.state !== "validated";
+  const snapshot = `snapshot ${refs.graphVersionNo != null ? `v${refs.graphVersionNo}` : card.graph_hash.slice(0, 7)}`;
+  const validated = `validated ${new Date(card.validated_at).toLocaleDateString()}`;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-[#52525b]" data-testid="model-facts">
       {/* WP 11.3 · §4 D259 — what the model binds: the simulation's inputs; the
           snapshot it was validated on is secondary. */}
-      <span title="model_validations.simulation_version_id → graph_level_versions.version_no · hash_simulation">
+      {/* The snapshot and the validation date are secondary — on hover. */}
+      <span title={`simulation inputs · ${snapshot} · ${validated}`}>
         {card.hash_simulation
-          ? `simulation inputs ${refs.simulationVersionNo != null ? `v${refs.simulationVersionNo}` : card.hash_simulation.slice(0, 7)}`
-          : "simulation inputs not recorded"}
-      </span>
-      <span title="model_validations.dataset_version_id → dataset_versions.version_no" className="text-[#71717a]">
-        snapshot {refs.graphVersionNo != null ? `v${refs.graphVersionNo}` : card.graph_hash.slice(0, 7)}
+          ? `inputs ${refs.simulationVersionNo != null ? `v${refs.simulationVersionNo}` : card.hash_simulation.slice(0, 7)}`
+          : "inputs not recorded"}
       </span>
       <span title="model_validations.policy_version_id → policy_versions.version_no">
         policy {refs.policyVersionNo != null ? `v${refs.policyVersionNo}` : card.policy_hash.slice(0, 7)}
       </span>
-      <span title="model_validations.validated_at">validated {new Date(card.validated_at).toLocaleDateString()}</span>
-      <span style={{ color: stale ? LAYER.firm : LAYER.process }}>{status}</span>
+      <span
+        style={{ color: stale ? LAYER.firm : LAYER.process }}
+        title={unmatched ? "not matched to the live policy, simulation inputs and scenario" : undefined}
+      >
+        {status}
+      </span>
       {notes.length > 0 ? (
         <span className="text-[#71717a]" data-testid="model-notes">{notes.join(" · ")}</span>
       ) : null}
@@ -112,8 +117,7 @@ export function LabModelStep(p: LabModelStepProps) {
         </div>
         {p.models.length === 0 && !p.chosen ? (
           <p className="text-[12px] text-[#52525b]">
-            No Validated Model yet — save one in Policies › Run &amp; Validate.
-            {p.canExplore ? " Until then a run here is exploratory." : ""}
+            No validated model — create one in Policies › Run &amp; Validate
           </p>
         ) : (
           <select
@@ -136,15 +140,17 @@ export function LabModelStep(p: LabModelStepProps) {
         )}
         {p.chosen && !p.exploratory ? <ChosenFacts card={p.chosen} credibility={p.credibility} /> : null}
         {p.canExplore ? (
-          <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-[12px] text-[#52525b] md:min-h-0">
+          <label
+            className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-[12px] text-[#52525b] md:min-h-0"
+            title="Badged everywhere, never a comparison baseline, never surrogate training data"
+          >
             <input
               type="checkbox"
               checked={p.exploratory}
               onChange={(e) => p.onExploratory(e.target.checked)}
               className="h-[14px] w-[14px] accent-foreground"
             />
-            Run an exploratory (unvalidated) model instead — badged everywhere, never a comparison
-            baseline, never surrogate training data
+            Exploratory run (unvalidated)
           </label>
         ) : null}
       </div>
@@ -155,10 +161,13 @@ export function LabModelStep(p: LabModelStepProps) {
           Engine
         </label>
         {p.enginesLoading ? (
-          <span className="font-mono text-[11px] text-[#52525b]">reading the engine registry…</span>
+          <span className="font-mono text-[11px] text-[#52525b]">loading…</span>
         ) : p.engines.length === 0 ? (
-          <span className="font-mono text-[11px] text-[#52525b]">
-            the engine registry is not readable here — the run goes to the single active engine
+          <span
+            className="font-mono text-[11px] text-[#52525b]"
+            title="The engine registry is not readable here — the run goes to the single active engine"
+          >
+            default engine
           </span>
         ) : (
           <select
@@ -172,7 +181,7 @@ export function LabModelStep(p: LabModelStepProps) {
               <option key={e.id} value={e.id}>
                 {e.name}
                 {e.version ? ` · ${e.version}` : ""}
-                {e.code_version ? ` · ${e.code_version}` : " · build not reported yet"}
+                {e.code_version ? ` · ${e.code_version}` : " · build ?"}
               </option>
             ))}
           </select>
@@ -204,7 +213,7 @@ export function LabModelStep(p: LabModelStepProps) {
           {p.deviations.length > 0 ? (
             <ul className="flex flex-col gap-0.5 text-[12px]" data-testid="protocol-deviations">
               <li className="text-[--warn-ink,#92400e]">
-                This run deviates from the model — recorded on the run and shown on its results and exports:
+                Deviations (recorded on the run):
               </li>
               {p.deviations.map((d) => (
                 <li key={d.key} className="font-mono text-[11.5px] text-[#18181b]">
@@ -212,9 +221,7 @@ export function LabModelStep(p: LabModelStepProps) {
                 </li>
               ))}
             </ul>
-          ) : (
-            <span className="text-[12px] text-[#52525b]">Faithful to the model's protocol — no deviations.</span>
-          )}
+          ) : null}
         </div>
       ) : null}
 
@@ -222,7 +229,7 @@ export function LabModelStep(p: LabModelStepProps) {
         <div className="flex flex-wrap items-center gap-2 border-t border-[--hair-rule] px-3 py-2.5">
           <span className="min-w-0 flex-1 text-[12px] text-[#52525b]">
             {p.runModelReason ??
-              "The validated baseline is read-only. Running the model makes a scenario seeded from it and runs that."}
+              "Read-only — runs as a new scenario."}
           </span>
           <button
             type="button"

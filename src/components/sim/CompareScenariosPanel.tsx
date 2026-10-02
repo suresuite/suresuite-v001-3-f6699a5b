@@ -151,13 +151,11 @@ export function CompareScenariosPanel({
   // between platforms.
   const shortfall =
     withResults.length < 2
-      ? `${withResults.length} of ${scenarios.length} ${
-          scenarios.length === 1 ? "scenario has" : "scenarios have"
-        } completed results — a comparison needs two`
+      ? `Needs 2 scenarios with results (${withResults.length} of ${scenarios.length})`
       : !pair
         ? "Pick two different scenarios"
         : failures.length === 0 && rows.length === 0
-          ? "The two runs share no KPI in their aggregates"
+          ? "No shared KPIs"
           : null;
 
   if (skin) {
@@ -218,8 +216,7 @@ export function CompareScenariosPanel({
             <MobileRow
               chevron={false}
               dot={M.firm}
-              label="Not a paired experiment"
-              sub="§9.3 requires CRN pairing and exactly one differing RunKey component"
+              label="Not comparable"
             />
           ) : (
             // A comparison IS a table, and §9.5 allows one to scroll inside
@@ -287,9 +284,7 @@ export function CompareScenariosPanel({
     >
       {withResults.length < 2 ? (
         <div className="px-3 py-[10px] text-[12.5px] text-[--zinc-quiet]">
-          {withResults.length} of {scenarios.length}{" "}
-          {scenarios.length === 1 ? "scenario has" : "scenarios have"} completed results — a
-          comparison needs two
+          {shortfall}
         </div>
       ) : !pair ? (
         <div className="px-3 py-[10px] text-[12.5px] text-[--zinc-quiet]">
@@ -297,9 +292,11 @@ export function CompareScenariosPanel({
         </div>
       ) : failures.length > 0 ? (
         <div className="flex flex-col gap-[5px] px-3 py-[10px]">
-          <span className="text-[12.5px] text-[#18181b]">
-            Not a paired experiment — §9.3 requires CRN pairing and exactly one differing RunKey
-            component
+          <span
+            className="text-[12.5px] text-[#18181b]"
+            title="Not a paired experiment — §9.3 requires CRN pairing and exactly one differing RunKey component"
+          >
+            Not comparable:
           </span>
           {failures.map((f) => (
             <span key={f} className="flex items-start gap-[7px] text-[12px] text-[#52525b]">
@@ -310,7 +307,7 @@ export function CompareScenariosPanel({
         </div>
       ) : rows.length === 0 ? (
         <div className="px-3 py-[10px] text-[12.5px] text-[--zinc-quiet]">
-          The two runs share no KPI in their aggregates
+          {shortfall}
         </div>
       ) : (
         <CompareTable rows={rows} />

@@ -117,7 +117,7 @@ export function RunProgressPanel({ run, reps, versionLabel, credibility, onCance
           </div>
           <Progress value={pct} />
           {run.status === "queued" && (
-            <p className="text-[11px] text-muted-foreground mt-1">Queued — waiting for a worker</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Queued</p>
           )}
           {run.error_message && (
             <p className="text-xs text-destructive mt-1">{run.error_message}</p>
@@ -133,7 +133,7 @@ export function RunProgressPanel({ run, reps, versionLabel, credibility, onCance
         </CardHeader>
         <CardContent>
           {reps.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Waiting for first replication…</p>
+            <p className="text-xs text-muted-foreground">Starting…</p>
           ) : (
             <div className="grid grid-cols-10 gap-1">
               {reps.map((r) => (

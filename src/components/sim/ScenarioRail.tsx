@@ -58,7 +58,7 @@ export function ExperimentLibraryBox({
             Stress-test experiments
           </span>
         </span>
-        <span className="text-[11.5px] text-[#3f3f46]">{count} presets ready to run</span>
+        <span className="text-[11.5px] text-[#3f3f46]">{count} presets</span>
       </span>
       <span className="ml-auto shrink-0 text-[13px] text-[#0e7f88]">{open ? "▾" : "▸"}</span>
     </button>
@@ -106,6 +106,7 @@ export function ScenarioList({
             type="button"
             onClick={onCreate}
             title="New scenario"
+            aria-label="New scenario"
             className="h-6 min-h-11 w-6 min-w-11 rounded-sm border border-[--hair-rule] text-[14px] leading-none text-[#52525b] hover:border-foreground hover:text-foreground md:min-h-0 md:min-w-0"
           >
             +
@@ -120,7 +121,7 @@ export function ScenarioList({
         ) : null}
         {!loading && scenarios.length === 0 ? (
           <div className="px-[14px] py-3 text-[12.5px] text-[--zinc-quiet]">
-            No scenarios yet — create one, or launch a stress test above.
+            No scenarios yet.
           </div>
         ) : null}
         {[...scenarios]
@@ -169,6 +170,7 @@ export function ScenarioList({
                 <button
                   type="button"
                   title={baseline ? "New scenario from this baseline" : "Duplicate scenario"}
+                  aria-label={baseline ? "New scenario from this baseline" : "Duplicate scenario"}
                   onClick={(e) => {
                     e.stopPropagation();
                     onDuplicate(s);
@@ -180,6 +182,7 @@ export function ScenarioList({
                 <button
                   type="button"
                   title={baseline ? BASELINE_READONLY_REASON : "Delete scenario"}
+                  aria-label="Delete scenario"
                   disabled={baseline}
                   onClick={(e) => {
                     e.stopPropagation();
