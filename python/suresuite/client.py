@@ -1,5 +1,7 @@
 # ── SuReSuite notebook library ──────────────────────────────────────────────
-# Run this cell; you do not need to read it. It defines:
+# The `suresuite` Python package's client (python/suresuite/client.py), inlined
+# into each notebook by scripts/notebooks/build-notebooks.mjs. Run this cell;
+# you do not need to read it. It defines:
 #   connect()                      the API client (live, or the offline demo)
 #   api.run_and_wait(...)          dispatch a simulation run and poll it to the end
 #   kpi_table / replications_frame / paired_compare / assert_disruption_applied
@@ -18,9 +20,18 @@ import time
 import uuid
 import zlib
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import requests
+
+try:  # the charts need matplotlib; the package works without it (`pip install suresuite[plots]`)
+    import matplotlib.pyplot as plt
+except ImportError:  # pragma: no cover - exercised only without the extra
+    plt = None
+
+try:  # as the `suresuite` package; in a notebook the KPI_DISPLAY cell is inlined below instead
+    from .kpi_display import KPI_DISPLAY
+except ImportError:
+    pass
 
 FAMILIES = ("sourcing", "inventory", "transport", "fulfillment", "production", "recovery", "demand")
 TERMINAL = ("done", "failed", "cancelled")  # a run's lifecycle: queued → running → done | failed | cancelled
@@ -168,6 +179,20 @@ class SuReSuite:
         """An immutable policy version. An unchanged configuration returns the version
         that already holds it (content-addressed), so the label may be an older one."""
         return self.post(f"/projects/{project_id}/policy-versions", {"label": label})
+
+    def dataset_version(self, project_id, version="latest", tables=None):
+        """One frozen dataset version WITH its rows (`snapshot`): exactly what a run
+        reads. `version` is an id or "latest"; `tables` narrows it."""
+        return self.get(f"/projects/{project_id}/dataset-versions/{version}",
+                        tables=",".join(tables) if tables else None)
+
+    def policy_version(self, project_id, version="latest"):
+        """One frozen policy version with its `snapshot` and `policy_hash`."""
+        return self.get(f"/projects/{project_id}/policy-versions/{version}")
+
+    def engine(self):
+        """The engine's wheels: sha256, size and a short-lived signed URL each."""
+        return self.get("/engine")
 
     def policy_versions(self, project_id):
         return self.get(f"/projects/{project_id}/policy-versions")["data"]
@@ -511,9 +536,15 @@ def export_run_workbook(api, run, scenario, path, policy_version_label=None):
 
 
 # ── charts ──────────────────────────────────────────────────────────────────
+def _need_plt():
+    if plt is None:
+        raise ImportError("charts need matplotlib: pip install 'suresuite[plots]'")
+
+
 def plot_kpis(runs, kpis, title=None):
     """One small panel per KPI (their scales differ), one bar per run, with the
     run's 95 % CI half-width as the error bar. `runs` is {label: run_row}."""
+    _need_plt()
     kpis = [k for k in kpis if all(k in _numeric(r.get("aggregate_kpis")) for r in runs.values())]
     if not kpis:
         print("none of those KPIs is present on every run")
@@ -538,6 +569,7 @@ def plot_series(series_by_label, column, title=None, window=None, warmup_week=No
     """Mean weekly trajectory per run with a band from the lowest to the highest
     replication. `series_by_label` is {label: api.series(run_id)}; `window` is a
     (start_week, end_week) disruption window to shade."""
+    _need_plt()
     fig, ax = plt.subplots(figsize=(8, 3.4))
     for i, (label, df) in enumerate(series_by_label.items()):
         if column not in df:
@@ -652,6 +684,10 @@ class DemoTransport:
             if m.group(1) != self.pid:
                 return self._err(404, "project_not_found", "project not found")
             return self._project(method, m.group(2) or "", body, headers)
+        if p == "/engine" and method == "GET":
+            return self._err(403, "demo_no_engine",
+                             "the offline demo cannot hand out the engine — it comes with an API key "
+                             "(create one on the app's /developer page, then suresuite.install_engine())")
         m = re.fullmatch(r"/runs/([^/:]+)(/replications|/validation|:cancel|:add-reps)?", p)
         if m:
             run = self.runs.get(m.group(1))
@@ -697,6 +733,26 @@ class DemoTransport:
                  "card_count": 0, "version_no": len(self.versions) + 1, "_policies": copy.deepcopy(self.defaults)}
             self.versions.append(v)
             return self._ok({k: v[k] for k in ("id", "label", "policy_hash", "created_at")}, 201)
+        m = re.fullmatch(r"/dataset-versions/([^/]+)", sub)
+        if m and method == "GET":
+            dv = self.datasets[0] if m.group(1) in ("latest", self.datasets[0]["id"]) else None
+            if dv is None:
+                return self._err(404, "dataset_version_not_found", "no such dataset version in this project")
+            snap = {"schema_version": 3, "inputs": {**copy.deepcopy(self.d["dataset"]), "customers": [],
+                                                    "bom_multi_level": []}, "network": {}}
+            return self._ok({**{k: dv[k] for k in ("id", "label", "version_no", "graph_hash", "author_email",
+                                                   "created_at")},
+                             "hash_inputs": None, "hash_network": None, "schema_version": 3, "snapshot": snap})
+        m = re.fullmatch(r"/policy-versions/([^/]+)", sub)
+        if m and method == "GET":
+            vid = m.group(1)
+            v = (self.versions[-1] if self.versions else None) if vid == "latest" else \
+                next((x for x in self.versions if x["id"] == vid), None)
+            if v is None:
+                return self._err(404, "policy_version_not_found", "no such policy version in this project")
+            return self._ok({**{k: x for k, x in v.items() if not k.startswith("_")},
+                             "snapshot": {"schema_version": 2, "defaults": copy.deepcopy(v["_policies"]),
+                                          "fulfillment_strategy": None, "overrides": []}})
         if sub == "/policy-versions" and method == "GET":
             return self._ok({"data": [{k: v for k, v in x.items() if not k.startswith("_")}
                                       for x in reversed(self.versions)]})

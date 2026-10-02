@@ -223,7 +223,9 @@ export function deriveApiRoutes(root) {
       // `(${UUID})` is a capture group for an id. Rendered as `{id}`, which is
       // what a reader types, rather than as the regular expression the server
       // matches with.
-      path: `/v1${m[2].replace(/\(\$\{UUID\}\)/g, "{id}")}`,
+      // `(${VERSION_ID})` (WP 12.2) is a version id OR the word `latest`, so it
+      // renders as `{version}` and the route's own description says which.
+      path: `/v1${m[2].replace(/\(\$\{UUID\}\)/g, "{id}").replace(/\(\$\{VERSION_ID\}\)/g, "{version}")}`,
       scope: m[3],
       handler: m[4],
     });

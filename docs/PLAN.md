@@ -458,6 +458,8 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D270** | **`PUT …/policies` accepts any field inside a family, and the catalog it points readers to names different fields.** Validation stops at family names, so a parameter named the way `GET …/policy-catalog` names it (`rule`, `fixed_days_cover`) is stored and never read — the engine's mapper reads the app's vocabulary (`backorder_allowed`, `safety_stock_days`). The two vocabularies are both correct and nothing tells an API caller there are two. The notebooks carry the mapping for the levers they use; the fix is the declaration D125 asks for, published through the API | `supabase/functions/api/index.ts:444`–`465`; `supabase/functions/_shared/policyFields.ts` | **OPEN — WP 6.4** *(R8 needs an open owner and the API workstream (G15 API Phase 3) has no package in this plan; WP 6.4 already owns the API half of D112, the same class — a public control whose meaning the engine or worker does not honour. Found by the notebook series' contract check, §16 · Developer API · the Python notebook series)* |
 | **D271** | **A scenario created through the API cannot say how its warm-up or replications are decided, and a short horizon is lengthened without a word.** `ScenarioCreateSchema` has no `warmup_mode`, `stopping_rule` or `demand_model`, so an API scenario always detects its warm-up and ignores the `warmup_days` it accepts; a `horizon_days` below 364 runs 52 weeks, the engine floor. The API's own default horizon is 90 days | `supabase/functions/api/index.ts:423`–`434` | **OPEN — WP 6.4** *(R8 needs an open owner and the API workstream (G15 API Phase 3) has no package in this plan; WP 6.4 already owns the API half of D112, the same class — a public control whose meaning the engine or worker does not honour. Found by the notebook series' contract check, §16 · Developer API · the Python notebook series)* |
 | **D272** | **`:cancel` answers `cancelled` for a run that had already finished.** The database update is guarded on `queued`/`running`, so the run correctly stays `done` — but the response does not read it back, so a caller is told something false. The notebooks read the run after cancelling | `supabase/functions/api/index.ts:861`–`869`; `supabase/functions/_shared/dispatch.ts:645`–`649` | **OPEN — WP 6.4** *(R8 needs an open owner and the API workstream (G15 API Phase 3) has no package in this plan; WP 6.4 already owns the API half of D112, the same class — a public control whose meaning the engine or worker does not honour. Found by the notebook series' contract check, §16 · Developer API · the Python notebook series)* |
+| **D273** | **The browser engine computed a run with its own copy of the worker's pipeline, and the copy had drifted.** Run & Validate runs scsim in the browser through a Python string inside `engine.worker.ts` — a hand copy of `snapshot_to_policies` → `build_project_data` → `compute_run_from_project` → `build_run_update`. The copy's result shaping lagged the worker's: it never wrote `_range` (the min/max across replications, WP 10.6) or `_meta.capacity_binding` (WP 9.3), so a browser-computed run read as having neither. A third place to compute a run — a user's own machine, Phase 12 — would have been a third copy | `src/lib/sim/engine.worker.ts` (the `PY_DRIVER` string) against `sim-worker/sim_worker/worker.py`'s `build_run_update` | **WP 12.1 ✅** *(`sim_worker.local.run_from_snapshots` is the one entry point; the shaping moved to `sim_worker/run_shape.py`, the long-form series to `series_store.long_columns`. The browser driver, the notebooks' demo recorder and the `suresuite` package call it. `sim-worker/tests/test_local_parity.py` executes the browser's own driver string and requires the worker's run row, byte for byte)* |
+| **D274** | **The engine is gated for pip and public for the browser.** WP 12.4 distributes the engine wheels to API users only through signed URLs from a private bucket (`GET /v1/engine`), logged per key — and the browser engine (Run & Validate) still loads the same two wheels from `public/engine/` as public static files, so anyone who can fetch the app's assets can fetch the engine. The gate is real for the PATH it covers (who installed which engine is now known) and is not a secrecy boundary | `public/engine/*.whl` and `src/lib/sim/engine.worker.ts` (`/engine/${whl}`) against `supabase/functions/_shared/engineIndex.ts` | **OPEN — WP 7.1** *(closing it means the browser fetches signed URLs too, which needs a browser principal the database can trust — the anon key is not one (D28), and that is WP 7.1's authentication model. Recorded when the engine route landed (§22), rather than hidden; the product owner chose "gated by API key" knowing the static copy exists)* |
 
 ### 4.1 Code map — the data layer
 
@@ -21930,6 +21932,121 @@ against the gateway, the worker and the engine:
   owner and the G15 API workstream has no package here; whether to open one is a product call.
 - **D112's notebook half is closed**; its presets and API-schema halves are not.
 
+### WP 12.1 — One local-run entry point · 2026-10-02 · no migration
+
+**Asked for (Phase 12, §22).** Advanced users run simulations on their own compute, so the
+engine must run outside the Fly worker — and must give the worker's answer there.
+
+**Found before writing.** A run is ALREADY computed in two places: the worker, and the browser
+(Run & Validate, Pyodide), and the browser's pipeline was a hand copy in a string whose result
+shaping had drifted (D273). A library would have been a third copy.
+
+**What changed.** `sim_worker/run_shape.py` holds `build_run_update` (pure; the worker wraps it
+with its clock). `series_store.long_columns` is the long-form table the Parquet writer and a
+local run share. `sim_worker/local.py`'s `run_from_snapshots(dataset, policy_snapshot, scenario)`
+reads a `dataset_versions.snapshot` (v1 or v2) or plain tables and returns the run row,
+replications and series in the API's shapes. The browser driver is now an adapter around it, and
+`record_demo.py` calls it — its fixture is unchanged, which is the check that nothing moved.
+`test_no_orphan_module.py` gained a CHECKED second entry point (the module must really be
+imported by `engine.worker.ts`), not a whitelist entry. The `sim_worker` wheel is rebuilt; the
+scsim wheel is untouched.
+
+**Gate results.** `sim-worker` pytest 144 passed, including `test_local_parity.py` (worker ==
+local == the browser's own driver string, on the Example project with an S2 outage);
+`build_engine_wheels.sh --check` green; `record_demo.py --check` current.
+
+**Gap check.** The browser path is proven by executing its Python, not by running Pyodide: a
+Pyodide-only import failure would still need the in-app self-test (Run & Validate → engine
+self-test) to catch it.
+
+### WP 12.2 — The snapshot read API · 2026-10-02 · no migration · §15 run `36984474315`
+
+**What changed.** Two read routes return a dataset version's frozen rows and a policy version's
+snapshot — the inputs `sim_worker.local` needs. Looked up by id AND project; `latest` resolves the
+newest; `?tables=` narrows a snapshot and reports unknown names; any response over 32 KB is
+gzipped for a client that accepts it. Pure logic in `_shared/snapshotView.ts`
+(`snapshotView.test.ts`); the docs' route renderer learnt `{version}`.
+
+**The reading** (probe pushed alone, fence unmoved at `20261001000024`): six projects hold
+snapshots; the largest is 592 370 bytes of JSON, of which 359 475 are the `inputs` a simulation
+reads; the largest policy snapshot is 135 527 bytes; all production snapshots are
+`schema_version` 3. **Decision: one gzipped response, no cap.** Re-measure if a snapshot passes
+10 MB.
+
+**Gap check.** The routes deploy with the edge function on merge, so no request against them has
+been served yet; the live check is the user's (README, "Live smoke test").
+
+### WP 12.3 — Personal API keys · 2026-10-02 · `20261002000001`
+
+**What changed.** See §22 · WP 12.3, including the recorded deviation (reads are not role-gated,
+because the app's reads are not). Gateway: a personal key resolves its owner through
+`api_personal_key_actor`; no owner → `401 key_owner_inactive`; the request log carries
+`actor_user_id`. `/developer`: an "Acts as" choice (you / the organization), personal by default,
+and a `personal` badge in the key list. Manual: a "Personal keys and organization keys" section,
+and the no-actor callout narrowed to WRITES.
+
+**Gate results.** `contract:rehearse` plain, `--fixtures` and `--since HEAD` green with
+`700_personal_api_keys.sql`; two mutations red as intended. `contract:check` green.
+
+**Gap check.** The §15 reading found ONE API key in production (test, revoked), so no live key
+changes behaviour. API WRITES still name no actor — deliberately, until push-back brings the
+project-role gate (the gateway's D71 comment). A plain `user` still cannot mint a key at all
+(`_api_key_management_org`: admin or modeler) — a product question if advanced users are often
+plain users.
+
+### WP 12.4 — Engine distribution, gated · 2026-10-02 · `20261002000002`
+
+**What changed.** A private `engine` bucket; `GET /v1/engine` signs a URL per wheel and returns
+its sha256 (`_shared/engineIndex.ts`); `scripts/publish_engine_wheels.mjs` + `engine-distribution.yml`
+publish on `main`, the service key derived from `SUPABASE_ACCESS_TOKEN` and masked.
+
+**Found while writing.** The first draft filed wheels under the ENGINE version (0.2.8). WP 12.1
+had just changed `sim_worker`'s content without changing any version, so the upload would have
+answered "already exists", kept the old wheel, and published an index whose hash the file did not
+match — every client would have refused the install. Paths are content-addressed instead.
+
+**Gap check.** Nothing about this package is observable before the merge: the bucket, the route
+and the publishing workflow all act on `main`. D274 — the public static copy — is recorded, not
+closed.
+
+### WP 12.5 — The `suresuite` Python package · 2026-10-02 · no migration
+
+**What changed.** `python/` is an installable package. The notebooks' client moved INTO it —
+one source for the package and the five notebooks — with two changes a package needs: the KPI
+vocabulary is imported when it is a package and inlined when it is a notebook, and matplotlib is
+optional. New: snapshot pulls (`dataset_version`, `policy_version`), the engine route, and the
+demo transport answering both (it refuses the engine: the engine comes with a key).
+`suresuite/local.py`: `Dataset`, `Policy`, `simulate`, `with_tables`, `install_engine`.
+
+**Gate results.** Package pytest 7 passed in the repo AND from a copy outside it against the
+installed wheels in a fresh virtualenv (no matplotlib); notebooks still current, 22 notebook
+tests pass, all five notebooks execute.
+
+**Gap check.** Live use needs the merge (the snapshot and engine routes deploy with the edge
+function) and a key. The package is served from the app, not PyPI; publishing it publicly is a
+separate decision because the engine it installs is "all rights reserved".
+
+### WP 12.6 — Notebook 05, and Phase 12's gap check · 2026-10-02 · no migration
+
+**What changed.** See §22 · WP 12.6. `/developer` offers six notebooks; the manual, the API
+README and the design doc say six; CI installs the engine for the notebook job.
+
+**Phase 12 gap check — what the phase promised against what is true.**
+
+| Promise (§22) | State |
+|---|---|
+| Pull the data a key may read | ✅ two snapshot routes; largest production snapshot 592 KB, one gzipped response |
+| Simulate on the user's own compute | ✅ `sim_worker.local` — one entry point for browser, recorder and package; worker == local == browser proven |
+| Personal keys, traced to the person | ✅ requests name the owner; ⚠ API WRITES still name nobody (deliberate, see the gateway's D71 comment) |
+| The engine gated by API key | ✅ for pip; ⚠ public for the browser (§4 D274, WP 7.1) |
+| A package and an example | ✅ `suresuite` 0.1.0 at `/python/`; notebook 05 |
+| Results badged until verified | not applicable yet — nothing is pushed back |
+
+**Nothing of Phase 12 is observable in production before the merge**: the routes, the bucket and
+the publishing workflow deploy on `main`. After the merge the user's live check is in
+`docs/api/README.md`: a personal key, `install_engine`, `dataset` + `policy`, `simulate`, and
+compare with a platform run of the same versions.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -21946,6 +22063,7 @@ against the gateway, the worker and the engine:
 | **9** | **9.1 – 9.4** | **results: inventory over time, capacity, the result binding, and the Lab surface** | — | **9.4 ✅** the Lab builds on the validated baseline: `scenarios.role`, one seeding module, one run gate, one planning unit, one disruption-event model exported by the engine, one network dialog (§4 D147, D219–D228 closed). **9.1 ✅** the weekly-series vocabulary is authored ONCE (`WEEKLY_SERIES`, scsim/core/context.py) and the engine's six copies derive from it — which is how §4 D164 was found and closed: `fg_value`, finished-goods inventory, had been computed on every replication since the trace was written and published by nothing, so the chart captioned "Inventory dynamics" showed MATERIAL stock and called it inventory. Materials and finished goods now both reach a user, in units or value, on BOTH result surfaces, on ordinary multi-replication runs. It also describes `run_replications` — the first of the nine run/result tables to leave the deferral — and re-homes the other eight, whose owner (WP 6.3) had shipped, which is the state R8 exists to refuse. **9.2** is what those eight owe and 9.1 does not pay: `result-binding` — every result binds dataset + policy + scenario + engine version. A5's Reproducibility Record (WP 6.3) assembles that at EXPORT time from rows that could each have been written by a different world; the invariant asks for it on the ROW, and D88 is the precondition — 8 577 derived rows predate provenance  **9.3 ✅** capacity becomes a recorded datum at both ends — §4 D167. The chain `products.production_capacity` declares was already machine-readable and the display layer could not walk it (`resolveEffective.ts` ended on a comment true of the logistics tables and false of the engine), so the plant grid showed nothing for the one number the run was certain to use; and `capacity_utilization` read a `full_debug`-only matrix, so it was NaN on every run a user ever made and the sanity tile printed "not recorded" — while D113's own closing note told the next reader the measure rendered, and `test_item_series.py`'s behaviour-neutrality gate carried a written exemption for the one KPI that was not behaviour-neutral. Closed with one author per fact (`EmptyMeaning`, `shadowed_by`, `derivedFallbackDetails`) and four always-on weekly capacity series plus per-entity binding measured against the UNCLIPPED want. **9.2** remains what the eight deferred run/result tables owe and neither 9.1 nor 9.3 pays |
 | **10** | **10.0 – 10.9** | **versions you can choose: graph versions per level, compute-once metrics, policy versions by content, the Validated Model, engines and RunKey, the Lab flow, result tiers, capacity, the surrogate training set** | — | **10.0 ✅** the plan (§20), §4 D233–D247 registered from a verified reading, WP 9.2's tables re-homed to WP 10.4 and `model_validations` to WP 10.3, the blueprint refined (§8.4, §9.2, §9.5, §11.4). **10.2 ✅** a policy version is its content: saves deduplicate by `policy_hash` with a per-project number, cards are matched by content everywhere including dispatch stamping and inheritance, and the version in force is derived, so a fresh Lab reads *validated* (D241, D242 closed). **10.1 ✅** graph versions per level and metrics computed once: three level hashes with the composite unchanged, a stored current hash, a numbered version per upload deduplicated against any, analyses keyed on the level they read, and three pages that read before they compute (D233–D239 closed; D240's last shim is WP 10.4's). **10.3 ✅** the Validated Model: a complete run protocol checked by one SQL function, `model_hash` as its identity, immutable, numbered and named, with its evidence in a row of its own; Student-t throughout Run & Validate, the warm-up the maximum over the selected KPIs, adoption only when every selected KPI passes or a statement is recorded, and Save Validated Model ending in **Open in Simulation Lab** (D243, D244 closed; the fingerprint deliberately not widened). **10.4 ✅** the binding on the row: an engine registry (scsim active, legacy retired), a RunKey computed once in SQL over engine build, graph, policy, the scenario's run spec and deviations, one insert path under which identical submissions make one run, the worker refusing a run bound to an engine it does not run, and all eight run/result tables described — plus **D248**, found by making the rehearsal mirror Supabase's default function grants: fifteen internal SECURITY DEFINER helpers had been callable through the API (D245, D248 closed; `network_topology_hash`'s drop moved to the new **WP 10.9**, which takes the after-merge readings). **10.5 ✅** the Lab starts from a choice of Validated Model: Model → Engine → Scenario → Settings → Run, the protocol locked behind "Advanced" with every deviation recorded as `protocol_overrides`, a run of the model dispatching the model's own policy version, "Run this model" seeding a scenario from it in one click, an editor's badged exploratory path, the run's size before it runs, and comparisons scoped to the model — which found **D249** (a model's evidence run reads as exploratory; the comparison half closed, the training half WP 10.8's). **10.6 ✅** result tiers: a worker run's weekly series in one zstd Parquet object per run in a private bucket, rows keeping their KPIs (and the min/max range the worker used to drop), one loader that hydrates rows so every chart reads what it always read, standard / pinned / evidence retention with a sweep that removes series only and says so with the RunKey — Postgres per run 165 KB → 23 KB at 30 × 52 (D246, D250 closed; the browser path keeps JSONB under the same retention). **10.7 ✅** capacity: an organization pool (monthly replication-weeks, series storage, replications per run, runs in flight, retention) and each project role's share of it, admitted in ONE place inside `create_simulation_run` after the RunKey lookup — a reuse or an attach consumes nothing, and the Lab, `/v1` and agent-apply are refused alike with 402/403/429 and the numbers; a ledger of reservation, actual and release; the Run card forecasting the answer and the super admin's usage table (D247 closed; **D252** — the share binds whom the caller names — WP 7.1's). **10.8 ✅** the surrogate-ready training set: one view stating which replications may train a surrogate — a validated model's faithful, completed runs, its evidence run included (D249 closed), nothing exploratory, deviating, gate-skipped or revoked — grouped by Validated Model and Graph Version with the RunKey and each replication's KPIs; structural features of the sourcing network computed once per product-level hash through the analysis store; the Lab's Surrogate card counting the set. No model is trained. **10.9 first half** the after-merge reading of WP 10.0–10.6 (§15 run `36857125032`): D248 closed in production, scsim reported by the worker, every graph and policy version numbered — and **D253**, retention inert in production (no pg_cron) with object removal by SQL that could break a run delete, closed by `20261001000014`. **10.9 second reading** the after-merge reading of WP 10.7–10.9a (§15 run `36863326325`): every migrated relation present, the role shares seeded, every organization at 90 days, the worker's first sweep run — and **D254**, the Surrogate card summing per-model groups, closed by `20261001000015`. **Still owed: the `network_topology_hash` drop, after a network-metrics or prominence analysis has run in production.** |
 | **11** | **11.0 – 11.5** | **one graph, three levels: a version per level, and every consumer bound to the level it reads** | — | **11.0 ✅** the plan (§21), §4 D258–D264 registered from a verified reading, the blueprint refined (§8.4, §9.2, §9.5, §11.4). The reading changed the design: the simulation's read set already HAS a hash — `hash_inputs`, the snapshot's `inputs` domain, whose eight tables are exactly the worker's eight reads — so the `simulation` scope is named and gated rather than minted, and `level_spec` stays 1. **11.1 ✅** a version per level: `graph_level_versions` numbers product, process and firm per project, deduplicated against any earlier version of the level; every snapshot names its tuple; history is backfilled in order; the state returns each level's version (D258's store half). It also closed **D265**: `anon` could insert a snapshot row directly, which from this package would have minted level versions. **11.2 ✅** the simulation scope NAMED (`simulation → hash_inputs`, one mapping, no new digest) and gated against the worker's reads; a Validated Model binds it, RunKey v2 hashes it, an analysis run names its level version; the agent's own copy of the badge rule follows (D260, D264 closed). **11.3 ✅** the surfaces: each network page names its level's version ("Product graph v3"), the Validated Model reads "simulation inputs v4" with a deep-tier change as a note and never re-validate, the snapshot list shows its tuple, the Reproducibility Record and Trust Report carry the levels (D258, D259, D263 closed; one read migration, `dataset_version_tuple`, because the browser cannot read the level table). **11.4 ✅** lineage: the training set groups and counts KPIs by simulation-input version and keeps the composite as lineage; the features name their product version; a run names its inputs whoever wrote it (D261, D262 closed). **11.5 ✅** the reading is §15 run `36903620736` (fence unmoved at `20261001000022`): every project with snapshots has all four levels, all 4 Validated Models bind the simulation scope, the doors D265 closed are closed. One firm-level `prominence` run met D240's condition, so `20261001000023` drops `network_topology_hash`. Two things are named, not met: RunKey v2 is unexercised (no simulation dispatched since WP 10.4), and the reading after the drop deploys is WP 10.9's. **PHASE COMPLETE.** |
+| **12** | **12.1 – 12.6** | **the library: pull the data you may read, simulate on your own machine** | — | **12.1 ✅** one local-run entry point (`sim_worker.local`), shared by the browser engine, the demo recorder and the coming `suresuite` package; D273 closed. **12.2 ✅** the snapshot read API (largest production snapshot 592 KB — one gzipped response, no cap). **12.3 ✅** personal keys (`20261002000001`, `rehearsal/700`). **12.4 ✅** the engine through `GET /v1/engine`, private bucket, content-addressed (D274 recorded). **12.5 ✅** the `suresuite` package (a local run equals the platform's, in a clean venv). **12.6 ✅** notebook 05 — simulate on your own machine. **PHASE COMPLETE**; push-back (upload, client-computed runs badged until verified) is the next phase, not started |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -23839,3 +23957,111 @@ by construction — the tables and columns deploy on merge — so the run that p
 production without Phase 11 and is not the reading. The reading is owed in the push after the
 merge, and the drop of `network_topology_hash` (D240) with it if probe 9 shows a
 `network_metrics` or `prominence` run keyed on a level.
+
+## 22. Phase 12 — The library: pull the data you may read, simulate on your own machine
+
+**The ask, and the decisions (2026-10-02).** The app suits users who do not code. Advanced users
+want the data they have rights to in their own Python (Colab, a laptop), and to run simulations
+on THEIR compute rather than the Fly worker — the backend as a library. The product owner chose:
+
+1. **Read-only first.** Nothing is pushed back in this phase.
+2. **Personal keys.** A key is bound to its creator, acts with that person's project role, and
+   every request names them (the API half of D28, for keys that opt in).
+3. **The engine is gated by API key.** A thin client installs freely and fetches the engine
+   with a valid key; each fetch is logged.
+4. **Client-computed results are badged until verified** — for when pushing back arrives:
+   "client-computed, unverified" until the platform re-runs the RunKey and the numbers match.
+
+**What was already true.** The engine is pure Python and already ships as wheels for the
+browser; `dataset_versions.snapshot` holds the frozen input rows; policy versions are
+content-addressed snapshots; `api_keys.created_by` names a key's creator. So the library is
+mostly a matter of exposing and sharing what exists — and of not copying the run pipeline a
+third time (D273).
+
+### WP 12.1 — One local-run entry point ✅ *(D273 closed — done, no migration)*
+
+`sim_worker.local.run_from_snapshots`: frozen dataset + policy snapshot + scenario → the
+worker's run row, replications and long-form series. The browser engine and the demo recorder
+call it; the `suresuite` package will.
+
+**Exit.** `test_local_parity.py`: worker, local and the browser's own driver give identical run
+rows for the Example project.
+
+### WP 12.2 — Read API: the frozen inputs ✅ *(done — no migration; §15 run `36984474315`)*
+
+`GET /projects/{id}/dataset-versions/{version}` (the snapshot; `?tables=`; `latest` or an id) and
+`GET /projects/{id}/policy-versions/{version}` (the policy snapshot). Tenancy-checked AND scoped
+to the project, gzip over 32 KB. **The measurement decided "no cap, one response"**: the largest
+snapshot in production is 592 KB of JSON (359 KB of it the simulation's `inputs`), and the largest
+policy snapshot 136 KB — so a signed-URL path like the run series' is not needed. Production's
+snapshots are `schema_version` 3; both the route and `sim_worker.local` key on the `inputs`
+domain, not on a version number.
+
+**Exit.** The endpoint returns what the database holds; another organization's key reads 404.
+
+### WP 12.3 — Personal keys ✅ *(done `20261002000001`)*
+
+`api_keys.principal` (`org` | `personal`, existing keys `org`); `api_personal_key_actor` answers
+which active user a personal key acts as, and the gateway refuses the key when it answers
+nothing; `api_request_logs.actor_user_id` names the person; only a key's owner may rotate a
+personal key; `/developer` creates personal keys by default.
+
+**DEVIATION FROM THIS PLAN AS FIRST WRITTEN, recorded here as the plan requires.** The plan said a
+personal key's project access "also requires the creator's `effective_project_role`". Reading the
+app showed that would make the key see LESS than its owner: `list_projects` shows a user every
+project of their organization, and project roles gate WRITES (promotion, D66), not reads. So a
+personal key reaches what its owner sees — the organization's projects, within the key's own
+restriction — and the role gate arrives with the first API write that needs it. The API's
+existing writes still pass no actor (the D71 comment in the gateway says why), so `audit-actor`
+for API writes is unchanged; what moved is that a personal key's REQUESTS name a person.
+
+**Exit.** `rehearsal/700`: a personal key resolves to its owner and an org key to nobody;
+deactivation and a change of organization each stop it; a super admin cannot mint one for another
+organization; an administrator cannot rotate someone else's; grants restated explicitly —
+mutation-tested (rotation guard → §5 red; active check → §2 red).
+
+### WP 12.4 — Engine distribution, gated ✅ *(done `20261002000002`; D274 recorded)*
+
+`GET /v1/engine` (any key with `read:data`) returns the engine version and, per wheel, its sha256,
+size and a 10-minute signed URL into the PRIVATE `engine` bucket; each fetch is a logged request
+naming the key (and, for a personal key, the person). `scripts/publish_engine_wheels.mjs` fills
+the bucket from `public/engine/` — at CONTENT-addressed paths, because `sim_worker`'s wheel
+version did not change when WP 12.1 changed its content, and a path by version would have kept
+the old file under the new hash — and `engine-distribution.yml` runs it on `main`. The browser
+still loads the same wheels publicly: §4 D274, owned by WP 7.1.
+
+**Exit.** `engineIndex.test.ts` runs the publisher's index through the gateway's parser (one
+format, two authors). The live half — install from the signed URLs in a clean environment, 401
+without a key — needs the merge (the bucket and the route deploy on main) and is the user's
+smoke test.
+
+### WP 12.5 — The `suresuite` Python package ✅ *(done — no migration)*
+
+`python/suresuite`: the notebooks' client MOVED in (`client.py`; the notebook build inlines it
+from there, and `kpi_display.py` is generated into the package), `ss.dataset()` / `ss.policy()`
+pull the frozen inputs, `ss.simulate()` runs `sim_worker.local.run_from_snapshots` on the user's
+machine and returns the API's shapes (marked `computed_by: client`), `ss.with_tables()` makes a
+local what-if, `ss.install_engine()` checks every wheel's sha256 before installing. Charts need
+the `plots` extra; the package itself needs only requests, pandas and pyarrow. The wheel is
+served at `/python/` and kept in step by `scripts/build_python_package.sh --check`.
+
+**Exit.** `notebooks.yml` · `python-package`: the committed wheels in a CLEAN virtualenv, tests
+run from outside the repo — pull the Example project through the client, simulate, and the
+aggregates EQUAL the platform's recorded run for the same inputs (baseline, and an S2 outage
+with 28 days of safety stock).
+
+### WP 12.6 — Notebook 05: simulate on your own machine ✅ *(done — no migration; Phase 12 complete)*
+
+`suresuite_05_local_simulation.ipynb`, built like 00–04 and offered on `/developer`; it inlines the
+package's `local.py` (new `include: local`). It pulls a dataset and a policy version, reproduces
+the platform's baseline run on the user's machine (identical on every KPI in demo), sweeps outage
+length × safety stock (20 runs, ~5 s), and runs a data what-if on a local copy.
+
+**Found by writing it.** The what-if first added a second supplier lane and showed NO effect:
+the engine orders from a lane only when a sourcing policy uses it. The notebook now shows four
+cases — single source; + a lane (nothing); + reactive backup, P-S.1 (a little); + split orders,
+P-S.2 (full service, for the multi-sourcing premium) — because "capacity in the network is not
+resilience until a policy uses it" is the lesson, not a bug to hide.
+
+**Exit.** `notebooks.yml` executes it keyless with the engine installed from `public/engine/`.
+
