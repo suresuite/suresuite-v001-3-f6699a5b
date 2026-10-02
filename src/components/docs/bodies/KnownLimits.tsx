@@ -103,6 +103,22 @@ export default function KnownLimits() {
             it as unlimited, which is the intended behaviour.
           </p>
         </Callout>
+
+        <Callout tone="limit" title="A run can use data edited after you pressed Run">
+          <p>
+            A run is bound to a frozen policy version, but its masters and lanes — cost, MOQ,
+            capacity, price, demand, the network itself — are read from your project when the run
+            starts, not from the dataset version it records. An edit made after dispatch, or after a
+            model was validated, can reach that run. The validated model is marked stale; the run is
+            not stopped. Separately, a few policy cells are not read by the engine yet, and a blank
+            project-wide default can show one value on the policies page while the run uses another.
+          </p>
+          <p>
+            <strong className="text-foreground">Until it is fixed:</strong> avoid editing data while
+            runs you depend on are queued, and rerun a validated model after any data change. See{" "}
+            <DocLink to="how-your-data-flows">How your data flows</DocLink>.
+          </p>
+        </Callout>
       </Section>
 
       <Section id="documentation-limits" title="Where this manual is not yet complete">

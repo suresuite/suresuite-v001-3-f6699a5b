@@ -102,6 +102,35 @@ export default function HowYourDataFlows() {
         </P>
       </Section>
 
+      <Section id="one-source" title="Which numbers a run uses">
+        <P>
+          The policies page is the one place you set a value the simulation uses. Every cell on it
+          is one of two kinds. An <Term>item-master</Term> cell — cost, MOQ, capacity, price,
+          demand — edits that item's master row. A <Term>policy</Term> cell — holding %, safety
+          stock, primary supplier, reorder settings — saves a policy override. Where you leave a
+          cell blank, the page shows the number that will be used instead: one derived from your
+          uploaded lanes, or a stated default.
+        </P>
+        <P>
+          When you run, two things are frozen: a <strong className="text-foreground">dataset
+          version</strong> (your masters and lanes) and a{" "}
+          <strong className="text-foreground">policy version</strong> (your policy settings). A
+          validated model names one of each. Edits you make afterwards go into the next version,
+          not into a run that has already been bound.
+        </P>
+        <Key>The rule: the number the policies page shows is the number the run uses.</Key>
+        <Callout tone="limit" title="Partly true today">
+          <p>
+            The policy side is frozen as described. The data side is not yet: a run records its
+            dataset version but is computed from your project's current masters and lanes, so an
+            edit made after you press Run, or after a model was validated, can reach that run. A
+            few page cells are also not read by the engine yet, and a blank project-wide default
+            can show one value while the run uses another. All of this is scheduled work and is
+            listed on <DocLink to="known-limits">Known limits</DocLink>.
+          </p>
+        </Callout>
+      </Section>
+
       <Section id="simulate" title="6. You simulate">
         <P>
           A run executes the model many times rather than once, because a single run of a system
