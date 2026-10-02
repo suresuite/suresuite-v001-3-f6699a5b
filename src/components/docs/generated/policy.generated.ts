@@ -2003,8 +2003,14 @@ export const UPLOAD_ASSETS: UploadAsset[] = [
   }
 ];
 
-/** The Colab notebook `/developer` offers, read from the href that offers it. */
-export const API_NOTEBOOK = "/notebooks/suresuite_api_quickstart.ipynb";
+/** The Python notebooks `/developer` offers, read from the hrefs that offer them. */
+export const API_NOTEBOOKS: string[] = [
+  "/notebooks/suresuite_00_quickstart.ipynb",
+  "/notebooks/suresuite_01_policy_experiment.ipynb",
+  "/notebooks/suresuite_02_disruption_resilience.ipynb",
+  "/notebooks/suresuite_03_material_shortage.ipynb",
+  "/notebooks/suresuite_04_results_and_reproducibility.ipynb"
+];
 
 /**
  * Every failure the public API can return, by stable machine code.

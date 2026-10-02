@@ -24,7 +24,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { API_NOTEBOOK, UPLOAD_ASSETS } from "../generated/policy.generated";
+import { API_NOTEBOOKS, UPLOAD_ASSETS } from "../generated/policy.generated";
 import { REFERENCE_TABLES } from "../generated/reference.generated";
 import { ALL_PAGES } from "../registry";
 
@@ -70,10 +70,8 @@ describe("every asset the manual links exists", () => {
     },
   );
 
-  it("ships the Colab notebook /developer offers", () => {
-    expect(existsSync(resolve(API_NOTEBOOK)), `${API_NOTEBOOK} is linked and not shipped`).toBe(
-      true,
-    );
+  it.each(API_NOTEBOOKS.map((n) => [n]))("ships the notebook /developer offers: %s", (nb) => {
+    expect(existsSync(resolve(nb)), `${nb} is linked and not shipped`).toBe(true);
   });
 
   it("records node_list as deliberately template-less rather than missing one", () => {

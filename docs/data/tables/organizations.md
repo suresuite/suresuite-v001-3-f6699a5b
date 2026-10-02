@@ -60,7 +60,7 @@ partially or get corrected — the write fails.
 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
-| `DeveloperApi.tsx` | rpc list_api_keys | `src/pages/DeveloperApi.tsx:271` | yes |
+| `DeveloperApi.tsx` | rpc list_api_keys | `src/pages/DeveloperApi.tsx:282` | yes |
 
 Each row says the page READS the table by that path, at that line. It does
 not say every column below is displayed there — a column carries its own
@@ -355,6 +355,6 @@ How long a standard run keeps its weekly series after it completes, read by `run
 
 ---
 
-*Generated from data contract `4a6b5c7ea5b5`, engine `0.2.8`,
+*Generated from data contract `06670c1d8c64`, engine `0.2.8`,
 sidecar `supabase/contract/organizations.contract.yaml`, table created by `20260709000002_super_admin_phase1.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

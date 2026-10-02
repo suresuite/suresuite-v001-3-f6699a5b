@@ -11,7 +11,7 @@
 
 import { PageTitle, Section, P, Key, Callout, Steps, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
 import { FROZEN_CELL } from "@/components/shared/frozenCell";
-import { API_LIMITS, API_NOTEBOOK, API_ROUTES } from "@/components/docs/generated/policy.generated";
+import { API_LIMITS, API_NOTEBOOKS, API_ROUTES } from "@/components/docs/generated/policy.generated";
 
 export default function GettingAnApiKey() {
   const scopes = [...new Set(API_ROUTES.map((r) => r.scope))].sort();
@@ -168,46 +168,60 @@ export default function GettingAnApiKey() {
         </P>
       </Section>
 
-      <Section id="notebook" title="The quickstart notebook">
+      <Section id="notebook" title="The notebook series">
         <Key>
-          The Notebook tab hands you a working client with your own project's ids already filled in.
+          Five Python notebooks do what you do in the application — with your own project's ids
+          already filled in, or with no key at all in demo mode.
         </Key>
         <P>
-          You do not have to write one to try the API. Pick a project on{" "}
+          You do not have to write a client to try the API. Pick a project on{" "}
           <AppLink to="/developer">Developer API</AppLink> → <strong>Notebook</strong>, and the
-          screen shows the exact configuration block the notebook will start with — the base URL,
-          your project id, a scenario id and a policy version id, chosen from the ones that project
-          actually has. The tab lists your scenarios, policy versions and dataset versions beside
-          it, so you can pick different ids rather than go hunting for them.
+          screen shows the exact configuration block every notebook starts with — the base URL, your
+          project id, a baseline scenario id and a policy version id, chosen from the ones that
+          project actually has. The tab lists your scenarios, policy versions and dataset versions
+          beside it, so you can pick different ids rather than go hunting for them.
         </P>
         <P>
-          <strong>Download</strong> is the button that carries those ids: it patches the
-          configuration cell as it saves, and names the file after your project. It works whether or
-          not you can see this application's source repository.
+          Each notebook mirrors one workflow: <strong>00</strong> sets up, runs and reads a
+          simulation; <strong>01</strong> changes a policy, snapshots it and compares A with B
+          replication by replication; <strong>02</strong> runs stress tests and reads survival and
+          recovery times; <strong>03</strong> produces a material shortage through a sole-source
+          supplier outage and compares lost sales with backorders; <strong>04</strong> exports a
+          run's results workbook with its reproducibility record. A notebook that changes your
+          policies puts them back when its block ends, even if a run fails.
         </P>
         <P>
-          <strong>Open in Colab</strong> saves the same pre-filled copy and opens Colab in a new
-          tab; choose <strong>File → Upload notebook</strong> there and pick the file you just
-          saved. Colab never reads the notebook from anywhere but your own download.
+          <strong>Without a key</strong> a notebook runs in <em>demo mode</em>: it replays engine
+          output recorded for the Example project (one product, two materials, three suppliers), and
+          every cell behaves as it would against the API. A request it has no recording for is
+          refused, never answered with an invented number. <strong>With a key</strong> — from
+          Colab's Secrets panel or the <Term>SURESUITE_API_KEY</Term> environment variable — the
+          same cells work on your project.
         </P>
         <P>
-          The notebook is thirteen worked sections, in the order a real integration goes: connect
-          and list projects, freeze a dataset version, read the engine's policy catalog, edit a
-          policy family, snapshot a policy version, create a scenario, dispatch a run and poll it to
-          completion, read aggregate KPIs and per-replication rows, check the credibility status,
-          compare two policy variants, and run a disruption experiment. It asks for your key with a
-          hidden prompt rather than storing it in a cell.
+          <strong>Download</strong> carries your ids: it patches the configuration cell as it saves,
+          and names the file after your project. <strong>Open in Colab</strong> saves the same
+          pre-filled copy and opens Colab in a new tab; choose <strong>File → Upload notebook</strong>{" "}
+          there and pick the file you just saved. Colab never reads the notebook from anywhere but
+          your own download.
         </P>
         <P className="text-[13px] text-muted-foreground">
-          The file itself is <Term>{API_NOTEBOOK}</Term>, shipped with the application.
+          The files are {API_NOTEBOOKS.map((n, i) => (
+            <span key={n}>
+              {i > 0 ? (i === API_NOTEBOOKS.length - 1 ? " and " : ", ") : ""}
+              <Term>{n}</Term>
+            </span>
+          ))}, shipped with the application.
         </P>
-        <Callout tone="limit" title="The notebook's disruption sections have the same targeting trap as the presets">
+        <Callout tone="limit" title="The API accepts disruption targets the engine skips">
           <p>
-            Its experiment cells suggest a material code as a disruption target. The engine resolves
-            a target against your supplier ids or the plant and drops anything else, so a material
-            code produces a run that completes with the disruption silently absent.{" "}
-            <DocLink to="stress-tests">Stress tests</DocLink> has the full rule and what a
-            resolvable target looks like.
+            The notebooks disrupt only what the engine can: a supplier of your project, or the
+            plant. The API itself accepts any target string, and the engine resolves a target
+            against your supplier ids or the plant and drops anything else — so a material code
+            sent through the API produces a run with the disruption absent. The pre-run gate
+            answers such a run with a warning you must acknowledge, and the notebooks check every
+            stress run for the recovery measures a real disruption leaves.{" "}
+            <DocLink to="stress-tests">Stress tests</DocLink> has the full rule.
           </p>
         </Callout>
       </Section>
