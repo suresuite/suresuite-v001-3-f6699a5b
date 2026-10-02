@@ -20,8 +20,8 @@ const WHAT: Record<string, { what: string; care?: string }> = {
     care: "Project visibility follows the organization the person is working in, so another organization's projects appear only after they switch, and a membership on a project outside all their organizations is recorded but never visible. The project's owner stays its owner until the project is transferred. Clearing the AI allow-list grants every model rather than revoking them.",
   },
   "/admin/roles": {
-    what: "Roles and the capabilities each one carries, and for the four project rights how the account role and the project role combine: the rule, its answer for every pair of roles, everyone it narrows today, the overrides above it, and the right each AI agent approval needs.",
-    care: "Removing a grant and denying a capability are different acts with different results. For Run Simulations, Edit Input Data, Edit Policies and Export an account-role switch is a ceiling: switching it off removes the right on every project, whatever the project role, and the page lists who would gain or lose it before it is saved.",
+    what: "Roles and the capabilities each one carries, and for the four project rights how the account role and the project role combine: the rule, its answer for every pair of roles, the overrides above it, and the right each AI agent approval needs.",
+    care: "Removing a grant and denying a capability are different acts with different results. For Run Simulations, Edit Input Data, Edit Policies and Export an account-role switch applies only to people with no role on the project: a project role decides on its own, so an Owner or Editor keeps all four whatever the switch says.",
   },
   "/admin/organizations": {
     what: "The tenant boundary and its members.",

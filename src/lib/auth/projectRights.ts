@@ -22,21 +22,21 @@ export const PROJECT_RIGHT_LABELS: Record<ProjectRight, string> = {
 };
 
 /**
- * D276 — which layer of the rule decided a right (`project_right_decide`, plus the two
- * gates `project_rights_for_user` applies after it). One vocabulary for /admin/roles,
- * the refusal sentences and the manual.
+ * D276, D279 — which layer of the rule decided a right (`project_right_decide`, plus the
+ * two gates `project_rights_for_user` applies after it). One vocabulary for /admin/roles,
+ * the refusal sentences and the manual. Since D279 a project role decides on its own, so
+ * the account role is no longer a ceiling over it.
  */
 export type RightDecider =
   | 'super_admin' | 'person_override' | 'account_role' | 'project_role'
-  | 'account_ceiling' | 'upload_gate' | 'suspended';
+  | 'upload_gate' | 'suspended';
 
 export const RIGHT_DECIDER_LABELS: Record<RightDecider, string> = {
   super_admin: 'Super admin',
   person_override: 'Person override',
   account_role: 'Account role (no project role)',
   project_role: 'Project role',
-  account_ceiling: 'Capped by account role',
-  upload_gate: 'Upload gate (owner or app admin)',
+  upload_gate: 'Upload gate (owner, editor or app admin)',
   suspended: 'Account suspended',
 };
 
@@ -60,7 +60,7 @@ export interface ProjectRights {
   working_in_project_org?: boolean;
   /** "Projects: org update by owner or admin". */
   can_edit_project: boolean;
-  /** The upload gate (`has_project_access`): the project's owner or an app admin. */
+  /** The upload gate (`has_project_access`): the project's owner, an Editor or Owner on it, or an app admin. */
   may_land_uploads: boolean;
   /** What the account may do here. */
   capabilities: Partial<Record<ProjectRight, boolean>>;
@@ -113,10 +113,6 @@ export function projectRightRefusal(right: ProjectRight, rights: ProjectRights |
   const d = rights.decisions?.[right];
   if (d) {
     switch (d.decided_by) {
-      case 'account_ceiling':
-        return d.account_source === 'organization'
-          ? `Your role on this project (${cap(d.project_role ?? '')}) includes ${label}, but this project's organization has it switched off.`
-          : `Your role on this project (${cap(d.project_role ?? '')}) includes ${label}, but your account role (${roleName(d.account_role)}) does not allow it on any project.`;
       case 'person_override':
         return `${label} has been switched off for your account by an administrator.`;
       case 'account_role':
@@ -128,7 +124,7 @@ export function projectRightRefusal(right: ProjectRight, rights: ProjectRights |
     }
   }
   if (right === 'data_edit_inputs' && rights.resolved_capabilities[right] && !rights.may_land_uploads) {
-    return `Your role allows ${label}, but uploads to this project are accepted only from its owner or an app admin.`;
+    return `Your access allows ${label}, but uploads to this project are accepted only from its owner, an Editor or Owner on it, or an app admin.`;
   }
   if (rights.effective_role) {
     return `Your role on this project (${cap(rights.effective_role)}) does not include ${label}.`;
@@ -153,7 +149,7 @@ export function projectRightsNotes(p: {
   }
   const notes: string[] = [];
   if (p.resolved_capabilities?.data_edit_inputs && !p.capabilities.data_edit_inputs && p.may_land_uploads === false) {
-    notes.push(`${PROJECT_RIGHT_LABELS.data_edit_inputs}: the role allows it, but uploads to this project are accepted only from its owner or an app admin.`);
+    notes.push(`${PROJECT_RIGHT_LABELS.data_edit_inputs}: the role allows it, but uploads to this project are accepted only from its owner, an Editor or Owner on it, or an app admin.`);
   }
   return notes;
 }

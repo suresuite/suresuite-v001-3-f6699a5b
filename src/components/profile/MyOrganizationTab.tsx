@@ -231,7 +231,7 @@ function ProjectsCard({ orgId, orgName, projects, projectId, onProject, userId }
               )}
             </section>
             <RoleLegend matrix={access.role_matrix} caps={access.project_capabilities}
-              note="An administrator can override a person's rights on their account, and that takes precedence over the project role. Edit Input Data also needs the upload gate: uploads are accepted only from the project's owner or an app admin." />
+              note="An administrator can override a person's rights on their account, and that takes precedence over the project role. Edit Input Data also needs the upload gate: uploads are accepted only from the project's owner, an Editor or Owner on it, or an app admin." />
           </>
         ) : null}
       </CardContent>

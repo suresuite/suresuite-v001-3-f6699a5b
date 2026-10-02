@@ -7,9 +7,10 @@
 --
 --   §1 THE PROJECT LAYER DECIDES: a Viewer member whose ACCOUNT is a modeler holds none of
 --      the four project rights; the owner holds all four.
---   §2 THE UPLOAD GATE IS PART OF "EDIT INPUT DATA": an Editor member who neither owns the
---      project nor is an app admin is refused it (the role grants it, `resolved_capabilities`
---      says so, `may_land_uploads` says why); an Editor member who is an app admin holds it.
+--   §2 THE UPLOAD GATE IS PART OF "EDIT INPUT DATA": since D279 it admits an Editor, so an
+--      Editor member who neither owns the project nor is an app admin holds it
+--      (`may_land_uploads` true); an Editor member who is an app admin holds it. `750` proves
+--      the gate still refuses a person whose access allows it without a project role.
 --   §3 A SUSPENDED ACCOUNT HOLDS NOTHING: not visible, no settings, no capability — while
 --      `resolved_capabilities` still shows what its role would give.
 --   §4 ONE ANSWER: for every active person, what the browser's gate reads
@@ -126,8 +127,8 @@ BEGIN
   -- ══ §2 · the upload gate is part of "Edit Input Data" ══
   SELECT p INTO v_pers FROM jsonb_array_elements(v_people) p WHERE p ->> 'user_id' = v_editor::text;
   IF (v_pers -> 'resolved_capabilities' ->> 'data_edit_inputs')::boolean IS NOT TRUE
-     OR (v_pers ->> 'may_land_uploads')::boolean IS NOT FALSE
-     OR (v_pers -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT FALSE
+     OR (v_pers ->> 'may_land_uploads')::boolean IS NOT TRUE
+     OR (v_pers -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT TRUE
      OR (v_pers -> 'capabilities' ->> 'data_edit_policies')::boolean IS NOT TRUE
      OR (v_pers -> 'capabilities' ->> 'simulation_lab')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'D230/550 §2: an Editor who neither owns the project nor is an app admin read as %', v_pers;

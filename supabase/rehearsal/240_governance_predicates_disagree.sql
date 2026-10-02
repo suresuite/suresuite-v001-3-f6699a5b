@@ -19,7 +19,9 @@
 --     `has_project_access` — the predicate 59 project-scoped policies call — and
 --     holds NO project role at all;
 --   · a genuine project EDITOR who is not the modeler holds `editor` and FAILS
---     `has_project_access`.
+--     `has_project_access`. **CLOSED BY §4 D279 (`20261002000007`)**: the upload gate
+--     admits Editor and Owner, so §2a now asserts the editor PASSES. The first
+--     direction — the admin — is unchanged and is still the blocker.
 --
 -- §4 D66 records only the second. The first is what makes the remedy
 -- product-breaking rather than per-table: swapping the predicate revokes every
@@ -91,21 +93,22 @@ BEGIN
       COALESCE(public.effective_project_role(v_modeler, v_project), '(NULL)');
   END IF;
 
-  -- ── 2a · THE DIVERGENCE §4 D66 ALREADY RECORDS ────────────────────────────
+  -- ── 2a · THE DIVERGENCE §4 D66 ALREADY RECORDED — CLOSED BY D279 ──────────
   --
   -- An editor who is a genuine member and is not the modeler: holds a role, and
-  -- the row rules refuse them. This is the half `rehearsal/100` found by running.
+  -- until D279 the row rules refused them. This is the half `rehearsal/100` found
+  -- by running; `20261002000007` taught `has_project_access` the project role, so
+  -- the two predicates now agree on an Editor.
   PERFORM set_config('app.current_user_id', v_editor::text, true);
   v_access := public.has_project_access(v_project);
   v_role   := public.effective_project_role(v_editor, v_project);
   IF v_role IS DISTINCT FROM 'editor' THEN
     RAISE EXCEPTION 'WP 6.2 / D66: the editor holds project role %, expected editor', COALESCE(v_role, '(NULL)');
   END IF;
-  IF v_access THEN
+  IF NOT v_access THEN
     RAISE EXCEPTION
-      'WP 6.2 / D66: a genuine editor now PASSES has_project_access. That is an '
-      'improvement and it changes the remedy — re-measure the divergence and '
-      'correct §4 D66 rather than deleting this assertion.';
+      'WP 6.2 / D66, D279: a genuine editor FAILS has_project_access again — the '
+      'upload gate lost its project-role branch and every Editor is refused uploads.';
   END IF;
 
   -- ── 2b · THE DIVERGENCE §4 D66 DOES NOT RECORD, AND IT IS THE BLOCKER ─────

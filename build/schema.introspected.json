@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 394,
-  "migrations_applied": 386,
+  "migrations_found": 395,
+  "migrations_applied": 387,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261002000006_account_role_change.sql",
+  "last_migration": "20261002000007_project_role_decides.sql",
   "counts": {
     "tables": 92,
     "views": 8,
@@ -27520,8 +27520,8 @@
       "returns": "boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
-      "comment": null,
-      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
+      "comment": "D279 — the upload gate: the current user (app.current_user_id) is the project's modeler, an ",
+      "defined_by": "20261002000007_project_role_decides.sql"
     },
     {
       "name": "http_post",
@@ -28230,8 +28230,8 @@
       "returns": "jsonb LANGUAGE sql IMMUTABLE SET search_path",
       "security_definer": false,
       "volatility": "IMMUTABLE",
-      "comment": "D276 — the one rule for a project-scoped right: super admin → yes; a person override → ",
-      "defined_by": "20261002000004_account_role_ceiling.sql"
+      "comment": "D276, D279 — the one rule for a project-scoped right: super admin → yes; a person override → ",
+      "defined_by": "20261002000007_project_role_decides.sql"
     },
     {
       "name": "project_right_decisions",
@@ -28256,8 +28256,8 @@
       "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
-      "comment": "D230, D231, D276 — one person's rights on one project, as the app applies them while the ",
-      "defined_by": "20261002000004_account_role_ceiling.sql"
+      "comment": "D230, D231, D276, D279 — one person's rights on one project, as the app applies them while ",
+      "defined_by": "20261002000007_project_role_decides.sql"
     },
     {
       "name": "project_role_holdings",

@@ -174,7 +174,7 @@ export function ProjectAccessDialog({ projectId, projectName, users, actorId, ac
               </section>
 
               <RoleLegend matrix={data.role_matrix} caps={data.project_capabilities}
-                note="A person's own overrides on their user page take precedence over the project role. Edit Input Data also needs the upload gate: uploads are accepted only from the project's owner or an app admin." />
+                note="A person's own overrides on their user page take precedence over the project role. Edit Input Data also needs the upload gate: uploads are accepted only from the project's owner, an Editor or Owner on it, or an app admin." />
             </div>
           )}
         </div>
