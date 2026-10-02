@@ -37,6 +37,7 @@ import {
   type DocsReleases,
 } from '@/lib/ui/docsVisibility';
 import { fetchDocsReleases } from '@/lib/docs/docsReleasesApi';
+import { capabilitiesReloadKey } from '@/lib/auth/sessionRefresh';
 
 /** Who may read which part of the manual — see `docsVisibility.ts`. */
 export interface DocsAccess {
@@ -91,6 +92,9 @@ const CAPABILITIES_WAIT_MS = 8000;
 export const CapabilitiesProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  // D278 — re-read when the ROLE changes too: a refreshed profile with a new role is a new
+  // question for the server, and the old answer would keep gating on the old role.
+  const reloadKey = capabilitiesReloadKey(user);
   const [resolved, setResolved] = useState<ResolvedCapabilities | null>(null);
   const [loading, setLoading] = useState(false);
   // Every read takes a number; only the newest may write, so a superseded
@@ -150,7 +154,8 @@ export const CapabilitiesProvider = ({ children }: { children: ReactNode }) => {
     seq.current++;
     setResolved(null);
     setLoading(false);
-  }, [userId, load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reloadKey carries userId and the role
+  }, [reloadKey, load]);
 
   const refresh = useCallback(async () => {
     if (userId) await load(userId);

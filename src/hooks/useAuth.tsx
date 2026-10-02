@@ -1,7 +1,9 @@
 // @ts-nocheck — schema mismatch: this file targets a supply-chain schema not yet migrated into this project. Remove once tables/RPCs are created.
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { mintAndVerifySession } from '@/lib/auth/sessionMint';
+import { roleChangeNotice, watchProfileFreshness } from '@/lib/auth/sessionRefresh';
+import { toast } from 'sonner';
 
 interface User {
   id: string;
@@ -254,9 +256,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       role: profile.role || user.role,
       organization: profile.organization || user.organization,
     };
+    // D278 — a super admin changed the role while this tab was open. Said once: the next
+    // refresh compares against the role stored here.
+    const notice = roleChangeNotice(user.role, updated.role);
+    if (notice) toast.info(notice);
     setUser(updated);
     localStorage.setItem('auth_user', JSON.stringify(updated));
   };
+  // The listeners below outlive a render; they call the latest refreshProfile, not the
+  // one closed over the user of the render that installed them.
+  const refreshRef = useRef(refreshProfile);
+  refreshRef.current = refreshProfile;
 
   useEffect(() => {
     // State initialized synchronously from localStorage
@@ -278,6 +288,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per signed-in user
   }, [user?.id, user?.email]);
+
+  // D278 — an account changed elsewhere (a role on /admin/users) reaches an open tab: on
+  // focus, on becoming visible, and every five minutes while signed in.
+  useEffect(() => {
+    if (!user?.id) return;
+    return watchProfileFreshness(() => { refreshRef.current(); });
+  }, [user?.id]);
 
   return (
     <AuthContext.Provider value={{ user, login, logout, refreshProfile, loading }}>
