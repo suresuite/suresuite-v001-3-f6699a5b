@@ -283,16 +283,29 @@ function findingsForField(g: GradedField): Finding[] {
   }
 
   // Data-derived fallbacks — provenance notes (§8.3 effective economics).
-  for (const fb of g.resolved.filter((r) => r.grade === "info").slice(0, 25)) {
+  // ONE note per field, not one per row: a value derived from the project's own
+  // lanes is the normal case, not a defect, and 25 identical lines per field
+  // buried the blockers above them. The affected ids still travel in `rows`
+  // (per-row remediation) and the first few, with their derived values, in the
+  // hint — T2 holds at the point of display without a line per entity.
+  const derivedRows = g.resolved.filter((r) => r.grade === "info");
+  if (derivedRows.length > 0) {
+    const examples = derivedRows
+      .slice(0, 6)
+      .map((fb) => (fb.value !== undefined ? `${fb.id} ≈${round2(fb.value)}` : fb.id))
+      .join(", ");
     out.push({
-      id: `req-fb-${g.field}-${fb.id}`,
+      id: `req-fb-${g.field}`,
       severity: "info",
       stage,
-      rowKey: fb.id,
+      rowKey: derivedRows.length === 1 ? derivedRows[0].id : undefined,
       field: g.field,
       policy: g.policyRef,
-      message: `"${fb.id}" has no master ${g.field} — the engine resolves it via ${g.fallbackProse ?? fb.via}${fb.value !== undefined ? ` (≈${round2(fb.value)})` : ""}.`,
-      hint: "Set the master value only to override the derived one.",
+      rows: derivedRows.map((fb) => fb.id),
+      message:
+        `${g.field} has no master value for ${derivedRows.length} row(s) — the engine derives it via ` +
+        `${g.fallbackProse ?? derivedRows[0].via}. Set the master value only to override the derived one.`,
+      hint: `e.g. ${examples}${derivedRows.length > 6 ? ", …" : ""}`,
     });
   }
 
