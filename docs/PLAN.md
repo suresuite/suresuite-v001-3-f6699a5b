@@ -22564,6 +22564,56 @@ page has always shown. (3) Values earlier /policies saves wrote into masters sta
 unmigrated, as the owner ruled. (4) Runs queued across the deploy take the legacy live path and
 say so. (5) D283 is open. No later package moves; Phase 13 is complete.
 
+### WP 14.0 — Baseline and the shared allocation helper · 2026-10-02 · no migration
+
+**Promised by the plan (§24)**: pin today's planning behaviour, build the one allocation function
+fulfillment (WP 14.3) and the plan's shortfall split (WP 14.4) will share, P-C.2 delegating with
+identical outputs, ADR 0002. **Preconditions held?** Yes, all three: §17 row 13 says PHASE
+COMPLETE; P-C.2 is a read-only PH-60 resident splitting product fulfillment across customers
+(fcfs / proportional / fair_share pro-rata, priority, sla_tier); `engine.py::_mech_material_demand`
+still uses `exp_demand_m` (MTO) or forecast × BOM (MTS).
+
+**What changed.** Engine (no `ENGINE_VERSION` change — 0.2.11): `scsim/scsim/core/allocation.py`
+(`allocate`, `allocate_batched`) — `priority`, `fair_share`, `proportional` (water-filling to a
+weight, default the row's want), `revenue_max` (by price), `sla_tier` (floors first, scaled
+pro-rata when short, then priority); oldest backlog first inside a row; ties by row order;
+batched over products by a CSR row pointer with no per-product Python loop. P-C.2 now builds one
+row per (product, customer) and calls the batched helper. ADR 0002 records decisions 1–8.
+
+**Discovered.**
+- **"Golden traces byte-identical" was not checkable.** The golden tests pin analytic values and
+  compare a run with ITSELF (`test_golden1_trace_byte_identical_across_runs`), which cannot notice
+  the code changing. Every Phase 14 package's exit rests on that claim, so this package froze
+  it: `scsim/tests/test_golden_digests.py` (12 reference scenarios — goldens #1–#4, P-P.9, MTS
+  with P-P.4 and with an MA forecast, P-C.2 priority/sla_tier under backorder and partial
+  backorder, Poisson + MTS + MOQ + multi-sourcing + expediting, P-C.6) hashes each one's trace,
+  per-item matrices and KPI aggregates (rounded to 9 decimals) into `tests/data/golden_digests.json`;
+  `sim-worker/tests/test_golden_runs.py` does the same for the two committed datasets (Example,
+  TRON) through `run_from_snapshots`, so the MAPPER is pinned too, mapping warnings included. A
+  deliberate change regenerates with `SCSIM_WRITE_GOLDEN=1` / `SIMWORKER_WRITE_GOLDEN=1` and names
+  the scenarios that moved. → affects every later Phase 14 package: "golden traces must not move"
+  now means these two files do not change.
+- **A pro-rata split drifts by an ulp** (22 × (15/22) = 14.999…98). The helper gives each scarce
+  product's last wanting row exactly what the others left, so a product with ONE row serves
+  `min(supply, want)` exactly — the arithmetic P-C.1 does today. → affects **WP 14.3**: one row
+  per product through the helper is the byte-identity case, and it holds by construction.
+- The baseline's backlog assertion reads "(n_prods, horizon + 1)" in the prompt; the horizon there
+  is `backorder_horizon`, not the run's. Pinned as such.
+
+**Gate results.** `scsim` 372 passed (48 new: 33 allocation, 2 baseline, 13 digests), including
+`test_pc2_customer_allocation.py` unchanged and green; P-C.2's helper split equals its inline
+predecessor (kept in the test as the oracle) to 1e-12 over 1 000 random cases; the digests were
+generated WITH the old P-C.2 and are byte-identical with the new. `gen_docs --check`,
+`gen_frontend_registry --check` (no registry change), `check_registry_bridge`, engine wheels
+rebuilt and `--check` green, `sim-worker` 160 passed, grading `deno test` 32 passed.
+`contract:check` holds with `main`'s two warnings (R10, R13); vitest 1 656 passed; `typecheck`,
+`check:docs`, `audit:ui` green; eslint at `main`'s baseline (295 errors / 110 warnings).
+
+**Handoff.** WP 14.1 inherits the digest files as its neutrality proof and must regenerate them
+only for the declared `normal` change — neither committed dataset declares `normal`, so neither
+worker digest should move. The helper's `floor_pct` is a percentage (0–100), matching
+`sla_tiers` and `customers.sla_fill_floor_pct`.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -22582,7 +22632,7 @@ say so. (5) D283 is open. No later package moves; Phase 13 is complete.
 | **11** | **11.0 – 11.5** | **one graph, three levels: a version per level, and every consumer bound to the level it reads** | — | **11.0 ✅** the plan (§21), §4 D258–D264 registered from a verified reading, the blueprint refined (§8.4, §9.2, §9.5, §11.4). The reading changed the design: the simulation's read set already HAS a hash — `hash_inputs`, the snapshot's `inputs` domain, whose eight tables are exactly the worker's eight reads — so the `simulation` scope is named and gated rather than minted, and `level_spec` stays 1. **11.1 ✅** a version per level: `graph_level_versions` numbers product, process and firm per project, deduplicated against any earlier version of the level; every snapshot names its tuple; history is backfilled in order; the state returns each level's version (D258's store half). It also closed **D265**: `anon` could insert a snapshot row directly, which from this package would have minted level versions. **11.2 ✅** the simulation scope NAMED (`simulation → hash_inputs`, one mapping, no new digest) and gated against the worker's reads; a Validated Model binds it, RunKey v2 hashes it, an analysis run names its level version; the agent's own copy of the badge rule follows (D260, D264 closed). **11.3 ✅** the surfaces: each network page names its level's version ("Product graph v3"), the Validated Model reads "simulation inputs v4" with a deep-tier change as a note and never re-validate, the snapshot list shows its tuple, the Reproducibility Record and Trust Report carry the levels (D258, D259, D263 closed; one read migration, `dataset_version_tuple`, because the browser cannot read the level table). **11.4 ✅** lineage: the training set groups and counts KPIs by simulation-input version and keeps the composite as lineage; the features name their product version; a run names its inputs whoever wrote it (D261, D262 closed). **11.5 ✅** the reading is §15 run `36903620736` (fence unmoved at `20261001000022`): every project with snapshots has all four levels, all 4 Validated Models bind the simulation scope, the doors D265 closed are closed. One firm-level `prominence` run met D240's condition, so `20261001000023` drops `network_topology_hash`. Two things are named, not met: RunKey v2 is unexercised (no simulation dispatched since WP 10.4), and the reading after the drop deploys is WP 10.9's. **PHASE COMPLETE.** |
 | **12** | **12.1 – 12.7** | **the library: pull the data you may read, simulate on your own machine** | — | **12.1 ✅** one local-run entry point (`sim_worker.local`), shared by the browser engine, the demo recorder and the coming `suresuite` package; D273 closed. **12.2 ✅** the snapshot read API (largest production snapshot 592 KB — one gzipped response, no cap). **12.3 ✅** personal keys (`20261002000001`, `rehearsal/700`). **12.4 ✅** the engine through `GET /v1/engine`, private bucket, content-addressed (D274 recorded). **12.5 ✅** the `suresuite` package (a local run equals the platform's, in a clean venv). **12.6 ✅** notebook 05 — simulate on your own machine (renumbered **03** when the series was trimmed to four, §16 · 2026-10-02). **12.7 ✅** every user may mint a personal, read-only key (`20261002000005`, `rehearsal/730`). **PHASE COMPLETE**; push-back (upload, client-computed runs badged until verified) is the next phase, not started |
 | **13** | **13.1 – 13.5** | **what you see on /policies is what runs: /policies writes overrides and never the item masters, the worker reads the frozen versions, the Validated Model binds both, every cell reaches the engine or says it does not** | — | **13.1 ✅** /policies writes overrides and never the masters (`20261002000008`, `rehearsal/760`; D281 closed — a save replaced a row's whole patch). **13.2 ✅** the worker computes through `run_from_snapshots` from the run's frozen dataset and policy versions; the browser too; D282 closed. **13.3 ✅** a Validated Model binds its evidence run's two versions, a model run replays them, the database refuses a model run on other data (`20261002000009`, `rehearsal/770`). **13.4 ✅** D204 (a)(b) closed (`20261002000010`, `rehearsal/780`), one capacity per row, gate `page-equals-run` (`pageEqualsRun.test.ts`, zero differing cells, mutation-tested). **13.5 ✅** the gate row in CLAUDE.md, the tests wired into `data-contract.yml`, the manual's callout removed, D280 closed. **PHASE COMPLETE.** Nothing reaches production until merge; the after-merge §15 reading is owed (D153)
-| **14** | **14.0 – 14.7** | **demand-driven planning: demand per customer × product row, planned production = min(requirement, capacity) with FG policies, MRP for materials, per-row fulfillment; multi-stage later** | — | **planned** — registered 2026-10-02 (§24, D284) after the owner's design decisions; prompts in `docs/design/demand-driven-planning-prompts.md` |
+| **14** | **14.0 – 14.7** | **demand-driven planning: demand per customer × product row, planned production = min(requirement, capacity) with FG policies, MRP for materials, per-row fulfillment; multi-stage later** | — | **14.0 ✅** the planning baseline pinned, the shared allocation helper (`core/allocation.py`) with P-C.2 delegating, ADR 0002, and frozen golden digests (engine + worker) that make "byte-identical" checkable. Registered 2026-10-02 (§24, D284); prompts in `docs/design/demand-driven-planning-prompts.md`. **WP 14.1 is next** |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -24822,11 +24872,13 @@ future demand draws.** Enforced by:
 - golden #7: the design's worked example reproduced week by week (WP 14.5).
 
 **Behaviour-neutral by construction.** A project that sets none of the new fields runs
-byte-identically, and every package re-proves that against the golden traces. A deliberate
+byte-identically, and every package re-proves that against the golden traces — since WP 14.0
+the frozen digests `scsim/tests/data/golden_digests.json` and `sim-worker/tests/data/golden_runs.json`
+(§16 · WP 14.0), which a package may regenerate only for a declared change. A deliberate
 behavioural change (`normal` becoming a real normal, WP 14.1) needs an `ENGINE_VERSION` bump, an
 ADR line and a §16 entry.
 
-### WP 14.0 — Baseline and the shared allocation helper *(D284 · G20 · engine only, no behaviour change)*
+### WP 14.0 — Baseline and the shared allocation helper ✅ *(D284 · G20 · engine only, no behaviour change — done, no migration)*
 
 - Pin today's behaviour in `scsim/tests/test_planning_baseline.py`: under a demand step,
   `material_demand` stays constant, and the backlog is per product. Mark the assertions that

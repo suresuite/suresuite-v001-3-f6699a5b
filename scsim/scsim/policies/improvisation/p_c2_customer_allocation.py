@@ -27,7 +27,11 @@ sub-weekly tick ever lands):
   cannot honor all floors), then distribute the remainder by priority.
 
 The split is value-weighted with the product's unit price, matching the
-engine's value-based fill-rate convention. Distribution does not alter
+engine's value-based fill-rate convention. Since WP 14.0 the split itself is
+``core/allocation.py::allocate_batched`` — the one allocation function per-row
+fulfillment (WP 14.3) and the plan's shortfall split (WP 14.4) also call — with
+one row per (product, customer); its outputs are the ones this module computed
+inline before, pinned by ``tests/test_allocation.py``. Distribution does not alter
 product-level physics (totals are conserved); its output is the per-segment
 service view — the §7 interaction-8 path made observable.
 
@@ -43,6 +47,7 @@ from typing import ClassVar, Literal
 import numpy as np
 from pydantic import Field
 
+from scsim.core.allocation import allocate_batched
 from scsim.core.context import SimContext
 from scsim.core.phases import DEMAND, FULFILLMENT, Hook, PhaseId
 from scsim.entities.enums import ConstraintTag, PolicyStatus, Stage, StrategyClass
@@ -55,6 +60,17 @@ from scsim.policies.base import (
     PolicyPlugin,
 )
 from scsim.policies.registry import register_plugin
+
+
+# The helper's rule for each P-C.2 rule. fcfs, proportional and fair_share all
+# split pro-rata to demand at weekly buckets (module docstring).
+_HELPER_RULE = {
+    "fcfs": "fair_share",
+    "proportional": "fair_share",
+    "fair_share": "fair_share",
+    "priority": "priority",
+    "sla_tier": "sla_tier",
+}
 
 
 class CustomerAllocationParams(PolicyParams):
@@ -185,15 +201,19 @@ class CustomerAllocation(PolicyPlugin):
             p.priority_weights.get(cid, m.cust_priority[c])
             for c, cid in enumerate(m.cust_ids)
         ]) if m.n_custs else np.zeros(0)
-        floors = np.array([
-            p.sla_tiers.get(seg, 0.0) / 100.0 for seg in m.cust_segment
+        floors_pct = np.array([
+            p.sla_tiers.get(seg, 0.0) for seg in m.cust_segment
         ]) if m.n_custs else np.zeros(0)
+        P, C = m.n_prods, m.n_custs
         ctx.policy_state[self.id] = {
             "seg_ids": seg_ids,
             "seg_of": seg_of,
-            # Priority order: descending weight, id as the deterministic tiebreak.
-            "order": np.lexsort((np.arange(m.n_custs), -weights)),
-            "floors": floors,
+            # Rows are (product, customer), product-major, so product p owns
+            # rows p·C .. (p+1)·C. Priority: descending weight, customer index
+            # (= row order) as the deterministic tiebreak — the helper's rule.
+            "row_ptr": np.arange(P + 1) * C,
+            "row_priority": np.tile(weights, P),
+            "row_floor_pct": np.tile(floors_pct, P),
             "demand_seg": np.zeros((len(seg_ids), T)),
             "served_seg": np.zeros((len(seg_ids), T)),
         }
@@ -205,38 +225,25 @@ class CustomerAllocation(PolicyPlugin):
         p: CustomerAllocationParams = self.params
         state = ctx.policy_state[self.id]
         t = ctx.week
+        P, C = m.n_prods, m.n_custs
         # Value-weighted weekly split (engine fill-rate convention).
         d_pc = (ctx.demand * m.unit_price)[:, None] * m.cust_share       # (P, C)
         avail = ctx.served_new_week * m.unit_price                       # (P,)
 
-        if p.rule in ("fcfs", "proportional", "fair_share"):
-            with np.errstate(invalid="ignore", divide="ignore"):
-                fill = np.where(ctx.demand > 0, ctx.served_new_week / ctx.demand, 1.0)
-            s_pc = d_pc * fill[:, None]
-        elif p.rule == "priority":
-            s_pc = self._fill_in_order(d_pc, avail, state["order"])
-        else:  # sla_tier: floors first (scaled if needed), remainder by priority
-            g_pc = d_pc * state["floors"][None, :]
-            g_tot = g_pc.sum(axis=1)
-            with np.errstate(invalid="ignore", divide="ignore"):
-                scale = np.where(g_tot > 0, np.minimum(1.0, avail / g_tot), 0.0)
-            g_pc = g_pc * scale[:, None]
-            s_pc = g_pc + self._fill_in_order(
-                d_pc - g_pc, avail - g_pc.sum(axis=1), state["order"])
+        # One row per (product, customer), product-major: the shared
+        # allocation helper (core/allocation.py, WP 14.0) splits each
+        # product's supply across its rows. fcfs / proportional / fair_share
+        # coincide at weekly buckets, so all three are the helper's
+        # equal-fill-rate rule.
+        _, s_new = allocate_batched(
+            avail, np.zeros((P * C, 0)), d_pc.ravel(), state["row_ptr"],
+            _HELPER_RULE[p.rule],
+            priority=state["row_priority"], floor_pct=state["row_floor_pct"],
+        )
+        s_pc = s_new.reshape(P, C)
 
         state["demand_seg"][:, t] = state["seg_of"] @ d_pc.sum(axis=0)
         state["served_seg"][:, t] = state["seg_of"] @ s_pc.sum(axis=0)
-
-    @staticmethod
-    def _fill_in_order(d_pc: np.ndarray, avail: np.ndarray, order: np.ndarray) -> np.ndarray:
-        """Serve customers left→right in ``order``: each fills completely
-        before the next sees a unit (vectorized over products)."""
-        d_sorted = d_pc[:, order]
-        before = np.cumsum(d_sorted, axis=1) - d_sorted
-        s_sorted = np.clip(avail[:, None] - before, 0.0, d_sorted)
-        s_pc = np.empty_like(d_pc)
-        s_pc[:, order] = s_sorted
-        return s_pc
 
     def kpi_contribution(self, ctx: SimContext, t_w: int, window_end: int) -> dict[str, float]:
         if ctx.model.n_custs < 2:

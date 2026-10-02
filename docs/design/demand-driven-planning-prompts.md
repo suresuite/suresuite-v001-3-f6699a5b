@@ -37,7 +37,10 @@ Non-negotiables:
 2. STAY IN SCOPE. A defect that belongs to another package goes into §16 and into that
    package's text in §24, not into your diff.
 3. BEHAVIOUR-NEUTRAL BY DEFAULT. A project that sets none of the new fields must run
-   byte-identically: the golden traces in scsim/tests must not move. A deliberate
+   byte-identically: the golden traces in scsim/tests must not move — since WP 14.0 that
+   means the frozen digests scsim/tests/data/golden_digests.json and
+   sim-worker/tests/data/golden_runs.json (regenerate them only for a declared change,
+   with SCSIM_WRITE_GOLDEN=1 / SIMWORKER_WRITE_GOLDEN=1, and name what moved). A deliberate
    behaviour change needs an ENGINE_VERSION bump (scsim/scsim/__init__.py), a line in
    scsim/docs/adr/0002-demand-driven-planning.md and a §16 note.
 4. THE PLAN NEVER READS REALIZED FUTURE DEMAND. Any planner you write reads the projected
