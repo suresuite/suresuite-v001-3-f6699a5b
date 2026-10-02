@@ -246,6 +246,24 @@ export default function GettingAnApiKey() {
         </P>
       </Section>
 
+      <Section id="who-can-create" title="Who can create a key">
+        <Key>
+          Everyone with an active account can create a personal key. Without an admin or modeler
+          role it is read-only.
+        </Key>
+        <P>
+          A viewer or any other user can create a <strong>personal</strong> key and use it to pull
+          the projects, dataset versions, policy versions and runs they can already see in the
+          application, install the engine, and simulate on their own machine. The create dialog
+          offers them only the read scopes, and they see, rotate and revoke only their own keys.
+        </P>
+        <P>
+          Writing through the API and organization keys stay with admins and modelers. The rule holds
+          when the key is <em>used</em>, not only when it is made: if a modeler later becomes a plain
+          user, their personal keys keep reading and stop writing on the next request.
+        </P>
+      </Section>
+
       <Callout tone="limit" title="Writes through the API still record no person">
         <p>
           A personal key's requests name you in the request log. The changes it WRITES — a frozen

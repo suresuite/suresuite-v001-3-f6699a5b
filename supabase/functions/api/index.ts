@@ -210,12 +210,18 @@ async function authenticate(req: Request, ip: string): Promise<Principal> {
   // active and still in the key's organization. The database answers which
   // person (api_personal_key_actor); no answer means the key is refused — the
   // same as a revoked key, because it is one in all but name.
+  // WP 12.7 — the database also answers the scopes the key may use NOW: a key
+  // whose owner does not manage keys is cut to the read-only scopes, so a
+  // write-scoped key stops writing the day its owner stops being a modeler.
   let actorUserId: string | null = null;
+  let scopes: string[] = (row.scopes as string[]) ?? [];
   if (row.principal === "personal") {
-    const { data: actor, error: actorErr } = await svc.rpc("api_personal_key_actor", { p_key_id: row.id });
-    if (actorErr) throw new ApiError(503, "auth_unavailable", "authentication backend unavailable"); // fail closed
-    if (!actor) return fail("key_owner_inactive", "this personal key's owner is no longer active in its organization");
-    actorUserId = String(actor);
+    const { data: grant, error: grantErr } = await svc.rpc("api_personal_key_grant", { p_key_id: row.id });
+    if (grantErr) throw new ApiError(503, "auth_unavailable", "authentication backend unavailable"); // fail closed
+    const g = Array.isArray(grant) ? grant[0] : grant;
+    if (!g?.actor_user_id) return fail("key_owner_inactive", "this personal key's owner is no longer active in its organization");
+    actorUserId = String(g.actor_user_id);
+    scopes = (g.scopes as string[]) ?? [];
   }
 
   // §5.3 step 4: stamp last_used_at asynchronously; never block the request.
@@ -234,7 +240,7 @@ async function authenticate(req: Request, ip: string): Promise<Principal> {
     keyId: String(row.id),
     keyPrefix: String(row.key_prefix),
     orgId: String(row.org_id),
-    scopes: (row.scopes as string[]) ?? [],
+    scopes,
     projectIds: (row.project_ids as string[] | null) ?? null,
     env: env as "live" | "test",
     actorUserId,
