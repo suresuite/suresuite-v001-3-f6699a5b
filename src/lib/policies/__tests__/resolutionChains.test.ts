@@ -236,7 +236,9 @@ describe("WP 6.1 · the chains that cannot be written down", () => {
     "customer.sourcing_firm",
     "plant.initial_on_hand",
     "plant.review_period_days",
-    "supplier.primary_source",
+    // supplier.primary_source left this list when a saved Supplier-stage primary
+    // became the engine's primary link (`SupplierLink.primary`, §4 D188). The
+    // CUSTOMER stage's primary stays: same name, other family, no reader.
     "supplier.review_period_days",
     // reorder_point / order_up_to left this list when the supplier grid's
     // replenishment cells started reaching the engine as
@@ -302,8 +304,10 @@ describe("§4 D90 · door 3 is a DECLARATION, not a scan", () => {
     ).toEqual([]);
   });
 
-  it("the fourteen declared keys carry their target and their transform", () => {
-    // FOURTEEN KEYS: `type` and `safety_stock_days` are rendered by both the
+  it("the sixteen declared keys carry their target and their transform", () => {
+    // SIXTEEN KEYS (fourteen until §4 D188/D204 added `primary_source` and
+    // `holding_cost_pct`; holding resolves through door 1 first, so only
+    // `primary_source` adds a chain here): `type` and `safety_stock_days` are rendered by both the
     // supplier and the plant stage, which is why the chain count and the key
     // count differ and why D90's "nine" was never wrong.
     //
@@ -317,11 +321,11 @@ describe("§4 D90 · door 3 is a DECLARATION, not a scan", () => {
     // defect fell through.
     const byDeclaration = chains.filter((c) =>
       /declared policy-bundle key/.test(c.hops.find((h) => h.kind === "engine")?.detail ?? ""));
-    expect(byDeclaration.length).toBe(16);
-    // 12 rendered fields resolve by declaration (rop_q_quantity and
-    // coverage_weeks resolve through their own doors on some stages, so the
-    // field count trails the 14 keys project_map declares).
-    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(12);
+    expect(byDeclaration.length).toBe(17);
+    // 13 rendered fields resolve by declaration (rop_q_quantity, coverage_weeks
+    // and holding_cost_pct resolve through their own doors on some stages, so
+    // the field count trails the 16 keys project_map declares).
+    expect(new Set(byDeclaration.map((c) => c.field)).size).toBe(13);
     for (const c of byDeclaration) {
       const detail = c.hops.find((h) => h.kind === "engine")!.detail;
       // The TARGET is what makes the chain followable; the TRANSFORM is what makes

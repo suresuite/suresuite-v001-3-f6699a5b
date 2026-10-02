@@ -91,9 +91,13 @@ export function FindingsList({ findings, groupBySeverity, walkTo, action, classN
                     <Link
                       to={route}
                       className="shrink-0 whitespace-nowrap font-mono text-[10px] underline-offset-2 hover:underline"
-                      title="Open the editor for this field in the Project Manager"
+                      title={
+                        route.startsWith("/policies")
+                          ? "Open this stage on /policies — a value set there is the one the run uses, over the item master"
+                          : "Open the editor for this field in the Project Manager"
+                      }
                     >
-                      fix data ↗
+                      {route.startsWith("/policies") ? "set on /policies ↗" : "fix data ↗"}
                     </Link>
                   )}
                 </li>

@@ -29,6 +29,7 @@ import {
   type DisruptionRule,
 } from "../../../supabase/functions/_shared/disruptionRules.ts";
 import { baseDataRequirements, policyCatalog } from "./registryAccess";
+import { findingFieldLabel } from "./columnSpecs";
 import type { PolicyBundle } from "./schemas";
 import type { StageKey } from "./stages";
 
@@ -75,6 +76,11 @@ export interface ManifestInput {
   /** Raw bom_single_level OR bom_multi_level rows — the shared grader
    * normalizes the shape; powers the unsourced-BOM hard block. */
   bom?: Row[];
+  /** `policy_overrides` rows as stored — the values set on /policies, which the
+   * engine reads before the item masters. The sim-command gate always passes
+   * them (`loadGateDataset`); without them a value set on /policies grades as
+   * missing here while the gate and the run use it. */
+  overrides?: Row[];
 }
 
 const STAGE_BY_DATASET: Record<string, StageKey> = {
@@ -137,6 +143,7 @@ function gradeInput(input: ManifestInput): { dataset: GradingDataset; graded: Gr
     inbound: input.inbound ?? [],
     outbound: input.outbound ?? [],
     bom: input.bom ?? [],
+    overrides: input.overrides,
   };
   const graded = gradeManifest(
     dataset,
@@ -218,6 +225,7 @@ export function gateFindingsToFindings(
 
 function findingsForField(g: GradedField): Finding[] {
   const dataset = g.field.split(".")[0];
+  const label = findingFieldLabel(g.field);
   const stage = STAGE_BY_DATASET[dataset] ?? "run_validate";
   const demandedBy = g.policyRef === "engine"
     ? "the engine"
@@ -234,7 +242,7 @@ function findingsForField(g: GradedField): Finding[] {
         stage,
         field: g.field,
         policy: g.policyRef,
-        message: `${g.field} is empty for ${g.missing.length} row(s) — the engine default applies (${g.fallbackProse ?? "engine default"}).`,
+        message: `${label} is empty for ${g.missing.length} row(s) — the engine default applies (${g.fallbackProse ?? "engine default"}).`,
         hint: g.reason,
       });
     } else {
@@ -246,7 +254,7 @@ function findingsForField(g: GradedField): Finding[] {
           rowKey: id,
           field: g.field,
           policy: g.policyRef,
-          message: `"${id}" has no ${g.field} — required by ${demandedBy}.`,
+          message: `"${id}" has no ${label} — required by ${demandedBy}.`,
           hint: g.reason,
         });
       }
@@ -257,7 +265,7 @@ function findingsForField(g: GradedField): Finding[] {
           stage,
           field: g.field,
           policy: g.policyRef,
-          message: `…and ${g.missing.length - 25} more row(s) missing ${g.field}.`,
+          message: `…and ${g.missing.length - 25} more row(s) missing ${label}.`,
         });
       }
     }
@@ -275,7 +283,7 @@ function findingsForField(g: GradedField): Finding[] {
       policy: g.policyRef,
       rowKey: warns.length === 1 ? warns[0].id : undefined,
       message:
-        `${g.field} is unset for ${warns.length} row(s) — the engine will apply its ` +
+        `${label} is unset for ${warns.length} row(s) — the engine will apply its ` +
         `neutral default (${example.value !== undefined ? `≈${round2(example.value)}` : example.via}). ` +
         `Acknowledge to run anyway, or fill the data to make the affected KPIs meaningful.`,
       hint: g.reason,
@@ -303,8 +311,8 @@ function findingsForField(g: GradedField): Finding[] {
       policy: g.policyRef,
       rows: derivedRows.map((fb) => fb.id),
       message:
-        `${g.field} has no master value for ${derivedRows.length} row(s) — the engine derives it via ` +
-        `${g.fallbackProse ?? derivedRows[0].via}. Set the master value only to override the derived one.`,
+        `${label} is not set for ${derivedRows.length} row(s) — the engine derives it via ` +
+        `${g.fallbackProse ?? derivedRows[0].via}. Set it only to override the derived value.`,
       hint: `e.g. ${examples}${derivedRows.length > 6 ? ", …" : ""}`,
     });
   }

@@ -159,14 +159,16 @@ const DROPPED_PER_ROW =
 export const COLUMN_CHECK: Record<string, ColumnCheck> = {
   // ─────────────────────────────── supplier ───────────────────────────────
   "supplier:primary_source": {
-    shows: "the grid's pick: highest weekly volume → lowest price → shortest lead time",
+    shows:
+      "saved choice; with nothing saved, the engine's own pick: cheapest link → shortest lead time → supplier id",
     savedTo: "override sourcing.primary_source",
-    engine: "not read — the engine's primary link is the CHEAPEST (cost → lead time → supplier id)",
-    verdict: "ignored",
+    engine:
+      "the material's primary link (where orders go): the saved choice, else the cheapest link. " +
+      "Two saved for one material → neither applied, warned",
+    verdict: "works",
     note:
-      "866 stored. Engine ≠ grid on 27 of 35 multi-sourced materials in Project 2 and in Project AA. " +
-      "The pre-run gate REQUIRES this selection, so it must be set even though the run ignores it.",
-    shouldBe: "one rule for 'primary' — the engine's — shown read-only, or the engine reads this field",
+      "866 stored as of the audit — seeded under the OLD suggestion (highest volume), so on multi-sourced " +
+      "materials those runs now buy from the saved supplier rather than the cheapest one. The run log counts how many.",
     refs: ["D188"],
   },
   "supplier:supply_share": {
@@ -292,19 +294,21 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
   "supplier:safety_stock_days": {
     shows: "override → project default → 7",
     savedTo: "override inventory.safety_stock_days (per row)",
-    engine: DROPPED_PER_ROW,
-    verdict: "ignored",
-    note: "340 stored per row, all ignored (the run log says so as a warning).",
-    shouldBe: "a project-level control, or make the engine read it per material",
+    engine:
+      "that material's safety stock = E[D]·days/7 (P-P.3 fixed_days_by_material), whatever the project-wide " +
+      "method; unset → the project-wide method. Two suppliers of one material disagreeing → first kept, warned",
+    verdict: "works",
+    note: "340 stored per row as of the audit — dropped until 2026-10-02, applied since.",
     refs: ["D204"],
   },
   "supplier:holding_cost_pct": {
     shows: "override → project default → 0.2",
     savedTo: "override inventory.holding_cost_pct (per row)",
-    engine: "materials.holding_cost_pct (master) → project-default policy → 20 %/yr; the per-row value is DROPPED",
-    verdict: "ignored",
-    note: "817 stored per row, all ignored.",
-    shouldBe: "a master-backed column on materials.holding_cost_pct",
+    engine:
+      "this row's value → materials.holding_cost_pct (master) → project-default policy → 20 %/yr. The /policies " +
+      "value beats the master. Two suppliers of one material disagreeing → first kept, warned",
+    verdict: "works",
+    note: "817 stored per row as of the audit — dropped until 2026-10-02, applied since.",
     refs: ["D204"],
   },
   "supplier:mode": {
@@ -332,6 +336,18 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     savedTo: "products.production_capacity (master upsert)",
     engine: "master → line capacity × 7 × utilization → max(2 × demand, 1000)",
     verdict: "works",
+  },
+  "plant:demand_cv": {
+    shows: "products.demand_cv (item master)",
+    savedTo: "products.demand_cv (master upsert)",
+    engine:
+      "products.demand_cv → the scenario's demand-model cv → 0.30; spreads a TRIANGULAR product's demand, and through " +
+      "that variance sizes P-P.3 safety stock",
+    verdict: "conditional",
+    note:
+      "Inert when the product's distribution resolves to Poisson — variance is the mean, the CV is never read, by the " +
+      "draw or by P-P.3. Every app-created scenario is Poisson (§4 D190), so set a product distribution for this to matter.",
+    refs: ["D190"],
   },
   "plant:demand_mean": {
     shows: "products.demand_mean, units / week (item master)",

@@ -44,7 +44,7 @@ from scsim.entities.enums import (
     StrategyClass,
     TransportMode,
 )
-from scsim.entities.network import Network
+from scsim.entities.network import Network, primary_rank
 from scsim.entities.scenario import Scenario
 from scsim.policies.base import (
     DataRequirement,
@@ -61,14 +61,13 @@ _log = logging.getLogger(__name__)
 
 def _primary_link_lts(net: Network) -> dict[str, int]:
     """Effective primary-link lead time per material id, mirroring
-    CompiledModel's (cost, lt, supplier) primary selection and edge
+    CompiledModel's primary selection (`primary_rank`) and edge
     lead-time folding — kept in lockstep by a drift test."""
     lane_extra: dict[str, int] = {}
     for lane in sorted(net.lanes, key=lambda l: (l.mode != TransportMode.DEFAULT, l.id)):
         lane_extra.setdefault(lane.supplier_id, int(lane.lead_time_weeks))
     out: dict[str, int] = {}
-    for link in sorted(net.supplier_links,
-                       key=lambda l: (l.cost, l.lead_time_weeks, l.supplier_id)):
+    for link in sorted(net.supplier_links, key=primary_rank):
         out.setdefault(link.material_id,
                        int(link.lead_time_weeks) + lane_extra.get(link.supplier_id, 0))
     return out

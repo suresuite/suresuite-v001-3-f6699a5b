@@ -43,6 +43,7 @@ from scsim.entities.network import (
     Product,
     Supplier,
     SupplierLink,
+    primary_rank,
     triangular_av,
 )
 from scsim.entities.scenario import Scenario
@@ -315,7 +316,7 @@ class MappingResult:
 # READ by this module, and every bundle key this module reads must be here —
 # `scsim/tests/test_registry_io.py` asserts both directions against the source.
 #
-# FOURTEEN KEYS: `type` and `safety_stock_days` are rendered by both
+# SIXTEEN KEYS: `type` and `safety_stock_days` are rendered by both
 # the supplier and the plant stage, so the grid has more cells than keys; the
 # four replenishment cells (Q, κ, s, S) joined when supplier-row overrides
 # started reaching the engine as `inventory_control.material_overrides`.
@@ -349,9 +350,33 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
         "family": "inventory",
         "target": "safety_stock_materials.fixed_days_cover",
         "catalog_ref": "P-X.2",
-        "transform": "days, clamped 0-84. Only when `safety_stock_method` is neither "
-                     "service_level/demand_variability nor king_method — those two take "
-                     "a different classification and this key is not read",
+        "transform": "days, clamped 0-84. At default scope only when `safety_stock_method` "
+                     "is neither service_level/demand_variability nor king_method. On a "
+                     "Supplier-stage row (`node:<supplier>::<material>`) it is that "
+                     "material's cover in `fixed_days_by_material`, whatever the method — "
+                     "the /policies value beats the project default (§4 D204)",
+    },
+    {
+        "key": "holding_cost_pct",
+        "family": "inventory",
+        # An ENTITY field, like capacity_units_per_day: the master column and
+        # this key feed the same number, and the /policies row wins.
+        "target": "Material.holding_cost_rate",
+        "catalog_ref": None,
+        "transform": "fraction x 100 -> %/yr, clamped 5-50. Order: the Supplier-stage row "
+                     "(`node:<supplier>::<material>`) -> materials.holding_cost_pct (master) "
+                     "-> the project-default policy -> 20. The /policies value beats the "
+                     "item master (§4 D204)",
+    },
+    {
+        "key": "primary_source",
+        "family": "sourcing",
+        "target": "SupplierLink.primary",
+        "catalog_ref": None,
+        "transform": "true on a Supplier-stage row makes that supplier the material's "
+                     "primary link (where P-P.1 orders go). Nothing saved -> the engine's "
+                     "rule: cheapest, then shortest lead time, then id. Two saved for one "
+                     "material -> neither applied, warned (§4 D188)",
     },
     {
         "key": "service_level_target",
@@ -572,6 +597,93 @@ def _merged_policy(policies: dict, node_id: str, family: str) -> dict:
     default = (policies.get("default") or {}).get(family) or {}
     override = (policies.get(f"node:{node_id}") or {}).get(family) or {}
     return {**default, **override}
+
+
+def _supplier_row_values(
+    policies: dict, family: str, field: str, mat_ids: set[str], w: list[MappingWarning],
+) -> dict[str, Any]:
+    """Per-material values of one field, read from /policies Supplier-stage rows.
+
+    Those rows key overrides ``node:<supplier>::<material>``. A material-level
+    attribute set on two rows of one material with DIFFERENT values is resolved
+    the way `_map_policies` resolves κ and Q: sorted key order, first wins, and
+    the conflict is announced rather than picked silently.
+    """
+    out: dict[str, Any] = {}
+    for k in sorted(k for k in policies if isinstance(k, str) and k.startswith("node:")):
+        sup, sep, mat = k[len("node:"):].partition("::")
+        if not sep or mat not in mat_ids:
+            continue
+        v = ((policies[k] or {}).get(family) or {}).get(field)
+        if v is None:
+            continue
+        if mat in out and out[mat] != v:
+            w.append(MappingWarning(
+                "warn", f"material:{mat}", field,
+                f"conflicting per-supplier values for one material — "
+                f"kept {out[mat]}, ignored {v} (from {sup})"))
+            continue
+        out[mat] = v
+    return out
+
+
+def _apply_primary_choice(
+    links: list[SupplierLink], policies: dict, w: list[MappingWarning],
+) -> None:
+    """Mark the primary supplier the /policies Supplier stage SAVED (§4 D188).
+
+    A saved ``node:<supplier>::<material>`` → ``sourcing.primary_source: true``
+    is the user's choice of where that material is bought, and it beats the
+    engine's own rule (cheapest link — `primary_rank`). Nothing saved leaves the
+    engine rule in charge, which is also what the grid suggests, so an unsaved
+    row and the run agree.
+
+    A material with TWO saved primaries is ambiguous: neither is applied, the
+    engine rule picks, and the warning says so — the pre-run check blocks that
+    state, so reaching here means the gate was bypassed. A saved primary whose
+    lane no longer exists is named rather than silently forgotten.
+    """
+    by_key = {(l.supplier_id, l.material_id): l for l in links}
+    chosen: dict[str, list[str]] = {}
+    stale: list[str] = []
+    for k in sorted(k for k in policies if isinstance(k, str) and k.startswith("node:")):
+        if ((policies[k] or {}).get("sourcing") or {}).get("primary_source") is not True:
+            continue
+        body = k[len("node:"):]
+        # Both halves are free text; try the first and the last `::`, keep the
+        # one that names a real link (the `_composite_target` convention).
+        cands = [body.partition("::"), body.rpartition("::")]
+        hit = next(((sup, mat) for sup, sep, mat in cands if sep and (sup, mat) in by_key), None)
+        if hit is None:
+            sup, sep, mat = cands[0]
+            if sep and not sup.startswith("("):  # "(made in-house)" etc. are grid-only rows
+                stale.append(body)
+            continue
+        chosen.setdefault(hit[1], []).append(hit[0])
+    if stale:
+        w.append(MappingWarning(
+            "info", "policy:sourcing", "primary_source",
+            f"{len(stale)} saved primary supplier choice(s) name a supplier × material "
+            f"with no inbound lane, so they choose nothing: {stale[:5]}"))
+    applied = changed = 0
+    for mat, sups in sorted(chosen.items()):
+        if len(sups) > 1:
+            w.append(MappingWarning(
+                "warn", f"material:{mat}", "primary_source",
+                f"{len(sups)} suppliers saved as primary ({sorted(sups)[:5]}) — none applied, "
+                "the engine's cheapest-supplier rule picks"))
+            continue
+        options = [l for l in links if l.material_id == mat]
+        before = min(options, key=primary_rank).supplier_id
+        by_key[(sups[0], mat)].primary = True
+        applied += 1
+        changed += before != sups[0]
+    if applied:
+        w.append(MappingWarning(
+            "info", "policy:sourcing", "primary_source",
+            f"{applied} material(s) are bought from the primary supplier saved on /policies; "
+            f"for {changed} of them that is not the cheapest supplier the engine would "
+            "otherwise pick"))
 
 
 def _composite_target(key_body: str, targets: set[str]) -> Optional[str]:
@@ -862,6 +974,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
         return None
 
     links = list(links_by_key.values())
+    _apply_primary_choice(links, data.policies, w)
 
     # BOM materials with no source link cannot be simulated. Since D166 this
     # says what it always claimed: a material here has NO inbound arc at all,
@@ -902,6 +1015,12 @@ def from_project_data(data: ProjectData) -> MappingResult:
     cap_by_sup = {s.id: s.capacity_per_week for s in suppliers}
 
     # ── Materials ──
+    # Holding % set on a /policies Supplier-stage row is the user's value for
+    # that material and beats the master (§4 D204): the item masters are the
+    # base layer, /policies overrides them.
+    row_holding = _supplier_row_values(
+        data.policies, "inventory", "holding_cost_pct",
+        {m.id for m in data.materials} | bom_mat_ids, w)
     materials: list[Material] = []
     for m in data.materials:
         inv = _merged_policy(data.policies, m.id, "inventory")
@@ -918,7 +1037,9 @@ def from_project_data(data: ProjectData) -> MappingResult:
             cost = 1.0
             w.append(MappingWarning("warn", f"material:{m.id}", "cost",
                                     "no master cost and no supplier price → defaulted to 1.0"))
-        hold_pct = m.holding_cost_pct if m.holding_cost_pct is not None else inv.get("holding_cost_pct")
+        hold_pct = (row_holding[m.id] if m.id in row_holding
+                    else m.holding_cost_pct if m.holding_cost_pct is not None
+                    else inv.get("holding_cost_pct"))
         holding = _clamp(float(hold_pct) * 100.0, 5.0, 50.0, w=w, entity=f"material:{m.id}",
                          field="holding_cost_pct", unit=" %/yr") \
             if hold_pct is not None else 20.0
@@ -939,8 +1060,14 @@ def from_project_data(data: ProjectData) -> MappingResult:
             "info", f"material:{mid}", "master_row",
             "no row in `materials` — simulated from its BOM and inbound lanes, "
             f"cost {'derived from those lanes' if derived else 'defaulted to 1.0'}; "
-            "holding cost, MOQ and lead-time distribution take engine defaults"))
-        materials.append(Material(id=mid, name=mid, cost=cost))
+            "MOQ and lead-time distribution take engine defaults, holding cost the "
+            "Supplier-stage value when one is set, else the engine default"))
+        kw: dict[str, Any] = {}
+        if mid in row_holding:  # the /policies value needs no master row (§4 D204)
+            kw["holding_cost_rate"] = _clamp(
+                float(row_holding[mid]) * 100.0, 5.0, 50.0, w=w,
+                entity=f"material:{mid}", field="holding_cost_pct", unit=" %/yr")
+        materials.append(Material(id=mid, name=mid, cost=cost, **kw))
 
     # ── Products ──
     # The plant grid keys its production overrides "<focal plant>::<product>",
@@ -1437,6 +1564,10 @@ def _map_policies(
             mat_over.pop(mat, None)
         else:
             consumed_keys.add(k)
+        # Read per material elsewhere (holding % in the material loop, safety
+        # days just below), so the row is applied, not dropped.
+        if inv_o.get("holding_cost_pct") is not None or inv_o.get("safety_stock_days") is not None:
+            consumed_keys.add(k)
     # An absolute band a row states inverted (s ≥ S) would be refused by the
     # engine's validator and abort the run; keep the reorder point (the half
     # that triggers) and say what was dropped.
@@ -1447,6 +1578,15 @@ def _map_policies(
             w.append(MappingWarning(
                 "warn", f"material:{mat}", "order_up_to",
                 f"order-up-to {S_v} ≤ reorder point {s_v} — S dropped, formula S used"))
+
+    # Safety-stock days set on a Supplier-stage row (§4 D204): that material's
+    # buffer is that many days of its demand, whatever the project-wide method.
+    row_ss_days = {
+        mat: _clamp(float(v), 0.0, 84.0, w=w, entity=f"material:{mat}",
+                    field="safety_stock_days", unit=" d")
+        for mat, v in _supplier_row_values(
+            policies, "inventory", "safety_stock_days", known_mats, w).items()
+    }
 
     # Surface per-node inventory overrides the engine will not apply (plant FG
     # rows and keys without a known material token).
@@ -1459,8 +1599,8 @@ def _map_policies(
         w.append(MappingWarning(
             "warn", "policy:inventory_control", "inventory",
             f"{dropped_inventory} per-node inventory override(s) not applied — "
-            "safety stock and FG stock are consumed at the project default "
-            "scope only; supplier-row replenishment overrides ARE applied"))
+            "plant-row stock settings are consumed at the project default "
+            "scope only; supplier-row overrides ARE applied"))
 
     out["inventory_control"] = {"policy_type": type_map.get(str(inv.get("type", "min_max")), "min_max")}
     if out["inventory_control"]["policy_type"] == "rop_q":
@@ -1507,6 +1647,12 @@ def _map_policies(
                                        w=w, entity="policy:default",
                                        field="safety_stock_days", unit=" d"),
         }
+    if row_ss_days:
+        out["safety_stock_materials"]["fixed_days_by_material"] = row_ss_days
+        w.append(MappingWarning(
+            "info", "policy:safety_stock_materials", "safety_stock_days",
+            f"{len(row_ss_days)} material(s) carry a Supplier-stage safety-stock "
+            "days value — applied per material, over the project-wide method"))
 
     if bool(fulfil.get("backorder_allowed", False)):
         out["unmet_demand_handling"] = {

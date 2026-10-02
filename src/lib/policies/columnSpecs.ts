@@ -287,6 +287,14 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("demand_mean", "production", {
         master: { table: "products", field: "demand_mean", idFrom: "product_id" },
       }),
+      // Demand variability — P-P.3 sizes safety stock from it and the run's
+      // demand draw spreads by it. Editable HERE so the run check's "has no
+      // products.demand_cv" points at a cell on /policies rather than at the
+      // Item Master editor (blueprint §8.3: masters are the base layer, set
+      // from this page).
+      col("demand_cv", "production", {
+        master: { table: "products", field: "demand_cv", idFrom: "product_id" },
+      }),
       col("capacity_units_per_day", "production", { defaultWhenMissing: 1000 }),
       // THE OTHER HALF OF THE ARITHMETIC, AND IT HAD NO COLUMN (§4 D167). The
       // engine builds a product's weekly capacity as units/day × 7 ×
@@ -474,6 +482,7 @@ export const COLUMN_FIT: Record<string, Omit<FitCol, "key" | "family" | "label">
   sell_price: { sub: "€ / unit · master", w: 92, kind: "num", dec: 2, unit: "€", keep: true },
   production_capacity: { sub: "units / wk · master", w: 100, kind: "int", prio: 5 },
   demand_mean: { sub: "units / wk · master", w: 100, kind: "int", prio: 4 },
+  demand_cv: { sub: "σ / mean · master", w: 80, kind: "num", dec: 2, prio: 3 },
   capacity_units_per_day: { sub: "units / day", w: 96, kind: "int", keep: true },
   utilization_cap_pct: { sub: "% of line capacity", w: 84, kind: "int", unit: "%", prio: 6 },
   allocation_priority_weight: { sub: "weight", w: 76, kind: "num", dec: 2, prio: 9 },
@@ -512,6 +521,7 @@ export const SHORT_LABEL: Record<string, string> = {
   sell_price: "Sell price",
   production_capacity: "Prod. capacity",
   demand_mean: "Demand mean",
+  demand_cv: "Demand CV",
   capacity_units_per_day: "Line capacity",
   utilization_cap_pct: "Utilization cap",
   allocation_priority_weight: "Allocation wt.",
@@ -543,4 +553,49 @@ export function fitColsForStage(stage: StageKey, rowsCtx: ColSpecCtx[]): FitCol[
     ...FIT_FALLBACK,
     ...(COLUMN_FIT[c.field] ?? {}),
   }));
+}
+
+/**
+ * The /policies cell where a `dataset.column` value is entered, or null.
+ *
+ * The item masters are the BASE layer and /policies is where a value is set
+ * (blueprint §8.3): a master-backed column saves into its master row, and
+ * `materials.holding_cost_pct` is a Supplier-stage override the engine reads
+ * BEFORE the master (§4 D204). The run check's walk-to links use this, so a
+ * finding about a field the page can set points at the page rather than at the
+ * Item Master editor. Derived from the column spec, so a new master-backed
+ * column is linked without anyone remembering to.
+ */
+const POLICIES_OVERRIDE_CELLS: Record<string, { stage: StageKey; field: string }> = {
+  "materials.holding_cost_pct": { stage: "supplier", field: "holding_cost_pct" },
+};
+
+export function policiesCellFor(datasetField: string): { stage: StageKey; field: string } | null {
+  if (POLICIES_OVERRIDE_CELLS[datasetField]) return POLICIES_OVERRIDE_CELLS[datasetField];
+  for (const stage of ["supplier", "plant", "customer"] as const) {
+    for (const c of STAGE_TABLE_SPEC[stage].cols) {
+      if (c.master && `${c.master.table}.${c.master.field}` === datasetField) {
+        return { stage, field: c.field };
+      }
+    }
+  }
+  return null;
+}
+
+const STAGE_NAME: Record<StageKey, string> = {
+  supplier: "Supplier",
+  plant: "Plant",
+  customer: "Customer",
+  run_validate: "Run & Validate",
+};
+
+/**
+ * How a finding names a field: by its /policies column when the page can set
+ * it ("Material cost · Supplier stage"), else by `dataset.column`. The raw
+ * field still travels on the finding for the mono sub-line, so nothing is lost.
+ */
+export function findingFieldLabel(datasetField: string): string {
+  const cell = policiesCellFor(datasetField);
+  if (!cell) return datasetField;
+  return `${shortLabelFor(cell.stage, cell.field, cell.field)} · ${STAGE_NAME[cell.stage]} stage`;
 }

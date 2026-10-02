@@ -61,10 +61,13 @@ describe("D188 · 'primary supplier' has three authors", () => {
     const r = resolvePrimarySupplier(rows);
     expect("primary" in r && r.primary.supplierId).toBe("B");
   });
-  it.fails("the Supplier grid ranks a material's primary by the engine's rule (cost first)", () => {
-    // useStageRows' matMeta ranking: highest volume → lowest price → lowest lead time.
+  // CLOSED 2026-10-02: the grid suggests via `engineSupplierLinks` (the
+  // engine's own link build and rank), and a SAVED primary now reaches the
+  // engine (`SupplierLink.primary`), so grid and run agree either way.
+  it("the Supplier grid ranks a material's primary by the engine's rule (cost first)", () => {
     const src = read("src/hooks/useStageRows.tsx");
     expect(src).not.toMatch(/Rank unique suppliers: highest volume/);
+    expect(src).toMatch(/engineSupplierLinks\(/);
   });
 });
 

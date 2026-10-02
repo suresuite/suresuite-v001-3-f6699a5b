@@ -225,6 +225,67 @@ export function cheapestInboundCost(inbound: Row[]): Map<string, number> {
   return out;
 }
 
+/** Python's `round` — half to EVEN (`round(2.5) == 2`), which `Math.round` is not. */
+function pyRound(x: number): number {
+  const f = Math.floor(x);
+  const d = x - f;
+  if (d > 0.5) return f + 1;
+  if (d < 0.5) return f;
+  return f % 2 === 0 ? f : f + 1;
+}
+
+/**
+ * Each (supplier, material) link as the engine builds it (project_map.py's
+ * supplier-link loop): cost = unit_price, ≤ 0 or blank → 1.0; lead time =
+ * lead_time × lead_time_unit in weeks, rounded half-even, clamped 1–51, blank or
+ * 0 → 2. Duplicate rows of one pair reduce to the cheapest (tie: shortest lead).
+ * Keyed `<supplier>::<material>`.
+ */
+export function engineSupplierLinks(
+  inbound: Row[],
+): Map<string, { supplier: string; material: string; cost: number; leadWeeks: number }> {
+  const out = new Map<string, { supplier: string; material: string; cost: number; leadWeeks: number }>();
+  for (const arc of inbound) {
+    const supplier = String(arc.supplier_id ?? "");
+    const material = String(arc.material_id ?? "");
+    if (!supplier || !material) continue;
+    let cost = num(arc.unit_price);
+    if (cost <= 0) cost = ENGINE_DEFAULT_PRICE;
+    const lt = num(arc.lead_time);
+    const weeks = lt ? (lt * (unitDays(arc.lead_time_unit as string | null) ?? 7)) / 7 : 2;
+    const leadWeeks = Math.min(51, Math.max(1, pyRound(weeks)));
+    const key = `${supplier}::${material}`;
+    const prev = out.get(key);
+    if (!prev || cost < prev.cost || (cost === prev.cost && leadWeeks < prev.leadWeeks)) {
+      out.set(key, { supplier, material, cost, leadWeeks });
+    }
+  }
+  return out;
+}
+
+/**
+ * The engine's OWN primary supplier per material — what a run buys from when
+ * nothing is saved on /policies (scsim `primary_rank`): cheapest link, then
+ * shortest lead time, then supplier id by code point (Python's string order).
+ * A saved `sourcing.primary_source` beats it (§4 D188); the Supplier grid
+ * suggests THIS, so an unsaved suggestion is what the run does.
+ */
+export function enginePrimarySupplier(inbound: Row[]): Map<string, string> {
+  const best = new Map<string, { supplier: string; cost: number; leadWeeks: number }>();
+  for (const l of engineSupplierLinks(inbound).values()) {
+    const b = best.get(l.material);
+    if (
+      !b ||
+      l.cost < b.cost ||
+      (l.cost === b.cost &&
+        (l.leadWeeks < b.leadWeeks || (l.leadWeeks === b.leadWeeks && l.supplier < b.supplier)))
+    ) {
+      best.set(l.material, l);
+    }
+  }
+  return new Map([...best].map(([mat, l]) => [mat, l.supplier]));
+}
+
 /**
  * Demand-weighted average outbound unit_price per product — engine fallback
  * for products.sell_price. Rows with falsy prices are skipped (engine:
@@ -279,6 +340,11 @@ export interface ReducerCtx {
    * dataset carries overrides. Engine precedence, most specific last:
    * defaults < node:<product> < node:<owner>::<product>. Empty otherwise. */
   policyCapacityById: Map<string, number>;
+  /** Materials whose holding % is set on a /policies Supplier-stage row
+   * (`node:<supplier>::<material>` → inventory.holding_cost_pct). The engine
+   * reads that value BEFORE the master (§4 D204), so such a material is set,
+   * not missing. Empty when the dataset carries no overrides. */
+  policyHoldingMaterials: Set<string>;
 }
 
 /** Named reducers — the shared vocabulary of registry `fallback_spec`.
@@ -540,6 +606,9 @@ interface FieldBinding {
   rows: (ds: GradingDataset) => Row[];
   id: (r: Row) => string;
   master: (r: Row) => number;
+  /** The entity's value is set on /policies, which the engine reads BEFORE the
+   *  master — so the field is set even when the master column is empty. */
+  policy?: (id: string, ctx: ReducerCtx) => boolean;
 }
 
 const arcId = (r: Row) => `${r.supplier_id ?? "?"}→${r.material_id ?? "?"}`;
@@ -550,7 +619,10 @@ const laneId = (r: Row) => `${r.product_id ?? "?"}→${r.customer_id ?? "?"}`;
 const FIELD_BINDINGS: Record<string, FieldBinding> = {
   "materials.cost": { rows: (d) => d.materials, id: (r) => String(r.material_id ?? ""), master: (r) => num(r.cost) },
   "materials.moq": { rows: (d) => d.materials, id: (r) => String(r.material_id ?? ""), master: (r) => num(r.moq) },
-  "materials.holding_cost_pct": { rows: (d) => d.materials, id: (r) => String(r.material_id ?? ""), master: (r) => num(r.holding_cost_pct) },
+  "materials.holding_cost_pct": {
+    rows: (d) => d.materials, id: (r) => String(r.material_id ?? ""), master: (r) => num(r.holding_cost_pct),
+    policy: (id, c) => c.policyHoldingMaterials.has(id),
+  },
   "products.sell_price": { rows: (d) => d.products, id: (r) => String(r.product_id ?? ""), master: (r) => num(r.sell_price) },
   "products.demand_mean": { rows: (d) => d.products, id: (r) => String(r.product_id ?? ""), master: (r) => num(r.demand_mean) },
   "products.production_capacity": { rows: (d) => d.products, id: (r) => String(r.product_id ?? ""), master: (r) => num(r.production_capacity) },
@@ -652,7 +724,26 @@ export function buildReducerCtx(dataset: GradingDataset, defaults: Row): Reducer
       if (weekly > 0) policyCapacityById.set(id, weekly);
     }
   }
+  // Supplier-stage holding % — project_map.py `_supplier_row_values`: split
+  // the key at the FIRST "::", the material must have a master row, and a
+  // null in the patch is no value.
+  const policyHoldingMaterials = new Set<string>();
+  if (dataset.overrides?.length) {
+    const materialIds = new Set(
+      dataset.materials.map((m) => String(m.material_id ?? "")).filter(Boolean),
+    );
+    for (const o of dataset.overrides) {
+      if (String(o.scope ?? "") !== "node" || String(o.family ?? "") !== "inventory") continue;
+      const key = String(o.target_key ?? "");
+      const at = key.indexOf("::");
+      if (at < 0) continue;
+      const mat = key.slice(at + 2);
+      const patch = (o.patch ?? {}) as Row;
+      if (materialIds.has(mat) && patch.holding_cost_pct != null) policyHoldingMaterials.add(mat);
+    }
+  }
   return {
+    policyHoldingMaterials,
     weightedInbound: volumeWeightedInboundCost(dataset.inbound),
     cheapestInbound: cheapestInboundCost(dataset.inbound),
     weightedPrice: demandWeightedSellPrice(dataset.outbound),
@@ -719,7 +810,7 @@ export function gradeManifest(
       for (const row of binding.rows(dataset)) {
         const id = binding.id(row);
         if (!id) continue;
-        if (binding.master(row) > 0) {
+        if (binding.master(row) > 0 || binding.policy?.(id, ctx)) {
           graded.set.push(id);
           continue;
         }

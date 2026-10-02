@@ -11,6 +11,8 @@
 // silently dropped. Reconciled with the engine on 2026-09-29 (PLAN.md §16 ·
 // *Audit 2026-09-29*, the Data map addendum).
 
+import { policiesCellFor } from "./columnSpecs";
+
 export type DataMapDataset =
   | "inbound_logistics"
   | "outbound_logistics"
@@ -79,7 +81,8 @@ export interface DataMapContractRow {
 
 /**
  * Walk-to link for a `dataset.column` manifest field (§6.3 rule 3 / §8.2):
- * the /project-manager route that opens the editor closest to the gap.
+ * the route that opens the editor closest to the gap — the /policies stage
+ * when the field has a cell there (`policiesCellFor`), else /project-manager.
  * Item-master datasets deep-open the Item Master editor on the right tab;
  * lane/BOM datasets (fixed by re-upload or the supplier-assignment RPC)
  * expand the project's data card. `materials.supplier_link` is the synthetic
@@ -90,6 +93,10 @@ export function fieldWalkToRoute(
   projectId: string | null | undefined,
 ): string | null {
   if (!projectId) return null;
+  // A field /policies can set goes to /policies: the value entered there is
+  // the one the run uses, over the item master (§4 D204).
+  const cell = policiesCellFor(field);
+  if (cell) return `/policies?stage=${cell.stage}`;
   const dataset = field.split(".")[0];
   const column = field.split(".")[1] ?? "";
   const base = `/project-manager?project=${projectId}`;
@@ -120,7 +127,7 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "inbound_logistics", field: "lead_time_unit", engineField: "lead-time unit", chain: "the unit of lead_time (day / week / month …); blank → weeks. Uploads promoted since WP 3.3 are already in weeks", statusKey: "inbound_lead_time_unit" },
   { dataset: "inbound_logistics", field: "time_unit", engineField: "volume unit", chain: "the period of volume only (day / week / month / year …); unknown → week", statusKey: "identity" },
   { dataset: "inbound_logistics", field: "plant_name", engineField: null, chain: "not read — the engine merges every plant name into one plant. The network pages and the Supplier tree do NOT — they join on plant, so a row on a different plant name is a separate island there (§4 D202)", statusKey: "plant_ignored" },
-  { dataset: "inbound_logistics", field: "volume", engineField: "weight of the materials.cost fallback", chain: "only weights the volume-weighted price when materials.cost is blank. It does NOT pick the primary (the cheapest link does) and does NOT split orders (P-S.2 without shares splits equally)", statusKey: "inbound_volume" },
+  { dataset: "inbound_logistics", field: "volume", engineField: "weight of the materials.cost fallback", chain: "only weights the volume-weighted price when materials.cost is blank. It does NOT pick the primary (the Supplier stage's saved primary does, else the cheapest link) and does NOT split orders (P-S.2 without shares splits equally)", statusKey: "inbound_volume" },
   // ── outbound_logistics ─────────────────────────────────────────────────
   { dataset: "outbound_logistics", field: "customer_id", engineField: "Customer / demand split", chain: "identity — builds the product→customer link", statusKey: "identity" },
   { dataset: "outbound_logistics", field: "product_id", engineField: "Product demand", chain: "identity — builds the product→customer link", statusKey: "identity" },
@@ -144,7 +151,7 @@ export const DATA_MAP_CONTRACT: DataMapContractRow[] = [
   { dataset: "materials", field: "material_id", engineField: "Material.id", chain: "identity — every master row is a material; a BOM material with no master row is still simulated, from its BOM and inbound lanes, with engine defaults for holding cost, MOQ and lead-time distribution", statusKey: "identity" },
   { dataset: "materials", field: "name", engineField: "Material.name", chain: "display only → id", statusKey: "name" },
   { dataset: "materials", field: "cost", engineField: "Material.cost (c_m)", chain: "master (when > 0; a 0 counts as blank) → volume-weighted inbound unit_price (info) → cheapest inbound price (info) → 1.0 (warn)", statusKey: "material_cost" },
-  { dataset: "materials", field: "holding_cost_pct", engineField: "Material.holding_cost_rate", chain: "master → the PROJECT-DEFAULT policy inventory.holding_cost_pct → 20 %/yr · fraction ×100, clamp [5, 50]. The Supplier grid's per-row Holding cell is not read (§4 D204)", statusKey: "material_holding" },
+  { dataset: "materials", field: "holding_cost_pct", engineField: "Material.holding_cost_rate", chain: "the Supplier stage's per-row Holding (/policies) → master → the PROJECT-DEFAULT policy inventory.holding_cost_pct → 20 %/yr · fraction ×100, clamp [5, 50]. A value set on /policies beats the master (§4 D204)", statusKey: "material_holding" },
   { dataset: "materials", field: "moq", engineField: "SupplierLink.moq", chain: "master → 0", statusKey: "material_moq" },
   { dataset: "materials", field: "initial_on_hand", engineField: "Material.initial_on_hand", chain: "master → the engine starts at its own base stock: coverage weeks (κ) × expected demand, plus safety stock, on hand; the lead-time demand starts in transit", statusKey: "material_initial_on_hand" },
   { dataset: "materials", field: "lead_time_dist / lead_time_cv", engineField: "SupplierLink.lead_time_dist/cv", chain: "master → deterministic, cv 0", statusKey: "material_lead_time_dist" },

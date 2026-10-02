@@ -166,8 +166,11 @@ export function engineDoors(registry: RegistryLike, src: EngineSources): EngineD
     for (const k of Object.keys(p.params_schema?.properties ?? {})) params.add(k);
   }
   const bundleKeys = new Map<string, { target: string; catalogRef: string | null; transform: string }>();
+  // Keyed `<family>.<key>`: one field name can live in two families with two
+  // fates — `sourcing.primary_source` reaches the engine (§4 D188),
+  // `fulfillment.primary_source` does not.
   for (const k of registry.policy_bundle_keys ?? []) {
-    bundleKeys.set(k.key, {
+    bundleKeys.set(`${k.family}.${k.key}`, {
       target: k.target,
       catalogRef: k.catalog_ref ?? null,
       transform: k.transform,
@@ -292,7 +295,7 @@ function citeDeclarations(files: Record<string, string>, field: string, limit = 
 }
 
 /** Which door, if any, this field goes through — in descending strength. */
-export function engineDoorFor(field: string, doors: EngineDoors): Hop | null {
+export function engineDoorFor(field: string, doors: EngineDoors, family?: string): Hop | null {
   const dr = [...doors.dataRequirements.keys()].filter((k) => k.endsWith(`.${field}`));
   if (dr.length) {
     return {
@@ -317,7 +320,9 @@ export function engineDoorFor(field: string, doors: EngineDoors): Hop | null {
   // which policy, through which transform — and a bidirectional parity test in
   // `scsim/tests/test_registry_io.py` keeps the declaration and the mapper
   // together in both directions.
-  const declared = doors.bundleKeys.get(field);
+  const declared = family
+    ? doors.bundleKeys.get(`${family}.${field}`)
+    : [...doors.bundleKeys].find(([k]) => k.endsWith(`.${field}`))?.[1];
   if (declared) {
     return {
       kind: "engine",
@@ -328,6 +333,10 @@ export function engineDoorFor(field: string, doors: EngineDoors): Hop | null {
       evidence: null,
     };
   }
+  // The same NAME declared under another family: the dict read the scan below
+  // would find is THAT family's read, not this column's. `customer.primary_source`
+  // (fulfillment) must not borrow `sourcing.primary_source`'s engine hop.
+  if (family && [...doors.bundleKeys.keys()].some((k) => k.endsWith(`.${field}`))) return null;
   // AND THE SCAN IS STILL HERE, for a key the declaration does not carry. That is
   // not a fallback for door 3 — it is the honest report that a bundle key reaches
   // the engine with nothing declaring it, which is what D90 WAS and what the
@@ -469,7 +478,7 @@ export function chainFor(
 
   // ── the engine hop, for a non-master column ─────────────────────────────
   if (!spec.master) {
-    const door = engineDoorFor(spec.field, doors);
+    const door = engineDoorFor(spec.field, doors, String(spec.family));
     if (door) {
       hops.push(door);
     } else if (spec.engineStatus?.state === "pending") {

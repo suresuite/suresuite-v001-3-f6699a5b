@@ -46,6 +46,7 @@ from scsim.entities.enums import (
     RampProfile,
     TransportMode,
 )
+from scsim.entities.network import primary_rank
 from scsim.entities.scenario import Scenario
 from scsim.stats.seeds import ReplicationStreams
 
@@ -158,11 +159,12 @@ class CompiledModel:
         self.exp_demand_m = np.asarray(self.bom.T @ self.mean_demand_p).ravel()  # Eq. 1
         self.var_demand_m = np.asarray((self.bom.power(2)).T @ self.var_demand_p).ravel()
 
-        # Supplier-material links, sorted (cost, lt, supplier) per material so
-        # links_of_mat[m][0] is the primary source (min cost — manuscript §3.5).
+        # Supplier-material links, sorted per material by `primary_rank` so
+        # links_of_mat[m][0] is the primary source: the link the user chose on
+        # /policies, else min cost (manuscript §3.5).
         links = sorted(
             net.supplier_links,
-            key=lambda l: (self.mat_index[l.material_id], l.cost, l.lead_time_weeks, l.supplier_id),
+            key=lambda l: (self.mat_index[l.material_id], *primary_rank(l)),
         )
         self.n_links = len(links)
         self.link_sup = np.array([self.sup_index[l.supplier_id] for l in links], dtype=int)
