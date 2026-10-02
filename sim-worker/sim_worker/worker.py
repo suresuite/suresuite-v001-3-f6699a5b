@@ -13,6 +13,7 @@ import httpx
 import redis.asyncio as redis
 
 from .datamap import load_project_data
+from .local import run_from_snapshots
 from .engine import apply_delta, compute_kpis
 from .graph_cache import GraphCache
 from .network_metrics import compute_network_metrics
@@ -107,6 +108,40 @@ def build_run_update(kpis: dict[str, Any], n_reps: int) -> dict[str, Any]:
     worker's clock. The shaping itself lives in `run_shape` so the browser and
     `sim_worker.local` produce the identical row."""
     return _shape_run_update(kpis, n_reps, ended_at=_now())
+
+def dataset_binding(envelope: dict[str, Any]) -> tuple[str, str]:
+    """Which input an experiment.run computes from — PLAN.md §23 WP 13.2, §4 D280.
+
+    Returns ``(mode, detail)``:
+
+    * ``("frozen", <dataset_version_id>)`` — the run's frozen dataset version.
+      The dispatcher puts the key on every envelope since WP 13.2, and the worker
+      computes from that snapshot and the run's policy version ONLY.
+    * ``("refuse", <reason>)`` — the envelope carries the key and it is empty: a
+      run with no dataset version is not computed, because there is nothing
+      frozen to compute from and the live tables are not what it is stamped with.
+    * ``("legacy", <note>)`` — an envelope from a dispatcher that predates the
+      binding (no key at all). It keeps the old path — the project's live tables
+      at start — and the run log says so.
+    """
+    if "dataset_version_id" not in envelope:
+        return ("legacy",
+                "legacy run: dispatched before runs carried their dataset version to the "
+                "worker, so it was computed from the project's live tables at start — "
+                "an edit made after dispatch can be in it (§4 D280)")
+    dvid = envelope.get("dataset_version_id")
+    if not dvid:
+        return ("refuse",
+                "this run has no dataset version, so there is no frozen copy of the project's "
+                "data to compute it from — it was not run (PLAN.md §23 WP 13.2). Dispatch it "
+                "again; the dispatcher freezes the data first")
+    return ("frozen", str(dvid))
+
+
+class DatasetVersionError(RuntimeError):
+    """The run's frozen dataset version could not be read — the run fails with
+    this, rather than falling back to the live tables (§4 D280)."""
+
 
 STREAM_PREFIX = "sim.cmd."
 CONSUMER_GROUP = "sim-workers"
@@ -371,9 +406,19 @@ class SimWorker:
 
                     if scsim_enabled() and run_id:
                         # Canonical path: the worker is the SOLE authoritative
-                        # writer. Map the project's stored data (item masters +
-                        # logistics + policies + scenario) → scsim, run it, and
-                        # persist runs + per-rep replications idempotently.
+                        # writer. It computes from the run's FROZEN dataset
+                        # version and policy version through the one pipeline
+                        # the browser and the package call
+                        # (`sim_worker.local.run_from_snapshots`, §23 WP 13.2),
+                        # and persists runs + per-rep replications idempotently.
+                        binding, binding_detail = dataset_binding(raw)
+                        if binding == "refuse":
+                            log.warning("run %s refused: %s", run_id, binding_detail)
+                            await self._transition(run_id, {
+                                "status": "failed", "error_message": binding_detail,
+                                "ended_at": _now(),
+                            }, ("queued",))
+                            return  # the outer finally ACKs
                         # queued → running, and ONLY from queued: a run cancelled
                         # before the worker reached it is left cancelled, not run.
                         if not await self._transition(
@@ -383,11 +428,6 @@ class SimWorker:
                         watch = CancelWatch()
                         try:
                             project_model = await self._fetch_project_model(cmd.project_id)
-                            data = await load_project_data(
-                                self._http, self._supabase_url, self._service_role_key,
-                                cmd.project_id, scenario=scenario_data, policies=policies,
-                                project_model=project_model,
-                            )
                             # Live streaming: the engine invokes this observer from
                             # its worker thread after each replication; hand the
                             # upsert to the event loop without blocking the run.
@@ -406,8 +446,38 @@ class SimWorker:
                                     loop,
                                 ))
 
-                            kpis = await asyncio.to_thread(
-                                compute_run_from_project, data, on_replication)
+                            if binding == "frozen":
+                                # §23 WP 13.2 — the run's two frozen versions, and
+                                # nothing live: a master edited after dispatch is
+                                # not in this run.
+                                dataset = await self._fetch_dataset_snapshot(
+                                    binding_detail, cmd.project_id)
+                                if snapshot is None:
+                                    raise DatasetVersionError(
+                                        "the run's policy version could not be read, so it "
+                                        "was not computed from live policies instead")
+                                result = await asyncio.to_thread(
+                                    run_from_snapshots, dataset, snapshot, scenario_data,
+                                    project_model, on_replication, recovery_data or None)
+                                kpis = result["kpis"]
+                                kpis.setdefault("mapping_warnings", []).append({
+                                    "level": "info", "entity": "run", "field": "inputs",
+                                    "reason": f"computed from dataset version {binding_detail} and "
+                                              f"policy version {raw.get('policy_version_id') or '(embedded)'} "
+                                              "— frozen at dispatch; nothing was read from the live project",
+                                })
+                            else:
+                                data = await load_project_data(
+                                    self._http, self._supabase_url, self._service_role_key,
+                                    cmd.project_id, scenario=scenario_data, policies=policies,
+                                    project_model=project_model,
+                                )
+                                kpis = await asyncio.to_thread(
+                                    compute_run_from_project, data, on_replication)
+                                kpis.setdefault("mapping_warnings", []).append({
+                                    "level": "warn", "entity": "run", "field": "inputs",
+                                    "reason": binding_detail,
+                                })
                             # Let in-flight streamed writes settle before the final
                             # authoritative update, so a stale rep_count_done can't
                             # land after the run is marked done.
@@ -536,6 +606,34 @@ class SimWorker:
         except Exception:
             log.exception("failed to fetch policy version %s", version_id)
             return None
+
+    async def _fetch_dataset_snapshot(self, version_id: str, project_id: str) -> dict[str, Any]:
+        """The run's frozen `dataset_versions.snapshot` (service role) — RAISES
+        rather than returning None: a run whose frozen data cannot be read is
+        failed with the reason, never computed from the live tables (§4 D280)."""
+        try:
+            r = await self._http.get(
+                f"{self._supabase_url}/rest/v1/dataset_versions",
+                params={"id": f"eq.{version_id}", "select": "project_id,snapshot"},
+                headers={
+                    "apikey": self._service_role_key,
+                    "Authorization": f"Bearer {self._service_role_key}",
+                },
+            )
+            r.raise_for_status()
+            rows = r.json()
+        except Exception as exc:
+            raise DatasetVersionError(
+                f"could not read the run's dataset version {version_id}: {exc}") from exc
+        if not rows:
+            raise DatasetVersionError(f"the run's dataset version {version_id} does not exist")
+        if str(rows[0].get("project_id")) != str(project_id):
+            raise DatasetVersionError(
+                f"dataset version {version_id} belongs to another project — not computed")
+        snap = rows[0].get("snapshot")
+        if not isinstance(snap, dict):
+            raise DatasetVersionError(f"dataset version {version_id} has no snapshot")
+        return snap
 
     async def _fetch_project_model(self, project_id: str) -> str | None:
         """projects.supply_chain_model → fulfillment mode default."""

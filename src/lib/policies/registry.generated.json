@@ -146,7 +146,7 @@
       "lane"
     ]
   },
-  "engine_version": "0.2.9",
+  "engine_version": "0.2.11",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -3313,6 +3313,9 @@
       "catalog_ref": "P-S.2",
       "family": "sourcing",
       "key": "supply_share",
+      "scopes": [
+        "supplier"
+      ],
       "target": "proactive_multi_sourcing.weights",
       "transform": "fraction x 100 into the material's weight map, keyed by supplier; only for a supplier the material actually has a link to"
     },
@@ -3320,6 +3323,10 @@
       "catalog_ref": "P-X.1",
       "family": "inventory",
       "key": "type",
+      "scopes": [
+        "default",
+        "supplier"
+      ],
       "target": "inventory_control.policy_type",
       "transform": "enum map \u2014 min_max/s_S/continuous_review -> min_max, base_stock -> base_stock, rop -> rop_q, periodic_review -> periodic; anything unrecognised falls back to min_max"
     },
@@ -3327,6 +3334,10 @@
       "catalog_ref": "P-X.2",
       "family": "inventory",
       "key": "safety_stock_days",
+      "scopes": [
+        "default",
+        "supplier"
+      ],
       "target": "safety_stock_materials.fixed_days_cover",
       "transform": "days, clamped 0-84. At default scope only when `safety_stock_method` is neither service_level/demand_variability nor king_method. On a Supplier-stage row (`node:<supplier>::<material>`) it is that material's cover in `fixed_days_by_material`, whatever the method \u2014 the /policies value beats the project default (\u00a74 D204)"
     },
@@ -3334,6 +3345,10 @@
       "catalog_ref": null,
       "family": "inventory",
       "key": "holding_cost_pct",
+      "scopes": [
+        "default",
+        "supplier"
+      ],
       "target": "Material.holding_cost_rate",
       "transform": "fraction x 100 -> %/yr, clamped 5-50. Order: the Supplier-stage row (`node:<supplier>::<material>`) -> materials.holding_cost_pct (master) -> the project-default policy -> 20. The /policies value beats the item master (\u00a74 D204)"
     },
@@ -3341,13 +3356,149 @@
       "catalog_ref": null,
       "family": "sourcing",
       "key": "primary_source",
+      "scopes": [
+        "supplier"
+      ],
       "target": "SupplierLink.primary",
       "transform": "true on a Supplier-stage row makes that supplier the material's primary link (where P-P.1 orders go). Nothing saved -> the engine's rule: cheapest, then shortest lead time, then id. Two saved for one material -> neither applied, warned (\u00a74 D188)"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "positive",
+      "empty_default": 1.0,
+      "family": "sourcing",
+      "key": "material_cost",
+      "master": "materials.cost",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "Material.cost",
+      "transform": "currency per unit, must be > 0. Order: the Supplier-stage row (`node:<supplier>::<material>`) -> materials.cost (master) -> the volume-weighted, then cheapest, inbound price -> 1.0"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": 0.0,
+      "family": "sourcing",
+      "key": "material_moq",
+      "master": "materials.moq",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "SupplierLink.moq",
+      "transform": "units, >= 0, applied to every supplier link of the material. Order: the Supplier-stage row -> materials.moq (master) -> 0"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "positive",
+      "empty_default": null,
+      "empty_note": "unlimited \u2014 no capacity limit",
+      "family": "sourcing",
+      "key": "capacity_per_week",
+      "master": "suppliers.capacity_per_week",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "Supplier.capacity_per_week",
+      "transform": "units per week, must be > 0; one value per SUPPLIER, read from any of its Supplier-stage rows. Order: the row -> suppliers.capacity_per_week (master; empty means unlimited)"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "fraction",
+      "empty_default": 1.0,
+      "family": "sourcing",
+      "key": "reliability_score",
+      "master": "suppliers.reliability_score",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "Supplier.reliability_score",
+      "transform": "fraction 0-1; one value per SUPPLIER, read from any of its Supplier-stage rows. Order: the row -> suppliers.reliability_score (master) -> 1.0"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "the engine's own opening stock (its starting cover)",
+      "family": "inventory",
+      "key": "initial_on_hand",
+      "master": "materials.initial_on_hand",
+      "rows": "supplier",
+      "scopes": [
+        "supplier"
+      ],
+      "target": "Material.initial_on_hand",
+      "transform": "units, >= 0. Order: the Supplier-stage row -> materials.initial_on_hand (master) -> the engine's own opening stock. A PLANT-stage initial_on_hand is not read (\u00a74 D89)"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "positive",
+      "empty_default": 1.0,
+      "family": "production",
+      "key": "sell_price",
+      "master": "products.sell_price",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.unit_price",
+      "transform": "currency per unit, must be > 0. Order: the Plant-stage row (`node:<plant>::<product>`) -> products.sell_price (master) -> the demand-weighted outbound price -> 1.0"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "positive",
+      "empty_default": null,
+      "empty_note": "max(2 \u00d7 demand, 1000) \u2014 chosen so capacity never binds",
+      "family": "production",
+      "key": "production_capacity",
+      "master": "products.production_capacity",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.production_capacity",
+      "transform": "units per week, must be > 0. Order: the Plant-stage row -> products.production_capacity (master) -> the line capacity (capacity_units_per_day x 7 x utilization) -> max(2 x demand, 1000)"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "positive",
+      "empty_default": 0.0,
+      "family": "production",
+      "key": "demand_mean",
+      "master": "products.demand_mean",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.demand_mode",
+      "transform": "units per week, must be > 0. Order: the Plant-stage row -> products.demand_mean (master) -> the weekly outbound volume -> 0"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "empty_default": null,
+      "empty_note": "the scenario demand model's CV, else 0.30",
+      "family": "production",
+      "key": "demand_cv",
+      "master": "products.demand_cv",
+      "rows": "plant",
+      "scopes": [
+        "plant"
+      ],
+      "target": "Product.demand_cv",
+      "transform": "sigma / mean, >= 0. Order: the Plant-stage row -> products.demand_cv (master) -> the scenario demand model's cv -> 0.30. Read by the triangular and negative-binomial draws; not under Poisson"
     },
     {
       "catalog_ref": "P-X.2",
       "family": "inventory",
       "key": "service_level_target",
+      "scopes": [
+        "default"
+      ],
       "target": "safety_stock_materials.uniform_service_level",
       "transform": "fraction x 100, clamped 80.0-99.9. Read only when `safety_stock_method` is service_level or demand_variability"
     },
@@ -3355,6 +3506,10 @@
       "catalog_ref": null,
       "family": "production",
       "key": "capacity_units_per_day",
+      "scopes": [
+        "default",
+        "plant"
+      ],
       "shadowed_by": "products.production_capacity",
       "target": "Product.production_capacity",
       "transform": "units/day x 7 x utilization_cap_pct (default 0.85) -> units/week. The MASTER `products.production_capacity` shadows it entirely when present, and the mapper warns that the grid entry is not applied"
@@ -3363,6 +3518,10 @@
       "catalog_ref": null,
       "family": "production",
       "key": "utilization_cap_pct",
+      "scopes": [
+        "default",
+        "plant"
+      ],
       "shadowed_by": "products.production_capacity",
       "target": "Product.production_capacity",
       "transform": "percent / 100, multiplied into the weekly capacity above; the mapper substitutes 85 when the production policy sets none and says so. Read ONLY on the branch that derives capacity from the grid \u2014 a master production_capacity shadows this too"
@@ -3371,6 +3530,9 @@
       "catalog_ref": "P-P.4",
       "family": "inventory",
       "key": "fg_safety_stock",
+      "scopes": [
+        "default"
+      ],
       "target": "fg_safety_stock.sizing",
       "transform": "enum \u2014 'none' skips the policy; 'service_level' selects service-level sizing; anything else selects fixed_days. Gated on the engine's own `has_mts`, not on the policy's fulfillment_strategy string"
     },
@@ -3378,6 +3540,9 @@
       "catalog_ref": "P-P.4",
       "family": "inventory",
       "key": "fg_service_level_target",
+      "scopes": [
+        "default"
+      ],
       "target": "fg_safety_stock.service_level_pct",
       "transform": "fraction x 100, clamped 80.0-99.9. Read only when `fg_safety_stock` is service_level"
     },
@@ -3385,6 +3550,9 @@
       "catalog_ref": "P-P.4",
       "family": "inventory",
       "key": "fg_safety_stock_days",
+      "scopes": [
+        "default"
+      ],
       "target": "fg_safety_stock.fixed_days_cover",
       "transform": "days, clamped 0-12. Read only when `fg_safety_stock` selects fixed_days sizing"
     },
@@ -3392,6 +3560,9 @@
       "catalog_ref": "P-X.3",
       "family": "production",
       "key": "allocation_priority_weight",
+      "scopes": [
+        "plant"
+      ],
       "target": "material_allocation.priority_weights",
       "transform": "per-product weight, collected from composite `node:<node>::<product>` override keys. Read only when the scenario asks for `allocate_materials`, and its presence switches the objective to priority_weighted"
     },
@@ -3399,6 +3570,10 @@
       "catalog_ref": "P-P.1",
       "family": "inventory",
       "key": "rop_q_quantity",
+      "scopes": [
+        "default",
+        "supplier"
+      ],
       "target": "inventory_control.rop_q_quantity",
       "transform": "units; 0 means UNSET (the frontend schema's default), never a zero lot \u2014 an (R,Q) scope with no positive Q orders up to S instead, and the substitution is warned at dispatch"
     },
@@ -3406,6 +3581,10 @@
       "catalog_ref": "P-P.1",
       "family": "inventory",
       "key": "coverage_weeks",
+      "scopes": [
+        "default",
+        "supplier"
+      ],
       "target": "inventory_control.coverage_weeks",
       "transform": "weeks, clamped 0-26. At default scope the one number becomes a fixed strip (nominal=alert=crisis); per material it fixes that material's \u03ba in every mode"
     },
@@ -3413,6 +3592,9 @@
       "catalog_ref": "P-P.1",
       "family": "inventory",
       "key": "reorder_point",
+      "scopes": [
+        "supplier"
+      ],
       "target": "inventory_control.material_overrides[*].reorder_point",
       "transform": "absolute units replacing s = E[D]\u00b7T_s for that material only; read from supplier-row overrides, not at default scope (the default s stays the formula)"
     },
@@ -3420,6 +3602,9 @@
       "catalog_ref": "P-P.1",
       "family": "inventory",
       "key": "order_up_to",
+      "scopes": [
+        "supplier"
+      ],
       "target": "inventory_control.material_overrides[*].order_up_to",
       "transform": "absolute units replacing S = E[D]\u00b7(T_s+\u03ba) for that material only; dropped with a warning when it does not exceed the row's reorder point. Not read at default scope"
     }

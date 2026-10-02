@@ -17,7 +17,7 @@
 // until they are not. One hook, two callers.
 
 import { useMemo } from "react";
-import { derivedProductionCapacity } from "@/lib/policies/effectiveEconomics";
+import { derivedMaterialCostDetails, derivedProductionCapacity } from "@/lib/policies/effectiveEconomics";
 import type { DerivedEconomics, ProductRow } from "@/hooks/useItemMasters";
 import type { DerivedMaps } from "@/lib/policies/resolveEffective";
 import type { OverrideRow } from "@/lib/policies/resolve";
@@ -28,10 +28,16 @@ export function useDerivedMaps(args: {
   products: ProductRow[];
   /** RAW outbound lanes — the demand side of the `twice_demand_floor_1000` step. */
   outbound: Record<string, unknown>[];
+  /** RAW inbound lanes — which step of the cost chain answered (§23 WP 13.4). */
+  inbound?: Record<string, unknown>[];
   defaults: PolicyBundle;
   overrides: OverrideRow[];
 }): DerivedMaps {
-  const { derived, products, outbound, defaults, overrides } = args;
+  const { derived, products, outbound, inbound, defaults, overrides } = args;
+  const materialCostVia = useMemo(
+    () => derivedMaterialCostDetails(inbound ?? []),
+    [inbound],
+  );
   const productionCapacity = useMemo(
     () =>
       derivedProductionCapacity(
@@ -43,7 +49,7 @@ export function useDerivedMaps(args: {
     [products, outbound, defaults, overrides],
   );
   return useMemo(
-    () => ({ ...derived, productionCapacity }),
-    [derived, productionCapacity],
+    () => ({ ...derived, productionCapacity, materialCostVia }),
+    [derived, productionCapacity, materialCostVia],
   );
 }

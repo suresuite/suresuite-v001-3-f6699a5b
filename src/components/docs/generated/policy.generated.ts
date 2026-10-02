@@ -44,7 +44,11 @@ export type ResolutionStep = { step: string; meaning: string };
 export const RESOLUTION_ORDER: ResolutionStep[] = [
   {
     "step": "draft",
-    "meaning": "an unsaved edit in this session wins over everything"
+    "meaning": "an unsaved edit in this session wins over everything (for a `master:` column, an emptied cell is *reset to master* and falls through to `master`)"
+  },
+  {
+    "step": "masterOverride",
+    "meaning": "§23 WP 13.1 — for a `master:` column, the /policies OVERRIDE of the item-master value, read the engine's way (`masterOverrides.ts`: the stage row the engine reads, ignored when outside its declared domain). /policies never writes the master"
   },
   {
     "step": "master",
@@ -1143,11 +1147,11 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "reaches NO scsim field, and is read only by the FROZEN legacy engine (`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field is editable, stored and hashed into `policy_hash` while the strategic engine ignores it — and no catalog policy is planned that would change that. Evidence: sim-worker/sim_worker/datamap.py:110."
+      "reaches NO scsim field, and is read only by the FROZEN legacy engine (`sim-worker/sim_worker/`). §3 forbids adding capability there, so this field is editable, stored and hashed into `policy_hash` while the strategic engine ignores it — and no catalog policy is planned that would change that. Evidence: sim-worker/sim_worker/datamap.py:112."
     ],
     "breakClass": "legacy-only",
     "breakEvidence": [
-      "sim-worker/sim_worker/datamap.py:110"
+      "sim-worker/sim_worker/datamap.py:112"
     ]
   },
   {

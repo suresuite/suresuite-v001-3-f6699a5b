@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 395,
-  "migrations_applied": 387,
+  "migrations_found": 398,
+  "migrations_applied": 390,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261002000007_project_role_decides.sql",
+  "last_migration": "20261002000010_policy_snapshot_resolves_defaults.sql",
   "counts": {
     "tables": 92,
     "views": 8,
     "enums": 4,
-    "functions": 407,
+    "functions": 409,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -23957,7 +23957,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260612000001_policy_version_snapshots.sql"
+      "defined_by": "20261002000010_policy_snapshot_resolves_defaults.sql"
     },
     {
       "name": "_build_scenario_fingerprint",
@@ -24341,6 +24341,19 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260715000001_agent_proposals.sql"
+    },
+    {
+      "name": "_resolve_policy_family",
+      "signature": "_resolve_policy_family(jsonb, jsonb)",
+      "args": [
+        "p_defaults jsonb",
+        "p_stored jsonb"
+      ],
+      "returns": "jsonb LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261002000010_policy_snapshot_resolves_defaults.sql"
     },
     {
       "name": "_run_usage_complete",
@@ -25706,7 +25719,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260916000021_actor_on_remaining_paths.sql"
+      "defined_by": "20261002000008_policies_writes_no_master.sql"
     },
     {
       "name": "assign_outbound_customer",
@@ -26418,7 +26431,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000020_simulation_scope.sql"
+      "defined_by": "20261002000009_model_run_reads_model_versions.sql"
     },
     {
       "name": "create_user_file",
@@ -28146,6 +28159,16 @@
       "volatility": "IMMUTABLE",
       "comment": "D206 — how long a password is valid after it is set. The one statement of the ",
       "defined_by": "20260929000003_account_self_service_names_its_user.sql"
+    },
+    {
+      "name": "policy_bundle_defaults",
+      "signature": "policy_bundle_defaults()",
+      "args": [],
+      "returns": "jsonb LANGUAGE sql IMMUTABLE SET search_path TO",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": null,
+      "defined_by": "20261002000010_policy_snapshot_resolves_defaults.sql"
     },
     {
       "name": "policy_versions_assign_number",

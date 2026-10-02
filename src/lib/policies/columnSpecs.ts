@@ -295,7 +295,15 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       col("demand_cv", "production", {
         master: { table: "products", field: "demand_cv", idFrom: "product_id" },
       }),
-      col("capacity_units_per_day", "production", { defaultWhenMissing: 1000 }),
+      // ONE CAPACITY PER ROW (§23 WP 13.4). The plant row's capacity is the
+      // `production_capacity` cell above — an override over the master. The line
+      // rate and utilization below are the DERIVATION the engine falls back to when
+      // neither carries a value; while they were editable here too, a planner had
+      // two capacities on one row that shadowed each other (§4 D167's strike-
+      // through said which one lost). They are shown, read-only, so the derived
+      // number is followable; the project-wide line rate is set on the Defaults
+      // card, and a saved per-row value is still read and still shown.
+      col("capacity_units_per_day", "production", { defaultWhenMissing: 1000, readOnly: true }),
       // THE OTHER HALF OF THE ARITHMETIC, AND IT HAD NO COLUMN (§4 D167). The
       // engine builds a product's weekly capacity as units/day × 7 ×
       // utilization_cap_pct, and the grid rendered the first factor and hid the
@@ -304,7 +312,7 @@ export const STAGE_TABLE_SPEC: Record<StageKey, StageTableSpec> = {
       // the Zod bundle declares 85 and `bundleVal` is read first, so a second
       // number here could only ever speak by disagreeing (the WP 0.1 gap
       // check's second divergence).
-      col("utilization_cap_pct", "production"),
+      col("utilization_cap_pct", "production", { readOnly: true }),
       // Fulfillment (backorder, allocation, service level) is a customer-stage
       // concern only — the engine reads it from the project fulfillment default,
       // never from a plant node — so no fulfillment column is offered here.

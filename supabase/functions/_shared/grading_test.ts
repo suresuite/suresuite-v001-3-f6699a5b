@@ -383,3 +383,25 @@ Deno.test("events past the cap, skipped targets and uncapacitated cuts are each 
   // §4 D223: the engine cuts BY the share — a 30% cut is not "to 30%".
   assertEquals(f[1].message.includes("by 30%"), true, f[1].message);
 });
+
+// ── §23 WP 13.1 — a /policies override of an item master is SET ─────────────
+// /policies never writes the masters: a cost typed there is a Supplier-row
+// override the engine reads BEFORE `materials.cost`. M_DERIVED has no master
+// cost, so without the override the chain derives one from its lane; with a
+// usable override the grader must say SET — the value the run will use — and
+// with an override outside its declared domain (cost 0) the engine ignores it,
+// so the grader must too.
+
+Deno.test("WP 13.1: a usable /policies cost override makes materials.cost set", () => {
+  const arc = (DATASET.inbound as Row[]).find((a) => a.material_id === "M_DERIVED")!;
+  const key = `${arc.supplier_id}::M_DERIVED`;
+  const withOverride = (cost: unknown): GradingDataset => ({
+    ...DATASET,
+    overrides: [{ scope: "node", target_key: key, family: "sourcing", patch: { material_cost: cost } }],
+  });
+  const set = gradeManifest(withOverride(4.5), DEFAULTS, REG, BRIDGE).find((g) => g.field === "materials.cost")!;
+  assertEquals(set.set.includes("M_DERIVED"), true, "the override is the value the run uses");
+  assertEquals(set.resolved.some((r) => r.id === "M_DERIVED"), false, "not also derived");
+  const ignored = gradeManifest(withOverride(0), DEFAULTS, REG, BRIDGE).find((g) => g.field === "materials.cost")!;
+  assertEquals(ignored.set.includes("M_DERIVED"), false, "a cost of 0 is outside the domain; the engine ignores it");
+});

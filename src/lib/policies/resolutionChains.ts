@@ -60,7 +60,8 @@ export interface Chain {
  * matches wins, so a value that appears twice is decided here and nowhere else.
  */
 export const RESOLUTION_ORDER: ReadonlyArray<{ step: string; meaning: string }> = [
-  { step: "draft", meaning: "an unsaved edit in this session wins over everything" },
+  { step: "draft", meaning: "an unsaved edit in this session wins over everything (for a `master:` column, an emptied cell is *reset to master* and falls through to `master`)" },
+  { step: "masterOverride", meaning: "§23 WP 13.1 — for a `master:` column, the /policies OVERRIDE of the item-master value, read the engine's way (`masterOverrides.ts`: the stage row the engine reads, ignored when outside its declared domain). /policies never writes the master" },
   { step: "master", meaning: "an item-master value (materials/products/suppliers) for a `master:` column" },
   { step: "derived", meaning: "the master column's logistics-derived fallback, when the master row has no value" },
   { step: "dataRow", meaning: "the value on the stage row itself — BEFORE the override bundle (see D-note below). A field the row carries only as a routing SUGGESTION (`__decided`) is excluded here and resolved two steps down" },
@@ -100,6 +101,8 @@ export interface RegistryLike {
     target: string;
     catalog_ref: string | null;
     transform: string;
+    /** §23 WP 13.1 — the stage whose row keys the mapper reads this key from. */
+    rows?: string;
   }>;
 }
 
@@ -155,7 +158,7 @@ export interface EngineDoors {
    * Python file. The scan remains ONLY as the classifier for a chain that BREAKS —
    * where the question is "what shape of nothing is this", not "does it reach".
    */
-  bundleKeys: Map<string, { target: string; catalogRef: string | null; transform: string }>;
+  bundleKeys: Map<string, { target: string; catalogRef: string | null; transform: string; rows?: string }>;
   /** The source texts the break CLASSIFIER reads. */
   src: EngineSources;
 }
@@ -165,7 +168,7 @@ export function engineDoors(registry: RegistryLike, src: EngineSources): EngineD
   for (const p of registry.policies ?? []) {
     for (const k of Object.keys(p.params_schema?.properties ?? {})) params.add(k);
   }
-  const bundleKeys = new Map<string, { target: string; catalogRef: string | null; transform: string }>();
+  const bundleKeys = new Map<string, { target: string; catalogRef: string | null; transform: string; rows?: string }>();
   // Keyed `<family>.<key>`: one field name can live in two families with two
   // fates — `sourcing.primary_source` reaches the engine (§4 D188),
   // `fulfillment.primary_source` does not.
@@ -174,6 +177,7 @@ export function engineDoors(registry: RegistryLike, src: EngineSources): EngineD
       target: k.target,
       catalogRef: k.catalog_ref ?? null,
       transform: k.transform,
+      ...(k.rows ? { rows: k.rows } : {}),
     });
   }
   return { dataRequirements: engineReads(registry), params, bundleKeys, src };
@@ -295,7 +299,7 @@ function citeDeclarations(files: Record<string, string>, field: string, limit = 
 }
 
 /** Which door, if any, this field goes through — in descending strength. */
-export function engineDoorFor(field: string, doors: EngineDoors, family?: string): Hop | null {
+export function engineDoorFor(field: string, doors: EngineDoors, family?: string, stage?: string): Hop | null {
   const dr = [...doors.dataRequirements.keys()].filter((k) => k.endsWith(`.${field}`));
   if (dr.length) {
     return {
@@ -323,6 +327,10 @@ export function engineDoorFor(field: string, doors: EngineDoors, family?: string
   const declared = family
     ? doors.bundleKeys.get(`${family}.${field}`)
     : [...doors.bundleKeys].find(([k]) => k.endsWith(`.${field}`))?.[1];
+  // §23 WP 13.1 — a key the mapper reads off ONE stage's rows (`rows`) is not
+  // a door for the same name on another stage: the Plant stage's
+  // `initial_on_hand` is not the Supplier stage's, which the engine reads.
+  if (declared?.rows && stage && declared.rows !== stage) return null;
   if (declared) {
     return {
       kind: "engine",
@@ -478,7 +486,7 @@ export function chainFor(
 
   // ── the engine hop, for a non-master column ─────────────────────────────
   if (!spec.master) {
-    const door = engineDoorFor(spec.field, doors, String(spec.family));
+    const door = engineDoorFor(spec.field, doors, String(spec.family), stage);
     if (door) {
       hops.push(door);
     } else if (spec.engineStatus?.state === "pending") {

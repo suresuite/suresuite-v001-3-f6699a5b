@@ -68,7 +68,17 @@ import {
   resolveCell,
   rowHasSeedableField,
   substitutionNote,
+  masterBaseFor,
+  masterOverrideFor,
 } from "@/lib/policies/resolveEffective";
+import { cellEngineRead, notSimulatedNote as noteOf } from "@/lib/policies/cellEngineRead";
+import {
+  masterOverrideRule,
+  planEntityOverride,
+  planPatch,
+  settlePlan,
+  type SavePlan,
+} from "@/lib/policies/masterOverrides";
 import { policyTypeLabel, inventoryParamsForType, paramFeasibility } from "@/lib/policies/registryPolicyTypes";
 import { groupHasPrimary as groupHasPrimaryFor, groupKeyFor, lineNeedsInput } from "@/lib/policies/stageGuards";
 import { ParameterSheet } from "./ParameterSheet";
@@ -78,10 +88,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { ValueChainPopover, type ValueChainTarget } from "@/components/policies/ValueChainPopover";
 import { sourceFor } from "@/lib/trust/valueChain";
 import { useGlobalProject } from "@/hooks/useGlobalProject";
-import { useItemMasters, type ItemMasterTable } from "@/hooks/useItemMasters";
+import { useItemMasters } from "@/hooks/useItemMasters";
 import { useProjectRights } from "@/hooks/useProjectRights";
 import { useDerivedMaps } from "@/hooks/useDerivedMaps";
-import { useDatasetVersion } from "@/hooks/useDatasetVersion";
 import { useTimeUnit } from "@/hooks/useTimeUnit";
 import type { StageRowsQuery } from "@/hooks/useStageGuards";
 import { qtyCellText, qtyPerAssemblyByMaterial } from "@/lib/policies/singleBomQty";
@@ -116,6 +125,8 @@ interface Props {
   leftActions?: React.ReactNode;
   /** The stage's lines, loaded once at the page level (see useStageGuards). */
   stageRows: StageRowsQuery;
+  /** §23 WP 13.4 — reports how many lines hold unsaved drafts. */
+  onDraftsChange?: (lines: number) => void;
 }
 
 type RowDraft = Record<string, unknown>;
@@ -276,6 +287,7 @@ export function StagePolicyTable({
   saveSnapshot,
   leftActions,
   stageRows,
+  onDraftsChange,
 }: Props) {
   const spec = specFor(stageKey);
   const families = familiesForStage(stageKey);
@@ -284,16 +296,17 @@ export function StagePolicyTable({
   const { user } = useAuth();
   const { selectedProject } = useGlobalProject();
 
-  // Item masters back the economics columns (ColSpec.master): the grid shows
-  // and edits materials.cost / products.sell_price / production_capacity /
-  // demand_mean directly, with the engine's derived fallback (≈) when unset.
+  // Item masters are the BASE of the economics columns (ColSpec.master): the
+  // grid shows materials.cost / products.sell_price / production_capacity /
+  // demand_mean …, with the engine's derived fallback (≈) when unset, and an
+  // edit is a policy override on top — /policies never writes a master (§23
+  // WP 13.1). These rows are read here, never saved from here.
   const {
     materials,
     products,
     suppliers,
     derived: derivedEconomics,
     lanes,
-    saveRows,
     error: mastersError,
     canEditInputs,
     inputEditRefusal,
@@ -305,10 +318,10 @@ export function StagePolicyTable({
     derived: derivedEconomics,
     products,
     outbound: lanes.outbound,
+    inbound: lanes.inbound,
     defaults,
     overrides,
   });
-  const { snapshot: snapshotDataset } = useDatasetVersion(projectId);
   const masterRowById = useMemo(
     () => ({
       materials: new Map(materials.map((m) => [m.material_id, m as unknown as Record<string, unknown>])),
@@ -794,6 +807,12 @@ export function StagePolicyTable({
    * Basis control is hidden while the line uses the default basis — it repeated
    * identically on every line.
    */
+  /** §23 WP 13.4 — the engine's own answer for a vector parameter on this stage. */
+  const notSimulatedNote = (field: string): string | undefined => {
+    const c = invParamColByField.get(field);
+    return c ? noteOf(cellEngineRead(stageKey, c)) : undefined;
+  };
+
   const renderInvParamsCell = (rowKey: string, r: Record<string, unknown>, paramW?: number) => {
     const type = String(getEffective(rowKey, r, "type", "inventory") ?? "min_max");
     const regParams = inventoryParamsForType(type).filter((p) => p.field !== "basis");
@@ -853,11 +872,13 @@ export function StagePolicyTable({
             onCommit: (v: number | undefined) => onCellChange(rowKey, p.field, v),
             invalid: paramFeasibility(p, value ?? undefined) ?? undefined,
             placeholder: placeholderFor[p.field],
+            notSimulated: notSimulatedNote(p.field),
           };
         })}
         labelFor={(f) => adaptLabel(invParamColByField.get(f)?.label ?? f, f)}
         basis={basis as "days_of_supply" | "forward_visible"}
         onBasisChange={(b) => onCellChange(rowKey, "basis", b)}
+        basisNotSimulated={notSimulatedNote("basis")}
       />
     );
   };
@@ -1035,6 +1056,11 @@ export function StagePolicyTable({
   };
 
   const dirtyKeys = Object.keys(drafts).filter((k) => Object.keys(drafts[k] ?? {}).length > 0);
+  // §23 WP 13.4 — the page asks before a stage switch or navigation drops these.
+  useEffect(() => {
+    onDraftsChange?.(dirtyKeys.length);
+  }, [dirtyKeys.length, onDraftsChange]);
+  useEffect(() => () => onDraftsChange?.(0), [onDraftsChange]);
 
   const onCellChange = (rowKey: string, field: string, v: unknown) => {
     setDrafts((d) => {
@@ -1066,40 +1092,40 @@ export function StagePolicyTable({
 
   const saveAll = async () => {
     if (dirtyKeys.length === 0) return;
-    const toUpsert: OverrideRow[] = [];
-    // Master-backed drafts, merged onto the FULL current master row — the
-    // bulk_upsert RPCs overwrite every column, so a partial row would wipe
-    // the other master fields.
-    const masterMerged: Record<ItemMasterTable, Map<string, Record<string, unknown>>> = {
-      materials: new Map(),
-      products: new Map(),
-      suppliers: new Map(),
-    };
+    // §23 WP 13.1 — /policies NEVER writes the item masters. Every value saved
+    // here, a master-backed cost, MOQ, capacity, price or demand included, is a
+    // POLICY OVERRIDE in the policy version; the engine reads it ahead of the
+    // master (`masterOverrides.ts`). And every row is written as its FULL patch
+    // — the saved one with this save applied on top — because the RPC replaces a
+    // row's patch and a partial one deleted the row's other saved fields (§4 D281).
+    const plan: SavePlan = new Map();
     for (const rowKey of dirtyKeys) {
       const draft = drafts[rowKey];
       const dataRow = dataRows.find((row) => row.key === rowKey) as
         | Record<string, unknown>
         | undefined;
-      const byFamily = new Map<PolicyFamily, Record<string, unknown>>();
       for (const [field, v] of Object.entries(draft)) {
         // Resolve from the FULL spec (not the header union) so vectorized
         // inventory params — which render inside the vector cell, not their own
         // column — still save under their family.
         const col = specColByField.get(field);
         if (!col || col.synthetic) continue;
-        const mcol = col.master;
-        if (mcol && dataRow) {
-          const id = String(dataRow[mcol.idFrom] ?? "");
+        const rule = col.master ? masterOverrideRule(col.family, col.field) : undefined;
+        if (col.master && rule && dataRow) {
+          const id = String(dataRow[col.master.idFrom] ?? "");
           if (!id) continue;
-          // Merge onto the loaded master row when one exists (the upsert RPCs
-          // overwrite every column); when the master table has no row yet,
-          // send a minimal row — the RPC inserts it.
-          const base =
-            masterMerged[mcol.table].get(id) ??
-            masterRowById[mcol.table].get(id) ??
-            ({ [mcol.idFrom]: id } as Record<string, unknown>);
-          if (isEqual(v ?? null, (base as Record<string, unknown>)[mcol.field] ?? null)) continue;
-          masterMerged[mcol.table].set(id, { ...base, [mcol.field]: v ?? null });
+          const siblings = dataRows
+            .filter((row) => String((row as Record<string, unknown>)[col.master!.idFrom] ?? "") === id)
+            .map((row) => String(row.key));
+          // `null` (or a cleared cell) is *reset to master*: the key leaves every
+          // row of the entity. A value equal to the base with no override saved
+          // is not an override at all — nothing to store.
+          const n = v === null || v === undefined || v === "" ? null : Number(v);
+          const base = masterBaseFor(col, dataRow, masterRowById, derived);
+          const saved = masterOverrideFor(col, dataRow, overrides, masterRowById);
+          if (n !== null && !saved && base !== undefined && isEqual(n, base)) continue;
+          if (n === null && !saved) continue;
+          planEntityOverride({ plan, overrides, rule, editedKey: rowKey, rowKeysOfEntity: siblings, value: n });
           continue;
         }
         if (v === undefined) continue;
@@ -1127,54 +1153,32 @@ export function StagePolicyTable({
         );
         const isDecision = ((dataRow?.__decided ?? {}) as Record<string, true>)[field] === true;
         if (isEqual(v, def) && !overridden && !isDecision) continue;
-        const bucket = byFamily.get(col.family) ?? {};
-        bucket[field] = v;
-        byFamily.set(col.family, bucket);
-      }
-      for (const [family, patch] of byFamily.entries()) {
-        if (Object.keys(patch).length === 0) continue;
-        toUpsert.push({ scope: spec.scope, target_key: rowKey, family, patch });
+        planPatch(plan, overrides, spec.scope, rowKey, col.family)[field] = v;
       }
     }
-    const masterRowCount =
-      masterMerged.materials.size + masterMerged.products.size + masterMerged.suppliers.size;
-    if (toUpsert.length === 0 && masterRowCount === 0) {
+    const { upserts: toUpsert, deletes } = settlePlan(plan, spec.scope);
+    if (toUpsert.length === 0 && deletes.length === 0) {
       setDrafts({});
       toast.info("No effective changes to save.", TOAST);
       return;
     }
-    const masterTablesToSave = (["materials", "products", "suppliers"] as ItemMasterTable[]).filter(
-      (t) => masterMerged[t].size > 0,
-    );
-    if (masterTablesToSave.length > 0 && mastersError) {
-      // Don't pretend: if the masters failed to load (missing table/RPC in
-      // this environment), a save would clobber unseen data or fail anyway.
-      toast.error(`Cannot save master data — item masters failed to load: ${mastersError}`, TOAST);
-      return;
-    }
     try {
-      for (const table of masterTablesToSave) {
-        await saveRows(
-          table,
-          [...masterMerged[table].values()] as unknown as Parameters<typeof saveRows>[1],
-        );
-      }
       if (toUpsert.length > 0) await bulkUpsertOverrides(toUpsert);
+      if (deletes.length > 0) {
+        if (!deleteOverride) throw new Error("this page cannot remove a saved override");
+        for (const d of deletes) await deleteOverride(d.scope, d.target_key, d.family);
+      }
     } catch (e) {
-      // Surface RPC failures (e.g. bulk_upsert_* missing in this DB) instead
-      // of swallowing them — the click handler has no other catch. A D230
-      // refusal was already said by the hook that refused it.
+      // Surface RPC failures instead of swallowing them — the click handler has
+      // no other catch. A D230 refusal was already said by the hook that refused it.
       if (!(e instanceof ProjectRightRefused)) {
         toast.error(errMsg(e, "Failed to save changes"), TOAST);
       }
       return;
     }
     setDrafts({});
-    // Offer to capture the edit as a version right away: master edits are
-    // dataset state (dataset_versions), override edits are policy state
-    // (policy version snapshot) — runs bind to both.
-    const savedMasters = masterRowCount > 0;
-    const savedOverrides = toUpsert.length > 0;
+    // Offer to capture the edit as a version right away: every /policies edit
+    // is policy state (the policy version snapshot), which a run binds to.
     toast.success(`Saved ${dirtyKeys.length} line(s)`, {
       ...TOAST,
       action: {
@@ -1182,14 +1186,7 @@ export function StagePolicyTable({
         onClick: () => {
           void (async () => {
             try {
-              if (savedMasters) await snapshotDataset();
-              if (savedOverrides && saveSnapshot) {
-                await saveSnapshot(`Grid edits — ${new Date().toLocaleString()}`);
-              } else if (savedMasters && !savedOverrides && saveSnapshot) {
-                // Masters changed only: still offer a policy version so the
-                // run picker has a labeled point-in-time to bind to.
-                await saveSnapshot(`Data edits — ${new Date().toLocaleString()}`);
-              }
+              if (saveSnapshot) await saveSnapshot(`Grid edits — ${new Date().toLocaleString()}`);
               toast.success("Version saved", TOAST);
             } catch (e) {
               toast.error(errMsg(e, "Failed to save version"), TOAST);
@@ -1819,7 +1816,16 @@ export function StagePolicyTable({
           const firms = r.__firms_available as string[] | undefined;
           const opts = enumOptionsFor(col);
           const kind = kindOf(col, opts, firms, cellValue, liveDefault);
-          const commit = (v: unknown) => onCellChange(rowKey, col.field, v);
+          // A cleared master-backed cell is *reset to master* (§23 WP 13.1):
+          // `null` removes the override on save, `undefined` would be no edit.
+          const commit = (v: unknown) =>
+            onCellChange(rowKey, col.field, col.master && v === undefined ? null : v);
+          const rowDraftValue = rowDraft[col.field];
+          const canResetToMaster =
+            !!col.master &&
+            (rowDraftValue === null
+              ? false
+              : rowDraftValue !== undefined || !!resolved.hasOverride);
 
           return (
             <td
@@ -1836,8 +1842,9 @@ export function StagePolicyTable({
 
               {kind === "readonly" && (
                 <span
-                  title={col.engineStatus ? `Activates with ${col.engineStatus.milestone}` : undefined}
+                  title={col.engineStatus ? `Activates with ${col.engineStatus.milestone}` : substitution}
                   className="block w-full px-[5px] text-right font-mono text-[11px] tabular-nums text-[#c4c4c4]"
+                  style={supersededBy ? { textDecoration: "line-through", opacity: 0.6 } : undefined}
                 >
                   {(() => {
                     const raw = cellValue ?? liveDefault;
@@ -1930,6 +1937,17 @@ export function StagePolicyTable({
                     title={substitution ?? placeholderTitle}
                     superseded={!!supersededBy}
                     onCommit={commit}
+                    reset={
+                      canResetToMaster
+                        ? {
+                            title:
+                              resolved.base !== undefined
+                                ? `Reset to master — remove the /policies override and use the ${resolved.baseSource === "derived" ? "lane-derived" : "item-master"} value ${resolved.base}`
+                                : "Reset to master — remove the /policies override (the item master has no value)",
+                            onReset: () => onCellChange(rowKey, col.field, null),
+                          }
+                        : undefined
+                    }
                     dot={
                       <ValueChainPopover
                         target={target}
@@ -2494,7 +2512,7 @@ export function StagePolicyTable({
           style={{ borderColor: tint(LAYER.brand, 0.4), color: LAYER.brand }}
         >
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: LAYER.brand }} />
-          item masters unavailable ({mastersError}) — master-data columns cannot be saved
+          item masters unavailable ({mastersError}) — base values under the master-backed columns cannot be shown
         </div>
       )}
 
@@ -2851,6 +2869,7 @@ export function StagePolicyTable({
                       onSort={() => toggleSort(col.field)}
                       onInfo={() => setParamSheetCol(col)}
                       pending={!!col.engineStatus}
+                      notSimulated={noteOf(cellEngineRead(stageKey, col))}
                       quiet={fc.quiet}
                       last={isLast}
                       filter={fc.filterable === false ? undefined : (colFilters[col.field] ?? "")}

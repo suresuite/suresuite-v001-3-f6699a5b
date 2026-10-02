@@ -3,6 +3,7 @@ import type { PolicyBundle, PolicyFamily } from "./schemas";
 import type { ColSpec } from "./columnSpecs";
 import { reducerLabel, type DerivedValue } from "./effectiveEconomics";
 import { shadowedBy } from "./registryAccess";
+import { entityOverride, masterOverrideRule, type ResolvedOverride } from "./masterOverrides";
 import type { Provenance } from "@/components/policies/policyGridUi";
 
 /**
@@ -39,6 +40,9 @@ export interface DerivedMaps {
    * which is exactly the behaviour it had before.
    */
   productionCapacity?: Map<string, DerivedValue>;
+  /** `materials.cost`'s derived value WITH the step that answered (§23 WP 13.4),
+   *  so a lane-derived cost is shown with its source. Optional, like the above. */
+  materialCostVia?: Map<string, DerivedValue>;
 }
 
 export function masterValueFor(
@@ -51,6 +55,40 @@ export function masterValueFor(
   const v = masterRowById[col.master.table].get(id)?.[col.master.field];
   const n = Number(v);
   return v == null || !Number.isFinite(n) ? undefined : n;
+}
+
+/**
+ * The /policies override the ENGINE reads for this master-backed cell's entity,
+ * or undefined (§23 WP 13.1). The rule is the engine's declaration
+ * (`masterOverrides.ts`); the entity id is the row's `master.idFrom`, and a
+ * product's composite target is checked against every product the masters know,
+ * as `_composite_target` checks it against the project's products.
+ */
+export function masterOverrideFor(
+  col: ColSpec,
+  row: Record<string, unknown>,
+  overrides: readonly OverrideRow[],
+  masterRowById: MasterRowMaps,
+): ResolvedOverride | undefined {
+  if (!col.master) return undefined;
+  const rule = masterOverrideRule(col.family, col.field);
+  if (!rule) return undefined;
+  const id = String(row[col.master.idFrom] ?? "");
+  const productIds =
+    rule.entity === "product" ? new Set([...(masterRowById.products?.keys() ?? []), id]) : undefined;
+  return entityOverride(overrides, rule, id, productIds);
+}
+
+/** The BASE value under a master-backed cell — the item master, else the
+ *  lane-derived fallback — i.e. what the cell shows once its override is reset. */
+export function masterBaseFor(
+  col: ColSpec,
+  row: Record<string, unknown>,
+  masterRowById: MasterRowMaps,
+  derived: DerivedMaps,
+): number | undefined {
+  const mv = masterValueFor(col, row, masterRowById);
+  return mv !== undefined ? mv : derivedValueFor(col, row, derived);
 }
 
 export function derivedValueFor(
@@ -92,8 +130,18 @@ function derivedStepFor(
   row: Record<string, unknown>,
   derived: DerivedMaps,
 ): DerivedValue | undefined {
-  if (col.master?.field !== "production_capacity") return undefined;
-  return derived.productionCapacity?.get(String(row[col.master.idFrom] ?? ""));
+  if (!col.master) return undefined;
+  const id = String(row[col.master.idFrom] ?? "");
+  if (col.master.field === "production_capacity") return derived.productionCapacity?.get(id);
+  // §23 WP 13.4 — every lane-derived value is shown with its source. The cost
+  // chain has two steps and the map says which answered; price and demand have
+  // one reducer each, so the step is the registry's only one.
+  if (col.master.table === "materials" && col.master.field === "cost") return derived.materialCostVia?.get(id);
+  const value = derivedValueFor(col, row, derived);
+  if (value === undefined) return undefined;
+  if (col.master.field === "sell_price") return { value, via: "demand_weighted_outbound_price", grade: "info" };
+  if (col.master.field === "demand_mean") return { value, via: "weekly_outbound_volume", grade: "info" };
+  return undefined;
 }
 
 /** `getEffective` — data prefill → override → default; master-backed columns
@@ -117,12 +165,18 @@ export function getEffectiveValue(args: {
     rowKey, dataRow, field, family, families, draft,
     masterColByField, masterRowById, derived, defaults, overrides, scope,
   } = args;
-  if (draft !== undefined) return draft;
   const mcol = masterColByField.get(field);
   if (mcol) {
-    const mv = masterValueFor(mcol, dataRow, masterRowById);
-    return mv !== undefined ? mv : derivedValueFor(mcol, dataRow, derived);
+    // §23 WP 13.1 — draft → override → item master → derived. A `null` draft
+    // is *reset to master*: the cell shows the base again before the save.
+    if (draft !== undefined && draft !== null) return draft;
+    if (draft === undefined) {
+      const ov = masterOverrideFor(mcol, dataRow, overrides, masterRowById);
+      if (ov?.usable) return Number(ov.value);
+    }
+    return masterBaseFor(mcol, dataRow, masterRowById, derived);
   }
+  if (draft !== undefined) return draft;
   /**
    * A ROUTING SUGGESTION IS NOT UPLOADED DATA, AND THAT DISTINCTION IS §4 D23.
    *
@@ -246,6 +300,21 @@ export interface ResolvedCell {
    * SOMETIMES.
    */
   supersededBy?: { field: string; note: string };
+  /**
+   * §23 WP 13.1 — for a master-backed cell, the BASE under it: the item master,
+   * else the lane-derived value. /policies never writes the master, so this is
+   * what the cell returns to on *reset to master*, and what the grid shows
+   * beside an override. Undefined when the column has no master or neither
+   * source has a value.
+   */
+  base?: number;
+  baseSource?: "master" | "derived";
+  /** A saved override the engine REFUSES (outside its declared domain): the run
+   *  uses the base and warns, so the cell shows the base and says why. */
+  overrideIgnored?: string;
+  /** A saved override sits under this master-backed cell (usable or not) — the
+   *  grid offers *reset to master* exactly when this is true. */
+  hasOverride?: boolean;
 }
 
 /**
@@ -254,10 +323,11 @@ export interface ResolvedCell {
  */
 export function supersededNote(shadowingField: string, label: string): string {
   return (
-    `Not applied on this row. ${shadowingField} has a value, and the engine ` +
-    `reads the item master before the plant grid — so the run uses that ` +
-    `number and this ${label} is stored but ignored. Clear the master value ` +
-    `to make this cell decide the capacity again.`
+    `Not applied on this row. ${shadowingField} has a value (your override or ` +
+    `the item master), and the engine reads it before the plant grid — so the ` +
+    `run uses that number and this ${label} is stored but ignored. Clear the ` +
+    `capacity (reset to master, with an empty master) to make this cell decide ` +
+    `the capacity again.`
   );
 }
 
@@ -308,6 +378,9 @@ export function resolveCell(args: {
   const masterSet = col.master ? masterValueFor(col, row, masterRowById) !== undefined : false;
   const derivedVal = col.master && !masterSet ? derivedValueFor(col, row, derived) : undefined;
   const derivedVia = derivedVal !== undefined ? derivedStepFor(col, row, derived) : undefined;
+  // §23 WP 13.1 — the override the engine reads ahead of the master.
+  const savedOverride = col.master ? masterOverrideFor(col, row, overrides, masterRowById) : undefined;
+  const overridden = draft === undefined && !!savedOverride?.usable;
 
   /**
    * IS THIS EDITABLE CELL ONE THE ENGINE WILL READ? (§4 D167)
@@ -325,7 +398,11 @@ export function resolveCell(args: {
   if (shadowField) {
     const [, shadowCol] = shadowField.split(".");
     const spec = shadowCol ? masterColByField.get(shadowCol) : undefined;
-    if (spec && masterValueFor(spec, row, masterRowById) !== undefined) {
+    if (
+      spec &&
+      (masterValueFor(spec, row, masterRowById) !== undefined ||
+        !!masterOverrideFor(spec, row, overrides, masterRowById)?.usable)
+    ) {
       supersededBy = {
         field: shadowField,
         note: supersededNote(spec.label, col.label.toLowerCase()),
@@ -352,9 +429,17 @@ export function resolveCell(args: {
    * now declares it in `columnSpecs.ts`, and the cell renders that token instead
    * of inventing a number.
    */
-  const nullMeans = col.master?.nullMeans;
+  // §23 WP 13.4 — what the ENGINE uses when override, master and derivation are
+  // all empty, from the override key's own declaration: a number shown as the
+  // default, or a declared meaning shown as a token. Never an invented 0.
+  const emptyRule = col.master ? masterOverrideRule(col.family, col.field) : undefined;
+  const nullMeans =
+    col.master?.nullMeans ??
+    (emptyRule && emptyRule.emptyDefault === null && emptyRule.emptyNote
+      ? { token: "engine", title: `Empty — the engine uses ${emptyRule.emptyNote}.` }
+      : undefined);
   const liveDefault = col.master
-    ? derivedVal ?? (nullMeans ? undefined : 0)
+    ? derivedVal ?? (nullMeans ? undefined : emptyRule?.emptyDefault ?? 0)
     : bundleVal !== undefined
       ? bundleVal
       : col.defaultWhenMissing !== undefined
@@ -377,22 +462,23 @@ export function resolveCell(args: {
   // "From project data". A field that is neither tracked nor master-backed
   // resolves to `default`, never `data`.
   const fromData =
-    !edited && !imputed && (col.master ? masterSet : fromDataMap[col.field] === true);
-  const derivedFallback = !edited && !!col.master && !masterSet && derivedVal !== undefined;
+    !edited && !imputed && !overridden && (col.master ? masterSet : fromDataMap[col.field] === true);
+  const derivedFallback =
+    !edited && !overridden && !!col.master && !masterSet && derivedVal !== undefined;
   // The master column is empty, nothing derived a value for it, and the schema
   // says what empty means. Ranked BELOW `derived`: a computed fallback is a
   // better answer than "this is what blank means", and above everything else,
   // because for a master column there is nothing else left.
   const declaredEmpty =
-    !edited && !!nullMeans && !masterSet && derivedVal === undefined && cellValue === undefined;
-  const fromOverride =
-    !edited &&
-    !imputed &&
-    !fromData &&
-    !col.master &&
-    overrides.some(
-      (o) => o.target_key === rowKey && o.family === col.family && col.field in (o.patch ?? {}),
-    );
+    !edited && !overridden && !!nullMeans && !masterSet && derivedVal === undefined && cellValue === undefined;
+  const fromOverride = col.master
+    ? overridden
+    : !edited &&
+      !imputed &&
+      !fromData &&
+      overrides.some(
+        (o) => o.target_key === rowKey && o.family === col.family && col.field in (o.patch ?? {}),
+      );
   // A routing decision this stage derived from the uploaded volumes (primary
   // source, sourcing firm). Ranked BELOW a saved override: once the user (or
   // the prefill) has persisted a choice, the override is the truer answer.
@@ -417,6 +503,7 @@ export function resolveCell(args: {
               ? "suggested"
               : "default";
 
+  const base = col.master ? (masterSet ? masterValueFor(col, row, masterRowById) : derivedVal) : undefined;
   return {
     value: cellValue ?? liveDefault,
     provenance,
@@ -427,6 +514,15 @@ export function resolveCell(args: {
     placeholderTitle: declaredEmpty ? nullMeans!.title : undefined,
     derivedVia: derivedFallback ? derivedVia : undefined,
     supersededBy,
+    base,
+    baseSource: base === undefined ? undefined : masterSet ? "master" : "derived",
+    overrideIgnored:
+      savedOverride && !savedOverride.usable
+        ? `The saved override ${JSON.stringify(savedOverride.value)} is outside what the engine ` +
+          `accepts, so the run ignores it and uses the ${masterSet ? "item master" : "base"} value. ` +
+          `Enter a valid value or reset to master.`
+        : undefined,
+    hasOverride: !!savedOverride,
   };
 }
 
@@ -441,6 +537,17 @@ export function resolveCell(args: {
  */
 export function substitutionNote(cell: ResolvedCell): string | undefined {
   if (cell.supersededBy) return cell.supersededBy.note;
+  if (cell.overrideIgnored) return cell.overrideIgnored;
+  if (cell.provenance === "override" && cell.baseSource) {
+    // §23 WP 13.1 — the override AND the base, at the point of display.
+    return (
+      `Your /policies override — the run uses it. The ${cell.baseSource === "master" ? "item master" : "lane-derived"} ` +
+      `value underneath is ${cell.base}; /policies never changes it. Reset to master to use it again.`
+    );
+  }
+  if (cell.provenance === "override" && cell.hasOverride) {
+    return "Your /policies override — the run uses it. The item master has no value underneath.";
+  }
   if (cell.derivedVia) {
     const lead =
       cell.derivedVia.grade === "warn"

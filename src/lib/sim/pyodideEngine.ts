@@ -46,7 +46,17 @@ export interface RunArgs {
     inspection?: boolean;
   };
   projectModel: string | null;
-  dataset: EngineDataset;
+  /** The input tables — a run's frozen `dataset_versions.snapshot` (§23 WP 13.2),
+   *  or, for a run with no dataset version, the tables the page loaded. */
+  dataset: EngineDataset | FrozenDataset;
+}
+
+/** A `dataset_versions.snapshot` (v2/v3: tables under `inputs`) — what
+ *  `sim_worker.local.dataset_inputs` reads. */
+export interface FrozenDataset {
+  schema_version: number;
+  inputs: Record<string, unknown>;
+  [k: string]: unknown;
 }
 
 /** Coarse phases for the loud UI status. */
@@ -287,6 +297,41 @@ export async function persistEngineResult(
 
 /** Fetch the saved policy snapshot (reproducible source). Falls back to a
  *  client-built snapshot when the version row can't be read. */
+/**
+ * The FROZEN input of a run — its `dataset_versions.snapshot` (PLAN.md §23
+ * WP 13.2, §4 D280). The dispatcher freezes the project's data for every run,
+ * browser runs included; computing from that snapshot rather than from the
+ * tables the page happened to load makes a browser run read exactly what the
+ * worker and the `suresuite` package read for the same versions. Null when the
+ * run carries no dataset version or it cannot be read — the caller then says it
+ * computed from the page's tables.
+ */
+export async function fetchRunDatasetSnapshot(
+  runId: string,
+): Promise<{ id: string; snapshot: FrozenDataset } | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any;
+  try {
+    const { data: run } = await sb
+      .from("simulation_runs")
+      .select("dataset_version_id")
+      .eq("id", runId)
+      .maybeSingle();
+    const id = run?.dataset_version_id as string | null | undefined;
+    if (!id) return null;
+    const { data, error } = await sb
+      .from("dataset_versions")
+      .select("snapshot")
+      .eq("id", id)
+      .maybeSingle();
+    const snap = data?.snapshot as FrozenDataset | undefined;
+    if (error || !snap || typeof snap.inputs !== "object" || snap.inputs === null) return null;
+    return { id, snapshot: snap };
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchPolicySnapshot(versionId: string): Promise<Record<string, unknown> | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any;

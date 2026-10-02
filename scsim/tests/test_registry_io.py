@@ -327,8 +327,17 @@ def test_policy_bundle_keys_match_what_the_mapper_reads():
     assert len(declared) == len(POLICY_BUNDLE_KEYS), "a key is declared twice"
 
     # Direction 1 — everything declared is read by the mapper, as a bundle key.
+    # A row override of an item master (§23 WP 13.1) is read through one of three
+    # helpers rather than a bare `.get`; each names the key as a literal, so the
+    # gate still reads it off the source.
+    # (policies, "<family>", "<key>", …) — the KEY is the third argument.
+    row_reads = (r"""_supplier_row_values\(\s*[\w.]+,\s*["'][a-z]+["'],\s*["']{k}["']""",
+                 r"""_supplier_values\(\s*[\w.]+,\s*["'][a-z]+["'],\s*["']{k}["']""",
+                 r"""_ovr\(prod_row,\s*["']{k}["']""")
     for key in sorted(declared):
-        assert re.search(rf"""\.get\(\s*["']{re.escape(key)}["']""", body), (
+        k = re.escape(key)
+        assert (re.search(rf"""\.get\(\s*["']{k}["']""", body)
+                or any(re.search(p.format(k=k), body) for p in row_reads)), (
             f"{key} is declared in POLICY_BUNDLE_KEYS and the mapper never reads it")
 
     # Direction 2 — every FAMILY dict read is declared. The families are the
@@ -343,7 +352,7 @@ def test_policy_bundle_keys_match_what_the_mapper_reads():
         "max_backorder_days", "backorder_cost_per_day", "allocation",
         "tier_overrides", "fulfillment_strategy",
         "min_share_pct", "review_period_days",
-        "material_price", "initial_on_hand",
+        "material_price",
         "sourcing_firm", "moq", "lead_time_distribution", "ordering_cost",
         "supplier_capacity_per_day", "capacity_machine_per_day",
         "capacity_labor_per_day", "production_cost_per_unit", "mode",
@@ -352,6 +361,10 @@ def test_policy_bundle_keys_match_what_the_mapper_reads():
     seen: set[str] = set()
     for var, _family in family_vars.items():
         for m in re.finditer(rf"""\b{var}\.get\(\s*["']([a-z_]+)["']""", body):
+            seen.add(m.group(1))
+    # …and every row-override read through the three helpers (§23 WP 13.1).
+    for p in row_reads:
+        for m in re.finditer(p.format(k="([a-z_]+)"), body):
             seen.add(m.group(1))
     undeclared = sorted(seen - declared - not_rendered)
     assert not undeclared, (
@@ -373,7 +386,7 @@ def test_registry_publishes_the_policy_bundle_keys():
     # One of them lands on an ENTITY field rather than a policy parameter, and
     # that is the case door 2 could never have covered — a Params addition would
     # have been the wrong fix.
-    entity = [k for k in keys if k["catalog_ref"] is None]
+    entity = [k for k in keys if k["catalog_ref"] is None and not k.get("master")]
     assert sorted(k["key"] for k in entity) == [
         "capacity_units_per_day", "holding_cost_pct", "primary_source",
         "utilization_cap_pct"], entity
@@ -442,3 +455,107 @@ def test_the_registry_publishes_empty_means():
     others = [f for f, r in rows.items()
               if r["empty_means"] is not None and f != "suppliers.capacity_per_week"]
     assert others == [], others
+
+
+def test_every_item_master_override_names_its_master_and_its_rows():
+    """§23 WP 13.1 — /policies never writes the item masters; a value changed
+    there is a row override the mapper reads BEFORE the master. Each such key
+    names the master column it overrides and the stage whose rows carry it, and
+    the master must be a column the engine reads (a base data requirement or a
+    column of the entity it lands on)."""
+    from scsim.io.project_map import POLICY_BUNDLE_KEYS
+
+    overrides = {k["key"]: (k["master"], k["rows"]) for k in POLICY_BUNDLE_KEYS if k.get("master")}
+    assert overrides == {
+        "material_cost": ("materials.cost", "supplier"),
+        "material_moq": ("materials.moq", "supplier"),
+        "capacity_per_week": ("suppliers.capacity_per_week", "supplier"),
+        "reliability_score": ("suppliers.reliability_score", "supplier"),
+        "initial_on_hand": ("materials.initial_on_hand", "supplier"),
+        "sell_price": ("products.sell_price", "plant"),
+        "production_capacity": ("products.production_capacity", "plant"),
+        "demand_mean": ("products.demand_mean", "plant"),
+        "demand_cv": ("products.demand_cv", "plant"),
+    }
+    for k in POLICY_BUNDLE_KEYS:
+        assert bool(k.get("master")) == bool(k.get("rows")) == bool(k.get("domain")), k
+        assert k.get("domain") in (None, "positive", "nonnegative", "fraction"), k
+        assert k["catalog_ref"] is None or not k.get("master"), k
+
+
+# ── §23 WP 13.4 · §4 D204 (b) — WHERE each key is read is a TESTED declaration ──
+
+def test_declared_scopes_are_the_scopes_the_mapper_reads():
+    """The grid's "not simulated" badges are generated from `scopes`, so a scope
+    that is wrong is a badge that lies. Every key is perturbed at each scope —
+    the project default, a Supplier-stage row, a Plant-stage row — under a
+    context in which the key CAN be read (a service-level method for the
+    service-level target, a line rate for the utilization, …), and the mapped
+    scenario must change exactly at the declared scopes."""
+    import copy
+    import json
+
+    from scsim.io.project_map import (
+        POLICY_BUNDLE_KEYS, BomArc, MaterialRow, OutboundArc, ProductRow, ProjectData,
+        ScenarioSettings, SupplierRow, SupplyArc, from_project_data,
+    )
+
+    def project():
+        return ProjectData(
+            suppliers=[SupplierRow("S1"), SupplierRow("S3")],
+            materials=[MaterialRow("M1", cost=10.0)],
+            products=[ProductRow("P1", sell_price=100.0, demand_mean=50.0, fulfillment_mode="mts")],
+            supply_arcs=[
+                SupplyArc("S1", "M1", unit_price=10, lead_time=2, lead_time_unit="week", volume=60, time_unit="week"),
+                SupplyArc("S3", "M1", unit_price=11, lead_time=2, lead_time_unit="week", volume=60, time_unit="week"),
+            ],
+            bom=[BomArc("P1", "M1", 1.0)],
+            outbound=[OutboundArc("P1", "C1", unit_price=100, volume=50, time_unit="week"),
+                      OutboundArc("P1", "C2", unit_price=100, volume=10, time_unit="week")],
+            scenario=ScenarioSettings(horizon_days=364),
+        )
+
+    # The context in which each key is readable at its declared scopes.
+    context = {
+        "safety_stock_days": {"inventory": {"safety_stock_method": "fixed_days"}},
+        "service_level_target": {"inventory": {"safety_stock_method": "service_level"}},
+        "utilization_cap_pct": {"production": {"capacity_units_per_day": 100}},
+        "fg_safety_stock": {"inventory": {"fg_safety_stock": "service_level"}},
+        "fg_service_level_target": {"inventory": {"fg_safety_stock": "service_level"}},
+        "fg_safety_stock_days": {"inventory": {"fg_safety_stock": "fixed_days"}},
+        "allocation_priority_weight": {"recovery": {"response": ["allocate_materials"]}},
+        "rop_q_quantity": {"inventory": {"type": "rop"}},
+    }
+    value = {
+        "supply_share": 0.3, "type": "rop", "safety_stock_days": 21, "holding_cost_pct": 0.4,
+        "primary_source": True, "service_level_target": 0.85, "capacity_units_per_day": 77,
+        "utilization_cap_pct": 50, "fg_safety_stock": "fixed_days", "fg_service_level_target": 0.85,
+        "fg_safety_stock_days": 5, "allocation_priority_weight": 3, "rop_q_quantity": 33,
+        "coverage_weeks": 3, "reorder_point": 40, "order_up_to": 400, "material_cost": 3.3,
+        "material_moq": 9, "capacity_per_week": 77, "reliability_score": 0.5, "initial_on_hand": 5,
+        "sell_price": 7, "production_capacity": 66, "demand_mean": 20, "demand_cv": 0.9,
+    }
+    keys = {"default": "default", "supplier": "node:S3::M1", "plant": "node:Plant::P1"}
+
+    def mapped(policies):
+        d = project()
+        d.policies = policies
+        sc = from_project_data(d).scenario
+        return json.dumps({"net": sc.network.model_dump(mode="json"), "pol": sc.policies},
+                          sort_keys=True, default=str)
+
+    wrong = []
+    for k in POLICY_BUNDLE_KEYS:
+        assert set(k["scopes"]) <= set(keys) and k["scopes"], k
+        assert k["key"] in value, f"no probe value for {k['key']} — add one"
+        base = {"default": copy.deepcopy(context.get(k["key"], {}))}
+        before = mapped(base)
+        for scope, target in keys.items():
+            pol = copy.deepcopy(base)
+            pol.setdefault(target, {}).setdefault(k["family"], {})[k["key"]] = value[k["key"]]
+            read = mapped(pol) != before
+            if read != (scope in k["scopes"]):
+                wrong.append(f"{k['family']}.{k['key']} @ {scope}: declared "
+                             f"{'read' if scope in k['scopes'] else 'not read'}, mapper "
+                             f"{'reads' if read else 'ignores'} it")
+    assert not wrong, "\n".join(wrong)

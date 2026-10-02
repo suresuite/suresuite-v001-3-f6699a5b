@@ -21,6 +21,8 @@
 // the named-reducer library below. Adding a fallback to the engine therefore
 // updates every grader through the generated snapshot.
 
+import { overriddenEntities } from "./entityOverrides.ts";
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type Row = Record<string, unknown>;
@@ -86,6 +88,8 @@ export interface RegistryRequirement {
 /** The slice of registry.generated.json this module reads. */
 export interface RegistryPayload {
   base_data_requirements: RegistryRequirement[];
+  /** `POLICY_BUNDLE_KEYS` — read for the item-master overrides (§23 WP 13.1). */
+  policy_bundle_keys?: Row[];
   policies: Array<{
     id: string;
     catalog_ref: string;
@@ -345,6 +349,12 @@ export interface ReducerCtx {
    * reads that value BEFORE the master (§4 D204), so such a material is set,
    * not missing. Empty when the dataset carries no overrides. */
   policyHoldingMaterials: Set<string>;
+  /** §23 WP 13.1 — per master column (`materials.cost`, …), the entities whose
+   *  value the engine takes from a usable /policies row override, with that
+   *  value. /policies never writes the masters, so such an entity is SET even
+   *  when its master column is empty. Empty when the dataset carries no
+   *  overrides or the caller passed no bundle keys. */
+  policyMasterOverrides?: Map<string, Map<string, number>>;
 }
 
 /** Named reducers — the shared vocabulary of registry `fallback_spec`.
@@ -611,24 +621,28 @@ interface FieldBinding {
   policy?: (id: string, ctx: ReducerCtx) => boolean;
 }
 
+/** §23 WP 13.1 — a usable /policies override of this master column. */
+const overridden = (field: string) => (id: string, c: ReducerCtx): boolean =>
+  c.policyMasterOverrides?.get(field)?.has(id) === true;
+
 const arcId = (r: Row) => `${r.supplier_id ?? "?"}→${r.material_id ?? "?"}`;
 const laneId = (r: Row) => `${r.product_id ?? "?"}→${r.customer_id ?? "?"}`;
 
 /** Which table/column each manifest field grades — data plumbing only; the
  * fallback semantics live in the registry `fallback_spec`. */
 const FIELD_BINDINGS: Record<string, FieldBinding> = {
-  "materials.cost": { rows: (d) => d.materials, id: (r) => String(r.material_id ?? ""), master: (r) => num(r.cost) },
-  "materials.moq": { rows: (d) => d.materials, id: (r) => String(r.material_id ?? ""), master: (r) => num(r.moq) },
+  "materials.cost": { rows: (d) => d.materials, id: (r) => String(r.material_id ?? ""), master: (r) => num(r.cost), policy: overridden("materials.cost") },
+  "materials.moq": { rows: (d) => d.materials, id: (r) => String(r.material_id ?? ""), master: (r) => num(r.moq), policy: overridden("materials.moq") },
   "materials.holding_cost_pct": {
     rows: (d) => d.materials, id: (r) => String(r.material_id ?? ""), master: (r) => num(r.holding_cost_pct),
     policy: (id, c) => c.policyHoldingMaterials.has(id),
   },
-  "products.sell_price": { rows: (d) => d.products, id: (r) => String(r.product_id ?? ""), master: (r) => num(r.sell_price) },
-  "products.demand_mean": { rows: (d) => d.products, id: (r) => String(r.product_id ?? ""), master: (r) => num(r.demand_mean) },
-  "products.production_capacity": { rows: (d) => d.products, id: (r) => String(r.product_id ?? ""), master: (r) => num(r.production_capacity) },
-  "products.demand_cv": { rows: (d) => d.products, id: (r) => String(r.product_id ?? ""), master: (r) => num(r.demand_cv) },
-  "suppliers.capacity_per_week": { rows: (d) => d.suppliers, id: (r) => String(r.supplier_id ?? ""), master: (r) => num(r.capacity_per_week) },
-  "suppliers.reliability_score": { rows: (d) => d.suppliers, id: (r) => String(r.supplier_id ?? ""), master: (r) => num(r.reliability_score) },
+  "products.sell_price": { rows: (d) => d.products, id: (r) => String(r.product_id ?? ""), master: (r) => num(r.sell_price), policy: overridden("products.sell_price") },
+  "products.demand_mean": { rows: (d) => d.products, id: (r) => String(r.product_id ?? ""), master: (r) => num(r.demand_mean), policy: overridden("products.demand_mean") },
+  "products.production_capacity": { rows: (d) => d.products, id: (r) => String(r.product_id ?? ""), master: (r) => num(r.production_capacity), policy: overridden("products.production_capacity") },
+  "products.demand_cv": { rows: (d) => d.products, id: (r) => String(r.product_id ?? ""), master: (r) => num(r.demand_cv), policy: overridden("products.demand_cv") },
+  "suppliers.capacity_per_week": { rows: (d) => d.suppliers, id: (r) => String(r.supplier_id ?? ""), master: (r) => num(r.capacity_per_week), policy: overridden("suppliers.capacity_per_week") },
+  "suppliers.reliability_score": { rows: (d) => d.suppliers, id: (r) => String(r.supplier_id ?? ""), master: (r) => num(r.reliability_score), policy: overridden("suppliers.reliability_score") },
   "inbound_logistics.unit_price": { rows: (d) => d.inbound, id: arcId, master: (r) => num(r.unit_price) },
   "inbound_logistics.lead_time": { rows: (d) => d.inbound, id: arcId, master: (r) => num(r.lead_time) },
   "inbound_logistics.volume": { rows: (d) => d.inbound, id: arcId, master: (r) => num(r.volume) },
@@ -697,14 +711,36 @@ function weeklyCapacityFrom(patch: Row): number {
   return daily * 7 * util;
 }
 
-export function buildReducerCtx(dataset: GradingDataset, defaults: Row): ReducerCtx {
+export function buildReducerCtx(
+  dataset: GradingDataset,
+  defaults: Row,
+  /** The registry's `policy_bundle_keys`; without them no item-master override
+   *  is resolved, which grades exactly as before WP 13.1. */
+  bundleKeys?: readonly Row[],
+): ReducerCtx {
   const weekly = weeklyDemand(dataset.outbound);
+  const idsOf = (rows: Row[], col: string) =>
+    new Set(rows.map((r) => String(r[col] ?? "")).filter(Boolean));
+  const policyMasterOverrides = overriddenEntities(dataset.overrides, bundleKeys, {
+    material: new Set([
+      ...idsOf(dataset.materials, "material_id"),
+      ...idsOf(dataset.inbound, "material_id"),
+    ]),
+    supplier: new Set([
+      ...idsOf(dataset.suppliers, "supplier_id"),
+      ...idsOf(dataset.inbound, "supplier_id"),
+    ]),
+    product: idsOf(dataset.products, "product_id"),
+  });
+  const demandOverride = policyMasterOverrides.get("products.demand_mean");
   const effectiveDemand = new Map<string, number>();
   for (const p of dataset.products) {
     const id = String(p.product_id ?? "");
     if (!id) continue;
+    // The engine's order: the /policies override, the master, the lanes.
+    const ov = demandOverride?.get(id);
     const master = num(p.demand_mean);
-    effectiveDemand.set(id, master > 0 ? master : weekly.get(id) ?? 0);
+    effectiveDemand.set(id, ov !== undefined ? ov : master > 0 ? master : weekly.get(id) ?? 0);
   }
   const prodPolicy = (defaults.production ?? {}) as Row;
   const daily = num(prodPolicy.capacity_units_per_day);
@@ -744,6 +780,7 @@ export function buildReducerCtx(dataset: GradingDataset, defaults: Row): Reducer
   }
   return {
     policyHoldingMaterials,
+    policyMasterOverrides,
     weightedInbound: volumeWeightedInboundCost(dataset.inbound),
     cheapestInbound: cheapestInboundCost(dataset.inbound),
     weightedPrice: demandWeightedSellPrice(dataset.outbound),
@@ -778,7 +815,7 @@ export function gradeManifest(
   }
   const hasMultiSource = [...supsByMat.values()].some((s) => s.size > 1);
   const manifest = compileManifest(registry, defaults, customers.size, bridge, hasMultiSource);
-  const ctx = buildReducerCtx(dataset, defaults);
+  const ctx = buildReducerCtx(dataset, defaults, registry.policy_bundle_keys);
 
   const out: GradedField[] = [];
   const seen = new Set<string>();
