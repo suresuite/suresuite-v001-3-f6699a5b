@@ -86,40 +86,16 @@ const DEMAND_DISTS = new Set(["triangular", "deterministic", "poisson", "negbin"
 const LEAD_TIME_DISTS = new Set(["deterministic", "lognormal", "gamma"]);
 
 // ── The dataset (1 product / 2 materials / 3 suppliers) ─────────────────────
-const suppliers = [
-  { supplier_id: "S1", name: "Supplier 1", capacity_per_week: 2000, reliability_score: 0.98 },
-  { supplier_id: "S2", name: "Supplier 2", capacity_per_week: 2000, reliability_score: 0.95 },
-  { supplier_id: "S3", name: "Supplier 3", capacity_per_week: 2000, reliability_score: 0.90 }, // 2nd source for M1
-];
-
-const materials = [
-  { material_id: "M1", name: "Material 1", cost: 10, holding_cost_pct: 0.20, moq: 0, initial_on_hand: 200, lead_time_dist: "deterministic", lead_time_cv: 0 },
-  { material_id: "M2", name: "Material 2", cost: 15, holding_cost_pct: 0.20, moq: 0, initial_on_hand: 150, lead_time_dist: "deterministic", lead_time_cv: 0 },
-];
-
-const products = [
-  { product_id: "P1", name: "Product 1", sell_price: 100, production_capacity: 200, fulfillment_mode: "mto", demand_distribution: "triangular", demand_mean: 50, demand_cv: 0.20 },
-];
-
-// Arc rows carry plant_name + project_id (filled in at write time). BOM top
-// level is the finished product; every BOM material has an inbound source.
-const bom = [
-  { product_id: "P1", material_id: "M1", consumption_rate: 2 },
-  { product_id: "P1", material_id: "M2", consumption_rate: 1 },
-];
-
-// inbound_logistics: supplier → material. lead_time is in WEEKS (§3 unit
-// contract); time_unit describes the volume period only.
-const inbound = [
-  { supplier_id: "S1", material_id: "M1", volume: 120, time_unit: "week", lead_time: 2, unit_price: 10 },
-  { supplier_id: "S2", material_id: "M2", volume: 60,  time_unit: "week", lead_time: 3, unit_price: 15 },
-  { supplier_id: "S3", material_id: "M1", volume: 120, time_unit: "week", lead_time: 2, unit_price: 11 }, // pricier backup
-];
-
-// outbound_logistics: product → customer. expected_lead_time in weeks.
-const outbound = [
-  { customer_id: "C1", product_id: "P1", volume: 50, time_unit: "week", expected_lead_time: 1, unit_price: 100 },
-];
+// Authored ONCE in scripts/example_project/dataset.json, which the notebooks'
+// offline-demo recorder (notebooks/tools/record_demo.py) reads too — so the
+// project this script seeds and the demo the notebooks replay are the same data.
+// S3 is a pricier second source for M1; S2 is the only source of M2. Arc rows
+// carry plant_name + project_id (filled in at write time). inbound lead_time
+// and outbound expected_lead_time are in WEEKS (§3 unit contract); time_unit
+// describes the volume period only.
+const { suppliers, materials, products, bom, inbound, outbound } = JSON.parse(
+  readFileSync(join(repoRoot, "scripts/example_project/dataset.json"), "utf8"),
+);
 
 // ── Local validation (enums, required fields, structural hard-blocks) ────────
 // Mirrors the gate's three hard blocks (supabase/functions/_shared/grading.ts):
