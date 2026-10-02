@@ -11,7 +11,8 @@
 //
 // Checkpoint 5 (fail closed): proposal status = approved; project ownership;
 // `agent_apply` + the artifact's own operation right (§13.3 — item_master_diff
-// needs `data_editing`); quota (§13.4); THEN delegate to the gate. Rights
+// needs `data_editing`); the project right the same edit needs on THIS project
+// (D273, `agent_project_right_refusal`); quota (§13.4); THEN delegate to the gate. Rights
 // failures return typed errors WITHOUT burning an apply attempt — attempts
 // count real gate/RPC executions only.
 
@@ -310,6 +311,23 @@ serve(async (req) => {
             type: "FORBIDDEN",
           });
         }
+      }
+      // D273: and the PROJECT right the same change needs by hand on this project
+      // (`agent_artifact_project_rights`) — the account-wide grants above say nothing about
+      // a Viewer member. The same function `review_agent_proposal` refuses an approval with.
+      const { data: projectRefusal, error: projectRefusalErr } = await svc.rpc("agent_project_right_refusal", {
+        p_user_id: userId,
+        p_project_id: projectId,
+        p_artifact_type: String(proposal.artifact_type),
+      });
+      if (projectRefusalErr) {
+        return jsonResponse({
+          error: "Could not verify your rights on this project — try again.",
+          type: "FORBIDDEN",
+        });
+      }
+      if (typeof projectRefusal === "string" && projectRefusal) {
+        return jsonResponse({ error: projectRefusal.replace(/^forbidden: /, ""), type: "FORBIDDEN" });
       }
     }
 

@@ -80,6 +80,15 @@ BEGIN
     ('viewer',  'data_edit_inputs', false), ('viewer',  'data_edit_policies', false),
     ('viewer',  'export', false),           ('viewer',  'simulation_lab', false)
   ON CONFLICT (project_role, capability_key) DO NOTHING;
+  -- D273 — the account role is now the CEILING the project role grants within, so the base
+  -- also needs the account layer the migrations seed (`20260711000002`: modeler, admin and
+  -- super admin hold all four; a 'user' account Export only; `20260915000005` copies
+  -- data_editing into the two edit keys). Without it every right reads false.
+  INSERT INTO public.role_capabilities (role, capability_key, allowed)
+  SELECT r.role, k.key, r.role <> 'user' OR k.key = 'export'
+    FROM (VALUES ('super_admin'), ('admin'), ('modeler'), ('user')) r(role)
+    CROSS JOIN (VALUES ('data_edit_inputs'), ('data_edit_policies'), ('export'), ('simulation_lab')) k(key)
+  ON CONFLICT (role, capability_key) DO NOTHING;
 
   SET LOCAL ROLE anon;
   PERFORM public.admin_set_project_member(v_super, 'd219s@example.invalid', v_editor, v_p, 'editor', NULL, 'D230 editor');

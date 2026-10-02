@@ -260,7 +260,7 @@ export default function RolesAndCapabilities() {
         <div className="divide-y divide-border rounded-sm border border-border bg-card shadow-xs">
           {[
             ["you", "a grant or denial set on your own account"],
-            ["your role on this project", "what your project role carries — consulted when the question is about a project"],
+            ["your role on this project", "what your project role carries — consulted when the question is about a project; for the four project rights it grants only what your account role also allows (below)"],
             ["your organization", "a grant or denial set for everyone in it"],
             ["your platform role", "what the role you hold carries by default"],
             ["nobody", "no row anywhere — the answer is no, not yes"],
@@ -294,6 +294,22 @@ export default function RolesAndCapabilities() {
           list above is the whole vocabulary rather than a summary of it. On a screen that is not
           about one project — the admin area, your profile — the project layer is simply skipped.
         </P>
+        <Callout title="The four project rights: the account role is the ceiling">
+          <p>
+            Run Simulations, Edit Input Data, Edit Policies and Export are decided per project by a
+            different rule. Your project role <em>grants</em> them and your account role (with your
+            organization's settings) <em>caps</em> them: you hold one only when <strong>both</strong>{" "}
+            allow it. A project role never lifts a right your account role does not carry — a User
+            account made Editor still holds only what a User account may do. With no role on the
+            project, your account role alone decides. A grant or denial set on your own account still
+            decides above both.
+          </p>
+          <p>
+            An AI agent's proposal can be approved only by someone who holds, on that project, the
+            right the same change needs by hand. <AppLink to="/admin/roles">/admin/roles</AppLink>{" "}
+            shows the rule's answer for every pair of roles and lists everyone it narrows today.
+          </p>
+        </Callout>
       </Section>
 
       <Section id="project-roles" title="Project roles — the ladder and the matrix">

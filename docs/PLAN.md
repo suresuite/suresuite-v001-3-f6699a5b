@@ -458,6 +458,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D270** | **`PUT …/policies` accepts any field inside a family, and the catalog it points readers to names different fields.** Validation stops at family names, so a parameter named the way `GET …/policy-catalog` names it (`rule`, `fixed_days_cover`) is stored and never read — the engine's mapper reads the app's vocabulary (`backorder_allowed`, `safety_stock_days`). The two vocabularies are both correct and nothing tells an API caller there are two. The notebooks carry the mapping for the levers they use; the fix is the declaration D125 asks for, published through the API | `supabase/functions/api/index.ts:444`–`465`; `supabase/functions/_shared/policyFields.ts` | **OPEN — WP 6.4** *(R8 needs an open owner and the API workstream (G15 API Phase 3) has no package in this plan; WP 6.4 already owns the API half of D112, the same class — a public control whose meaning the engine or worker does not honour. Found by the notebook series' contract check, §16 · Developer API · the Python notebook series)* |
 | **D271** | **A scenario created through the API cannot say how its warm-up or replications are decided, and a short horizon is lengthened without a word.** `ScenarioCreateSchema` has no `warmup_mode`, `stopping_rule` or `demand_model`, so an API scenario always detects its warm-up and ignores the `warmup_days` it accepts; a `horizon_days` below 364 runs 52 weeks, the engine floor. The API's own default horizon is 90 days | `supabase/functions/api/index.ts:423`–`434` | **OPEN — WP 6.4** *(R8 needs an open owner and the API workstream (G15 API Phase 3) has no package in this plan; WP 6.4 already owns the API half of D112, the same class — a public control whose meaning the engine or worker does not honour. Found by the notebook series' contract check, §16 · Developer API · the Python notebook series)* |
 | **D272** | **`:cancel` answers `cancelled` for a run that had already finished.** The database update is guarded on `queued`/`running`, so the run correctly stays `done` — but the response does not read it back, so a caller is told something false. The notebooks read the run after cancelling | `supabase/functions/api/index.ts:861`–`869`; `supabase/functions/_shared/dispatch.ts:645`–`649` | **OPEN — WP 6.4** *(R8 needs an open owner and the API workstream (G15 API Phase 3) has no package in this plan; WP 6.4 already owns the API half of D112, the same class — a public control whose meaning the engine or worker does not honour. Found by the notebook series' contract check, §16 · Developer API · the Python notebook series)* |
+| **D273** | **A project role REPLACED the account role for the four project rights instead of narrowing it, /admin/roles never said so, and an AI agent could approve on a project what its approver was refused there by hand.** `capabilities_for_user(user, project)` answered each key from the first layer with an opinion — person override → project role → organization → account role — so for Run Simulations, Edit Input Data, Edit Policies and Export the account-role switches on /admin/roles applied only to people with NO role on the project: a 'User' account (Run Simulations only, in production) made Editor held Edit Policies and Export there. The Features grid drew those four rows like every other, so the switch an admin flipped was not the one that decided. And `review_agent_proposal` and `agent-apply` read the ACCOUNT-wide set (`get_my_capabilities`), so a modeler who is a Viewer member could approve a Policy Configurator bundle — the agent gap D232 left open. Asked by the owner: "how could we reconcile the role in the project and feature capability", then "approve your recommendation … make it strong and transparent in page /admin/roles" | `supabase/migrations/20261001000004_project_rights_in_the_project.sql` (`capabilities_for_user(uuid, uuid)`: the COALESCE chain); `supabase/migrations/20260723000001_reports_and_file_workspace.sql` (`review_agent_proposal`: `get_my_capabilities`); `supabase/functions/agent-apply/index.ts` (checkpoint 5: account-wide features only); `src/pages/admin/AdminRoles.tsx` | **CLOSED ✅ (`20261002000001`), by the owner's choice of the ceiling model.** ONE rule, `project_right_decide` (pure): super admin → yes; a person override → its value; no project role → the account's answer; otherwise project grant AND account answer — and it returns which of those decided. `project_right_decisions(user, project)` supplies its inputs (the account's answer is the PROJECT's organization layer, then the account role, D231's order); `capabilities_for_user(user, project)` reads it for the project-scoped keys and keeps every other key's chain verbatim; `project_rights_for_user` returns `decisions`, naming the upload gate and suspension as deciders too, and `projectRightRefusal` says which layer refused. `agent_artifact_project_rights()` declares the project right each artifact's approval needs (data diffs → Edit Input Data, policy bundle and model card → Edit Policies, experiment and risk alert → Run Simulations, decision report → Export, explanation → none), `agent_project_right_refusal` applies it and fails closed on an undeclared type, and both `review_agent_proposal` (approve) and `agent-apply` call it. /admin/roles reads `get_role_access`, which now also returns the project-role matrix, the EFFECTIVE matrix (account role × project role, computed by the rule, not re-authored in the page), the memberships per cell, every membership the ceiling narrows today, the organization and person overrides on those keys, and the agent map; a switch on a project-scoped key asks `admin_preview_role_capability` first and the page names who would gain or lose it before anything is written. `rehearsal/700` §1–§7 (every branch of the rule, the ceiling, no role, both overrides, the agent gate including coverage of every `proposals_artifact_type_check` value, the admin read, the preview); `460`, `490`, `550` now plant the account-role rows the migrations seed, because the base has none and the ceiling reads them; `projectRights.test.ts` pins the deciders and their sentences. Mutation: the `account_ceiling` branch removed turns `700` §1 red. NOT changed, stated: a person override still beats the project role (the one deliberate escape hatch, now listed on the page); the project-role matrix stays a migration's (D232's shape) so the manual cannot drift, shown read-only; D230's open server gates (`sim-command`, the policy and item-master RPCs) still check no project role; who in production LOSES a right on deploy is not measured from a branch — /admin/roles' "Narrowed by the ceiling today" list is that reading once the migration is live |
 
 ### 4.1 Code map — the data layer
 
@@ -21929,6 +21930,46 @@ against the gateway, the worker and the engine:
   The notebooks work around each and say so. They are owned by WP 6.4 because R8 needs an open
   owner and the G15 API workstream has no package here; whether to open one is a product call.
 - **D112's notebook half is closed**; its presets and API-schema halves are not.
+
+### Profile · the account role caps, the project role grants · 2026-10-02 · `20261002000001`
+
+**Asked for.** Shown /admin/roles' Features grid beside the project-role table: "how could we
+reconcile the role in the project and feature capability"; then, of the recommendation (account
+role = ceiling, project role = grant, agent approvals bound to the project right, the grid
+labelled): "approve your recommendation! but is there any way that we could make it a strong and
+transparent in page /admin/roles".
+
+**Promised versus found.** D230 made the project rights the app's own answer and D232 said its
+open gaps were "agent approvals, `sim-command`". Reading the resolver for the answer found the
+larger fact: the project layer did not narrow the account layer, it replaced it, so a User
+account made Editor held rights its account column refuses — and the admin page could not show
+that, because it rendered the account matrix alone (D273).
+
+**Decisions.** (1) The ceiling is the account's answer AS IT WAS — organization layer, then
+account role — so an organization switch still caps its own projects. (2) A person override
+stays above the project role: it is the per-person escape hatch the admin pages already offer,
+and the page now lists every one on these keys rather than hiding it. (3) The project-role matrix
+is NOT made editable on the page: the manual's role table is generated from migrations (D232),
+and an editable copy would drift from it within a quarter; the page says so. (4) The page never
+re-implements the rule: the effective matrix, the narrowed list and the switch preview are all
+computed by `project_right_decide` in the database. (5) A switch on one of the four keys is never
+flipped blind: the preview names the memberships that would move. (6) An agent approval asks the
+project right the same change needs by hand, in ONE declared map read by the SQL approval and the
+edge function alike; an undeclared artifact type is refused, not waved through.
+
+**Gap check.** (1) `460`, `490` and `550` asserted owners and editors holding rights while
+planting no account-role rows; under the ceiling every such right read false. The plants now
+carry the account layer as the migrations seed it — D50's lesson: plant what every later base
+will hold, not what makes this branch green. (2) The DB-backed agent evals apply a fixed migration
+list and keep the old `review_agent_proposal`; `rehearsal/700` §5 is where the new gate is proven.
+(3) Production impact is unmeasured from a branch: who loses a right is the page's own "Narrowed
+by the ceiling today" list after deploy, and any §15 reading belongs in the push after the merge
+(D153). (4) D230's server gates are unchanged. No later package changes.
+
+**Measured locally.** `contract:rehearse` against PostgreSQL 16, fresh and `--fixtures`: 70 files
+pass, `700` new; the mutation above red at `700` §1. The page was rendered in Chromium against
+`get_role_access` and `admin_preview_role_capability` output taken from the `700` fixtures, desktop
+and phone width, including the preview dialog.
 
 ## 17. Sequencing
 
