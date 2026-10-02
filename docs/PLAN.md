@@ -42,6 +42,8 @@ duplicated facts stated here, which is the defect this plan exists to end.)*
 | 19 | Phase 9 — Results: inventory over time, and the result binding |
 | 20 | Phase 10 — Versions you can choose |
 | 21 | Phase 11 — One graph, three levels |
+| 22 | Phase 12 — The library |
+| 23 | Phase 13 — What you see on /policies is what runs |
 
 ---
 
@@ -465,6 +467,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D277** | **The pre-run check and the Supplier grid answered "does this material have a primary supplier?" from two different sources, so a single-source material was blocked while the grid showed it resolved.** The grid and its step track resolve `primary_source` through `getEffectiveValue` — a saved override, else the stage's own routing decision (`__decided`: a material with one supplier IS its primary). `verifyProjectPolicies` read `effectivePolicy` over the SAVED bundle alone. The decision only reaches that bundle through the auto-seed, which fires once per stage, when the stage has NO overrides — so every lane uploaded after a stage's first seed showed "Primary ✓" and was refused at Run checks. Owner-reported on `Aumovio`: `M0241`, sourced only from `S012` | `src/lib/policies/verification.ts` (`verifyProjectPolicies`); `src/components/policies/StagePolicyTable.tsx` (the auto-seed's `hasOverridesForStage` guard); `src/hooks/useStageRows.tsx` (`__decided`) | **CLOSED ✅ (2026-10-02)** — the verifier reads `primary_source` through `getEffectiveValue`, the grid's own resolver: an explicit save still wins, so un-checking the only supplier still blocks. `primaryFromGrid.test.ts`, three of four assertions red on the old verifier. With D188's engine half closed in the same day, a resolved suggestion is also what the run does |
 | **D278** | **An account-role change on /admin/users changed less than it appeared to, and said nothing about the rest.** (1) `admin_set_user_role` wrote `approved_users.role` alone, and the membership trigger maps account `admin` → organization `admin` only when a membership is CREATED, so a promotion left the active organization's row at `member` and a DEMOTION left an `admin` row in place — the half that holds a right: `_api_key_management_org` admits an organization owner/admin whatever the account role, so an admin demoted to `user` kept managing the organization's API keys and every scope on a personal key (`_api_key_caller.can_manage`). The promotion half held no new right (an account `admin` already passes that check by its account role); it was a contradiction on /profile and /admin/users, which listed an account admin as an organization member. (2) Nothing said what the change did NOT change: a person override (`user_capabilities`) or organization override (`org_capabilities`) beats the account role in `capabilities_for_user`, and since D276 a project role limits the account role on the four project rights. (3) `admin` is not `super_admin` — /admin and every `admin_*` RPC are super-admin-only — but the picker showed bare words; the gloss that says so lived only in the manual. (4) An open session never learned of the change: the profile was re-read once on mount and the capability set only when the user id changed. Owner-reported: changing a user's account role (e.g. user → admin) did not change what that person could do | `supabase/migrations/20260929000002_admin_users_read.sql:169` (`admin_set_user_role`: the UPDATE alone); `supabase/migrations/20260930000004_account_in_several_organizations.sql:87` (the sync trigger returns unless `organization_id` changes); `supabase/migrations/20260711000001_api_access_control.sql:160` (`_api_key_management_org`: org owner/admin); `supabase/migrations/20261002000005_personal_keys_for_every_user.sql:46` (`_api_key_caller` inherits it); `supabase/migrations/20260905000001_grant_ga_agent_capabilities.sql:79` (override precedence); `supabase/migrations/20261002000004_account_role_ceiling.sql:63` (`project_right_decide`); `src/lib/permissions.ts:22` (`/admin` super_admin only); was `src/pages/admin/AdminUsers.tsx:92,339` (bare role words) and `src/components/docs/bodies/RolesAndCapabilities.tsx:30` (the gloss, manual only); was `src/hooks/useAuth.tsx:277-280` and `src/hooks/useCapabilities.tsx:153` (reads keyed on mount / user id) | **CLOSED ✅ (`20261002000006`).** `admin_set_user_role` (DROP + CREATE, `jsonb`; grants re-issued, every guard kept) moves the ACTIVE organization's row `member` → `admin` on becoming admin and `admin` → `member` on leaving it — never `owner`, never another organization (D210) — each move logged as `user.org_role_change` in `admin_set_user_org_role`'s shape; and RETURNS `{role_before, role_after, org, overrides, narrowed_projects}`: the overrides that now differ from the new role's default, and the projects whose role refuses what the account allows, read from `project_right_decisions` (D276's rule, not re-authored). No backfill: `admin_list_account_role_gaps` lists account admins left at `member`, and /admin/users marks each with a one-click `admin_set_user_org_role`. The page shows the summary in a dialog linking to /admin/users/:userId; the picker's options carry one line each from `roleGloss.ts`, which the manual now reads too. `useAuth` re-reads the profile on focus, on visibility and every five minutes and says a changed role once; `useCapabilities` reloads on the role. `rehearsal/740` §1–§7, three mutations red (owner guard, other-organization guard, demotion branch). NOT closed, stated: a role changed while the person's ACTIVE organization is not the one meant moves that one only; an open tab learns within five minutes or on return, not instantly; the grants mutation stays green because Supabase's default privileges grant `anon`/`authenticated` on every new function |
 | **D279** | **The OWNER of a project could not edit its input data or policies, or export from it, and an Editor could never upload.** D276 made the account role a ceiling over the project role, and production's 'user' account role allows Run Simulations only — so a project's owner, listed "Owner (fixed)" and administering its organization, held Run Simulations there and not Edit Input Data, Edit Policies or Export; every Editor with a 'user' account was capped the same way. And Edit Input Data had a second gate after the rule: `has_project_access`, which every upload passes, admitted the modeler and app admins only, so an Editor whose role grants Edit Input Data was refused it on every project (`upload_gate`) — the editor half of D66's divergence. Owner-reported: "if he is the editor or the owner, we must be able to Edit Input Data, Edit Policies, Export" | `supabase/migrations/20261002000004_account_role_ceiling.sql` (`project_right_decide`: the `account_ceiling` branch); `supabase/migrations/20261001000017_super_admin_acts_as_admin.sql` (`has_project_access`: modeler or admin only; `project_rights_for_user`: `v_land`) | **CLOSED ✅ (`20261002000007`).** `project_right_decide`: super admin → yes; a person override → its value; no project role → the account's answer (organization switch, then account role); otherwise the project role's grant — no ceiling. `has_project_access` admits Editor and Owner beside the modeler and app admins, and `project_rights_for_user.may_land_uploads` is the same test, so the page and the upload agree; `ingest_apply_run` already required Editor. `get_role_access`, `admin_preview_role_capability` and D275's policy writers read the rule unchanged; /admin/roles drops the "Narrowed by the ceiling" list and says an account-role switch on these four applies only without a project role. `rehearsal/750` proves the reported case (a 'user'-account owner who is an organization admin holds all four), an Editor's landing through `ingest_land_file`, and the gate still refusing an Analyst, a Viewer, a lapsed Editor and a no-role member; `720`, `240`, `460`, `490`, `550` re-assert the rule as it now stands. A person override still beats the project role |
+| **D280** | **The run does not read what the page shows, and does not read the version it is stamped with.** A run is bound to a policy version (frozen) and records a `dataset_version_id` and `graph_hash`, but the Fly worker builds the engine input from the LIVE item masters and lanes at the moment it starts — so a cost, MOQ, capacity, price or demand edited on /policies (which writes the master row directly), in the Item Master editor, by a CSV or by ERP sync after dispatch or after a Validated Model was adopted flows into that run silently. The model is marked stale; nothing refuses the run. The frozen input already exists and one pipeline already reads it — `sim_worker.local.run_from_snapshots` (browser engine, `suresuite` package) — so two runs stamped with the same versions can be computed from different data depending on WHERE they ran. The page/run disagreements D204 (a)(b) and the master-vs-line capacity shadow are the same class on the policy side | `sim-worker/sim_worker/worker.py:386` (`load_project_data` — live tables); `sim-worker/sim_worker/local.py` (`run_from_snapshots` — the frozen path the worker does not use); `src/components/policies/StagePolicyTable.tsx:1090` (master-backed cells write the master row); `scsim/scsim/io/project_map.py:1104` (master capacity shadows line capacity) | **OPEN** — Phase 13 (§23): WP 13.1 the worker, WP 13.2 the freeze at dispatch, WP 13.3 page = run |
 
 ### 4.1 Code map — the data layer
 
@@ -22312,6 +22315,16 @@ package moves.
 `--fixtures`. `npm test` 142 files / 1 621 tests green; `typecheck` 15 of 15 held; `audit:ui` and
 `check:docs` clean; eslint 295 errors / 110 warnings, identical to `main`.
 
+### Plan · Phase 13 registered — the page and the run read one source · 2026-10-02 · docs only
+
+**Promised by the previous entry** ("a value set on /policies is the value the run uses"): true
+for the POLICY side of a run, which is frozen in its policy version. **Found**: false for the DATA
+side. The Fly worker reads the live masters and lanes at start (D280), although every run already
+records a `dataset_version_id` and `sim_worker.local` already computes from that frozen snapshot.
+The fix is therefore mostly reuse, not construction. Registered as §23 with four packages; no code
+changed. **Changes a later package**: none yet open — D204 (a)(b) and the capacity shadow are
+now owned by WP 13.3 rather than "owner to be decided".
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -22329,6 +22342,7 @@ package moves.
 | **10** | **10.0 – 10.9** | **versions you can choose: graph versions per level, compute-once metrics, policy versions by content, the Validated Model, engines and RunKey, the Lab flow, result tiers, capacity, the surrogate training set** | — | **10.0 ✅** the plan (§20), §4 D233–D247 registered from a verified reading, WP 9.2's tables re-homed to WP 10.4 and `model_validations` to WP 10.3, the blueprint refined (§8.4, §9.2, §9.5, §11.4). **10.2 ✅** a policy version is its content: saves deduplicate by `policy_hash` with a per-project number, cards are matched by content everywhere including dispatch stamping and inheritance, and the version in force is derived, so a fresh Lab reads *validated* (D241, D242 closed). **10.1 ✅** graph versions per level and metrics computed once: three level hashes with the composite unchanged, a stored current hash, a numbered version per upload deduplicated against any, analyses keyed on the level they read, and three pages that read before they compute (D233–D239 closed; D240's last shim is WP 10.4's). **10.3 ✅** the Validated Model: a complete run protocol checked by one SQL function, `model_hash` as its identity, immutable, numbered and named, with its evidence in a row of its own; Student-t throughout Run & Validate, the warm-up the maximum over the selected KPIs, adoption only when every selected KPI passes or a statement is recorded, and Save Validated Model ending in **Open in Simulation Lab** (D243, D244 closed; the fingerprint deliberately not widened). **10.4 ✅** the binding on the row: an engine registry (scsim active, legacy retired), a RunKey computed once in SQL over engine build, graph, policy, the scenario's run spec and deviations, one insert path under which identical submissions make one run, the worker refusing a run bound to an engine it does not run, and all eight run/result tables described — plus **D248**, found by making the rehearsal mirror Supabase's default function grants: fifteen internal SECURITY DEFINER helpers had been callable through the API (D245, D248 closed; `network_topology_hash`'s drop moved to the new **WP 10.9**, which takes the after-merge readings). **10.5 ✅** the Lab starts from a choice of Validated Model: Model → Engine → Scenario → Settings → Run, the protocol locked behind "Advanced" with every deviation recorded as `protocol_overrides`, a run of the model dispatching the model's own policy version, "Run this model" seeding a scenario from it in one click, an editor's badged exploratory path, the run's size before it runs, and comparisons scoped to the model — which found **D249** (a model's evidence run reads as exploratory; the comparison half closed, the training half WP 10.8's). **10.6 ✅** result tiers: a worker run's weekly series in one zstd Parquet object per run in a private bucket, rows keeping their KPIs (and the min/max range the worker used to drop), one loader that hydrates rows so every chart reads what it always read, standard / pinned / evidence retention with a sweep that removes series only and says so with the RunKey — Postgres per run 165 KB → 23 KB at 30 × 52 (D246, D250 closed; the browser path keeps JSONB under the same retention). **10.7 ✅** capacity: an organization pool (monthly replication-weeks, series storage, replications per run, runs in flight, retention) and each project role's share of it, admitted in ONE place inside `create_simulation_run` after the RunKey lookup — a reuse or an attach consumes nothing, and the Lab, `/v1` and agent-apply are refused alike with 402/403/429 and the numbers; a ledger of reservation, actual and release; the Run card forecasting the answer and the super admin's usage table (D247 closed; **D252** — the share binds whom the caller names — WP 7.1's). **10.8 ✅** the surrogate-ready training set: one view stating which replications may train a surrogate — a validated model's faithful, completed runs, its evidence run included (D249 closed), nothing exploratory, deviating, gate-skipped or revoked — grouped by Validated Model and Graph Version with the RunKey and each replication's KPIs; structural features of the sourcing network computed once per product-level hash through the analysis store; the Lab's Surrogate card counting the set. No model is trained. **10.9 first half** the after-merge reading of WP 10.0–10.6 (§15 run `36857125032`): D248 closed in production, scsim reported by the worker, every graph and policy version numbered — and **D253**, retention inert in production (no pg_cron) with object removal by SQL that could break a run delete, closed by `20261001000014`. **10.9 second reading** the after-merge reading of WP 10.7–10.9a (§15 run `36863326325`): every migrated relation present, the role shares seeded, every organization at 90 days, the worker's first sweep run — and **D254**, the Surrogate card summing per-model groups, closed by `20261001000015`. **Still owed: the `network_topology_hash` drop, after a network-metrics or prominence analysis has run in production.** |
 | **11** | **11.0 – 11.5** | **one graph, three levels: a version per level, and every consumer bound to the level it reads** | — | **11.0 ✅** the plan (§21), §4 D258–D264 registered from a verified reading, the blueprint refined (§8.4, §9.2, §9.5, §11.4). The reading changed the design: the simulation's read set already HAS a hash — `hash_inputs`, the snapshot's `inputs` domain, whose eight tables are exactly the worker's eight reads — so the `simulation` scope is named and gated rather than minted, and `level_spec` stays 1. **11.1 ✅** a version per level: `graph_level_versions` numbers product, process and firm per project, deduplicated against any earlier version of the level; every snapshot names its tuple; history is backfilled in order; the state returns each level's version (D258's store half). It also closed **D265**: `anon` could insert a snapshot row directly, which from this package would have minted level versions. **11.2 ✅** the simulation scope NAMED (`simulation → hash_inputs`, one mapping, no new digest) and gated against the worker's reads; a Validated Model binds it, RunKey v2 hashes it, an analysis run names its level version; the agent's own copy of the badge rule follows (D260, D264 closed). **11.3 ✅** the surfaces: each network page names its level's version ("Product graph v3"), the Validated Model reads "simulation inputs v4" with a deep-tier change as a note and never re-validate, the snapshot list shows its tuple, the Reproducibility Record and Trust Report carry the levels (D258, D259, D263 closed; one read migration, `dataset_version_tuple`, because the browser cannot read the level table). **11.4 ✅** lineage: the training set groups and counts KPIs by simulation-input version and keeps the composite as lineage; the features name their product version; a run names its inputs whoever wrote it (D261, D262 closed). **11.5 ✅** the reading is §15 run `36903620736` (fence unmoved at `20261001000022`): every project with snapshots has all four levels, all 4 Validated Models bind the simulation scope, the doors D265 closed are closed. One firm-level `prominence` run met D240's condition, so `20261001000023` drops `network_topology_hash`. Two things are named, not met: RunKey v2 is unexercised (no simulation dispatched since WP 10.4), and the reading after the drop deploys is WP 10.9's. **PHASE COMPLETE.** |
 | **12** | **12.1 – 12.7** | **the library: pull the data you may read, simulate on your own machine** | — | **12.1 ✅** one local-run entry point (`sim_worker.local`), shared by the browser engine, the demo recorder and the coming `suresuite` package; D273 closed. **12.2 ✅** the snapshot read API (largest production snapshot 592 KB — one gzipped response, no cap). **12.3 ✅** personal keys (`20261002000001`, `rehearsal/700`). **12.4 ✅** the engine through `GET /v1/engine`, private bucket, content-addressed (D274 recorded). **12.5 ✅** the `suresuite` package (a local run equals the platform's, in a clean venv). **12.6 ✅** notebook 05 — simulate on your own machine (renumbered **03** when the series was trimmed to four, §16 · 2026-10-02). **12.7 ✅** every user may mint a personal, read-only key (`20261002000005`, `rehearsal/730`). **PHASE COMPLETE**; push-back (upload, client-computed runs badged until verified) is the next phase, not started |
+| **13** | **13.1 – 13.4** | **what you see on /policies is what runs: the worker reads the frozen versions, dispatch freezes both, every cell reaches the engine or says it does not** | — | **planned** — registered 2026-10-02 (§23, D280). Nothing shipped |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -24363,3 +24377,88 @@ an org key; lists and reads usage of only their own keys; revokes their own and 
 demoted modeler's write key is granted `read:data` alone and cannot be rotated into a fresh write
 key; a manager is unchanged; inactive and organization-less users get nothing — mutation-tested
 (the creation scope check → §2 red; the use-time cut → §6 red).
+
+## 23. Phase 13 — What you see on /policies is what runs
+
+**The ask (product owner, 2026-10-02).** The data shown on /policies must be the single source of
+truth for a simulation run. Anything else is a gap: a validated decision cannot rest on numbers
+nobody can point at.
+
+### 23.1 How data moves between the pages — in one picture
+
+```
+ Project manager            Item masters / lanes            /policies                 Simulation Lab
+ (upload CSV)        ─►     materials · products ·    ◄─►   one grid: master cells   ─►  Save version & run
+ lanes, BOM, masters        suppliers · customers ·         write the master row;        │
+                            inbound · outbound · BOM        policy cells write            ▼
+                            (tier 2, live)                  overrides (tier 4, live)   FREEZE BOTH
+                                                                                         dataset version  +  policy version
+                                                                                         │
+                                                                                         ▼
+                                                                                       worker → engine
+                                                                                       reads ONLY the two frozen versions
+```
+
+1. **Upload** lands the lanes, BOM and any item-master CSV; the item-master IDs are seeded from
+   the lanes, their values come from a master CSV, ERP sync, or /policies.
+2. **/policies is the one place a value is set.** It shows every value the engine will use, and
+   where each came from: *your value*, *item master*, *derived from your lanes*, or *default*.
+   A master-backed cell (cost, MOQ, capacity, price, demand) edits the master row; a policy cell
+   (holding %, safety stock, primary supplier, s/S/Q, …) edits a policy override.
+3. **Run** freezes two versions, by content: the **dataset version** (masters + lanes) and the
+   **policy version** (defaults + overrides). A Validated Model names one of each.
+4. **The worker computes only from those two versions** — never from the live tables. Edits made
+   after the freeze go into the NEXT version, not into a run already bound.
+
+### 23.2 How we guarantee it — the rule and its gates
+
+**Rule (gate `page-equals-run`).** For a given dataset version and policy version, the value
+/policies displays for a cell is the value the engine receives, or the cell says, at the point of
+display, that the engine does not read it (T2). There is no third state.
+
+| Guarantee | How it is held |
+|---|---|
+| One input for every run | the worker calls the same `run_from_snapshots` pipeline as the browser and the `suresuite` package (WP 13.1) |
+| What was validated is what runs | dispatch refuses a Validated-Model run whose dataset or policy version is not the model's; it may run as *exploratory*, labelled (WP 13.2) |
+| The page shows the run's numbers | a parity test resolves a fixture project through the grid's resolver AND the mapper and fails on any cell that differs (WP 13.3) |
+| Nothing on the page is silently ignored | every editable cell is either read by the engine or badged "not simulated"; the badge list is generated from the mapper's bundle keys (WP 13.3) |
+| It stays true | the parity test and the worker-path test run in `data-contract.yml`; CLAUDE.md gains the gate row (WP 13.4) |
+
+### WP 13.1 — The worker reads the frozen versions *(D280 · gates `result-binding`, `single-source`)*
+
+The Fly worker's `experiment.run` path stops calling `load_project_data` on live tables and
+computes through `sim_worker.local.run_from_snapshots` from the run's `dataset_version_id` snapshot
+and policy version snapshot. A run with no dataset version fails with a stated reason; runs that
+predate the binding keep the legacy path and say so in the run log.
+**Exit.** A worker test where a master cost changes AFTER dispatch: the run uses the frozen cost.
+Browser, worker and package produce identical results for the same versions and seed.
+
+### WP 13.2 — Dispatch freezes both, and a validated run is the validated data *(D280 · blueprint §9.5)*
+
+"Save version & run" snapshots the dataset version as it already snapshots the policy version
+(dedup by content — an unchanged project reuses its version). A run that follows a Validated Model
+is dispatched with the MODEL's two versions; if the live project has moved, the Lab says so and
+offers *run the validated versions* or *run current data as exploratory*. Blueprint §8.3 and §9.5
+are updated in the same commit (the "base layer + override" rule now ends at the freeze).
+**Exit.** `rehearsal/` proves a model run binds the model's dataset version after a live edit.
+
+### WP 13.3 — Every cell on /policies reaches the engine or says it does not *(D204 (a)(b), capacity shadow)*
+
+- **D204 (a):** the policy snapshot stores defaults RESOLVED, as the page displays them, so an
+  unsaved key no longer means "UI default on screen, engine default in the run".
+- **D204 (b):** `basis`, `review_period_days`, a supplier row's `service_level_target` and plant-row
+  inventory fields are either mapped or badged "not simulated" on the grid.
+- **Capacity:** one rule for a product — the line capacity on the plant row and the master's
+  weekly capacity are one cell, not two that shadow each other.
+- **Derived values** (cost from inbound prices, demand from outbound volume) are shown in the grid
+  with their source, and they are what the frozen dataset version yields.
+**Exit.** `pageEqualsRun.test.ts`: zero differing cells on the fixture project; mutation-tested.
+
+### WP 13.4 — Documentation and the gate *(T5)*
+
+Manual "How your data flows" states the rule and its known limit until 13.1–13.3 ship; the limit is
+removed by the package that closes it. CLAUDE.md gains the `page-equals-run` row; §16 entries per
+package as usual.
+
+**Out of scope.** Writes from Project manager, the Item Master editor and ERP sync stay allowed —
+they change the live data, which a run reads only after the next freeze.
