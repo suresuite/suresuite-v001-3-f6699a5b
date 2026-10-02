@@ -51,38 +51,40 @@ def series_keys(reps: list[dict[str, Any]]) -> list[str]:
     return list(seen)
 
 
-def write(reps: list[dict[str, Any]]) -> bytes:
-    """One run's replications → zstd Parquet bytes (long form).
+def long_columns(reps: list[dict[str, Any]]) -> dict[str, list]:
+    """One run's replications → the long-form columns, as plain lists.
 
     Columns: ``rep_index``, ``model_rep``, ``event_rep``, ``week``, then one
-    float64 column per series. A replication missing a series (or shorter than
-    the longest) contributes nulls there — absent stays absent."""
-    if not _HAS_PYARROW:
-        raise RuntimeError("pyarrow is not installed")
+    column per series. A replication missing a series (or shorter than the
+    longest) contributes nulls there — absent stays absent. Pure Python, so
+    `sim_worker.local` hands a user's own run the same table the worker stores."""
     keys = series_keys(reps)
-    rep_col: list[int] = []
-    model_col: list[int | None] = []
-    event_col: list[int | None] = []
-    week_col: list[int] = []
-    cols: dict[str, list[float | None]] = {k: [] for k in keys}
+    cols: dict[str, list] = {"rep_index": [], "model_rep": [], "event_rep": [], "week": []}
+    cols.update({k: [] for k in keys})
     for r in reps:
         ts = r.get("time_series") or {}
         weeks = max((len(v) for v in ts.values() if isinstance(v, list)), default=0)
         kp = r.get("kpis") or {}
         for w in range(weeks):
-            rep_col.append(int(r["rep_index"]))
-            model_col.append(_int_or_none(kp.get("model_rep")))
-            event_col.append(_int_or_none(kp.get("event_rep")))
-            week_col.append(w)
+            cols["rep_index"].append(int(r["rep_index"]))
+            cols["model_rep"].append(_int_or_none(kp.get("model_rep")))
+            cols["event_rep"].append(_int_or_none(kp.get("event_rep")))
+            cols["week"].append(w)
             for k in keys:
                 v = ts.get(k)
                 cols[k].append(float(v[w]) if isinstance(v, list) and w < len(v) and v[w] is not None else None)
+    return cols
+
+
+def write(reps: list[dict[str, Any]]) -> bytes:
+    """One run's replications → zstd Parquet bytes (long form, `long_columns`)."""
+    if not _HAS_PYARROW:
+        raise RuntimeError("pyarrow is not installed")
+    cols = long_columns(reps)
+    index = ("rep_index", "model_rep", "event_rep", "week")
     table = pa.table({
-        "rep_index": pa.array(rep_col, pa.int32()),
-        "model_rep": pa.array(model_col, pa.int32()),
-        "event_rep": pa.array(event_col, pa.int32()),
-        "week": pa.array(week_col, pa.int32()),
-        **{k: pa.array(v, pa.float64()) for k, v in cols.items()},
+        **{k: pa.array(cols[k], pa.int32()) for k in index},
+        **{k: pa.array(v, pa.float64()) for k, v in cols.items() if k not in index},
     })
     buf = io.BytesIO()
     pq.write_table(table, buf, compression="zstd")

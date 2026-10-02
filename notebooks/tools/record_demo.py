@@ -111,47 +111,32 @@ def demo_key(policies: dict, schedule: list, frame: dict) -> str:
 
 def record() -> dict:
     from scsim import ENGINE_VERSION
-    from sim_worker.datamap import build_project_data
-    from sim_worker.scsim_bridge import compute_run_from_project
-    from sim_worker.worker import build_run_update
+    from sim_worker.local import run_from_snapshots
 
     ds = json.loads(DATASET.read_text())
     registry = json.loads(REGISTRY.read_text())
-    graph_hash = sha({k: ds[k] for k in ("suppliers", "materials", "products", "bom", "inbound", "outbound")})
+    tables = {k: ds[k] for k in ("suppliers", "materials", "products", "bom", "inbound", "outbound")}
+    graph_hash = sha(tables)
 
     recordings = []
     for label, policies, schedule in RECORDINGS:
-        data = build_project_data(
-            suppliers=ds["suppliers"], materials=ds["materials"], products=ds["products"],
-            inbound=ds["inbound"], bom=ds["bom"], outbound=ds["outbound"],
-            policies={"default": policies},
-            scenario={**FRAME, "warmup_mode": "auto", "disruption_schedule": schedule},
+        # The one local-run entry point (Phase 12 · WP 12.1) — the same function
+        # the browser engine and the `suresuite` package call.
+        out = run_from_snapshots(
+            {"schema_version": 2, "inputs": tables},
+            {"schema_version": 2, "defaults": policies, "overrides": []},
+            {**FRAME, "warmup_mode": "auto", "disruption_schedule": schedule},
             project_model="Make-To-Order",
         )
-        out = compute_run_from_project(data)
-        update = build_run_update(out, FRAME["replications"])
-        update.pop("ended_at", None)
+        update = out["run_update"]
         update.pop("mapping_warnings", None)  # GET /runs does not return them
 
-        reps = []
-        series_cols = {c: [] for c in ["rep_index", "model_rep", "event_rep", "week", *DEMO_SERIES]}
-        for row in out["replications"]:
-            kpis = row["kpis"]
-            reps.append({
-                "rep_index": row["rep_index"], "seed_used": row["seed_used"], "status": "done",
-                "kpis": kpis, "warmup_at": row["warmup_at"],
-                "started_at": FIXED_TS, "ended_at": FIXED_TS,
-            })
-            ts = row["time_series"]
-            weeks = len(ts.get("fill_rate", []))
-            for w in range(weeks):
-                series_cols["rep_index"].append(row["rep_index"])
-                series_cols["model_rep"].append(int(kpis.get("model_rep", row["rep_index"])))
-                series_cols["event_rep"].append(int(kpis.get("event_rep", 0)))
-                series_cols["week"].append(w)
-                for s in DEMO_SERIES:
-                    vals = ts.get(s) or []
-                    series_cols[s].append(vals[w] if w < len(vals) else None)
+        reps = [{
+            "rep_index": r["rep_index"], "seed_used": r["seed_used"], "status": "done",
+            "kpis": r["kpis"], "warmup_at": r["warmup_at"],
+            "started_at": FIXED_TS, "ended_at": FIXED_TS,
+        } for r in out["replications"]]
+        series_cols = {c: out["series"][c] for c in ["rep_index", "model_rep", "event_rep", "week", *DEMO_SERIES]}
 
         recordings.append({
             "label": label,
