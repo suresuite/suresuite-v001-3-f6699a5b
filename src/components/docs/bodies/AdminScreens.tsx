@@ -13,7 +13,7 @@ const WHAT: Record<string, { what: string; care?: string }> = {
   },
   "/admin/users": {
     what: "Who may sign in, and the way into each person's own entitlements.",
-    care: "The entitlements themselves are on the per-user page below, not here. Suspending an account can be undone; deleting it cannot. A deleted person's uploads, analyses and lanes are kept with the author shown as unknown, and an account that still owns projects cannot be deleted until they are transferred.",
+    care: "The role picker sets the platform role, and the person's member/admin role in their active organization follows it (an organization owner stays owner; their other organizations are untouched). It does not change what decides above or beside the role: a grant or denial set on the person or their organization still decides, a project role still limits the four project rights on that project, and admin does not open this administration area — only super admin does. After a change the page lists each of these that still applies, with a link to the person's page; an account left an organization member while its platform role is admin is marked, with a one-click fix. The entitlements themselves are on the per-user page below, not here. Suspending an account can be undone; deleting it cannot. A deleted person's uploads, analyses and lanes are kept with the author shown as unknown, and an account that still owns projects cannot be deleted until they are transferred.",
   },
   "/admin/users/:userId": {
     what: "One person's access: the organizations they belong to and their role in each, every project they can reach with their role and rights on each, their capability grants and denials, and their permitted AI models.",

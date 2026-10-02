@@ -8,7 +8,8 @@
 // authored here: the matrix and the rank ladder come from
 // `capabilities.generated.ts` (read out of the migration seeds — I1, D101),
 // and the screen table comes from the route guard itself. The only
-// hand-written facts on this page are glosses.
+// hand-written facts on this page are glosses — and the account-role glosses
+// live in `roleGloss.ts`, which the role picker on /admin/users reads too (D278).
 
 import { PageTitle, Section, P, Key, Callout, Term, DocLink, AppLink, Provenance } from "@/components/docs/prose";
 import { DocFigure } from "@/components/docs/DocFigure";
@@ -21,26 +22,12 @@ import {
   PROJECT_ROLE_DEFAULTS,
 } from "@/lib/capabilities.generated";
 import { ROUTE_PERMISSIONS } from "@/lib/permissions";
-import type { UserRole } from "@/hooks/useUserRole";
+import { ACCOUNT_ROLES, ACCOUNT_ROLE_GLOSS, ACCOUNT_ROLE_CHANGE_RULE } from "@/lib/auth/roleGloss";
 import { FROZEN_CELL } from "@/components/shared/frozenCell";
-
-/** Display order for the global vocabulary: widest first, like PROJECT_ROLES. */
-const GLOBAL_ROLES: UserRole[] = ["super_admin", "admin", "modeler", "user"];
-
-const GLOBAL_GLOSS: Record<UserRole, string> = {
-  super_admin:
-    "Everything, everywhere — the checks below are skipped entirely, and this is the only role that opens the administration area.",
-  admin:
-    "The full working surface: every workspace, the Project Manager and the Developer API, with every feature on by default.",
-  modeler:
-    "The builder's role. The same default surface as admin — the two differ by what older row rules name and by convention, not by their default grants.",
-  user:
-    "Read and analyse. Every workspace opens, but creating projects, editing data and running simulations are off by default.",
-};
 
 const ORG_ROLES: { role: string; gloss: string }[] = [
   { role: "owner", gloss: "The organization's principal. Together with admin, may issue and revoke the organization's API keys." },
-  { role: "admin", gloss: "Manages the organization. The same API-key right as owner." },
+  { role: "admin", gloss: "Manages the organization. The same API-key right as owner. A person whose platform role becomes admin is made admin of their active organization, and becomes a member again on leaving it." },
   { role: "member", gloss: "Belongs. Sees their own membership row and nothing about who else is in the organization." },
 ];
 
@@ -85,7 +72,9 @@ export default function RolesAndCapabilities() {
         <Key>
           You hold up to three roles at once: one on the platform, one in your organization, and
           one on each project. They are separate vocabularies, deliberately — a grant in one never
-          silently becomes a grant in another.
+          silently becomes a grant in another. The one link is stated: changing your platform
+          role to or from admin moves your member/admin role in your active organization with it
+          (below).
         </Key>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div className="rounded-sm border border-border bg-card p-4 shadow-xs">
@@ -97,11 +86,11 @@ export default function RolesAndCapabilities() {
               <Term>user</Term>, the least of the four.
             </p>
             <ul className="mt-3 space-y-2">
-              {GLOBAL_ROLES.map((r) => (
+              {ACCOUNT_ROLES.map((r) => (
                 <li key={r}>
                   <Term>{r}</Term>
                   <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
-                    {GLOBAL_GLOSS[r]}
+                    {ACCOUNT_ROLE_GLOSS[r]}
                   </p>
                 </li>
               ))}
@@ -165,7 +154,7 @@ export default function RolesAndCapabilities() {
             <thead>
               <tr className="border-b border-border">
                 <th className={`p-3 text-left font-semibold text-foreground ${FROZEN_CELL}`}>Screen</th>
-                {GLOBAL_ROLES.map((r) => (
+                {ACCOUNT_ROLES.map((r) => (
                   <th key={r} className="p-3 text-center font-mono text-[11px] font-semibold text-foreground">
                     {r}
                   </th>
@@ -179,7 +168,7 @@ export default function RolesAndCapabilities() {
                     <span className="text-foreground">{pageLabel.get(path) ?? path}</span>{" "}
                     <span className="font-mono text-[11px] text-muted-foreground">{path}</span>
                   </td>
-                  {GLOBAL_ROLES.map((r) => (
+                  {ACCOUNT_ROLES.map((r) => (
                     <td key={r} className="p-3 text-center">
                       <YesNo allowed={r === "super_admin" || allowed.includes(r)} />
                     </td>
@@ -195,6 +184,19 @@ export default function RolesAndCapabilities() {
           assistant, Project Intelligence and export — and not data editing or the Simulation Lab.
           Any of it can be changed per organization or per person, which is the next section.
         </P>
+        <Callout title="Changing someone's platform role">
+          <p>{ACCOUNT_ROLE_CHANGE_RULE.moves}</p>
+          <p>What it does not change:</p>
+          <ul className="list-disc space-y-1 pl-5">
+            {Object.values(ACCOUNT_ROLE_CHANGE_RULE.stillDecides).map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <p>
+            After a change, <AppLink to="/admin/users">/admin/users</AppLink> lists each of these
+            that still applies to the person. {ACCOUNT_ROLE_CHANGE_RULE.openSessions}
+          </p>
+        </Callout>
       </Section>
 
       <Section id="capabilities" title={`The ${capabilities} capabilities, and how one is resolved`}>

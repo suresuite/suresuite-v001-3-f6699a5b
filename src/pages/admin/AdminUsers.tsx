@@ -27,6 +27,16 @@
 // what the person recorded (uploaded files, runs, lanes) is KEPT with its actor
 // anonymised — WP 7.2 (a). The dialog says so and asks for the email, which the
 // server checks.
+//
+// §4 D278 — the role picker changes the ACCOUNT role, and `admin_set_user_role` now moves
+// the active organization's member/admin role with it and RETURNS what it did and what
+// still decides instead (person and organization overrides, project roles that narrow the
+// account). The page shows that summary in a dialog rather than a bare "Role updated".
+// Each option carries its one-line meaning from `roleGloss.ts` — the module the manual
+// reads — because `admin` is not `super_admin` and does not open this area. Accounts the
+// old body left at organization `member` while their role is `admin`
+// (`admin_list_account_role_gaps`) carry a badge and a one-click "Make organization admin"
+// (`admin_set_user_org_role`).
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,6 +59,8 @@ import { toast } from 'sonner';
 import { planRefusal } from '@/lib/auth/organizationPlan';
 import { dismissResetRequest, listResetRequests, resetUserPassword, type ResetRequest } from '@/lib/auth/passwordReset';
 import { generateTemporaryPassword } from '@/lib/auth/temporaryPassword';
+import { ACCOUNT_ROLES, ACCOUNT_ROLE_CHANGE_RULE, ACCOUNT_ROLE_GLOSS, ACCOUNT_ROLE_PICKER_LINE, accountRoleLabel, isAccountRole } from '@/lib/auth/roleGloss';
+import { describeRoleChange, parseRoleChangeSummary, type RoleChangeSummary } from '@/lib/auth/roleChange';
 
 interface Props { isCollapsed: boolean; setIsCollapsed: (v: boolean) => void; }
 interface OrgOption { id: string; name: string; }
@@ -89,7 +101,11 @@ const ORG_ROLES = ['member', 'admin', 'owner'];
 const db = supabase as any;
 /** Who a reset is for — a table row or a request. */
 interface ResetTarget { user_id: string; email: string | null; name: string | null }
-const ROLES = ['user', 'modeler', 'admin', 'super_admin'];
+/** Narrowest first, as the picker always listed them; the vocabulary is `roleGloss.ts`'s. */
+const ROLES = [...ACCOUNT_ROLES].reverse();
+const pickerLine = (role: string) => (isAccountRole(role) ? ACCOUNT_ROLE_PICKER_LINE[role] : '');
+/** D278 — an account whose role is admin while its active organization says member. */
+interface RoleGap { user_id: string; org_id: string; org_name: string | null }
 
 export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
   const isMobile = useIsMobile();
@@ -104,18 +120,24 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
   const [deleteOf, setDeleteOf] = useState<Row | null>(null);
   const [resetOf, setResetOf] = useState<ResetTarget | null>(null);
   const [requests, setRequests] = useState<ResetRequest[]>([]);
+  const [gaps, setGaps] = useState<Map<string, RoleGap>>(new Map());
+  const [roleChange, setRoleChange] = useState<{ row: Row; summary: RoleChangeSummary } | null>(null);
 
   const actorArgs = () => ({ p_actor_id: actor?.id, p_actor_email: actor?.email });
 
   const load = async () => {
     setLoading(true);
     setLoadError(null);
-    const [usage, orgRes, resetRes] = await Promise.all([
+    const [usage, orgRes, resetRes, gapRes] = await Promise.all([
       db.rpc('admin_list_users', actorArgs()),
       db.rpc('admin_list_organizations', actorArgs()),
       listResetRequests(actorArgs()),
+      db.rpc('admin_list_account_role_gaps', actorArgs()),
     ]);
     setRequests(resetRes.data);
+    // Absent until `20261002000006` deploys: then no account is marked, and the page says nothing false.
+    if (gapRes.error) console.warn('[admin/users] role gaps unreadable:', gapRes.error.message);
+    setGaps(new Map(((gapRes.data ?? []) as RoleGap[]).map((g) => [g.user_id, g])));
     // A refused read is not an empty platform: say which it is (D205, D203).
     if (usage.error) {
       setLoadError(usage.error.message === 'forbidden'
@@ -157,10 +179,23 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
 
   const changeRole = async (row: Row, next: string) => {
     if (next === row.role) return;
-    const { error } = await db.rpc('admin_set_user_role', { ...actorArgs(), p_target_user_id: row.user_id, p_role: next });
+    const { data, error } = await db.rpc('admin_set_user_role', { ...actorArgs(), p_target_user_id: row.user_id, p_role: next });
     if (error) return toast.error(error.message);
-    toast.success(`Role updated for ${row.email}`);
+    toast.success(`${row.email} is now ${accountRoleLabel(next)}`);
     setRows((prev) => prev.map((r) => (r.user_id === row.user_id ? { ...r, role: next } : r)));
+    // D278 — what the change did, and what still decides instead. A pre-D278 server returns nothing.
+    const summary = parseRoleChangeSummary(data);
+    if (summary) setRoleChange({ row, summary });
+    load();
+  };
+
+  const makeOrgAdmin = async (row: Row, gap: RoleGap) => {
+    const { error } = await db.rpc('admin_set_user_org_role', {
+      ...actorArgs(), p_target_user_id: row.user_id, p_org_id: gap.org_id, p_org_role: 'admin',
+    });
+    if (error) return toast.error(error.message.replace(/^not_a_member:\s*/, ''));
+    toast.success(`${row.email} is now an admin of ${gap.org_name ?? 'the organization'}`);
+    load();
   };
 
   const dismissRequest = async (r: ResetRequest) => {
@@ -229,7 +264,8 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                 label={r.name || '—'}
                 dot={active ? M.process : M.blocking}
                 sub={`${r.email || '—'} · default org ${defaultOrgLabel(r) || 'not set'}${
-                  activeOrgLabel(r) && activeOrgLabel(r) !== defaultOrgLabel(r) ? ` · now in ${activeOrgLabel(r)}` : ''} · access ${(r.memberships ?? []).length} org(s) · ${r.role} · ${Number(
+                  activeOrgLabel(r) && activeOrgLabel(r) !== defaultOrgLabel(r) ? ` · now in ${activeOrgLabel(r)}` : ''} · access ${(r.memberships ?? []).length} org(s) · ${r.role}${
+                  gaps.has(r.user_id) ? ' (organization member)' : ''} · ${Number(
                   r.mtd_requests,
                 ).toLocaleString()} req MTD · budget ${budget != null ? `$${budget.toFixed(2)}` : '—'}${
                   remaining != null && remaining < 0 ? ' · over budget' : ''
@@ -262,8 +298,16 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                         sub: 'temporary password, changed at next sign-in',
                         onClick: () => setResetOf(r),
                       }]),
+                  ...(gaps.get(r.user_id)
+                    ? [{
+                        label: 'Make organization admin',
+                        sub: `account admin · member of ${gaps.get(r.user_id)!.org_name ?? 'the active organization'}`,
+                        onClick: () => makeOrgAdmin(r, gaps.get(r.user_id)!),
+                      }]
+                    : []),
                   ...ROLES.filter((role) => role !== r.role).map((role) => ({
                     label: `Change role to ${role}`,
+                    sub: pickerLine(role),
                     onClick: () => changeRole(r, role),
                   })),
                   ...(r.user_id === actor?.id
@@ -335,9 +379,31 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
                     <td className={`${TD} text-[12.5px] text-muted-foreground`}>{r.email}</td>
                     <td className={TD}>
                       <Select value={r.role} onValueChange={(v) => changeRole(r, v)}>
-                        <SelectTrigger className="h-7 w-32 rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role} className="min-h-11 md:min-h-0">{role}</SelectItem>)}</SelectContent>
+                        <SelectTrigger className="h-7 w-32 rounded-sm text-[12px]" title={isAccountRole(r.role) ? ACCOUNT_ROLE_GLOSS[r.role] : undefined}>
+                          {/* The trigger shows the word; the options carry its meaning. */}
+                          <SelectValue>{r.role}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="max-w-[340px]">
+                          {ROLES.map((role) => (
+                            <SelectItem key={role} value={role} className="min-h-11 md:min-h-0">
+                              <span className="block text-[12.5px]">{role}</span>
+                              <span className="block text-[11px] leading-snug text-muted-foreground">{pickerLine(role)}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
                       </Select>
+                      {gaps.get(r.user_id) && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <span className="rounded-sm bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-900"
+                            title={`The account role is admin, but in ${gaps.get(r.user_id)!.org_name ?? 'the active organization'} this person is a member. Changing the role used to leave the organization role behind.`}>
+                            account admin · organization member
+                          </span>
+                          <button className="text-[11px] text-[#bf2330] underline-offset-2 hover:underline"
+                            onClick={() => makeOrgAdmin(r, gaps.get(r.user_id)!)}>
+                            Make organization admin
+                          </button>
+                        </div>
+                      )}
                     </td>
                     <td className={TD}><StatusDot tone={active ? 'active' : 'error'} label={active ? 'Active' : 'Suspended'} /></td>
                     <td className={`${TD} text-right font-mono text-[12px] tabular-nums text-muted-foreground`}>{Number(r.mtd_requests).toLocaleString()}</td>
@@ -392,7 +458,59 @@ export default function AdminUsers({ isCollapsed, setIsCollapsed }: Props) {
         <ResetPasswordDialog target={resetOf} actorArgs={actorArgs}
           onClose={() => setResetOf(null)} onDone={load} />
       )}
+      {roleChange && (
+        <RoleChangeDialog row={roleChange.row} summary={roleChange.summary}
+          onOpenUser={() => { const id = roleChange.row.user_id; setRoleChange(null); navigate(`/admin/users/${id}`); }}
+          onClose={() => setRoleChange(null)} />
+      )}
     </AdminLayout>
+  );
+}
+
+/**
+ * D278 — what an account-role change did, and what still decides instead. Every line is
+ * the database's (`admin_set_user_role`'s return); this only words it.
+ */
+function RoleChangeDialog({ row, summary, onOpenUser, onClose }: {
+  row: Row; summary: RoleChangeSummary; onOpenUser: () => void; onClose: () => void;
+}) {
+  const lines = describeRoleChange(summary);
+  const stillDecides = lines.overrides.length + lines.projects.length > 0;
+  return (
+    <ResponsiveDialog open onOpenChange={(v) => !v && onClose()}>
+      <ResponsiveDialogContent className={cn(DIALOG_AS_SHEET, 'md:max-w-lg md:rounded-sm')}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>
+            {row.name || row.email}: {accountRoleLabel(summary.role_before)} → {accountRoleLabel(summary.role_after)}
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
+            {isAccountRole(summary.role_after) ? ACCOUNT_ROLE_GLOSS[summary.role_after] : ''}
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
+        <div className="grid gap-3 text-[13px]">
+          {lines.org && <p>{lines.org}</p>}
+          {stillDecides ? (
+            <div>
+              <p className="font-medium">Still deciding instead of the role:</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+                {lines.overrides.map((l) => <li key={l}>{l}</li>)}
+                {lines.projects.map((l) => <li key={l}>{l}</li>)}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">No override and no project role limits this person below the new role.</p>
+          )}
+          {summary.role_after === 'admin' && (
+            <p className="text-xs text-muted-foreground">{ACCOUNT_ROLE_CHANGE_RULE.stillDecides.adminArea}</p>
+          )}
+          <p className="text-xs text-muted-foreground">{ACCOUNT_ROLE_CHANGE_RULE.openSessions}</p>
+        </div>
+        <ResponsiveDialogFooter>
+          <Button variant="ghost" onClick={onClose}>Close</Button>
+          <Button onClick={onOpenUser}>Open {row.name || row.email}&rsquo;s access</Button>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 

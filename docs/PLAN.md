@@ -461,7 +461,9 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D273** | **The browser engine computed a run with its own copy of the worker's pipeline, and the copy had drifted.** Run & Validate runs scsim in the browser through a Python string inside `engine.worker.ts` — a hand copy of `snapshot_to_policies` → `build_project_data` → `compute_run_from_project` → `build_run_update`. The copy's result shaping lagged the worker's: it never wrote `_range` (the min/max across replications, WP 10.6) or `_meta.capacity_binding` (WP 9.3), so a browser-computed run read as having neither. A third place to compute a run — a user's own machine, Phase 12 — would have been a third copy | `src/lib/sim/engine.worker.ts` (the `PY_DRIVER` string) against `sim-worker/sim_worker/worker.py`'s `build_run_update` | **WP 12.1 ✅** *(`sim_worker.local.run_from_snapshots` is the one entry point; the shaping moved to `sim_worker/run_shape.py`, the long-form series to `series_store.long_columns`. The browser driver, the notebooks' demo recorder and the `suresuite` package call it. `sim-worker/tests/test_local_parity.py` executes the browser's own driver string and requires the worker's run row, byte for byte)* |
 | **D274** | **The engine is gated for pip and public for the browser.** WP 12.4 distributes the engine wheels to API users only through signed URLs from a private bucket (`GET /v1/engine`), logged per key — and the browser engine (Run & Validate) still loads the same two wheels from `public/engine/` as public static files, so anyone who can fetch the app's assets can fetch the engine. The gate is real for the PATH it covers (who installed which engine is now known) and is not a secrecy boundary | `public/engine/*.whl` and `src/lib/sim/engine.worker.ts` (`/engine/${whl}`) against `supabase/functions/_shared/engineIndex.ts` | **OPEN — WP 7.1** *(closing it means the browser fetches signed URLs too, which needs a browser principal the database can trust — the anon key is not one (D28), and that is WP 7.1's authentication model. Recorded when the engine route landed (§22), rather than hidden; the product owner chose "gated by API key" knowing the static copy exists)* |
 | **D275** | **An analyst could still rewrite a project's policies by calling the database, and could validate on /policies.** D232 made the analyst run-only and D230 made the BROWSER obey it, but the eight policy writers took the actor (D71) only to name it on the audit row: none asked whether that actor held Edit Policies, so any client that skipped the page's gate wrote freely. And /policies' Run & Validate gated on Run Simulations alone, so the analyst — whose role is to run from /simulation-lab — still ran the validation step of policy editing. Reported by the owner: "stop Analysts running from Run & Validate on /policies, or make the server refuse their policy writes" — both | `supabase/migrations/20260918000003_actor_on_the_remaining_nine.sql` (five writers: actor named, not checked); `supabase/migrations/20260919000007_decision_plane_actor.sql` (two); `supabase/migrations/20260918000002_actor_on_three_definer_writers.sql` (`apply_policy_bundle`); `src/components/policies/RunValidateStage.tsx` (`canRun` = `simulation_lab`) | **CLOSED ✅ (`20261002000003`), for every caller that names its actor.** `assert_may_edit_policies(project, actor)` reads `project_rights_for_user` — the one answer D230 made the browser, /profile and both admin pages read — and raises `forbidden` (42501) without `data_edit_policies`; `save_policy_defaults`, `bulk_upsert_policy_overrides`, `delete_policy_override`, `clear_policy_preset`, `restore_policy_version`, `update_policy_version_notes`, `delete_policy_version` and `apply_policy_bundle` each call it once after setting the actor GUC (bodies copied, one line added, `CREATE OR REPLACE` so grants survive). An actor that is not an approved user is refused. `snapshot_policy` is NOT gated — a version on the way to a run changes no value (D230 decision 5). Run & Validate now needs Run Simulations AND Edit Policies, and says the Lab is where a run-only role runs. `rehearsal/710` §1–§5: analyst, viewer and an unknown actor refused by all eight with no value moved; editor and owner write; the analyst still snapshots; a call naming no actor still writes. NOT closed, stated: a call naming NO actor passes — the Developer API's writes carry an API key, not a user (D28, D71's remainder), governed by the key's `write:policies` scope; the actor is client-asserted (D28), so this binds a caller that tells the truth about who it is and not one that lies; `sim-command` does not know which page dispatched a run, so Run & Validate's restriction is the browser's |
+| **D276** | **A project role REPLACED the account role for the four project rights instead of narrowing it, /admin/roles never said so, and an AI agent could approve on a project what its approver was refused there by hand.** `capabilities_for_user(user, project)` answered each key from the first layer with an opinion — person override → project role → organization → account role — so for Run Simulations, Edit Input Data, Edit Policies and Export the account-role switches on /admin/roles applied only to people with NO role on the project: a 'User' account (Run Simulations only, in production) made Editor held Edit Policies and Export there. The Features grid drew those four rows like every other, so the switch an admin flipped was not the one that decided. And `review_agent_proposal` and `agent-apply` read the ACCOUNT-wide set (`get_my_capabilities`), so a modeler who is a Viewer member could approve a Policy Configurator bundle — the agent gap D232 left open. Asked by the owner: "how could we reconcile the role in the project and feature capability", then "approve your recommendation … make it strong and transparent in page /admin/roles" | `supabase/migrations/20261001000004_project_rights_in_the_project.sql` (`capabilities_for_user(uuid, uuid)`: the COALESCE chain); `supabase/migrations/20260723000001_reports_and_file_workspace.sql` (`review_agent_proposal`: `get_my_capabilities`); `supabase/functions/agent-apply/index.ts` (checkpoint 5: account-wide features only); `src/pages/admin/AdminRoles.tsx` | **CLOSED ✅ (`20261002000004`), by the owner's choice of the ceiling model.** ONE rule, `project_right_decide` (pure): super admin → yes; a person override → its value; no project role → the account's answer; otherwise project grant AND account answer — and it returns which of those decided. `project_right_decisions(user, project)` supplies its inputs (the account's answer is the PROJECT's organization layer, then the account role, D231's order); `capabilities_for_user(user, project)` reads it for the project-scoped keys and keeps every other key's chain verbatim; `project_rights_for_user` returns `decisions`, naming the upload gate and suspension as deciders too, and `projectRightRefusal` says which layer refused. `agent_artifact_project_rights()` declares the project right each artifact's approval needs (data diffs → Edit Input Data, policy bundle and model card → Edit Policies, experiment and risk alert → Run Simulations, decision report → Export, explanation → none), `agent_project_right_refusal` applies it and fails closed on an undeclared type, and both `review_agent_proposal` (approve) and `agent-apply` call it. /admin/roles reads `get_role_access`, which now also returns the project-role matrix, the EFFECTIVE matrix (account role × project role, computed by the rule, not re-authored in the page), the memberships per cell, every membership the ceiling narrows today, the organization and person overrides on those keys, and the agent map; a switch on a project-scoped key asks `admin_preview_role_capability` first and the page names who would gain or lose it before anything is written. `rehearsal/720` §1–§7 (every branch of the rule, the ceiling, no role, both overrides, the agent gate including coverage of every `proposals_artifact_type_check` value, the admin read, the preview); `460`, `490`, `550` now plant the account-role rows the migrations seed, because the base has none and the ceiling reads them; `projectRights.test.ts` pins the deciders and their sentences. Mutation: the `account_ceiling` branch removed turns `720` §1 red. NOT changed, stated: a person override still beats the project role (the one deliberate escape hatch, now listed on the page); the project-role matrix stays a migration's (D232's shape) so the manual cannot drift, shown read-only; D230's open server gates (`sim-command`, the policy and item-master RPCs) still check no project role; who in production LOSES a right on deploy is not measured from a branch — /admin/roles' "Narrowed by the ceiling today" list is that reading once the migration is live *(Row restored by D278: the merge `b4780a9` that renumbered this package D273 → D276 dropped it, and its §16 entry, instead of renumbering them; text as written at `5e6efac`, numbers as merged.)* |
 | **D277** | **The pre-run check and the Supplier grid answered "does this material have a primary supplier?" from two different sources, so a single-source material was blocked while the grid showed it resolved.** The grid and its step track resolve `primary_source` through `getEffectiveValue` — a saved override, else the stage's own routing decision (`__decided`: a material with one supplier IS its primary). `verifyProjectPolicies` read `effectivePolicy` over the SAVED bundle alone. The decision only reaches that bundle through the auto-seed, which fires once per stage, when the stage has NO overrides — so every lane uploaded after a stage's first seed showed "Primary ✓" and was refused at Run checks. Owner-reported on `Aumovio`: `M0241`, sourced only from `S012` | `src/lib/policies/verification.ts` (`verifyProjectPolicies`); `src/components/policies/StagePolicyTable.tsx` (the auto-seed's `hasOverridesForStage` guard); `src/hooks/useStageRows.tsx` (`__decided`) | **CLOSED ✅ (2026-10-02)** — the verifier reads `primary_source` through `getEffectiveValue`, the grid's own resolver: an explicit save still wins, so un-checking the only supplier still blocks. `primaryFromGrid.test.ts`, three of four assertions red on the old verifier. With D188's engine half closed in the same day, a resolved suggestion is also what the run does |
+| **D278** | **An account-role change on /admin/users changed less than it appeared to, and said nothing about the rest.** (1) `admin_set_user_role` wrote `approved_users.role` alone, and the membership trigger maps account `admin` → organization `admin` only when a membership is CREATED, so a promotion left the active organization's row at `member` and a DEMOTION left an `admin` row in place — the half that holds a right: `_api_key_management_org` admits an organization owner/admin whatever the account role, so an admin demoted to `user` kept managing the organization's API keys and every scope on a personal key (`_api_key_caller.can_manage`). The promotion half held no new right (an account `admin` already passes that check by its account role); it was a contradiction on /profile and /admin/users, which listed an account admin as an organization member. (2) Nothing said what the change did NOT change: a person override (`user_capabilities`) or organization override (`org_capabilities`) beats the account role in `capabilities_for_user`, and since D276 a project role limits the account role on the four project rights. (3) `admin` is not `super_admin` — /admin and every `admin_*` RPC are super-admin-only — but the picker showed bare words; the gloss that says so lived only in the manual. (4) An open session never learned of the change: the profile was re-read once on mount and the capability set only when the user id changed. Owner-reported: changing a user's account role (e.g. user → admin) did not change what that person could do | `supabase/migrations/20260929000002_admin_users_read.sql:169` (`admin_set_user_role`: the UPDATE alone); `supabase/migrations/20260930000004_account_in_several_organizations.sql:87` (the sync trigger returns unless `organization_id` changes); `supabase/migrations/20260711000001_api_access_control.sql:160` (`_api_key_management_org`: org owner/admin); `supabase/migrations/20261002000005_personal_keys_for_every_user.sql:46` (`_api_key_caller` inherits it); `supabase/migrations/20260905000001_grant_ga_agent_capabilities.sql:79` (override precedence); `supabase/migrations/20261002000004_account_role_ceiling.sql:63` (`project_right_decide`); `src/lib/permissions.ts:22` (`/admin` super_admin only); was `src/pages/admin/AdminUsers.tsx:92,339` (bare role words) and `src/components/docs/bodies/RolesAndCapabilities.tsx:30` (the gloss, manual only); was `src/hooks/useAuth.tsx:277-280` and `src/hooks/useCapabilities.tsx:153` (reads keyed on mount / user id) | **CLOSED ✅ (`20261002000006`).** `admin_set_user_role` (DROP + CREATE, `jsonb`; grants re-issued, every guard kept) moves the ACTIVE organization's row `member` → `admin` on becoming admin and `admin` → `member` on leaving it — never `owner`, never another organization (D210) — each move logged as `user.org_role_change` in `admin_set_user_org_role`'s shape; and RETURNS `{role_before, role_after, org, overrides, narrowed_projects}`: the overrides that now differ from the new role's default, and the projects whose role refuses what the account allows, read from `project_right_decisions` (D276's rule, not re-authored). No backfill: `admin_list_account_role_gaps` lists account admins left at `member`, and /admin/users marks each with a one-click `admin_set_user_org_role`. The page shows the summary in a dialog linking to /admin/users/:userId; the picker's options carry one line each from `roleGloss.ts`, which the manual now reads too. `useAuth` re-reads the profile on focus, on visibility and every five minutes and says a changed role once; `useCapabilities` reloads on the role. `rehearsal/740` §1–§7, three mutations red (owner guard, other-organization guard, demotion branch). NOT closed, stated: a role changed while the person's ACTIVE organization is not the one meant moves that one only; an open tab learns within five minutes or on return, not instantly; the grants mutation stays green because Supabase's default privileges grant `anon`/`authenticated` on every new function |
 
 ### 4.1 Code map — the data layer
 
@@ -22080,6 +22082,48 @@ every body. (3) No later package changes; D28 still owns the asserted actor.
 passes, `710` new. Mutation: `assert_may_edit_policies` returning early turns `710` §1 red.
 Nothing reaches production until merge; any §15 reading belongs in the push after it (D153).
 
+### Profile · the account role caps, the project role grants · 2026-10-02 · `20261002000004`
+
+*Restored by D278. The merge `b4780a9` that renumbered this package D273 → D276 (and `20261002000001` → `20261002000004`, `700` → `720`) kept its code and dropped this entry and its §4 row. R7 did not notice: its entry key is the heading before the first `·`, and other `Profile · …` entries still carry that key. Text as written at `5e6efac`; numbers as merged.*
+
+**Asked for.** Shown /admin/roles' Features grid beside the project-role table: "how could we
+reconcile the role in the project and feature capability"; then, of the recommendation (account
+role = ceiling, project role = grant, agent approvals bound to the project right, the grid
+labelled): "approve your recommendation! but is there any way that we could make it a strong and
+transparent in page /admin/roles".
+
+**Promised versus found.** D230 made the project rights the app's own answer and D232 said its
+open gaps were "agent approvals, `sim-command`". Reading the resolver for the answer found the
+larger fact: the project layer did not narrow the account layer, it replaced it, so a User
+account made Editor held rights its account column refuses — and the admin page could not show
+that, because it rendered the account matrix alone (D276).
+
+**Decisions.** (1) The ceiling is the account's answer AS IT WAS — organization layer, then
+account role — so an organization switch still caps its own projects. (2) A person override
+stays above the project role: it is the per-person escape hatch the admin pages already offer,
+and the page now lists every one on these keys rather than hiding it. (3) The project-role matrix
+is NOT made editable on the page: the manual's role table is generated from migrations (D232),
+and an editable copy would drift from it within a quarter; the page says so. (4) The page never
+re-implements the rule: the effective matrix, the narrowed list and the switch preview are all
+computed by `project_right_decide` in the database. (5) A switch on one of the four keys is never
+flipped blind: the preview names the memberships that would move. (6) An agent approval asks the
+project right the same change needs by hand, in ONE declared map read by the SQL approval and the
+edge function alike; an undeclared artifact type is refused, not waved through.
+
+**Gap check.** (1) `460`, `490` and `550` asserted owners and editors holding rights while
+planting no account-role rows; under the ceiling every such right read false. The plants now
+carry the account layer as the migrations seed it — D50's lesson: plant what every later base
+will hold, not what makes this branch green. (2) The DB-backed agent evals apply a fixed migration
+list and keep the old `review_agent_proposal`; `rehearsal/720` §5 is where the new gate is proven.
+(3) Production impact is unmeasured from a branch: who loses a right is the page's own "Narrowed
+by the ceiling today" list after deploy, and any §15 reading belongs in the push after the merge
+(D153). (4) D230's server gates are unchanged. No later package changes.
+
+**Measured locally.** `contract:rehearse` against PostgreSQL 16, fresh and `--fixtures`: 70 files
+pass, `720` new; the mutation above red at `720` §1. The page was rendered in Chromium against
+`get_role_access` and `admin_preview_role_capability` output taken from the `720` fixtures, desktop
+and phone width, including the preview dialog.
+
 ### WP 12.7 — A key for every user, read-only without a role · 2026-10-02 · `20261002000005`
 
 **What WP 12.3 promised against what this found.** WP 12.3's gap check named the open question
@@ -22170,6 +22214,58 @@ says so; the requirement itself is declared by P-P.3 in the registry and is unch
 primaries stored before today were seeded under the highest-volume rule. Compare runs across
 0.2.9 only with that in mind; the RunKey's engine build already separates them. Nothing reaches
 production until merge.
+
+### Profile · an account role change reaches the organization role and the open session · 2026-10-02 · `20261002000006`
+
+**Owner-reported.** Changing a user's account role on /admin/users (user → admin) did not change
+what that person could do. The approved plan named it D277 / `20261002000006` / `rehearsal/740`;
+`main` had taken D277 since (the pre-run supplier check), so this is **§4 D278**, and the
+migration and rehearsal numbers were free.
+
+**What D276 promised against what this found.** D276 made the account role the CEILING on the
+four project rights and made /admin/roles say so. It did not touch the verb that sets an account
+role, so the ceiling made the role picker look more powerful than it is: the role decides less
+than the picker implies (overrides above it, project roles beside it, and `admin` is not the
+admin area), and it decided more than it said in one place — the organization role it left
+behind. The plan named org API keys as the right that "never arrives" on promotion; reading
+`_api_key_management_org` found the opposite direction: an account `admin` already passes it by
+its account role, while an account DEMOTED from admin kept its organization `admin` row and with
+it the organization's keys and every personal-key scope. `rehearsal/740` §4 proves the demotion
+now removes that right. The `organization_members` sidecar said "no policy and no RPC consults
+`org_role`", which that function falsified; the note is corrected (D103's class: a prose fact
+with nothing comparing it to the code).
+
+**Also found: D276's own record was missing.** The merge `b4780a9` that renumbered D273 → D276
+kept the migration, the rehearsal and every code citation of D276 and dropped its §4 row and its
+§16 entry. `contract:check` R16 printed it ("1 unused (D276)") as information; R7 could not see
+it, because its entry key is the heading before the first `·` — `Profile` — and other `Profile ·`
+entries remain. Both are restored above, verbatim from `5e6efac` with the merged numbers. R7's
+key is not changed here: widening it would re-key every historical heading at once, and that is
+its own package.
+
+**What changed.** See §4 D278. Migration `20261002000006` (the verb, the gap read). App:
+`roleGloss.ts` (the account-role vocabulary, glosses, picker lines and the change rule, read by
+the manual AND /admin/users), `roleChange.ts` (the summary's wording, nothing decided),
+`sessionRefresh.ts` (focus / visibility / five-minute refresh, the one-time "Your role changed
+to X" notice, the capability reload key). Manual: Roles and capabilities says the one stated link
+between the platform and organization vocabularies; Admin screens says what the picker moves
+and what still decides.
+
+**Gate results.** `contract:rehearse` against a local PostgreSQL 16 green, `740` new; mutations
+red at `740` §3 (owner guard), §1 (other-organization guard) and §4 (demotion branch). A fourth —
+deleting the GRANT line — stays green, because Supabase's default privileges, which the rehearsal
+base reproduces, grant `anon`/`authenticated` on every new function; §7 catches a REVOKE and a
+PUBLIC grant, and says so. `npm test` green with two new suites; `typecheck` 15 of 15 held;
+`audit:ui`, `check:docs` clean; eslint 295 errors / 110 warnings, identical to `main`, none in the
+new files.
+
+**Gap check.** (1) The organization move is the ACTIVE organization's only; an account working
+in another of its organizations when its role changes is moved there. The summary names the
+organization it moved. (2) No backfill: production's count of account admins at `member` is the
+new §15 probe, read in the push AFTER the merge (D153); before it deploys the page shows no badge
+and the RPC is absent, which the page tolerates. (3) An open tab learns within five minutes or on
+return to it — nothing in the database can push to a browser. (4) The `user.role_change` audit
+row is written even when the role does not change, as before. No later package moves.
 
 ## 17. Sequencing
 
