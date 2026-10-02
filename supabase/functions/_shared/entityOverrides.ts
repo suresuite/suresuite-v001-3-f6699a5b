@@ -31,6 +31,10 @@ export interface OverrideDecl {
   rows: "supplier" | "plant";
   domain: OverrideDomain;
   entity: OverrideEntity;
+  /** What the engine uses when override, master and derivations are all empty:
+   *  a number, or null with `emptyNote` saying what it does instead. */
+  emptyDefault: number | null;
+  emptyNote: string | null;
 }
 
 const ENTITY_OF_TABLE: Record<string, OverrideEntity> = {
@@ -53,6 +57,8 @@ export function overrideDecls(bundleKeys: readonly Row[] | undefined): OverrideD
       rows: k.rows === "plant" ? "plant" : "supplier",
       domain: (k.domain as OverrideDomain) ?? "nonnegative",
       entity,
+      emptyDefault: typeof k.empty_default === "number" ? k.empty_default : null,
+      emptyNote: typeof k.empty_note === "string" ? k.empty_note : null,
     });
   }
   return out;

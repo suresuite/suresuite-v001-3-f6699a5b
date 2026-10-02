@@ -99,7 +99,9 @@ def build_project_data(
             SupplierRow(
                 id=str(r["supplier_id"]), name=r.get("name"),
                 capacity_per_week=_num(r.get("capacity_per_week")),
-                reliability_score=_num(r.get("reliability_score")) or 1.0,
+                # None stays None: the mapper applies the engine's declared 1.0 and
+                # SAYS it is the default (§23 WP 13.4) rather than a master value.
+                reliability_score=_num(r.get("reliability_score")),
             )
             for r in suppliers if r.get("supplier_id")
         ],

@@ -40,6 +40,9 @@ export interface DerivedMaps {
    * which is exactly the behaviour it had before.
    */
   productionCapacity?: Map<string, DerivedValue>;
+  /** `materials.cost`'s derived value WITH the step that answered (§23 WP 13.4),
+   *  so a lane-derived cost is shown with its source. Optional, like the above. */
+  materialCostVia?: Map<string, DerivedValue>;
 }
 
 export function masterValueFor(
@@ -127,8 +130,18 @@ function derivedStepFor(
   row: Record<string, unknown>,
   derived: DerivedMaps,
 ): DerivedValue | undefined {
-  if (col.master?.field !== "production_capacity") return undefined;
-  return derived.productionCapacity?.get(String(row[col.master.idFrom] ?? ""));
+  if (!col.master) return undefined;
+  const id = String(row[col.master.idFrom] ?? "");
+  if (col.master.field === "production_capacity") return derived.productionCapacity?.get(id);
+  // §23 WP 13.4 — every lane-derived value is shown with its source. The cost
+  // chain has two steps and the map says which answered; price and demand have
+  // one reducer each, so the step is the registry's only one.
+  if (col.master.table === "materials" && col.master.field === "cost") return derived.materialCostVia?.get(id);
+  const value = derivedValueFor(col, row, derived);
+  if (value === undefined) return undefined;
+  if (col.master.field === "sell_price") return { value, via: "demand_weighted_outbound_price", grade: "info" };
+  if (col.master.field === "demand_mean") return { value, via: "weekly_outbound_volume", grade: "info" };
+  return undefined;
 }
 
 /** `getEffective` — data prefill → override → default; master-backed columns
@@ -416,9 +429,17 @@ export function resolveCell(args: {
    * now declares it in `columnSpecs.ts`, and the cell renders that token instead
    * of inventing a number.
    */
-  const nullMeans = col.master?.nullMeans;
+  // §23 WP 13.4 — what the ENGINE uses when override, master and derivation are
+  // all empty, from the override key's own declaration: a number shown as the
+  // default, or a declared meaning shown as a token. Never an invented 0.
+  const emptyRule = col.master ? masterOverrideRule(col.family, col.field) : undefined;
+  const nullMeans =
+    col.master?.nullMeans ??
+    (emptyRule && emptyRule.emptyDefault === null && emptyRule.emptyNote
+      ? { token: "engine", title: `Empty — the engine uses ${emptyRule.emptyNote}.` }
+      : undefined);
   const liveDefault = col.master
-    ? derivedVal ?? (nullMeans ? undefined : 0)
+    ? derivedVal ?? (nullMeans ? undefined : emptyRule?.emptyDefault ?? 0)
     : bundleVal !== undefined
       ? bundleVal
       : col.defaultWhenMissing !== undefined

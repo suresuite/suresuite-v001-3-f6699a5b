@@ -52,6 +52,8 @@ interface Props {
   /** Lines per setup stage, loaded once at the page level for the step track —
    *  the grid and stage 4's verification read them instead of refetching. */
   rowsByStage: Record<Exclude<StageKey, "run_validate">, StageRowsQuery>;
+  /** §23 WP 13.4 — how many grid lines hold unsaved drafts (the page guards leaving). */
+  onDraftsChange?: (lines: number) => void;
 }
 
 export function FocusedStage({
@@ -72,6 +74,7 @@ export function FocusedStage({
   selectedVersionId,
   policyDirty,
   rowsByStage,
+  onDraftsChange,
 }: Props) {
   const stage = getStage(stageKey);
   const isMobile = useIsMobile();
@@ -277,6 +280,7 @@ export function FocusedStage({
         saveSnapshot={saveSnapshot}
         leftActions={tableLeftActions}
         stageRows={rowsByStage[stageKey]}
+        onDraftsChange={onDraftsChange}
       />
 
       {/* Fulfillment (allocation, backorder, service level) is consumed by the

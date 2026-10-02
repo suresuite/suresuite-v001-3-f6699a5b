@@ -647,6 +647,6 @@ The simulation scope's level version ("simulation inputs v4") — `graph_level_v
 
 ---
 
-*Generated from data contract `307e530f0910`, engine `0.2.10`,
+*Generated from data contract `0f63c0936a2a`, engine `0.2.11`,
 sidecar `supabase/contract/model_validations.contract.yaml`, table created by `20260710000001_model_validations.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

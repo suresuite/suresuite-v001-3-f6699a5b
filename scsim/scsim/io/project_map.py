@@ -115,7 +115,7 @@ class SupplierRow:
     id: str
     name: Optional[str] = None
     capacity_per_week: Optional[float] = None  # None = ∞
-    reliability_score: float = 1.0
+    reliability_score: Optional[float] = None  # None = no master value → the engine's 1.0
 
 
 @dataclass
@@ -273,6 +273,9 @@ class MappingWarning:
 class MappingResult:
     scenario: Scenario
     warnings: list[MappingWarning] = field(default_factory=list)
+    # §23 WP 13.4 — `{"materials.cost": {"M1": {"source": "override", "value": 3.5}}}`:
+    # what the engine was given for every master-backed field, and from where.
+    resolved: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)
 
     @property
     def warning_dicts(self) -> list[dict]:
@@ -329,15 +332,28 @@ class MappingResult:
 # `products.production_capacity` (§4 D167) — which since WP 13.1 is present when
 # the master OR the Plant-stage override of it carries a value.
 #
+# `scopes` is REQUIRED (§23 WP 13.4, §4 D204 b): WHERE the mapper reads the key —
+# `default` (the project-wide policy), `supplier` (a Supplier-stage row,
+# `node:<supplier>::<material>`), `plant` (a Plant-stage row,
+# `node:<plant>::<product>`). A /policies cell whose stage is not in its key's
+# scopes is stored and versioned and changes no result, and the grid badges it
+# "not simulated" — the badge list is generated from this field, and
+# `test_declared_scopes_are_the_scopes_the_mapper_reads` perturbs every key at
+# every scope to prove each declaration true.
+#
 # `master`, `rows` and `domain` are OPTIONAL and travel together (§23 WP
 # 13.1): `master` names the item-master column this key OVERRIDES, `rows` the
 # /policies stage whose row keys the mapper reads it from, and `domain` the
 # values it accepts (positive · nonnegative · fraction) — an override outside it
-# is ignored with a warning and the master decides. Nine keys carry them, and
+# is ignored with a warning and the master decides. `empty_default` (and, when it
+# is not a number, `empty_note`) is what the engine uses when the override, the
+# master and every derivation are empty — the grid shows exactly that rather than
+# an invented 0 (§23 WP 13.4). Nine keys carry them, and
 # the grid reads all three from the registry rather than restating them.
-POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
+POLICY_BUNDLE_KEYS: tuple[dict[str, Any], ...] = (
     {
         "key": "supply_share",
+        "scopes": ("supplier",),
         "family": "sourcing",
         "target": "proactive_multi_sourcing.weights",
         "catalog_ref": "P-S.2",
@@ -346,6 +362,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     },
     {
         "key": "type",
+        "scopes": ("default", "supplier"),
         "family": "inventory",
         "target": "inventory_control.policy_type",
         "catalog_ref": "P-X.1",
@@ -355,6 +372,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     },
     {
         "key": "safety_stock_days",
+        "scopes": ("default", "supplier"),
         "family": "inventory",
         "target": "safety_stock_materials.fixed_days_cover",
         "catalog_ref": "P-X.2",
@@ -366,6 +384,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     },
     {
         "key": "holding_cost_pct",
+        "scopes": ("default", "supplier"),
         "family": "inventory",
         # An ENTITY field, like capacity_units_per_day: the master column and
         # this key feed the same number, and the /policies row wins.
@@ -378,6 +397,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     },
     {
         "key": "primary_source",
+        "scopes": ("supplier",),
         "family": "sourcing",
         "target": "SupplierLink.primary",
         "catalog_ref": None,
@@ -394,112 +414,135 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     # value read here.
     {
         "key": "material_cost",
+        "scopes": ("supplier",),
         "family": "sourcing",
         "target": "Material.cost",
         "catalog_ref": None,
         "master": "materials.cost",
         "rows": "supplier",
         "domain": "positive",
+        "empty_default": 1.0,
         "transform": "currency per unit, must be > 0. Order: the Supplier-stage row "
                      "(`node:<supplier>::<material>`) -> materials.cost (master) -> the "
                      "volume-weighted, then cheapest, inbound price -> 1.0",
     },
     {
         "key": "material_moq",
+        "scopes": ("supplier",),
         "family": "sourcing",
         "target": "SupplierLink.moq",
         "catalog_ref": None,
         "master": "materials.moq",
         "rows": "supplier",
         "domain": "nonnegative",
+        "empty_default": 0.0,
         "transform": "units, >= 0, applied to every supplier link of the material. Order: "
                      "the Supplier-stage row -> materials.moq (master) -> 0",
     },
     {
         "key": "capacity_per_week",
+        "scopes": ("supplier",),
         "family": "sourcing",
         "target": "Supplier.capacity_per_week",
         "catalog_ref": None,
         "master": "suppliers.capacity_per_week",
         "rows": "supplier",
         "domain": "positive",
+        "empty_default": None,
+        "empty_note": "unlimited — no capacity limit",
         "transform": "units per week, must be > 0; one value per SUPPLIER, read from any "
                      "of its Supplier-stage rows. Order: the row -> "
                      "suppliers.capacity_per_week (master; empty means unlimited)",
     },
     {
         "key": "reliability_score",
+        "scopes": ("supplier",),
         "family": "sourcing",
         "target": "Supplier.reliability_score",
         "catalog_ref": None,
         "master": "suppliers.reliability_score",
         "rows": "supplier",
         "domain": "fraction",
+        "empty_default": 1.0,
         "transform": "fraction 0-1; one value per SUPPLIER, read from any of its "
                      "Supplier-stage rows. Order: the row -> suppliers.reliability_score "
                      "(master) -> 1.0",
     },
     {
         "key": "initial_on_hand",
+        "scopes": ("supplier",),
         "family": "inventory",
         "target": "Material.initial_on_hand",
         "catalog_ref": None,
         "master": "materials.initial_on_hand",
         "rows": "supplier",
         "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "the engine's own opening stock (its starting cover)",
         "transform": "units, >= 0. Order: the Supplier-stage row -> "
                      "materials.initial_on_hand (master) -> the engine's own opening "
                      "stock. A PLANT-stage initial_on_hand is not read (§4 D89)",
     },
     {
         "key": "sell_price",
+        "scopes": ("plant",),
         "family": "production",
         "target": "Product.unit_price",
         "catalog_ref": None,
         "master": "products.sell_price",
         "rows": "plant",
         "domain": "positive",
+        "empty_default": 1.0,
         "transform": "currency per unit, must be > 0. Order: the Plant-stage row "
                      "(`node:<plant>::<product>`) -> products.sell_price (master) -> the "
                      "demand-weighted outbound price -> 1.0",
     },
     {
         "key": "production_capacity",
+        "scopes": ("plant",),
         "family": "production",
         "target": "Product.production_capacity",
         "catalog_ref": None,
         "master": "products.production_capacity",
         "rows": "plant",
         "domain": "positive",
+        "empty_default": None,
+        "empty_note": "max(2 × demand, 1000) — chosen so capacity never binds",
         "transform": "units per week, must be > 0. Order: the Plant-stage row -> "
                      "products.production_capacity (master) -> the line capacity "
                      "(capacity_units_per_day x 7 x utilization) -> max(2 x demand, 1000)",
     },
     {
         "key": "demand_mean",
+        "scopes": ("plant",),
         "family": "production",
         "target": "Product.demand_mode",
         "catalog_ref": None,
         "master": "products.demand_mean",
         "rows": "plant",
         "domain": "positive",
+        "empty_default": 0.0,
         "transform": "units per week, must be > 0. Order: the Plant-stage row -> "
                      "products.demand_mean (master) -> the weekly outbound volume -> 0",
     },
     {
         "key": "demand_cv",
+        "scopes": ("plant",),
         "family": "production",
         "target": "Product.demand_cv",
         "catalog_ref": None,
         "master": "products.demand_cv",
         "rows": "plant",
         "domain": "nonnegative",
+        "empty_default": None,
+        "empty_note": "the scenario demand model's CV, else 0.30",
         "transform": "sigma / mean, >= 0. Order: the Plant-stage row -> products.demand_cv "
                      "(master) -> the scenario demand model's cv -> 0.30. Read by the "
                      "triangular and negative-binomial draws; not under Poisson",
     },
     {
         "key": "service_level_target",
+        "scopes": ("default",),
         "family": "inventory",
         "target": "safety_stock_materials.uniform_service_level",
         "catalog_ref": "P-X.2",
@@ -508,6 +551,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     },
     {
         "key": "capacity_units_per_day",
+        "scopes": ("default", "plant"),
         "family": "production",
         # NOT a policy parameter. This one lands on an ENTITY field, which is why
         # door 2 could never have declared it and why the row needed this table
@@ -530,6 +574,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
         # nothing on screen holding the 0.85. It is read by `_map_policies`'s
         # capacity branch exactly as `capacity_units_per_day` is.
         "key": "utilization_cap_pct",
+        "scopes": ("default", "plant"),
         "family": "production",
         "target": "Product.production_capacity",
         "catalog_ref": None,
@@ -541,6 +586,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     },
     {
         "key": "fg_safety_stock",
+        "scopes": ("default",),
         "family": "inventory",
         "target": "fg_safety_stock.sizing",
         "catalog_ref": "P-P.4",
@@ -550,6 +596,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     },
     {
         "key": "fg_service_level_target",
+        "scopes": ("default",),
         "family": "inventory",
         "target": "fg_safety_stock.service_level_pct",
         "catalog_ref": "P-P.4",
@@ -558,6 +605,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     },
     {
         "key": "fg_safety_stock_days",
+        "scopes": ("default",),
         "family": "inventory",
         "target": "fg_safety_stock.fixed_days_cover",
         "catalog_ref": "P-P.4",
@@ -566,6 +614,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     },
     {
         "key": "allocation_priority_weight",
+        "scopes": ("plant",),
         "family": "production",
         "target": "material_allocation.priority_weights",
         "catalog_ref": "P-X.3",
@@ -583,6 +632,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     # inventory-flatline defect exposed).
     {
         "key": "rop_q_quantity",
+        "scopes": ("default", "supplier"),
         "family": "inventory",
         "target": "inventory_control.rop_q_quantity",
         "catalog_ref": "P-P.1",
@@ -592,6 +642,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     },
     {
         "key": "coverage_weeks",
+        "scopes": ("default", "supplier"),
         "family": "inventory",
         "target": "inventory_control.coverage_weeks",
         "catalog_ref": "P-P.1",
@@ -601,6 +652,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     },
     {
         "key": "reorder_point",
+        "scopes": ("supplier",),
         "family": "inventory",
         "target": "inventory_control.material_overrides[*].reorder_point",
         "catalog_ref": "P-P.1",
@@ -610,6 +662,7 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     },
     {
         "key": "order_up_to",
+        "scopes": ("supplier",),
         "family": "inventory",
         "target": "inventory_control.material_overrides[*].order_up_to",
         "catalog_ref": "P-P.1",
@@ -798,12 +851,22 @@ _SOURCE_ORDER = ("override", "master", "lanes", "derived", "default")
 
 
 class _SourceTally:
+    """Where every master-backed value came from — counted for the run log and
+    recorded per entity for `MappingResult.resolved` (§23 WP 13.4: the value the
+    engine receives for each /policies cell, which `pageEqualsRun` compares)."""
+
     def __init__(self) -> None:
         self.counts: dict[str, dict[str, int]] = {}
+        self.by_entity: dict[str, dict[str, dict[str, Any]]] = {}
 
-    def add(self, field: str, source: str) -> None:
+    def add(self, field: str, source: str, entity: Optional[str] = None) -> None:
         row = self.counts.setdefault(field, {})
         row[source] = row.get(source, 0) + 1
+        if entity is not None:
+            self.by_entity.setdefault(field, {})[entity] = {"source": source}
+
+    def value(self, field: str, entity: str, v: Any) -> None:
+        self.by_entity.setdefault(field, {}).setdefault(entity, {})["value"] = v
 
     def emit(self, w: list[MappingWarning]) -> None:
         for field in sorted(self.counts):
@@ -1116,13 +1179,13 @@ def from_project_data(data: ProjectData) -> MappingResult:
         ov = _ovr(row_moq, mid, f"material:{mid}", "material_moq")
         if ov is not None:
             moq_by_mat[mid] = ov
-            tally.add("materials.moq", "override")
+            tally.add("materials.moq", "override", mid)
         elif mrow0 is not None and mrow0.moq:
             moq_by_mat[mid] = float(mrow0.moq)
-            tally.add("materials.moq", "master")
+            tally.add("materials.moq", "master", mid)
         else:
             moq_by_mat[mid] = 0.0
-            tally.add("materials.moq", "default")
+            tally.add("materials.moq", "default", mid)
 
     # ── Supplier links (per supplier×material) + the materials.cost fallback ──
     # Duplicate (supplier, material) inbound rows are reduced to one link:
@@ -1255,22 +1318,28 @@ def from_project_data(data: ProjectData) -> MappingResult:
     def _sup_capacity(sid: str) -> Optional[float]:
         ov = _ovr(row_sup_cap, sid, f"supplier:{sid}", "capacity_per_week")
         if ov is not None:
-            tally.add("suppliers.capacity_per_week", "override")
+            tally.add("suppliers.capacity_per_week", "override", sid)
             return ov
         cap = sup_master[sid].capacity_per_week if sid in sup_master else None
         # An empty master capacity MEANS unlimited (the registry's `empty_means`),
         # so it is the master answering, not a default standing in.
-        tally.add("suppliers.capacity_per_week", "master" if sid in sup_master else "default")
+        tally.add("suppliers.capacity_per_week", "master" if sid in sup_master else "default", sid)
         return cap
 
     def _sup_reliability(sid: str) -> float:
         ov = _ovr(row_sup_rel, sid, f"supplier:{sid}", "reliability_score")
         if ov is not None:
-            tally.add("suppliers.reliability_score", "override")
+            tally.add("suppliers.reliability_score", "override", sid)
             return ov
-        rel = (sup_master.get(sid) or SupplierRow(sid)).reliability_score
-        tally.add("suppliers.reliability_score", "master" if rel else "default")
-        return float(rel or 1.0)
+        # An EMPTY master value is the declared default (1.0), and a stated 0 is
+        # the master's 0 — before §23 WP 13.4 both read as "master 1.0", which is
+        # what the grid's empty cell did not show (page-equals-run).
+        rel = sup_master[sid].reliability_score if sid in sup_master else None
+        if rel is None:
+            tally.add("suppliers.reliability_score", "default", sid)
+            return 1.0
+        tally.add("suppliers.reliability_score", "master", sid)
+        return float(rel)
 
     suppliers = [
         Supplier(
@@ -1294,9 +1363,9 @@ def from_project_data(data: ProjectData) -> MappingResult:
     def _on_hand(mid: str, master: Optional[float]) -> Optional[float]:
         ov = _ovr(row_on_hand, mid, f"material:{mid}", "initial_on_hand")
         if ov is not None:
-            tally.add("materials.initial_on_hand", "override")
+            tally.add("materials.initial_on_hand", "override", mid)
             return ov
-        tally.add("materials.initial_on_hand", "master" if master is not None else "default")
+        tally.add("materials.initial_on_hand", "master" if master is not None else "default", mid)
         return float(master) if master is not None else None
 
     for m in data.materials:
@@ -1304,13 +1373,13 @@ def from_project_data(data: ProjectData) -> MappingResult:
         cost_ov = _ovr(row_cost, m.id, f"material:{m.id}", "material_cost")
         if cost_ov is not None:
             cost = cost_ov
-            tally.add("materials.cost", "override")
+            tally.add("materials.cost", "override", m.id)
         elif m.cost and m.cost > 0:
             cost = float(m.cost)
-            tally.add("materials.cost", "master")
+            tally.add("materials.cost", "master", m.id)
         elif (derived := _inbound_cost(m.id)) is not None:
             cost, via = derived
-            tally.add("materials.cost", "lanes")
+            tally.add("materials.cost", "lanes", m.id)
             w.append(MappingWarning(
                 "info", f"material:{m.id}", "cost",
                 "no master cost → using volume-weighted inbound price"
@@ -1318,7 +1387,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
                 else "no master cost and no inbound volumes → using cheapest supplier price"))
         else:
             cost = 1.0
-            tally.add("materials.cost", "default")
+            tally.add("materials.cost", "default", m.id)
             w.append(MappingWarning("warn", f"material:{m.id}", "cost",
                                     "no master cost and no supplier price → defaulted to 1.0"))
         hold_pct = (row_holding[m.id] if m.id in row_holding
@@ -1342,7 +1411,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
         derived = None if cost_ov is not None else _inbound_cost(mid)
         cost = cost_ov if cost_ov is not None else derived[0] if derived else 1.0
         tally.add("materials.cost",
-                  "override" if cost_ov is not None else "lanes" if derived else "default")
+                  "override" if cost_ov is not None else "lanes" if derived else "default", mid)
         w.append(MappingWarning(
             "info", f"material:{mid}", "master_row",
             "no row in `materials` — simulated from its BOM and inbound lanes, cost "
@@ -1382,31 +1451,31 @@ def from_project_data(data: ProjectData) -> MappingResult:
         price_ov = _ovr(prod_row, "sell_price", ent, "sell_price")
         if price_ov is not None:
             price = price_ov
-            tally.add("products.sell_price", "override")
+            tally.add("products.sell_price", "override", p.id)
         elif p.sell_price and p.sell_price > 0:
             price = float(p.sell_price)
-            tally.add("products.sell_price", "master")
+            tally.add("products.sell_price", "master", p.id)
         elif out_price_den.get(p.id):
             price = out_price_num[p.id] / out_price_den[p.id]
-            tally.add("products.sell_price", "lanes")
+            tally.add("products.sell_price", "lanes", p.id)
             w.append(MappingWarning("info", f"product:{p.id}", "unit_price",
                                     "no master sell_price → demand-weighted outbound price"))
         else:
             price = 1.0
-            tally.add("products.sell_price", "default")
+            tally.add("products.sell_price", "default", p.id)
             w.append(MappingWarning("warn", f"product:{p.id}", "unit_price",
                                     "no sell_price and no outbound price → defaulted to 1.0"))
         # demand mean
         mean_ov = _ovr(prod_row, "demand_mean", ent, "demand_mean")
         if mean_ov is not None:
             mean = mean_ov
-            tally.add("products.demand_mean", "override")
+            tally.add("products.demand_mean", "override", p.id)
         elif p.demand_mean and p.demand_mean > 0:
             mean = float(p.demand_mean)
-            tally.add("products.demand_mean", "master")
+            tally.add("products.demand_mean", "master", p.id)
         else:
             mean = out_demand.get(p.id, 0.0)
-            tally.add("products.demand_mean", "lanes" if mean > 0 else "default")
+            tally.add("products.demand_mean", "lanes" if mean > 0 else "default", p.id)
             if mean <= 0:
                 w.append(MappingWarning("warn", f"product:{p.id}", "demand_mean",
                                         "no master demand_mean and no outbound volume → 0"))
@@ -1418,7 +1487,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
         if cap_ov is not None or (p.production_capacity and p.production_capacity > 0):
             cap = cap_ov if cap_ov is not None else float(p.production_capacity)
             tally.add("products.production_capacity",
-                      "override" if cap_ov is not None else "master")
+                      "override" if cap_ov is not None else "master", p.id)
             if line_cap:
                 w.append(MappingWarning("info", f"product:{p.id}", "production_capacity",
                                         "production_capacity (units/week, "
@@ -1433,12 +1502,12 @@ def from_project_data(data: ProjectData) -> MappingResult:
                                         "production policy sets no utilization cap → 85%"))
             util = float(85.0 if util_raw is None else util_raw) / 100.0
             cap = float(line_cap) * 7.0 * util
-            tally.add("products.production_capacity", "derived")
+            tally.add("products.production_capacity", "derived", p.id)
             w.append(MappingWarning("info", f"product:{p.id}", "production_capacity",
                                     "no master capacity → derived from production policy"))
         else:
             cap = max(mean * 2.0, 1000.0)
-            tally.add("products.production_capacity", "default")
+            tally.add("products.production_capacity", "default", p.id)
             w.append(MappingWarning("warn", f"product:{p.id}", "production_capacity",
                                     "no capacity source → defaulted (capacity will not bind)"))
         mode = _fulfillment_mode(p.fulfillment_mode, data.project_model, w, p.id)
@@ -1446,14 +1515,16 @@ def from_project_data(data: ProjectData) -> MappingResult:
         cv_ov = _ovr(prod_row, "demand_cv", ent, "demand_cv")
         if cv_ov is not None:
             cv = cv_ov
-            tally.add("products.demand_cv", "override")
+            tally.add("products.demand_cv", "override", p.id)
         elif p.demand_cv is not None:
             cv = float(p.demand_cv)
-            tally.add("products.demand_cv", "master")
+            tally.add("products.demand_cv", "master", p.id)
         else:
             cv = (float((sc.demand_model or {}).get("cv"))
                   if (sc.demand_model or {}).get("cv") is not None else _DEFAULT_CV)
-            tally.add("products.demand_cv", "default")
+            tally.add("products.demand_cv", "default", p.id)
+        tally.value("products.demand_mean", p.id, mean)
+        tally.value("products.demand_cv", p.id, cv)
         kind = _resolve_demand_kind(p.demand_distribution, sc.demand_model)
         products.append(_build_product(p, price=price, capacity=cap, mode=mode,
                                        mean=mean, cv=cv, kind=kind, warnings=w))
@@ -1501,7 +1572,8 @@ def from_project_data(data: ProjectData) -> MappingResult:
         sups_by_mat.setdefault(link.material_id, set()).add(link.supplier_id)
     policies = _map_policies(data.policies, w, n_customers=len(customers),
                              sups_by_mat=sups_by_mat,
-                             has_mts=(FulfillmentMode.MTS in product_modes))
+                             has_mts=(FulfillmentMode.MTS in product_modes),
+                             prod_ids=prod_ids)
 
     # Every override the user typed should reach SOME entity. A key whose
     # components name no supplier, material, product or customer joins
@@ -1521,9 +1593,21 @@ def from_project_data(data: ProjectData) -> MappingResult:
             f"product or customer in this project and were not applied: {shown}"))
 
     tally.emit(w)
+    # The value each master-backed entity field was given, beside its source.
+    for mat in materials:
+        tally.value("materials.cost", mat.id, mat.cost)
+        tally.value("materials.initial_on_hand", mat.id, mat.initial_on_hand)
+    for mid, moq in moq_by_mat.items():
+        tally.value("materials.moq", mid, moq)
+    for sup in suppliers:
+        tally.value("suppliers.capacity_per_week", sup.id, sup.capacity_per_week)
+        tally.value("suppliers.reliability_score", sup.id, sup.reliability_score)
+    for prod in products:
+        tally.value("products.sell_price", prod.id, prod.unit_price)
+        tally.value("products.production_capacity", prod.id, prod.production_capacity)
     scenario = Scenario(name=sc.name or "scenario", network=network,
                         settings=settings, events=events, policies=policies)
-    return MappingResult(scenario=scenario, warnings=w)
+    return MappingResult(scenario=scenario, warnings=w, resolved=tally.by_entity)
 
 
 # ── The run window — ONE author, exported (audit 2026-09-22, F-02) ─────────────
@@ -1821,6 +1905,7 @@ def _map_policies(
     policies: dict, w: list[MappingWarning], n_customers: int = 0,
     sups_by_mat: Optional[dict[str, set[str]]] = None,
     has_mts: bool = False,
+    prod_ids: Optional[set[str]] = None,
 ) -> dict[str, dict]:
     out: dict[str, dict] = {}
     default = policies.get("default") or {}
@@ -2101,7 +2186,10 @@ def _map_policies(
                 continue
             _node, _, prod = key[len("node:"):].partition("::")
             v = (families.get("production") or {}).get("allocation_priority_weight")
-            if v is not None and prod:
+            # A PRODUCT's row only (§23 WP 13.4): a Supplier-stage row keys a
+            # material, and folding its production family made a material id a
+            # product priority.
+            if v is not None and prod and (prod_ids is None or prod in prod_ids):
                 priority[prod] = float(v)
         params: dict[str, Any] = {"activation": "during_disruption"}
         if priority:

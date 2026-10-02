@@ -481,3 +481,81 @@ def test_every_item_master_override_names_its_master_and_its_rows():
         assert bool(k.get("master")) == bool(k.get("rows")) == bool(k.get("domain")), k
         assert k.get("domain") in (None, "positive", "nonnegative", "fraction"), k
         assert k["catalog_ref"] is None or not k.get("master"), k
+
+
+# ── §23 WP 13.4 · §4 D204 (b) — WHERE each key is read is a TESTED declaration ──
+
+def test_declared_scopes_are_the_scopes_the_mapper_reads():
+    """The grid's "not simulated" badges are generated from `scopes`, so a scope
+    that is wrong is a badge that lies. Every key is perturbed at each scope —
+    the project default, a Supplier-stage row, a Plant-stage row — under a
+    context in which the key CAN be read (a service-level method for the
+    service-level target, a line rate for the utilization, …), and the mapped
+    scenario must change exactly at the declared scopes."""
+    import copy
+    import json
+
+    from scsim.io.project_map import (
+        POLICY_BUNDLE_KEYS, BomArc, MaterialRow, OutboundArc, ProductRow, ProjectData,
+        ScenarioSettings, SupplierRow, SupplyArc, from_project_data,
+    )
+
+    def project():
+        return ProjectData(
+            suppliers=[SupplierRow("S1"), SupplierRow("S3")],
+            materials=[MaterialRow("M1", cost=10.0)],
+            products=[ProductRow("P1", sell_price=100.0, demand_mean=50.0, fulfillment_mode="mts")],
+            supply_arcs=[
+                SupplyArc("S1", "M1", unit_price=10, lead_time=2, lead_time_unit="week", volume=60, time_unit="week"),
+                SupplyArc("S3", "M1", unit_price=11, lead_time=2, lead_time_unit="week", volume=60, time_unit="week"),
+            ],
+            bom=[BomArc("P1", "M1", 1.0)],
+            outbound=[OutboundArc("P1", "C1", unit_price=100, volume=50, time_unit="week"),
+                      OutboundArc("P1", "C2", unit_price=100, volume=10, time_unit="week")],
+            scenario=ScenarioSettings(horizon_days=364),
+        )
+
+    # The context in which each key is readable at its declared scopes.
+    context = {
+        "safety_stock_days": {"inventory": {"safety_stock_method": "fixed_days"}},
+        "service_level_target": {"inventory": {"safety_stock_method": "service_level"}},
+        "utilization_cap_pct": {"production": {"capacity_units_per_day": 100}},
+        "fg_safety_stock": {"inventory": {"fg_safety_stock": "service_level"}},
+        "fg_service_level_target": {"inventory": {"fg_safety_stock": "service_level"}},
+        "fg_safety_stock_days": {"inventory": {"fg_safety_stock": "fixed_days"}},
+        "allocation_priority_weight": {"recovery": {"response": ["allocate_materials"]}},
+        "rop_q_quantity": {"inventory": {"type": "rop"}},
+    }
+    value = {
+        "supply_share": 0.3, "type": "rop", "safety_stock_days": 21, "holding_cost_pct": 0.4,
+        "primary_source": True, "service_level_target": 0.85, "capacity_units_per_day": 77,
+        "utilization_cap_pct": 50, "fg_safety_stock": "fixed_days", "fg_service_level_target": 0.85,
+        "fg_safety_stock_days": 5, "allocation_priority_weight": 3, "rop_q_quantity": 33,
+        "coverage_weeks": 3, "reorder_point": 40, "order_up_to": 400, "material_cost": 3.3,
+        "material_moq": 9, "capacity_per_week": 77, "reliability_score": 0.5, "initial_on_hand": 5,
+        "sell_price": 7, "production_capacity": 66, "demand_mean": 20, "demand_cv": 0.9,
+    }
+    keys = {"default": "default", "supplier": "node:S3::M1", "plant": "node:Plant::P1"}
+
+    def mapped(policies):
+        d = project()
+        d.policies = policies
+        sc = from_project_data(d).scenario
+        return json.dumps({"net": sc.network.model_dump(mode="json"), "pol": sc.policies},
+                          sort_keys=True, default=str)
+
+    wrong = []
+    for k in POLICY_BUNDLE_KEYS:
+        assert set(k["scopes"]) <= set(keys) and k["scopes"], k
+        assert k["key"] in value, f"no probe value for {k['key']} — add one"
+        base = {"default": copy.deepcopy(context.get(k["key"], {}))}
+        before = mapped(base)
+        for scope, target in keys.items():
+            pol = copy.deepcopy(base)
+            pol.setdefault(target, {}).setdefault(k["family"], {})[k["key"]] = value[k["key"]]
+            read = mapped(pol) != before
+            if read != (scope in k["scopes"]):
+                wrong.append(f"{k['family']}.{k['key']} @ {scope}: declared "
+                             f"{'read' if scope in k['scopes'] else 'not read'}, mapper "
+                             f"{'reads' if read else 'ignores'} it")
+    assert not wrong, "\n".join(wrong)

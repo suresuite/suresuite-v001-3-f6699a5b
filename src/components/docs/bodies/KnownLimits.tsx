@@ -104,22 +104,19 @@ export default function KnownLimits() {
           </p>
         </Callout>
 
-        <Callout tone="limit" title="A few policy cells are not read by the engine yet">
+        <Callout tone="limit" title="Values saved into item masters before the policies page stopped writing them">
           <p>
             Every run is computed from two frozen versions — your data and your policies as they were
-            when you pressed Run — and a validated model replays the versions it was validated on.
-            What is not true yet: a few policy cells are stored and versioned but not read by the
-            engine, and a blank project-wide default can show one value on the policies page while
-            the run uses another.
+            when you pressed Run — a validated model replays the versions it was validated on, and the
+            policies page no longer writes your item masters. But values an earlier version of the
+            page saved into a master are still in it: they cannot be told apart from uploaded ones,
+            so nothing moved them back. Separately, the browser's Back button leaves the policies page
+            without asking, so unsaved edits there are lost.
           </p>
           <p>
-            The policies page no longer writes your item masters: a value changed there is a policy
-            override, and the master keeps its uploaded value. Values an earlier version of the page
-            saved into a master are still in it — they cannot be told apart from uploaded ones.
-          </p>
-          <p>
-            <strong className="text-foreground">Until it is fixed:</strong> set the project-wide
-            defaults you rely on explicitly. See{" "}
+            <strong className="text-foreground">Until it is fixed:</strong> if you changed a cost,
+            MOQ, capacity, price or demand on the policies page before October 2026, check the item
+            master and re-upload the original value if needed. See{" "}
             <DocLink to="how-your-data-flows">How your data flows</DocLink>.
           </p>
         </Callout>

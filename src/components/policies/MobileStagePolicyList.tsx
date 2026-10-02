@@ -100,7 +100,7 @@ export function MobileStagePolicyList({
     materials, products, suppliers, derived: derivedEconomics, lanes,
   } = useItemMasters(projectId);
   const derived = useDerivedMaps({
-    derived: derivedEconomics, products, outbound: lanes.outbound, defaults, overrides,
+    derived: derivedEconomics, products, outbound: lanes.outbound, inbound: lanes.inbound, defaults, overrides,
   });
   const [openRowKey, setOpenRowKey] = useState<string | null>(null);
   // A group can hold forty lanes. The panel shows what the device can hold and

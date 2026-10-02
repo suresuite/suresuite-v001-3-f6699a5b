@@ -121,14 +121,18 @@ export default function HowYourDataFlows() {
           has, the Simulation Lab offers two choices: run the validated versions, or run your
           current data as an exploratory run. Unsaved edits on the policies page reach nothing.
         </P>
+        <P>
+          A cell the engine does not read on its stage — the policy basis, a review period, a
+          finished-goods stock setting on a plant row — is marked <Term>not simulated</Term> where it
+          is shown, and a blank project-wide default is saved in the policy version exactly as the
+          page displays it.
+        </P>
         <Key>The rule: the number the policies page shows is the number the run uses — and the policies page never changes your item masters.</Key>
         <Callout tone="limit" title="Not true yet">
           <p>
-            A few page cells are not read by the engine yet, and a blank project-wide default can
-            show one value on the policies page while the run uses another. This is scheduled work
-            and is listed on <DocLink to="known-limits">Known limits</DocLink>. Values that an
-            earlier version of the policies page saved into your item masters are still there: they
-            cannot be told apart from uploaded ones, so nothing moved them back.
+            Values that an earlier version of the policies page saved into your item masters are
+            still there: they cannot be told apart from uploaded ones, so nothing moved them back.
+            See <DocLink to="known-limits">Known limits</DocLink>.
           </p>
         </Callout>
       </Section>

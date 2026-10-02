@@ -71,6 +71,7 @@ import {
   masterBaseFor,
   masterOverrideFor,
 } from "@/lib/policies/resolveEffective";
+import { cellEngineRead, notSimulatedNote as noteOf } from "@/lib/policies/cellEngineRead";
 import {
   masterOverrideRule,
   planEntityOverride,
@@ -124,6 +125,8 @@ interface Props {
   leftActions?: React.ReactNode;
   /** The stage's lines, loaded once at the page level (see useStageGuards). */
   stageRows: StageRowsQuery;
+  /** §23 WP 13.4 — reports how many lines hold unsaved drafts. */
+  onDraftsChange?: (lines: number) => void;
 }
 
 type RowDraft = Record<string, unknown>;
@@ -284,6 +287,7 @@ export function StagePolicyTable({
   saveSnapshot,
   leftActions,
   stageRows,
+  onDraftsChange,
 }: Props) {
   const spec = specFor(stageKey);
   const families = familiesForStage(stageKey);
@@ -314,6 +318,7 @@ export function StagePolicyTable({
     derived: derivedEconomics,
     products,
     outbound: lanes.outbound,
+    inbound: lanes.inbound,
     defaults,
     overrides,
   });
@@ -802,6 +807,12 @@ export function StagePolicyTable({
    * Basis control is hidden while the line uses the default basis — it repeated
    * identically on every line.
    */
+  /** §23 WP 13.4 — the engine's own answer for a vector parameter on this stage. */
+  const notSimulatedNote = (field: string): string | undefined => {
+    const c = invParamColByField.get(field);
+    return c ? noteOf(cellEngineRead(stageKey, c)) : undefined;
+  };
+
   const renderInvParamsCell = (rowKey: string, r: Record<string, unknown>, paramW?: number) => {
     const type = String(getEffective(rowKey, r, "type", "inventory") ?? "min_max");
     const regParams = inventoryParamsForType(type).filter((p) => p.field !== "basis");
@@ -861,11 +872,13 @@ export function StagePolicyTable({
             onCommit: (v: number | undefined) => onCellChange(rowKey, p.field, v),
             invalid: paramFeasibility(p, value ?? undefined) ?? undefined,
             placeholder: placeholderFor[p.field],
+            notSimulated: notSimulatedNote(p.field),
           };
         })}
         labelFor={(f) => adaptLabel(invParamColByField.get(f)?.label ?? f, f)}
         basis={basis as "days_of_supply" | "forward_visible"}
         onBasisChange={(b) => onCellChange(rowKey, "basis", b)}
+        basisNotSimulated={notSimulatedNote("basis")}
       />
     );
   };
@@ -1043,6 +1056,11 @@ export function StagePolicyTable({
   };
 
   const dirtyKeys = Object.keys(drafts).filter((k) => Object.keys(drafts[k] ?? {}).length > 0);
+  // §23 WP 13.4 — the page asks before a stage switch or navigation drops these.
+  useEffect(() => {
+    onDraftsChange?.(dirtyKeys.length);
+  }, [dirtyKeys.length, onDraftsChange]);
+  useEffect(() => () => onDraftsChange?.(0), [onDraftsChange]);
 
   const onCellChange = (rowKey: string, field: string, v: unknown) => {
     setDrafts((d) => {
@@ -1824,8 +1842,9 @@ export function StagePolicyTable({
 
               {kind === "readonly" && (
                 <span
-                  title={col.engineStatus ? `Activates with ${col.engineStatus.milestone}` : undefined}
+                  title={col.engineStatus ? `Activates with ${col.engineStatus.milestone}` : substitution}
                   className="block w-full px-[5px] text-right font-mono text-[11px] tabular-nums text-[#c4c4c4]"
+                  style={supersededBy ? { textDecoration: "line-through", opacity: 0.6 } : undefined}
                 >
                   {(() => {
                     const raw = cellValue ?? liveDefault;
@@ -2850,6 +2869,7 @@ export function StagePolicyTable({
                       onSort={() => toggleSort(col.field)}
                       onInfo={() => setParamSheetCol(col)}
                       pending={!!col.engineStatus}
+                      notSimulated={noteOf(cellEngineRead(stageKey, col))}
                       quiet={fc.quiet}
                       last={isLast}
                       filter={fc.filterable === false ? undefined : (colFilters[col.field] ?? "")}

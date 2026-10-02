@@ -303,6 +303,7 @@ export function SortHeader({
   onFilter,
   last,
   filterPlaceholder,
+  notSimulated,
 }: {
   label: string;
   /** Second header line: unit, range, provenance note — never part of `label`. */
@@ -319,6 +320,12 @@ export function SortHeader({
   last?: boolean;
   /** Says what the filter does when it is not "thin the rows" (§4 D180). */
   filterPlaceholder?: string;
+  /**
+   * §23 WP 13.4 · §4 D204 (b) — the engine does not read this column on this
+   * stage. The sentence, at the point of display; the badge list is generated
+   * from the engine's own declaration (`cellEngineRead.ts`).
+   */
+  notSimulated?: string;
 }) {
   return (
     <div
@@ -364,6 +371,15 @@ export function SortHeader({
           className="self-start rounded-sm bg-white/15 px-1 font-mono text-[9px] text-white"
         >
           pending
+        </span>
+      )}
+      {!pending && notSimulated && (
+        <span
+          title={notSimulated}
+          data-testid="not-simulated"
+          className="self-start rounded-sm bg-white/15 px-1 font-mono text-[9px] text-white"
+        >
+          not simulated
         </span>
       )}
       {onFilter && (
@@ -673,6 +689,7 @@ export function ReplenishmentCell({
   onBasisChange,
   showBasis,
   paramW,
+  basisNotSimulated,
 }: {
   policyType: string;
   params: Array<{
@@ -684,10 +701,14 @@ export function ReplenishmentCell({
      *  s = E[D]·T_s), rendered greyed in place — so the global default is
      *  visible on every row, and typing replaces it for that row only. */
     placeholder?: string;
+    /** §23 WP 13.4 — the engine does not read this parameter on this stage. */
+    notSimulated?: string;
   }>;
   labelFor: (field: string) => string;
   basis: "days_of_supply" | "forward_visible";
   onBasisChange: (b: "days_of_supply" | "forward_visible") => void;
+  /** §23 WP 13.4 — the engine reads `basis` nowhere; said where it is shown. */
+  basisNotSimulated?: string;
   showBasis?: boolean;
   /** Value input width — the fit shrinks this (columnFit §1.2) when the cell
    *  itself has been compacted, so the cell's contents keep fitting its box. */
@@ -709,15 +730,26 @@ export function ReplenishmentCell({
               key={String(p?.value)}
               defaultValue={p?.value ?? ""}
               placeholder={p?.placeholder ?? "—"}
-              title={p?.placeholder ? `engine default: ${p.placeholder}` : undefined}
+              title={p?.notSimulated ?? (p?.placeholder ? `engine default: ${p.placeholder}` : undefined)}
               size={1}
               onBlur={(e) => {
                 const raw = e.target.value.trim();
                 p?.onCommit(raw === "" ? undefined : parseFloat(raw.replace(",", ".")));
               }}
-              style={{ width: w, boxSizing: "border-box" }}
+              style={{
+                width: w,
+                boxSizing: "border-box",
+                ...(p?.notSimulated
+                  ? { textDecoration: "line-through", textDecorationThickness: "1px", opacity: 0.5 }
+                  : {}),
+              }}
               className="h-5 rounded-sm border border-transparent bg-transparent px-1 text-right font-mono text-[11.5px] tabular-nums outline-none hover:bg-[#fafafa] focus:border-[--zinc-border] focus:bg-background"
             />
+            {p?.notSimulated && (
+              <span title={p.notSimulated} className="cursor-help font-mono text-[9px] text-muted-foreground">
+                not simulated
+              </span>
+            )}
             {p?.invalid && (
               <span title={p.invalid} className="cursor-help font-mono text-[10px] font-medium" style={{ color: LAYER.brand }}>
                 !
@@ -727,15 +759,20 @@ export function ReplenishmentCell({
         );
       })}
       {visibleBasis && (
-        <CellSegmented
-          tiny
-          value={basis}
-          onChange={onBasisChange}
-          options={[
-            { value: "days_of_supply", label: "days_of_supply", title: "Policy Basis · days_of_supply" },
-            { value: "forward_visible", label: "forward_visible", title: "Policy Basis · forward_visible" },
-          ]}
-        />
+        <span className="flex min-w-0 items-center gap-[3px]" title={basisNotSimulated}>
+          <CellSegmented
+            tiny
+            value={basis}
+            onChange={onBasisChange}
+            options={[
+              { value: "days_of_supply", label: "days_of_supply", title: basisNotSimulated ?? "Policy Basis · days_of_supply" },
+              { value: "forward_visible", label: "forward_visible", title: basisNotSimulated ?? "Policy Basis · forward_visible" },
+            ]}
+          />
+          {basisNotSimulated && (
+            <span className="cursor-help font-mono text-[9px] text-muted-foreground">not simulated</span>
+          )}
+        </span>
       )}
     </div>
   );

@@ -26,6 +26,7 @@ import { useProjectContext } from "@/hooks/useProjectContext";
 import { useModelValidation } from "@/hooks/useModelValidation";
 import { useStageGuards } from "@/hooks/useStageGuards";
 import { useItemMasters } from "@/hooks/useItemMasters";
+import { useUnsavedDraftsGuard } from "@/hooks/useUnsavedDraftsGuard";
 import { usePolicySearchIndex, type SearchObjectType, type SearchResult } from "@/hooks/usePolicySearchIndex";
 import { useTimeUnit, DAYS_PER_UNIT, UNIT_LABEL_PLURAL } from "@/hooks/useTimeUnit";
 import { FocusedStage } from "@/components/policies/FocusedStage";
@@ -190,6 +191,19 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
       setTab("stages");
     }
   }, [stageParam]);
+  // §23 WP 13.4 — unsaved grid edits are drafts that reach nothing; leaving the
+  // stage, the tab or the page with some asks first (`useUnsavedDraftsGuard`).
+  const [draftLines, setDraftLines] = useState(0);
+  const { confirmLeave } = useUnsavedDraftsGuard(draftLines);
+  const switchStage = async (s: StageKey) => {
+    if (s === activeStage) return;
+    if (!(await confirmLeave())) return;
+    setActiveStage(s);
+  };
+  const switchTab = async (t: "stages" | "guide" | "datamap") => {
+    if (t !== "stages" && tab === "stages" && !(await confirmLeave())) return;
+    setTab(t);
+  };
   const [historyOpen, setHistoryOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   // v3 §3.1 (gap-close T6): search the network, not the catalog.
@@ -249,7 +263,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
   const searching = policyQueryLower.length > 0;
 
   const openSearchResult = (result: SearchResult) => {
-    if (result.targetStage) setActiveStage(result.targetStage);
+    if (result.targetStage) void switchStage(result.targetStage);
     setTab("stages");
     setPolicyQuery("");
   };
@@ -295,7 +309,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
                 <Segmented<"stages" | "guide" | "datamap">
                   size="sm"
                   value={tab}
-                  onChange={setTab}
+                  onChange={(t) => void switchTab(t as "stages" | "guide" | "datamap")}
                   className={HDR_SEGMENTED}
                   options={[
                     { value: "stages", label: "Policies" },
@@ -441,7 +455,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
               unitMap={unitMap}
               stages={guards}
               activeStage={activeStage}
-              onStageChange={setActiveStage}
+              onStageChange={(s) => void switchStage(s)}
             />
 
             {/* D230 — "Edit Policies" on this project, as /profile lists it. Every write
@@ -468,6 +482,7 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
               clearActivePreset={clearActivePreset}
               saveSnapshot={saveSnapshot}
               selectedVersionId={selectedVersionId}
+              onDraftsChange={setDraftLines}
               policyDirty={isDirty}
               rowsByStage={rowsByStage}
             />

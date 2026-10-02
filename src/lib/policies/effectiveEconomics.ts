@@ -159,6 +159,24 @@ export function derivedProductionCapacity(
   return derivedFallbackDetails(CAPACITY_STEPS, ids, ctx);
 }
 
+/**
+ * `derivedMaterialCost` keeping WHICH step answered (§23 WP 13.4): a derived cost
+ * is shown with its source — the volume-weighted lane price, or the cheapest quote
+ * when no lane carries a volume — not as an anonymous "≈". The same walk.
+ */
+export function derivedMaterialCostDetails(inbound: Row[]): Map<string, DerivedValue> {
+  const ids = new Set<string>();
+  for (const arc of inbound) {
+    const id = String(arc.material_id ?? "");
+    if (id) ids.add(id);
+  }
+  const ctx = buildReducerCtx(
+    { materials: [], products: [], suppliers: [], inbound, outbound: [], bom: [] },
+    {},
+  );
+  return derivedFallbackDetails(MATERIAL_COST_STEPS, ids, ctx);
+}
+
 export function derivedMaterialCost(inbound: Row[]): Map<string, number> {
   const ids = new Set<string>();
   for (const arc of inbound) {
