@@ -83,6 +83,7 @@ import {
   EngineCancelledError,
   ensureEngine,
   fetchPolicySnapshot,
+  fetchRunDatasetSnapshot,
   persistEngineResult,
   runInBrowser,
   selfTest,
@@ -957,6 +958,8 @@ export function RunValidateStage({
     // compute:"client" keeps the deployed worker out of this run.
     let runId: string;
     let snapshot: Record<string, unknown> | null = null;
+    // §23 WP 13.2 — the run's FROZEN dataset version, when it has one.
+    let frozen: Awaited<ReturnType<typeof fetchRunDatasetSnapshot>> = null;
     if (versionId) {
       try {
         const dispatched = await dispatchRun(scenarioId, versionId, true, inspection);
@@ -969,6 +972,7 @@ export function RunValidateStage({
         }
         runId = dispatched.runId;
         snapshot = await fetchPolicySnapshot(versionId);
+        frozen = await fetchRunDatasetSnapshot(runId);
       } catch (err) {
         // A hard gate rejection (missing required data) must still stop the run.
         const msg = (err as Error).message ?? String(err);
@@ -999,7 +1003,9 @@ export function RunValidateStage({
           snapshot,
           scenario: { ...scenario, crn: true },
           projectModel: fulfillmentStrategy,
-          dataset: engineDataset(),
+          // The frozen version the run is stamped with; the page's tables only
+          // for a run that has none (sim-command unreachable), and then said.
+          dataset: frozen?.snapshot ?? engineDataset(),
         },
         (p) => setRunPhase(p === "ready" ? { kind: "computing", done: 0, total: scenario.replications } : { kind: "loading", detail: loadDetail(p) }),
         // Live per-replication streaming — each finished rep lands in the grid.
@@ -1037,7 +1043,9 @@ export function RunValidateStage({
     const rev = agg.revenue != null ? formatMoney(agg.revenue) : "—";
     setRunPhase({
       kind: "succeeded",
-      summary: `fill rate ${fr} · revenue ${rev} · ${result.replications.length} replication(s) · scsim ${result.engineVersion}`,
+      summary:
+        `fill rate ${fr} · revenue ${rev} · ${result.replications.length} replication(s) · scsim ${result.engineVersion}` +
+        (frozen ? "" : " · computed from the data this page loaded — the run has no frozen dataset version"),
       persisted,
     });
   };

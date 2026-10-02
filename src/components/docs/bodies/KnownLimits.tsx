@@ -104,14 +104,15 @@ export default function KnownLimits() {
           </p>
         </Callout>
 
-        <Callout tone="limit" title="A run can use data edited after you pressed Run">
+        <Callout tone="limit" title="A validated model runs on your current data">
           <p>
-            A run is bound to a frozen policy version, but its masters and lanes — cost, MOQ,
-            capacity, price, demand, the network itself — are read from your project when the run
-            starts, not from the dataset version it records. An edit made after dispatch, or after a
-            model was validated, can reach that run. The validated model is marked stale; the run is
-            not stopped. Separately, a few policy cells are not read by the engine yet, and a blank
-            project-wide default can show one value on the policies page while the run uses another.
+            Every run is computed from two frozen versions — your data and your policies as they were
+            when you pressed Run — so a change made afterwards is not in it. But running a validated
+            model again freezes your project's data as it is now, not as it was when the model was
+            validated: an edit made after validation reaches the new run. The validated model is
+            marked stale; the run is not stopped. Separately, a few policy cells are not read by the
+            engine yet, and a blank project-wide default can show one value on the policies page
+            while the run uses another.
           </p>
           <p>
             The policies page no longer writes your item masters: a value changed there is a policy
@@ -119,9 +120,9 @@ export default function KnownLimits() {
             saved into a master are still in it — they cannot be told apart from uploaded ones.
           </p>
           <p>
-            <strong className="text-foreground">Until it is fixed:</strong> avoid editing data while
-            runs you depend on are queued, and rerun a validated model after any data change. See{" "}
-            <DocLink to="how-your-data-flows">How your data flows</DocLink>.
+            <strong className="text-foreground">Until it is fixed:</strong> rerun a validated model
+            only when its data has not changed since validation, or treat the new run as exploratory.
+            See <DocLink to="how-your-data-flows">How your data flows</DocLink>.
           </p>
         </Callout>
       </Section>

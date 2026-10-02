@@ -338,9 +338,9 @@ export async function dispatchExperimentRun(
 
   // Snapshot the dataset (graph + economics) and bind this run to it, so a
   // later CSV re-upload is detectable rather than silently changing history
-  // (Phase A / G5 / §8.4). Deduped server-side: an unchanged dataset reuses
-  // its latest version. Best-effort: if the migration hasn't reached the DB
-  // yet the run still dispatches, just without a dataset binding.
+  // (Phase A / G5 / §8.4). Deduped server-side by content: an unchanged dataset
+  // reuses its version. Since WP 13.2 the worker COMPUTES from this version, so
+  // a server run without one is refused below rather than run unbound.
   let datasetVersionId: string | null = null;
   let graphHash: string | null = null;
   let simulationHash: string | null = null;
@@ -365,7 +365,19 @@ export async function dispatchExperimentRun(
       simulationHash = (dv?.hash_inputs as string | null) ?? null;
     }
   } catch (e) {
-    console.error("snapshot_dataset failed (run continues unbound)", e);
+    console.error("snapshot_dataset failed", e);
+  }
+  // PLAN.md §23 WP 13.2 · §4 D280 — the worker computes from the FROZEN dataset
+  // version and nothing else, so a server run that could not be frozen is not
+  // dispatched: there would be nothing for it to read. (Before WP 13.2 it ran
+  // "unbound", from the live tables.) A browser run computes from what the page
+  // loaded and is not refused here.
+  if ((cmd.payload as Record<string, unknown>).compute !== "client" && !datasetVersionId) {
+    throw new Error(
+      "the project's data could not be frozen as a dataset version, so the run was not " +
+        "dispatched — the server computes only from frozen versions. Try again; if it repeats, " +
+        "the dataset snapshot is failing.",
+    );
   }
 
   // Stamp the credibility provenance (Phase B0 / G13 / §9.5): the scenario's
@@ -581,6 +593,9 @@ export async function dispatchExperimentRun(
       policy_version_id: policyVersionId,
       policy_hash: policyHash,
       policy_snapshot: snapshot,
+      // §23 WP 13.2 — the key is ALWAYS present: the worker reads its absence
+      // as an envelope from before the binding (the legacy live path).
+      dataset_version_id: datasetVersionId,
       // WP 10.4 — the engine the run is bound to; the worker refuses a mismatch.
       ...(engine ? { engine } : {}),
       server_ts: Date.now(),

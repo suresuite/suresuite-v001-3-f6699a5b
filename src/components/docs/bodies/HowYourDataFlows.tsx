@@ -122,12 +122,12 @@ export default function HowYourDataFlows() {
         <Key>The rule: the number the policies page shows is the number the run uses — and the policies page never changes your item masters.</Key>
         <Callout tone="limit" title="Not true yet">
           <p>
-            A run records its dataset version but is computed from your project's current masters
-            and lanes, so an edit made after you press Run, or after a model was validated, can reach
-            that run. A few page cells are also not read by the engine yet. Both are scheduled work
-            and are listed on <DocLink to="known-limits">Known limits</DocLink>. Values that an
-            earlier version of the policies page saved into your item masters are still there: they
-            cannot be told apart from uploaded ones, so nothing moved them back.
+            Running a validated model again still freezes your project's current data rather than the
+            data the model was validated on, so an edit made after validation reaches the new run. A
+            few page cells are also not read by the engine yet. Both are scheduled work and are
+            listed on <DocLink to="known-limits">Known limits</DocLink>. Values that an earlier
+            version of the policies page saved into your item masters are still there: they cannot
+            be told apart from uploaded ones, so nothing moved them back.
           </p>
         </Callout>
       </Section>
@@ -140,7 +140,8 @@ export default function HowYourDataFlows() {
         </P>
         <P>
           The work happens on a separate worker, not in your browser. You can close the tab; the run
-          continues and the result is waiting.
+          continues and the result is waiting. The worker reads only the two frozen versions the run
+          is stamped with — a change you make to your data after pressing Run is not in that run.
         </P>
       </Section>
 
