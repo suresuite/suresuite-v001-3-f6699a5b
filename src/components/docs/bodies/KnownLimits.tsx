@@ -104,15 +104,13 @@ export default function KnownLimits() {
           </p>
         </Callout>
 
-        <Callout tone="limit" title="A validated model runs on your current data">
+        <Callout tone="limit" title="A few policy cells are not read by the engine yet">
           <p>
             Every run is computed from two frozen versions — your data and your policies as they were
-            when you pressed Run — so a change made afterwards is not in it. But running a validated
-            model again freezes your project's data as it is now, not as it was when the model was
-            validated: an edit made after validation reaches the new run. The validated model is
-            marked stale; the run is not stopped. Separately, a few policy cells are not read by the
-            engine yet, and a blank project-wide default can show one value on the policies page
-            while the run uses another.
+            when you pressed Run — and a validated model replays the versions it was validated on.
+            What is not true yet: a few policy cells are stored and versioned but not read by the
+            engine, and a blank project-wide default can show one value on the policies page while
+            the run uses another.
           </p>
           <p>
             The policies page no longer writes your item masters: a value changed there is a policy
@@ -120,9 +118,9 @@ export default function KnownLimits() {
             saved into a master are still in it — they cannot be told apart from uploaded ones.
           </p>
           <p>
-            <strong className="text-foreground">Until it is fixed:</strong> rerun a validated model
-            only when its data has not changed since validation, or treat the new run as exploratory.
-            See <DocLink to="how-your-data-flows">How your data flows</DocLink>.
+            <strong className="text-foreground">Until it is fixed:</strong> set the project-wide
+            defaults you rely on explicitly. See{" "}
+            <DocLink to="how-your-data-flows">How your data flows</DocLink>.
           </p>
         </Callout>
       </Section>

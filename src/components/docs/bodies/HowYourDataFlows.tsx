@@ -116,18 +116,19 @@ export default function HowYourDataFlows() {
           then run and validate in Simulation Lab, then save the{" "}
           <strong className="text-foreground">validated model</strong>. A run freezes two things — a
           dataset version (your masters and lanes) and a policy version (your settings and
-          overrides). The validated model names one of each, so anyone who runs it later gets
-          exactly those numbers. Unsaved edits on the policies page reach nothing.
+          overrides). The validated model names the two versions its evidence run used, so anyone
+          who runs it later gets exactly those numbers — even after your data has changed. If it
+          has, the Simulation Lab offers two choices: run the validated versions, or run your
+          current data as an exploratory run. Unsaved edits on the policies page reach nothing.
         </P>
         <Key>The rule: the number the policies page shows is the number the run uses — and the policies page never changes your item masters.</Key>
         <Callout tone="limit" title="Not true yet">
           <p>
-            Running a validated model again still freezes your project's current data rather than the
-            data the model was validated on, so an edit made after validation reaches the new run. A
-            few page cells are also not read by the engine yet. Both are scheduled work and are
-            listed on <DocLink to="known-limits">Known limits</DocLink>. Values that an earlier
-            version of the policies page saved into your item masters are still there: they cannot
-            be told apart from uploaded ones, so nothing moved them back.
+            A few page cells are not read by the engine yet, and a blank project-wide default can
+            show one value on the policies page while the run uses another. This is scheduled work
+            and is listed on <DocLink to="known-limits">Known limits</DocLink>. Values that an
+            earlier version of the policies page saved into your item masters are still there: they
+            cannot be told apart from uploaded ones, so nothing moved them back.
           </p>
         </Callout>
       </Section>

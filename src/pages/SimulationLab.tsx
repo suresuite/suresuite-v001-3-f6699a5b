@@ -64,6 +64,7 @@ import {
 import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/validationBaseline";
 import { runGateState } from "@/lib/sim/runGate";
 import { reuseConfirmRequest } from "@/lib/sim/dispatch";
+import { modelRunOffer } from "@/lib/sim/labModel";
 import { useConfirm } from "@/components/shared/confirm/useConfirm";
 import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
 import { versionDisplayName } from "@/components/policies/PolicyVersionSheets";
@@ -244,12 +245,15 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   }, [modelParam, baselineScenario, searchParams]);
   const deviations =
     usingModel && selected && !baselineSelected ? protocolDeviations(chosenModel!.protocol, selected) : [];
+  // §23 WP 13.3 — a run of the model replays its OWN two versions, so moved
+  // data is a choice (replay, or current data as exploratory), not a block.
+  const modelOffer = chosenModel ? modelRunOffer(chosenModel, modelCredibility) : null;
   const runModelReason = !chosenModel
     ? "There is no Validated Model to run."
-    : chosenModel.status !== "active"
-      ? "This model is no longer in force — choose the one that is."
-      : modelCredibility?.state === "stale"
-        ? "The simulation's inputs or the scenario's world changed since this model was validated — re-validate it in Policies first."
+    : modelOffer?.kind === "blocked"
+      ? modelOffer.reason
+      : modelOffer?.kind === "moved" && !modelOffer.replayable
+        ? modelOffer.note
         : !canRunSimulations
           ? projectRights.refusal("simulation_lab") ?? "Running simulations isn't enabled for your account."
           : null;
@@ -301,6 +305,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     versionId: string,
     forceRerun = false,
     target: { id: string; name: string } & Parameters<typeof protocolDeviations>[1] = selected!,
+    /** §23 WP 13.3 — the model's policies on CURRENT data, never validated. */
+    currentAsExploratory = false,
   ) => {
     if (!projectId || !target) return;
     if (!canRunSimulations) {
@@ -308,7 +314,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       return;
     }
     try {
-      const followModel = usingModel && chosenModel;
+      const followModel = usingModel && chosenModel && !currentAsExploratory;
       const result = await dispatchExperiment({
         projectId,
         scenarioId: target.id,
@@ -345,7 +351,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           setPane("results");
           return;
         }
-        await dispatchRun(versionId, true, target);
+        await dispatchRun(versionId, true, target, currentAsExploratory);
         return;
       }
       // Typed 422: render the gate's findings structurally in the run pane.
@@ -375,8 +381,12 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   // of the model uses is SEEDED FROM THE MODEL (`buildScenarioSeed` with its
   // protocol), found by name if it already exists, so running a model twice does
   // not litter the list — and the second run is then a RunKey reuse.
-  const runChosenModel = async () => {
-    if (!projectId || !chosenModel || runModelReason) return;
+  const runChosenModel = async (mode: "validated" | "current" = "validated") => {
+    if (!projectId || !chosenModel) return;
+    // The replay needs the model to be replayable; current data needs only the
+    // model in force and the right to run an exploratory model.
+    if (mode === "validated" && runModelReason) return;
+    if (mode === "current" && (!canExplore || modelOffer?.kind === "blocked")) return;
     const name = `${chosenModel.name ?? "Validated model"}${
       chosenModel.version_no != null ? ` v${chosenModel.version_no}` : ""
     } — run`;
@@ -395,7 +405,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       if (!target) return;
     }
     setSelectedId(target.id);
-    await dispatchRun(chosenModel.policy_version_id, false, target);
+    await dispatchRun(chosenModel.policy_version_id, false, target, mode === "current");
   };
 
   const handleSaveVersionAndRun = async () => {
@@ -648,8 +658,14 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       deviations={deviations}
       advanced={advanced}
       onAdvanced={setAdvanced}
-      onRunModel={baselineSelected && usingModel ? runChosenModel : undefined}
+      onRunModel={baselineSelected && usingModel ? () => void runChosenModel("validated") : undefined}
       runModelReason={runModelReason}
+      modelMoved={modelOffer?.kind === "moved" ? modelOffer : null}
+      onRunCurrent={
+        baselineSelected && usingModel && canExplore && modelOffer?.kind === "moved"
+          ? () => void runChosenModel("current")
+          : undefined
+      }
     />
   ) : null;
 

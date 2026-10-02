@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 396,
-  "migrations_applied": 388,
+  "migrations_found": 397,
+  "migrations_applied": 389,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261002000008_policies_writes_no_master.sql",
+  "last_migration": "20261002000009_model_run_reads_model_versions.sql",
   "counts": {
     "tables": 92,
     "views": 8,
@@ -26418,7 +26418,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000020_simulation_scope.sql"
+      "defined_by": "20261002000009_model_run_reads_model_versions.sql"
     },
     {
       "name": "create_user_file",

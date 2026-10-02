@@ -27,6 +27,8 @@ export interface SimulationRun {
   code_version: string | null;
   policy_version_id: string | null;
   policy_hash: string | null;
+  /** The frozen dataset version the run was computed from (§23 WP 13.2). */
+  dataset_version_id?: string | null;
   mapping_warnings: MappingWarning[] | null;
   created_at: string;
   /** Touched by every worker write, including the per-replication counter —

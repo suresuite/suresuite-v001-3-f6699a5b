@@ -155,6 +155,6 @@ The super admin who closed it; NULL while open, or once that account is deleted 
 
 ---
 
-*Generated from data contract `8fdf05a58fb5`, engine `0.2.10`,
+*Generated from data contract `307e530f0910`, engine `0.2.10`,
 sidecar `supabase/contract/password_reset_requests.contract.yaml`, table created by `20261001000011_password_reset_requests.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

@@ -41,6 +41,10 @@ export interface LabModelStepProps {
   /** Shown when the selected scenario is the read-only validated baseline. */
   onRunModel?: () => void;
   runModelReason?: string | null;
+  /** §23 WP 13.3 — the live data moved since validation: a run of the model
+   *  replays its own versions, or the user runs current data as exploratory. */
+  modelMoved?: { note: string; replayable: boolean } | null;
+  onRunCurrent?: () => void;
 }
 
 function ChosenFacts({ card, credibility }: { card: ModelValidationCard; credibility: Credibility | null }) {
@@ -50,7 +54,9 @@ function ChosenFacts({ card, credibility }: { card: ModelValidationCard; credibi
       ? "revoked — not usable"
       : card.status === "superseded"
         ? "superseded — a newer model is in force"
-        : credibility?.state === "stale"
+        : credibility?.state === "stale" && credibility.drift.every((d) => d === "data")
+          ? "data changed since validation → a run replays the validated data"
+          : credibility?.state === "stale"
           ? `${driftReasons(credibility.drift).join(" · ") || "stale"} → re-validate`
           : credibility?.state === "validated"
             ? "in force"
@@ -227,10 +233,20 @@ export function LabModelStep(p: LabModelStepProps) {
 
       {p.onRunModel ? (
         <div className="flex flex-wrap items-center gap-2 border-t border-[--hair-rule] px-3 py-2.5">
-          <span className="min-w-0 flex-1 text-[12px] text-[#52525b]">
+          <span className="min-w-0 flex-1 text-[12px] text-[#52525b]" data-testid="model-run-note">
             {p.runModelReason ??
+              p.modelMoved?.note ??
               "Read-only — runs as a new scenario."}
           </span>
+          {p.onRunCurrent ? (
+            <button
+              type="button"
+              onClick={p.onRunCurrent}
+              className="h-[30px] min-h-11 shrink-0 rounded-sm border border-[#d4d4d8] bg-white px-4 text-[13px] font-medium text-[#18181b] md:min-h-0"
+            >
+              Run current data as exploratory
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={p.onRunModel}
@@ -242,7 +258,7 @@ export function LabModelStep(p: LabModelStepProps) {
                 : "border-foreground bg-foreground text-background",
             )}
           >
-            Run this model
+            {p.modelMoved ? "Run validated versions" : "Run this model"}
           </button>
         </div>
       ) : null}

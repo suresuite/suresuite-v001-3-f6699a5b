@@ -16,6 +16,7 @@
 // `opts.limits`; they can only tighten the plan's.
 
 import {
+  gateDatasetFromSnapshot,
   loadGateDataset,
   runValidationGate,
   type GateResult,
@@ -251,6 +252,17 @@ export class ReuseAvailable extends Error {
   }
 }
 
+/** The Validated Model a run follows, as dispatch reads it (§23 WP 13.3). */
+interface FollowedModel {
+  id: string;
+  project_id: string;
+  status: string;
+  policy_version_id: string | null;
+  dataset_version_id: string | null;
+  graph_hash: string | null;
+  hash_simulation: string | null;
+}
+
 export async function dispatchExperimentRun(
   deps: DispatchDeps,
   cmd: DispatchCommand,
@@ -260,8 +272,28 @@ export async function dispatchExperimentRun(
   const { reader: sb, svc, upstash } = deps;
   if (!cmd.scenario_id) throw new Error("experiment.run requires scenario_id");
 
+  // PLAN.md §23 WP 13.3 — a run of a Validated Model is dispatched with the
+  // MODEL's two versions: its policy version and its dataset version, whatever
+  // the caller sent and whatever the live project holds now. Resolved first, so
+  // everything below — the gate, the binding, the RunKey — reads those.
+  const payload0 = cmd.payload as Record<string, unknown>;
+  const followedModelId =
+    payload0.exploratory !== true && typeof payload0.validated_model_id === "string" && payload0.validated_model_id
+      ? payload0.validated_model_id
+      : null;
+  let followedModel: FollowedModel | null = null;
+  if (followedModelId) {
+    const { data: m } = await svc
+      .from("model_validations")
+      .select("id,project_id,status,policy_version_id,dataset_version_id,graph_hash,hash_simulation")
+      .eq("id", followedModelId)
+      .maybeSingle();
+    if (!m || m.project_id !== cmd.project_id) throw new Error("validated model not found in this project");
+    if (m.status === "revoked") throw new Error("this Validated Model was revoked and cannot be run");
+    followedModel = m as unknown as FollowedModel;
+  }
   const policyVersionId = String(
-    (cmd.payload as Record<string, unknown>).policy_version_id ?? "",
+    followedModel?.policy_version_id ?? payload0.policy_version_id ?? "",
   );
   if (!policyVersionId) {
     throw new Error("experiment.run requires a saved policy version (policy_version_id)");
@@ -306,6 +338,78 @@ export async function dispatchExperimentRun(
     (scenario.recovery_overrides as Record<string, unknown> | null) ?? null,
   );
 
+  // Snapshot the dataset (graph + economics) and bind this run to it, so a
+  // later CSV re-upload is detectable rather than silently changing history
+  // (Phase A / G5 / §8.4). Deduped server-side by content: an unchanged dataset
+  // reuses its version. Since WP 13.2 the worker COMPUTES from this version, so
+  // a server run without one is refused below rather than run unbound.
+  let datasetVersionId: string | null = null;
+  let graphHash: string | null = null;
+  let simulationHash: string | null = null;
+  // §23 WP 13.3 — the frozen dataset a MODEL run reads, for the gate below.
+  let frozenDataset: Record<string, unknown> | null = null;
+  try {
+    // A followed model that names its dataset version is run on THAT version —
+    // nothing is snapshotted, because the live project is not what it replays.
+    let dsId: string | null = followedModel?.dataset_version_id ?? null;
+    if (!dsId) {
+      // deno-lint-ignore no-explicit-any
+      const { data, error: dsErr } = await (sb as any).rpc("snapshot_dataset", {
+        p_project_id: scenario.project_id,
+      });
+      if (dsErr) throw dsErr;
+      dsId = (data as string | null) ?? null;
+    }
+    datasetVersionId = dsId;
+    if (datasetVersionId) {
+      // deno-lint-ignore no-explicit-any
+      const { data: dv } = await (svc as any)
+        .from("dataset_versions")
+        .select(followedModel?.dataset_version_id ? "graph_hash,hash_inputs,snapshot" : "graph_hash,hash_inputs")
+        .eq("id", datasetVersionId)
+        .maybeSingle();
+      if (followedModel?.dataset_version_id) {
+        frozenDataset = (dv?.snapshot as Record<string, unknown> | null) ?? null;
+      }
+      graphHash = (dv?.graph_hash as string | null) ?? null;
+      // WP 11.2 · §4 D260 — the simulation scope of the same snapshot, which the
+      // RunKey hashes. `create_simulation_run` reads it off the snapshot row itself;
+      // it travels here only for a database that cannot (the deploy window).
+      simulationHash = (dv?.hash_inputs as string | null) ?? null;
+    }
+  } catch (e) {
+    console.error("snapshot_dataset failed", e);
+  }
+  // §23 WP 13.3 — a model recorded before models named their dataset version
+  // (WP 10.3) can only be run on the live data, and only while that data is
+  // still the data it was validated on. Otherwise its run would claim a
+  // validation it does not have: the caller is told to run current data as an
+  // exploratory run instead.
+  if (followedModel && !followedModel.dataset_version_id && datasetVersionId) {
+    const same = followedModel.hash_simulation
+      ? simulationHash === followedModel.hash_simulation
+      : graphHash === followedModel.graph_hash;
+    if (!same) {
+      throw new Error(
+        "your project's data changed since this model was validated, and the model does not name " +
+          "the dataset version it was validated on, so it cannot be replayed — run current data as " +
+          "exploratory, or re-validate the model",
+      );
+    }
+  }
+  // PLAN.md §23 WP 13.2 · §4 D280 — the worker computes from the FROZEN dataset
+  // version and nothing else, so a server run that could not be frozen is not
+  // dispatched: there would be nothing for it to read. (Before WP 13.2 it ran
+  // "unbound", from the live tables.) A browser run computes from what the page
+  // loaded and is not refused here.
+  if ((cmd.payload as Record<string, unknown>).compute !== "client" && !datasetVersionId) {
+    throw new Error(
+      "the project's data could not be frozen as a dataset version, so the run was not " +
+        "dispatched — the server computes only from frozen versions. Try again; if it repeats, " +
+        "the dataset snapshot is failing.",
+    );
+  }
+
   // Pre-dispatch validation gate (§8.1–8.2): grade the required-data manifest
   // — compiled from the engine registry for THIS policy configuration —
   // against the live project tables, read with the SERVICE ROLE (grading is a
@@ -318,7 +422,10 @@ export async function dispatchExperimentRun(
   // the run row (gate_skipped) instead of vanishing into the logs.
   let gateSkipped = false;
   try {
-    const gateDataset = await loadGateDataset(svc, scenario.project_id as string);
+    // §23 WP 13.3 — a model run is graded on the frozen data it will READ.
+    const gateDataset = frozenDataset
+      ? gateDatasetFromSnapshot(frozenDataset, snapshot)
+      : await loadGateDataset(svc, scenario.project_id as string);
     const gate = runValidationGate({
       dataset: gateDataset,
       snapshotDefaults: snapshotDefaults ?? {},
@@ -335,50 +442,6 @@ export async function dispatchExperimentRun(
   }
 
   const replications = Math.max(1, Math.min(200, Number(scenario.replications) || 10));
-
-  // Snapshot the dataset (graph + economics) and bind this run to it, so a
-  // later CSV re-upload is detectable rather than silently changing history
-  // (Phase A / G5 / §8.4). Deduped server-side by content: an unchanged dataset
-  // reuses its version. Since WP 13.2 the worker COMPUTES from this version, so
-  // a server run without one is refused below rather than run unbound.
-  let datasetVersionId: string | null = null;
-  let graphHash: string | null = null;
-  let simulationHash: string | null = null;
-  try {
-    // deno-lint-ignore no-explicit-any
-    const { data: dsId, error: dsErr } = await (sb as any).rpc("snapshot_dataset", {
-      p_project_id: scenario.project_id,
-    });
-    if (dsErr) throw dsErr;
-    datasetVersionId = (dsId as string | null) ?? null;
-    if (datasetVersionId) {
-      // deno-lint-ignore no-explicit-any
-      const { data: dv } = await (sb as any)
-        .from("dataset_versions")
-        .select("graph_hash,hash_inputs")
-        .eq("id", datasetVersionId)
-        .maybeSingle();
-      graphHash = (dv?.graph_hash as string | null) ?? null;
-      // WP 11.2 · §4 D260 — the simulation scope of the same snapshot, which the
-      // RunKey hashes. `create_simulation_run` reads it off the snapshot row itself;
-      // it travels here only for a database that cannot (the deploy window).
-      simulationHash = (dv?.hash_inputs as string | null) ?? null;
-    }
-  } catch (e) {
-    console.error("snapshot_dataset failed", e);
-  }
-  // PLAN.md §23 WP 13.2 · §4 D280 — the worker computes from the FROZEN dataset
-  // version and nothing else, so a server run that could not be frozen is not
-  // dispatched: there would be nothing for it to read. (Before WP 13.2 it ran
-  // "unbound", from the live tables.) A browser run computes from what the page
-  // loaded and is not refused here.
-  if ((cmd.payload as Record<string, unknown>).compute !== "client" && !datasetVersionId) {
-    throw new Error(
-      "the project's data could not be frozen as a dataset version, so the run was not " +
-        "dispatched — the server computes only from frozen versions. Try again; if it repeats, " +
-        "the dataset snapshot is failing.",
-    );
-  }
 
   // Stamp the credibility provenance (Phase B0 / G13 / §9.5): the scenario's
   // baseline fingerprint hash and — when the exact triple has an active card —
@@ -437,22 +500,8 @@ export async function dispatchExperimentRun(
       !Array.isArray(payload.protocol_overrides)
       ? (payload.protocol_overrides as Record<string, unknown>)
       : {};
-  const chosenModel =
-    typeof payload.validated_model_id === "string" && payload.validated_model_id
-      ? payload.validated_model_id
-      : null;
-  if (chosenModel) {
-    const { data: m } = await svc
-      .from("model_validations")
-      .select("id,project_id,status")
-      .eq("id", chosenModel)
-      .maybeSingle();
-    if (!m || m.project_id !== scenario.project_id) {
-      throw new Error("validated model not found in this project");
-    }
-    if (m.status === "revoked") throw new Error("this Validated Model was revoked and cannot be run");
-    modelValidationId = String(m.id);
-  }
+  // The chosen model was resolved (and checked) before anything else, above.
+  if (followedModel) modelValidationId = String(followedModel.id);
   const exploratory = payload.exploratory === true || !modelValidationId;
   // Whose share this run draws on: the app's asserted user (D28 — the app
   // authenticates against `approved_users`, so `userId`, the Supabase Auth

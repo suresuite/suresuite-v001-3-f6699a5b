@@ -1282,14 +1282,20 @@ export function RunValidateStage({
     }
     setAdopting(true);
     try {
+      // §23 WP 13.3 — the model binds the TWO VERSIONS ITS EVIDENCE RUN READ.
+      // Snapshotting the live project here (as this did before) bound whatever
+      // the data and policies were at the moment of saving — which, after an
+      // edit between the run and the save, is a world nobody validated.
+      const evidence = dbRun && dbRun.status === "done" ? dbRun : null;
       // 1 — the exact policy snapshot (deduped by content since WP 10.2)
       const versionId =
-        policyDirty || !selectedVersionId
+        evidence?.policy_version_id ??
+        (policyDirty || !selectedVersionId
           ? await saveSnapshot("Validated model", undefined, { quiet: true })
-          : selectedVersionId;
+          : selectedVersionId);
       if (!versionId) throw new Error("could not save the policy snapshot");
       // 2 — the exact graph version (dedup-or-insert, §8.4)
-      const datasetVersionId = await dataset.snapshot();
+      const datasetVersionId = evidence?.dataset_version_id ?? (await dataset.snapshot());
       if (!datasetVersionId) throw new Error("could not snapshot the dataset");
       // 3 — the model (supersedes the same-content active model server-side)
       await modelValidation.recordValidatedModel({

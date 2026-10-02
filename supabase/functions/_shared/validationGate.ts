@@ -106,6 +106,41 @@ export async function loadGateDataset(sb: any, projectId: string): Promise<Gradi
   };
 }
 
+/**
+ * The gate's dataset from FROZEN versions — PLAN.md §23 WP 13.3.
+ *
+ * A run of a Validated Model computes from the model's own dataset version and
+ * policy version (WP 13.2/13.3), which can differ from the live project; grading
+ * the live tables would then judge data the run does not read. This builds the
+ * same `GradingDataset` `loadGateDataset` returns, from a `dataset_versions`
+ * snapshot (v2/v3: tables under `inputs`) and the policy version's overrides.
+ * Pure. Multi-level BOM rows win, as everywhere.
+ */
+export function gateDatasetFromSnapshot(
+  datasetSnapshot: Record<string, unknown>,
+  policySnapshot: Record<string, unknown>,
+): GradingDataset {
+  const inputs = (
+    datasetSnapshot && typeof datasetSnapshot.inputs === "object" && datasetSnapshot.inputs
+      ? datasetSnapshot.inputs
+      : datasetSnapshot
+  ) as Record<string, unknown>;
+  const rows = (k: string) => (Array.isArray(inputs[k]) ? (inputs[k] as Record<string, unknown>[]) : []);
+  const multi = rows("bom_multi_level");
+  const overrides = Array.isArray(policySnapshot?.overrides)
+    ? (policySnapshot.overrides as Record<string, unknown>[]).map((o) => ({ scope: "node", ...o }))
+    : [];
+  return {
+    materials: rows("materials"),
+    products: rows("products"),
+    suppliers: rows("suppliers"),
+    inbound: rows("inbound"),
+    outbound: rows("outbound"),
+    bom: multi.length > 0 ? multi : rows("bom"),
+    overrides,
+  };
+}
+
 /** The `meta.note` for a tool envelope built from a graded dataset.
  *
  * Two things can make such a result partial, and both must reach the model:
