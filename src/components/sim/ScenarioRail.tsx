@@ -75,6 +75,7 @@ export function ScenarioList({
   onDuplicate,
   onDelete,
   onBrowseSaved,
+  fill = false,
 }: {
   scenarios: Scenario[];
   selectedId: string | null;
@@ -87,11 +88,22 @@ export function ScenarioList({
   onDelete: (id: string) => void;
   /** Opens the saved-experiment library (scenario templates). */
   onBrowseSaved: () => void;
+  /**
+   * Desktop rail: the list shrinks to the height its column leaves it and
+   * scrolls inside itself, so the cards above it stay put. Off on mobile,
+   * where the page scrolls.
+   */
+  fill?: boolean;
 }) {
   const confirm = useConfirm();
   return (
-    <aside className="overflow-hidden rounded-sm border border-[--hair-rule] bg-white">
-      <div className="flex items-center justify-between gap-2 border-b border-[--hair-rule] px-[14px] py-[11px]">
+    <aside
+      className={cn(
+        "overflow-hidden rounded-sm border border-[--hair-rule] bg-white",
+        fill && "md:flex md:min-h-[180px] md:shrink md:flex-col",
+      )}
+    >
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[--hair-rule] px-[14px] py-[11px]">
         <span className="text-[13.5px] font-semibold tracking-[-0.011em] text-[#18181b]">Scenarios</span>
         <span className="flex items-center gap-[6px]">
           <button
@@ -115,7 +127,12 @@ export function ScenarioList({
       </div>
 
       {/* 420px is taller than a landscape phone's whole viewport (§2.6). */}
-      <div className="max-h-[min(420px,60svh)] overflow-y-auto md:max-h-[420px]">
+      <div
+        className={cn(
+          "max-h-[min(420px,60svh)] overflow-y-auto",
+          fill ? "md:max-h-none md:min-h-0 md:flex-1 md:overscroll-contain" : "md:max-h-[420px]",
+        )}
+      >
         {loading ? (
           <div className="px-[14px] py-3 text-[12.5px] text-[--zinc-quiet]">Loading…</div>
         ) : null}

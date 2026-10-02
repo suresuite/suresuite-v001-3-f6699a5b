@@ -11,7 +11,8 @@
  * what to simulate (T1). It is NOT the network pages' "Nexus node prediction"
  * panel, which reads a different function and a different model.
  *
- * Neutral palette on purpose — teal is the stress-test card's, which is live.
+ * Red, not teal: teal is the stress-test card's, which is live; red marks this
+ * one as not built yet, so it is never mistaken for a working surface.
  *
  * WP 10.8 (§4 D249) gives it ONE figure, and it is a count, not a prediction:
  * how many replications the training set already holds, from
@@ -29,12 +30,12 @@ export function SurrogateCard({ training = null }: { training?: TrainingTotals |
     <section
       aria-label="Surrogate model: nexus node detection, coming soon"
       title={detail}
-      className="mb-3 flex w-full items-center gap-[7px] rounded-sm border border-dashed border-[#d4d4d8] bg-[#fafafa] px-[14px] py-[9px]"
+      className="mb-3 flex w-full items-center gap-[7px] rounded-sm border border-dashed border-[#BF2330] bg-[rgba(191,35,48,0.06)] px-[14px] py-[9px]"
       data-testid="surrogate-card"
     >
-      <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#d4d4d8]" />
-      <span className="min-w-0 text-[13px] font-semibold tracking-[-0.011em] text-[#3f3f46]">Surrogate model</span>
-      <span className="ml-auto shrink-0 rounded-sm bg-[#f0f0f2] px-[6px] py-px font-mono text-[10.5px] text-[#71717a]">
+      <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#BF2330]" />
+      <span className="min-w-0 text-[13px] font-semibold tracking-[-0.011em] text-[#18181b]">Surrogate model</span>
+      <span className="ml-auto shrink-0 rounded-sm bg-[rgba(191,35,48,0.12)] px-[6px] py-px font-mono text-[10.5px] text-[#BF2330]">
         coming soon
       </span>
     </section>

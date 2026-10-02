@@ -874,16 +874,21 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
             <div className="flex flex-col gap-4 md:flex-row md:items-start">
               <aside
-                className="w-full min-w-0 md:sticky md:w-64 md:shrink-0 md:self-start md:overflow-y-auto md:overscroll-contain"
+                // Only the scenario list scrolls (it shrinks to what is left);
+                // the aside itself scrolls only when the open stress-test
+                // drawer alone outgrows the viewport.
+                className="w-full min-w-0 md:sticky md:flex md:w-64 md:shrink-0 md:flex-col md:self-start md:overflow-y-auto md:overscroll-contain"
                 style={{ top: asideTop, maxHeight: `calc(100dvh - ${asideTop}px - 16px)` }}
               >
-                <ExperimentLibraryBox
-                  count={STRESS_TESTS.length}
-                  open={stressOpen}
-                  onToggle={() => setStressOpen((v) => !v)}
-                />
-                {stressOpen ? <StressTestDrawer onLaunch={launchStress} /> : null}
-                <SurrogateCard training={trainingSet} />
+                <div className="md:shrink-0">
+                  <ExperimentLibraryBox
+                    count={STRESS_TESTS.length}
+                    open={stressOpen}
+                    onToggle={() => setStressOpen((v) => !v)}
+                  />
+                  {stressOpen ? <StressTestDrawer onLaunch={launchStress} /> : null}
+                  <SurrogateCard training={trainingSet} />
+                </div>
                 <ScenarioList
                   scenarios={scenarios}
                   selectedId={selectedId}
@@ -894,6 +899,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   onCreate={createScenario}
                   onDuplicate={duplicateScenario}
                   onDelete={deleteScenario}
+                  fill
                 />
               </aside>
 
