@@ -25,7 +25,7 @@ surfaces:
   - page: "DeveloperApi.tsx"
     via: "rpc list_api_keys"
     grain: table
-    evidence: "src/pages/DeveloperApi.tsx:284"
+    evidence: "src/pages/DeveloperApi.tsx:293"
     confirmed: true
 
 governance:

@@ -42,7 +42,7 @@ your project in the app ──freeze──▶ dataset version (rows + graph_hash
 | | |
 |---|---|
 | Python | 3.10 or later (Colab works as is) |
-| API key | A **personal** key from the app's **/developer** page. Scopes: `read:data` and `read:policies` to pull data and the engine; `read:runs` + `write:runs` to also run on the platform |
+| API key | A **personal** key from the app's **/developer** page. Scopes: `read:data` and `read:policies` to pull data and the engine; `read:runs` + `write:runs` to also run on the platform. Every user may create a read-only personal key; the write scopes need a key manager (admin or modeler) |
 | Without a key | The notebooks run in **demo mode** on a small example project. Demo mode does not hand out the engine, so local simulation needs a key |
 
 Keep the key out of your code: in Colab, add it in the **Secrets** panel as

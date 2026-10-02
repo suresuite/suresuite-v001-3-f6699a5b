@@ -256,6 +256,15 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
   const [projectIds, setProjectIds] = useState<string[]>([]);
   const [expiry, setExpiry] = useState('never');
 
+  // WP 12.7 — what the database will let this caller mint. Every user may create
+  // a PERSONAL key with the self-service (read) scopes; admins and modelers also
+  // create organization keys and any scope. Read from `api_key_caller`, so the
+  // page offers exactly what `create_api_key` accepts. Until it answers, the page
+  // assumes the narrower standing.
+  const [canManage, setCanManage] = useState(false);
+  const [selfServiceScopes, setSelfServiceScopes] = useState<string[]>(['read:data', 'read:policies', 'read:runs']);
+  const offeredScopes = canManage ? SCOPES : SCOPES.filter((s) => selfServiceScopes.includes(s.id));
+
   // show-once state
   const [mintedKey, setMintedKey] = useState<{ plaintext: string; name: string } | null>(null);
 
@@ -280,20 +289,27 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
   const load = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
-    const [keysRes, usageRes, projectsRes] = await Promise.all([
+    const [keysRes, usageRes, projectsRes, callerRes] = await Promise.all([
       db.rpc('list_api_keys', rpcAuth),
       db.rpc('api_key_usage', rpcAuth),
       db.rpc('list_projects', rpcAuth),
+      db.rpc('api_key_caller', rpcAuth),
     ]);
+    const caller = Array.isArray(callerRes.data) ? callerRes.data[0] : callerRes.data;
+    if (caller) {
+      setCanManage(!!caller.can_manage);
+      if (Array.isArray(caller.self_service_scopes)) setSelfServiceScopes(caller.self_service_scopes);
+      if (!caller.can_manage) setPrincipal('personal');
+    }
     if (keysRes.error) {
-      // 'forbidden' = a plain user account; anything else is a real failure.
+      // 'forbidden' = an inactive account or one with no organization.
       const msg = String(keysRes.error.message ?? '');
       toast({
         title: msg.includes('forbidden')
-          ? 'Your account cannot manage API keys'
+          ? 'Your account cannot use API keys'
           : 'Could not load API keys',
         description: msg.includes('forbidden')
-          ? 'Ask an admin or modeler in your organization to create a key for you.'
+          ? 'API keys need an active account in an organization. Ask your administrator.'
           : msg,
         variant: 'destructive',
       });
@@ -610,6 +626,10 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
           <ResponsiveDialogTitle>Create API key</ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
             The key is scoped to your organization. You'll see the secret once, right after creation.
+            {!canManage && (
+              <> Your key acts as you and is read-only: it can pull the projects, datasets, policies
+              and runs you can see, and install the engine to simulate on your own machine.</>
+            )}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         <div className="space-y-4">
@@ -633,6 +653,7 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
               </SelectContent>
             </Select>
           </div>
+          {canManage && (
           <div className="space-y-1.5">
             <Label>Acts as</Label>
             <Select value={principal} onValueChange={(v) => setPrincipal(v as 'personal' | 'org')}>
@@ -643,10 +664,11 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
               </SelectContent>
             </Select>
           </div>
+          )}
           <div className="space-y-1.5">
             <Label>Scopes (least privilege: pick only what the caller needs)</Label>
             <div className="grid grid-cols-1 gap-1.5 rounded-sm border border-[--hair-border] p-3 md:max-h-48 md:overflow-y-auto">
-              {SCOPES.map((s) => (
+              {offeredScopes.map((s) => (
                 <label key={s.id} className="flex cursor-pointer items-start gap-2 text-sm">
                   <Checkbox
                     checked={scopes.includes(s.id)}
@@ -792,7 +814,7 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
         </MobilePanel>
       </MobileGroup>
 
-      <MobileGroup label="Organization keys">
+      <MobileGroup label={canManage ? "Organization keys" : "Your keys"}>
         {keys.length > 0 && (
           <MobileStatGrid
             stats={[
@@ -1228,7 +1250,7 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
 
             {/* L1: the table's name reads on the canvas, above the shell. */}
             <TableBlock
-              name="Organization keys"
+              name={canManage ? "Organization keys" : "Your keys"}
               count={keys.length}
               meta={`${activeCount} active`}
               actions={
