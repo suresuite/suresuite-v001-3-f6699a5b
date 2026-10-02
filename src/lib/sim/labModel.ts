@@ -15,7 +15,7 @@
 //     exploratory run as the baseline side.
 import type { ModelValidationCard } from "@/hooks/useModelValidation";
 import { REPLICATION_SERIES_FACTS } from "@/components/docs/generated/policy.generated";
-import { protocolLine, type ValidatedModelProtocol } from "./validatedModel";
+import { driftReasons, protocolLine, type ValidatedModelProtocol } from "./validatedModel";
 
 // ── the model choice ─────────────────────────────────────────────────────────
 
@@ -257,4 +257,51 @@ export function capacityVerdict(
     refusal = `this run is expected to keep ${formatBytes(run.bytes)}; ${formatBytes(storage.left)} is left — release pinned runs or let runs expire`;
   }
   return { line, refusal };
+}
+
+/**
+ * PLAN.md §23 WP 13.3 — what the Lab may offer for a run of a Validated Model.
+ *
+ * A run of a model is dispatched with the MODEL's own dataset version and policy
+ * version (the dispatcher enforces it), so a live project that has MOVED since
+ * validation no longer makes the run unfaithful: it replays the validated data.
+ * The user chooses — *run the validated versions*, or *run current data as
+ * exploratory* (the model's policies on today's data, never a validated result).
+ * Only what a replay cannot hold still blocks: the scenario's world or the engine
+ * changed, or the model is no longer in force. A model recorded before models
+ * named their dataset version cannot be replayed on moved data at all.
+ */
+export type ModelRunOffer =
+  | { kind: "faithful" }
+  | { kind: "moved"; replayable: boolean; note: string }
+  | { kind: "blocked"; reason: string };
+
+export function modelRunOffer(
+  card: Pick<ModelValidationCard, "status" | "dataset_version_id">,
+  credibility: { state: string; drift?: string[] } | null,
+): ModelRunOffer {
+  if (card.status !== "active") {
+    return { kind: "blocked", reason: "This model is no longer in force — choose the one that is." };
+  }
+  const drift = credibility?.state === "stale" ? credibility.drift ?? [] : [];
+  if (drift.includes("scenario") || drift.includes("engine")) {
+    return {
+      kind: "blocked",
+      reason: `${driftReasons(drift.filter((d) => d !== "data")).join(" and ")} since this model was validated — re-validate it in Policies first.`.replace(/^./, (c) => c.toUpperCase()),
+    };
+  }
+  if (drift.includes("data")) {
+    return card.dataset_version_id
+      ? {
+          kind: "moved",
+          replayable: true,
+          note: "Your project's data changed since this model was validated. A run of the model replays the data it was validated on; run current data to see today's numbers as an exploratory run.",
+        }
+      : {
+          kind: "moved",
+          replayable: false,
+          note: "Your project's data changed since this model was validated, and this model does not name the data version it was validated on — it cannot be replayed. Run current data as exploratory, or re-validate.",
+        };
+  }
+  return { kind: "faithful" };
 }

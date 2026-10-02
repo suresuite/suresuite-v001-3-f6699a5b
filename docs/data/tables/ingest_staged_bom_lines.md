@@ -280,6 +280,6 @@ master or transactional. Master rows describe things that persist — an item, a
 
 ---
 
-*Generated from data contract `c0bee291baee`, engine `0.2.9`,
+*Generated from data contract `0f63c0936a2a`, engine `0.2.11`,
 sidecar `supabase/contract/ingest_staged_bom_lines.contract.yaml`, table created by `20260829120000_erp_connector_phase1_2.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

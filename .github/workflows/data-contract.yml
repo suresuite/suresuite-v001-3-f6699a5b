@@ -142,6 +142,64 @@ jobs:
       - name: Data contract holds (coverage, page drift, §4 citations)
         run: npm run contract:check
 
+  # ── gate `page-equals-run` (PLAN.md §23, Phase 13 · WP 13.5) ─────────────
+  #
+  # For a given dataset version and policy version, the value /policies shows in
+  # a cell is the value the engine receives, or the cell says it does not read
+  # it — and /policies writes no item master. The gate has a GRID half (vitest)
+  # and an ENGINE half (pytest over scsim's mapper and the worker), and they share
+  # the fixtures under scripts/example_project/. `npm test` above already runs the
+  # grid half; this job names the gate in the Actions UI and is the only place in
+  # THIS workflow the engine half runs — so a mapper change that would make the
+  # page lie fails here, beside the data contract it belongs to.
+  page-equals-run:
+    name: page equals run
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          pip install -r sim-worker/requirements.txt pytest
+          pip install ./scsim
+
+      - name: Grid half — the page resolves every cell to the engine's value (vitest)
+        run: >-
+          npx vitest run
+          src/lib/policies/__tests__/pageEqualsRun.test.ts
+          src/lib/policies/__tests__/policiesNeverWriteMasters.test.ts
+          src/lib/policies/__tests__/masterOverrides.test.ts
+          src/lib/policies/__tests__/policyBundleDefaultsSql.test.ts
+          src/lib/policies/__tests__/frozenRunDispatch.test.ts
+          src/lib/policies/__tests__/unsavedDraftsGuard.test.ts
+          src/lib/sim/__tests__/modelRunOffer.test.ts
+
+      - name: Engine half — the mapper's answers, scopes and frozen inputs (pytest)
+        working-directory: sim-worker
+        run: >-
+          python -m pytest -q
+          tests/test_page_equals_run.py
+          tests/test_policies_override.py
+          tests/test_frozen_inputs.py
+
+      - name: Engine half — declared scopes and override keys are the mapper's (pytest)
+        working-directory: scsim
+        run: >-
+          python -m pytest -q tests/test_registry_io.py
+          -k "scopes or override or policy_bundle_keys"
+
   # ── D31 · a migration's first execution is no longer the production deploy ──
   #
   # `contract:introspect` replays migrations STATICALLY — it parses DDL, it never

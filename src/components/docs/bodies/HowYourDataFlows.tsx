@@ -116,20 +116,23 @@ export default function HowYourDataFlows() {
           then run and validate in Simulation Lab, then save the{" "}
           <strong className="text-foreground">validated model</strong>. A run freezes two things — a
           dataset version (your masters and lanes) and a policy version (your settings and
-          overrides). The validated model names one of each, so anyone who runs it later gets
-          exactly those numbers. Unsaved edits on the policies page reach nothing.
+          overrides). The validated model names the two versions its evidence run used, so anyone
+          who runs it later gets exactly those numbers — even after your data has changed. If it
+          has, the Simulation Lab offers two choices: run the validated versions, or run your
+          current data as an exploratory run. Unsaved edits on the policies page reach nothing.
+        </P>
+        <P>
+          A cell the engine does not read on its stage — the policy basis, a review period, a
+          finished-goods stock setting on a plant row — is marked <Term>not simulated</Term> where it
+          is shown, and a blank project-wide default is saved in the policy version exactly as the
+          page displays it.
         </P>
         <Key>The rule: the number the policies page shows is the number the run uses — and the policies page never changes your item masters.</Key>
-        <Callout tone="limit" title="Not true yet">
-          <p>
-            Today, saving a cost, MOQ, capacity, price or demand on the policies page still writes it
-            into the item master. And a run records its dataset version but is computed from your
-            project's current masters and lanes, so an edit made after you press Run, or after a
-            model was validated, can reach that run. A few page cells are also not read by the
-            engine yet. All of this is scheduled work and is listed on{" "}
-            <DocLink to="known-limits">Known limits</DocLink>.
-          </p>
-        </Callout>
+        <P>
+          One thing predates the rule: values an earlier version of the policies page saved into
+          your item masters are still there, and cannot be told apart from uploaded ones. See{" "}
+          <DocLink to="known-limits">Known limits</DocLink>.
+        </P>
       </Section>
 
       <Section id="simulate" title="6. You simulate">
@@ -140,7 +143,8 @@ export default function HowYourDataFlows() {
         </P>
         <P>
           The work happens on a separate worker, not in your browser. You can close the tab; the run
-          continues and the result is waiting.
+          continues and the result is waiting. The worker reads only the two frozen versions the run
+          is stamped with — a change you make to your data after pressing Run is not in that run.
         </P>
       </Section>
 

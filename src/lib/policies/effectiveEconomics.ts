@@ -27,7 +27,7 @@ import {
   type FallbackStep,
   type Row,
 } from "../../../supabase/functions/_shared/grading.ts";
-import { baseDataRequirements } from "./registryAccess";
+import { baseDataRequirements, policyBundleKeys } from "./registryAccess";
 
 export type { DerivedValue, EmptyMeaning };
 
@@ -149,11 +149,32 @@ export function derivedProductionCapacity(
     const id = String(p.product_id ?? "");
     if (id) ids.add(id);
   }
+  // The bundle keys carry the item-master overrides (§23 WP 13.1): a demand
+  // mean set on /policies is the demand the engine's capacity floor doubles.
   const ctx = buildReducerCtx(
     { materials: [], products, suppliers: [], inbound: [], outbound, bom: [], overrides },
     defaults,
+    policyBundleKeys() as unknown as Row[],
   );
   return derivedFallbackDetails(CAPACITY_STEPS, ids, ctx);
+}
+
+/**
+ * `derivedMaterialCost` keeping WHICH step answered (§23 WP 13.4): a derived cost
+ * is shown with its source — the volume-weighted lane price, or the cheapest quote
+ * when no lane carries a volume — not as an anonymous "≈". The same walk.
+ */
+export function derivedMaterialCostDetails(inbound: Row[]): Map<string, DerivedValue> {
+  const ids = new Set<string>();
+  for (const arc of inbound) {
+    const id = String(arc.material_id ?? "");
+    if (id) ids.add(id);
+  }
+  const ctx = buildReducerCtx(
+    { materials: [], products: [], suppliers: [], inbound, outbound: [], bom: [] },
+    {},
+  );
+  return derivedFallbackDetails(MATERIAL_COST_STEPS, ids, ctx);
 }
 
 export function derivedMaterialCost(inbound: Row[]): Map<string, number> {

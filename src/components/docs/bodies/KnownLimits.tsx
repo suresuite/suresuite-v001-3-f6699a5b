@@ -104,21 +104,19 @@ export default function KnownLimits() {
           </p>
         </Callout>
 
-        <Callout tone="limit" title="The policies page writes item masters, and a run can use data edited after you pressed Run">
+        <Callout tone="limit" title="Values saved into item masters before the policies page stopped writing them">
           <p>
-            Saving a cost, MOQ, capacity, price or demand on the policies page currently writes it
-            into your item master, so the uploaded value is overwritten; it should be kept as a
-            policy setting instead. A run is bound to a frozen policy version, but its masters and lanes — cost, MOQ,
-            capacity, price, demand, the network itself — are read from your project when the run
-            starts, not from the dataset version it records. An edit made after dispatch, or after a
-            model was validated, can reach that run. The validated model is marked stale; the run is
-            not stopped. Separately, a few policy cells are not read by the engine yet, and a blank
-            project-wide default can show one value on the policies page while the run uses another.
+            Every run is computed from two frozen versions — your data and your policies as they were
+            when you pressed Run — a validated model replays the versions it was validated on, and the
+            policies page no longer writes your item masters. But values an earlier version of the
+            page saved into a master are still in it: they cannot be told apart from uploaded ones,
+            so nothing moved them back. Separately, the browser's Back button leaves the policies page
+            without asking, so unsaved edits there are lost.
           </p>
           <p>
-            <strong className="text-foreground">Until it is fixed:</strong> avoid editing data while
-            runs you depend on are queued, rerun a validated model after any data change, and note an
-            item master's original value before you change it on the policies page. See{" "}
+            <strong className="text-foreground">Until it is fixed:</strong> if you changed a cost,
+            MOQ, capacity, price or demand on the policies page before October 2026, check the item
+            master and re-upload the original value if needed. See{" "}
             <DocLink to="how-your-data-flows">How your data flows</DocLink>.
           </p>
         </Callout>

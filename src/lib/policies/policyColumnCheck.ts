@@ -190,26 +190,26 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     refs: ["D189"],
   },
   "supplier:material_cost": {
-    shows: "materials.cost (item master)",
-    savedTo: "materials.cost (master upsert)",
-    engine: "materials.cost → volume-weighted inbound price → cheapest inbound price → 1.0",
+    shows: "your override → materials.cost (item master) → derived from the inbound lanes",
+    savedTo: "override sourcing.material_cost (per row — /policies never writes the item master, §23 WP 13.1)",
+    engine: "override → materials.cost → volume-weighted inbound price → cheapest inbound price → 1.0",
     verdict: "works",
   },
   "supplier:material_moq": {
-    shows: "materials.moq (item master)",
-    savedTo: "materials.moq (master upsert)",
-    engine: "materials.moq on every link of the material; blank → 0",
+    shows: "your override → materials.moq (item master)",
+    savedTo: "override sourcing.material_moq (per row — /policies never writes the item master, §23 WP 13.1)",
+    engine: "override → materials.moq, on every link of the material; blank → 0",
     verdict: "works",
   },
   "supplier:capacity_per_week": {
-    shows: "suppliers.capacity_per_week (item master); blank shows ∞",
-    savedTo: "suppliers.capacity_per_week (master upsert)",
-    engine: "suppliers.capacity_per_week; blank = unlimited",
+    shows: "your override → suppliers.capacity_per_week (item master); blank shows ∞",
+    savedTo: "override sourcing.capacity_per_week (per row — /policies never writes the item master, §23 WP 13.1) — one value per supplier" ,
+    engine: "override → suppliers.capacity_per_week; blank = unlimited",
     verdict: "works",
   },
   "supplier:reliability_score": {
-    shows: "suppliers.reliability_score (item master)",
-    savedTo: "suppliers.reliability_score (master upsert)",
+    shows: "your override → suppliers.reliability_score (item master)",
+    savedTo: "override sourcing.reliability_score (per row — /policies never writes the item master, §23 WP 13.1) — one value per supplier",
     engine: "passed to the engine, but read only by the backup-supplier 'reliability' selection rule, which the mapper never selects (always min_cost)",
     verdict: "ignored",
     shouldBe: "remove, or let the backup rule be chosen so this value matters",
@@ -272,9 +272,9 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
   "supplier:coverage_weeks": {
     shows: "override → project default → 8",
     savedTo: "override inventory.coverage_weeks",
-    engine: "κ for that material; with NOTHING saved the engine uses its own 8 / 10 / 12-week strip, which rises during disruptions",
-    verdict: "conditional",
-    note: "Works once saved. κ is saved in no project today, so every run used the strip while the page said 8.",
+    engine: "κ for that material, else the project default — which the policy version now stores as the page shows it (8), so the run reads 8",
+    verdict: "works",
+    note: "Before §23 WP 13.4 (§4 D204 a) an unsaved κ was 8 on the page and the 8 / 10 / 12-week strip in the run; κ was saved in no project.",
     refs: ["D204"],
   },
   "supplier:review_period_days": {
@@ -286,9 +286,9 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     shouldBe: "remove, or wire it into the periodic policy",
   },
   "supplier:initial_on_hand": {
-    shows: "materials.initial_on_hand (item master)",
-    savedTo: "materials.initial_on_hand (master upsert)",
-    engine: "materials.initial_on_hand; blank → the engine's own starting stock",
+    shows: "your override → materials.initial_on_hand (item master)",
+    savedTo: "override inventory.initial_on_hand (per row — /policies never writes the item master, §23 WP 13.1)",
+    engine: "override → materials.initial_on_hand; blank → the engine's own starting stock",
     verdict: "works",
   },
   "supplier:safety_stock_days": {
@@ -326,22 +326,22 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
 
   // ──────────────────────────────── plant ────────────────────────────────
   "plant:sell_price": {
-    shows: "products.sell_price (item master)",
-    savedTo: "products.sell_price (master upsert)",
-    engine: "products.sell_price → demand-weighted outbound price → 1.0",
+    shows: "your override → products.sell_price (item master) → derived from the outbound lanes",
+    savedTo: "override production.sell_price (per row — /policies never writes the item master, §23 WP 13.1)",
+    engine: "override → products.sell_price → demand-weighted outbound price → 1.0",
     verdict: "works",
   },
   "plant:production_capacity": {
-    shows: "products.production_capacity, units / week (item master)",
-    savedTo: "products.production_capacity (master upsert)",
-    engine: "master → line capacity × 7 × utilization → max(2 × demand, 1000)",
+    shows: "your override → products.production_capacity, units / week (item master) → the line-rate derivation",
+    savedTo: "override production.production_capacity (per row — /policies never writes the item master, §23 WP 13.1) — the ONE capacity of the row",
+    engine: "override → master → line capacity × 7 × utilization → max(2 × demand, 1000)",
     verdict: "works",
   },
   "plant:demand_cv": {
-    shows: "products.demand_cv (item master)",
-    savedTo: "products.demand_cv (master upsert)",
+    shows: "your override → products.demand_cv (item master)",
+    savedTo: "override production.demand_cv (per row — /policies never writes the item master, §23 WP 13.1)",
     engine:
-      "products.demand_cv → the scenario's demand-model cv → 0.30; spreads a TRIANGULAR product's demand, and through " +
+      "override → products.demand_cv → the scenario's demand-model cv → 0.30; spreads a TRIANGULAR product's demand, and through " +
       "that variance sizes P-P.3 safety stock",
     verdict: "conditional",
     note:
@@ -350,25 +350,25 @@ export const COLUMN_CHECK: Record<string, ColumnCheck> = {
     refs: ["D190"],
   },
   "plant:demand_mean": {
-    shows: "products.demand_mean, units / week (item master)",
-    savedTo: "products.demand_mean (master upsert)",
-    engine: "products.demand_mean → Σ weekly outbound volume → 0",
+    shows: "your override → products.demand_mean, units / week (item master) → Σ weekly outbound volume",
+    savedTo: "override production.demand_mean (per row — /policies never writes the item master, §23 WP 13.1)",
+    engine: "override → products.demand_mean → Σ weekly outbound volume → 0",
     verdict: "works",
     note: "The run uses it; the network pages and the Supplier tree do not (they use outbound volume) — all 6 Aumovio products differ.",
     refs: ["D195"],
   },
   "plant:capacity_units_per_day": {
-    shows: "override → 1000",
-    savedTo: "override production.capacity_units_per_day",
-    engine: "used ONLY when products.production_capacity is blank (the master wins, with a warning)",
-    verdict: "conditional",
-    note: "8 stored.",
+    shows: "read-only: the row's saved line rate → the project default (1000), the input of the derived capacity",
+    savedTo: "— (read-only since §23 WP 13.4; set the capacity itself in the Capacity column, the project line rate on the Defaults card)",
+    engine: "used ONLY when the row's capacity (override or master) is blank",
+    verdict: "info",
+    note: "8 stored per row — still read and still shown. One editable capacity per row: the Capacity column.",
   },
   "plant:utilization_cap_pct": {
-    shows: "override → 85",
-    savedTo: "override production.utilization_cap_pct",
-    engine: "multiplies line capacity — only when products.production_capacity is blank",
-    verdict: "conditional",
+    shows: "read-only: the row's saved utilization → the project default (85)",
+    savedTo: "— (read-only since §23 WP 13.4)",
+    engine: "multiplies the line rate — only when the row's capacity (override or master) is blank",
+    verdict: "info",
   },
   "plant:type": {
     shows: "override → project default",
@@ -462,19 +462,18 @@ export function stageColumnChecks(stage: GridStage) {
 export const FULFILLMENT_CARD_CHECK: Record<string, ColumnCheck> = {
   allocation: {
     shows: "saved value; never saved → 'priority'",
-    savedTo: "policy_defaults.fulfillment (whole family on save)",
-    engine: "P-C.2 customer allocation, with ≥ 2 customers; never saved → NO allocation rule",
-    verdict: "conditional",
-    note: "Never saved in 9 of 10 projects, so the page says 'priority' and the run has no rule.",
+    savedTo: "policy_defaults.fulfillment (whole family on save); a policy version stores the shown default",
+    engine: "P-C.2 customer allocation, with ≥ 2 customers; never saved → 'priority', as shown (§23 WP 13.4)",
+    verdict: "works",
+    note: "Never saved in 9 of 10 projects. Before WP 13.4 (§4 D204 a) the page said 'priority' and the run had no rule; the policy version now stores the default the page shows.",
     refs: ["D204"],
   },
   backorder_allowed: {
     shows: "saved value; never saved → YES",
     savedTo: "policy_defaults.fulfillment",
-    engine: "P-C.1 backorder; never saved → NO (lost sales)",
-    verdict: "conditional",
-    note: "Never saved in 9 of 10 projects: every run there simulated lost sales while this card said backorders are allowed.",
-    shouldBe: "store the defaults the page shows, so page and run agree before the first save",
+    engine: "P-C.1 backorder; never saved → YES, as shown (§23 WP 13.4)",
+    verdict: "works",
+    note: "Never saved in 9 of 10 projects: before WP 13.4 (§4 D204 a) every run there simulated lost sales while this card said backorders are allowed. The policy version now stores the default the page shows.",
     refs: ["D204"],
   },
   max_backorder_days: {
@@ -486,9 +485,9 @@ export const FULFILLMENT_CARD_CHECK: Record<string, ColumnCheck> = {
   backorder_cost_per_day: {
     shows: "saved value; never saved → 2 (visible when backorder is on)",
     savedTo: "policy_defaults.fulfillment",
-    engine: "backorder penalty × 7 per week; never saved → 0",
-    verdict: "conditional",
-    note: "Agrees once the card is saved.",
+    engine: "backorder penalty × 7 per week; never saved → 2, as shown (§23 WP 13.4)",
+    verdict: "works",
+    note: "Before WP 13.4 (§4 D204 a) an unsaved cost was 2 on the card and 0 in the run.",
     refs: ["D204"],
   },
 };
@@ -604,7 +603,7 @@ export const NO_COLUMN_CHECK: Array<{ label: string; check: ColumnCheck }> = [
     check: {
       shows: "no column",
       savedTo: "customers upload only",
-      engine: "used only under an allocation rule — which 9 of 10 projects never saved",
+      engine: "used only under an allocation rule — 'priority' by default since §23 WP 13.4 (§4 D204 a)",
       verdict: "info",
     },
   },

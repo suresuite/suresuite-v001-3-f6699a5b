@@ -88,10 +88,25 @@ describe("the exploratory path is an editor's, and it is badged", () => {
 });
 
 describe("staleness and the run-the-model action", () => {
-  it("a stale model says re-validate", () => {
-    const t = text(html(base({ credibility: { state: "stale", card: model(), drift: ["data"] } })));
+  it("a stale model says re-validate when a replay cannot hold the change", () => {
+    const t = text(html(base({ credibility: { state: "stale", card: model(), drift: ["data", "scenario"] } })));
     // WP 11.2 — `data` drift is the simulation's INPUTS, which is what it now says.
-    expect(t).toContain("the simulation's inputs changed → re-validate");
+    expect(t).toContain("the simulation's inputs changed · the scenario's world changed → re-validate");
+  });
+  it("moved DATA alone is not a re-validation: a run replays the validated data (§23 WP 13.3)", () => {
+    const t = text(html(base({ credibility: { state: "stale", card: model(), drift: ["data"] } })));
+    expect(t).toContain("data changed since validation → a run replays the validated data");
+    expect(t).not.toContain("re-validate");
+  });
+  it("moved data offers the replay AND current data as exploratory (§23 WP 13.3)", () => {
+    const h = html(base({
+      onRunModel: () => {},
+      onRunCurrent: () => {},
+      modelMoved: { replayable: true, note: "Your project's data changed since this model was validated." },
+    }));
+    expect(h).toContain("Run validated versions");
+    expect(h).toContain("Run current data as exploratory");
+    expect(text(h)).toContain("Your project's data changed since this model was validated.");
   });
   it("a deep-tier change is a note beside 'in force', never 're-validate' (WP 11.3)", () => {
     const t = text(html(base({ credibility: { state: "validated", card: model(), notes: ["network"] } })));

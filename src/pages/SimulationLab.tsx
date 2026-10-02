@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useSearchParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -64,6 +64,7 @@ import {
 import { BASELINE_READONLY_REASON, isValidationBaseline } from "@/lib/sim/validationBaseline";
 import { runGateState } from "@/lib/sim/runGate";
 import { reuseConfirmRequest } from "@/lib/sim/dispatch";
+import { modelRunOffer } from "@/lib/sim/labModel";
 import { useConfirm } from "@/components/shared/confirm/useConfirm";
 import { MobileSimulationLab } from "@/components/sim/MobileSimulationLab";
 import { versionDisplayName } from "@/components/policies/PolicyVersionSheets";
@@ -244,12 +245,15 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   }, [modelParam, baselineScenario, searchParams]);
   const deviations =
     usingModel && selected && !baselineSelected ? protocolDeviations(chosenModel!.protocol, selected) : [];
+  // §23 WP 13.3 — a run of the model replays its OWN two versions, so moved
+  // data is a choice (replay, or current data as exploratory), not a block.
+  const modelOffer = chosenModel ? modelRunOffer(chosenModel, modelCredibility) : null;
   const runModelReason = !chosenModel
     ? "There is no Validated Model to run."
-    : chosenModel.status !== "active"
-      ? "This model is no longer in force — choose the one that is."
-      : modelCredibility?.state === "stale"
-        ? "The simulation's inputs or the scenario's world changed since this model was validated — re-validate it in Policies first."
+    : modelOffer?.kind === "blocked"
+      ? modelOffer.reason
+      : modelOffer?.kind === "moved" && !modelOffer.replayable
+        ? modelOffer.note
         : !canRunSimulations
           ? projectRights.refusal("simulation_lab") ?? "Running simulations isn't enabled for your account."
           : null;
@@ -301,6 +305,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     versionId: string,
     forceRerun = false,
     target: { id: string; name: string } & Parameters<typeof protocolDeviations>[1] = selected!,
+    /** §23 WP 13.3 — the model's policies on CURRENT data, never validated. */
+    currentAsExploratory = false,
   ) => {
     if (!projectId || !target) return;
     if (!canRunSimulations) {
@@ -308,7 +314,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       return;
     }
     try {
-      const followModel = usingModel && chosenModel;
+      const followModel = usingModel && chosenModel && !currentAsExploratory;
       const result = await dispatchExperiment({
         projectId,
         scenarioId: target.id,
@@ -345,7 +351,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           setPane("results");
           return;
         }
-        await dispatchRun(versionId, true, target);
+        await dispatchRun(versionId, true, target, currentAsExploratory);
         return;
       }
       // Typed 422: render the gate's findings structurally in the run pane.
@@ -375,8 +381,12 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   // of the model uses is SEEDED FROM THE MODEL (`buildScenarioSeed` with its
   // protocol), found by name if it already exists, so running a model twice does
   // not litter the list — and the second run is then a RunKey reuse.
-  const runChosenModel = async () => {
-    if (!projectId || !chosenModel || runModelReason) return;
+  const runChosenModel = async (mode: "validated" | "current" = "validated") => {
+    if (!projectId || !chosenModel) return;
+    // The replay needs the model to be replayable; current data needs only the
+    // model in force and the right to run an exploratory model.
+    if (mode === "validated" && runModelReason) return;
+    if (mode === "current" && (!canExplore || modelOffer?.kind === "blocked")) return;
     const name = `${chosenModel.name ?? "Validated model"}${
       chosenModel.version_no != null ? ` v${chosenModel.version_no}` : ""
     } — run`;
@@ -395,7 +405,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       if (!target) return;
     }
     setSelectedId(target.id);
-    await dispatchRun(chosenModel.policy_version_id, false, target);
+    await dispatchRun(chosenModel.policy_version_id, false, target, mode === "current");
   };
 
   const handleSaveVersionAndRun = async () => {
@@ -648,8 +658,14 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       deviations={deviations}
       advanced={advanced}
       onAdvanced={setAdvanced}
-      onRunModel={baselineSelected && usingModel ? runChosenModel : undefined}
+      onRunModel={baselineSelected && usingModel ? () => void runChosenModel("validated") : undefined}
       runModelReason={runModelReason}
+      modelMoved={modelOffer?.kind === "moved" ? modelOffer : null}
+      onRunCurrent={
+        baselineSelected && usingModel && canExplore && modelOffer?.kind === "moved"
+          ? () => void runChosenModel("current")
+          : undefined
+      }
     />
   ) : null;
 
@@ -680,6 +696,34 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
       overrides={policyOverrides}
     />
   );
+
+  // The frame stays put while the stage changes: the rail pins under the sticky
+  // page header and the aside pins under the rail, so switching Setup →
+  // Recovery → Run → Results → Compare (or scrolling a long pane) moves only
+  // the pane column. Both offsets are MEASURED rather than written as literals
+  // — the header's right slot may wrap and the rail's sub-labels change with
+  // state, and a hard-coded top would overlap or gap the moment either grows.
+  const gutterRef = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
+  const [pinTop, setPinTop] = useState({ header: 0, rail: 0 });
+  const hasSelected = !!selected;
+  useLayoutEffect(() => {
+    // PageHeader takes no ref; it is always the gutter's first child.
+    const header = gutterRef.current?.firstElementChild as HTMLElement | null;
+    const rail = railRef.current;
+    const read = () =>
+      setPinTop((prev) => {
+        const next = { header: header?.offsetHeight ?? 0, rail: rail?.offsetHeight ?? 0 };
+        return prev.header === next.header && prev.rail === next.rail ? prev : next;
+      });
+    read();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(read);
+    if (header) ro.observe(header);
+    if (rail) ro.observe(rail);
+    return () => ro.disconnect();
+  }, [isMobile, projectId, hasSelected]);
+  const asideTop = pinTop.header + pinTop.rail;
 
   // Below md the desktop rail + aside + pane grid is not reflowed, it is
   // replaced: MobileSimulationLab is the phone composition (PAGES.md 14 · 15).
@@ -777,7 +821,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className={PAGE_GUTTER}>
+      <div ref={gutterRef} className={PAGE_GUTTER}>
         <PageHeader
           title="Simulation Lab"
           rightContent={
@@ -813,20 +857,38 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
             No project selected
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col">
             {selected ? (
-              <StageRail stages={stages} active={pane} onSelect={setPane} gate={gateReadout} />
+              // Opaque canvas behind the pinned rail so the pane scrolls UNDER
+              // it; -mt-3/pt-3 keeps 12px of canvas below the header once
+              // stuck without moving the rail at rest, and pb-3 is the gap the
+              // column used to carry.
+              <div
+                ref={railRef}
+                className="sticky z-30 -mt-3 bg-[hsl(var(--surface-sunken))] pb-3 pt-3"
+                style={{ top: pinTop.header }}
+              >
+                <StageRail stages={stages} active={pane} onSelect={setPane} gate={gateReadout} />
+              </div>
             ) : null}
 
             <div className="flex flex-col gap-4 md:flex-row md:items-start">
-              <aside className="w-full min-w-0 md:w-64 md:shrink-0">
-                <ExperimentLibraryBox
-                  count={STRESS_TESTS.length}
-                  open={stressOpen}
-                  onToggle={() => setStressOpen((v) => !v)}
-                />
-                {stressOpen ? <StressTestDrawer onLaunch={launchStress} /> : null}
-                <SurrogateCard training={trainingSet} />
+              <aside
+                // Only the scenario list scrolls (it shrinks to what is left);
+                // the aside itself scrolls only when the open stress-test
+                // drawer alone outgrows the viewport.
+                className="w-full min-w-0 md:sticky md:flex md:w-64 md:shrink-0 md:flex-col md:self-start md:overflow-y-auto md:overscroll-contain"
+                style={{ top: asideTop, maxHeight: `calc(100dvh - ${asideTop}px - 16px)` }}
+              >
+                <div className="md:shrink-0">
+                  <ExperimentLibraryBox
+                    count={STRESS_TESTS.length}
+                    open={stressOpen}
+                    onToggle={() => setStressOpen((v) => !v)}
+                  />
+                  {stressOpen ? <StressTestDrawer onLaunch={launchStress} /> : null}
+                  <SurrogateCard training={trainingSet} />
+                </div>
                 <ScenarioList
                   scenarios={scenarios}
                   selectedId={selectedId}
@@ -837,6 +899,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
                   onCreate={createScenario}
                   onDuplicate={duplicateScenario}
                   onDelete={deleteScenario}
+                  fill
                 />
               </aside>
 

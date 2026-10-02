@@ -498,7 +498,11 @@ def test_e1_fully_specified_project_has_no_silent_fallbacks():
     res = from_project_data(d)
     warns = [w for w in res.warnings if w.level == "warn"]
     assert warns == [], [w.as_dict() for w in warns]
-    info_residue = {(w.entity, w.field) for w in res.warnings if w.level == "info"}
+    # `source` lines are the run log naming where each value came from (§23 WP
+    # 13.1) — a report of the order override → master → lanes → default, never a
+    # substitution, so they are not residue.
+    info_residue = {(w.entity, w.field) for w in res.warnings
+                    if w.level == "info" and w.entity != "source"}
     # The second residue is not new behaviour — it is a substitution that was
     # SILENT until audit WP 2 (F-21): at a 52-week horizon the analysis window is
     # bounded to horizon − 13 = 39 weeks, not the nominal 52, and this gate could
@@ -864,3 +868,120 @@ def test_per_material_safety_days_size_the_buffer():
     ss = ctx.policy_state["safety_stock_materials"]
     assert ss["ss_s"][i] == pytest.approx(exp_d * 14 / 7)
     assert ss["ss_S"][i] == pytest.approx(exp_d * 14 / 7)
+
+
+# ── §23 WP 13.1 — /policies writes OVERRIDES, never the item masters ──────────
+#
+# Every master-backed /policies cell is a per-row policy override, read
+# override → item master → derived from lanes → default. The master rows in
+# these fixtures carry a value on purpose: the override must beat it, and the
+# master must still decide when no override exists.
+
+def _sources(res, field):
+    return next(w.reason for w in res.warnings if w.entity == "source" and w.field == field)
+
+
+def test_supplier_row_overrides_beat_every_material_and_supplier_master():
+    d = _base()
+    d.suppliers = [SupplierRow(id="s1", capacity_per_week=500.0, reliability_score=0.9)]
+    d.materials = [MaterialRow(id="m1", cost=2.0, moq=10.0, initial_on_hand=5.0)]
+    d.policies = {"node:s1::m1": {
+        "sourcing": {"material_cost": 3.5, "material_moq": 40, "capacity_per_week": 250,
+                     "reliability_score": 0.75},
+        "inventory": {"initial_on_hand": 80},
+    }}
+    res = from_project_data(d)
+    net = res.scenario.network
+    assert net.materials[0].cost == pytest.approx(3.5)
+    assert net.materials[0].initial_on_hand == pytest.approx(80.0)
+    assert net.supplier_links[0].moq == pytest.approx(40.0)
+    assert net.suppliers[0].capacity_per_week == pytest.approx(250.0)
+    assert net.suppliers[0].reliability_score == pytest.approx(0.75)
+    # The master rows are inputs and are not touched by the mapper.
+    assert d.materials[0].cost == 2.0 and d.suppliers[0].capacity_per_week == 500.0
+    assert _sources(res, "materials.cost") .endswith("override 1")
+    # An applied supplier-row inventory override is not counted as dropped.
+    assert not any(w.field == "inventory" and "not applied" in w.reason for w in res.warnings)
+
+
+def test_plant_row_overrides_beat_every_product_master():
+    d = _base()
+    d.products[0].demand_cv = 0.2
+    d.policies = {"node:Plant A::p1": {"production": {
+        "sell_price": 31.0, "production_capacity": 333.0, "demand_mean": 70.0, "demand_cv": 0.4}}}
+    res = from_project_data(d)
+    p = res.scenario.network.products[0]
+    assert p.unit_price == pytest.approx(31.0)
+    assert p.production_capacity == pytest.approx(333.0)
+    assert p.demand_mode == pytest.approx(70.0)
+    assert "override 1" in _sources(res, "products.demand_cv")
+    assert "override 1" in _sources(res, "products.sell_price")
+
+
+def test_the_master_decides_when_no_override_exists():
+    d = _base()
+    res = from_project_data(d)
+    assert res.scenario.network.materials[0].cost == 2.0
+    assert _sources(res, "materials.cost").endswith("master 1")
+    assert _sources(res, "products.sell_price").endswith("master 1")
+
+
+def test_override_beats_the_lanes_when_there_is_no_master():
+    d = _base()
+    d.materials = [MaterialRow(id="m1")]          # no master cost: lanes would say 2.0
+    d.products[0].sell_price = None                # lanes would say 20.0
+    d.policies = {"node:s1::m1": {"sourcing": {"material_cost": 4.0}},
+                  "node:Plant A::p1": {"production": {"sell_price": 25.0}}}
+    res = from_project_data(d)
+    assert res.scenario.network.materials[0].cost == pytest.approx(4.0)
+    assert res.scenario.network.products[0].unit_price == pytest.approx(25.0)
+    d.policies = {}
+    res = from_project_data(d)
+    assert res.scenario.network.materials[0].cost == pytest.approx(2.0)
+    assert _sources(res, "materials.cost").endswith("lanes 1")
+
+
+def test_an_unusable_override_is_ignored_and_said_and_the_master_decides():
+    d = _base()
+    d.policies = {"node:s1::m1": {"sourcing": {"material_cost": 0, "reliability_score": 1.7}}}
+    res = from_project_data(d)
+    assert res.scenario.network.materials[0].cost == 2.0
+    assert res.scenario.network.suppliers[0].reliability_score == 1.0
+    bad = [w for w in res.warnings if w.level == "warn" and "not a usable value" in w.reason]
+    assert {w.field for w in bad} == {"material_cost", "reliability_score"}
+
+
+def test_an_override_reaches_a_bom_material_with_no_master_row():
+    d = _base()
+    d.materials = []
+    d.policies = {"node:s1::m1": {"sourcing": {"material_cost": 6.0, "material_moq": 12},
+                                  "inventory": {"initial_on_hand": 9}}}
+    res = from_project_data(d)
+    m = res.scenario.network.materials[0]
+    assert (m.cost, m.initial_on_hand) == (pytest.approx(6.0), pytest.approx(9.0))
+    assert res.scenario.network.supplier_links[0].moq == pytest.approx(12.0)
+
+
+def test_a_supplier_override_on_two_rows_that_disagree_keeps_the_first_and_says_so():
+    d = _base()
+    d.materials.append(MaterialRow(id="m2", cost=1.0))
+    d.supply_arcs.append(SupplyArc(supplier_id="s1", material_id="m2", unit_price=1.0,
+                                   lead_time=1, lead_time_unit="week"))
+    d.bom.append(BomArc(product_id="p1", material_id="m2", consumption_rate=1.0))
+    d.policies = {"node:s1::m1": {"sourcing": {"capacity_per_week": 100}},
+                  "node:s1::m2": {"sourcing": {"capacity_per_week": 300}}}
+    res = from_project_data(d)
+    assert res.scenario.network.suppliers[0].capacity_per_week == pytest.approx(100.0)
+    assert any(w.entity == "supplier:s1" and w.field == "capacity_per_week"
+               and "conflicting" in w.reason for w in res.warnings)
+
+
+def test_a_production_capacity_override_shadows_the_line_capacity_and_says_which():
+    d = _base()
+    d.products[0].production_capacity = None
+    d.policies = {"node:Plant A::p1": {"production": {
+        "production_capacity": 150.0, "capacity_units_per_day": 1000}}}
+    res = from_project_data(d)
+    assert res.scenario.network.products[0].production_capacity == pytest.approx(150.0)
+    assert any(w.field == "production_capacity" and "the /policies override" in w.reason
+               for w in res.warnings)

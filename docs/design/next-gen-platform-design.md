@@ -854,6 +854,26 @@ This subsection is numbered inside §9 but **logically precedes §9.1**: experim
 > stamping, supersession — compares it (PLAN.md §4 D259). A deep-tier change is still SHOWN, as an
 > informational note that the network moved and the simulation does not read it, and never marks
 > the model stale.
+>
+> **Phase 13 refinement (PLAN.md §23, WP 13.2–13.3): what was validated is what runs.** The
+> workflow is *edit on /policies → Save changes → run and validate → save the Validated Model*,
+> and every step is bound to two FROZEN versions: a dataset version (the masters and lanes as
+> uploaded, deduplicated by content) and a policy version (defaults and every override, the
+> economics included — /policies never writes a master, §8.3). (1) **The worker reads only those
+> two versions** — the run's `dataset_versions.snapshot` and its policy version, through the one
+> pipeline the browser and the package call; the live tables are not an input to any run
+> dispatched since WP 13.2. (2) **A Validated Model binds the versions its evidence run read**,
+> not a snapshot of the project at the moment of saving. (3) **A run of a model replays the
+> model's own versions.** The dispatcher sends the model's policy version and dataset version,
+> and `create_simulation_run` refuses a non-exploratory run that names a model while reading
+> other policies or other simulation inputs (by content, so a deep-tier change the engine does
+> not read still keeps the model). So the staleness law above changes meaning for the Lab: a
+> model whose project data MOVED is no longer a model that cannot be run faithfully — its run
+> replays the validated data — and the Lab offers two honest choices, *run the validated
+> versions* or *run current data as exploratory* (the model's policies on today's data, never a
+> validated result). A changed scenario world or engine still requires re-validation, because a
+> replay cannot hold those; a model recorded before models named their dataset version cannot be
+> replayed on moved data and offers only the exploratory run.
 
 #### 9.5.1 The Run & Validate surface: trust before persistence *(closes G14a)*
 
