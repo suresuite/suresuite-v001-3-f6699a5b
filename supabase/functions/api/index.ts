@@ -145,6 +145,8 @@ interface Principal {
   scopes: string[];
   projectIds: string[] | null;
   env: "live" | "test";
+  /** WP 12.3 — the person a PERSONAL key acts as; null for an organization key. */
+  actorUserId: string | null;
 }
 
 const KEY_RE = /^sk_(live|test)_([0-9a-f]{8})_([0-9a-f]{16,128})$/;
@@ -184,7 +186,7 @@ async function authenticate(req: Request, ip: string): Promise<Principal> {
 
   const { data: row, error } = await svc
     .from("api_keys")
-    .select("id,key_prefix,secret_hash,org_id,scopes,project_ids,env,status,expires_at,revoked_at")
+    .select("id,key_prefix,secret_hash,org_id,scopes,project_ids,env,status,expires_at,revoked_at,principal")
     .eq("key_prefix", prefix)
     .maybeSingle();
   if (error) throw new ApiError(503, "auth_unavailable", "authentication backend unavailable"); // fail closed
@@ -202,6 +204,18 @@ async function authenticate(req: Request, ip: string): Promise<Principal> {
     .eq("id", row.org_id)
     .maybeSingle();
   if (!org || org.status !== "active") return fail("org_suspended", "the key's organization is not active");
+
+  // WP 12.3 — a PERSONAL key acts as its creator, and only while that person is
+  // active and still in the key's organization. The database answers which
+  // person (api_personal_key_actor); no answer means the key is refused — the
+  // same as a revoked key, because it is one in all but name.
+  let actorUserId: string | null = null;
+  if (row.principal === "personal") {
+    const { data: actor, error: actorErr } = await svc.rpc("api_personal_key_actor", { p_key_id: row.id });
+    if (actorErr) throw new ApiError(503, "auth_unavailable", "authentication backend unavailable"); // fail closed
+    if (!actor) return fail("key_owner_inactive", "this personal key's owner is no longer active in its organization");
+    actorUserId = String(actor);
+  }
 
   // §5.3 step 4: stamp last_used_at asynchronously; never block the request.
   // (PostgREST builders resolve with {error} rather than rejecting.)
@@ -222,6 +236,7 @@ async function authenticate(req: Request, ip: string): Promise<Principal> {
     scopes: (row.scopes as string[]) ?? [],
     projectIds: (row.project_ids as string[] | null) ?? null,
     env: env as "live" | "test",
+    actorUserId,
   };
 }
 
@@ -579,6 +594,12 @@ const putPolicies: Handler = async (ctx) => {
   // about somebody who did not act, which is worse than recording that the
   // actor is unknown. Making an API key nameable in the audit plane is D28's
   // question and WP 7.1's to answer.
+  //
+  // WP 12.3 made a PERSONAL key nameable (`ctx.principal.actorUserId`), and the
+  // request log names its owner. It is deliberately NOT passed here yet: a user
+  // id switches these RPCs onto their per-user checks, which the API path has
+  // never gone through, so naming the person in a write is the push-back
+  // package's change, made together with the project-role gate it needs.
   let strategySent = false;
   for (const [family, value] of Object.entries(body.defaults ?? {})) {
     const { error } = await svc.rpc("save_policy_defaults", {
@@ -1051,6 +1072,7 @@ function logRequest(row: {
   request_id: string;
   error_code: string | null;
   ip: string | null;
+  actor_user_id: string | null;
 }): void {
   const p = svc.from("api_request_logs").insert(row)
     .then(({ error: e }) => {
@@ -1081,6 +1103,7 @@ Deno.serve(async (req) => {
     logRequest({
       api_key_id: principal?.keyId ?? null,
       org_id: principal?.orgId ?? null,
+      actor_user_id: principal?.actorUserId ?? null,
       method: req.method,
       route: subPath.slice(0, 300),
       status,

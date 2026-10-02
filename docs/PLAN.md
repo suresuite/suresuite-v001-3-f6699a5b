@@ -21958,6 +21958,41 @@ local == the browser's own driver string, on the Example project with an S2 outa
 Pyodide-only import failure would still need the in-app self-test (Run & Validate → engine
 self-test) to catch it.
 
+### WP 12.2 — The snapshot read API · 2026-10-02 · no migration · §15 run `36984474315`
+
+**What changed.** Two read routes return a dataset version's frozen rows and a policy version's
+snapshot — the inputs `sim_worker.local` needs. Looked up by id AND project; `latest` resolves the
+newest; `?tables=` narrows a snapshot and reports unknown names; any response over 32 KB is
+gzipped for a client that accepts it. Pure logic in `_shared/snapshotView.ts`
+(`snapshotView.test.ts`); the docs' route renderer learnt `{version}`.
+
+**The reading** (probe pushed alone, fence unmoved at `20261001000024`): six projects hold
+snapshots; the largest is 592 370 bytes of JSON, of which 359 475 are the `inputs` a simulation
+reads; the largest policy snapshot is 135 527 bytes; all production snapshots are
+`schema_version` 3. **Decision: one gzipped response, no cap.** Re-measure if a snapshot passes
+10 MB.
+
+**Gap check.** The routes deploy with the edge function on merge, so no request against them has
+been served yet; the live check is the user's (README, "Live smoke test").
+
+### WP 12.3 — Personal API keys · 2026-10-02 · `20261002000001`
+
+**What changed.** See §22 · WP 12.3, including the recorded deviation (reads are not role-gated,
+because the app's reads are not). Gateway: a personal key resolves its owner through
+`api_personal_key_actor`; no owner → `401 key_owner_inactive`; the request log carries
+`actor_user_id`. `/developer`: an "Acts as" choice (you / the organization), personal by default,
+and a `personal` badge in the key list. Manual: a "Personal keys and organization keys" section,
+and the no-actor callout narrowed to WRITES.
+
+**Gate results.** `contract:rehearse` plain, `--fixtures` and `--since HEAD` green with
+`700_personal_api_keys.sql`; two mutations red as intended. `contract:check` green.
+
+**Gap check.** The §15 reading found ONE API key in production (test, revoked), so no live key
+changes behaviour. API WRITES still name no actor — deliberately, until push-back brings the
+project-role gate (the gateway's D71 comment). A plain `user` still cannot mint a key at all
+(`_api_key_management_org`: admin or modeler) — a product question if advanced users are often
+plain users.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -21974,7 +22009,7 @@ self-test) to catch it.
 | **9** | **9.1 – 9.4** | **results: inventory over time, capacity, the result binding, and the Lab surface** | — | **9.4 ✅** the Lab builds on the validated baseline: `scenarios.role`, one seeding module, one run gate, one planning unit, one disruption-event model exported by the engine, one network dialog (§4 D147, D219–D228 closed). **9.1 ✅** the weekly-series vocabulary is authored ONCE (`WEEKLY_SERIES`, scsim/core/context.py) and the engine's six copies derive from it — which is how §4 D164 was found and closed: `fg_value`, finished-goods inventory, had been computed on every replication since the trace was written and published by nothing, so the chart captioned "Inventory dynamics" showed MATERIAL stock and called it inventory. Materials and finished goods now both reach a user, in units or value, on BOTH result surfaces, on ordinary multi-replication runs. It also describes `run_replications` — the first of the nine run/result tables to leave the deferral — and re-homes the other eight, whose owner (WP 6.3) had shipped, which is the state R8 exists to refuse. **9.2** is what those eight owe and 9.1 does not pay: `result-binding` — every result binds dataset + policy + scenario + engine version. A5's Reproducibility Record (WP 6.3) assembles that at EXPORT time from rows that could each have been written by a different world; the invariant asks for it on the ROW, and D88 is the precondition — 8 577 derived rows predate provenance  **9.3 ✅** capacity becomes a recorded datum at both ends — §4 D167. The chain `products.production_capacity` declares was already machine-readable and the display layer could not walk it (`resolveEffective.ts` ended on a comment true of the logistics tables and false of the engine), so the plant grid showed nothing for the one number the run was certain to use; and `capacity_utilization` read a `full_debug`-only matrix, so it was NaN on every run a user ever made and the sanity tile printed "not recorded" — while D113's own closing note told the next reader the measure rendered, and `test_item_series.py`'s behaviour-neutrality gate carried a written exemption for the one KPI that was not behaviour-neutral. Closed with one author per fact (`EmptyMeaning`, `shadowed_by`, `derivedFallbackDetails`) and four always-on weekly capacity series plus per-entity binding measured against the UNCLIPPED want. **9.2** remains what the eight deferred run/result tables owe and neither 9.1 nor 9.3 pays |
 | **10** | **10.0 – 10.9** | **versions you can choose: graph versions per level, compute-once metrics, policy versions by content, the Validated Model, engines and RunKey, the Lab flow, result tiers, capacity, the surrogate training set** | — | **10.0 ✅** the plan (§20), §4 D233–D247 registered from a verified reading, WP 9.2's tables re-homed to WP 10.4 and `model_validations` to WP 10.3, the blueprint refined (§8.4, §9.2, §9.5, §11.4). **10.2 ✅** a policy version is its content: saves deduplicate by `policy_hash` with a per-project number, cards are matched by content everywhere including dispatch stamping and inheritance, and the version in force is derived, so a fresh Lab reads *validated* (D241, D242 closed). **10.1 ✅** graph versions per level and metrics computed once: three level hashes with the composite unchanged, a stored current hash, a numbered version per upload deduplicated against any, analyses keyed on the level they read, and three pages that read before they compute (D233–D239 closed; D240's last shim is WP 10.4's). **10.3 ✅** the Validated Model: a complete run protocol checked by one SQL function, `model_hash` as its identity, immutable, numbered and named, with its evidence in a row of its own; Student-t throughout Run & Validate, the warm-up the maximum over the selected KPIs, adoption only when every selected KPI passes or a statement is recorded, and Save Validated Model ending in **Open in Simulation Lab** (D243, D244 closed; the fingerprint deliberately not widened). **10.4 ✅** the binding on the row: an engine registry (scsim active, legacy retired), a RunKey computed once in SQL over engine build, graph, policy, the scenario's run spec and deviations, one insert path under which identical submissions make one run, the worker refusing a run bound to an engine it does not run, and all eight run/result tables described — plus **D248**, found by making the rehearsal mirror Supabase's default function grants: fifteen internal SECURITY DEFINER helpers had been callable through the API (D245, D248 closed; `network_topology_hash`'s drop moved to the new **WP 10.9**, which takes the after-merge readings). **10.5 ✅** the Lab starts from a choice of Validated Model: Model → Engine → Scenario → Settings → Run, the protocol locked behind "Advanced" with every deviation recorded as `protocol_overrides`, a run of the model dispatching the model's own policy version, "Run this model" seeding a scenario from it in one click, an editor's badged exploratory path, the run's size before it runs, and comparisons scoped to the model — which found **D249** (a model's evidence run reads as exploratory; the comparison half closed, the training half WP 10.8's). **10.6 ✅** result tiers: a worker run's weekly series in one zstd Parquet object per run in a private bucket, rows keeping their KPIs (and the min/max range the worker used to drop), one loader that hydrates rows so every chart reads what it always read, standard / pinned / evidence retention with a sweep that removes series only and says so with the RunKey — Postgres per run 165 KB → 23 KB at 30 × 52 (D246, D250 closed; the browser path keeps JSONB under the same retention). **10.7 ✅** capacity: an organization pool (monthly replication-weeks, series storage, replications per run, runs in flight, retention) and each project role's share of it, admitted in ONE place inside `create_simulation_run` after the RunKey lookup — a reuse or an attach consumes nothing, and the Lab, `/v1` and agent-apply are refused alike with 402/403/429 and the numbers; a ledger of reservation, actual and release; the Run card forecasting the answer and the super admin's usage table (D247 closed; **D252** — the share binds whom the caller names — WP 7.1's). **10.8 ✅** the surrogate-ready training set: one view stating which replications may train a surrogate — a validated model's faithful, completed runs, its evidence run included (D249 closed), nothing exploratory, deviating, gate-skipped or revoked — grouped by Validated Model and Graph Version with the RunKey and each replication's KPIs; structural features of the sourcing network computed once per product-level hash through the analysis store; the Lab's Surrogate card counting the set. No model is trained. **10.9 first half** the after-merge reading of WP 10.0–10.6 (§15 run `36857125032`): D248 closed in production, scsim reported by the worker, every graph and policy version numbered — and **D253**, retention inert in production (no pg_cron) with object removal by SQL that could break a run delete, closed by `20261001000014`. **10.9 second reading** the after-merge reading of WP 10.7–10.9a (§15 run `36863326325`): every migrated relation present, the role shares seeded, every organization at 90 days, the worker's first sweep run — and **D254**, the Surrogate card summing per-model groups, closed by `20261001000015`. **Still owed: the `network_topology_hash` drop, after a network-metrics or prominence analysis has run in production.** |
 | **11** | **11.0 – 11.5** | **one graph, three levels: a version per level, and every consumer bound to the level it reads** | — | **11.0 ✅** the plan (§21), §4 D258–D264 registered from a verified reading, the blueprint refined (§8.4, §9.2, §9.5, §11.4). The reading changed the design: the simulation's read set already HAS a hash — `hash_inputs`, the snapshot's `inputs` domain, whose eight tables are exactly the worker's eight reads — so the `simulation` scope is named and gated rather than minted, and `level_spec` stays 1. **11.1 ✅** a version per level: `graph_level_versions` numbers product, process and firm per project, deduplicated against any earlier version of the level; every snapshot names its tuple; history is backfilled in order; the state returns each level's version (D258's store half). It also closed **D265**: `anon` could insert a snapshot row directly, which from this package would have minted level versions. **11.2 ✅** the simulation scope NAMED (`simulation → hash_inputs`, one mapping, no new digest) and gated against the worker's reads; a Validated Model binds it, RunKey v2 hashes it, an analysis run names its level version; the agent's own copy of the badge rule follows (D260, D264 closed). **11.3 ✅** the surfaces: each network page names its level's version ("Product graph v3"), the Validated Model reads "simulation inputs v4" with a deep-tier change as a note and never re-validate, the snapshot list shows its tuple, the Reproducibility Record and Trust Report carry the levels (D258, D259, D263 closed; one read migration, `dataset_version_tuple`, because the browser cannot read the level table). **11.4 ✅** lineage: the training set groups and counts KPIs by simulation-input version and keeps the composite as lineage; the features name their product version; a run names its inputs whoever wrote it (D261, D262 closed). **11.5 ✅** the reading is §15 run `36903620736` (fence unmoved at `20261001000022`): every project with snapshots has all four levels, all 4 Validated Models bind the simulation scope, the doors D265 closed are closed. One firm-level `prominence` run met D240's condition, so `20261001000023` drops `network_topology_hash`. Two things are named, not met: RunKey v2 is unexercised (no simulation dispatched since WP 10.4), and the reading after the drop deploys is WP 10.9's. **PHASE COMPLETE.** |
-| **12** | **12.1 – 12.6** | **the library: pull the data you may read, simulate on your own machine** | — | **12.1 ✅** one local-run entry point (`sim_worker.local`), shared by the browser engine, the demo recorder and the coming `suresuite` package; D273 closed. **12.2** snapshot read API · **12.3** personal keys · **12.4** gated engine distribution · **12.5** the `suresuite` package · **12.6** notebook 05 — open |
+| **12** | **12.1 – 12.6** | **the library: pull the data you may read, simulate on your own machine** | — | **12.1 ✅** one local-run entry point (`sim_worker.local`), shared by the browser engine, the demo recorder and the coming `suresuite` package; D273 closed. **12.2 ✅** the snapshot read API (largest production snapshot 592 KB — one gzipped response, no cap). **12.3 ✅** personal keys (`20261002000001`, `rehearsal/700`). **12.4** gated engine distribution · **12.5** the `suresuite` package · **12.6** notebook 05 — open |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -23898,21 +23933,38 @@ call it; the `suresuite` package will.
 **Exit.** `test_local_parity.py`: worker, local and the browser's own driver give identical run
 rows for the Example project.
 
-### WP 12.2 — Read API: the frozen inputs
+### WP 12.2 — Read API: the frozen inputs ✅ *(done — no migration; §15 run `36984474315`)*
 
-`GET /projects/{id}/dataset-versions/{vid}` (the snapshot; `?tables=`) and
-`GET /projects/{id}/policy-versions/{vid}` (the policy snapshot). Tenancy-checked, gzip. A §15
-probe measures the largest snapshot across ALL projects before a size cap is chosen.
+`GET /projects/{id}/dataset-versions/{version}` (the snapshot; `?tables=`; `latest` or an id) and
+`GET /projects/{id}/policy-versions/{version}` (the policy snapshot). Tenancy-checked AND scoped
+to the project, gzip over 32 KB. **The measurement decided "no cap, one response"**: the largest
+snapshot in production is 592 KB of JSON (359 KB of it the simulation's `inputs`), and the largest
+policy snapshot 136 KB — so a signed-URL path like the run series' is not needed. Production's
+snapshots are `schema_version` 3; both the route and `sim_worker.local` key on the `inputs`
+domain, not on a version number.
 
 **Exit.** The endpoint returns what the database holds; another organization's key reads 404.
 
-### WP 12.3 — Personal keys
+### WP 12.3 — Personal keys ✅ *(done `20261002000001`)*
 
-`api_keys.principal` (`org` | `personal`); a personal key's project access also requires the
-creator's `effective_project_role`; request logs name the user; `/developer` offers it.
+`api_keys.principal` (`org` | `personal`, existing keys `org`); `api_personal_key_actor` answers
+which active user a personal key acts as, and the gateway refuses the key when it answers
+nothing; `api_request_logs.actor_user_id` names the person; only a key's owner may rotate a
+personal key; `/developer` creates personal keys by default.
 
-**Exit.** A rehearsal: a personal key is refused a project its creator has no role on, an org
-key is not, and the log row names the person — mutation-tested.
+**DEVIATION FROM THIS PLAN AS FIRST WRITTEN, recorded here as the plan requires.** The plan said a
+personal key's project access "also requires the creator's `effective_project_role`". Reading the
+app showed that would make the key see LESS than its owner: `list_projects` shows a user every
+project of their organization, and project roles gate WRITES (promotion, D66), not reads. So a
+personal key reaches what its owner sees — the organization's projects, within the key's own
+restriction — and the role gate arrives with the first API write that needs it. The API's
+existing writes still pass no actor (the D71 comment in the gateway says why), so `audit-actor`
+for API writes is unchanged; what moved is that a personal key's REQUESTS name a person.
+
+**Exit.** `rehearsal/700`: a personal key resolves to its owner and an org key to nobody;
+deactivation and a change of organization each stop it; a super admin cannot mint one for another
+organization; an administrator cannot rotate someone else's; grants restated explicitly —
+mutation-tested (rotation guard → §5 red; active check → §2 red).
 
 ### WP 12.4 — Engine distribution, gated
 

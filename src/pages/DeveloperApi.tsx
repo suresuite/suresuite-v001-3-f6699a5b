@@ -80,6 +80,8 @@ interface ApiKeyRow {
   revoked_at: string | null;
   created_at: string;
   created_by_email: string | null;
+  /** WP 12.3 — `personal` acts as its creator; `org` acts for the organization. */
+  principal?: 'org' | 'personal';
 }
 
 interface UsageRow {
@@ -249,6 +251,7 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [env, setEnv] = useState<'live' | 'test'>('test');
+  const [principal, setPrincipal] = useState<'personal' | 'org'>('personal');
   const [scopes, setScopes] = useState<string[]>(['read:data', 'read:runs']);
   const [allProjects, setAllProjects] = useState(true);
   const [projectIds, setProjectIds] = useState<string[]>([]);
@@ -420,6 +423,7 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
   const resetCreateForm = () => {
     setName('');
     setEnv('test');
+    setPrincipal('personal');
     setScopes(['read:data', 'read:runs']);
     setAllProjects(true);
     setProjectIds([]);
@@ -442,6 +446,7 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
       p_env: env,
       p_project_ids: allProjects || projectIds.length === 0 ? null : projectIds,
       p_expires_at: expiresAt,
+      p_principal: principal,
     });
     setCreating(false);
     if (error) {
@@ -626,6 +631,16 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
               <SelectContent>
                 <SelectItem value="test">test — stricter limits, 1 concurrent run (recommended to start)</SelectItem>
                 <SelectItem value="live">live — production traffic</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Acts as</Label>
+            <Select value={principal} onValueChange={(v) => setPrincipal(v as 'personal' | 'org')}>
+              <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="personal">you — stops working if you leave the organization; requests name you</SelectItem>
+                <SelectItem value="org">the organization — for shared services; requests name no person</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -817,7 +832,7 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
                   key={k.id}
                   dot={st.dot}
                   label={k.name}
-                  sub={`sk_${k.env}_${k.key_prefix}_•••• · ${st.label} · ${
+                  sub={`sk_${k.env}_${k.key_prefix}_•••• · ${st.label}${k.principal === 'personal' ? ' · personal' : ''} · ${
                     k.project_ids ? `${k.project_ids.length} projects` : 'all projects'
                   }`}
                   value={u ? Number(u.requests_30d).toLocaleString() : '0'}
@@ -1281,6 +1296,11 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
                               ) : (
                                 <span className="rounded-sm border border-[#d4d4d4] px-[7px] py-0.5 font-mono text-[10px] text-foreground">
                                   live
+                                </span>
+                              )}
+                              {k.principal === 'personal' && (
+                                <span className="ml-1 rounded-sm bg-[#f0f0f0] px-[7px] py-0.5 font-mono text-[10px] text-[#525252]">
+                                  personal
                                 </span>
                               )}
                             </td>

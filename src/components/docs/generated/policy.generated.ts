@@ -2067,6 +2067,12 @@ export const API_ERRORS: ApiErrorCode[] = [
     "sites": 2
   },
   {
+    "code": "key_owner_inactive",
+    "status": 401,
+    "message": "this personal key's owner is no longer active in its organization",
+    "sites": 1
+  },
+  {
     "code": "org_suspended",
     "status": 401,
     "message": "the key's organization is not active",
@@ -2190,7 +2196,7 @@ export const API_ERRORS: ApiErrorCode[] = [
     "code": "auth_unavailable",
     "status": 503,
     "message": "authentication backend unavailable",
-    "sites": 1
+    "sites": 2
   },
   {
     "code": "authz_unavailable",
