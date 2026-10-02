@@ -13,6 +13,7 @@ Engine version: **0.2.0** (ADR 0001 — MTS fulfillment mode). ✅ = shipped ·
 | M6 | Docs auto-generation + docs CI gate; validation suite | ✅ — `scripts/gen_docs.py --check` gates CI; 90+ tests including golden traces |
 | M7 | capacity_reduction ✅ + ST-2 ✅; **MTS mode + P-P.4 ✅ (0.2.0, ADR 0001)**; P-S.2 ✅; golden #6 ✅ + MTS-vs-MTO TTS comparison ✅; plant targets ✅; P-S.4 ✅; P-C.2 ✅; edge split ✅; ST-3/4/5 batteries | 🔜 — remaining batteries + per-mode lanes (P-T.1) scheduled |
 | M8 | Remaining 🧩 policies; P-X.1 playbook; LLM diff proposer (flagged) | 🧩 — full parameter schemas already in the registry |
+| M9 | Dependent-demand planning (blueprint G20, workstream B2): time-phased demand plan (P-F.1 projection), MPS (P-P.13), MRP as a P-P.1 policy type + P-P.2 lot sizing, multi-level item model (intermediates, WIP, stage lead time/capacity); golden #7 (textbook MRP record) and #8 (multi-level ≡ flattened at zero stage lead time) | 🧩 proposed — plan in `docs/design/mrp-multi-stage-planning.md`; P-P.2 moves here from M8 |
 
 ## Shipped ahead of plan
 
