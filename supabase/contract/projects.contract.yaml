@@ -29,7 +29,7 @@ surfaces:
   - page: "DeveloperApi.tsx"
     via: "rpc list_projects"
     grain: table
-    evidence: "src/pages/DeveloperApi.tsx:297"
+    evidence: "src/pages/DeveloperApi.tsx:295"
     confirmed: true
   - page: "FirmLevelNetwork.tsx"
     via: "rpc list_projects"

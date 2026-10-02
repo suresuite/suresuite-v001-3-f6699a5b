@@ -54,7 +54,7 @@ Written by the `_build_dataset_snapshot` database function, never by a page — 
 | Page | Via | Evidence | Confirmed |
 |---|---|---|---|
 | `DataManager.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:513` | yes |
-| `DeveloperApi.tsx` | rpc list_dataset_versions | `src/pages/DeveloperApi.tsx:352` | yes |
+| `DeveloperApi.tsx` | rpc list_dataset_versions | `src/pages/DeveloperApi.tsx:350` | yes |
 | `ProductLevelNetwork.tsx` | rpc project_freshness (GraphVersionChip → FreshnessBadge, WP 10.1) | `src/components/trust/useProjectFreshness.ts:28` | yes |
 | `ProjectPolicies.tsx` | rpc record_validated_model (Save Validated Model, WP 10.3) | `src/hooks/useModelValidation.tsx:541` | yes |
 | `SimulationLab.tsx` | rpc record_model_validation | `src/hooks/useModelValidation.tsx:513` | yes |
@@ -412,6 +412,6 @@ This snapshot's SIMULATION scope version — the `graph_level_versions` row whos
 
 ---
 
-*Generated from data contract `a815f50a0e45`, engine `0.2.8`,
+*Generated from data contract `13e7be306ea9`, engine `0.2.8`,
 sidecar `supabase/contract/dataset_versions.contract.yaml`, table created by `20260703000001_dataset_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

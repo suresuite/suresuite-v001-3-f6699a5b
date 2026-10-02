@@ -39,3 +39,8 @@ the platform's run. Results come back in the API's shapes.
 
 **Your compute.** A local run uses your CPU and none of your organization's compute
 quota. Requests to the API (pulling data, the engine) are logged against your key.
+
+The full user guide — requirements, the function reference, reproducibility and
+limits — is [`docs/api/python-library.md`](../docs/api/python-library.md). The four
+notebooks on `/developer` (00 Quickstart, 01 Policy experiment, 02 Disruption and
+resilience, 03 Simulate on your own machine) show it in use.

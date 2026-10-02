@@ -225,6 +225,6 @@ When the event happened; the month a reservation counts in.
 
 ---
 
-*Generated from data contract `a815f50a0e45`, engine `0.2.8`,
+*Generated from data contract `13e7be306ea9`, engine `0.2.8`,
 sidecar `supabase/contract/run_usage.contract.yaml`, table created by `20261001000012_capacity.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
