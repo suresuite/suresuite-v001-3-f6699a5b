@@ -3154,21 +3154,27 @@ exists.
    `_kpi_row` key. Until that exists the KPI page says it is not obtainable, and the
    manual says the same.
 
-6. **Dependent-demand planning: MPS → MRP → multi-stage** *(blueprint G20, workstream
-   B2, engine milestone M9; plan `docs/design/mrp-multi-stage-planning.md`)*. The engine
-   derives material requirements from a stationary constant, never from the production
-   plan, and models one production stage. **Its data-layer half is this plan's to own**,
-   and it lands as a work package here when M9.5 is ready (the plan's M9.6). That package
-   passes `bom_multi_level` through to the engine instead of flattening it, once the engine
-   declares level support. It also adds item fields: make-or-buy, production lead time,
-   per-item capacity, intermediate and FG initial stock (absorbing RFC 4's column, in RFC 4's
-   order: capability first), lot-sizing parameters and service-part demand on intermediates.
-   Each field gets a sidecar and a gate finding. **Preconditions it inherits:** D191's "which
-   BOM table" rule must have one author first. D174's sub-assembly exclusion and D136's
-   collapsed lane become the *fallback* for engines without level support, not the only path.
-   Shared work-centre capacity stays with routings (D139). RFC 3 (non-stationarity) is a
-   validation dependency: MRP's advantage over reorder point is measurable only under demand
-   that moves.
+6. **Demand-driven planning: customer demand → planned production → MRP → per-row
+   fulfillment** *(blueprint G20, workstream B2, engine milestone M9; plan
+   `docs/design/mrp-multi-stage-planning.md` v0.2, agreed with the project owner
+   2026-10-02)*. The engine derives material requirements from a stationary constant, never
+   from the production plan, and keeps demand and backlog per product only. **Its data-layer
+   half is this plan's to own**, and each engine package (A–D, F) brings a work package here:
+   - **A:** a demand spec per customer × product row (mode, mean, variation, distribution,
+     min/max), on `outbound_logistics` or a new table. A forecast-series table landed
+     through the ingestion contract and normalized to weeks at promotion.
+   - **B:** FG policy fields and FG starting stock on `products`, absorbing RFC 4's column in
+     RFC 4's order (capability first).
+   - **D:** the per-row fulfillment overrides the mapper drops today become consumed.
+     `outbound_logistics.unit_price` becomes the row price. `customers.sla_fill_floor_pct`
+     (read by nothing) and `customers.priority_weight` become row defaults, closing the R13
+     grading-binding warning on the latter.
+   - **F:** `bom_multi_level` is passed through instead of flattened. Preconditions: D191's
+     "which BOM table" rule has one author first, and D174's exclusion and D136's collapsed
+     lane become the fallback, not the only path. Shared work-centre capacity stays with
+     routings (D139).
+
+   Each field gets a sidecar and a gate finding.
 
 ---
 

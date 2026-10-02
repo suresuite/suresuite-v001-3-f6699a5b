@@ -334,10 +334,9 @@ Covers: demand management, production, fulfillment, FG inventory, MPS, MRP, disp
 | ID | Policy | Domain | Horizon | Status | Variants / algorithms | Required data |
 |---|---|---|---|---|---|---|
 | P-F.1 | `forecasting_method` | forecasting | tactical | ✚ (promoted from PH-10 mechanic) | moving_average · exponential_smoothing · seasonal_naive · user_supplied_series; forecast-error metrics exposed as KPIs | demand history window; calendar (for seasonal) |
-| P-P.0 | `greedy_production_plan` | production planning | operational | ✚ (promoted default) | MTO: produce to demand+backlog; MTS: replenish to S^FG — today's PH-40 mechanic, named | none |
-| P-P.1 | `inventory_control` | inventory control | tactical | ✅ **extended** | min_max ✅ · s_S · base_stock · (R,Q) · periodic — extension closes G1's biggest loss: absolute `reorder_point` / `order_up_to` / `moq` / `review_period_days` honored, coverage-κ retained as the default sizing heuristic · **✚ `mrp` (time-phased, per material, G20)** · **✚ basis `planned_requirements`** | per-material control params; `materials.moq`; for `mrp`: lead time, planning horizon, safety stock (or P-P.3) |
-| P-P.2 | `lot_sizing` | production planning | tactical | 🧩 → activate with B2 | fixed · lot_for_lot · EOQ/EPQ · period_order_quantity — the modifier MRP applies to net requirements | `production.setup_cost`, `setup_time_hours`, holding cost |
-| P-P.13 | `master_production_schedule` | production planning | tactical | ✚ (G20) | time-phased FG plan over N weeks: MTS netting against FG stock, MTO order book, demand/planning time fences, rough-cut capacity (`push_late` / `pull_early`); P-P.0 stays the default and is the 1-week MPS | planning horizon, fences; FG `initial_on_hand` (RFC 4) |
+| P-P.0 | `greedy_production_plan` | production planning | operational | ✚ (promoted default) | MTO: produce to demand+backlog; MTS: replenish to S^FG — today's PH-40 mechanic, named. **B2 (G20):** extended over a planning horizon as planned production = min(requirement, capacity), where the requirement is projected demand (MTO) or the FG policy's requirement (MTS: base-stock / min-max / days of cover via `Product.fg_policy`) | capacity; FG policy levels and FG starting stock (MTS) |
+| P-P.1 | `inventory_control` | inventory control | tactical | ✅ **extended** | min_max ✅ · s_S · base_stock · (R,Q) · periodic — extension closes G1's biggest loss: absolute `reorder_point` / `order_up_to` / `moq` / `review_period_days` honored, coverage-κ retained as the default sizing heuristic · **✚ `mrp` (time-phased, per material, G20)** · **✚ basis `planned_requirements`** | per-material control params; `materials.moq`; for `mrp`: lead time, MOQ, safety-stock days |
+| P-P.2 | `lot_sizing` | production planning | tactical | 🧩 | fixed · lot_for_lot · EOQ/EPQ · period_order_quantity (B2's MRP rounds to MOQ only; lot rules stay here until a study shows they matter) | `production.setup_cost`, `setup_time_hours`, holding cost |
 | P-P.3 | `safety_stock_materials` | safety stock | strategic | ✅ | fixed_days · service_level · king · abc_xyz (implemented; expose the abc_xyz variant the UI currently can't reach — G1) | service targets; demand/lead-time variability |
 | P-P.4 | `fg_safety_stock` | safety stock | strategic | ✅ (MTS; unreachable today — G3) | service_level · fixed_days · fixed_units; uniform / abc_by_revenue segmentation | `products.sell_price`, demand stats |
 | P-P.5 | `short_term_capacity` | capacity | operational | ✅ | overtime with premium, revenue-positive activation | `production.capacity_units_per_day`, overtime premium |
@@ -349,10 +348,10 @@ Covers: demand management, production, fulfillment, FG inventory, MPS, MRP, disp
 > **Retired: P-P.12 `fulfillment_discipline` (plant-side).** An earlier draft placed a plant "fulfillment discipline" slot here (ship-complete vs. partial, backorder release ordering, order splitting). Those responsibilities already live at the **customer** stage inside P-C.1 `unmet_demand_handling` at PH-60 (partial/backorder rule + FIFO release order) and P-C.2 `customer_allocation` — a second PH-60 writer of the same fulfillment/backlog state would only duplicate them. Fulfillment stays customer-side (§4.3, §5.4); no plant fulfillment policy is defined, and the UI collects fulfillment at the project default scope only, not per plant node.
 
 **MPS/MRP: corrected 2026-10-02 (G20).** An earlier version of this paragraph said the engine already computes MPS and MRP at weekly granularity: PH-40 as the "MPS-lite" and PH-70's D_m projection as the "MRP-lite". It therefore declined to define MRP policies. **That claim does not hold.** PH-40 plans one week, not a schedule. PH-70's D_m is a compile-time constant for MTO (stationary mean × BOM) and this week's forecast × BOM for MTS. It never explodes the production plan, has no time buckets, nets no dated receipts and releases no lead-time-offset planned orders. P-P.1 is a reorder-point rule sized on that constant. Measured evidence is in `docs/design/mrp-multi-stage-planning.md` §1. The correction:
-- **MPS** becomes a real occupant of the production-planning slot: **P-P.13** `master_production_schedule`. P-P.0 remains the default, as the 1-week special case, so every existing project runs unchanged.
-- **MRP** becomes a P-P.1 policy type (`mrp`), selectable per material, as `docs/design/policy-specification.md` §III.11 already specifies.
-- **P-P.2** lot sizing is activated as the modifier on net requirements.
-- **Multi-stage production** (intermediate items with stock, WIP, stage lead time and capacity) is a model capability planned by the same MRP, not a separate policy.
+- **The flow starts from future finished-good demand.** MTO uses the demand projected from the customer table (a forecast series or a demand model per customer × product row, P-C.4). MTS uses what the FG inventory policy requires (`Product.fg_policy`: base-stock / min-max / days of cover, made real).
+- **Planned production** = min(requirement, capacity), over a short horizon. This is P-P.0 extended; no new policy ID.
+- **MRP** is a P-P.1 policy type (`mrp`), selectable per material, as `docs/design/policy-specification.md` §III.11 specifies: BOM × planned production, minus stock and orders on the way, rounded up to MOQ, released one supplier lead time ahead.
+- **Multi-stage production** (sub-assemblies with stock, WIP, stage lead time and capacity) is a later model capability planned by the same MRP, not a separate policy.
 
 All of it is opt-in and golden-trace-neutral under defaults; the sequence is workstream B2 (§13). A finite-capacity MPS optimizer remains just another occupant of the production-planning slot.
 
@@ -389,7 +388,7 @@ Demand-side behavior, promoted from engine mechanics and data fields into config
 
 ### 5.6 Catalog summary
 
-v1 active surface: **26 policies** (9 implemented, 6 planned-activated, 11 new — of which 4 are promotions of existing mechanics, so genuinely new engine behavior is limited). Appendix A lists all entries including deferred ones with full metadata. *G20 (2026-10-02) adds one ID, P-P.13 `master_production_schedule`, plus two P-P.1 variants (`mrp`, basis `planned_requirements`) and the activation of P-P.2. The count rises to 27 and the variants add no IDs.*
+v1 active surface: **26 policies** (9 implemented, 6 planned-activated, 11 new — of which 4 are promotions of existing mechanics, so genuinely new engine behavior is limited). Appendix A lists all entries including deferred ones with full metadata. *G20 (2026-10-02) adds no ID: it adds the P-P.1 `mrp` type, extends P-P.0 over a horizon, delivers P-C.4 per customer row, and makes P-C.1/P-C.2 work per row.*
 
 ### 5.7 Parameters mean data (forward reference)
 
@@ -1227,24 +1226,23 @@ first slice of G10/§9.2.
 > edits, its columns appear in the right stage. Guardrails: R3, R4 (per-node
 > params only via grouped dict-keyed params), R9.
 
-**B2 — Dependent-demand planning: MPS → MRP → multi-stage (G20; engine milestone M9):**
+**B2 — Demand-driven planning: customer demand → planned production → MRP → per-row fulfillment (G20; engine milestone M9):**
 
-Proposed design and work plan, pending the team's answers to the open questions in its §8: `docs/design/mrp-multi-stage-planning.md`. Packages M9.0–M9.8, summarized:
-- **Visible first (M9.1).** A time-phased `gross_requirements` key, behavior-neutral, so a single-seed inspection run shows planned material demand against actual consumption.
-- **Demand plan (M9.2).** P-F.1 emits an N-week projection. Forecast consumption by the P-C.6 book. A demand step/surge event class, shared with G11 and with RFC 3's first slice.
-- **MPS (M9.3).** P-P.13 with time fences and rough-cut capacity, plus FG initial inventory (RFC 4).
-- **Single-level MRP (M9.4).** P-P.1 `mrp`, mixable per material with reorder-point rows, plus P-P.2 lot sizing, the MRP record and the planning KPIs (past-due releases, shortage weeks, nervousness). ADR 0002.
-- **Multi-level item model (M9.5).** Intermediate items, item×item BOM, low-level codes, WIP ring, stage lead time and capacity, service-part demand. ADR 0003.
-- **Data path (M9.6, a `docs/PLAN.md` work package).** `bom_multi_level` passed through instead of flattened, plus the new item fields with sidecars and gate findings.
-- **UI (M9.7).** Registry-generated columns and an MRP-record viewer.
-- **Validation (M9.8).** CRN-paired MRP vs reorder point under demand steps, surges and the ST-1 battery.
-- **Guardrails.** Every new behavior is opt-in. Golden traces stay byte-identical under default policies. Plans never read the world schedule beyond the P-C.6 horizon τ*.
+Work plan v0.2, agreed with the project owner on 2026-10-02: `docs/design/mrp-multi-stage-planning.md`. The flow always starts from future finished-good demand: projected demand from the customer table for MTO, the FG inventory policy's requirement for MTS. Packages:
+- **A — Demand per customer × product row (P-C.4).** Each row has a forecast series, or a mean + variation + distribution (normal *(new)*, triangular, triangularAV, deterministic, poisson). Product demand is the row sum. The plan uses the forecast or mean; actual demand is drawn around it.
+- **B — Planned production + FG policies.** P-P.0 extended over a horizon: planned production = min(requirement, capacity), with carry-forward. `Product.fg_policy` made real: base-stock / min-max / days of cover. FG starting stock (RFC 4).
+- **C — MRP for materials (P-P.1 `mrp`).** BOM × planned production, minus on hand and on the way, rounded up to MOQ, released one supplier lead time ahead. Materials can mix MRP and reorder point. Week-by-week MRP record in inspection runs.
+- **D — Per-row fulfillment (P-C.1 + P-C.2).** One allocation rule per project. Priority, price and service target per row. Backorder allowed, max days and cost per row, with a per-row backlog. `revenue_max` becomes real by row price.
+- **E — Validation.** CRN-paired MRP vs reorder point under demand steps and surges, the ST-1 battery and forecast bias.
+- **F — Multi-stage, later.** Sub-assemblies with stock, WIP, stage lead time and capacity, planned by the same MRP level by level.
+- **Guardrails.** Every new behavior is opt-in at the data level. Golden traces stay byte-identical for projects that set no new field. The plan never sees actual future demand draws.
 - **Exit:**
-  - The engine reproduces a textbook MRP record bucket-for-bucket (golden #7).
-  - A zero-lead-time multi-level network is byte-identical to its flattened twin (golden #8).
-  - A user can select `mrp` per material and read the record that justified each release.
-  - The validation study reports, with confidence intervals, fill rate at equal inventory for MRP against reorder point.
-- **Closes:** G20. **Partially closes:** G11 (demand-side event class) and G19 (stage-level inventory becomes measurable).
+  - The engine reproduces the plan's worked MRP example week by week (golden #7).
+  - Two rows of one product can backorder and lose independently, each reported separately.
+  - A project can select MRP per material and read the record that justified each order.
+  - Package E reports fill rate at equal stock for MRP vs reorder point, with confidence intervals.
+  - Package F: a zero-lead-time multi-level network is byte-identical to its flattened twin (golden #8).
+- **Closes:** G20. **Partially closes:** G19 (per-row and planned-vs-actual series). Delivers P-C.4. Resolves `revenue_max`'s deferral.
 
 ### Phase C — Experimentation productized
 - Typed experiments: comparison, DOE (resurrect `ExperimentDesigner` + `doe.ts`), stress batteries, portfolio/synergy studies in the product (§9.1); Compare pane with CRN semantics (§9.3).
@@ -1330,9 +1328,9 @@ Status: ✅ implemented · 🧩 planned (schema registered) · ✚ new in this d
 | P-S.8 | shipment_discipline | supplier | order management | operational | ✚ | complete / partial / threshold |
 | P-F.0 | builtin_forecast | plant | forecasting | tactical | ✚ (promoted PH-10 mechanic) | named default of the forecasting slot |
 | P-F.1 | forecasting_method | plant | forecasting | tactical | ✚ | moving_avg / exp_smoothing / seasonal_naive / user series |
-| P-P.0 | greedy_production_plan | plant | production planning | operational | ✚ (promoted PH-40 mechanic) | MTO to demand+backlog; MTS to S^FG |
-| P-P.1 | inventory_control | plant | inventory control | tactical | ✅ extended | PH-70/80; min_max ✅ + s_S / base_stock / (R,Q) / periodic with absolute params; ✚ `mrp` time-phased type + basis `planned_requirements` (G20, B2) |
-| P-P.2 | lot_sizing | plant | production planning | tactical | 🧩 M8 → M9 (B2) | fixed / L4L / EOQ-EPQ / POQ; modifier on MRP net requirements |
+| P-P.0 | greedy_production_plan | plant | production planning | operational | ✚ (promoted PH-40 mechanic) | MTO to demand+backlog; MTS to S^FG; B2: horizon plan = min(requirement, capacity), FG policies base-stock / min-max / days of cover |
+| P-P.1 | inventory_control | plant | inventory control | tactical | ✅ extended | PH-70/80; min_max ✅ + s_S / base_stock / (R,Q) / periodic with absolute params; ✚ `mrp` type per material: BOM × planned production − stock − on the way, ≥ MOQ, released one lead time ahead (G20, B2) |
+| P-P.2 | lot_sizing | plant | production planning | tactical | 🧩 M8 | fixed / L4L / EOQ-EPQ / POQ (B2's MRP uses MOQ only) |
 | P-P.3 | safety_stock_materials | plant | safety stock | strategic | ✅ | PH-70; fixed_days / service_level / king / abc_xyz |
 | P-P.4 | fg_safety_stock | plant | safety stock | strategic | ✅ (MTS) | PH-70; wire to UI (G3) |
 | P-P.5 | short_term_capacity | plant | capacity | operational | ✅ | PH-40; overtime, revenue-positive activation |
@@ -1342,17 +1340,16 @@ Status: ✅ implemented · 🧩 planned (schema registered) · ✚ new in this d
 | P-P.9 | material_allocation | plant | allocation | operational | ✅ | PH-40; rolling LP (HiGHS) / greedy — wire to UI (G3) |
 | P-P.10 | repurposing | plant | production planning | operational | 🧩 M8 | |
 | P-P.11 | dispatching_rule | plant | order management | operational | ✚ | FIFO / EDD / priority (weekly buckets) |
-| P-P.13 | master_production_schedule | plant | production planning | tactical | ✚ (G20, B2) | PH-40; time-phased FG plan, fences, rough-cut capacity; P-P.0 = 1-week default |
 | P-T.1 | multimodal_lane_portfolio | transport | transport | strategic | 🧩 M7 | prerequisite: lanes first-class (§8.3) |
 | P-T.2 | expedited_shipments | transport | transport | operational | ✅ | PH-90; premium pull-forward |
 | P-T.3 | mode_shift | transport | transport | operational | 🧩 M7 | needs P-T.1 |
 | P-T.4 | leadtime_hedging | transport | transport | tactical | 🧩 M8 | not v1 priority |
 | P-T.5 | shipment_consolidation | transport | transport | tactical | ✚ | per-lane window consolidation |
 | P-T.6 | shipping_frequency | transport | transport | tactical | ✚ | fixed weekly / threshold dispatch |
-| P-C.1 | unmet_demand_handling | customer | order management | operational | ✅ | PH-60; lost_sales ✅ / backorder / partial_backorder |
-| P-C.2 | customer_allocation | customer | allocation | operational | ✅ | PH-60; fcfs / proportional / fair_share / priority / sla_tier; per-segment fill-rate KPIs |
+| P-C.1 | unmet_demand_handling | customer | order management | operational | ✅ | PH-60; lost_sales ✅ / backorder / partial_backorder; B2: per customer × product row (backorder allowed, max days, cost/unit/day), per-row backlog |
+| P-C.2 | customer_allocation | customer | allocation | operational | ✅ | PH-60; fcfs / proportional / fair_share / priority / sla_tier; per-segment fill-rate KPIs; B2: one rule per project, per-row priority / price / service target; `revenue_max` by row price |
 | P-C.3 | demand_shaping | customer | demand modeling | operational | 🧩 M8 · ⏸ activation | needs revenue model (§5.8) |
-| P-C.4 | demand_model | customer | demand modeling | strategic | ✚ (promoted mechanic) | distribution / frequency×size / seasonality / forecast error |
+| P-C.4 | demand_model | customer | demand modeling | strategic | ✚ (promoted mechanic) | distribution / frequency×size / seasonality / forecast error; B2 delivers it per customer × product row: forecast series, or mean + variation + distribution (normal / triangular / triangularAV / deterministic / poisson) |
 | P-C.5 | backorder_behavior | customer | demand modeling | operational | ✚ | patience → cancellation; delivery windows; SLA expectations |
 | P-X.1 | recovery_playbook | network | recovery | operational | 🧩 M8 (activate) | sequenced triggers/budgets; replaces flat response list |
 | P-W.x | warehouse namespace | warehouse | — | — | 🔒 Phase E | DRP, echelon inventory, delivery scheduling |
@@ -1369,10 +1366,10 @@ Condensed from `scsim/scsim/core/phases.py` (authoritative; see also `scsim/docs
 | PH-10 | demand_realization | `demand`, `forecast`; ✚ `demand_plan` (B2) | P-C.4, P-F.0/P-F.1 |
 | PH-20 | detection | `firm_knowledge` | P-S.4, P-X.1 |
 | PH-30 | fulfill_from_stock (MTS) | `fg_fulfillment` | — (engine mechanic) |
-| PH-40 | production_planning | `production_plan`, `overtime_capacity`, `substitutions`; ✚ `mps` (B2) | P-P.0, P-P.13, P-P.2, P-P.5, P-P.8, P-P.9, P-P.11 |
+| PH-40 | production_planning | `production_plan`, `overtime_capacity`, `substitutions`; ✚ `planned_production` (B2) | P-P.0, P-P.2, P-P.5, P-P.8, P-P.9, P-P.11 |
 | PH-50 | production_execute | `production_output` | — (pure mechanics, Eq. 8/9) |
 | PH-60 | fulfillment | `fulfillment` | P-C.1, P-C.2, P-C.3 |
-| PH-70 | material_planning | `material_demand`, `inventory_levels`; ✚ `gross_requirements`, `planned_orders` (B2) | P-P.1 (incl. `mrp`), P-P.3, P-P.4 |
+| PH-70 | material_planning | `material_demand`, `inventory_levels`; ✚ `gross_requirements` (B2) | P-P.1 (incl. `mrp`), P-P.3, P-P.4 |
 | PH-80 | procurement | `purchase_orders` | P-P.1, P-S.1, P-S.2 |
 | PH-90 | logistics | `arrivals` | P-S.5–S.8, P-T.2, P-T.3, P-T.5, P-T.6 |
 | PH-99 | accounting | `kpi_rows` | — (read-only; `cost_contribution` assessed) |
@@ -1386,9 +1383,9 @@ Condensed from `scsim/scsim/core/phases.py` (authoritative; see also `scsim/docs
 | `state.queue` | PH-80, PH-90 | supplier order queue (capacity gating) |
 | `state.fg_on_hand` | PH-30, PH-50 | finished-goods stock (MTS) |
 | `state.fg_target` | PH-70 | S^FG target, read next week at PH-40 (ADR 0001) |
-| ✚ `state.item_on_hand` (B2) | PH-50, PH-90 | intermediate (sub-assembly) stock |
-| ✚ `state.wip` (B2) | PH-50 | production pipeline ring of make items (stage lead time) |
-| ✚ `state.firm_plan` (B2) | PH-40, PH-70 | previous MPS/MRP plan — frozen fence + nervousness KPI |
+| `state.backlog` — B2 | PH-60 | becomes per customer × product row (per-row age buckets); the product sum stays readable for planners |
+| ✚ `state.item_on_hand` (B2, package F) | PH-50, PH-90 | sub-assembly stock (multi-stage, later) |
+| ✚ `state.wip` (B2, package F) | PH-50 | production pipeline of sub-assemblies (stage lead time, later) |
 | `state.cost_ledger` | any phase (append-only) | C^res component contributions |
 
 ## Appendix C — Glossary and gap index
