@@ -42,9 +42,11 @@ BEGIN
   INSERT INTO auth.users (id, email) VALUES
     (v_actor,    'd71-actor@example.invalid'),
     (v_stranger, 'd71-stranger@example.invalid');
-  INSERT INTO public.approved_users (id, email, name, password_hash, organization, organization_id) VALUES
-    (v_actor,    'd71-actor@example.invalid',    'D71 Actor',    'x', 'D71 Org', v_org),
-    (v_stranger, 'd71-stranger@example.invalid', 'D71 Stranger', 'x', 'D71 Org', v_org);
+  -- D276 — the actor is a MODELER account: under the account-role ceiling a 'user' account
+  -- (the column's default) may not edit policies on any project, owner or not.
+  INSERT INTO public.approved_users (id, email, name, password_hash, organization, organization_id, role) VALUES
+    (v_actor,    'd71-actor@example.invalid',    'D71 Actor',    'x', 'D71 Org', v_org, 'modeler'),
+    (v_stranger, 'd71-stranger@example.invalid', 'D71 Stranger', 'x', 'D71 Org', v_org, 'user');
   INSERT INTO public.projects (id, name, modeler_id, plant_name, organization, organization_id)
     VALUES (v_project, 'D71', v_actor, 'D71P', 'D71 Org', v_org);
 

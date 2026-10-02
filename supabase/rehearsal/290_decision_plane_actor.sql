@@ -40,9 +40,11 @@ BEGIN
   INSERT INTO public.organizations (id, name, slug) VALUES (v_org, 'WP64A Org', 'wp64a-org');
   INSERT INTO auth.users (id, email) VALUES
     (v_actor, 'wp64a@example.invalid'), (v_stranger, 'wp64as@example.invalid');
-  INSERT INTO public.approved_users (id, email, name, password_hash, organization, organization_id) VALUES
-    (v_actor,    'wp64a@example.invalid',  'WP64A Actor',    'x', 'WP64A Org', v_org),
-    (v_stranger, 'wp64as@example.invalid', 'WP64A Stranger', 'x', 'WP64A Org', v_org);
+  -- D276 — the actor is a MODELER account: under the account-role ceiling a 'user' account
+  -- (the column's default) may not edit policies on any project, owner or not.
+  INSERT INTO public.approved_users (id, email, name, password_hash, organization, organization_id, role) VALUES
+    (v_actor,    'wp64a@example.invalid',  'WP64A Actor',    'x', 'WP64A Org', v_org, 'modeler'),
+    (v_stranger, 'wp64as@example.invalid', 'WP64A Stranger', 'x', 'WP64A Org', v_org, 'user');
   INSERT INTO public.projects (id, name, modeler_id, plant_name, organization, organization_id)
     VALUES (v_project, 'WP64A', v_actor, 'WP64AP', 'WP64A Org', v_org);
 
