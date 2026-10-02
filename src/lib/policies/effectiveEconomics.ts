@@ -27,7 +27,7 @@ import {
   type FallbackStep,
   type Row,
 } from "../../../supabase/functions/_shared/grading.ts";
-import { baseDataRequirements } from "./registryAccess";
+import { baseDataRequirements, policyBundleKeys } from "./registryAccess";
 
 export type { DerivedValue, EmptyMeaning };
 
@@ -149,9 +149,12 @@ export function derivedProductionCapacity(
     const id = String(p.product_id ?? "");
     if (id) ids.add(id);
   }
+  // The bundle keys carry the item-master overrides (§23 WP 13.1): a demand
+  // mean set on /policies is the demand the engine's capacity floor doubles.
   const ctx = buildReducerCtx(
     { materials: [], products, suppliers: [], inbound: [], outbound, bom: [], overrides },
     defaults,
+    policyBundleKeys() as unknown as Row[],
   );
   return derivedFallbackDetails(CAPACITY_STEPS, ids, ctx);
 }

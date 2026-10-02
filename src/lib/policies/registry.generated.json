@@ -146,7 +146,7 @@
       "lane"
     ]
   },
-  "engine_version": "0.2.9",
+  "engine_version": "0.2.10",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -3343,6 +3343,96 @@
       "key": "primary_source",
       "target": "SupplierLink.primary",
       "transform": "true on a Supplier-stage row makes that supplier the material's primary link (where P-P.1 orders go). Nothing saved -> the engine's rule: cheapest, then shortest lead time, then id. Two saved for one material -> neither applied, warned (\u00a74 D188)"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "positive",
+      "family": "sourcing",
+      "key": "material_cost",
+      "master": "materials.cost",
+      "rows": "supplier",
+      "target": "Material.cost",
+      "transform": "currency per unit, must be > 0. Order: the Supplier-stage row (`node:<supplier>::<material>`) -> materials.cost (master) -> the volume-weighted, then cheapest, inbound price -> 1.0"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "family": "sourcing",
+      "key": "material_moq",
+      "master": "materials.moq",
+      "rows": "supplier",
+      "target": "SupplierLink.moq",
+      "transform": "units, >= 0, applied to every supplier link of the material. Order: the Supplier-stage row -> materials.moq (master) -> 0"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "positive",
+      "family": "sourcing",
+      "key": "capacity_per_week",
+      "master": "suppliers.capacity_per_week",
+      "rows": "supplier",
+      "target": "Supplier.capacity_per_week",
+      "transform": "units per week, must be > 0; one value per SUPPLIER, read from any of its Supplier-stage rows. Order: the row -> suppliers.capacity_per_week (master; empty means unlimited)"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "fraction",
+      "family": "sourcing",
+      "key": "reliability_score",
+      "master": "suppliers.reliability_score",
+      "rows": "supplier",
+      "target": "Supplier.reliability_score",
+      "transform": "fraction 0-1; one value per SUPPLIER, read from any of its Supplier-stage rows. Order: the row -> suppliers.reliability_score (master) -> 1.0"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "family": "inventory",
+      "key": "initial_on_hand",
+      "master": "materials.initial_on_hand",
+      "rows": "supplier",
+      "target": "Material.initial_on_hand",
+      "transform": "units, >= 0. Order: the Supplier-stage row -> materials.initial_on_hand (master) -> the engine's own opening stock. A PLANT-stage initial_on_hand is not read (\u00a74 D89)"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "positive",
+      "family": "production",
+      "key": "sell_price",
+      "master": "products.sell_price",
+      "rows": "plant",
+      "target": "Product.unit_price",
+      "transform": "currency per unit, must be > 0. Order: the Plant-stage row (`node:<plant>::<product>`) -> products.sell_price (master) -> the demand-weighted outbound price -> 1.0"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "positive",
+      "family": "production",
+      "key": "production_capacity",
+      "master": "products.production_capacity",
+      "rows": "plant",
+      "target": "Product.production_capacity",
+      "transform": "units per week, must be > 0. Order: the Plant-stage row -> products.production_capacity (master) -> the line capacity (capacity_units_per_day x 7 x utilization) -> max(2 x demand, 1000)"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "positive",
+      "family": "production",
+      "key": "demand_mean",
+      "master": "products.demand_mean",
+      "rows": "plant",
+      "target": "Product.demand_mode",
+      "transform": "units per week, must be > 0. Order: the Plant-stage row -> products.demand_mean (master) -> the weekly outbound volume -> 0"
+    },
+    {
+      "catalog_ref": null,
+      "domain": "nonnegative",
+      "family": "production",
+      "key": "demand_cv",
+      "master": "products.demand_cv",
+      "rows": "plant",
+      "target": "Product.demand_cv",
+      "transform": "sigma / mean, >= 0. Order: the Plant-stage row -> products.demand_cv (master) -> the scenario demand model's cv -> 0.30. Read by the triangular and negative-binomial draws; not under Poisson"
     },
     {
       "catalog_ref": "P-X.2",

@@ -233,7 +233,12 @@ describe("the declarations the surfaces read", () => {
     // `SCSIM_VISIBLE_FIELDS`, so the moment it got a column it would have
     // rendered with a `stored-only` badge — the grid telling a planner the
     // engine ignores the number it is about to multiply the capacity by.
+    // §23 WP 13.1 — an item-master override (`master` declared) is claimed by
+    // its grid column's own `master:` block, which badges it reaching the engine;
+    // listing it in SCSIM_VISIBLE_FIELDS too would claim the Plant stage's
+    // same-named `initial_on_hand`, which the engine does not read.
     const unclaimed = policyBundleKeys()
+      .filter((k) => !(k as { master?: string }).master)
       .filter((k) => !isScsimVisible(k.family as never, k.key))
       .map((k) => `${k.family}.${k.key}`);
     expect(

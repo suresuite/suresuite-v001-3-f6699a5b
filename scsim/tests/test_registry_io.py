@@ -327,8 +327,17 @@ def test_policy_bundle_keys_match_what_the_mapper_reads():
     assert len(declared) == len(POLICY_BUNDLE_KEYS), "a key is declared twice"
 
     # Direction 1 — everything declared is read by the mapper, as a bundle key.
+    # A row override of an item master (§23 WP 13.1) is read through one of three
+    # helpers rather than a bare `.get`; each names the key as a literal, so the
+    # gate still reads it off the source.
+    # (policies, "<family>", "<key>", …) — the KEY is the third argument.
+    row_reads = (r"""_supplier_row_values\(\s*[\w.]+,\s*["'][a-z]+["'],\s*["']{k}["']""",
+                 r"""_supplier_values\(\s*[\w.]+,\s*["'][a-z]+["'],\s*["']{k}["']""",
+                 r"""_ovr\(prod_row,\s*["']{k}["']""")
     for key in sorted(declared):
-        assert re.search(rf"""\.get\(\s*["']{re.escape(key)}["']""", body), (
+        k = re.escape(key)
+        assert (re.search(rf"""\.get\(\s*["']{k}["']""", body)
+                or any(re.search(p.format(k=k), body) for p in row_reads)), (
             f"{key} is declared in POLICY_BUNDLE_KEYS and the mapper never reads it")
 
     # Direction 2 — every FAMILY dict read is declared. The families are the
@@ -343,7 +352,7 @@ def test_policy_bundle_keys_match_what_the_mapper_reads():
         "max_backorder_days", "backorder_cost_per_day", "allocation",
         "tier_overrides", "fulfillment_strategy",
         "min_share_pct", "review_period_days",
-        "material_price", "initial_on_hand",
+        "material_price",
         "sourcing_firm", "moq", "lead_time_distribution", "ordering_cost",
         "supplier_capacity_per_day", "capacity_machine_per_day",
         "capacity_labor_per_day", "production_cost_per_unit", "mode",
@@ -352,6 +361,10 @@ def test_policy_bundle_keys_match_what_the_mapper_reads():
     seen: set[str] = set()
     for var, _family in family_vars.items():
         for m in re.finditer(rf"""\b{var}\.get\(\s*["']([a-z_]+)["']""", body):
+            seen.add(m.group(1))
+    # …and every row-override read through the three helpers (§23 WP 13.1).
+    for p in row_reads:
+        for m in re.finditer(p.format(k="([a-z_]+)"), body):
             seen.add(m.group(1))
     undeclared = sorted(seen - declared - not_rendered)
     assert not undeclared, (
@@ -373,7 +386,7 @@ def test_registry_publishes_the_policy_bundle_keys():
     # One of them lands on an ENTITY field rather than a policy parameter, and
     # that is the case door 2 could never have covered — a Params addition would
     # have been the wrong fix.
-    entity = [k for k in keys if k["catalog_ref"] is None]
+    entity = [k for k in keys if k["catalog_ref"] is None and not k.get("master")]
     assert sorted(k["key"] for k in entity) == [
         "capacity_units_per_day", "holding_cost_pct", "primary_source",
         "utilization_cap_pct"], entity
@@ -442,3 +455,29 @@ def test_the_registry_publishes_empty_means():
     others = [f for f, r in rows.items()
               if r["empty_means"] is not None and f != "suppliers.capacity_per_week"]
     assert others == [], others
+
+
+def test_every_item_master_override_names_its_master_and_its_rows():
+    """§23 WP 13.1 — /policies never writes the item masters; a value changed
+    there is a row override the mapper reads BEFORE the master. Each such key
+    names the master column it overrides and the stage whose rows carry it, and
+    the master must be a column the engine reads (a base data requirement or a
+    column of the entity it lands on)."""
+    from scsim.io.project_map import POLICY_BUNDLE_KEYS
+
+    overrides = {k["key"]: (k["master"], k["rows"]) for k in POLICY_BUNDLE_KEYS if k.get("master")}
+    assert overrides == {
+        "material_cost": ("materials.cost", "supplier"),
+        "material_moq": ("materials.moq", "supplier"),
+        "capacity_per_week": ("suppliers.capacity_per_week", "supplier"),
+        "reliability_score": ("suppliers.reliability_score", "supplier"),
+        "initial_on_hand": ("materials.initial_on_hand", "supplier"),
+        "sell_price": ("products.sell_price", "plant"),
+        "production_capacity": ("products.production_capacity", "plant"),
+        "demand_mean": ("products.demand_mean", "plant"),
+        "demand_cv": ("products.demand_cv", "plant"),
+    }
+    for k in POLICY_BUNDLE_KEYS:
+        assert bool(k.get("master")) == bool(k.get("rows")) == bool(k.get("domain")), k
+        assert k.get("domain") in (None, "positive", "nonnegative", "fraction"), k
+        assert k["catalog_ref"] is None or not k.get("master"), k

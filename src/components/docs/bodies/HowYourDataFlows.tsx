@@ -122,12 +122,12 @@ export default function HowYourDataFlows() {
         <Key>The rule: the number the policies page shows is the number the run uses — and the policies page never changes your item masters.</Key>
         <Callout tone="limit" title="Not true yet">
           <p>
-            Today, saving a cost, MOQ, capacity, price or demand on the policies page still writes it
-            into the item master. And a run records its dataset version but is computed from your
-            project's current masters and lanes, so an edit made after you press Run, or after a
-            model was validated, can reach that run. A few page cells are also not read by the
-            engine yet. All of this is scheduled work and is listed on{" "}
-            <DocLink to="known-limits">Known limits</DocLink>.
+            A run records its dataset version but is computed from your project's current masters
+            and lanes, so an edit made after you press Run, or after a model was validated, can reach
+            that run. A few page cells are also not read by the engine yet. Both are scheduled work
+            and are listed on <DocLink to="known-limits">Known limits</DocLink>. Values that an
+            earlier version of the policies page saved into your item masters are still there: they
+            cannot be told apart from uploaded ones, so nothing moved them back.
           </p>
         </Callout>
       </Section>

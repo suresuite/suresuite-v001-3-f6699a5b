@@ -1,0 +1,18 @@
+{
+  "_about": "PLAN.md §23 WP 13.1 exit test, shared by the grid (src/lib/policies/__tests__/masterOverrides.test.ts) and the engine (sim-worker/tests/test_policies_override.py). On the Example project (dataset.json), a planner edits Material cost on the Supplier-stage row S1::M1 to 12.5. M1's other row, S3::M1, already carries a saved cost of 11 and a saved primary; S1::M1 carries a saved replenishment setting. The grid must save the edit as OVERRIDES — S1::M1 gets the cost, S3::M1 loses its cost and keeps its primary, the inventory patch is untouched — and write no item master. The engine must then use 12.5 for M1 while materials.cost stays 10.",
+  "edit": { "stage": "supplier", "row_key": "S1::M1", "material_id": "M1", "field": "material_cost", "value": 12.5 },
+  "grid_rows": [
+    { "key": "S1::M1", "supplier_id": "S1", "material_id": "M1" },
+    { "key": "S3::M1", "supplier_id": "S3", "material_id": "M1" },
+    { "key": "S2::M2", "supplier_id": "S2", "material_id": "M2" }
+  ],
+  "saved_before": [
+    { "scope": "node", "target_key": "S1::M1", "family": "inventory", "patch": { "type": "rop", "rop_q_quantity": 40 } },
+    { "scope": "node", "target_key": "S3::M1", "family": "sourcing", "patch": { "material_cost": 11, "primary_source": true } }
+  ],
+  "upserts_after_save": [
+    { "scope": "node", "target_key": "S1::M1", "family": "sourcing", "patch": { "material_cost": 12.5 } },
+    { "scope": "node", "target_key": "S3::M1", "family": "sourcing", "patch": { "primary_source": true } }
+  ],
+  "engine_reads": { "material": "M1", "cost": 12.5, "master_cost": 10 }
+}

@@ -483,6 +483,7 @@ export function NumCell({
   title,
   dot,
   superseded,
+  reset,
 }: {
   value: number | undefined;
   provenance: Provenance;
@@ -533,6 +534,12 @@ export function NumCell({
    * will need the moment they clear the master.
    */
   superseded?: boolean;
+  /**
+   * *Reset to master* (§23 WP 13.1). /policies never writes an item master, so
+   * a master-backed cell's edit is an override; this removes it (as a draft, on
+   * the next save) and the cell shows the master value again.
+   */
+  reset?: { title: string; onReset: () => void };
 }) {
   const derived = provenance === "derived";
   const formatted = (v: number) =>
@@ -566,6 +573,20 @@ export function NumCell({
         />
         {unit && <span className="text-[9px] text-[#a3a3a3]">{unit}</span>}
       </span>
+      {reset && (
+        <button
+          type="button"
+          aria-label="Reset to master"
+          title={reset.title}
+          onClick={(e) => {
+            e.stopPropagation();
+            reset.onReset();
+          }}
+          className="absolute left-0 top-1/2 -translate-y-1/2 px-[2px] font-mono text-[10px] text-[#a3a3a3] opacity-0 transition-opacity hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+        >
+          ↺
+        </button>
+      )}
     </>
   );
 }

@@ -104,11 +104,9 @@ export default function KnownLimits() {
           </p>
         </Callout>
 
-        <Callout tone="limit" title="The policies page writes item masters, and a run can use data edited after you pressed Run">
+        <Callout tone="limit" title="A run can use data edited after you pressed Run">
           <p>
-            Saving a cost, MOQ, capacity, price or demand on the policies page currently writes it
-            into your item master, so the uploaded value is overwritten; it should be kept as a
-            policy setting instead. A run is bound to a frozen policy version, but its masters and lanes — cost, MOQ,
+            A run is bound to a frozen policy version, but its masters and lanes — cost, MOQ,
             capacity, price, demand, the network itself — are read from your project when the run
             starts, not from the dataset version it records. An edit made after dispatch, or after a
             model was validated, can reach that run. The validated model is marked stale; the run is
@@ -116,9 +114,13 @@ export default function KnownLimits() {
             project-wide default can show one value on the policies page while the run uses another.
           </p>
           <p>
+            The policies page no longer writes your item masters: a value changed there is a policy
+            override, and the master keeps its uploaded value. Values an earlier version of the page
+            saved into a master are still in it — they cannot be told apart from uploaded ones.
+          </p>
+          <p>
             <strong className="text-foreground">Until it is fixed:</strong> avoid editing data while
-            runs you depend on are queued, rerun a validated model after any data change, and note an
-            item master's original value before you change it on the policies page. See{" "}
+            runs you depend on are queued, and rerun a validated model after any data change. See{" "}
             <DocLink to="how-your-data-flows">How your data flows</DocLink>.
           </p>
         </Callout>

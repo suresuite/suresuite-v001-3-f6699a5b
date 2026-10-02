@@ -467,7 +467,8 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D277** | **The pre-run check and the Supplier grid answered "does this material have a primary supplier?" from two different sources, so a single-source material was blocked while the grid showed it resolved.** The grid and its step track resolve `primary_source` through `getEffectiveValue` — a saved override, else the stage's own routing decision (`__decided`: a material with one supplier IS its primary). `verifyProjectPolicies` read `effectivePolicy` over the SAVED bundle alone. The decision only reaches that bundle through the auto-seed, which fires once per stage, when the stage has NO overrides — so every lane uploaded after a stage's first seed showed "Primary ✓" and was refused at Run checks. Owner-reported on `Aumovio`: `M0241`, sourced only from `S012` | `src/lib/policies/verification.ts` (`verifyProjectPolicies`); `src/components/policies/StagePolicyTable.tsx` (the auto-seed's `hasOverridesForStage` guard); `src/hooks/useStageRows.tsx` (`__decided`) | **CLOSED ✅ (2026-10-02)** — the verifier reads `primary_source` through `getEffectiveValue`, the grid's own resolver: an explicit save still wins, so un-checking the only supplier still blocks. `primaryFromGrid.test.ts`, three of four assertions red on the old verifier. With D188's engine half closed in the same day, a resolved suggestion is also what the run does |
 | **D278** | **An account-role change on /admin/users changed less than it appeared to, and said nothing about the rest.** (1) `admin_set_user_role` wrote `approved_users.role` alone, and the membership trigger maps account `admin` → organization `admin` only when a membership is CREATED, so a promotion left the active organization's row at `member` and a DEMOTION left an `admin` row in place — the half that holds a right: `_api_key_management_org` admits an organization owner/admin whatever the account role, so an admin demoted to `user` kept managing the organization's API keys and every scope on a personal key (`_api_key_caller.can_manage`). The promotion half held no new right (an account `admin` already passes that check by its account role); it was a contradiction on /profile and /admin/users, which listed an account admin as an organization member. (2) Nothing said what the change did NOT change: a person override (`user_capabilities`) or organization override (`org_capabilities`) beats the account role in `capabilities_for_user`, and since D276 a project role limits the account role on the four project rights. (3) `admin` is not `super_admin` — /admin and every `admin_*` RPC are super-admin-only — but the picker showed bare words; the gloss that says so lived only in the manual. (4) An open session never learned of the change: the profile was re-read once on mount and the capability set only when the user id changed. Owner-reported: changing a user's account role (e.g. user → admin) did not change what that person could do | `supabase/migrations/20260929000002_admin_users_read.sql:169` (`admin_set_user_role`: the UPDATE alone); `supabase/migrations/20260930000004_account_in_several_organizations.sql:87` (the sync trigger returns unless `organization_id` changes); `supabase/migrations/20260711000001_api_access_control.sql:160` (`_api_key_management_org`: org owner/admin); `supabase/migrations/20261002000005_personal_keys_for_every_user.sql:46` (`_api_key_caller` inherits it); `supabase/migrations/20260905000001_grant_ga_agent_capabilities.sql:79` (override precedence); `supabase/migrations/20261002000004_account_role_ceiling.sql:63` (`project_right_decide`); `src/lib/permissions.ts:22` (`/admin` super_admin only); was `src/pages/admin/AdminUsers.tsx:92,339` (bare role words) and `src/components/docs/bodies/RolesAndCapabilities.tsx:30` (the gloss, manual only); was `src/hooks/useAuth.tsx:277-280` and `src/hooks/useCapabilities.tsx:153` (reads keyed on mount / user id) | **CLOSED ✅ (`20261002000006`).** `admin_set_user_role` (DROP + CREATE, `jsonb`; grants re-issued, every guard kept) moves the ACTIVE organization's row `member` → `admin` on becoming admin and `admin` → `member` on leaving it — never `owner`, never another organization (D210) — each move logged as `user.org_role_change` in `admin_set_user_org_role`'s shape; and RETURNS `{role_before, role_after, org, overrides, narrowed_projects}`: the overrides that now differ from the new role's default, and the projects whose role refuses what the account allows, read from `project_right_decisions` (D276's rule, not re-authored). No backfill: `admin_list_account_role_gaps` lists account admins left at `member`, and /admin/users marks each with a one-click `admin_set_user_org_role`. The page shows the summary in a dialog linking to /admin/users/:userId; the picker's options carry one line each from `roleGloss.ts`, which the manual now reads too. `useAuth` re-reads the profile on focus, on visibility and every five minutes and says a changed role once; `useCapabilities` reloads on the role. `rehearsal/740` §1–§7, three mutations red (owner guard, other-organization guard, demotion branch). NOT closed, stated: a role changed while the person's ACTIVE organization is not the one meant moves that one only; an open tab learns within five minutes or on return, not instantly; the grants mutation stays green because Supabase's default privileges grant `anon`/`authenticated` on every new function |
 | **D279** | **The OWNER of a project could not edit its input data or policies, or export from it, and an Editor could never upload.** D276 made the account role a ceiling over the project role, and production's 'user' account role allows Run Simulations only — so a project's owner, listed "Owner (fixed)" and administering its organization, held Run Simulations there and not Edit Input Data, Edit Policies or Export; every Editor with a 'user' account was capped the same way. And Edit Input Data had a second gate after the rule: `has_project_access`, which every upload passes, admitted the modeler and app admins only, so an Editor whose role grants Edit Input Data was refused it on every project (`upload_gate`) — the editor half of D66's divergence. Owner-reported: "if he is the editor or the owner, we must be able to Edit Input Data, Edit Policies, Export" | `supabase/migrations/20261002000004_account_role_ceiling.sql` (`project_right_decide`: the `account_ceiling` branch); `supabase/migrations/20261001000017_super_admin_acts_as_admin.sql` (`has_project_access`: modeler or admin only; `project_rights_for_user`: `v_land`) | **CLOSED ✅ (`20261002000007`).** `project_right_decide`: super admin → yes; a person override → its value; no project role → the account's answer (organization switch, then account role); otherwise the project role's grant — no ceiling. `has_project_access` admits Editor and Owner beside the modeler and app admins, and `project_rights_for_user.may_land_uploads` is the same test, so the page and the upload agree; `ingest_apply_run` already required Editor. `get_role_access`, `admin_preview_role_capability` and D275's policy writers read the rule unchanged; /admin/roles drops the "Narrowed by the ceiling" list and says an account-role switch on these four applies only without a project role. `rehearsal/750` proves the reported case (a 'user'-account owner who is an organization admin holds all four), an Editor's landing through `ingest_land_file`, and the gate still refusing an Analyst, a Viewer, a lapsed Editor and a no-role member; `720`, `240`, `460`, `490`, `550` re-assert the rule as it now stands. A person override still beats the project role |
-| **D280** | **The run does not read what the page shows, and does not read the version it is stamped with.** A run is bound to a policy version (frozen) and records a `dataset_version_id` and `graph_hash`, but the Fly worker builds the engine input from the LIVE item masters and lanes at the moment it starts — so a cost, MOQ, capacity, price or demand edited on /policies (which writes the master row directly), in the Item Master editor, by a CSV or by ERP sync after dispatch or after a Validated Model was adopted flows into that run silently. The model is marked stale; nothing refuses the run. The frozen input already exists and one pipeline already reads it — `sim_worker.local.run_from_snapshots` (browser engine, `suresuite` package) — so two runs stamped with the same versions can be computed from different data depending on WHERE they ran. The page/run disagreements D204 (a)(b) and the master-vs-line capacity shadow are the same class on the policy side | `sim-worker/sim_worker/worker.py:386` (`load_project_data` — live tables); `sim-worker/sim_worker/local.py` (`run_from_snapshots` — the frozen path the worker does not use); `src/components/policies/StagePolicyTable.tsx:1090` (master-backed cells write the master row); `scsim/scsim/io/project_map.py:1104` (master capacity shadows line capacity) | **OPEN** — Phase 13 (§23). **Owner, 2026-10-02: /policies never writes the item masters** — its edits are policy overrides in the policy version (WP 13.1); the worker reads the frozen versions (WP 13.2); run → validate → Validated Model binds both (WP 13.3); page = run (WP 13.4) |
+| **D280** | **The run does not read what the page shows, and does not read the version it is stamped with.** A run is bound to a policy version (frozen) and records a `dataset_version_id` and `graph_hash`, but the Fly worker builds the engine input from the LIVE item masters and lanes at the moment it starts — so a cost, MOQ, capacity, price or demand edited on /policies (which writes the master row directly), in the Item Master editor, by a CSV or by ERP sync after dispatch or after a Validated Model was adopted flows into that run silently. The model is marked stale; nothing refuses the run. The frozen input already exists and one pipeline already reads it — `sim_worker.local.run_from_snapshots` (browser engine, `suresuite` package) — so two runs stamped with the same versions can be computed from different data depending on WHERE they ran. The page/run disagreements D204 (a)(b) and the master-vs-line capacity shadow are the same class on the policy side | `sim-worker/sim_worker/worker.py:386` (`load_project_data` — live tables); `sim-worker/sim_worker/local.py` (`run_from_snapshots` — the frozen path the worker does not use); `src/components/policies/StagePolicyTable.tsx:1090` (master-backed cells write the master row); `scsim/scsim/io/project_map.py:1104` (master capacity shadows line capacity) | **OPEN** — Phase 13 (§23). **Owner, 2026-10-02: /policies never writes the item masters** — its edits are policy overrides in the policy version (WP 13.1); the worker reads the frozen versions (WP 13.2); run → validate → Validated Model binds both (WP 13.3); page = run (WP 13.4). **WP 13.1 SHIPPED (2026-10-02)**: the grid's `saveAll` has no master write path — every master-backed cell saves as a row override (`masterOverrides.ts` plans it, `_shared/entityOverrides.ts` resolves it the mapper's way), `assign_material_supplier` no longer inserts a supplier master (`20261002000008`), and `project_map.py` reads nine fields override → master → lanes → default with a `source` line per field in the run log (`ENGINE_VERSION` 0.2.10); `policiesNeverWriteMasters.test.ts` and `rehearsal/760` gate it. The worker half (live tables at start) is WP 13.2's |
+| **D281** | **Saving one /policies cell deleted every other value saved on that row and family.** `bulk_upsert_policy_overrides` REPLACES a row's patch (`ON CONFLICT … DO UPDATE SET patch = excluded.patch`), and the grid's `saveAll` sent only the fields drafted in that save — so editing Holding % on a Supplier row whose policy type, Q and κ were saved earlier stored `{holding_cost_pct}` and nothing else, silently, for every save since the grid had per-row overrides. The prefill path was not affected (it writes every persistable field of the row at once); the Excel import writes whole patches too | `src/components/policies/StagePolicyTable.tsx` (`saveAll`, before WP 13.1: `bucket` held the draft only); `supabase/migrations/20261002000003_policy_writes_need_edit_policies.sql` (`bulk_upsert_policy_overrides`, `patch = excluded.patch`) | **CLOSED by WP 13.1 (2026-10-02)** — a save is planned as FULL patches: the saved patch with the save applied on top (`planPatch`, `settlePlan` in `masterOverrides.ts`), and a row whose patch empties is deleted rather than stored as `{}`. `masterOverrides.test.ts` (§4 D281). **Not measured**: how many saved fields production lost this way — an overwritten patch leaves no trace but the audit log's `before`, which a §15 probe could read |
 
 ### 4.1 Code map — the data layer
 
@@ -22336,6 +22337,64 @@ path) and renumbers the rest to 13.2–13.5; blueprint §8.3's precedence senten
 this commit. Values earlier /policies saves wrote into masters stay there — nothing distinguishes
 them from uploaded ones.
 
+### WP 13.1 — /policies writes overrides, never the item masters · 2026-10-02 · `20261002000008`
+
+**Promised by the previous entry** (Phase 13 amended): a cost, MOQ, capacity, price or demand
+changed on /policies is a policy override, read ahead of the master; the masters stay as uploaded.
+**Found against the code.** Two master writes, not one: the grid's `saveAll` (every master-backed
+draft merged onto the full master row and sent through `bulk_upsert_{materials,products,suppliers}`)
+and `assign_material_supplier`, which inserted a bare supplier master "so capacity/reliability are
+editable right away" — §23 named only the first. And the save path carried a defect of its own,
+**§4 D281**: `bulk_upsert_policy_overrides` replaces a row's patch and the grid sent only the
+drafted fields, so editing one cell deleted the row's other saved values.
+
+**What changed.** Engine (`ENGINE_VERSION` 0.2.9 → 0.2.10; registry snapshots, reference docs, the
+pipeline snapshot and both browser wheels regenerated): `project_map.py` reads nine fields
+**override → item master → lanes → default** — `material_cost`, `material_moq`, `initial_on_hand`
+(Supplier rows, per material), `capacity_per_week`, `reliability_score` (Supplier rows, per
+supplier), `sell_price`, `production_capacity`, `demand_mean`, `demand_cv` (Plant rows, per
+product). A value outside the key's declared domain is ignored with a warning and the master
+decides. Every field's sources are counted and written to the run log as one `source` line
+(`override 1 · master 9 · lanes 2`). `POLICY_BUNDLE_KEYS` declares the nine with `master`, `rows`
+and `domain`, and the parity test in `test_registry_io.py` now reads the three helper reads in
+both directions. A production-capacity override shadows the line capacity exactly as the master
+did, and says which. App: `saveAll` has no master path; a save is planned as full patches
+(`masterOverrides.ts`) — the edited row carries an entity value and the entity's other rows drop
+it, an emptied row is deleted; the cell shows the override with the master (or lane-derived)
+base in its hover and a ↺ *reset to master* that removes the override on save; the shared
+resolution of a row key lives once in `_shared/entityOverrides.ts`, imported by the grid and the
+grader, so the run check and the dispatch gate count an override as SET. Database:
+`20261002000008` — `assign_material_supplier` writes the lane and no master. Manual: the "Not true
+yet" callout and the Known-limits card lose the master-write sentence and say that earlier saves
+remain in the masters.
+
+**Not migrated, as the owner ruled.** Values earlier /policies saves wrote INTO masters are
+indistinguishable from uploaded ones and stay where they are; nothing was moved or reset. So
+were the supplier rows `assign_material_supplier` created.
+
+**Gate results.** scsim 323 passed (nine new mapper tests, a declaration test); sim-worker 146
+(`test_policies_override.py`, the exit test's engine half on the shared fixture
+`scripts/example_project/policies_edit_cost.json`); the Deno grader 32 (one new); `gen_docs`,
+`gen_frontend_registry`, `check_registry_bridge` and `build_engine_wheels.sh --check` green;
+vitest 144 files / 1 634 tests (`policiesNeverWriteMasters.test.ts`, red on the pre-WP grid and
+without the migration — both halves checked; `masterOverrides.test.ts`, the grid half on the same
+fixture); `contract:check` holds with `main`'s two warnings (R10, R13); `typecheck` 15 of 15 held;
+`audit:ui` and `check:docs` clean; eslint 295 errors / 110 warnings, identical to `main`;
+`contract:rehearse` green fresh and `--fixtures`, `760` new — and red with `20261002000008`
+removed (§1, "wrote a supplier MASTER row").
+
+**Gap check — what this did not do.** (1) The worker still builds its input from the live masters
+and lanes at start (WP 13.2). (2) The dispatch gate grades the LIVE overrides, while the run reads
+the policy VERSION's; on a version older than the overrides the two can differ — WP 13.2/13.3's
+binding is where that closes. (3) A save now merges onto the saved patch, so a seeded row a person
+edits becomes a typed decision as a whole (`seeded_from_hash` is per row); before, the edit
+replaced the row and the seeded fields were lost (D281), so this errs on the side of keeping them.
+(4) The Plant stage's `initial_on_hand` is still not read (§4 D89) — the declaration says
+`rows: supplier`, and `engineDoorFor` now refuses to lend a key to a stage it does not name, so
+the chain stays honestly broken (WP 13.4 badges it). **Results move** for any policy version that
+carries one of the nine keys — none did before today, since the grid never stored them as
+overrides; the engine build separates the RunKeys either way.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -24436,7 +24495,7 @@ no item-master table.**
 
 | Guarantee | How it is held |
 |---|---|
-| /policies never changes the masters | the grid has no master write path; a test fails if `StagePolicyTable` (or anything under `src/components/policies/`) calls a `bulk_upsert_{materials,products,suppliers}` RPC (WP 13.1) |
+| /policies never changes the masters | the grid has no master write path; `policiesNeverWriteMasters.test.ts` fails if anything under `src/components/policies/` or the /policies page calls a `bulk_upsert_{materials,products,suppliers,customers}` RPC, `saveRows` or writes a master table, or if `assign_material_supplier` writes one — and `rehearsal/760` proves the last against a database (WP 13.1) |
 | One input for every run | the worker calls the same `run_from_snapshots` pipeline as the browser and the `suresuite` package (WP 13.2) |
 | What was validated is what runs | dispatch uses a Validated Model's own two versions; if the live project moved, the Lab offers *run validated versions* or *run current as exploratory* (WP 13.3) |
 | The page shows the run's numbers | a parity test resolves a fixture project through the grid's resolver AND the mapper and fails on any cell that differs (WP 13.4) |
@@ -24459,6 +24518,18 @@ no item-master table.**
 **Exit.** A test edits cost on /policies and asserts the master row did not change, the policy
 version carries the override, and the mapper uses it. The no-master-write test is red on the
 current code.
+
+**Found by WP 13.1, where §23 and the code disagreed (the code was right).** (1) The grid had a
+second master write nobody had listed: `assign_material_supplier` — the Supplier stage's "assign a
+supplier" — inserted a bare `suppliers` row "so capacity/reliability are editable right away".
+`20261002000008` removes it; the lane writes stay (they are an input-data edit, gated by Edit Input
+Data). (2) The save path had a defect of its own, §4 D281: the RPC replaces a row's patch and the
+grid sent only the drafted fields, so one edited cell deleted the row's other saved values. The
+override save is planned as full patches, which closes it. (3) A Supplier-stage cell for a
+MATERIAL value (cost, MOQ, initial stock) or a SUPPLIER value (capacity, reliability) sits on every
+row of that material or supplier, and the mapper reads one value per entity — first row in key
+order. The grid therefore resolves the cell per ENTITY, and a save writes the edited row and
+clears the key from the entity's other rows, so two rows can never disagree.
 
 ### WP 13.2 — The worker reads the frozen versions *(D280 · gates `result-binding`, `single-source`)*
 

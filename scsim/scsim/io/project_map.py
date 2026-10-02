@@ -326,7 +326,15 @@ class MappingResult:
 #
 # `shadowed_by` is OPTIONAL and names the entity field that, when present,
 # makes this key's value unreachable. Two keys carry it and both name
-# `products.production_capacity` (§4 D167).
+# `products.production_capacity` (§4 D167) — which since WP 13.1 is present when
+# the master OR the Plant-stage override of it carries a value.
+#
+# `master`, `rows` and `domain` are OPTIONAL and travel together (§23 WP
+# 13.1): `master` names the item-master column this key OVERRIDES, `rows` the
+# /policies stage whose row keys the mapper reads it from, and `domain` the
+# values it accepts (positive · nonnegative · fraction) — an override outside it
+# is ignored with a warning and the master decides. Nine keys carry them, and
+# the grid reads all three from the registry rather than restating them.
 POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
     {
         "key": "supply_share",
@@ -377,6 +385,118 @@ POLICY_BUNDLE_KEYS: tuple[dict[str, str | None], ...] = (
                      "primary link (where P-P.1 orders go). Nothing saved -> the engine's "
                      "rule: cheapest, then shortest lead time, then id. Two saved for one "
                      "material -> neither applied, warned (§4 D188)",
+    },
+    # ── /policies overrides of the item masters (PLAN.md §23 WP 13.1, §4 D280) ──
+    # /policies never writes the masters: each of these is a per-row override the
+    # mapper reads BEFORE the master column it names (`master`), on the stage rows
+    # it names (`rows`). The grid's resolver derives the same rule from these
+    # declarations (`src/lib/policies/masterOverrides.ts`), so a cell shows the
+    # value read here.
+    {
+        "key": "material_cost",
+        "family": "sourcing",
+        "target": "Material.cost",
+        "catalog_ref": None,
+        "master": "materials.cost",
+        "rows": "supplier",
+        "domain": "positive",
+        "transform": "currency per unit, must be > 0. Order: the Supplier-stage row "
+                     "(`node:<supplier>::<material>`) -> materials.cost (master) -> the "
+                     "volume-weighted, then cheapest, inbound price -> 1.0",
+    },
+    {
+        "key": "material_moq",
+        "family": "sourcing",
+        "target": "SupplierLink.moq",
+        "catalog_ref": None,
+        "master": "materials.moq",
+        "rows": "supplier",
+        "domain": "nonnegative",
+        "transform": "units, >= 0, applied to every supplier link of the material. Order: "
+                     "the Supplier-stage row -> materials.moq (master) -> 0",
+    },
+    {
+        "key": "capacity_per_week",
+        "family": "sourcing",
+        "target": "Supplier.capacity_per_week",
+        "catalog_ref": None,
+        "master": "suppliers.capacity_per_week",
+        "rows": "supplier",
+        "domain": "positive",
+        "transform": "units per week, must be > 0; one value per SUPPLIER, read from any "
+                     "of its Supplier-stage rows. Order: the row -> "
+                     "suppliers.capacity_per_week (master; empty means unlimited)",
+    },
+    {
+        "key": "reliability_score",
+        "family": "sourcing",
+        "target": "Supplier.reliability_score",
+        "catalog_ref": None,
+        "master": "suppliers.reliability_score",
+        "rows": "supplier",
+        "domain": "fraction",
+        "transform": "fraction 0-1; one value per SUPPLIER, read from any of its "
+                     "Supplier-stage rows. Order: the row -> suppliers.reliability_score "
+                     "(master) -> 1.0",
+    },
+    {
+        "key": "initial_on_hand",
+        "family": "inventory",
+        "target": "Material.initial_on_hand",
+        "catalog_ref": None,
+        "master": "materials.initial_on_hand",
+        "rows": "supplier",
+        "domain": "nonnegative",
+        "transform": "units, >= 0. Order: the Supplier-stage row -> "
+                     "materials.initial_on_hand (master) -> the engine's own opening "
+                     "stock. A PLANT-stage initial_on_hand is not read (§4 D89)",
+    },
+    {
+        "key": "sell_price",
+        "family": "production",
+        "target": "Product.unit_price",
+        "catalog_ref": None,
+        "master": "products.sell_price",
+        "rows": "plant",
+        "domain": "positive",
+        "transform": "currency per unit, must be > 0. Order: the Plant-stage row "
+                     "(`node:<plant>::<product>`) -> products.sell_price (master) -> the "
+                     "demand-weighted outbound price -> 1.0",
+    },
+    {
+        "key": "production_capacity",
+        "family": "production",
+        "target": "Product.production_capacity",
+        "catalog_ref": None,
+        "master": "products.production_capacity",
+        "rows": "plant",
+        "domain": "positive",
+        "transform": "units per week, must be > 0. Order: the Plant-stage row -> "
+                     "products.production_capacity (master) -> the line capacity "
+                     "(capacity_units_per_day x 7 x utilization) -> max(2 x demand, 1000)",
+    },
+    {
+        "key": "demand_mean",
+        "family": "production",
+        "target": "Product.demand_mode",
+        "catalog_ref": None,
+        "master": "products.demand_mean",
+        "rows": "plant",
+        "domain": "positive",
+        "transform": "units per week, must be > 0. Order: the Plant-stage row -> "
+                     "products.demand_mean (master) -> the weekly outbound volume -> 0",
+    },
+    {
+        "key": "demand_cv",
+        "family": "production",
+        "target": "Product.demand_cv",
+        "catalog_ref": None,
+        "master": "products.demand_cv",
+        "rows": "plant",
+        "domain": "nonnegative",
+        "transform": "sigma / mean, >= 0. Order: the Plant-stage row -> products.demand_cv "
+                     "(master) -> the scenario demand model's cv -> 0.30. Read by the "
+                     "triangular and negative-binomial draws; not under Poisson",
     },
     {
         "key": "service_level_target",
@@ -625,6 +745,99 @@ def _supplier_row_values(
             continue
         out[mat] = v
     return out
+
+
+def _supplier_values(
+    policies: dict, family: str, field: str, sup_ids: set[str], w: list[MappingWarning],
+) -> dict[str, Any]:
+    """Per-SUPPLIER values of one field, read from /policies Supplier-stage rows.
+
+    The supplier-level twin of :func:`_supplier_row_values`: the row key is
+    ``node:<supplier>::<material>`` and a supplier attribute (capacity,
+    reliability) is the same on every row of that supplier. Sorted key order,
+    first wins, and two rows of one supplier disagreeing is announced.
+    """
+    out: dict[str, Any] = {}
+    for k in sorted(k for k in policies if isinstance(k, str) and k.startswith("node:")):
+        sup, sep, mat = k[len("node:"):].partition("::")
+        if not sep or sup not in sup_ids:
+            continue
+        v = ((policies[k] or {}).get(family) or {}).get(field)
+        if v is None:
+            continue
+        if sup in out and out[sup] != v:
+            w.append(MappingWarning(
+                "warn", f"supplier:{sup}", field,
+                f"conflicting per-material values for one supplier — "
+                f"kept {out[sup]}, ignored {v} (from {mat})"))
+            continue
+        out[sup] = v
+    return out
+
+
+# ── /policies overrides of item-master values (PLAN.md §23 WP 13.1, §4 D280) ──
+#
+# /policies NEVER writes the item masters. A cost, MOQ, capacity, price or
+# demand changed there is a POLICY OVERRIDE on the grid row, saved in the policy
+# version, and the mapper reads every such field in one order:
+#
+#     override → item master → derived from lanes → default
+#
+# — the order `holding_cost_pct` already followed (§4 D204). The row keys are the
+# grid's own: the Supplier stage's ``node:<supplier>::<material>`` and the Plant
+# stage's ``node:<plant>::<product>`` (`columnSpecs.ts` targetKey). The grid
+# resolves the same rule (`src/lib/policies/masterOverrides.ts`) so the value a
+# cell shows is the value read here.
+#
+# The sources of every value are COUNTED and the counts go to the run log, one
+# line per field, so a run states how many entities took the /policies value,
+# how many the uploaded master, how many a lane-derived value, how many another
+# derivation (a product's capacity from the plant grid's line rate) and how many
+# the terminal default.
+_SOURCE_ORDER = ("override", "master", "lanes", "derived", "default")
+
+
+class _SourceTally:
+    def __init__(self) -> None:
+        self.counts: dict[str, dict[str, int]] = {}
+
+    def add(self, field: str, source: str) -> None:
+        row = self.counts.setdefault(field, {})
+        row[source] = row.get(source, 0) + 1
+
+    def emit(self, w: list[MappingWarning]) -> None:
+        for field in sorted(self.counts):
+            row = self.counts[field]
+            parts = " · ".join(f"{s} {row[s]}" for s in _SOURCE_ORDER if row.get(s))
+            w.append(MappingWarning(
+                "info", "source", field,
+                f"value sources (override → item master → lanes → default): {parts}"))
+
+
+def _override_num(
+    v: Any, *, entity: str, field: str, domain: str, w: list[MappingWarning],
+) -> Optional[float]:
+    """A /policies override as a number, or None when it cannot be used.
+
+    `domain` is the key's declared one (`POLICY_BUNDLE_KEYS`). A non-numeric or
+    out-of-domain value is IGNORED WITH A WARNING rather than applied or
+    silently dropped: the master underneath then decides, and the run log says
+    the override did not."""
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        n = float("nan")
+    ok = n == n and n not in (float("inf"), float("-inf")) and n >= 0
+    if domain == "positive":
+        ok = ok and n > 0
+    elif domain == "fraction":
+        ok = ok and n <= 1.0
+    if not ok:
+        w.append(MappingWarning(
+            "warn", entity, field,
+            f"/policies override {v!r} is not a usable value — ignored, the item master decides"))
+        return None
+    return n
 
 
 def _apply_primary_choice(
@@ -876,6 +1089,41 @@ def from_project_data(data: ProjectData) -> MappingResult:
     bom_mat_ids = {b.material_id for b in data.bom if b.product_id in prod_ids}
     sup_ids = {s.id for s in data.suppliers}
 
+    # /policies overrides of item-master values (§23 WP 13.1): read once, here,
+    # because the arc loop below already needs the MOQ.
+    tally = _SourceTally()
+    all_mat_ids = mat_ids | bom_mat_ids
+    arc_sup_ids = sup_ids | {a.supplier_id for a in data.supply_arcs}
+    row_cost = _supplier_row_values(data.policies, "sourcing", "material_cost", all_mat_ids, w)
+    row_moq = _supplier_row_values(data.policies, "sourcing", "material_moq", all_mat_ids, w)
+    row_on_hand = _supplier_row_values(data.policies, "inventory", "initial_on_hand", all_mat_ids, w)
+    row_sup_cap = _supplier_values(data.policies, "sourcing", "capacity_per_week", arc_sup_ids, w)
+    row_sup_rel = _supplier_values(data.policies, "sourcing", "reliability_score", arc_sup_ids, w)
+
+    domains = {k["key"]: str(k["domain"]) for k in POLICY_BUNDLE_KEYS if k.get("master")}
+
+    def _ovr(table: dict[str, Any], key: str, entity: str, bundle_key: str) -> Optional[float]:
+        """The override of `bundle_key` for `key`, validated against its
+        declared domain; None when there is none or it is unusable."""
+        if key not in table:
+            return None
+        return _override_num(table[key], entity=entity, field=bundle_key,
+                             domain=domains[bundle_key], w=w)
+
+    moq_by_mat: dict[str, float] = {}
+    for mid in sorted(all_mat_ids):
+        mrow0 = next((m for m in data.materials if m.id == mid), None)
+        ov = _ovr(row_moq, mid, f"material:{mid}", "material_moq")
+        if ov is not None:
+            moq_by_mat[mid] = ov
+            tally.add("materials.moq", "override")
+        elif mrow0 is not None and mrow0.moq:
+            moq_by_mat[mid] = float(mrow0.moq)
+            tally.add("materials.moq", "master")
+        else:
+            moq_by_mat[mid] = 0.0
+            tally.add("materials.moq", "default")
+
     # ── Supplier links (per supplier×material) + the materials.cost fallback ──
     # Duplicate (supplier, material) inbound rows are reduced to one link:
     # cheapest unit_price wins, ties broken by shortest lead time.
@@ -935,7 +1183,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
                 entity=f"supply:{arc.supplier_id}->{arc.material_id}")),
             lead_time_dist=LeadTimeDist((mrow.lead_time_dist or "deterministic")) if mrow and mrow.lead_time_dist else LeadTimeDist.DETERMINISTIC,
             lead_time_cv=float(mrow.lead_time_cv) if mrow and mrow.lead_time_cv else 0.0,
-            moq=float(mrow.moq) if mrow and mrow.moq else 0.0,
+            moq=moq_by_mat.get(arc.material_id, 0.0),
         )
         key = (arc.supplier_id, arc.material_id)
         prev = links_by_key.get(key)
@@ -1003,12 +1251,33 @@ def from_project_data(data: ProjectData) -> MappingResult:
 
     # ── Suppliers ──
     sup_master = {s.id: s for s in data.suppliers}
+
+    def _sup_capacity(sid: str) -> Optional[float]:
+        ov = _ovr(row_sup_cap, sid, f"supplier:{sid}", "capacity_per_week")
+        if ov is not None:
+            tally.add("suppliers.capacity_per_week", "override")
+            return ov
+        cap = sup_master[sid].capacity_per_week if sid in sup_master else None
+        # An empty master capacity MEANS unlimited (the registry's `empty_means`),
+        # so it is the master answering, not a default standing in.
+        tally.add("suppliers.capacity_per_week", "master" if sid in sup_master else "default")
+        return cap
+
+    def _sup_reliability(sid: str) -> float:
+        ov = _ovr(row_sup_rel, sid, f"supplier:{sid}", "reliability_score")
+        if ov is not None:
+            tally.add("suppliers.reliability_score", "override")
+            return ov
+        rel = (sup_master.get(sid) or SupplierRow(sid)).reliability_score
+        tally.add("suppliers.reliability_score", "master" if rel else "default")
+        return float(rel or 1.0)
+
     suppliers = [
         Supplier(
             id=sid,
             name=str((sup_master.get(sid) or SupplierRow(sid)).name or sid),
-            capacity_per_week=(sup_master.get(sid).capacity_per_week if sid in sup_master else None),
-            reliability_score=float((sup_master.get(sid) or SupplierRow(sid)).reliability_score or 1.0),
+            capacity_per_week=_sup_capacity(sid),
+            reliability_score=_sup_reliability(sid),
         )
         for sid in sorted(sup_ids)
     ]
@@ -1022,12 +1291,26 @@ def from_project_data(data: ProjectData) -> MappingResult:
         data.policies, "inventory", "holding_cost_pct",
         {m.id for m in data.materials} | bom_mat_ids, w)
     materials: list[Material] = []
+    def _on_hand(mid: str, master: Optional[float]) -> Optional[float]:
+        ov = _ovr(row_on_hand, mid, f"material:{mid}", "initial_on_hand")
+        if ov is not None:
+            tally.add("materials.initial_on_hand", "override")
+            return ov
+        tally.add("materials.initial_on_hand", "master" if master is not None else "default")
+        return float(master) if master is not None else None
+
     for m in data.materials:
         inv = _merged_policy(data.policies, m.id, "inventory")
-        if m.cost and m.cost > 0:
+        cost_ov = _ovr(row_cost, m.id, f"material:{m.id}", "material_cost")
+        if cost_ov is not None:
+            cost = cost_ov
+            tally.add("materials.cost", "override")
+        elif m.cost and m.cost > 0:
             cost = float(m.cost)
+            tally.add("materials.cost", "master")
         elif (derived := _inbound_cost(m.id)) is not None:
             cost, via = derived
+            tally.add("materials.cost", "lanes")
             w.append(MappingWarning(
                 "info", f"material:{m.id}", "cost",
                 "no master cost → using volume-weighted inbound price"
@@ -1035,6 +1318,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
                 else "no master cost and no inbound volumes → using cheapest supplier price"))
         else:
             cost = 1.0
+            tally.add("materials.cost", "default")
             w.append(MappingWarning("warn", f"material:{m.id}", "cost",
                                     "no master cost and no supplier price → defaulted to 1.0"))
         hold_pct = (row_holding[m.id] if m.id in row_holding
@@ -1045,7 +1329,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
             if hold_pct is not None else 20.0
         materials.append(Material(
             id=m.id, name=str(m.name or m.id), cost=cost, holding_cost_rate=holding,
-            initial_on_hand=(float(m.initial_on_hand) if m.initial_on_hand is not None else None),
+            initial_on_hand=_on_hand(m.id, m.initial_on_hand),
         ))
     # Materials the BOM consumes that have no master row. REACHABLE since §4
     # D166 — before it, the arc filter above dropped their arcs, so the
@@ -1054,19 +1338,27 @@ def from_project_data(data: ProjectData) -> MappingResult:
     # so the fallback is all it has, and every such material is NAMED rather
     # than quietly materialized (T1 — no number without a source).
     for mid in sorted(bom_mat_ids - {m.id for m in materials}):
-        derived = _inbound_cost(mid)
-        cost = derived[0] if derived else 1.0
+        cost_ov = _ovr(row_cost, mid, f"material:{mid}", "material_cost")
+        derived = None if cost_ov is not None else _inbound_cost(mid)
+        cost = cost_ov if cost_ov is not None else derived[0] if derived else 1.0
+        tally.add("materials.cost",
+                  "override" if cost_ov is not None else "lanes" if derived else "default")
         w.append(MappingWarning(
             "info", f"material:{mid}", "master_row",
-            "no row in `materials` — simulated from its BOM and inbound lanes, "
-            f"cost {'derived from those lanes' if derived else 'defaulted to 1.0'}; "
-            "MOQ and lead-time distribution take engine defaults, holding cost the "
-            "Supplier-stage value when one is set, else the engine default"))
+            "no row in `materials` — simulated from its BOM and inbound lanes, cost "
+            + ("the /policies override" if cost_ov is not None
+               else "derived from those lanes" if derived else "defaulted to 1.0")
+            + "; MOQ, initial stock and holding cost take the Supplier-stage value when "
+            "one is set, else the engine default; the lead-time distribution takes the "
+            "engine default"))
         kw: dict[str, Any] = {}
         if mid in row_holding:  # the /policies value needs no master row (§4 D204)
             kw["holding_cost_rate"] = _clamp(
                 float(row_holding[mid]) * 100.0, 5.0, 50.0, w=w,
                 entity=f"material:{mid}", field="holding_cost_pct", unit=" %/yr")
+        on_hand = _on_hand(mid, None)
+        if on_hand is not None:
+            kw["initial_on_hand"] = on_hand
         materials.append(Material(id=mid, name=mid, cost=cost, **kw))
 
     # ── Products ──
@@ -1080,35 +1372,60 @@ def from_project_data(data: ProjectData) -> MappingResult:
     for p in data.products:
         prod_pol = {**_merged_policy(data.policies, p.id, "production"),
                     **prod_composite.get(p.id, {})}
+        # The Plant-stage row's overrides of the product master (§23 WP 13.1) —
+        # NODE scope only, the bare and the composite key, composite last: a
+        # project-default `production` family is not a value for one product.
+        prod_row = {**(((data.policies.get(f"node:{p.id}") or {}).get("production")) or {}),
+                    **prod_composite.get(p.id, {})}
+        ent = f"product:{p.id}"
         # price
-        if p.sell_price and p.sell_price > 0:
+        price_ov = _ovr(prod_row, "sell_price", ent, "sell_price")
+        if price_ov is not None:
+            price = price_ov
+            tally.add("products.sell_price", "override")
+        elif p.sell_price and p.sell_price > 0:
             price = float(p.sell_price)
+            tally.add("products.sell_price", "master")
         elif out_price_den.get(p.id):
             price = out_price_num[p.id] / out_price_den[p.id]
+            tally.add("products.sell_price", "lanes")
             w.append(MappingWarning("info", f"product:{p.id}", "unit_price",
                                     "no master sell_price → demand-weighted outbound price"))
         else:
             price = 1.0
+            tally.add("products.sell_price", "default")
             w.append(MappingWarning("warn", f"product:{p.id}", "unit_price",
                                     "no sell_price and no outbound price → defaulted to 1.0"))
         # demand mean
-        if p.demand_mean and p.demand_mean > 0:
+        mean_ov = _ovr(prod_row, "demand_mean", ent, "demand_mean")
+        if mean_ov is not None:
+            mean = mean_ov
+            tally.add("products.demand_mean", "override")
+        elif p.demand_mean and p.demand_mean > 0:
             mean = float(p.demand_mean)
+            tally.add("products.demand_mean", "master")
         else:
             mean = out_demand.get(p.id, 0.0)
+            tally.add("products.demand_mean", "lanes" if mean > 0 else "default")
             if mean <= 0:
                 w.append(MappingWarning("warn", f"product:{p.id}", "demand_mean",
                                         "no master demand_mean and no outbound volume → 0"))
-        # capacity — master (units/week) wins over the plant grid's line
-        # capacity (units/day); say so rather than dropping the edit silently.
+        # capacity — the /policies override, then the master (units/week), then
+        # the plant grid's line capacity (units/day); say so rather than
+        # dropping a line-capacity edit silently.
         line_cap = prod_pol.get("capacity_units_per_day")
-        if p.production_capacity and p.production_capacity > 0:
-            cap = float(p.production_capacity)
+        cap_ov = _ovr(prod_row, "production_capacity", ent, "production_capacity")
+        if cap_ov is not None or (p.production_capacity and p.production_capacity > 0):
+            cap = cap_ov if cap_ov is not None else float(p.production_capacity)
+            tally.add("products.production_capacity",
+                      "override" if cap_ov is not None else "master")
             if line_cap:
                 w.append(MappingWarning("info", f"product:{p.id}", "production_capacity",
-                                        "master production_capacity (units/week) shadows the "
-                                        "plant grid's line capacity (units/day) — the line "
-                                        "capacity entry is not applied"))
+                                        "production_capacity (units/week, "
+                                        + ("the /policies override" if cap_ov is not None
+                                           else "the item master")
+                                        + ") shadows the plant grid's line capacity "
+                                        "(units/day) — the line capacity entry is not applied"))
         elif line_cap:
             util_raw = prod_pol.get("utilization_cap_pct")
             if util_raw is None:
@@ -1116,17 +1433,27 @@ def from_project_data(data: ProjectData) -> MappingResult:
                                         "production policy sets no utilization cap → 85%"))
             util = float(85.0 if util_raw is None else util_raw) / 100.0
             cap = float(line_cap) * 7.0 * util
+            tally.add("products.production_capacity", "derived")
             w.append(MappingWarning("info", f"product:{p.id}", "production_capacity",
                                     "no master capacity → derived from production policy"))
         else:
             cap = max(mean * 2.0, 1000.0)
+            tally.add("products.production_capacity", "default")
             w.append(MappingWarning("warn", f"product:{p.id}", "production_capacity",
                                     "no capacity source → defaulted (capacity will not bind)"))
         mode = _fulfillment_mode(p.fulfillment_mode, data.project_model, w, p.id)
         product_modes.add(mode)
-        cv = float(p.demand_cv) if p.demand_cv is not None else (
-            float((sc.demand_model or {}).get("cv")) if (sc.demand_model or {}).get("cv") is not None else _DEFAULT_CV
-        )
+        cv_ov = _ovr(prod_row, "demand_cv", ent, "demand_cv")
+        if cv_ov is not None:
+            cv = cv_ov
+            tally.add("products.demand_cv", "override")
+        elif p.demand_cv is not None:
+            cv = float(p.demand_cv)
+            tally.add("products.demand_cv", "master")
+        else:
+            cv = (float((sc.demand_model or {}).get("cv"))
+                  if (sc.demand_model or {}).get("cv") is not None else _DEFAULT_CV)
+            tally.add("products.demand_cv", "default")
         kind = _resolve_demand_kind(p.demand_distribution, sc.demand_model)
         products.append(_build_product(p, price=price, capacity=cap, mode=mode,
                                        mean=mean, cv=cv, kind=kind, warnings=w))
@@ -1193,6 +1520,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
             f"{len(orphan_keys)} policy override(s) name no supplier, material, "
             f"product or customer in this project and were not applied: {shown}"))
 
+    tally.emit(w)
     scenario = Scenario(name=sc.name or "scenario", network=network,
                         settings=settings, events=events, policies=policies)
     return MappingResult(scenario=scenario, warnings=w)
@@ -1564,9 +1892,11 @@ def _map_policies(
             mat_over.pop(mat, None)
         else:
             consumed_keys.add(k)
-        # Read per material elsewhere (holding % in the material loop, safety
-        # days just below), so the row is applied, not dropped.
-        if inv_o.get("holding_cost_pct") is not None or inv_o.get("safety_stock_days") is not None:
+        # Read per material elsewhere (holding % and initial stock in the
+        # material loop, safety days just below), so the row is applied, not
+        # dropped.
+        if (inv_o.get("holding_cost_pct") is not None or inv_o.get("safety_stock_days") is not None
+                or inv_o.get("initial_on_hand") is not None):
             consumed_keys.add(k)
     # An absolute band a row states inverted (s ≥ S) would be refused by the
     # engine's validator and abort the run; keep the reorder point (the half

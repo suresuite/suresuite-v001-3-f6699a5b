@@ -132,9 +132,11 @@ describe("WP 6.1 · the resolver's order is transcribed, and still true", () => 
     // the transcription has to be checkable, and this is the check.
     const body = src.slice(src.indexOf("export function getEffectiveValue"));
     const markers = [
+      // §23 WP 13.1 — a `master:` column: draft → override → master → derived.
+      "if (draft !== undefined && draft !== null) return draft",
+      "masterOverrideFor(mcol, dataRow, overrides, masterRowById)",
+      "masterBaseFor(mcol, dataRow, masterRowById, derived)",
       "if (draft !== undefined) return draft",
-      "masterValueFor",
-      "derivedValueFor",
       "if (hasValue && !isSuggestion) return dataRow[field]",
       // §4 D23 — the rung that lets a SAVED routing choice outrank the stage's
       // own suggestion. It reads the raw patches, not `effectivePolicy`, so it
@@ -154,7 +156,7 @@ describe("WP 6.1 · the resolver's order is transcribed, and still true", () => 
 
   it("the transcription lists a step for each of those branches", () => {
     expect(RESOLUTION_ORDER.map((r) => r.step)).toEqual([
-      "draft", "master", "derived", "dataRow",
+      "draft", "masterOverride", "master", "derived", "dataRow",
       "savedOverride", "suggestion",
       "bundle.family", "bundle.families", "undefined",
     ]);
