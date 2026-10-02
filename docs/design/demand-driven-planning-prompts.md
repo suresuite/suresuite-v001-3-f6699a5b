@@ -4,9 +4,12 @@
 > (the design: definitions, formulas, the worked example).
 > **Status:** AUTHORED 2026-10-02.
 
-Two ways to run it: **the whole phase in one prompt** (next section), or one prompt per work package — paste the **preamble**,
-then **one** WP prompt. Never run two WPs in one session. The gap check at the end of each
-package is what keeps the next one honest.
+Two ways to run it:
+- **The whole phase in one prompt** (next section): one session executes WP 14.0 → 14.6 in order.
+- **One package at a time**: paste the **preamble**, then **one** WP prompt, into a fresh session.
+
+Either way, every package ends with its own checks, gap check, §16 entry and commit before the
+next one starts. That gap check is what keeps the next package honest.
 
 The *Already verified* lines are leads from the investigation that produced the plan, recorded
 so a cold session does not spend its budget rediscovering them. **Re-check anything you rely
