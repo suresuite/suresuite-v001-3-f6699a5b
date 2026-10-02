@@ -63,7 +63,7 @@ jobs:
 
       - name: Install the notebooks' own dependencies (what a user installs)
         if: ${{ !cancelled() }}
-        # + the engine wheels, so notebook 05 (local simulation) runs fully rather than
+        # + the engine wheels, so notebook 03 (local simulation) runs fully rather than
         # taking its "engine not installed" branch.
         run: pip install requests pandas matplotlib pyarrow openpyxl nbclient nbformat ipykernel pytest public/engine/*.whl
 

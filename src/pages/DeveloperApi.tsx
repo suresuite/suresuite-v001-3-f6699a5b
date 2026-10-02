@@ -146,9 +146,7 @@ const NOTEBOOKS = [
   { path: '/notebooks/suresuite_00_quickstart.ipynb', title: '00 · Quickstart', mirrors: 'Simulation Lab: set up a run, run it, read the results', minutes: 10 },
   { path: '/notebooks/suresuite_01_policy_experiment.ipynb', title: '01 · Policy experiment', mirrors: '/policies edit → Save version → Lab Compare, paired by replication', minutes: 15 },
   { path: '/notebooks/suresuite_02_disruption_resilience.ipynb', title: '02 · Disruption and resilience', mirrors: 'Lab stress tests: plant shutdown, supplier outage, recovery times', minutes: 15 },
-  { path: '/notebooks/suresuite_03_material_shortage.ipynb', title: '03 · Material shortage', mirrors: 'A sole-source outage, read as a shortage; lost sales vs backorders', minutes: 15 },
-  { path: '/notebooks/suresuite_04_results_and_reproducibility.ipynb', title: '04 · Results and reproducibility', mirrors: 'The run-results workbook and its reproducibility record', minutes: 10 },
-  { path: '/notebooks/suresuite_05_local_simulation.ipynb', title: '05 · Simulate on your own machine', mirrors: 'Pull a dataset and policy version, run the engine locally, sweep for free', minutes: 15 },
+  { path: '/notebooks/suresuite_03_local_simulation.ipynb', title: '03 · Simulate on your own machine', mirrors: 'Pull a dataset and policy version, run the engine locally, sweep for free', minutes: 15 },
 ] as const;
 type NotebookPath = (typeof NOTEBOOKS)[number]['path'];
 const COLAB_START_URL = 'https://colab.research.google.com/';
@@ -1066,7 +1064,7 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
           <MobilePanel label="Scenarios · SCENARIO_ID" counter={`${nbScenarios.length}`}>
             {nbScenarios.length === 0 ? (
               <p className="px-3 py-3 text-[12.5px] leading-[1.45] text-[#525252]">
-                None yet — §6 of the notebook creates one via{' '}
+                None yet — §3 of the Quickstart creates one via{' '}
                 <span className="font-mono">POST …/scenarios</span>.
               </p>
             ) : (
@@ -1084,7 +1082,7 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
           <MobilePanel label="Policy versions · POLICY_VERSION_ID" counter={`${nbPolicyVersions.length}`}>
             {nbPolicyVersions.length === 0 ? (
               <p className="px-3 py-3 text-[12.5px] leading-[1.45] text-[#525252]">
-                None yet — §5 of the notebook snapshots one via{' '}
+                None yet — §2 of the Quickstart snapshots one via{' '}
                 <span className="font-mono">POST …/policy-versions</span>.
               </p>
             ) : (
@@ -1103,7 +1101,7 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
           <MobilePanel label="Dataset versions · provenance" counter={`${nbDatasetVersions.length}`}>
             {nbDatasetVersions.length === 0 ? (
               <p className="px-3 py-3 text-[12.5px] leading-[1.45] text-[#525252]">
-                None yet — §2 of the notebook freezes one via{' '}
+                None yet — §2 of the Quickstart freezes one via{' '}
                 <span className="font-mono">POST …/datasets:freeze</span>.
               </p>
             ) : (
@@ -1549,7 +1547,7 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
                       </div>
                       {nbScenarios.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                          None yet — §6 of the notebook creates one via{' '}
+                          None yet — §3 of the Quickstart creates one via{' '}
                           <span className="font-mono">POST …/scenarios</span>.
                         </p>
                       ) : (
@@ -1588,7 +1586,7 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
                       </div>
                       {nbPolicyVersions.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                          None yet — §5 of the notebook snapshots one via{' '}
+                          None yet — §2 of the Quickstart snapshots one via{' '}
                           <span className="font-mono">POST …/policy-versions</span>.
                         </p>
                       ) : (
@@ -1629,7 +1627,7 @@ for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_w
                       </div>
                       {nbDatasetVersions.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
-                          None yet — §2 of the notebook freezes one via{' '}
+                          None yet — §2 of the Quickstart freezes one via{' '}
                           <span className="font-mono">POST …/datasets:freeze</span>.
                         </p>
                       ) : (

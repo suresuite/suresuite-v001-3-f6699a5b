@@ -2026,9 +2026,7 @@ export const API_NOTEBOOKS: string[] = [
   "/notebooks/suresuite_00_quickstart.ipynb",
   "/notebooks/suresuite_01_policy_experiment.ipynb",
   "/notebooks/suresuite_02_disruption_resilience.ipynb",
-  "/notebooks/suresuite_03_material_shortage.ipynb",
-  "/notebooks/suresuite_04_results_and_reproducibility.ipynb",
-  "/notebooks/suresuite_05_local_simulation.ipynb"
+  "/notebooks/suresuite_03_local_simulation.ipynb"
 ];
 
 /**

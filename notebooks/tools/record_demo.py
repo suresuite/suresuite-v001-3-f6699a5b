@@ -62,8 +62,6 @@ FRAME = {"horizon_days": 364, "warmup_days": 14, "replications": 10, "seed": 42,
 DEMO_SERIES = ["fill_rate", "backlog_units", "on_hand_units", "on_hand_value", "revenue_value"]
 
 SS = lambda days: {"inventory": {"safety_stock_method": "fixed_days", "safety_stock_days": days}}  # noqa: E731
-BACKORDER = {"fulfillment": {"backorder_allowed": True, "max_backorder_days": 28,
-                             "backorder_cost_per_day": 0.5}}
 OUTAGE_S2 = [{"target": "S2", "start_day": 140, "duration_days": 42, "magnitude_pct": 100}]
 OUTAGE_S1 = [{"target": "S1", "start_day": 140, "duration_days": 42, "magnitude_pct": 100}]
 CUT_S2 = [{"target": "S2", "start_day": 140, "duration_days": 42, "magnitude_pct": 60}]
@@ -74,13 +72,11 @@ PLANT = [{"target": "plant", "start_day": 140, "duration_days": 28, "magnitude_p
 RECORDINGS = [
     ("baseline", {}, []),
     ("safety_stock_28d", SS(28), []),
-    ("backorder", BACKORDER, []),
     ("s2_outage", {}, OUTAGE_S2),
     ("s2_outage_safety_stock_7d", SS(7), OUTAGE_S2),
     ("s2_outage_safety_stock_14d", SS(14), OUTAGE_S2),
     ("s2_outage_safety_stock_28d", SS(28), OUTAGE_S2),
     ("s2_outage_safety_stock_42d", SS(42), OUTAGE_S2),
-    ("s2_outage_backorder", BACKORDER, OUTAGE_S2),
     ("s2_capacity_cut_60", {}, CUT_S2),
     ("s1_outage", {}, OUTAGE_S1),
     ("plant_shutdown", {}, PLANT),

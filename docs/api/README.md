@@ -153,7 +153,7 @@ the Developer API page's Quickstart tab.
 
 ### Python notebooks (Google Colab or local Jupyter)
 
-Six notebooks, each the Python version of one workflow in the app. Get them from
+Four notebooks, each the Python version of one workflow in the app. Get them from
 the `/developer` page's **Notebook** tab, which lists your projects and, per
 project, every id the notebooks need, and downloads any of them with the CONFIG
 cell pre-filled. **Open in Colab** downloads the same pre-filled copy and opens
@@ -165,9 +165,7 @@ repository, which is private.
 | `suresuite_00_quickstart.ipynb` | Simulation Lab: freeze data, snapshot policies, run a baseline, read KPIs ± CI, replications, weekly series, credibility |
 | `suresuite_01_policy_experiment.ipynb` | /policies edit → Save version → Lab Compare: A vs B on common random numbers, paired by replication, plus a safety-stock sweep |
 | `suresuite_02_disruption_resilience.ipynb` | Lab stress tests: plant shutdown, sole- and dual-source supplier outages, a partial capacity cut; time to survive / recover |
-| `suresuite_03_material_shortage.ipynb` | A material shortage induced by its sole supplier's outage; lost sales vs backorders (P-C.1) |
-| `suresuite_04_results_and_reproducibility.ipynb` | The run-results workbook (`run_meta`, `aggregate_kpis`, `replication_kpis`, `series_*`, `reproducibility`), cancel, errors |
-| `suresuite_05_local_simulation.ipynb` | Simulate on your own machine: pull a dataset and policy version, reproduce a platform run exactly, sweep 20 scenarios locally, a what-if on your copy of the data |
+| `suresuite_03_local_simulation.ipynb` | Simulate on your own machine: pull a dataset and policy version, reproduce a platform run exactly, sweep 20 scenarios locally, a what-if on your copy of the data |
 
 **Two modes.** With no key the notebooks run in **demo mode**: they replay engine
 output recorded for the Example project (`scripts/example_project/dataset.json`,
@@ -197,7 +195,8 @@ rows (`ss.dataset`) and a policy version (`ss.policy`), installs the engine thro
 `GET /engine` with each wheel's sha256 checked (`ss.install_engine`), and runs it on
 YOUR machine (`ss.simulate`) — the same function the platform's browser engine runs,
 so the same inputs give the platform's numbers. `ss.with_tables` makes a what-if on
-your local copy. Nothing in the package writes to the platform. See `python/README.md`.
+your local copy. Nothing in the package writes to the platform. The user guide is
+[`python-library.md`](python-library.md); the package's own notes are `python/README.md`.
 
 **Authoring.** The notebooks are generated: edit `notebooks/src/*.py` (percent
 format) and `notebooks/src/common/*.py`, then `npm run notebooks:build`.
