@@ -70,6 +70,15 @@ class SafetyStockParams(PolicyParams):
         14.0, ge=0.0, le=84.0,
         json_schema_extra={"unit": "days", "scope": "G", "notes": "classification=fixed_days."},
     )
+    fixed_days_by_material: dict[str, float] = Field(
+        default_factory=dict,
+        json_schema_extra={
+            "unit": "days", "scope": "M", "range": "[0, 84]",
+            "notes": "Per-material fixed-days cover (the /policies Supplier stage's "
+                     "safety-stock days). A listed material's buffer is E[D_m]·days/7 "
+                     "whatever the classification; unlisted materials follow it.",
+        },
+    )
 
     @field_validator("z_matrix")
     @classmethod
@@ -82,6 +91,14 @@ class SafetyStockParams(PolicyParams):
                 raise ValueError(f"unknown z_matrix cell {cell!r}")
             if not (80.0 <= sl <= 99.9):
                 raise ValueError(f"z_matrix[{cell}] must be in [80, 99.9] %")
+        return v
+
+    @field_validator("fixed_days_by_material")
+    @classmethod
+    def _days(cls, v: dict[str, float]) -> dict[str, float]:
+        for mid, days in v.items():
+            if not (0.0 <= days <= 84.0):
+                raise ValueError(f"fixed_days_by_material[{mid}] must be in [0, 84] days")
         return v
 
 
@@ -140,6 +157,13 @@ class SafetyStockMaterials(PolicyPlugin):
             else:
                 ss_s = z * sigma * np.sqrt(lt)            # Eq. 20
                 ss_S = z * sigma * np.sqrt(lt + self._kappa_hint(ctx))  # Eq. 21
+        if p.fixed_days_by_material:
+            ss_s = np.array(ss_s, dtype=float)
+            ss_S = np.array(ss_S, dtype=float)
+            for mid, days in p.fixed_days_by_material.items():
+                i = m.mat_index.get(mid)
+                if i is not None:
+                    ss_s[i] = ss_S[i] = exp_d[i] * days / 7.0
         ctx.policy_state[self.id] = {"ss_s": ss_s, "ss_S": ss_S}
 
     def _kappa_hint(self, ctx: SimContext) -> float:

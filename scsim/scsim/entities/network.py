@@ -105,6 +105,26 @@ class SupplierLink(BaseModel):
         0.0, ge=0,
         json_schema_extra=_meta("units", "SM", "Q_MOQ — minimum order quantity."),
     )
+    primary: bool = Field(
+        False,
+        json_schema_extra=_meta(
+            "-", "SM",
+            "Chosen primary source for its material (the /policies Supplier stage). "
+            "False everywhere → the manuscript rule: min cost, then lead time, then id.",
+        ),
+    )
+
+
+def primary_rank(link: SupplierLink) -> tuple:
+    """Sort key whose first element per material is that material's PRIMARY link.
+
+    A link the user chose (`primary=True`, the /policies Supplier stage) ranks
+    first; otherwise the manuscript rule (§3.5) — min cost, then shortest lead
+    time, then supplier id. The ONE statement of the rule: `CompiledModel`,
+    `Network.supplier_options` and P-P.1's planning lead times all sort by it,
+    so the three cannot pick different primaries.
+    """
+    return (not link.primary, link.cost, link.lead_time_weeks, link.supplier_id)
 
 
 class Material(BaseModel):
@@ -386,9 +406,9 @@ class Network(BaseModel):
     # ------------------------------------------------------------------ derived
 
     def supplier_options(self, material_id: str) -> list[SupplierLink]:
-        """𝒮_m, sorted by (cost, lead time, id) — primary supplier is first (min cost)."""
+        """𝒮_m in primary order (`primary_rank`) — the primary supplier is first."""
         opts = [l for l in self.supplier_links if l.material_id == material_id]
-        return sorted(opts, key=lambda l: (l.cost, l.lead_time_weeks, l.supplier_id))
+        return sorted(opts, key=primary_rank)
 
     def primary_link(self, material_id: str) -> SupplierLink:
         return self.supplier_options(material_id)[0]

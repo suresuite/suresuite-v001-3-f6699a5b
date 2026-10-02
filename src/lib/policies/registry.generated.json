@@ -146,7 +146,7 @@
       "lane"
     ]
   },
-  "engine_version": "0.2.8",
+  "engine_version": "0.2.9",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -1079,6 +1079,14 @@
           "title": "Moq",
           "type": "number",
           "unit": "units"
+        },
+        "primary": {
+          "default": false,
+          "notes": "Chosen primary source for its material (the /policies Supplier stage). False everywhere \u2192 the manuscript rule: min cost, then lead time, then id.",
+          "scope": "SM",
+          "title": "Primary",
+          "type": "boolean",
+          "unit": "-"
         },
         "supplier_id": {
           "title": "Supplier Id",
@@ -2043,6 +2051,17 @@
             "title": "Classification",
             "type": "string",
             "unit": "enum"
+          },
+          "fixed_days_by_material": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "notes": "Per-material fixed-days cover (the /policies Supplier stage's safety-stock days). A listed material's buffer is E[D_m]\u00b7days/7 whatever the classification; unlisted materials follow it.",
+            "range": "[0, 84]",
+            "scope": "M",
+            "title": "Fixed Days By Material",
+            "type": "object",
+            "unit": "days"
           },
           "fixed_days_cover": {
             "default": 14.0,
@@ -3309,7 +3328,21 @@
       "family": "inventory",
       "key": "safety_stock_days",
       "target": "safety_stock_materials.fixed_days_cover",
-      "transform": "days, clamped 0-84. Only when `safety_stock_method` is neither service_level/demand_variability nor king_method \u2014 those two take a different classification and this key is not read"
+      "transform": "days, clamped 0-84. At default scope only when `safety_stock_method` is neither service_level/demand_variability nor king_method. On a Supplier-stage row (`node:<supplier>::<material>`) it is that material's cover in `fixed_days_by_material`, whatever the method \u2014 the /policies value beats the project default (\u00a74 D204)"
+    },
+    {
+      "catalog_ref": null,
+      "family": "inventory",
+      "key": "holding_cost_pct",
+      "target": "Material.holding_cost_rate",
+      "transform": "fraction x 100 -> %/yr, clamped 5-50. Order: the Supplier-stage row (`node:<supplier>::<material>`) -> materials.holding_cost_pct (master) -> the project-default policy -> 20. The /policies value beats the item master (\u00a74 D204)"
+    },
+    {
+      "catalog_ref": null,
+      "family": "sourcing",
+      "key": "primary_source",
+      "target": "SupplierLink.primary",
+      "transform": "true on a Supplier-stage row makes that supplier the material's primary link (where P-P.1 orders go). Nothing saved -> the engine's rule: cheapest, then shortest lead time, then id. Two saved for one material -> neither applied, warned (\u00a74 D188)"
     },
     {
       "catalog_ref": "P-X.2",

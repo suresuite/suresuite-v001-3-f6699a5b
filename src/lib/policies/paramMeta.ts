@@ -346,6 +346,14 @@ export const PARAM_META: Record<string, ParamMeta> = {
     meaning: "Mean weekly demand for the product (item master) — sizes MTS targets and default capacity.",
     specRef: "§III-D",
   },
+  demand_cv: {
+    symbol: "CV_p",
+    unit: "σ / mean",
+    range: "≥ 0",
+    meaning:
+      "Demand variability for the product (item master). Spreads a triangular demand draw, and through that variance sizes P-P.3 safety stock. Blank → the scenario's demand-model CV, then 0.30. Not read under Poisson demand (variance = mean).",
+    specRef: "§III-D",
+  },
   lead_time_mean_days: {
     symbol: "L",
     unit: "days",

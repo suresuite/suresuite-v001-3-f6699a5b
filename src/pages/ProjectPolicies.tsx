@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PageLayout } from "@/components/shared/PageLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { HDR_PROJECT_SELECT, HDR_SEGMENTED } from "@/components/shared/headerControls";
@@ -38,7 +39,7 @@ import {
   SaveVersionDialog,
   versionDisplayName,
 } from "@/components/policies/PolicyVersionSheets";
-import type { StageKey } from "@/lib/policies/stages";
+import { STAGES, type StageKey } from "@/lib/policies/stages";
 
 interface Props {
   isCollapsed: boolean;
@@ -177,6 +178,18 @@ export default function ProjectPolicies({ isCollapsed, setIsCollapsed }: Props) 
 
   const [tab, setTab] = useState<"stages" | "guide" | "datamap">("stages");
   const [activeStage, setActiveStage] = useState<StageKey>("supplier");
+  // Walk-to deep link: `?stage=<supplier|plant|customer|run_validate>` opens that
+  // stage — the run check's links land on the cell where the value is set
+  // (`fieldWalkToRoute` → `policiesCellFor`). Re-read on every change, because a
+  // link clicked from Run & Validate navigates within this same mounted page.
+  const [searchParams] = useSearchParams();
+  const stageParam = searchParams.get("stage");
+  useEffect(() => {
+    if (stageParam && STAGES.some((s) => s.key === stageParam)) {
+      setActiveStage(stageParam as StageKey);
+      setTab("stages");
+    }
+  }, [stageParam]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   // v3 §3.1 (gap-close T6): search the network, not the catalog.

@@ -36,8 +36,9 @@ export default function SupplierStage() {
           notes={{
             primary_source: (
               <>
-                Which supplier the app treats as the first choice for this material. It steers the
-                product, not the simulation — see the note below it.
+                Which supplier this material is bought from. A choice saved here is the one the
+                simulation orders from; with nothing saved, the run uses the cheapest supplier, and
+                that is the one this column suggests.
               </>
             ),
             material_price: (

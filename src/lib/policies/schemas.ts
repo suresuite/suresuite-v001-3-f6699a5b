@@ -431,7 +431,9 @@ export const MULTI_SELECT_OPTIONS: Record<string, readonly string[]> = {
  * attributes, demand by product/graph data.
  */
 export const SCSIM_VISIBLE_FIELDS: Partial<Record<PolicyFamily, ReadonlySet<string>>> = {
-  sourcing: new Set(["strategy", "ratios", "supply_share"]),
+  // `primary_source` since §4 D188's engine half: a saved Supplier-stage
+  // primary is the material's primary link (`SupplierLink.primary`).
+  sourcing: new Set(["strategy", "ratios", "supply_share", "primary_source"]),
   inventory: new Set([
     "type",
     "rop_q_quantity",
@@ -601,6 +603,7 @@ export const FIELD_LABELS: Record<string, string> = {
   sell_price: "Sell price",
   production_capacity: "Capacity (units/wk)",
   demand_mean: "Demand mean (units/wk)",
+  demand_cv: "Demand CV (σ / mean)",
   capacity_per_week: "Supplier capacity (units/wk)",
   reliability_score: "Reliability (0–1)",
   material_moq: "MOQ (master)",

@@ -196,6 +196,7 @@ export function verifyProjectPolicies(input: VerifyInput): VerifyResult {
   out.push(
     ...compileRequiredDataFindings({
       defaults,
+      overrides: overrides as unknown as Record<string, unknown>[],
       materials: materials as unknown as Record<string, unknown>[] | undefined,
       products: products as unknown as Record<string, unknown>[] | undefined,
       suppliers: suppliers as unknown as Record<string, unknown>[] | undefined,

@@ -102,16 +102,16 @@ export const CHAINS: PolicyChain[] = [
         "kind": "rpc",
         "detail": "`bulk_upsert_policy_overrides` (stamps `seeded_from_hash` when the value was seeded, WP 4.4)",
         "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → SupplierLink.primary — an ENTITY field, not a policy parameter. Transform: true on a Supplier-stage row makes that supplier the material's primary link (where P-P.1 orders go). Nothing saved -> the engine's rule: cheapest, then shortest lead time, then id. Two saved for one material -> neither applied, warned (§4 D188)",
+        "evidence": null
       }
     ],
-    "breaks": [
-      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:445, src/hooks/useStageRows.tsx:459."
-    ],
-    "breakClass": "app-routing",
-    "breakEvidence": [
-      "src/hooks/useStageRows.tsx:445",
-      "src/hooks/useStageRows.tsx:459"
-    ]
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
   },
   {
     "stage": "supplier",
@@ -614,7 +614,7 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → safety_stock_materials.fixed_days_cover (P-X.2). Transform: days, clamped 0-84. Only when `safety_stock_method` is neither service_level/demand_variability nor king_method — those two take a different classification and this key is not read",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → safety_stock_materials.fixed_days_cover (P-X.2). Transform: days, clamped 0-84. At default scope only when `safety_stock_method` is neither service_level/demand_variability nor king_method. On a Supplier-stage row (`node:<supplier>::<material>`) it is that material's cover in `fixed_days_by_material`, whatever the method — the /policies value beats the project default (§4 D204)",
         "evidence": null
       }
     ],
@@ -810,6 +810,41 @@ export const CHAINS: PolicyChain[] = [
       {
         "kind": "engine",
         "detail": "project_map.py::_map_products -> demand_mode",
+        "evidence": null
+      },
+      {
+        "kind": "rpc",
+        "detail": "item-master upsert (NOT a policy override) — `bulk_upsert_materials` / `_products` / `_suppliers`",
+        "evidence": null
+      }
+    ],
+    "breaks": [],
+    "breakClass": null,
+    "breakEvidence": []
+  },
+  {
+    "stage": "plant",
+    "field": "demand_cv",
+    "family": "production",
+    "hops": [
+      {
+        "kind": "hook",
+        "detail": "rendered by the plant grid as `demand_cv` (family `production`)",
+        "evidence": "src/lib/policies/columnSpecs.ts"
+      },
+      {
+        "kind": "db",
+        "detail": "`products.demand_cv` (item master, keyed from `product_id`)",
+        "evidence": null
+      },
+      {
+        "kind": "unit",
+        "detail": "`coefficient of variation (dimensionless)`, fixed by `fixed`",
+        "evidence": null
+      },
+      {
+        "kind": "engine",
+        "detail": "project_map.py::_map_products -> demand cv",
         "evidence": null
       },
       {
@@ -1142,7 +1177,7 @@ export const CHAINS: PolicyChain[] = [
       },
       {
         "kind": "engine",
-        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → safety_stock_materials.fixed_days_cover (P-X.2). Transform: days, clamped 0-84. Only when `safety_stock_method` is neither service_level/demand_variability nor king_method — those two take a different classification and this key is not read",
+        "detail": "declared policy-bundle key (`POLICY_BUNDLE_KEYS`) → safety_stock_materials.fixed_days_cover (P-X.2). Transform: days, clamped 0-84. At default scope only when `safety_stock_method` is neither service_level/demand_variability nor king_method. On a Supplier-stage row (`node:<supplier>::<material>`) it is that material's cover in `fixed_days_by_material`, whatever the method — the /policies value beats the project default (§4 D204)",
         "evidence": null
       }
     ],
@@ -1377,13 +1412,10 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:445, src/hooks/useStageRows.tsx:459."
+      "is read by NO consumer anywhere — not scsim, not the frozen legacy engine, and by nothing in the product beyond the grid that renders it. Editable, stored, versioned and hashed into `policy_hash`, and the only thing that ever happens to the value is that it is shown back. This is §4 D18's exact shape."
     ],
-    "breakClass": "app-routing",
-    "breakEvidence": [
-      "src/hooks/useStageRows.tsx:445",
-      "src/hooks/useStageRows.tsx:459"
-    ]
+    "breakClass": "unread",
+    "breakEvidence": []
   },
   {
     "stage": "customer",
@@ -1407,27 +1439,28 @@ export const CHAINS: PolicyChain[] = [
       }
     ],
     "breaks": [
-      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:752, src/hooks/useStageRows.tsx:767."
+      "is an APPLICATION routing decision, not an engine parameter: `project_map.py` excludes it deliberately and the product reads it to decide a lane. The chain is unwritable only because nothing DECLARES that, so a reader cannot tell it apart from a field the engine forgot. Evidence: src/hooks/useStageRows.tsx:756, src/hooks/useStageRows.tsx:771."
     ],
     "breakClass": "app-routing",
     "breakEvidence": [
-      "src/hooks/useStageRows.tsx:752",
-      "src/hooks/useStageRows.tsx:767"
+      "src/hooks/useStageRows.tsx:756",
+      "src/hooks/useStageRows.tsx:771"
     ]
   }
 ];
 
 /** How many chains break, by shape. A page renders the number, never types it. */
 export const BREAKS_BY_CLASS: Record<string, string[]> = {
-  "app-routing": [
-    "supplier.primary_source",
-    "customer.primary_source",
-    "customer.sourcing_firm"
-  ],
   "legacy-only": [
     "supplier.review_period_days",
     "plant.review_period_days",
     "plant.initial_on_hand"
+  ],
+  "unread": [
+    "customer.primary_source"
+  ],
+  "app-routing": [
+    "customer.sourcing_firm"
   ]
 };
 
@@ -3985,5 +4018,5 @@ export const READ_EXPOSURE: ReadExposure = {
   ]
 };
 
-export const CHAIN_COUNT = 41;
-export const BROKEN_COUNT = 6;
+export const CHAIN_COUNT = 42;
+export const BROKEN_COUNT = 5;

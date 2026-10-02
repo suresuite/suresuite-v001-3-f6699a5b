@@ -749,3 +749,118 @@ def test_plant_row_inventory_stays_default_scope_and_warns():
     assert "material_overrides" not in res.scenario.policies["inventory_control"]
     assert any(w.level == "warn" and w.field == "inventory"
                and "not applied" in w.reason for w in res.warnings)
+
+
+# ------------- /policies values override the item masters (§4 D188, D204)
+
+def _two_suppliers() -> ProjectData:
+    """m1 bought from s1 at 2.0 and s2 at 5.0 — the engine's own rule picks s1."""
+    d = _base()
+    d.suppliers.append(SupplierRow(id="s2"))
+    d.supply_arcs.append(SupplyArc(supplier_id="s2", material_id="m1",
+                                   unit_price=5.0, lead_time=3, lead_time_unit="week"))
+    return d
+
+
+def _primary(res) -> str:
+    from scsim.core.context import CompiledModel
+    m = CompiledModel(res.scenario)
+    return m.sup_ids[m.link_sup[m.primary_link[m.mat_index["m1"]]]]
+
+
+def test_unsaved_primary_keeps_the_cheapest_supplier():
+    res = from_project_data(_two_suppliers())
+    assert _primary(res) == "s1"
+    assert res.scenario.network.primary_link("m1").supplier_id == "s1"
+
+
+def test_saved_primary_on_policies_beats_the_cheapest_supplier():
+    """The run buys where the /policies Supplier stage says, not where the
+    engine's cost rule would — D188's 'the grid says X, the run buys from Y'."""
+    d = _two_suppliers()
+    d.policies = {"node:s2::m1": {"sourcing": {"primary_source": True}}}
+    res = from_project_data(d)
+    assert _primary(res) == "s2"
+    assert res.scenario.network.primary_link("m1").supplier_id == "s2"
+    note = next(w for w in res.warnings if w.field == "primary_source")
+    assert note.level == "info"
+    assert "for 1 of them that is not the cheapest" in note.reason
+
+
+def test_two_saved_primaries_apply_neither_and_warn():
+    d = _two_suppliers()
+    d.policies = {
+        "node:s1::m1": {"sourcing": {"primary_source": True}},
+        "node:s2::m1": {"sourcing": {"primary_source": True}},
+    }
+    res = from_project_data(d)
+    assert _primary(res) == "s1"
+    assert any(w.level == "warn" and w.entity == "material:m1"
+               and w.field == "primary_source" for w in res.warnings)
+
+
+def test_saved_primary_with_no_lane_is_named_not_forgotten():
+    d = _base()
+    d.policies = {"node:gone::m1": {"sourcing": {"primary_source": True}}}
+    res = from_project_data(d)
+    assert any(w.field == "primary_source" and "no inbound lane" in w.reason
+               for w in res.warnings)
+
+
+def test_policies_holding_pct_beats_the_master():
+    d = _base()
+    d.materials[0].holding_cost_pct = 0.10
+    d.policies = {"node:s1::m1": {"inventory": {"holding_cost_pct": 0.30}}}
+    res = from_project_data(d)
+    assert res.scenario.network.materials[0].holding_cost_rate == pytest.approx(30.0)
+    # Applied, so not counted among the dropped per-node overrides.
+    assert not any(w.field == "inventory" and "not applied" in w.reason for w in res.warnings)
+
+
+def test_policies_holding_pct_applies_to_a_material_with_no_master_row():
+    d = _base()
+    d.materials = []  # m1 exists only through the BOM and its lane
+    d.policies = {"node:s1::m1": {"inventory": {"holding_cost_pct": 0.35}}}
+    res = from_project_data(d)
+    assert res.scenario.network.materials[0].holding_cost_rate == pytest.approx(35.0)
+
+
+def test_master_holding_pct_applies_when_policies_says_nothing():
+    d = _base()
+    d.materials[0].holding_cost_pct = 0.10
+    res = from_project_data(d)
+    assert res.scenario.network.materials[0].holding_cost_rate == pytest.approx(10.0)
+
+
+def test_policies_safety_days_reach_the_engine_per_material():
+    d = _base()
+    d.policies = {
+        "default": {"inventory": {"safety_stock_method": "service_level"}},
+        "node:s1::m1": {"inventory": {"safety_stock_days": 21}},
+    }
+    res = from_project_data(d)
+    ss = res.scenario.policies["safety_stock_materials"]
+    assert ss["classification"] == "uniform"
+    assert ss["fixed_days_by_material"] == {"m1": 21.0}
+    assert not any(w.field == "inventory" and "not applied" in w.reason for w in res.warnings)
+
+
+def test_per_material_safety_days_size_the_buffer():
+    """E[D]·days/7 for the listed material, whatever the classification."""
+    from scsim.core.engine import compile_scenario, run_replication
+    from scsim.policies.strategic.p_p3_safety_stock import SafetyStockParams
+
+    with pytest.raises(ValueError):
+        SafetyStockParams(fixed_days_by_material={"m1": 90.0})
+    d = _base(horizon_days=90)
+    d.policies = {
+        "default": {"inventory": {"safety_stock_method": "service_level"}},
+        "node:s1::m1": {"inventory": {"safety_stock_days": 14}},
+    }
+    compiled = compile_scenario(from_project_data(d).scenario)
+    ctx = run_replication(compiled, 0, 0, [], debug=True)
+    i = compiled.model.mat_index["m1"]
+    exp_d = compiled.model.exp_demand_m[i]
+    ss = ctx.policy_state["safety_stock_materials"]
+    assert ss["ss_s"][i] == pytest.approx(exp_d * 14 / 7)
+    assert ss["ss_S"][i] == pytest.approx(exp_d * 14 / 7)

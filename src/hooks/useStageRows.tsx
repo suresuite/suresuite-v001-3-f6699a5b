@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import type { StageKey } from "@/lib/policies/stages";
 import { ratePerDay } from "@/lib/policies/effectiveEconomics";
 import { fetchProjectLanes } from "@/lib/policies/projectLanes";
+import { engineSupplierLinks } from "../../supabase/functions/_shared/grading";
 
 export interface StageRow {
   /** Composite key = "<location>::<material_or_product>" — also used as override target_key. */
@@ -368,6 +369,7 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
             }
           }
           // Per-material: total volume (over unique suppliers) + suggested primary.
+          const engineLinks = engineSupplierLinks(inbound as Record<string, unknown>[]);
           const matMeta = new Map<
             string,
             { total: number; primary: string; count: number }
@@ -378,17 +380,19 @@ export function useStageRows({ projectId, plantName, stage }: Args) {
               (s, sup) => s + (volByPair.get(`${sup}::${mat}`) ?? 0),
               0,
             );
-            // Rank unique suppliers: highest volume → lowest price → lowest lead time.
+            // Suggest the supplier the ENGINE buys from when nothing is saved
+            // (§4 D188): cheapest link → shortest lead time → supplier id, each
+            // link built exactly as the mapper builds it (`engineSupplierLinks`).
+            // This used to suggest the highest-VOLUME lane, so the grid named X
+            // primary while an unsaved run bought from Y. Now an unsaved
+            // suggestion is what runs, and a saved choice overrides both.
             const ranked = [...supList].sort((a, b) => {
-              const ea = inboundByKey.get(`${a}::${mat}`) ?? {};
-              const eb = inboundByKey.get(`${b}::${mat}`) ?? {};
+              const la = engineLinks.get(`${a}::${mat}`);
+              const lb = engineLinks.get(`${b}::${mat}`);
               return (
-                (volByPair.get(`${b}::${mat}`) ?? 0) -
-                  (volByPair.get(`${a}::${mat}`) ?? 0) ||
-                Number(ea.unit_price ?? Number.POSITIVE_INFINITY) -
-                  Number(eb.unit_price ?? Number.POSITIVE_INFINITY) ||
-                Number(ea.lead_time_days ?? Number.POSITIVE_INFINITY) -
-                  Number(eb.lead_time_days ?? Number.POSITIVE_INFINITY)
+                (la?.cost ?? Number.POSITIVE_INFINITY) - (lb?.cost ?? Number.POSITIVE_INFINITY) ||
+                (la?.leadWeeks ?? Number.POSITIVE_INFINITY) - (lb?.leadWeeks ?? Number.POSITIVE_INFINITY) ||
+                (a < b ? -1 : a > b ? 1 : 0)
               );
             });
             matMeta.set(mat, {

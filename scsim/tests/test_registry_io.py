@@ -343,7 +343,7 @@ def test_policy_bundle_keys_match_what_the_mapper_reads():
         "max_backorder_days", "backorder_cost_per_day", "allocation",
         "tier_overrides", "fulfillment_strategy",
         "min_share_pct", "review_period_days",
-        "primary_source", "material_price", "initial_on_hand", "holding_cost_pct",
+        "material_price", "initial_on_hand",
         "sourcing_firm", "moq", "lead_time_distribution", "ordering_cost",
         "supplier_capacity_per_day", "capacity_machine_per_day",
         "capacity_labor_per_day", "production_cost_per_unit", "mode",
@@ -374,13 +374,18 @@ def test_registry_publishes_the_policy_bundle_keys():
     # that is the case door 2 could never have covered — a Params addition would
     # have been the wrong fix.
     entity = [k for k in keys if k["catalog_ref"] is None]
-    assert [k["key"] for k in entity] == [
-        "capacity_units_per_day", "utilization_cap_pct"], entity
-    # Both of them are also SHADOWED, and by the same master column — the plant
+    assert sorted(k["key"] for k in entity) == [
+        "capacity_units_per_day", "holding_cost_pct", "primary_source",
+        "utilization_cap_pct"], entity
+    # The two capacity cells are SHADOWED, by the same master column — the plant
     # grid's two capacity cells are unreachable together or not at all (§4 D167).
+    # The other two are the reverse: the /policies value BEATS the master or the
+    # engine's own rule (§4 D188, D204), so nothing shadows them.
     assert {k["key"]: k.get("shadowed_by") for k in entity} == {
         "capacity_units_per_day": "products.production_capacity",
         "utilization_cap_pct": "products.production_capacity",
+        "holding_cost_pct": None,
+        "primary_source": None,
     }
     # A `shadowed_by` that names nothing the engine reads is fiction, so it must
     # resolve to a declared base data requirement.
