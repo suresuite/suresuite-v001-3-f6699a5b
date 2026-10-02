@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 392,
-  "migrations_applied": 384,
+  "migrations_found": 393,
+  "migrations_applied": 385,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261002000004_account_role_ceiling.sql",
+  "last_migration": "20261002000005_personal_keys_for_every_user.sql",
   "counts": {
     "tables": 92,
     "views": 8,
     "enums": 4,
-    "functions": 402,
+    "functions": 406,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -23885,6 +23885,19 @@
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
+      "name": "_api_key_caller",
+      "signature": "_api_key_caller(uuid, uuid)",
+      "args": [
+        "p_user_id uuid",
+        "p_org_id uuid DEFAULT NULL"
+      ],
+      "returns": "TABLE (org_id uuid, can_manage boolean)",
+      "security_definer": true,
+      "volatility": null,
+      "comment": null,
+      "defined_by": "20261002000005_personal_keys_for_every_user.sql"
+    },
+    {
       "name": "_api_key_management_org",
       "signature": "_api_key_management_org(uuid, uuid)",
       "args": [
@@ -25457,6 +25470,29 @@
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
+      "name": "api_key_caller",
+      "signature": "api_key_caller(uuid, text)",
+      "args": [
+        "p_user_id uuid",
+        "p_user_email text"
+      ],
+      "returns": "TABLE (org_id uuid, can_manage boolean, self_service_scopes text[])",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "The caller's key-management standing: their organization, whether they manage its keys, ",
+      "defined_by": "20261002000005_personal_keys_for_every_user.sql"
+    },
+    {
+      "name": "api_key_self_service_scopes",
+      "signature": "api_key_self_service_scopes()",
+      "args": [],
+      "returns": "text[] LANGUAGE sql IMMUTABLE AS",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": "The scopes a user who does not manage API keys may put on (and use through) a personal key (WP 12.7).",
+      "defined_by": "20261002000005_personal_keys_for_every_user.sql"
+    },
+    {
       "name": "api_key_usage",
       "signature": "api_key_usage(uuid, text)",
       "args": [
@@ -25467,7 +25503,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000001_api_access_control.sql"
+      "defined_by": "20261002000005_personal_keys_for_every_user.sql"
     },
     {
       "name": "api_personal_key_actor",
@@ -25480,6 +25516,18 @@
       "volatility": "STABLE",
       "comment": "The active user a personal key acts as, or NULL — the gateway refuses a personal key ",
       "defined_by": "20261002000001_personal_api_keys.sql"
+    },
+    {
+      "name": "api_personal_key_grant",
+      "signature": "api_personal_key_grant(uuid)",
+      "args": [
+        "p_key_id uuid"
+      ],
+      "returns": "TABLE (actor_user_id uuid, scopes text[])",
+      "security_definer": true,
+      "volatility": null,
+      "comment": "The active user a personal key acts as and the scopes it may use now — cut to ",
+      "defined_by": "20261002000005_personal_keys_for_every_user.sql"
     },
     {
       "name": "append_chat_message",
@@ -26211,7 +26259,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261002000001_personal_api_keys.sql"
+      "defined_by": "20261002000005_personal_keys_for_every_user.sql"
     },
     {
       "name": "create_chat_folder",
@@ -27738,7 +27786,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261002000001_personal_api_keys.sql"
+      "defined_by": "20261002000005_personal_keys_for_every_user.sql"
     },
     {
       "name": "list_approved_users_safe",
@@ -28501,7 +28549,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000001_api_access_control.sql"
+      "defined_by": "20261002000005_personal_keys_for_every_user.sql"
     },
     {
       "name": "revoke_model_validation",
@@ -28543,7 +28591,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261002000001_personal_api_keys.sql"
+      "defined_by": "20261002000005_personal_keys_for_every_user.sql"
     },
     {
       "name": "run_series_retention",

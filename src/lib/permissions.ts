@@ -15,8 +15,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/policies': ['admin', 'modeler', 'user', 'super_admin'],
   '/simulation-lab': ['admin', 'modeler', 'user', 'super_admin'],
   '/project-intelligence': ['admin', 'modeler', 'user', 'super_admin'],
-  // Developer API keys: matches who can mint keys (_api_key_management_org)
-  '/developer': ['admin', 'modeler', 'super_admin'],
+  // Developer API keys: every user may mint a personal, read-only key (WP 12.7,
+  // `_api_key_caller`); admins and modelers also manage organization keys.
+  '/developer': ['admin', 'modeler', 'user', 'super_admin'],
   '/profile': ['admin', 'modeler', 'user', 'super_admin'],
   '/admin': ['super_admin'],
   '/admin/*': ['super_admin'],
