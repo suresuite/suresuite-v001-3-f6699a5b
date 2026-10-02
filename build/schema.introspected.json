@@ -1,19 +1,19 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 389,
-  "migrations_applied": 381,
+  "migrations_found": 391,
+  "migrations_applied": 383,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000025_policy_writes_need_edit_policies.sql",
+  "last_migration": "20261002000003_policy_writes_need_edit_policies.sql",
   "counts": {
     "tables": 92,
     "views": 8,
     "enums": 4,
-    "functions": 395,
+    "functions": 396,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
-    "dynamic_ddl_statements": 37,
+    "dynamic_ddl_statements": 38,
     "rls_indeterminate_tables": 4,
     "rls_dynamic_unresolved": 0,
     "orphans": 0,
@@ -2376,6 +2376,18 @@
           "unique": false,
           "references": null,
           "added_by": "20260711000001_api_access_control.sql"
+        },
+        {
+          "name": "principal",
+          "quoted": false,
+          "type": "text",
+          "type_raw": "text",
+          "nullable": false,
+          "default": "'org'",
+          "primary_key": false,
+          "unique": false,
+          "references": null,
+          "added_by": "20261002000001_personal_api_keys.sql"
         }
       ],
       "constraints": [
@@ -2418,6 +2430,16 @@
           "definition": "CHECK (status IN ('active','revoked'))",
           "implicit": true,
           "added_by": "20260711000001_api_access_control.sql"
+        },
+        {
+          "name": "api_keys_principal_check",
+          "kind": "CHECK",
+          "columns": [
+            "principal"
+          ],
+          "definition": "CHECK (principal IN ('org', 'personal'))",
+          "implicit": true,
+          "added_by": "20261002000001_personal_api_keys.sql"
         }
       ],
       "indexes": [
@@ -2819,6 +2841,25 @@
           "unique": false,
           "references": null,
           "added_by": "20260711000001_api_access_control.sql"
+        },
+        {
+          "name": "actor_user_id",
+          "quoted": false,
+          "type": "uuid",
+          "type_raw": "uuid",
+          "nullable": true,
+          "default": null,
+          "primary_key": false,
+          "unique": false,
+          "references": {
+            "schema": "public",
+            "table": "approved_users",
+            "columns": [
+              "id"
+            ],
+            "on_delete": "SET NULL"
+          },
+          "added_by": "20261002000001_personal_api_keys.sql"
         }
       ],
       "constraints": [
@@ -25389,6 +25430,18 @@
       "defined_by": "20260711000001_api_access_control.sql"
     },
     {
+      "name": "api_personal_key_actor",
+      "signature": "api_personal_key_actor(uuid)",
+      "args": [
+        "p_key_id uuid"
+      ],
+      "returns": "uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "The active user a personal key acts as, or NULL — the gateway refuses a personal key ",
+      "defined_by": "20261002000001_personal_api_keys.sql"
+    },
+    {
       "name": "append_chat_message",
       "signature": "append_chat_message(uuid, uuid, text, text, jsonb, jsonb, uuid, text, timestamptz)",
       "args": [
@@ -25426,7 +25479,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
+      "defined_by": "20261002000003_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "apply_validation_to_scenario",
@@ -25504,8 +25557,8 @@
       "returns": "void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
-      "comment": "D273 — raises forbidden unless the named actor holds data_edit_policies on the project, as ",
-      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
+      "comment": "D275 — raises forbidden unless the named actor holds data_edit_policies on the project, as ",
+      "defined_by": "20261002000003_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "assert_writer_may_act",
@@ -25916,7 +25969,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
+      "defined_by": "20261002000003_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "bulk_upsert_products",
@@ -26058,7 +26111,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
+      "defined_by": "20261002000003_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "combine_project_into_supply_chain",
@@ -26102,7 +26155,7 @@
     },
     {
       "name": "create_api_key",
-      "signature": "create_api_key(uuid, text, text, text[], text, uuid[], timestamptz, uuid)",
+      "signature": "create_api_key(uuid, text, text, text[], text, uuid[], timestamptz, uuid, text)",
       "args": [
         "p_user_id uuid",
         "p_user_email text",
@@ -26111,13 +26164,14 @@
         "p_env text DEFAULT 'live'",
         "p_project_ids uuid[] DEFAULT NULL",
         "p_expires_at timestamptz DEFAULT NULL",
-        "p_org_id uuid DEFAULT NULL"
+        "p_org_id uuid DEFAULT NULL",
+        "p_principal text DEFAULT 'org'"
       ],
       "returns": "TABLE (id uuid, key_prefix text, plaintext_key text)",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000001_api_access_control.sql"
+      "defined_by": "20261002000001_personal_api_keys.sql"
     },
     {
       "name": "create_chat_folder",
@@ -26447,7 +26501,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
+      "defined_by": "20261002000003_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "delete_policy_version",
@@ -26460,7 +26514,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
+      "defined_by": "20261002000003_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "delete_project_dataset",
@@ -27640,11 +27694,11 @@
         "p_user_id uuid",
         "p_user_email text"
       ],
-      "returns": "TABLE ( id uuid, key_prefix text, org_id uuid, org_name text, name text, note text, scopes text[], project_ids uuid[], env text, status text, expires_at timestamptz, last_used_at timestamptz, revoked_at timestamptz, rotated_from uuid, created_at timestamptz, created_by_email text )",
+      "returns": "TABLE ( id uuid, key_prefix text, org_id uuid, org_name text, name text, note text, scopes text[], project_ids uuid[], env text, status text, expires_at timestamptz, last_used_at timestamptz, revoked_at timestamptz, rotated_from uuid, created_at timestamptz, created_by_email text, principal text )",
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000001_api_access_control.sql"
+      "defined_by": "20261002000001_personal_api_keys.sql"
     },
     {
       "name": "list_approved_users_safe",
@@ -28338,7 +28392,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
+      "defined_by": "20261002000003_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "review_agent_proposal",
@@ -28410,7 +28464,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260711000001_api_access_control.sql"
+      "defined_by": "20261002000001_personal_api_keys.sql"
     },
     {
       "name": "run_series_retention",
@@ -28440,7 +28494,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
+      "defined_by": "20261002000003_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "save_project_memory",
@@ -28921,7 +28975,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
+      "defined_by": "20261002000003_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "update_project_completion_status",
@@ -29816,6 +29870,17 @@
       "migration": "20261001000010_result_tiers.sql",
       "statement": "BEGIN IF to_regclass('storage.buckets') IS NOT NULL THEN EXECUTE $ins$ INSERT INTO storage.buckets (id, name, public) VALUES ('run-results', 'run-results', false) ON CONFLICT (id) DO UPDATE SET public = false $ins$",
       "mentions": [],
+      "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20261002000002_engine_bucket.sql",
+      "statement": "BEGIN IF to_regclass('storage.buckets') IS NOT NULL THEN EXECUTE $ins$ INSERT INTO storage.buckets (id, name, public) VALUES ('engine', 'engine', false) ON CONFLICT (id) DO UPDATE SET public = false $ins$",
+      "mentions": [
+        "engine"
+      ],
       "touches_rls": false,
       "has_format_placeholder": false,
       "named_only_via_block": false,

@@ -5358,6 +5358,43 @@ async function phase11Levels() {
     (rows) => { out("**(9) `network_metrics` / `prominence` runs keyed on a level (any row here is what D240's drop waits for):**"); out(...table(rows)); });
 }
 
+async function phase12Library() {
+  section("Phase 12 · WP 12.2–12.3 — what a library would pull, and who a key is");
+
+  report("(1) WP 12.2 — dataset snapshot sizes per project (the response a library pulls)",
+    await tryQ(`
+      select project_id::text as project_id, count(*) as versions,
+             max(octet_length(snapshot::text)) as max_json_bytes,
+             round(avg(octet_length(snapshot::text))) as avg_json_bytes,
+             max(pg_column_size(snapshot)) as max_stored_bytes
+        from public.dataset_versions group by 1 order by max_json_bytes desc nulls last`),
+    (rows) => { out("**(1) dataset snapshots by project — `max_json_bytes` is the uncompressed response body:**"); out(...table(rows)); });
+
+  report("(2) WP 12.2 — the five largest dataset snapshots, and which domain carries the weight",
+    await tryQ(`
+      select id::text as id, project_id::text as project_id,
+             coalesce(snapshot ->> 'schema_version', '1') as schema_version,
+             octet_length(snapshot::text) as json_bytes,
+             octet_length(coalesce(snapshot -> 'inputs', snapshot)::text) as inputs_bytes,
+             octet_length(coalesce(snapshot -> 'network', '{}'::jsonb)::text) as network_bytes
+        from public.dataset_versions order by octet_length(snapshot::text) desc nulls last limit 5`),
+    (rows) => { out("**(2) largest dataset snapshots (`inputs` is what a simulation needs; `network` only the analyses):**"); out(...table(rows)); });
+
+  report("(3) WP 12.2 — policy snapshot sizes",
+    await tryQ(`
+      select count(*) as versions, max(octet_length(snapshot::text)) as max_json_bytes,
+             round(avg(octet_length(snapshot::text))) as avg_json_bytes
+        from public.policy_versions`),
+    (rows) => { out("**(3) policy snapshots:**"); out(...table(rows)); });
+
+  report("(4) WP 12.3 — API keys by whether they name a creator (a personal key needs one)",
+    await tryQ(`
+      select env, count(*) as keys, count(created_by) as with_creator,
+             count(*) filter (where revoked_at is null) as not_revoked
+        from public.api_keys group by 1 order by 1`),
+    (rows) => { out("**(4) API keys (`with_creator` < `keys` means some keys could not become personal):**"); out(...table(rows)); });
+}
+
 async function main() {
   out(`# PLAN.md §15 — verification SQL, executed`);
   out("");
@@ -5373,6 +5410,7 @@ async function main() {
   await wp94ScenarioRole();
   await phase10Versions();
   await phase11Levels();
+  await phase12Library();
 
   await schemaProbe();
   await viewSecurity();

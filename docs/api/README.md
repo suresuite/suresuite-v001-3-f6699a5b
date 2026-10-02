@@ -95,11 +95,13 @@ in flight consumes nothing.
 | `GET /projects/{id}` | read:data | one project |
 | `POST /projects/{id}/datasets:freeze` | write:data | `201` dataset version + `graph_hash` (deduped server-side) |
 | `GET /projects/{id}/dataset-versions` | read:data | provenance history |
+| `GET /projects/{id}/dataset-versions/{version}` | read:data | one frozen dataset version **with its rows** (`snapshot`: v2 `inputs` = what a simulation reads, `network` = what the analyses read); `{version}` is an id or `latest`; `?tables=suppliers,inbound` narrows it; gzip when the client accepts it |
 | `GET /projects/{id}/policy-catalog` | read:policies | engine policy catalog (registry export — the same contract the UI forms use) |
 | `GET /projects/{id}/policies` | read:policies | policy defaults + per-node overrides |
 | `PUT /projects/{id}/policies` | write:policies | update defaults (`{"defaults":{"inventory":{…}},"overrides":[…]}`) via the same RPCs the UI uses |
 | `POST /projects/{id}/policy-versions` | write:policies | `201` immutable snapshot + `policy_hash` |
 | `GET /projects/{id}/policy-versions` | read:policies | snapshot history |
+| `GET /projects/{id}/policy-versions/{version}` | read:policies | one frozen policy version with its `snapshot` and `policy_hash`; `{version}` is an id or `latest` |
 | `GET /projects/{id}/scenarios` | read:runs | scenarios (paginated) |
 | `POST /projects/{id}/scenarios` | write:runs | `201` new scenario (horizon, replications, seed, disruptions…) |
 | `POST /projects/{id}/runs` | write:runs | `202 {run_id, status, policy_hash, graph_hash, gate_skipped}`; body `{"scenario_id","policy_version_id","acknowledge_warnings"?,"force_rerun"?}` |
@@ -108,6 +110,7 @@ in flight consumes nothing.
 | `POST /runs/{id}:cancel` | write:runs | `202` cancel |
 | `POST /runs/{id}:add-reps` | write:runs | `202` — **accepted but has no effect today**: the worker has no handler for the command it queues. Dispatch a scenario with more replications instead |
 | `GET /runs/{id}/validation` | read:runs | credibility badge: `validated` / `stale` / `unvalidated` + the model-validation card |
+| `GET /engine` | read:data | the simulation engine for your own machine: per wheel, its sha256, size and a 10-minute signed URL (`suresuite.install_engine()` uses it). Every fetch is logged |
 | `GET /keys` | admin:keys | org's keys (never the secret) |
 | `POST /keys/{id}:revoke` | admin:keys | kill switch over the API |
 
@@ -150,7 +153,7 @@ the Developer API page's Quickstart tab.
 
 ### Python notebooks (Google Colab or local Jupyter)
 
-Five notebooks, each the Python version of one workflow in the app. Get them from
+Six notebooks, each the Python version of one workflow in the app. Get them from
 the `/developer` page's **Notebook** tab, which lists your projects and, per
 project, every id the notebooks need, and downloads any of them with the CONFIG
 cell pre-filled. **Open in Colab** downloads the same pre-filled copy and opens
@@ -164,6 +167,7 @@ repository, which is private.
 | `suresuite_02_disruption_resilience.ipynb` | Lab stress tests: plant shutdown, sole- and dual-source supplier outages, a partial capacity cut; time to survive / recover |
 | `suresuite_03_material_shortage.ipynb` | A material shortage induced by its sole supplier's outage; lost sales vs backorders (P-C.1) |
 | `suresuite_04_results_and_reproducibility.ipynb` | The run-results workbook (`run_meta`, `aggregate_kpis`, `replication_kpis`, `series_*`, `reproducibility`), cancel, errors |
+| `suresuite_05_local_simulation.ipynb` | Simulate on your own machine: pull a dataset and policy version, reproduce a platform run exactly, sweep 20 scenarios locally, a what-if on your copy of the data |
 
 **Two modes.** With no key the notebooks run in **demo mode**: they replay engine
 output recorded for the Example project (`scripts/example_project/dataset.json`,
@@ -183,6 +187,17 @@ jupyter lab
 upload `suresuite_00_quickstart.ipynb` to Colab with a `sk_test_` key on the
 Example project, *Run all*, and check the run reaches `done` and the weekly series
 load. Run `01` and confirm the project's policies read the same afterwards.
+
+### The `suresuite` Python package — simulate on your own machine
+
+For scripts and your own notebooks: `pip install` the wheel the app serves at
+`/python/suresuite-0.1.0-py3-none-any.whl` (built from `python/` and kept in step by
+`scripts/build_python_package.sh --check`). With a key it pulls a dataset version's
+rows (`ss.dataset`) and a policy version (`ss.policy`), installs the engine through
+`GET /engine` with each wheel's sha256 checked (`ss.install_engine`), and runs it on
+YOUR machine (`ss.simulate`) — the same function the platform's browser engine runs,
+so the same inputs give the platform's numbers. `ss.with_tables` makes a what-if on
+your local copy. Nothing in the package writes to the platform. See `python/README.md`.
 
 **Authoring.** The notebooks are generated: edit `notebooks/src/*.py` (percent
 format) and `notebooks/src/common/*.py`, then `npm run notebooks:build`.

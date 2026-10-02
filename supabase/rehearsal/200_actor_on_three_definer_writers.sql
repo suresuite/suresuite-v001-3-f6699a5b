@@ -48,9 +48,9 @@ BEGIN
   INSERT INTO public.projects (id, name, modeler_id, plant_name, organization, organization_id)
     VALUES (v_project, 'D71', v_actor, 'D71P', 'D71 Org', v_org);
 
-  -- §4 D273 · the policy writers now refuse a named actor without Edit Policies, and the
+  -- §4 D275 · the policy writers now refuse a named actor without Edit Policies, and the
   -- rehearsal base is schema, not seed: plant the project layer where it is missing, as the
-  -- migrations leave it (`20260915000005`, `20261001000005`), as `550` and `700` do. The
+  -- migrations leave it (`20260915000005`, `20261001000005`), as `550` and `710` do. The
   -- project's modeler is its owner member (D61's trigger), so the owner rows are the ones read.
   INSERT INTO public.capabilities (key, kind, label, sort_order) VALUES
     ('data_edit_inputs', 'feature', 'Edit Input Data', 241),

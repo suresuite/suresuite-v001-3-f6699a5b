@@ -1,4 +1,4 @@
--- Profile / §4 D273 — a policy write that names its actor is refused unless that actor holds
+-- Profile / §4 D275 — a policy write that names its actor is refused unless that actor holds
 -- Edit Policies on the project.
 --
 -- ── WHAT CHANGES ─────────────────────────────────────────────────────────────
@@ -54,10 +54,10 @@ BEGIN
   END IF;
   RAISE EXCEPTION 'forbidden: your role on this project does not include Edit Policies'
     USING ERRCODE = 'insufficient_privilege',
-          HINT = 'D273 — policy writes need Edit Policies; an Analyst runs simulations from the Simulation Lab.';
+          HINT = 'D275 — policy writes need Edit Policies; an Analyst runs simulations from the Simulation Lab.';
 END; $$;
 COMMENT ON FUNCTION public.assert_may_edit_policies(uuid, uuid) IS
-  'D273 — raises forbidden unless the named actor holds data_edit_policies on the project, as '
+  'D275 — raises forbidden unless the named actor holds data_edit_policies on the project, as '
   'project_rights_for_user (D230) states it. A NULL actor passes (the API-key path, D28). '
   'Internal: called by the eight policy writers, never by a client.';
 REVOKE ALL ON FUNCTION public.assert_may_edit_policies(uuid, uuid) FROM PUBLIC, anon, authenticated;
@@ -85,7 +85,7 @@ BEGIN
   IF _actor_user_id IS NOT NULL THEN
     PERFORM set_config('app.current_user_id', _actor_user_id::text, true);
   END IF;
-  -- D273 · a named actor must hold Edit Policies on the project.
+  -- D275 · a named actor must hold Edit Policies on the project.
   PERFORM public.assert_may_edit_policies(p_project_id, _actor_user_id);
   INSERT INTO public.policy_defaults (project_id, updated_at)
   VALUES (p_project_id, now())
@@ -132,7 +132,7 @@ BEGIN
   IF _actor_user_id IS NOT NULL THEN
     PERFORM set_config('app.current_user_id', _actor_user_id::text, true);
   END IF;
-  -- D273 · a named actor must hold Edit Policies on the project.
+  -- D275 · a named actor must hold Edit Policies on the project.
   PERFORM public.assert_may_edit_policies(p_project_id, _actor_user_id);
   -- ONCE, outside the insert: a per-row call would rebuild the eleven-table
   -- snapshot for every override in a bulk seed, and two rows of one seed could
@@ -178,7 +178,7 @@ BEGIN
   IF _actor_user_id IS NOT NULL THEN
     PERFORM set_config('app.current_user_id', _actor_user_id::text, true);
   END IF;
-  -- D273 · a named actor must hold Edit Policies on the project.
+  -- D275 · a named actor must hold Edit Policies on the project.
   PERFORM public.assert_may_edit_policies(p_project_id, _actor_user_id);
   DELETE FROM public.policy_overrides
    WHERE project_id = p_project_id
@@ -206,7 +206,7 @@ BEGIN
   IF _actor_user_id IS NOT NULL THEN
     PERFORM set_config('app.current_user_id', _actor_user_id::text, true);
   END IF;
-  -- D273 · a named actor must hold Edit Policies on the project.
+  -- D275 · a named actor must hold Edit Policies on the project.
   PERFORM public.assert_may_edit_policies(p_project_id, _actor_user_id);
   UPDATE public.policy_defaults
      SET active_preset     = NULL,
@@ -238,7 +238,7 @@ BEGIN
   IF _actor_user_id IS NOT NULL THEN
     PERFORM set_config('app.current_user_id', _actor_user_id::text, true);
   END IF;
-  -- D273 · a named actor must hold Edit Policies on the project.
+  -- D275 · a named actor must hold Edit Policies on the project.
   PERFORM public.assert_may_edit_policies((SELECT project_id FROM public.policy_versions WHERE id = p_version_id), _actor_user_id);
   SELECT * INTO v_row FROM public.policy_versions WHERE id = p_version_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Version % not found', p_version_id; END IF;
@@ -290,7 +290,7 @@ BEGIN
   IF _actor_user_id IS NOT NULL THEN
     PERFORM set_config('app.current_user_id', _actor_user_id::text, true);
   END IF;
-  -- D273 · a named actor must hold Edit Policies on the project.
+  -- D275 · a named actor must hold Edit Policies on the project.
   PERFORM public.assert_may_edit_policies((SELECT project_id FROM public.policy_versions WHERE id = p_version_id), _actor_user_id);
   UPDATE public.policy_versions
      SET notes = NULLIF(btrim(COALESCE(p_notes, '')), '')
@@ -313,7 +313,7 @@ BEGIN
   IF _actor_user_id IS NOT NULL THEN
     PERFORM set_config('app.current_user_id', _actor_user_id::text, true);
   END IF;
-  -- D273 · a named actor must hold Edit Policies on the project.
+  -- D275 · a named actor must hold Edit Policies on the project.
   PERFORM public.assert_may_edit_policies((SELECT project_id FROM public.policy_versions WHERE id = p_version_id), _actor_user_id);
 
   SELECT count(*) INTO v_runs  FROM public.simulation_runs  WHERE policy_version_id = p_version_id;
@@ -366,7 +366,7 @@ BEGIN
   IF p_user_id IS NOT NULL THEN
     PERFORM set_config('app.current_user_id', p_user_id::text, true);
   END IF;
-  -- D273 · a named actor must hold Edit Policies on the project.
+  -- D275 · a named actor must hold Edit Policies on the project.
   PERFORM public.assert_may_edit_policies(p_project_id, p_user_id);
   IF NOT EXISTS (SELECT 1 FROM public.projects WHERE id = p_project_id) THEN
     RAISE EXCEPTION 'project % not found', p_project_id;

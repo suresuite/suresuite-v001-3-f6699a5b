@@ -266,6 +266,6 @@ WP 4.4 · the `current_graph_hash` of the moment this override was SEEDED from p
 
 ---
 
-*Generated from data contract `20e789e509c3`, engine `0.2.8`,
+*Generated from data contract `69e8c4dd0508`, engine `0.2.8`,
 sidecar `supabase/contract/policy_overrides.contract.yaml`, table created by `20260607055908_b3e74750-d55a-4eb6-8bdc-460bc4cb90a6.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

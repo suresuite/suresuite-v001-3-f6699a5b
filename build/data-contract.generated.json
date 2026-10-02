@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 389,
-      "migrations_applied": 381,
-      "last_migration": "20261001000025_policy_writes_need_edit_policies.sql"
+      "migrations_found": 391,
+      "migrations_applied": 383,
+      "last_migration": "20261002000003_policy_writes_need_edit_policies.sql"
     },
     "sidecars": 75,
     "registry": {
@@ -1520,7 +1520,7 @@
           "page": "DeveloperApi.tsx",
           "via": "rpc list_api_keys",
           "grain": "table",
-          "evidence": "src/pages/DeveloperApi.tsx:282",
+          "evidence": "src/pages/DeveloperApi.tsx:286",
           "confirmed": true
         },
         {
@@ -5047,7 +5047,7 @@
           "page": "DeveloperApi.tsx",
           "via": "rpc list_dataset_versions",
           "grain": "table",
-          "evidence": "src/pages/DeveloperApi.tsx:332",
+          "evidence": "src/pages/DeveloperApi.tsx:336",
           "confirmed": true
         },
         {
@@ -21720,7 +21720,7 @@
           "page": "DeveloperApi.tsx",
           "via": "rpc list_api_keys",
           "grain": "table",
-          "evidence": "src/pages/DeveloperApi.tsx:282",
+          "evidence": "src/pages/DeveloperApi.tsx:286",
           "confirmed": true
         }
       ],
@@ -28640,7 +28640,7 @@
           "page": "DeveloperApi.tsx",
           "via": "rpc list_projects",
           "grain": "table",
-          "evidence": "src/pages/DeveloperApi.tsx:284",
+          "evidence": "src/pages/DeveloperApi.tsx:288",
           "confirmed": true
         },
         {
@@ -42746,5 +42746,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "20e789e509c3"
+  "contract_version": "69e8c4dd0508"
 }

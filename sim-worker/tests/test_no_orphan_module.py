@@ -55,9 +55,35 @@ KEPT_UNREACHABLE = {
 }
 
 
+# Entry points OTHER than the worker's, each with the file that runs it (Phase 12 ·
+# WP 12.1). `local` is the one place a run is computed outside the Fly worker:
+# the browser engine imports it inside its Pyodide driver string, and the
+# `suresuite` package and the notebooks' demo recorder call it on a user's
+# machine. The claim is CHECKED below, not taken on trust: the named file must
+# import the module, or the module is an orphan like any other.
+ROOT = PKG.parents[1]
+EXTERNAL_ENTRY_POINTS = {
+    "local": ("src/lib/sim/engine.worker.ts", "from sim_worker.local import"),
+}
+
+
+def reachable_from_all() -> set[str]:
+    seen = reachable()
+    for mod in EXTERNAL_ENTRY_POINTS:
+        seen |= reachable(mod)
+    return seen
+
+
+def test_external_entry_points_are_really_used():
+    for mod, (path, needle) in EXTERNAL_ENTRY_POINTS.items():
+        assert (PKG / f"{mod}.py").exists(), f"{mod}.py is gone — drop it from EXTERNAL_ENTRY_POINTS"
+        assert needle in (ROOT / path).read_text(), (
+            f"{path} no longer imports sim_worker.{mod} — it is not an entry point, so it is an orphan")
+
+
 def test_every_module_is_reachable_from_the_entry_point():
     modules = {p.stem for p in PKG.glob("*.py")} - {"__init__"}
-    orphans = sorted(modules - reachable() - KEPT_UNREACHABLE)
+    orphans = sorted(modules - reachable_from_all() - KEPT_UNREACHABLE)
     assert orphans == [], (
         f"sim_worker modules nothing imports: {orphans}. Delete them, or import "
         "them from the path that runs them."
@@ -67,7 +93,7 @@ def test_every_module_is_reachable_from_the_entry_point():
 def test_the_exceptions_are_not_stale():
     for mod in KEPT_UNREACHABLE:
         assert (PKG / f"{mod}.py").exists(), f"{mod}.py is gone — drop it from KEPT_UNREACHABLE"
-        assert mod not in reachable(), f"{mod} is imported now — drop it from KEPT_UNREACHABLE"
+        assert mod not in reachable_from_all(), f"{mod} is imported now — drop it from KEPT_UNREACHABLE"
 
 
 def test_the_walk_is_not_vacuous():

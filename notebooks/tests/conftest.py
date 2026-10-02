@@ -11,7 +11,7 @@ import pytest
 matplotlib.use("Agg")
 
 ROOT = Path(__file__).resolve().parents[2]
-COMMON = ROOT / "notebooks" / "src" / "common"
+COMMON = ROOT / "python" / "suresuite"  # the client is the suresuite package's, inlined into each notebook
 DEMO = ROOT / "notebooks" / "demo" / "example_project.json"
 
 # The repo root's `scsim/` folder would shadow nothing we import here, but keep

@@ -38,7 +38,7 @@ describe("paired comparison — notebooks and Simulation Lab agree", () => {
 
 describe("offline demo answers in the gateway's shapes", () => {
   const gateway = read("supabase/functions/api/index.ts");
-  const client = read("notebooks/src/common/client.py");
+  const client = read("python/suresuite/client.py");
 
   const pyTuple = (name: string) => {
     const m = new RegExp(`^${name} = \\(([\\s\\S]*?)\\)`, "m").exec(client);
