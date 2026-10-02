@@ -18,6 +18,9 @@
 | 3 | FG inventory policies for MTS | **base-stock, min-max, days of cover**, each defined exactly (§3.2). |
 | 4 | Allocation when supply is short | **One allocation rule per project.** The values the rule needs (priority, price, service-level target) are set **row by row** in the customer table. |
 | 5 | Backorder per row now or later? | **Now.** Backorder allowed, max backorder days and backorder cost are per row (customer × product), which needs a per-row backlog in the engine. |
+| 6 | When planned demand exceeds capacity, what carries to next week? | **Only the shortfall of rows that allow backorder** (and only within their max backorder window). A lost-sales row's shortfall is dropped from the plan. So the plan and fulfillment use the same rule, and the backorder setting affects both. |
+| 7 | A forecast entered per month | **Spread evenly over its weeks.** The run says so. |
+| 8 | `normal` demand with a high CV | **Negative draws are set to 0.** The run reports how many draws were clipped and how much that raised the realized mean. |
 
 Principle behind all five: **the flow always starts from future finished-good demand.**
 For MTO that means the projected or forecast demand; for MTS it means what the FG
@@ -67,7 +70,7 @@ future draws.
 ### Worked example (MTO, one product, two customer rows)
 
 Setup:
-- **Demand rows.** Customer C1 has a forecast of 60, 60, 80, 160, 100 … per week. Customer C2 has a demand model with mean 40/week.
+- **Demand rows.** Customer C1 has a forecast of 60, 60, 80, 160, 100 … per week. Customer C2 has a demand model with mean 40/week. **Both rows allow backorder.** The project allocation rule is `fair_share`.
 - **Plant.** P1 has a capacity of 180/week, and each P1 needs 2 units of material M1.
 - **Material.** M1 has a lead time of 2 weeks and an MOQ of 250. On hand at start: 400. 200 more units arrive at the start of week 2.
 
@@ -86,7 +89,8 @@ MRP decision for M1 each week. The order covers the next L = 2 weeks:
 | 3 | 210 | 250 | 680 | 220 | **250** | week 5 |
 
 What to notice:
-- The week-4 peak above capacity is pre-planned: 20 units are carried into week 5.
+- The week-4 peak above capacity is pre-planned. 20 units are short, split by `fair_share` as 16 for C1 and 4 for C2, and both carry into week 5 because both rows allow backorder.
+- **If C1 did not allow backorder**, only C2's 4 units would carry. Week 5 would plan 144, not 160, and C1 would lose 16 units in week 4: the backorder setting changes the plan *and* the fulfillment.
 - Material orders follow the plan, not past consumption.
 - MOQ leftovers are absorbed automatically by the next week's netting.
 
@@ -109,7 +113,7 @@ next to the field:
 | Distribution | Parameters | Variation means | Example (mean 100) |
 |---|---|---|---|
 | `deterministic` | mean | none | always 100 |
-| `normal` **(new in the engine)** | mean, **CV** | standard deviation ÷ mean | CV 0.2 → σ = 20. Negative draws are set to 0, and the run reports how often that happened. |
+| `normal` **(new in the engine)** | mean, **CV** | standard deviation ÷ mean | CV 0.2 → σ = 20. Negative draws are set to 0 (decision 8), and the run reports how often that happened. |
 | `triangularAV` | average, **± fraction** | half-width as a fraction of the average | 0.3 → triangular(70, 100, 130) |
 | `triangular` | min, mode, max | explicit bounds; no fraction | (60, 100, 150) |
 | `poisson` | mean | none (variance = mean) | — |
@@ -154,17 +158,31 @@ Notes:
 For each week τ = t … t+H, where H is the planning horizon (§3.4):
 
 ```
-requirement(τ) = MTO:  projected demand(τ)            (week t: actual demand + backlog)
-                 MTS:  FG-policy requirement(τ)        (§3.2, projecting FG stock forward)
-planned production(τ) = min(requirement(τ) + carried(τ), capacity)
-carried(τ+1)          = requirement(τ) + carried(τ) − planned production(τ)
+requirement(τ) = MTO:  projected demand(τ) + projected backlog(τ)
+                 MTS:  FG-policy requirement(τ) + projected backlog(τ)    (§3.2)
+planned production(τ) = min(requirement(τ), capacity)
+
+shortfall(τ)  = projected demand the plan cannot serve in τ
+                (MTO: from production; MTS: from FG stock + production)
+split shortfall(τ) across the product's rows with the project's allocation rule
+                (the SAME function fulfillment uses, §3.5)
+projected backlog(τ+1) = Σ shortfall of rows with backorder allowed,
+                         minus units older than that row's max backorder weeks
+rows without backorder: their shortfall is dropped (lost in the plan, as in reality)
 ```
 
-Week t's planned production is what the plant builds this week, so the existing
-execution step is unchanged. Later weeks exist so MRP can see them. **Carry-forward
-assumption:** a capacity shortfall moves to the next week in the plan (the planner
-intends to make it up). Whether a customer waits for it is decided by that row's
-backorder setting at fulfillment (§3.5).
+Week t starts from the **actual** per-row backlog. Week t's planned production is what
+the plant builds this week, so the existing execution step is unchanged. Later weeks
+exist so MRP can see them.
+
+**Why one rule for plan and fulfillment (decision 6).** If the plan carried every
+shortfall, MRP would buy material for demand that lost-sales customers have already
+walked away from, and stock would build. If it carried none, backorder customers would
+wait longer than necessary. Because the split uses the project's allocation rule:
+- a high-priority row that allows backorder is planned first;
+- a lost-sales row's shortfall leaves the plan the same week it leaves the order book.
+
+The backorder setting therefore affects both the plan and fulfillment, as intended.
 
 ### 3.4 MRP per material — P-P.1 `policy_type = "mrp"`
 
@@ -235,7 +253,7 @@ share one backlog.
 | # | Change | State / phase (A1) | Default behaviour |
 |---|---|---|---|
 | E1 | **Demand per row.** Rows (customer × product) get their own demand spec. The pre-drawn world schedule becomes `[rows × weeks]`, drawn per row in a fixed order from the world demand stream. Product demand = the row sum. New `normal` sampler. A forecast series becomes the per-week centre of the distribution. | PH-10 owns `demand` (product) + new `demand_rows`; new transient `demand_plan` (rows × H) | No rows → today's per-product draw, **byte-identical** |
-| E2 | **Planned production over a horizon** (P-P.0 extended): §3.3, with MTO/MTS requirement, min(·, capacity) and carry-forward | PH-40 owns `production_plan` (week t, unchanged) + new `planned_production` (products × H) | H = 1 and no FG policy → today's formula |
+| E2 | **Planned production over a horizon** (P-P.0 extended): §3.3, with MTO/MTS requirement, min(·, capacity), and carry-forward of backorder rows' shortfall (split by the allocation rule) | PH-40 owns `production_plan` (week t, unchanged) + new `planned_production` (products × H) | H = 1 and no FG policy → today's formula |
 | E3 | **FG policies made real**: base-stock / min-max / days of cover; FG starting stock | PH-70 `state.fg_target` (existing writer); `Product` fields | base-stock with empty S → today |
 | E4 | **MRP type** in P-P.1: §3.4 | PH-70 new `gross_requirements` (materials × H); PH-80 `purchase_orders` (existing writer) | Only materials set to `mrp` change |
 | E5 | **Per-row fulfillment**: backlog becomes per row with per-row age buckets, max-backorder horizon and cost. P-C.1 stays the **single writer** of fulfillment/backlog; P-C.2 publishes its rule and per-row ordering at setup (the P-C.6 publish pattern) and keeps its KPIs. `revenue_max` uses row price; `sla_tier` uses row targets. MTS: PH-30 still decides how much FG ships; the per-row split happens at PH-60. | `state.backlog` becomes per row; `ctx.backlog` stays available as the product sum for planners | One row per product, project-wide settings → today, **byte-identical** |
@@ -272,15 +290,13 @@ work package with its §16 drift entry.
 | Pkg | Scope | Exit criteria (all must hold) |
 |---|---|---|
 | **A — Demand per row** | E1 + the §6 demand fields + Customer-table columns. `normal` sampler. Forecast series ingestion. Projected demand published per row and per product. | A project with two rows per product (one forecast, one demand model) runs. Product demand = row sum. Choosing `normal` gives a normal draw: no silent triangular, and the warning disappears. Variation is labelled per distribution. Old projects byte-identical. |
-| **B — Planned production + FG policies** | E2 + E3 + FG starting stock + Plant-table columns | MTO plan = projected demand capped at capacity, with carry-forward (test against §2's example). Each FG policy reproduces its §3.2 example exactly. Days of cover moves with the forecast. Existing MTS projects byte-identical. |
+| **B — Planned production + FG policies** | E2 + E3 + FG starting stock + Plant-table columns. Needs package D's allocation function for the shortfall split; until D lands, the split falls back to pro-rata and says so. | MTO plan = projected demand capped at capacity. Carry-forward only for backorder rows: §2's example plans 160 in week 5, and 144 when C1 is lost-sales. Each FG policy reproduces its §3.2 example exactly. Days of cover moves with the forecast. Existing MTS projects byte-identical. |
 | **C — MRP for materials** | E4 + E7 + the MRP choice in the Supplier table | **Golden #7:** the engine reproduces §2's worked example week by week (orders 250/250/250 arriving weeks 3/4/5). A textbook MRP record test passes. MRP and reorder-point materials coexist in one run. Under the demand-step probe, MRP loses no sales where lean min-max lost 650 units. Performance at TRON scale (17 products × 560 materials) ≤ +20 % time per replication. |
 | **D — Per-row fulfillment** | E5 + E6 + the §6 fulfillment fields + the mapper stops dropping per-row values | Two rows of one product: one backorders, one loses. Their backlogs, costs and fill rates are reported separately. Each allocation rule passes a scarcity test, including `revenue_max` by row price and `sla_tier` by row target. The "not applied" warning is gone. Max-backorder rounding is shown in the UI. |
 | **E — Validation study** | CRN-paired comparisons on reference networks and Project TRON: reorder point vs MRP at equal average stock; demand step / surge; supplier outage (ST-1); forecast quality (bias lever) | Published with confidence intervals: fill rate, lost units, average stock, order variability, time to recover. Preset changes only if the evidence supports them. |
 | **F — Multi-stage (later)** | Sub-assemblies as real items (stock, WIP, production lead time, capacity) with the same MRP applied level by level. `bom_multi_level` passed through instead of flattened (D136, D174, D191). | **Golden #8:** a zero-lead-time multi-level network is byte-identical to its flattened twin. A 2-week sub-assembly lead time shifts FG output by exactly 2 weeks. |
 
-**Order:** A first, because everything reads demand. Then **B → C** (the MRP chain) and
-**D** in parallel; they touch different phases (PH-40/70/80 vs PH-30/60). E runs after
-C and D. F follows once single-level MRP is validated.
+**Order:** A first, because everything reads demand. Then **B → C** (the MRP chain) and **D** in parallel; they touch different phases (PH-40/70/80 vs PH-30/60). One coupling: B's carry-forward splits a shortfall with D's allocation function. Write that function first, as a pure helper both packages import, so B never needs a fallback for long. E runs after C and D. F follows once single-level MRP is validated.
 
 ---
 
@@ -294,13 +310,11 @@ C and D. F follows once single-level MRP is validated.
 - Sub-weekly time steps (the weekly fidelity boundary, blueprint §5.8).
 - Multi-plant and warehouse echelons (Phase E).
 
-## 9. Open points (small, with the default the plan uses)
+## 9. Open points
 
-1. Carry-forward of a capacity shortfall in the plan: always carried (default), or only
-   for demand whose row allows backorder?
-2. A forecast entered monthly: spread evenly over its weeks (default), or as a step in
-   the first week?
-3. `normal` with high CV: set negatives to 0 and report it (default), or refuse CV > 0.5?
+None left. The last three were decided on 2026-10-02 (§0, decisions 6–8). New questions
+found during implementation are recorded here, each with its default, before the package
+that raises them merges.
 
 ---
 
