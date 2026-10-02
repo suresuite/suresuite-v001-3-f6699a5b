@@ -70,7 +70,7 @@ BEGIN
     ('analyst', 'export', false),           ('analyst', 'simulation_lab', true),
     ('viewer', 'data_edit_inputs', false),  ('viewer', 'data_edit_policies', false)
   ON CONFLICT (project_role, capability_key) DO NOTHING;
-  -- D273 — the account role is now the CEILING the project role grants within, so the base
+  -- D276 — the account role is now the CEILING the project role grants within, so the base
   -- also needs the account layer the migrations seed (`20260711000002`: modeler, admin and
   -- super admin hold all four; a 'user' account Export only; `20260915000005` copies
   -- data_editing into the two edit keys). Without it every right reads false.

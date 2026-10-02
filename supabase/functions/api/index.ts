@@ -27,6 +27,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3";
 import { cleanEnv } from "../_shared/env.ts";
 import registry from "../_shared/registry.generated.json" with { type: "json" };
+import { selectTables, tablesParam, wantsGzip } from "../_shared/snapshotView.ts";
+import { ENGINE_URL_TTL_SECONDS, engineResponse, parseEngineIndex, wheelPath } from "../_shared/engineIndex.ts";
 import {
   dispatchExperimentCancel,
   dispatchExperimentRun,
@@ -144,6 +146,8 @@ interface Principal {
   scopes: string[];
   projectIds: string[] | null;
   env: "live" | "test";
+  /** WP 12.3 — the person a PERSONAL key acts as; null for an organization key. */
+  actorUserId: string | null;
 }
 
 const KEY_RE = /^sk_(live|test)_([0-9a-f]{8})_([0-9a-f]{16,128})$/;
@@ -183,7 +187,7 @@ async function authenticate(req: Request, ip: string): Promise<Principal> {
 
   const { data: row, error } = await svc
     .from("api_keys")
-    .select("id,key_prefix,secret_hash,org_id,scopes,project_ids,env,status,expires_at,revoked_at")
+    .select("id,key_prefix,secret_hash,org_id,scopes,project_ids,env,status,expires_at,revoked_at,principal")
     .eq("key_prefix", prefix)
     .maybeSingle();
   if (error) throw new ApiError(503, "auth_unavailable", "authentication backend unavailable"); // fail closed
@@ -201,6 +205,18 @@ async function authenticate(req: Request, ip: string): Promise<Principal> {
     .eq("id", row.org_id)
     .maybeSingle();
   if (!org || org.status !== "active") return fail("org_suspended", "the key's organization is not active");
+
+  // WP 12.3 — a PERSONAL key acts as its creator, and only while that person is
+  // active and still in the key's organization. The database answers which
+  // person (api_personal_key_actor); no answer means the key is refused — the
+  // same as a revoked key, because it is one in all but name.
+  let actorUserId: string | null = null;
+  if (row.principal === "personal") {
+    const { data: actor, error: actorErr } = await svc.rpc("api_personal_key_actor", { p_key_id: row.id });
+    if (actorErr) throw new ApiError(503, "auth_unavailable", "authentication backend unavailable"); // fail closed
+    if (!actor) return fail("key_owner_inactive", "this personal key's owner is no longer active in its organization");
+    actorUserId = String(actor);
+  }
 
   // §5.3 step 4: stamp last_used_at asynchronously; never block the request.
   // (PostgREST builders resolve with {error} rather than rejecting.)
@@ -221,6 +237,7 @@ async function authenticate(req: Request, ip: string): Promise<Principal> {
     scopes: (row.scopes as string[]) ?? [],
     projectIds: (row.project_ids as string[] | null) ?? null,
     env: env as "live" | "test",
+    actorUserId,
   };
 }
 
@@ -578,6 +595,12 @@ const putPolicies: Handler = async (ctx) => {
   // about somebody who did not act, which is worse than recording that the
   // actor is unknown. Making an API key nameable in the audit plane is D28's
   // question and WP 7.1's to answer.
+  //
+  // WP 12.3 made a PERSONAL key nameable (`ctx.principal.actorUserId`), and the
+  // request log names its owner. It is deliberately NOT passed here yet: a user
+  // id switches these RPCs onto their per-user checks, which the API path has
+  // never gone through, so naming the person in a write is the push-back
+  // package's change, made together with the project-role gate it needs.
   let strategySent = false;
   for (const [family, value] of Object.entries(body.defaults ?? {})) {
     const { error } = await svc.rpc("save_policy_defaults", {
@@ -954,6 +977,88 @@ const revokeKey: Handler = async (ctx) => {
 // Key minting stays in the key-management UI (show-once ceremony + human
 // authorization); the API surface for it is deferred with OAuth tokens (§5.5).
 
+// ── Phase 12 · WP 12.2 — the frozen inputs, for a library to pull ──────────
+//
+// A dataset version's snapshot is the tier-2 rows a run reads, frozen; a policy
+// version's snapshot is the configuration a run reads, frozen. Together they are
+// what `sim_worker.local.run_from_snapshots` needs to compute a run on a user's
+// own machine — the same inputs the worker binds (graph_hash, policy_hash).
+// `latest` names the newest version. The row is looked up by id AND project, so
+// an id from another project reads exactly like one that does not exist.
+
+const VERSION_ID = `${UUID}|latest`;
+
+const getDatasetVersion: Handler = async (ctx) => {
+  const [projectId, versionId] = ctx.params;
+  await authorizeProject(ctx.principal, projectId);
+  ctx.auditProjectId = projectId;
+  let q = svc
+    .from("dataset_versions")
+    .select("id,label,version_no,graph_hash,hash_inputs,hash_network,author_email,created_at,snapshot")
+    .eq("project_id", projectId);
+  q = versionId === "latest" ? q.order("created_at", { ascending: false }).limit(1) : q.eq("id", versionId);
+  const { data, error } = await q.maybeSingle();
+  if (error) throw new ApiError(503, "read_failed", "dataset version read failed");
+  if (!data) throw new ApiError(404, "dataset_version_not_found", "no such dataset version in this project");
+  const raw = (data.snapshot ?? {}) as Record<string, unknown>;
+  const { snapshot, unknown } = selectTables(raw, tablesParam(ctx.url));
+  if (unknown.length) {
+    throw new ApiError(400, "invalid_request", `unknown table(s): ${unknown.join(", ")}`, { unknown });
+  }
+  return {
+    status: 200,
+    body: {
+      id: data.id, label: data.label, version_no: data.version_no,
+      graph_hash: data.graph_hash, hash_inputs: data.hash_inputs, hash_network: data.hash_network,
+      author_email: data.author_email, created_at: data.created_at,
+      schema_version: Number(raw.schema_version ?? 1),
+      snapshot,
+    },
+  };
+};
+
+const getPolicyVersion: Handler = async (ctx) => {
+  const [projectId, versionId] = ctx.params;
+  await authorizeProject(ctx.principal, projectId);
+  ctx.auditProjectId = projectId;
+  let q = svc
+    .from("policy_versions")
+    .select("id,label,version_no,policy_hash,notes,parent_version_id,author_email,created_at,snapshot")
+    .eq("project_id", projectId);
+  q = versionId === "latest" ? q.order("created_at", { ascending: false }).limit(1) : q.eq("id", versionId);
+  const { data, error } = await q.maybeSingle();
+  if (error) throw new ApiError(503, "read_failed", "policy version read failed");
+  if (!data) throw new ApiError(404, "policy_version_not_found", "no such policy version in this project");
+  return { status: 200, body: data };
+};
+
+// ── Phase 12 · WP 12.4 — the engine, for a key's own machine ───────────────
+//
+// Short-lived signed URLs to the engine wheels in the PRIVATE `engine` bucket,
+// with each wheel's sha256 (published by scripts/publish_engine_wheels.mjs).
+// Every fetch is a logged request naming the key — and, for a personal key, the
+// person. The browser engine still loads the same wheels publicly (§4 D274).
+
+const getEngine: Handler = async () => {
+  const { data: blob, error } = await svc.storage.from("engine").download("index.json");
+  if (error || !blob) throw new ApiError(503, "engine_unpublished", "the engine has not been published to the API yet");
+  let index;
+  try {
+    index = parseEngineIndex(JSON.parse(await blob.text()));
+  } catch (_e) {
+    throw new ApiError(503, "engine_unpublished", "the published engine index is unreadable");
+  }
+  const urls: Record<string, string | null> = {};
+  for (const w of index.wheels) {
+    const { data: signed } = await svc.storage.from("engine").createSignedUrl(wheelPath(w), ENGINE_URL_TTL_SECONDS);
+    urls[w.file] = signed?.signedUrl ?? null;
+  }
+  if (Object.values(urls).some((u) => !u)) {
+    throw new ApiError(503, "engine_unpublished", "a published engine wheel is missing from storage");
+  }
+  return { status: 200, body: engineResponse(index, urls) };
+};
+
 // ── Route table (§8) ─────────────────────────────────────────────────────────
 
 const routes: Route[] = [
@@ -961,11 +1066,13 @@ const routes: Route[] = [
   { method: "GET", pattern: new RegExp(`^/projects/(${UUID})$`), scope: "read:data", handler: getProject },
   { method: "POST", pattern: new RegExp(`^/projects/(${UUID})/datasets:freeze$`), scope: "write:data", handler: freezeDataset },
   { method: "GET", pattern: new RegExp(`^/projects/(${UUID})/dataset-versions$`), scope: "read:data", handler: listDatasetVersions },
+  { method: "GET", pattern: new RegExp(`^/projects/(${UUID})/dataset-versions/(${VERSION_ID})$`), scope: "read:data", handler: getDatasetVersion },
   { method: "GET", pattern: new RegExp(`^/projects/(${UUID})/policy-catalog$`), scope: "read:policies", handler: getPolicyCatalog },
   { method: "GET", pattern: new RegExp(`^/projects/(${UUID})/policies$`), scope: "read:policies", handler: getPolicies },
   { method: "PUT", pattern: new RegExp(`^/projects/(${UUID})/policies$`), scope: "write:policies", handler: putPolicies },
   { method: "POST", pattern: new RegExp(`^/projects/(${UUID})/policy-versions$`), scope: "write:policies", handler: snapshotPolicyVersion },
   { method: "GET", pattern: new RegExp(`^/projects/(${UUID})/policy-versions$`), scope: "read:policies", handler: listPolicyVersions },
+  { method: "GET", pattern: new RegExp(`^/projects/(${UUID})/policy-versions/(${VERSION_ID})$`), scope: "read:policies", handler: getPolicyVersion },
   { method: "GET", pattern: new RegExp(`^/projects/(${UUID})/scenarios$`), scope: "read:runs", handler: listScenarios },
   { method: "POST", pattern: new RegExp(`^/projects/(${UUID})/scenarios$`), scope: "write:runs", handler: createScenario },
   { method: "POST", pattern: new RegExp(`^/projects/(${UUID})/runs$`), scope: "write:runs", handler: createRun },
@@ -974,6 +1081,7 @@ const routes: Route[] = [
   { method: "POST", pattern: new RegExp(`^/runs/(${UUID}):cancel$`), scope: "write:runs", handler: cancelRun },
   { method: "POST", pattern: new RegExp(`^/runs/(${UUID}):add-reps$`), scope: "write:runs", handler: addRunReps },
   { method: "GET", pattern: new RegExp(`^/runs/(${UUID})/validation$`), scope: "read:runs", handler: getRunValidation },
+  { method: "GET", pattern: new RegExp(`^/engine$`), scope: "read:data", handler: getEngine },
   { method: "GET", pattern: new RegExp(`^/keys$`), scope: "admin:keys", handler: listKeys },
   { method: "POST", pattern: new RegExp(`^/keys/(${UUID}):revoke$`), scope: "admin:keys", handler: revokeKey },
 ];
@@ -993,6 +1101,7 @@ function logRequest(row: {
   request_id: string;
   error_code: string | null;
   ip: string | null;
+  actor_user_id: string | null;
 }): void {
   const p = svc.from("api_request_logs").insert(row)
     .then(({ error: e }) => {
@@ -1023,6 +1132,7 @@ Deno.serve(async (req) => {
     logRequest({
       api_key_id: principal?.keyId ?? null,
       org_id: principal?.orgId ?? null,
+      actor_user_id: principal?.actorUserId ?? null,
       method: req.method,
       route: subPath.slice(0, 300),
       status,
@@ -1036,16 +1146,19 @@ Deno.serve(async (req) => {
         : null,
       ip,
     });
-    return new Response(text, {
-      status,
-      headers: {
-        ...corsHeaders,
-        ...rlHeaders,
-        ...extra,
-        "Content-Type": "application/json",
-        "X-Request-Id": requestId,
-      },
-    });
+    const headers = {
+      ...corsHeaders,
+      ...rlHeaders,
+      ...extra,
+      "Content-Type": "application/json",
+      "X-Request-Id": requestId,
+    };
+    // A snapshot can be large (WP 12.2): compress when the client accepts it.
+    if (wantsGzip(req.headers.get("Accept-Encoding"), text.length)) {
+      const gz = new Blob([text]).stream().pipeThrough(new CompressionStream("gzip"));
+      return new Response(gz, { status, headers: { ...headers, "Content-Encoding": "gzip", Vary: "Accept-Encoding" } });
+    }
+    return new Response(text, { status, headers });
   };
 
   try {

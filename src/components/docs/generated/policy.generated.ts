@@ -1635,6 +1635,12 @@ export const API_ROUTES: ApiRoute[] = [
   },
   {
     "method": "GET",
+    "path": "/v1/projects/{id}/dataset-versions/{version}",
+    "scope": "read:data",
+    "handler": "getDatasetVersion"
+  },
+  {
+    "method": "GET",
     "path": "/v1/projects/{id}/policy-catalog",
     "scope": "read:policies",
     "handler": "getPolicyCatalog"
@@ -1662,6 +1668,12 @@ export const API_ROUTES: ApiRoute[] = [
     "path": "/v1/projects/{id}/policy-versions",
     "scope": "read:policies",
     "handler": "listPolicyVersions"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/projects/{id}/policy-versions/{version}",
+    "scope": "read:policies",
+    "handler": "getPolicyVersion"
   },
   {
     "method": "GET",
@@ -1710,6 +1722,12 @@ export const API_ROUTES: ApiRoute[] = [
     "path": "/v1/runs/{id}/validation",
     "scope": "read:runs",
     "handler": "getRunValidation"
+  },
+  {
+    "method": "GET",
+    "path": "/v1/engine",
+    "scope": "read:data",
+    "handler": "getEngine"
   },
   {
     "method": "GET",
@@ -2009,7 +2027,8 @@ export const API_NOTEBOOKS: string[] = [
   "/notebooks/suresuite_01_policy_experiment.ipynb",
   "/notebooks/suresuite_02_disruption_resilience.ipynb",
   "/notebooks/suresuite_03_material_shortage.ipynb",
-  "/notebooks/suresuite_04_results_and_reproducibility.ipynb"
+  "/notebooks/suresuite_04_results_and_reproducibility.ipynb",
+  "/notebooks/suresuite_05_local_simulation.ipynb"
 ];
 
 /**
@@ -2040,7 +2059,7 @@ export const API_ERRORS: ApiErrorCode[] = [
     "code": "invalid_request",
     "status": 400,
     "message": "request body failed validation",
-    "sites": 1
+    "sites": 2
   },
   {
     "code": "expired_key",
@@ -2053,6 +2072,12 @@ export const API_ERRORS: ApiErrorCode[] = [
     "status": 401,
     "message": "missing or malformed API key (expected `Authorization: Bearer sk_…`)",
     "sites": 2
+  },
+  {
+    "code": "key_owner_inactive",
+    "status": 401,
+    "message": "this personal key's owner is no longer active in its organization",
+    "sites": 1
   },
   {
     "code": "org_suspended",
@@ -2085,9 +2110,21 @@ export const API_ERRORS: ApiErrorCode[] = [
     "sites": 1
   },
   {
+    "code": "dataset_version_not_found",
+    "status": 404,
+    "message": "no such dataset version in this project",
+    "sites": 1
+  },
+  {
     "code": "key_not_found",
     "status": 404,
     "message": "key not found",
+    "sites": 1
+  },
+  {
+    "code": "policy_version_not_found",
+    "status": 404,
+    "message": "no such policy version in this project",
     "sites": 1
   },
   {
@@ -2166,13 +2203,19 @@ export const API_ERRORS: ApiErrorCode[] = [
     "code": "auth_unavailable",
     "status": 503,
     "message": "authentication backend unavailable",
-    "sites": 1
+    "sites": 2
   },
   {
     "code": "authz_unavailable",
     "status": 503,
     "message": "authorization backend unavailable",
     "sites": 1
+  },
+  {
+    "code": "engine_unpublished",
+    "status": 503,
+    "message": "the engine has not been published to the API yet",
+    "sites": 3
   },
   {
     "code": "rate_limiter_unavailable",
@@ -2184,7 +2227,7 @@ export const API_ERRORS: ApiErrorCode[] = [
     "code": "read_failed",
     "status": 503,
     "message": "run read failed",
-    "sites": 9
+    "sites": 11
   }
 ];
 

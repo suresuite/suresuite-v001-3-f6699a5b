@@ -22,7 +22,7 @@ export const PROJECT_RIGHT_LABELS: Record<ProjectRight, string> = {
 };
 
 /**
- * D273 — which layer of the rule decided a right (`project_right_decide`, plus the two
+ * D276 — which layer of the rule decided a right (`project_right_decide`, plus the two
  * gates `project_rights_for_user` applies after it). One vocabulary for /admin/roles,
  * the refusal sentences and the manual.
  */
@@ -40,7 +40,7 @@ export const RIGHT_DECIDER_LABELS: Record<RightDecider, string> = {
   suspended: 'Account suspended',
 };
 
-/** One right's inputs and answer, as `project_right_decisions` returns them (D273). */
+/** One right's inputs and answer, as `project_right_decisions` returns them (D276). */
 export interface RightDecision {
   allowed: boolean;
   decided_by: RightDecider;
@@ -68,7 +68,7 @@ export interface ProjectRights {
   resolved_capabilities: Partial<Record<ProjectRight, boolean>>;
   effective_role: string | null;
   is_modeler: boolean;
-  /** D273 — why each right holds or not. Absent before `20261002000001` deploys. */
+  /** D276 — why each right holds or not. Absent before `20261002000004` deploys. */
   decisions?: Partial<Record<ProjectRight, RightDecision>>;
 }
 
@@ -109,7 +109,7 @@ export function projectRightRefusal(right: ProjectRight, rights: ProjectRights |
   if (rights.capabilities[right]) return null;
   const label = PROJECT_RIGHT_LABELS[right];
   if (!rights.account_active) return 'Your account has been deactivated.';
-  // D273 — the database says which layer decided; say that, not a guess.
+  // D276 — the database says which layer decided; say that, not a guess.
   const d = rights.decisions?.[right];
   if (d) {
     switch (d.decided_by) {

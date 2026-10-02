@@ -474,7 +474,7 @@ function MyAccessTab() {
           {/* Features */}
           <section>
             <h3 className="mb-2 text-sm font-semibold">Features</h3>
-            {/* D230, D273 — these are ACCOUNT-wide; on a project the four project rights need
+            {/* D230, D276 — these are ACCOUNT-wide; on a project the four project rights need
                 BOTH this list and the role there, and that is what the app applies. */}
             <p className="mb-2 text-xs text-muted-foreground">
               Account-wide. On each project, Run Simulations, Edit Input Data, Edit Policies and Export

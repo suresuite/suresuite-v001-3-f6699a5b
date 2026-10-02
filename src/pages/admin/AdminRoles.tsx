@@ -1,10 +1,10 @@
 // Role Defaults (/admin/roles) — SuReSuite "Ledger" redesign.
 // Data flow: get_role_access (read), admin_set_capability (write),
-// admin_preview_role_capability (D273 — what a switch on a project right would change,
+// admin_preview_role_capability (D276 — what a switch on a project right would change,
 // asked BEFORE it is flipped). Switch matrices use the black-pill Toggle; super_admin +
 // /profile stay forced-on and locked.
 //
-// D273 — the four project rights (Run Simulations, Edit Input Data, Edit Policies,
+// D276 — the four project rights (Run Simulations, Edit Input Data, Edit Policies,
 // Export) are decided by one rule, `project_right_decide`: the account role is the
 // CEILING and the project role is the GRANT. This page shows that rule's own output —
 // the effective matrix, the people it narrows today, the overrides that beat it and the
@@ -103,7 +103,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
   const scoped = useMemo(() => new Set(access?.project_scoped ?? []), [access]);
   const scopedCaps = useMemo(() => features.filter((c) => scoped.has(c.key)), [features, scoped]);
   const labelOf = useCallback((key: string) => caps.find((c) => c.key === key)?.label ?? key, [caps]);
-  /** The D273 read is present (the migration has deployed). */
+  /** The D276 read is present (the migration has deployed). */
   const hasRule = !!access?.effective && scoped.size > 0;
 
   const write = async (role: string, cap: Cap, allowed: boolean) => {
@@ -596,7 +596,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
           {hasRule ? ruleCard : (
             <div className="rounded-sm border border-[#e0930b]/40 bg-[#e0930b]/10 p-3 text-[12.5px]">
               The project-rights rule could not be read from the database yet, so this page shows the account
-              defaults only. It appears once migration <code>20261002000001</code> is deployed.
+              defaults only. It appears once migration <code>20261002000004</code> is deployed.
             </div>
           )}
           {renderSection('Pages', pages)}

@@ -37,49 +37,27 @@ const post = (m: any) => self.postMessage(m);
 let pyodide: any = null;
 let ready: Promise<void> | null = null;
 
-// The in-worker equivalent of the old api/run_simulation.py — the SAME worker
-// pipeline (snapshot_to_policies → build_project_data → compute_run_from_project),
-// now driving the engine's on_replication hook so each finished replication is
-// reported back the instant it completes.
+// The in-worker driver. Since Phase 12 · WP 12.1 it holds NO pipeline of its
+// own: `sim_worker.local.run_from_snapshots` is the one entry point the browser,
+// the `suresuite` Python package and the notebooks' demo recorder share, and it
+// is the worker's own pipeline (snapshot_to_policies → build_project_data →
+// compute_run_from_project → run_shape.build_run_update). This string used to
+// be a hand copy of it, and its result shaping had drifted: it dropped `_range`
+// and `capacity_binding` (§4 D273). It now only adapts the message protocol.
 const PY_DRIVER = `
 import json
-from sim_worker.policy_snapshot import snapshot_to_policies
-from sim_worker.datamap import build_project_data
-from sim_worker.scsim_bridge import compute_run_from_project
+from sim_worker.local import run_from_snapshots
 
 def _run(payload_json, on_rep=None):
     b = json.loads(payload_json)
-    ds = b.get("dataset") or {}
-    policies = snapshot_to_policies(b.get("snapshot") or {})
-    data = build_project_data(
-        suppliers=ds.get("suppliers") or [], materials=ds.get("materials") or [],
-        products=ds.get("products") or [], inbound=ds.get("inbound") or [],
-        bom=ds.get("bom") or [], outbound=ds.get("outbound") or [],
-        policies=policies, scenario=b.get("scenario") or {},
-        project_model=b.get("project_model"))
 
     def _cb(rep_row, done, total):
         if on_rep is not None:
             on_rep(json.dumps(rep_row), int(done), int(total))
 
-    kpis = compute_run_from_project(data, on_replication=_cb)
-
-    agg = {k[len("mean_"):]: v for k, v in kpis.items() if k.startswith("mean_")}
-    agg["_meta"] = {"engine": kpis.get("source", "pyodide")}
-    if kpis.get("scsim_notes"):
-        agg["_meta"]["scsim_notes"] = kpis["scsim_notes"]
-    n_reps = int(kpis.get("n_reps", (b.get("scenario") or {}).get("replications", 1)) or 1)
-    run_update = {
-        "status": "done",
-        "aggregate_kpis": agg,
-        "ci_half_widths": {k[len("ci_"):]: v for k, v in kpis.items() if k.startswith("ci_")},
-        "code_version": ("scsim-" + str(kpis.get("engine_version", "unknown"))) if kpis.get("source") == "scsim" else "worker-legacy",
-        "rep_count_done": n_reps,
-    }
-    if kpis.get("mapping_warnings") is not None:
-        run_update["mapping_warnings"] = kpis["mapping_warnings"]
-    if kpis.get("warmup_detected_at") is not None:
-        run_update["warmup_detected_at"] = kpis["warmup_detected_at"]
+    out = run_from_snapshots(
+        b.get("dataset") or {}, b.get("snapshot") or {}, b.get("scenario") or {},
+        project_model=b.get("project_model"), on_replication=_cb)
 
     run_id, project_id = b.get("run_id"), b.get("project_id")
     reps = [{
@@ -87,18 +65,12 @@ def _run(payload_json, on_rep=None):
         "rep_index": r["rep_index"], "seed_used": r["seed_used"], "status": "done",
         "kpis": r.get("kpis", {}), "time_series": r.get("time_series", {}),
         "warmup_at": r.get("warmup_at"),
-    } for r in (kpis.get("replications") or [])]
-
-    # Inspection runs (G17/§9.5.1): per-item weekly series rows in the
-    # run_item_series persistence shape — empty for every multi-rep run.
-    item_rows = [{
-        "kind": r["kind"], "item_id": r["item_id"], "series": r.get("series", {}),
-    } for r in (kpis.get("item_series") or [])]
+    } for r in out["replications"]]
 
     return json.dumps({
-        "engine_version": kpis.get("engine_version"),
-        "run_update": run_update, "replications": reps,
-        "item_series": item_rows,
+        "engine_version": out["engine_version"],
+        "run_update": out["run_update"], "replications": reps,
+        "item_series": out["item_series"],
     })
 `;
 

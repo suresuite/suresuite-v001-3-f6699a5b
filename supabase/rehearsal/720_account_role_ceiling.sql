@@ -1,7 +1,7 @@
--- §4 D273 · THE ACCOUNT ROLE IS THE CEILING AND THE PROJECT ROLE IS THE GRANT; AN AGENT MAY
+-- §4 D276 · THE ACCOUNT ROLE IS THE CEILING AND THE PROJECT ROLE IS THE GRANT; AN AGENT MAY
 -- NOT APPROVE WHAT ITS APPROVER MAY NOT DO BY HAND; /admin/roles READS THE RULE ITSELF.
 --
--- `20261002000001` makes `project_right_decide` the one rule for the four project-scoped
+-- `20261002000004` makes `project_right_decide` the one rule for the four project-scoped
 -- rights and reads it from the resolver, the per-person explanation, the agent approval and
 -- the /admin/roles matrix. What only a running database can settle:
 --
@@ -19,8 +19,10 @@
 --      list names the 'user' Editor, and a non-super actor is refused.
 --   §7 THE PREVIEW: flipping an account-role switch lists exactly the memberships whose
 --      right would move — and not one an organization override already decides.
+--   §8 THE SERVER: D275's policy writers read the same rights, so a 'user' account made Editor
+--      is refused a policy write and a modeler Editor is not.
 
-DO $d273$
+DO $d276$
 DECLARE
   v_org     uuid := gen_random_uuid();
   v_org2    uuid := gen_random_uuid();
@@ -74,26 +76,26 @@ BEGIN
                             'agent_proposals', 'agent_apply');
 
   INSERT INTO public.organizations (id, name, slug) VALUES
-    (v_org,  'D273 Org',  'd273-' || substr(v_org::text, 1, 8)),
-    (v_org2, 'D273 Org2', 'd273b-' || substr(v_org2::text, 1, 8));
+    (v_org,  'D276 Org',  'd276-' || substr(v_org::text, 1, 8)),
+    (v_org2, 'D276 Org2', 'd276b-' || substr(v_org2::text, 1, 8));
   INSERT INTO public.approved_users (id, email, name, password_hash, role, organization, organization_id, is_active) VALUES
-    (v_super, 'd273s@example.invalid', 'D273 Super',  'x', 'super_admin', 'D273 Org',  v_org,  true),
-    (v_owner, 'd273o@example.invalid', 'D273 Owner',  'x', 'modeler',     'D273 Org',  v_org,  true),
-    (v_ued,   'd273u@example.invalid', 'D273 UserEd', 'x', 'user',        'D273 Org',  v_org,  true),
-    (v_med,   'd273m@example.invalid', 'D273 ModEd',  'x', 'modeler',     'D273 Org',  v_org,  true),
-    (v_mview, 'd273v@example.invalid', 'D273 ModVw',  'x', 'modeler',     'D273 Org',  v_org,  true),
-    (v_plain, 'd273p@example.invalid', 'D273 Plain',  'x', 'user',        'D273 Org',  v_org,  true),
-    (v_over,  'd273x@example.invalid', 'D273 Over',   'x', 'user',        'D273 Org',  v_org,  true),
-    (v_o2ed,  'd273e@example.invalid', 'D273 Org2Ed', 'x', 'modeler',     'D273 Org2', v_org2, true);
+    (v_super, 'd276s@example.invalid', 'D276 Super',  'x', 'super_admin', 'D276 Org',  v_org,  true),
+    (v_owner, 'd276o@example.invalid', 'D276 Owner',  'x', 'modeler',     'D276 Org',  v_org,  true),
+    (v_ued,   'd276u@example.invalid', 'D276 UserEd', 'x', 'user',        'D276 Org',  v_org,  true),
+    (v_med,   'd276m@example.invalid', 'D276 ModEd',  'x', 'modeler',     'D276 Org',  v_org,  true),
+    (v_mview, 'd276v@example.invalid', 'D276 ModVw',  'x', 'modeler',     'D276 Org',  v_org,  true),
+    (v_plain, 'd276p@example.invalid', 'D276 Plain',  'x', 'user',        'D276 Org',  v_org,  true),
+    (v_over,  'd276x@example.invalid', 'D276 Over',   'x', 'user',        'D276 Org',  v_org,  true),
+    (v_o2ed,  'd276e@example.invalid', 'D276 Org2Ed', 'x', 'modeler',     'D276 Org2', v_org2, true);
   INSERT INTO public.projects (id, name, modeler_id, plant_name, organization, organization_id, bom_level) VALUES
-    (v_p,  'D273 p',  v_owner, 'D273P',  'D273 Org',  v_org,  'single'),
-    (v_p2, 'D273 p2', v_owner, 'D273P2', 'D273 Org2', v_org2, 'single');
+    (v_p,  'D276 p',  v_owner, 'D276P',  'D276 Org',  v_org,  'single'),
+    (v_p2, 'D276 p2', v_owner, 'D276P2', 'D276 Org2', v_org2, 'single');
 
-  PERFORM public.admin_set_project_member(v_super, 'd273s@example.invalid', v_ued,   v_p,  'editor', NULL, 'D273');
-  PERFORM public.admin_set_project_member(v_super, 'd273s@example.invalid', v_med,   v_p,  'editor', NULL, 'D273');
-  PERFORM public.admin_set_project_member(v_super, 'd273s@example.invalid', v_mview, v_p,  'viewer', NULL, 'D273');
-  PERFORM public.admin_set_project_member(v_super, 'd273s@example.invalid', v_over,  v_p,  'editor', NULL, 'D273');
-  PERFORM public.admin_set_project_member(v_super, 'd273s@example.invalid', v_o2ed,  v_p2, 'editor', NULL, 'D273');
+  PERFORM public.admin_set_project_member(v_super, 'd276s@example.invalid', v_ued,   v_p,  'editor', NULL, 'D276');
+  PERFORM public.admin_set_project_member(v_super, 'd276s@example.invalid', v_med,   v_p,  'editor', NULL, 'D276');
+  PERFORM public.admin_set_project_member(v_super, 'd276s@example.invalid', v_mview, v_p,  'viewer', NULL, 'D276');
+  PERFORM public.admin_set_project_member(v_super, 'd276s@example.invalid', v_over,  v_p,  'editor', NULL, 'D276');
+  PERFORM public.admin_set_project_member(v_super, 'd276s@example.invalid', v_o2ed,  v_p2, 'editor', NULL, 'D276');
   INSERT INTO public.user_capabilities (user_id, capability_key, allowed) VALUES (v_over, 'simulation_lab', true);
   INSERT INTO public.org_capabilities (org_id, capability_key, allowed) VALUES (v_org2, 'export', false);
   PERFORM set_config('app.current_user_id', '', true);
@@ -110,7 +112,7 @@ BEGIN
       (jsonb_build_object('a', public.project_right_decide(false, NULL,  'editor', true,  true),  'want', '{"allowed":true,"decided_by":"project_role"}'::jsonb))
     ) AS c(x) LOOP
     IF v_r -> 'a' IS DISTINCT FROM v_r -> 'want' THEN
-      RAISE EXCEPTION 'D273/700 §1: the rule answered % where % was owed', v_r -> 'a', v_r -> 'want';
+      RAISE EXCEPTION 'D276/720 §1: the rule answered % where % was owed', v_r -> 'a', v_r -> 'want';
     END IF;
   END LOOP;
 
@@ -121,23 +123,23 @@ BEGIN
      OR (v_r -> 'capabilities' ->> 'data_edit_policies')::boolean IS NOT FALSE
      OR v_r -> 'decisions' -> 'simulation_lab' ->> 'decided_by' IS DISTINCT FROM 'account_ceiling'
      OR (v_r -> 'decisions' -> 'simulation_lab' ->> 'project_grant')::boolean IS NOT TRUE THEN
-    RAISE EXCEPTION 'D273/700 §2: a user-account Editor read as %', v_r;
+    RAISE EXCEPTION 'D276/720 §2: a user-account Editor read as %', v_r;
   END IF;
   -- The resolver itself, not only the projection of it.
   IF (public.capabilities_for_user(v_ued, v_p) -> 'features' ->> 'data_edit_policies')::boolean IS NOT FALSE THEN
-    RAISE EXCEPTION 'D273/700 §2: capabilities_for_user still lets the project role lift a user account';
+    RAISE EXCEPTION 'D276/720 §2: capabilities_for_user still lets the project role lift a user account';
   END IF;
   v_r := public.project_rights_for_user(v_med, v_p);
   IF (v_r -> 'capabilities' ->> 'simulation_lab')::boolean IS NOT TRUE
      OR (v_r -> 'capabilities' ->> 'data_edit_policies')::boolean IS NOT TRUE
      OR (v_r -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT FALSE
      OR v_r -> 'decisions' -> 'data_edit_inputs' ->> 'decided_by' IS DISTINCT FROM 'upload_gate' THEN
-    RAISE EXCEPTION 'D273/700 §2: a modeler Editor read as %', v_r;
+    RAISE EXCEPTION 'D276/720 §2: a modeler Editor read as %', v_r;
   END IF;
   v_r := public.project_rights_for_user(v_mview, v_p);
   IF v_r -> 'capabilities' @> '{"simulation_lab":true}' OR v_r -> 'capabilities' @> '{"export":true}'
      OR v_r -> 'decisions' -> 'simulation_lab' ->> 'decided_by' IS DISTINCT FROM 'project_role' THEN
-    RAISE EXCEPTION 'D273/700 §2: a modeler Viewer read as %', v_r;
+    RAISE EXCEPTION 'D276/720 §2: a modeler Viewer read as %', v_r;
   END IF;
 
   -- ── §3 no project role ───────────────────────────────────────────────────
@@ -145,20 +147,20 @@ BEGIN
   IF (v_r -> 'capabilities' ->> 'export')::boolean IS NOT TRUE
      OR (v_r -> 'capabilities' ->> 'simulation_lab')::boolean IS NOT FALSE
      OR v_r -> 'decisions' -> 'export' ->> 'decided_by' IS DISTINCT FROM 'account_role' THEN
-    RAISE EXCEPTION 'D273/700 §3: an organization member with no role read as %', v_r;
+    RAISE EXCEPTION 'D276/720 §3: an organization member with no role read as %', v_r;
   END IF;
 
   -- ── §4 overrides ─────────────────────────────────────────────────────────
   v_r := public.project_rights_for_user(v_over, v_p);
   IF (v_r -> 'capabilities' ->> 'simulation_lab')::boolean IS NOT TRUE
      OR v_r -> 'decisions' -> 'simulation_lab' ->> 'decided_by' IS DISTINCT FROM 'person_override' THEN
-    RAISE EXCEPTION 'D273/700 §4: a person override did not decide: %', v_r;
+    RAISE EXCEPTION 'D276/720 §4: a person override did not decide: %', v_r;
   END IF;
   v_r := public.project_rights_for_user(v_o2ed, v_p2);
   IF (v_r -> 'capabilities' ->> 'export')::boolean IS NOT FALSE
      OR v_r -> 'decisions' -> 'export' ->> 'decided_by' IS DISTINCT FROM 'account_ceiling'
      OR v_r -> 'decisions' -> 'export' ->> 'account_source' IS DISTINCT FROM 'organization' THEN
-    RAISE EXCEPTION 'D273/700 §4: an organization override is not the ceiling: %', v_r;
+    RAISE EXCEPTION 'D276/720 §4: an organization override is not the ceiling: %', v_r;
   END IF;
 
   -- ── §5 the agent gate ────────────────────────────────────────────────────
@@ -168,39 +170,39 @@ BEGIN
    WHERE c.conname = 'proposals_artifact_type_check';
   FOREACH t IN ARRAY v_allowed LOOP
     IF NOT (public.agent_artifact_project_rights() ? t) THEN
-      RAISE EXCEPTION 'D273/700 §5: artifact type % declares no project right', t;
+      RAISE EXCEPTION 'D276/720 §5: artifact type % declares no project right', t;
     END IF;
   END LOOP;
   IF public.agent_project_right_refusal(v_med, v_p, 'not_an_artifact') IS NULL THEN
-    RAISE EXCEPTION 'D273/700 §5: an undeclared artifact type was not refused';
+    RAISE EXCEPTION 'D276/720 §5: an undeclared artifact type was not refused';
   END IF;
 
   INSERT INTO public.proposals (project_id, agent_id, artifact_type, title, payload, provenance, idempotency_key, status)
-  VALUES (v_p, 'policy-configurator', 'policy_bundle_diff', 'D273 bundle', '{}'::jsonb, 'deterministic',
-          'd273-' || gen_random_uuid(), 'proposed')
+  VALUES (v_p, 'policy-configurator', 'policy_bundle_diff', 'D276 bundle', '{}'::jsonb, 'deterministic',
+          'd276-' || gen_random_uuid(), 'proposed')
   RETURNING id INTO v_prop;
   v_code := NULL;
   BEGIN
     SET LOCAL ROLE anon;
-    PERFORM public.review_agent_proposal(v_prop, 'approve', v_mview, 'd273v@example.invalid', NULL);
+    PERFORM public.review_agent_proposal(v_prop, 'approve', v_mview, 'd276v@example.invalid', NULL);
     RESET ROLE;
   EXCEPTION WHEN OTHERS THEN
     RESET ROLE; v_code := SQLSTATE; v_msg := SQLERRM;
   END;
   IF v_code IS NULL OR v_msg NOT LIKE 'forbidden: approving this proposal needs Edit Policies%' THEN
-    RAISE EXCEPTION 'D273/700 §5: a modeler Viewer approved a policy bundle (%: %)', v_code, v_msg;
+    RAISE EXCEPTION 'D276/720 §5: a modeler Viewer approved a policy bundle (%: %)', v_code, v_msg;
   END IF;
   SET LOCAL ROLE anon;
-  PERFORM public.review_agent_proposal(v_prop, 'approve', v_med, 'd273m@example.invalid', NULL);
+  PERFORM public.review_agent_proposal(v_prop, 'approve', v_med, 'd276m@example.invalid', NULL);
   RESET ROLE;
   PERFORM set_config('app.current_user_id', '', true);
   IF (SELECT status FROM public.proposals WHERE id = v_prop) IS DISTINCT FROM 'approved' THEN
-    RAISE EXCEPTION 'D273/700 §5: a modeler Editor could not approve a policy bundle';
+    RAISE EXCEPTION 'D276/720 §5: a modeler Editor could not approve a policy bundle';
   END IF;
 
   -- ── §6 /admin/roles ──────────────────────────────────────────────────────
   SET LOCAL ROLE anon;
-  v_acc := public.get_role_access(v_super, 'd273s@example.invalid');
+  v_acc := public.get_role_access(v_super, 'd276s@example.invalid');
   RESET ROLE;
   PERFORM set_config('app.current_user_id', '', true);
   FOR t IN SELECT jsonb_array_elements_text(v_acc -> 'project_scoped') LOOP
@@ -208,40 +210,40 @@ BEGIN
     IF v_d IS DISTINCT FROM public.project_right_decide(false, NULL, 'editor',
          (SELECT allowed FROM public.project_role_capabilities WHERE project_role = 'editor' AND capability_key = t),
          (SELECT allowed FROM public.role_capabilities WHERE role = 'user' AND capability_key = t)) THEN
-      RAISE EXCEPTION 'D273/700 §6: the effective matrix says % for user×editor×%', v_d, t;
+      RAISE EXCEPTION 'D276/720 §6: the effective matrix says % for user×editor×%', v_d, t;
     END IF;
   END LOOP;
   IF v_acc -> 'effective' -> 'user' -> 'editor' -> 'simulation_lab' ->> 'decided_by' IS DISTINCT FROM 'account_ceiling'
      OR (v_acc -> 'effective' -> 'super_admin' -> 'viewer' -> 'export' ->> 'allowed')::boolean IS NOT TRUE
      OR jsonb_array_length(v_acc -> 'project_scoped') <> 4 THEN
-    RAISE EXCEPTION 'D273/700 §6: the effective matrix read as %', v_acc -> 'effective';
+    RAISE EXCEPTION 'D276/720 §6: the effective matrix read as %', v_acc -> 'effective';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_acc -> 'capped') c
                   WHERE c ->> 'user_id' = v_ued::text AND c ->> 'capability_key' = 'simulation_lab')
      OR EXISTS (SELECT 1 FROM jsonb_array_elements(v_acc -> 'capped') c WHERE c ->> 'user_id' = v_over::text
                    AND c ->> 'capability_key' = 'simulation_lab') THEN
-    RAISE EXCEPTION 'D273/700 §6: the capped list read as %', v_acc -> 'capped';
+    RAISE EXCEPTION 'D276/720 §6: the capped list read as %', v_acc -> 'capped';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_acc -> 'person_overrides') o WHERE o ->> 'user_id' = v_over::text)
      OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_acc -> 'org_overrides') o WHERE o ->> 'org_id' = v_org2::text)
      OR (v_acc -> 'agent_rights' ->> 'policy_bundle_diff') IS DISTINCT FROM 'data_edit_policies' THEN
-    RAISE EXCEPTION 'D273/700 §6: overrides or agent map missing: %', v_acc;
+    RAISE EXCEPTION 'D276/720 §6: overrides or agent map missing: %', v_acc;
   END IF;
   v_code := NULL;
   BEGIN
     SET LOCAL ROLE anon;
-    PERFORM public.get_role_access(v_med, 'd273m@example.invalid');
+    PERFORM public.get_role_access(v_med, 'd276m@example.invalid');
     RESET ROLE;
   EXCEPTION WHEN OTHERS THEN RESET ROLE; v_code := SQLERRM;
   END;
   PERFORM set_config('app.current_user_id', '', true);
   IF v_code IS DISTINCT FROM 'forbidden' THEN
-    RAISE EXCEPTION 'D273/700 §6: a modeler read /admin/roles (%)', v_code;
+    RAISE EXCEPTION 'D276/720 §6: a modeler read /admin/roles (%)', v_code;
   END IF;
 
   -- ── §7 the preview ───────────────────────────────────────────────────────
   SET LOCAL ROLE anon;
-  v_r := public.admin_preview_role_capability(v_super, 'd273s@example.invalid', 'user', 'simulation_lab', true);
+  v_r := public.admin_preview_role_capability(v_super, 'd276s@example.invalid', 'user', 'simulation_lab', true);
   RESET ROLE;
   PERFORM set_config('app.current_user_id', '', true);
   IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'changes') c
@@ -249,20 +251,33 @@ BEGIN
                     AND (c ->> 'before')::boolean = false AND (c ->> 'after')::boolean = true)
      OR EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'changes') c
                  WHERE c ->> 'user_id' = v_over::text) THEN
-    RAISE EXCEPTION 'D273/700 §7: turning Run Simulations on for user accounts previewed as %', v_r;
+    RAISE EXCEPTION 'D276/720 §7: turning Run Simulations on for user accounts previewed as %', v_r;
   END IF;
   SET LOCAL ROLE anon;
-  v_r := public.admin_preview_role_capability(v_super, 'd273s@example.invalid', 'modeler', 'export', false);
+  v_r := public.admin_preview_role_capability(v_super, 'd276s@example.invalid', 'modeler', 'export', false);
   RESET ROLE;
   PERFORM set_config('app.current_user_id', '', true);
   IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'changes') c WHERE c ->> 'user_id' = v_med::text)
      OR EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'changes') c WHERE c ->> 'user_id' = v_o2ed::text)
      OR EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'changes') c WHERE c ->> 'user_id' = v_mview::text) THEN
-    RAISE EXCEPTION 'D273/700 §7: turning Export off for modelers previewed as %', v_r;
+    RAISE EXCEPTION 'D276/720 §7: turning Export off for modelers previewed as %', v_r;
   END IF;
   IF (SELECT allowed FROM public.role_capabilities WHERE role = 'modeler' AND capability_key = 'export') IS NOT TRUE THEN
-    RAISE EXCEPTION 'D273/700 §7: the preview wrote';
+    RAISE EXCEPTION 'D276/720 §7: the preview wrote';
   END IF;
 
-  RAISE NOTICE 'D273/700: the account role caps, the project role grants, agents ask the same right, and /admin/roles reads the rule';
-END $d273$;
+  -- ── §8 the server's policy writers apply the ceiling (D275) ──────────────
+  v_code := NULL;
+  BEGIN
+    PERFORM public.save_policy_defaults(v_p, 'inventory', '{"d276": "user editor"}'::jsonb, _actor_user_id => v_ued);
+  EXCEPTION WHEN insufficient_privilege THEN v_code := SQLERRM;
+  END;
+  PERFORM set_config('app.current_user_id', '', true);
+  IF v_code IS NULL OR v_code NOT LIKE 'forbidden:%' THEN
+    RAISE EXCEPTION 'D276/720 §8: a user-account Editor wrote a policy (%)', v_code;
+  END IF;
+  PERFORM public.save_policy_defaults(v_p, 'inventory', '{"d276": "modeler editor"}'::jsonb, _actor_user_id => v_med);
+  PERFORM set_config('app.current_user_id', '', true);
+
+  RAISE NOTICE 'D276/720: the account role caps, the project role grants, agents ask the same right, and /admin/roles reads the rule';
+END $d276$;

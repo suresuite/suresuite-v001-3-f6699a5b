@@ -1,0 +1,55 @@
+name: engine distribution
+
+# Phase 12 · WP 12.4 — publish the engine wheels (public/engine/*.whl, kept equal
+# to the engine source by scsim-tests.yml's freshness gate) to the PRIVATE
+# `engine` storage bucket that `GET /v1/engine` signs URLs to.
+#
+# Main only, like every deploy: a branch's wheels are not what production runs.
+# Content-addressed paths, so publishing the same wheel twice is a no-op and an
+# old index's URLs keep resolving. The service-role key is derived from
+# SUPABASE_ACCESS_TOKEN through the Management API, masked, and never printed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "public/engine/**"
+      - "scripts/publish_engine_wheels.mjs"
+      - ".github/workflows/engine-distribution.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PROJECT_REF: wckdrutwkytwcomrlpib
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: The index the wheels produce
+        run: node scripts/publish_engine_wheels.mjs --dry-run
+
+      - name: Resolve the service-role key (masked)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          key=$(curl -fsS "https://api.supabase.com/v1/projects/${PROJECT_REF}/api-keys?reveal=true" \
+                  -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+                | jq -r '.[] | select(.name == "service_role") | .api_key')
+          if [ -z "$key" ] || [ "$key" = "null" ]; then echo "no service_role key returned"; exit 1; fi
+          echo "::add-mask::$key"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$key" >> "$GITHUB_ENV"
+
+      - name: Publish to the private engine bucket
+        env:
+          SUPABASE_URL: https://${{ env.PROJECT_REF }}.supabase.co
+        run: node scripts/publish_engine_wheels.mjs

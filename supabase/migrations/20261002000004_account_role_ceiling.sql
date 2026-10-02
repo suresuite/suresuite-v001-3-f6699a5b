@@ -1,4 +1,4 @@
--- Profile / §4 D273 — the ACCOUNT role is the ceiling and the PROJECT role is the grant; an
+-- Profile / §4 D276 — the ACCOUNT role is the ceiling and the PROJECT role is the grant; an
 -- agent may not approve what its approver may not do by hand; and /admin/roles shows the
 -- rule it is setting.
 --
@@ -83,7 +83,7 @@ LANGUAGE sql IMMUTABLE SET search_path = public AS $$
   END;
 $$;
 COMMENT ON FUNCTION public.project_right_decide(boolean, boolean, text, boolean, boolean) IS
-  'D273 — the one rule for a project-scoped right: super admin → yes; a person override → '
+  'D276 — the one rule for a project-scoped right: super admin → yes; a person override → '
   'its value; no project role → the account''s answer; otherwise the project grant AND the '
   'account''s answer (the account role is the ceiling). Returns {allowed, decided_by}. '
   'capabilities_for_user, project_rights_for_user, get_role_access and '
@@ -135,7 +135,7 @@ BEGIN
   RETURN v_out;
 END; $$;
 COMMENT ON FUNCTION public.project_right_decisions(uuid, uuid) IS
-  'D273 — per project-scoped key, the inputs project_right_decide reads for one person on one '
+  'D276 — per project-scoped key, the inputs project_right_decide reads for one person on one '
   'project (project role and its grant, the account''s answer and where it came from, any '
   'person override) and its answer. Internal.';
 REVOKE ALL ON FUNCTION public.project_right_decisions(uuid, uuid) FROM PUBLIC, anon, authenticated;
@@ -207,7 +207,7 @@ BEGIN
     END AS eff) x
   WHERE c.kind = 'feature';
 
-  -- D273 — the keys the project layer decides follow `project_right_decide`: the project
+  -- D276 — the keys the project layer decides follow `project_right_decide`: the project
   -- role grants, the account role caps.
   v_decisions := public.project_right_decisions(_user_id, _project_id);
   SELECT v_features || COALESCE(jsonb_object_agg(d.key, d.value -> 'allowed'), '{}'::jsonb)
@@ -268,7 +268,7 @@ BEGIN
     INTO v_caps
     FROM jsonb_each(v_resolved) r;
 
-  -- D273 — why each right holds or not. The rule's own decider, then the two gates applied
+  -- D276 — why each right holds or not. The rule's own decider, then the two gates applied
   -- after it: suspension and, for Edit Input Data, the upload gate.
   SELECT COALESCE(jsonb_object_agg(d.key,
            d.value || jsonb_build_object(
@@ -293,7 +293,7 @@ BEGIN
     'decisions',             v_decisions);
 END; $$;
 COMMENT ON FUNCTION public.project_rights_for_user(uuid, uuid) IS
-  'D230, D231, D273 — one person''s rights on one project, as the app applies them while the '
+  'D230, D231, D276 — one person''s rights on one project, as the app applies them while the '
   'person works in the project''s organization: visible, working_in_project_org, '
   'can_edit_project, may_land_uploads, capabilities (project_right_decide''s answer, refused '
   'to a suspended account, and data_edit_inputs also requiring the upload gate), '
@@ -322,7 +322,7 @@ LANGUAGE sql IMMUTABLE SET search_path = public AS $$
     ) AS t(artifact_type, capability_key);
 $$;
 COMMENT ON FUNCTION public.agent_artifact_project_rights() IS
-  'D273 — the project right an approver must hold on the proposal''s project for each agent '
+  'D276 — the project right an approver must hold on the proposal''s project for each agent '
   'artifact type: the right the same change needs by hand. Read by agent_project_right_refusal '
   '(review_agent_proposal, agent-apply) and shown on /admin/roles.';
 GRANT EXECUTE ON FUNCTION public.agent_artifact_project_rights() TO anon, authenticated, service_role;
@@ -353,7 +353,7 @@ BEGIN
                 COALESCE(v_rights -> 'decisions' -> v_key ->> 'decided_by', 'no project access'));
 END; $$;
 COMMENT ON FUNCTION public.agent_project_right_refusal(uuid, uuid, text) IS
-  'D273 — NULL when the user holds, on the project, the right agent_artifact_project_rights '
+  'D276 — NULL when the user holds, on the project, the right agent_artifact_project_rights '
   'names for the artifact; otherwise the refusal. Fails closed on an undeclared artifact type.';
 REVOKE ALL ON FUNCTION public.agent_project_right_refusal(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.agent_project_right_refusal(uuid, uuid, text) TO service_role;
@@ -404,7 +404,7 @@ BEGIN
       END IF;
     END IF;
 
-    -- D273 — approving is never more than the approver could do by hand on this project.
+    -- D276 — approving is never more than the approver could do by hand on this project.
     IF p_action = 'approve' AND NOT COALESCE((v_caps->>'is_super_admin')::boolean, false) THEN
       v_refusal := public.agent_project_right_refusal(p_user_id, v_row.project_id, v_row.artifact_type);
       IF v_refusal IS NOT NULL THEN RAISE EXCEPTION '%', v_refusal; END IF;
@@ -554,7 +554,7 @@ BEGIN
     'roles', (SELECT jsonb_object_agg(role, caps) FROM (
         SELECT rc.role, jsonb_object_agg(rc.capability_key, rc.allowed) AS caps
         FROM public.role_capabilities rc GROUP BY rc.role) r),
-    -- D273
+    -- D276
     'project_scoped',     v_scoped,
     'project_roles',      v_prm,
     'effective',          v_eff,
@@ -607,7 +607,7 @@ BEGIN
   RETURN jsonb_build_object('project_scoped', true, 'changes', v_changes);
 END; $$;
 COMMENT ON FUNCTION public.admin_preview_role_capability(uuid, text, text, text, boolean) IS
-  'D273 — the memberships whose project right would change if the account role''s switch for '
+  'D276 — the memberships whose project right would change if the account role''s switch for '
   'a project-scoped key were set to p_allowed, re-decided by project_right_decide. Read-only.';
 REVOKE ALL ON FUNCTION public.admin_preview_role_capability(uuid, text, text, text, boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.admin_preview_role_capability(uuid, text, text, text, boolean) TO anon, authenticated;

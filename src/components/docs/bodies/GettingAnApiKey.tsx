@@ -170,7 +170,7 @@ export default function GettingAnApiKey() {
 
       <Section id="notebook" title="The notebook series">
         <Key>
-          Five Python notebooks do what you do in the application — with your own project's ids
+          Six Python notebooks do what you do in the application — with your own project's ids
           already filled in, or with no key at all in demo mode.
         </Key>
         <P>
@@ -187,7 +187,9 @@ export default function GettingAnApiKey() {
           replication by replication; <strong>02</strong> runs stress tests and reads survival and
           recovery times; <strong>03</strong> produces a material shortage through a sole-source
           supplier outage and compares lost sales with backorders; <strong>04</strong> exports a
-          run's results workbook with its reproducibility record. A notebook that changes your
+          run's results workbook with its reproducibility record; <strong>05</strong> pulls a dataset
+          and a policy version and runs the simulation engine on your own machine — reproducing a
+          platform run exactly, then sweeping twenty scenarios at no cost to your quota. A notebook that changes your
           policies puts them back when its block ends, even if a run fails.
         </P>
         <P>
@@ -226,17 +228,36 @@ export default function GettingAnApiKey() {
         </Callout>
       </Section>
 
-      <Callout tone="limit" title="A key has no person behind it, so the audit trail has no name">
+      <Section id="personal-keys" title="Personal keys and organization keys">
+        <Key>
+          A personal key acts as you: it stops working if you leave the organization, and every
+          request it makes is logged under your name.
+        </Key>
+        <P>
+          When you create a key you choose what it acts as. A <strong>personal</strong> key — the
+          default — is bound to you. It reaches what you can see in the application, it stops the
+          moment your account is deactivated or moves to another organization, and the request log
+          names you on everything it does. Only you can rotate it; an administrator can revoke it but
+          not rotate it, because rotating hands over a secret that would act as you.
+        </P>
+        <P>
+          An <strong>organization</strong> key acts for the organization and names no person. Use it
+          for a shared service that should keep working whoever leaves.
+        </P>
+      </Section>
+
+      <Callout tone="limit" title="Writes through the API still record no person">
         <p>
-          Because a key belongs to a project rather than to somebody, a write made with it is
-          recorded with <strong>no actor</strong>. The change is logged; who made it is not, because
-          there is no “who” to log.
+          A personal key's requests name you in the request log. The changes it WRITES — a frozen
+          dataset, a saved policy, a dispatched run — are still recorded with <strong>no actor</strong>,
+          as they are for an organization key. Naming the person in a write turns on the per-user
+          permission checks the application applies, and those arrive together with writing data
+          back through the API, not before.
         </p>
         <p>
           Naming a fabricated user would be worse — an audit trail reading as though a person acted
-          when none did. So the field is left empty and this is where we say so. If attribution
-          matters for an automated process, the practical answer today is one key per process, named
-          for the process, so the key's own name carries what the actor field cannot.
+          when none did. For an organization key the practical answer remains one key per process,
+          named for the process, so the key's own name carries what the actor field cannot.
         </p>
         <p>
           <DocLink to="audit-log">Audit log</DocLink> and{" "}

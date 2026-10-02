@@ -25,9 +25,9 @@ export type UndescribedGroup = {
 };
 
 /** The contract version these figures came from. §6.4: a version, never a date. */
-export const CONTRACT_VERSION = "82ef90744042";
+export const CONTRACT_VERSION = "a1ead19d1bd2";
 export const ENGINE_VERSION = "0.2.8";
-export const LAST_MIGRATION = "20261002000001_account_role_ceiling.sql";
+export const LAST_MIGRATION = "20261002000004_account_role_ceiling.sql";
 
 export const COUNTS = {
   "tablesInSchema": 92,
@@ -574,7 +574,7 @@ export const UNDESCRIBED: UndescribedGroup[] = [
       },
       {
         "table": "api_keys",
-        "columns": 17
+        "columns": 18
       },
       {
         "table": "api_rate_limits",
@@ -582,7 +582,7 @@ export const UNDESCRIBED: UndescribedGroup[] = [
       },
       {
         "table": "api_request_logs",
-        "columns": 14
+        "columns": 15
       },
       {
         "table": "chat_folders",

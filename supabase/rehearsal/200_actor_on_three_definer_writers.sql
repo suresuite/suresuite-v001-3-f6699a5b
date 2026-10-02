@@ -48,6 +48,27 @@ BEGIN
   INSERT INTO public.projects (id, name, modeler_id, plant_name, organization, organization_id)
     VALUES (v_project, 'D71', v_actor, 'D71P', 'D71 Org', v_org);
 
+  -- §4 D275 · the policy writers now refuse a named actor without Edit Policies, and the
+  -- rehearsal base is schema, not seed: plant the project layer where it is missing, as the
+  -- migrations leave it (`20260915000005`, `20261001000005`), as `550` and `710` do. The
+  -- project's modeler is its owner member (D61's trigger), so the owner rows are the ones read.
+  INSERT INTO public.capabilities (key, kind, label, sort_order) VALUES
+    ('data_edit_inputs', 'feature', 'Edit Input Data', 241),
+    ('data_edit_policies', 'feature', 'Edit Policies', 242),
+    ('export', 'feature', 'Export', 250),
+    ('simulation_lab', 'feature', 'Run Simulations', 220)
+  ON CONFLICT (key) DO NOTHING;
+  INSERT INTO public.project_role_capabilities (project_role, capability_key, allowed) VALUES
+    ('owner',   'data_edit_inputs', true),  ('owner',   'data_edit_policies', true),
+    ('owner',   'export', true),            ('owner',   'simulation_lab', true),
+    ('editor',  'data_edit_inputs', true),  ('editor',  'data_edit_policies', true),
+    ('editor',  'export', true),            ('editor',  'simulation_lab', true),
+    ('analyst', 'data_edit_inputs', false), ('analyst', 'data_edit_policies', false),
+    ('analyst', 'export', false),           ('analyst', 'simulation_lab', true),
+    ('viewer',  'data_edit_inputs', false), ('viewer',  'data_edit_policies', false),
+    ('viewer',  'export', false),           ('viewer',  'simulation_lab', false)
+  ON CONFLICT (project_role, capability_key) DO NOTHING;
+
   -- ── 1 · assign_bom_line ─────────────────────────────────────────────────
   SELECT count(*) INTO v_before FROM public.audit_logs
    WHERE plane = 'data' AND target_type = 'bom_single_level';

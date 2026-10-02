@@ -81,8 +81,8 @@ describe('D230 · what a row of ticks owes its reader', () => {
   });
 });
 
-describe('D273 · the refusal names the layer that decided', () => {
-  const ceilingSql = readFileSync(path.join(root, 'supabase/migrations/20261002000001_account_role_ceiling.sql'), 'utf8');
+describe('D276 · the refusal names the layer that decided', () => {
+  const ceilingSql = readFileSync(path.join(root, 'supabase/migrations/20261002000004_account_role_ceiling.sql'), 'utf8');
   const decided = (decided_by: RightDecider, over: Partial<RightDecision> = {}): ProjectRights => rights({
     effective_role: 'editor',
     decisions: {

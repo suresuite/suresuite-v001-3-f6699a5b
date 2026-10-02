@@ -20,6 +20,7 @@ from .policy_snapshot import snapshot_to_policies
 from .schemas import Command
 from .scsim_bridge import compute_kpis_scsim, compute_run_from_project, scsim_enabled
 from . import series_store
+from .run_shape import build_run_update as _shape_run_update
 
 try:  # scsim ships with the canonical path; the legacy-only image lacks it
     from scsim import RunCancelled
@@ -102,52 +103,10 @@ def engine_mismatch(engine: dict[str, Any] | None, scsim_on: bool) -> str | None
 
 
 def build_run_update(kpis: dict[str, Any], n_reps: int) -> dict[str, Any]:
-    """Translate an engine KPI dict (mean_*/ci_* shape) into the
-    simulation_runs row update persisted after an experiment.run."""
-    aggregate = {k[len("mean_"):]: v for k, v in kpis.items() if k.startswith("mean_")}
-    # The range across replications the bridge computes and this used to drop
-    # (WP 10.6 · §4 D246). Under an underscore key, like `_meta`, so a reader
-    # that iterates KPIs is not handed `min_fill_rate` as a KPI of its own.
-    rng = {
-        k[len("min_"):]: {"min": v, "max": kpis.get("max_" + k[len("min_"):])}
-        for k, v in kpis.items() if k.startswith("min_")
-    }
-    if rng:
-        aggregate["_range"] = rng
-    aggregate["_meta"] = {
-        "engine": kpis.get("source", "worker"),
-        **({"scsim_notes": kpis["scsim_notes"]} if kpis.get("scsim_notes") else {}),
-        # WHICH products/suppliers capacity bound, and for how many weeks of the
-        # analysis window (WP 9.3 / §4 D167). A run-level fact about the run, so
-        # it rides `_meta` beside the conversion notes rather than becoming a
-        # scalar KPI — `products_capacity_bound` is the scalar, and it cannot
-        # name a product.
-        **({"capacity_binding": kpis["capacity_binding"]}
-           if kpis.get("capacity_binding") else {}),
-        # Which rule decided the replication count (audit F-13): the KPI table
-        # labels a sequentially stopped run's intervals.
-        **({"stopping_rule": kpis["stopping_rule"]} if kpis.get("stopping_rule") else {}),
-    }
-    if kpis.get("source") == "scsim":
-        code_version = f"scsim-{kpis.get('engine_version', 'unknown')}"
-    else:
-        code_version = "worker-legacy"
-    patch: dict[str, Any] = {
-        "status": "done",
-        "ended_at": _now(),
-        "aggregate_kpis": aggregate,
-        "ci_half_widths": {k[len("ci_"):]: v for k, v in kpis.items() if k.startswith("ci_")},
-        "code_version": code_version,
-        # The replications that EXIST, not the ones asked for (audit F-18). The
-        # legacy engine writes no `run_replications` rows, so it claims none;
-        # it used to claim the requested count over an empty table.
-        "rep_count_done": len(kpis.get("replications") or []),
-    }
-    if kpis.get("mapping_warnings") is not None:
-        patch["mapping_warnings"] = kpis["mapping_warnings"]
-    if kpis.get("warmup_detected_at") is not None:
-        patch["warmup_detected_at"] = kpis["warmup_detected_at"]
-    return patch
+    """The worker's run row: `run_shape.build_run_update`, stamped with the
+    worker's clock. The shaping itself lives in `run_shape` so the browser and
+    `sim_worker.local` produce the identical row."""
+    return _shape_run_update(kpis, n_reps, ended_at=_now())
 
 STREAM_PREFIX = "sim.cmd."
 CONSUMER_GROUP = "sim-workers"
