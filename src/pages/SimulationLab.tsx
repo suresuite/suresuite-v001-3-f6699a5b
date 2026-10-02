@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { useSearchParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -681,6 +681,34 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     />
   );
 
+  // The frame stays put while the stage changes: the rail pins under the sticky
+  // page header and the aside pins under the rail, so switching Setup →
+  // Recovery → Run → Results → Compare (or scrolling a long pane) moves only
+  // the pane column. Both offsets are MEASURED rather than written as literals
+  // — the header's right slot may wrap and the rail's sub-labels change with
+  // state, and a hard-coded top would overlap or gap the moment either grows.
+  const gutterRef = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
+  const [pinTop, setPinTop] = useState({ header: 0, rail: 0 });
+  const hasSelected = !!selected;
+  useLayoutEffect(() => {
+    // PageHeader takes no ref; it is always the gutter's first child.
+    const header = gutterRef.current?.firstElementChild as HTMLElement | null;
+    const rail = railRef.current;
+    const read = () =>
+      setPinTop((prev) => {
+        const next = { header: header?.offsetHeight ?? 0, rail: rail?.offsetHeight ?? 0 };
+        return prev.header === next.header && prev.rail === next.rail ? prev : next;
+      });
+    read();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(read);
+    if (header) ro.observe(header);
+    if (rail) ro.observe(rail);
+    return () => ro.disconnect();
+  }, [isMobile, projectId, hasSelected]);
+  const asideTop = pinTop.header + pinTop.rail;
+
   // Below md the desktop rail + aside + pane grid is not reflowed, it is
   // replaced: MobileSimulationLab is the phone composition (PAGES.md 14 · 15).
   // Both trees are fed from the state above, and the branch sits below every
@@ -777,7 +805,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
 
   return (
     <PageLayout isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed}>
-      <div className={PAGE_GUTTER}>
+      <div ref={gutterRef} className={PAGE_GUTTER}>
         <PageHeader
           title="Simulation Lab"
           rightContent={
@@ -813,13 +841,26 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
             No project selected
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col">
             {selected ? (
-              <StageRail stages={stages} active={pane} onSelect={setPane} gate={gateReadout} />
+              // Opaque canvas behind the pinned rail so the pane scrolls UNDER
+              // it; -mt-3/pt-3 keeps 12px of canvas below the header once
+              // stuck without moving the rail at rest, and pb-3 is the gap the
+              // column used to carry.
+              <div
+                ref={railRef}
+                className="sticky z-30 -mt-3 bg-[hsl(var(--surface-sunken))] pb-3 pt-3"
+                style={{ top: pinTop.header }}
+              >
+                <StageRail stages={stages} active={pane} onSelect={setPane} gate={gateReadout} />
+              </div>
             ) : null}
 
             <div className="flex flex-col gap-4 md:flex-row md:items-start">
-              <aside className="w-full min-w-0 md:w-64 md:shrink-0">
+              <aside
+                className="w-full min-w-0 md:sticky md:w-64 md:shrink-0 md:self-start md:overflow-y-auto md:overscroll-contain"
+                style={{ top: asideTop, maxHeight: `calc(100dvh - ${asideTop}px - 16px)` }}
+              >
                 <ExperimentLibraryBox
                   count={STRESS_TESTS.length}
                   open={stressOpen}
