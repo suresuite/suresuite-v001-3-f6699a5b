@@ -208,6 +208,6 @@ When it was last changed. Maintained by a trigger where one exists; with no writ
 
 ---
 
-*Generated from data contract `0f63c0936a2a`, engine `0.2.11`,
+*Generated from data contract `48d3cc002eef`, engine `0.3.0`,
 sidecar `supabase/contract/policy_presets.contract.yaml`, table created by `20260607115833_78440629-51bc-4ad3-9934-f6c2f357ff86.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

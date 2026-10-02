@@ -327,6 +327,22 @@ None left. The last three were decided on 2026-10-02 (§0, decisions 6–8). New
 found during implementation are recorded here, each with its default, before the package
 that raises them merges.
 
+Found by WP 14.1 (defaults shipped; the owner may overrule):
+
+1. **What "centre" means for a forecast.** The forecast value is the week's **expected
+   value**: normal's μ, poisson's λ, triangularAV's mode (= its mean), deterministic's value.
+   For an explicit **triangular** row (min, mode, max) the triangle is **scaled** so its mean
+   equals the week's forecast — its shape is kept, its bounds move proportionally. Without a
+   forecast, the plan reads the triangle's mean (min + mode + max)/3, and `demand_mean` is
+   its mode, as `products.demand_mean` is for a product.
+2. **A row without a spec, beside rows with one.** It takes its product's distribution scaled
+   by its share of the product's volume (normalized over all the product's rows). The
+   product's stationary mean becomes the sum of its rows' means, so P-P.1 sizes on the rows.
+3. **A product no customer row names** gets one implicit row (no customer, share 1).
+4. **Week 0 of a forecast series** is the first simulated week. Where a stored series carries
+   dates, WP 14.2 decides how a date maps to a simulated week.
+
+
 ---
 
 ## Appendix — probe method (reproducibility; not engine code)

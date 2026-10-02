@@ -1,5 +1,5 @@
 {
-  "engine_version": "0.2.11",
+  "engine_version": "0.3.0",
   "phases": [
     {
       "id": "PH-00",
@@ -14,9 +14,10 @@
       "name": "demand_realization",
       "owns": [
         "demand",
-        "forecast"
+        "forecast",
+        "demand_rows"
       ],
-      "description": "Update the demand forecast from history (\u00a73.3 models), then draw D_p[t] from the world demand stream."
+      "description": "Update the demand forecast from history (\u00a73.3 models), then read D_p[t] \u2014 and per customer \u00d7 product row, D_r[t] \u2014 from the pre-drawn world demand stream."
     },
     {
       "id": "PH-20",

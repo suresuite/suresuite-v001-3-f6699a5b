@@ -207,6 +207,6 @@ When the project's level first had this content — the first snapshot's `create
 
 ---
 
-*Generated from data contract `0f63c0936a2a`, engine `0.2.11`,
+*Generated from data contract `48d3cc002eef`, engine `0.3.0`,
 sidecar `supabase/contract/graph_level_versions.contract.yaml`, table created by `20261001000019_graph_level_versions.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

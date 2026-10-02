@@ -52,6 +52,7 @@ class PhaseId(str, Enum):
 # Transient keys — owned by exactly one phase, recomputed weekly.
 DISRUPTION_STATE = "disruption_state"
 DEMAND = "demand"
+DEMAND_ROWS = "demand_rows"  # WP 14.1 / ADR 0002: demand per customer × product row; Σ = demand
 FORECAST = "forecast"  # ADR 0001: produced at PH-10, consumed by PH-40/PH-70 (MTS)
 FIRM_KNOWLEDGE = "firm_knowledge"
 FG_FULFILLMENT = "fg_fulfillment"
@@ -88,9 +89,9 @@ class PhaseSpec:
 PIPELINE: tuple[PhaseSpec, ...] = (
     PhaseSpec(PhaseId.PH00, "week_start", (DISRUPTION_STATE,),
               "Onset/recovery profiles → physical disruption state for the week."),
-    PhaseSpec(PhaseId.PH10, "demand_realization", (DEMAND, FORECAST),
-              "Update the demand forecast from history (§3.3 models), then draw D_p[t] "
-              "from the world demand stream."),
+    PhaseSpec(PhaseId.PH10, "demand_realization", (DEMAND, FORECAST, DEMAND_ROWS),
+              "Update the demand forecast from history (§3.3 models), then read D_p[t] — and "
+              "per customer × product row, D_r[t] — from the pre-drawn world demand stream."),
     PhaseSpec(PhaseId.PH20, "detection", (FIRM_KNOWLEDGE,),
               "Firm-visible events (t ≥ start + detection_lag). P-S.4 / P-X.1 evaluate here."),
     PhaseSpec(PhaseId.PH30, "fulfill_from_stock", (FG_FULFILLMENT,),

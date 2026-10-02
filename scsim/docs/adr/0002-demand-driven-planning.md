@@ -56,3 +56,19 @@ demand**, and **the plan never reads the realized future demand draws** (gate
   `sla_tier`; oldest backlog first; ties by row order; batched over products by
   a CSR row pointer). P-C.2 delegates to it with outputs identical to before
   (golden digests unchanged). No contract or behaviour change.
+* **WP 14.1** (engine 0.2.11 → **0.3.0**, Tier 3: a new transient key) —
+  `CustomerLink` carries an optional demand spec (`demand_model` ∈
+  deterministic / normal / triangular / triangular_av / poisson, `demand_mean`,
+  `demand_variation`, `demand_min`, `demand_max`, `forecast`). New transient key
+  **`demand_rows`**, owned by **PH-10**; `pipeline_schema.json` re-frozen. When
+  any row carries a spec, the world schedule is drawn **per row** under a new
+  consumption contract (`context.py::draw_week_demand_rows`) and product demand
+  is the row sum; with none, the per-product draw and its contract are
+  unchanged byte for byte. `DemandModel.NORMAL` (last in the enum, so no
+  existing draw sequence moves): N(μ, cv·μ), negatives set to 0, clips and the
+  mean shift reported on `ScenarioResult.demand_clips` and as run warnings.
+  **Declared behaviour change:** the mapper's `normal` is a real normal (it ran
+  as triangularAV with `demand_cv` as its ± fraction). The plan's view is
+  `SimContext.projected_demand_rows` / `projected_demand` — centres only, never
+  draws. KPIs `demand_forecast_bias` / `demand_forecast_mape` (pooled and per
+  product) appear only when rows carry specs.

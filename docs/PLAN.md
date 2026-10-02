@@ -472,7 +472,7 @@ else cites the D-number or the §4.1 row. `npm run check:docs` enforces it.
 | **D281** | **Saving one /policies cell deleted every other value saved on that row and family.** `bulk_upsert_policy_overrides` REPLACES a row's patch (`ON CONFLICT … DO UPDATE SET patch = excluded.patch`), and the grid's `saveAll` sent only the fields drafted in that save — so editing Holding % on a Supplier row whose policy type, Q and κ were saved earlier stored `{holding_cost_pct}` and nothing else, silently, for every save since the grid had per-row overrides. The prefill path was not affected (it writes every persistable field of the row at once); the Excel import writes whole patches too | `src/components/policies/StagePolicyTable.tsx` (`saveAll`, before WP 13.1: `bucket` held the draft only); `supabase/migrations/20261002000003_policy_writes_need_edit_policies.sql` (`bulk_upsert_policy_overrides`, `patch = excluded.patch`) | **✅ CLOSED by WP 13.1 (2026-10-02)** — a save is planned as FULL patches: the saved patch with the save applied on top (`planPatch`, `settlePlan` in `masterOverrides.ts`), and a row whose patch empties is deleted rather than stored as `{}`. `masterOverrides.test.ts` (§4 D281). **Not measured**: how many saved fields production lost this way — an overwritten patch leaves no trace but the audit log's `before`, which a §15 probe could read |
 | **D282** | **A scenario's recovery playbook reached the worker's runs and nobody else's.** The dispatcher resolves `scenarios.recovery_overrides` over the version's recovery family and sends it as the envelope's `recovery`; the worker merged it into the policies inline. `sim_worker.local.run_from_snapshots` — the browser engine and the `suresuite` package — took no recovery at all, and the package even passed `recovery_overrides` through in its scenario to be ignored. So one scenario with a playbook (`dual_source_activate`, …) simulated two ways depending on where it ran, under one RunKey | `sim-worker/sim_worker/worker.py` (the inline merge, before WP 13.2); `sim-worker/sim_worker/local.py` (`run_from_snapshots`, no recovery); `python/suresuite/local.py` (`recovery_overrides` in the frame) | **✅ CLOSED by WP 13.2 (2026-10-02)** — `apply_recovery` in `local.py` is the one merge: the worker passes its envelope's resolved playbook, every other caller the scenario's own `recovery_overrides` (nulls skipped, as `resolveRecovery` skips them). `test_frozen_inputs.py` |
 | **D283** | **The project-wide inventory, sourcing and recovery defaults have no control on /policies.** Since presets and the strategy selector were removed (`e86f875f`), only the Fulfillment card can save a project default; the safety-stock method and days, the service level, κ, holding cost, the sourcing strategy and ratios, the recovery responses and detection lag can be set only by Excel import or a version restore. Split out of §4 D204 (c) when Phase 13 closed (a) and (b): since `20261002000010` those defaults are at least SAVED in every policy version exactly as the page would show them, so page = run holds — but a planner cannot change them where they read them | `src/lib/policies/policyColumnCheck.ts` (`PAGE_LEVEL_CHECK`, "no card since presets were removed"); `src/components/policies/FocusedStage.tsx` (the Fulfillment card only) | **OPEN** — owner to be decided by the product owner: §23 made the page and the run agree; adding controls is a product decision no package has been given |
-| **D284** | **The run does not plan from the demand the customer table states, and it cannot serve a customer row differently from another.** Four connected gaps, all measured on engine 0.2.9 (blueprint G20, `docs/design/mrp-multi-stage-planning.md` §1). (a) **Material demand ignores the production plan.** PH-70's `material_demand` is a compile-time constant for MTO (stationary mean × BOM) and this week's forecast × BOM for MTS. P-P.1 sizes its reorder levels on it. With demand stepped 100 → 150/wk it read 100 in all 60 weeks, and with 2 weeks of cover the run lost 650 units that a time-phased prototype did not. (b) **Demand is per product only.** There is no per customer × product demand and no forecast series. A product whose `demand_distribution` is `normal` silently runs as triangularAV (one mapping warning), and `demand_cv` is used as triangularAV's ± fraction rather than as a coefficient of variation. (c) **Fulfillment is project-wide only.** The backlog is per product. Per-row backorder allowed / max days / cost and allocation inputs are dropped with a warning. `revenue_max` runs as `priority`, and `customers.sla_fill_floor_pct` is read by nothing. (d) **The finished-goods policy is half-declared.** `Product.fg_policy = min_max` exists and no code reads it, and there is no FG opening stock (engine RFC 4) | `scsim/scsim/core/engine.py:245` (`_mech_material_demand`); `scsim/scsim/core/engine.py:202` (`_mech_default_plan`, one week); `scsim/scsim/policies/builtin/p_p1_inventory_control.py:298-323` (levels from the constant); `scsim/scsim/io/project_map.py:1103` (`normal` → triangularAV); `scsim/scsim/io/project_map.py:1074` (`demand_cv` as the AV fraction); `scsim/scsim/io/project_map.py:1819` (`_FULFILLMENT_DEFAULT_ONLY`); `scsim/scsim/io/project_map.py:2089` (`revenue_max` → priority); `scsim/scsim/policies/builtin/p_c1_unmet_demand.py:91` (backlog per product); `scsim/scsim/entities/network.py:221` (`fg_policy`, unread) | **OPEN** — Phase 14 (§24). Owner decisions 2026-10-02: planned production = min(requirement, capacity); demand per customer × product row (a forecast series, or mean + variation + distribution); FG policies base-stock / min-max / days of cover; one allocation rule per project with per-row priority / price / service target; per-row backorder now; a shortfall carries only for rows that allow backorder; monthly forecasts spread evenly; negative normal draws set to 0. WP 14.1–14.5 close (a)–(d) |
+| **D284** | **The run does not plan from the demand the customer table states, and it cannot serve a customer row differently from another.** Four connected gaps, all measured on engine 0.2.9 (blueprint G20, `docs/design/mrp-multi-stage-planning.md` §1). (a) **Material demand ignores the production plan.** PH-70's `material_demand` is a compile-time constant for MTO (stationary mean × BOM) and this week's forecast × BOM for MTS. P-P.1 sizes its reorder levels on it. With demand stepped 100 → 150/wk it read 100 in all 60 weeks, and with 2 weeks of cover the run lost 650 units that a time-phased prototype did not. (b) **Demand is per product only.** There is no per customer × product demand and no forecast series. A product whose `demand_distribution` is `normal` silently runs as triangularAV (one mapping warning), and `demand_cv` is used as triangularAV's ± fraction rather than as a coefficient of variation. (c) **Fulfillment is project-wide only.** The backlog is per product. Per-row backorder allowed / max days / cost and allocation inputs are dropped with a warning. `revenue_max` runs as `priority`, and `customers.sla_fill_floor_pct` is read by nothing. (d) **The finished-goods policy is half-declared.** `Product.fg_policy = min_max` exists and no code reads it, and there is no FG opening stock (engine RFC 4) | `scsim/scsim/core/engine.py:245` (`_mech_material_demand`); `scsim/scsim/core/engine.py:202` (`_mech_default_plan`, one week); `scsim/scsim/policies/builtin/p_p1_inventory_control.py:298-323` (levels from the constant); `scsim/scsim/io/project_map.py:1103` (`normal` → triangularAV); `scsim/scsim/io/project_map.py:1074` (`demand_cv` as the AV fraction); `scsim/scsim/io/project_map.py:1819` (`_FULFILLMENT_DEFAULT_ONLY`); `scsim/scsim/io/project_map.py:2089` (`revenue_max` → priority); `scsim/scsim/policies/builtin/p_c1_unmet_demand.py:91` (backlog per product); `scsim/scsim/entities/network.py:221` (`fg_policy`, unread) | **OPEN** — Phase 14 (§24). Owner decisions 2026-10-02: planned production = min(requirement, capacity); demand per customer × product row (a forecast series, or mean + variation + distribution); FG policies base-stock / min-max / days of cover; one allocation rule per project with per-row priority / price / service target; per-row backorder now; a shortfall carries only for rows that allow backorder; monthly forecasts spread evenly; negative normal draws set to 0. **Progress:** (b)'s engine half shipped in engine 0.3.0 (row demand specs, a real `normal`; §16, the 14.1 entry). **Still to run:** (b)'s data half by WP 14.2, (c) by WP 14.3, (d) by WP 14.4, (a) by WP 14.5 |
 
 ### 4.1 Code map — the data layer
 
@@ -22614,6 +22614,68 @@ only for the declared `normal` change — neither committed dataset declares `no
 worker digest should move. The helper's `floor_pct` is a percentage (0–100), matching
 `sla_tiers` and `customers.sla_fill_floor_pct`.
 
+### WP 14.1 — Demand per customer × product row, in the engine · 2026-10-02 · no migration
+
+**Promised by WP 14.0**: the allocation helper, ADR 0002 and frozen golden digests; WP 14.1 may
+regenerate the digests only for the declared `normal` change. **Preconditions held?** Yes:
+`CustomerLink` has `product_id`, `customer_id`, `share`; `context.py::draw_week_demand` draws per
+product by demand group in the order the golden traces compare; `project_map.py::_build_product`
+sent `normal` (and every unknown kind) to triangularAV with a warning and passed `demand_cv` as
+its fraction (§4 D284 (b)).
+
+**What changed.** Engine **0.2.11 → 0.3.0** (Tier 3: a new transient key). `CustomerLink` gains
+an optional demand spec, validated per combination. `CompiledModel` compiles demand ROWS
+(product-major CSR, an implicit row for a product no link names) with a per-week CENTRE (forecast,
+else mean, else the product mean × share). With any spec, `SimContext` draws a `[rows × (T + τ*)]`
+schedule under a new, documented consumption contract (`draw_week_demand_rows`) and product
+demand is the row sum; with none, nothing about the draw changes. New transient key
+`demand_rows` (PH-10); `pipeline_schema.json` re-frozen. `DemandModel.NORMAL` at product and row
+level, clipped at 0 with clips and mean shift on `ScenarioResult.demand_clips` and as run
+warnings (`demand_warnings`, which the bridge appends to `mapping_warnings`); a forecast shorter
+than the horizon warns and names its tail (mean, else last value). `projected_demand_rows` /
+`projected_demand` are the plan's view. KPIs `demand_forecast_bias` / `_mape` (pooled and per
+product) only when rows carry specs. Mapper: `normal` is a real normal with an info line saying
+what `demand_cv` means for it; the unsupported-kind fallback now says `demand_cv` is the ±
+fraction; `OutboundArc` carries the per-row fields and `_customer_links` turns them into specs
+(rates normalized to weeks; an invalid spec is dropped WITH a warning, never a crash).
+
+**The declared behaviour change, and who it reaches.** A product whose `demand_distribution` is
+`normal` now draws a normal with σ = `demand_cv` × mean, where it drew triangular(mean·(1−cv),
+mean, mean·(1+cv)). **Not measured in production**: no work-package session can reach the
+database. Neither committed dataset (Example, TRON — all `triangular`) declares `normal`, so
+both worker digests are unchanged, and so are all twelve engine digests (none uses `normal`).
+The §15 reading owed after merge: `select project_id, count(*) from products where
+lower(demand_distribution) = 'normal' group by 1` — those projects' results move at 0.3.0.
+
+**Discovered.**
+- **"Centre" needed a definition the design did not give** for an explicit triangular row with a
+  forecast. Shipped default: the centre is the week's EXPECTED value, and a triangular row's
+  triangle is scaled to it (design doc §9, now listing four implementation defaults). → no later
+  package changes.
+- **A product's stationary mean must follow its rows**: with row specs, `mean_demand_p`,
+  `var_demand_p` and `exp_demand_m` are recomputed from the rows, otherwise P-P.1 would size on a
+  `products.demand_mean` the rows contradict. → **WP 14.4/14.5** read `projected_demand`, not
+  `mean_demand_p`, for anything time-phased.
+- **P-C.2's customer split and the demand rows differ for a product no link names**: P-C.2
+  spreads it uniformly over all customers, the demand rows give it one implicit row. → **WP
+  14.3** must pick one row set for per-row fulfillment; the demand rows are the natural one
+  (recorded in §24 WP 14.3).
+- The variation-semantics note for the `products` sidecar is WP 14.2's (it owns the sidecars),
+  written into its §24 text with the rest of what it inherits.
+
+**Gate results.** `scsim` 402 passed (30 new in `test_demand_rows.py`: two rows sum to the
+product; the normal sampler's moments at CV 0.2 and its clip count / mean shift at CV 1.5 against
+the analytic 0.2525 and 22.66; the honesty test with a deliberately peeking planner that the
+same check catches; mapper semantics), golden digests unchanged. `pipeline_schema.json`
+re-frozen, `gen_docs`, `gen_frontend_registry`, `check_registry_bridge`, wheels rebuilt and
+`--check` green; `sim-worker` 161 passed (worker digests unchanged; a new bridge test for the
+clip warning); grading `deno test` 32 passed. `contract:generate` re-run (engine version in every
+generated page footer); `contract:check` holds with `main`'s two warnings; vitest 1 656 passed;
+`typecheck`, `check:docs`, `audit:ui` green; eslint at baseline (295 / 110).
+
+**Handoff.** WP 14.2 fills `OutboundArc`'s new fields from the data and owns the sidecar text
+above. WP 14.3 reads `model.row_*` (rows, `row_ptr`, `row_share`) and `ctx.demand_rows`.
+
 ## 17. Sequencing
 
 | Phase | WPs | Focus | Blocks | Status |
@@ -22632,7 +22694,7 @@ worker digest should move. The helper's `floor_pct` is a percentage (0–100), m
 | **11** | **11.0 – 11.5** | **one graph, three levels: a version per level, and every consumer bound to the level it reads** | — | **11.0 ✅** the plan (§21), §4 D258–D264 registered from a verified reading, the blueprint refined (§8.4, §9.2, §9.5, §11.4). The reading changed the design: the simulation's read set already HAS a hash — `hash_inputs`, the snapshot's `inputs` domain, whose eight tables are exactly the worker's eight reads — so the `simulation` scope is named and gated rather than minted, and `level_spec` stays 1. **11.1 ✅** a version per level: `graph_level_versions` numbers product, process and firm per project, deduplicated against any earlier version of the level; every snapshot names its tuple; history is backfilled in order; the state returns each level's version (D258's store half). It also closed **D265**: `anon` could insert a snapshot row directly, which from this package would have minted level versions. **11.2 ✅** the simulation scope NAMED (`simulation → hash_inputs`, one mapping, no new digest) and gated against the worker's reads; a Validated Model binds it, RunKey v2 hashes it, an analysis run names its level version; the agent's own copy of the badge rule follows (D260, D264 closed). **11.3 ✅** the surfaces: each network page names its level's version ("Product graph v3"), the Validated Model reads "simulation inputs v4" with a deep-tier change as a note and never re-validate, the snapshot list shows its tuple, the Reproducibility Record and Trust Report carry the levels (D258, D259, D263 closed; one read migration, `dataset_version_tuple`, because the browser cannot read the level table). **11.4 ✅** lineage: the training set groups and counts KPIs by simulation-input version and keeps the composite as lineage; the features name their product version; a run names its inputs whoever wrote it (D261, D262 closed). **11.5 ✅** the reading is §15 run `36903620736` (fence unmoved at `20261001000022`): every project with snapshots has all four levels, all 4 Validated Models bind the simulation scope, the doors D265 closed are closed. One firm-level `prominence` run met D240's condition, so `20261001000023` drops `network_topology_hash`. Two things are named, not met: RunKey v2 is unexercised (no simulation dispatched since WP 10.4), and the reading after the drop deploys is WP 10.9's. **PHASE COMPLETE.** |
 | **12** | **12.1 – 12.7** | **the library: pull the data you may read, simulate on your own machine** | — | **12.1 ✅** one local-run entry point (`sim_worker.local`), shared by the browser engine, the demo recorder and the coming `suresuite` package; D273 closed. **12.2 ✅** the snapshot read API (largest production snapshot 592 KB — one gzipped response, no cap). **12.3 ✅** personal keys (`20261002000001`, `rehearsal/700`). **12.4 ✅** the engine through `GET /v1/engine`, private bucket, content-addressed (D274 recorded). **12.5 ✅** the `suresuite` package (a local run equals the platform's, in a clean venv). **12.6 ✅** notebook 05 — simulate on your own machine (renumbered **03** when the series was trimmed to four, §16 · 2026-10-02). **12.7 ✅** every user may mint a personal, read-only key (`20261002000005`, `rehearsal/730`). **PHASE COMPLETE**; push-back (upload, client-computed runs badged until verified) is the next phase, not started |
 | **13** | **13.1 – 13.5** | **what you see on /policies is what runs: /policies writes overrides and never the item masters, the worker reads the frozen versions, the Validated Model binds both, every cell reaches the engine or says it does not** | — | **13.1 ✅** /policies writes overrides and never the masters (`20261002000008`, `rehearsal/760`; D281 closed — a save replaced a row's whole patch). **13.2 ✅** the worker computes through `run_from_snapshots` from the run's frozen dataset and policy versions; the browser too; D282 closed. **13.3 ✅** a Validated Model binds its evidence run's two versions, a model run replays them, the database refuses a model run on other data (`20261002000009`, `rehearsal/770`). **13.4 ✅** D204 (a)(b) closed (`20261002000010`, `rehearsal/780`), one capacity per row, gate `page-equals-run` (`pageEqualsRun.test.ts`, zero differing cells, mutation-tested). **13.5 ✅** the gate row in CLAUDE.md, the tests wired into `data-contract.yml`, the manual's callout removed, D280 closed. **PHASE COMPLETE.** Nothing reaches production until merge; the after-merge §15 reading is owed (D153)
-| **14** | **14.0 – 14.7** | **demand-driven planning: demand per customer × product row, planned production = min(requirement, capacity) with FG policies, MRP for materials, per-row fulfillment; multi-stage later** | — | **14.0 ✅** the planning baseline pinned, the shared allocation helper (`core/allocation.py`) with P-C.2 delegating, ADR 0002, and frozen golden digests (engine + worker) that make "byte-identical" checkable. Registered 2026-10-02 (§24, D284); prompts in `docs/design/demand-driven-planning-prompts.md`. **WP 14.1 is next** |
+| **14** | **14.0 – 14.7** | **demand-driven planning: demand per customer × product row, planned production = min(requirement, capacity) with FG policies, MRP for materials, per-row fulfillment; multi-stage later** | — | **14.0 ✅** the planning baseline pinned, the shared allocation helper (`core/allocation.py`) with P-C.2 delegating, ADR 0002, and frozen golden digests (engine + worker) that make "byte-identical" checkable. Registered 2026-10-02 (§24, D284); prompts in `docs/design/demand-driven-planning-prompts.md`. **14.1 ✅** demand per customer × product row in the engine (engine 0.3.0): row specs and forecasts, a real `normal` clipped at 0 and counted, the plan's projected-demand view, projection-error KPIs. **WP 14.2 is next** |
 
 **27 work packages** (26 + the five 5.2 sub-packages counted as one). WP 3.0 was added at the Phase 2→3 boundary review, for the reason boundary reviews exist: nine defects had an owner that had already finished, which reads exactly like having an owner.
 Commit convention: `Phase N / WP N.M / <blueprint ref>: <title>`.
@@ -24892,7 +24954,7 @@ ADR line and a §16 entry.
 **Exit.** Engine suite green with golden traces byte-identical. Every rule is unit-tested,
 including scarcity, zero supply and ties. P-C.2's existing tests pass through the helper.
 
-### WP 14.1 — Demand per customer × product row, in the engine *(D284 (b) · P-C.4 · blueprint §5.4)*
+### WP 14.1 — Demand per customer × product row, in the engine ✅ *(D284 (b) · P-C.4 · blueprint §5.4 — done, no migration; engine 0.3.0)*
 
 - `CustomerLink` gains a demand spec: model, mean, variation, min, max, and an optional weekly
   forecast series. Variation is interpreted by model (normal → CV; triangularAV → ± fraction;
@@ -24928,6 +24990,14 @@ honesty test is red on a planner that peeks at draws.
 - **Pre-run gate.** A finding for a missing parameter the chosen distribution needs; a warning for
   a forecast shorter than the horizon.
 - **Manual.** The demand pages describe the two modes and the variation meanings.
+- **Inherited from WP 14.1 (§16).** The engine side exists: `OutboundArc` carries
+  `demand_distribution`, `demand_mean`, `demand_min`, `demand_max` (rates in the row's
+  `time_unit`), `demand_variation` and a weekly `forecast` list; `datamap` does not fill them
+  yet — this package does. The `products` sidecar's `demand_cv` meaning must say it is read
+  by the distribution (a CV for `normal`, the ± fraction for triangular/triangularAV), and
+  `demand_distribution`'s that `normal` is a real normal since engine 0.3.0. A dated forecast
+  needs a rule for which simulated week a `period_start` is (design doc §9, point 4): decide
+  it here and record it.
 
 **Exit.** `contract:check`; `contract:rehearse` all three ways; a rehearsal proving
 upload → promotion → snapshot carries the forecast. A worker test: a run from snapshots uses the
@@ -24935,6 +25005,10 @@ uploaded forecast. `page-equals-run` shows zero differing cells including the ne
 
 ### WP 14.3 — Per-row fulfillment *(D284 (c) · P-C.1, P-C.2 · blueprint §5.4)*
 
+- **Inherited from WP 14.1 (§16).** The demand rows exist in the engine (`model.row_*`, CSR
+  `row_ptr`, `ctx.demand_rows`). P-C.2's split still uses `cust_share`, which spreads a product
+  no customer link names over ALL customers, where the demand rows give it one implicit row:
+  per-row fulfillment uses the demand rows, and P-C.2's segment KPIs must agree with them.
 - **Backlog per row.** P-C.1's backlog becomes per row, with per-row age buckets, horizon and cost.
   It stays the single writer of fulfillment and backlog; `ctx.backlog` stays the product sum.
 - **Allocation.** P-C.2 publishes the rule and the per-row priority, price and service target at

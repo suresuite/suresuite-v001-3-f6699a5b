@@ -56,6 +56,10 @@ class DemandModel(str, Enum):
     POISSON = "poisson"
     NEGBIN = "negbin"
     BOOTSTRAP = "bootstrap"
+    # WP 14.1 (ADR 0002, decision 8): N(μ, σ = CV·μ), negative draws set to 0
+    # and counted. LAST on purpose: `demand_groups` iterate this enum in order,
+    # so a value appended here leaves every existing draw sequence untouched.
+    NORMAL = "normal"
 
 
 class LeadTimeDist(str, Enum):

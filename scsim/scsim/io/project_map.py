@@ -174,12 +174,27 @@ class BomArc:
 
 @dataclass
 class OutboundArc:
-    """outbound_logistics row: product → customer (demand + price fallback)."""
+    """outbound_logistics row: product → customer (demand + price fallback).
+
+    The ``demand_*`` fields and ``forecast`` are the row's own demand spec
+    (WP 14.1, ADR 0002 decision 2). All optional: a row that sets none keeps
+    today's behaviour — its product's distribution, scaled by its volume share.
+    ``demand_mean`` / ``demand_min`` / ``demand_max`` are rates in the row's
+    ``time_unit`` (like ``volume``); ``forecast`` is already weekly, one value
+    per simulated week from week 0. ``demand_variation`` is read by the
+    distribution: a CV for ``normal``, the ± fraction for ``triangular_av``.
+    """
     product_id: str
     customer_id: str
     unit_price: Optional[float] = None
     volume: Optional[float] = None
     time_unit: Optional[str] = None
+    demand_distribution: Optional[str] = None
+    demand_mean: Optional[float] = None
+    demand_variation: Optional[float] = None
+    demand_min: Optional[float] = None
+    demand_max: Optional[float] = None
+    forecast: Optional[list[float]] = None
 
 
 @dataclass
@@ -1098,12 +1113,100 @@ def _build_product(
     if kind == "negbin":
         return Product(demand_model=DemandModel.NEGBIN, demand_mode=mean,
                        negbin_dispersion=_negbin_k(mean, cv), **common)
+    if kind == "normal":
+        # A REAL normal since WP 14.1 (ADR 0002 decision 8; §4 D284 (b)). Before
+        # it, `normal` ran as triangularAV with demand_cv as its ± fraction.
+        warnings.append(MappingWarning(
+            "info", f"product:{row.id}", "demand_distribution",
+            f"normal demand: demand_cv {cv:g} is the coefficient of variation "
+            f"(σ = {cv:g} × {mean:g} = {cv * mean:g}/wk); negative draws are set to 0 and the "
+            f"run reports how many (for triangular, demand_cv is the ± fraction instead)"))
+        return Product(demand_model=DemandModel.NORMAL, demand_mode=max(mean, 0.0),
+                       demand_cv=max(cv, 0.0), **common)
     # bootstrap (needs history we don't have) / unknown → triangularAV fallback
     warnings.append(MappingWarning("warn", f"product:{row.id}", "demand_distribution",
-                                   f"demand kind {kind!r} unsupported here — using triangularAV"))
+                                   f"demand kind {kind!r} unsupported here — using triangularAV "
+                                   f"with demand_cv {cv:g} as its ± fraction"))
     a, b, c = triangular_av(max(mean, 0.0), max(cv, 0.0))
     return Product(demand_model=DemandModel.TRIANGULAR,
                    demand_mode=b, demand_min=a, demand_max=c, **common)
+
+
+# ── Demand per customer × product row (WP 14.1) ──────────────────────────────
+
+_ROW_KIND = {
+    "deterministic": "deterministic", "normal": "normal", "poisson": "poisson",
+    "triangular": "triangular",
+    "triangular_av": "triangular_av", "triangularav": "triangular_av",
+}
+
+
+def _row_demand_spec(o: OutboundArc, w: list[MappingWarning]) -> Optional[dict[str, Any]]:
+    """The CustomerLink demand fields an outbound row carries, normalized to
+    weeks — or None when it carries none (today's behaviour for the row)."""
+    ent = f"customer_row:{o.customer_id}::{o.product_id}"
+    raw_kind = (o.demand_distribution or "").strip().lower().replace("-", "_").replace(" ", "_")
+    has_any = raw_kind or o.forecast or any(
+        v is not None for v in (o.demand_mean, o.demand_variation, o.demand_min, o.demand_max))
+    if not has_any:
+        return None
+    spec: dict[str, Any] = {}
+    if raw_kind:
+        kind = _ROW_KIND.get(raw_kind)
+        if kind is None:
+            w.append(MappingWarning(
+                "warn", ent, "demand_distribution",
+                f"row demand distribution {o.demand_distribution!r} is not one of "
+                f"{sorted(set(_ROW_KIND.values()))} — the row keeps its product's distribution"))
+            return None
+        spec["demand_model"] = kind
+    elif o.forecast:
+        spec["demand_model"] = "deterministic"
+    for f in ("demand_mean", "demand_min", "demand_max"):
+        v = getattr(o, f)
+        if v is not None:
+            spec[f] = _rate_to_weekly(float(v), o.time_unit)
+    if o.demand_variation is not None:
+        spec["demand_variation"] = float(o.demand_variation)
+    if o.forecast:
+        spec["forecast"] = [float(x) for x in o.forecast]
+    return spec
+
+
+def _customer_links(cust_share: dict[tuple[str, str], float],
+                    row_spec: dict[tuple[str, str], dict[str, Any]],
+                    prod_ids: set[str], w: list[MappingWarning]) -> list[CustomerLink]:
+    """One CustomerLink per (product, customer) with volume or a demand spec.
+
+    A spec the engine rejects (a distribution missing a parameter it needs)
+    is dropped WITH a warning and the row keeps its product's distribution —
+    the pre-run gate blocks such a row before a run is dispatched (WP 14.2).
+    """
+    out: list[CustomerLink] = []
+    for key in sorted(set(cust_share) | set(row_spec)):
+        pid, cid = key
+        if pid not in prod_ids:
+            continue
+        spec = row_spec.get(key)
+        share = cust_share.get(key, 0.0)
+        if share <= 0 and spec is not None:
+            fc = spec.get("forecast") or []
+            share = spec.get("demand_mean") or (sum(fc) / len(fc) if fc else 0.0) or 1.0
+        if share <= 0:
+            continue
+        if spec is not None:
+            try:
+                out.append(CustomerLink(product_id=pid, customer_id=cid, share=share, **spec))
+                continue
+            except ValueError as exc:
+                errs = getattr(exc, "errors", None)
+                msg = (errs()[0]["msg"] if callable(errs) else str(exc)).removeprefix("Value error, ")
+                w.append(MappingWarning(
+                    "warn", f"customer_row:{cid}::{pid}", "demand_distribution",
+                    f"row demand spec not applied ({msg.strip()}) — the row keeps its "
+                    f"product's distribution"))
+        out.append(CustomerLink(product_id=pid, customer_id=cid, share=share))
+    return out
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
@@ -1300,12 +1403,22 @@ def from_project_data(data: ProjectData) -> MappingResult:
     out_demand: dict[str, float] = {}
     customers: set[str] = set(data.customers)
     cust_share: dict[tuple[str, str], float] = {}  # (product, customer) → weekly volume
+    row_spec: dict[tuple[str, str], dict[str, Any]] = {}  # WP 14.1: the row's demand spec
     for o in data.outbound:
         customers.add(o.customer_id)
         weekly = _rate_to_weekly(float(o.volume or 0.0), o.time_unit)
         out_demand[o.product_id] = out_demand.get(o.product_id, 0.0) + weekly
+        key = (o.product_id, o.customer_id)
+        spec = _row_demand_spec(o, w)
+        if spec is not None:
+            if key in row_spec:
+                w.append(MappingWarning(
+                    "warn", f"customer_row:{o.customer_id}::{o.product_id}", "demand_distribution",
+                    "two outbound rows for this customer × product both carry a demand spec — "
+                    "the first is used"))
+            else:
+                row_spec[key] = spec
         if weekly > 0:
-            key = (o.product_id, o.customer_id)
             cust_share[key] = cust_share.get(key, 0.0) + weekly
         if o.unit_price:
             wgt = max(weekly, 1e-9)
@@ -1550,10 +1663,7 @@ def from_project_data(data: ProjectData) -> MappingResult:
         suppliers=suppliers, materials=materials, products=products,
         bom=bom, supplier_links=links,
         customers=_build_customers(customers, data.customer_rows, w),
-        customer_links=[
-            CustomerLink(product_id=pid, customer_id=cid, share=share)
-            for (pid, cid), share in sorted(cust_share.items()) if pid in prod_ids
-        ],
+        customer_links=_customer_links(cust_share, row_spec, prod_ids, w),
     )
 
     settings = _build_settings(sc, w)

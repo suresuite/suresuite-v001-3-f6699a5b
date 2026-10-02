@@ -259,3 +259,31 @@ def test_feasibility_warnings_reach_the_mapping_warnings_list():
                  "field": "no_backup_supplier",
                  "reason": "P-S.1 has no second qualified supplier"}
     assert _feasibility_warnings(SimpleNamespace()) == []
+
+
+def test_normal_demand_clips_reach_the_mapping_warnings_list():
+    """WP 14.1 (ADR 0002 decision 8): a `normal` product is a real normal, its
+    negative draws are set to 0, and the run says how many and by how much —
+    on the list the run panel reads, not only on the engine's result."""
+    from sim_worker.datamap import build_project_data
+    from sim_worker.scsim_bridge import compute_run_from_project
+
+    data = build_project_data(
+        suppliers=[{"supplier_id": "S1", "name": "S1"}],
+        materials=[{"material_id": "M1", "cost": 4.0}],
+        products=[{"product_id": "P1", "sell_price": 25.0, "production_capacity": 900,
+                   "demand_distribution": "normal", "demand_mean": 100, "demand_cv": 1.5}],
+        inbound=[{"supplier_id": "S1", "material_id": "M1", "unit_price": 4.0, "lead_time": 2}],
+        bom=[{"product_id": "P1", "material_id": "M1", "consumption_rate": 1.0}],
+        outbound=[{"product_id": "P1", "customer_id": "C1", "unit_price": 25.0,
+                   "volume": 100, "time_unit": "week"}],
+        policies={"default": {}},
+        scenario={"horizon_days": 365, "seed": 1, "replications": 2, "crn": True},
+        project_model="make_to_order",
+    )
+    out = compute_run_from_project(data)
+    fields = [(w["entity"], w["field"]) for w in out["mapping_warnings"]]
+    assert ("product:P1", "demand_distribution") in fields
+    reasons = [w["reason"] for w in out["mapping_warnings"] if w["entity"] == "product:P1"]
+    assert any("set to 0" in r for r in reasons)
+    assert not any("unsupported" in r for r in reasons)

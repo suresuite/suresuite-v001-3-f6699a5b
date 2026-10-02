@@ -146,7 +146,7 @@
       "lane"
     ]
   },
-  "engine_version": "0.2.11",
+  "engine_version": "0.3.0",
   "entities": {
     "bom_line": {
       "description": "r_{p,m} \u2014 \u00a73.2. ALL listed materials are required (hard constraint, Eq. 8).",
@@ -525,7 +525,8 @@
             "triangular",
             "poisson",
             "negbin",
-            "bootstrap"
+            "bootstrap",
+            "normal"
           ],
           "title": "DemandModel",
           "type": "string"
@@ -560,6 +561,22 @@
       },
       "description": "Product + demand model + fulfillment mode (CODP) \u2014 \u00a73.1\u20133.3.",
       "properties": {
+        "demand_cv": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "notes": "Coefficient of variation for demand_model=normal: \u03c3 = cv \u00b7 demand_mode. Negative draws are set to 0 and counted (ADR 0002, decision 8). Read only by normal; triangular uses demand_floor_factor / explicit bounds.",
+          "scope": "P",
+          "title": "Demand Cv",
+          "unit": "-"
+        },
         "demand_floor_factor": {
           "anyOf": [
             {
@@ -1228,12 +1245,13 @@
         ]
       },
       {
-        "description": "Update the demand forecast from history (\u00a73.3 models), then draw D_p[t] from the world demand stream.",
+        "description": "Update the demand forecast from history (\u00a73.3 models), then read D_p[t] \u2014 and per customer \u00d7 product row, D_r[t] \u2014 from the pre-drawn world demand stream.",
         "id": "PH-10",
         "name": "demand_realization",
         "owns": [
           "demand",
-          "forecast"
+          "forecast",
+          "demand_rows"
         ]
       },
       {

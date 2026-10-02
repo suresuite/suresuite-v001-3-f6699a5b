@@ -37,6 +37,7 @@ from scsim.core.mechanics import greedy_feasible
 from scsim.core.phases import (
     ARRIVALS,
     DEMAND,
+    DEMAND_ROWS,
     DISRUPTION_STATE,
     FG_FULFILLMENT,
     FIRM_KNOWLEDGE,
@@ -136,6 +137,12 @@ def _mech_demand(model: CompiledModel, ctx: SimContext) -> None:
     # Realized demand is this week's column of the pre-drawn world schedule
     # (§III-D.6: D_{p}[t] = D̃_{p}[t] — the committed order book realizes).
     ctx.demand = ctx.demand_schedule[:, ctx.week].copy()
+    # Per customer × product row (WP 14.1). Drawn per row when a row carries a
+    # spec; otherwise the product's demand split by share — a view, no draw.
+    if model.has_row_demand:
+        ctx.demand_rows = ctx.demand_schedule_rows[:, ctx.week].copy()
+    else:
+        ctx.demand_rows = ctx.demand[model.row_prod] * model.row_share
     # Append the realization to the history ring (consumed by next week's forecast).
     ctx.demand_history[:, ctx.demand_history_n % 26] = ctx.demand
     ctx.demand_history_n += 1
@@ -430,7 +437,7 @@ _MECHANIC_HOOKS: list[tuple[str, Hook, Callable]] = [
     ("mech.week_start", Hook(phase=PhaseId.PH00, priority=50, writes={DISRUPTION_STATE}),
      _mech_week_start),
     ("mech.demand_realization", Hook(phase=PhaseId.PH10, priority=50,
-                                     writes={DEMAND, FORECAST}),
+                                     writes={DEMAND, FORECAST, DEMAND_ROWS}),
      _mech_demand),
     ("mech.detection", Hook(phase=PhaseId.PH20, priority=50,
                             reads={DISRUPTION_STATE}, writes={FIRM_KNOWLEDGE}),
@@ -739,6 +746,14 @@ class ScenarioResult:
     # Fixed-start events moved from inside warm-up to t_w (audit F-03):
     # [{"event_index", "target_id", "authored_week", "used_week", "replications"}].
     event_shifts: list = field(default_factory=list)
+    # Demand per customer × product row (WP 14.1). `demand_clips`: normal draws
+    # set to 0 (decision 8) — [{"row"|"product", "clipped_draws", "draws",
+    # "mean_shift", "replications"}], empty when nothing was clipped.
+    # `demand_warnings`: the run's demand notes in the mapping-warning shape
+    # ({level, entity, field, reason}) — clips and forecasts shorter than the
+    # horizon — so the bridge can put them where the run panel reads.
+    demand_clips: list = field(default_factory=list)
+    demand_warnings: list = field(default_factory=list)
 
     def kpi_array(self, key: str) -> np.ndarray:
         return np.array([row.get(key, np.nan) for row in self.kpis])
@@ -811,6 +826,30 @@ class _CapacityBindingAccumulator:
         self.ring_width = int(model.ring_width)
         self.link_ids = [(model.sup_ids[model.link_sup[k]], model.mat_ids[model.link_mat[k]])
                          for k in range(model.n_links)]
+        # Normal-demand clips (WP 14.1, decision 8): per row when demand is drawn
+        # per row, else per product — summed over replications like the above.
+        self.clip_labels = (list(model.row_ids) if model.has_row_demand
+                            else list(model.prod_ids))
+        self.clip_kind = "row" if model.has_row_demand else "product"
+        self.demand_clips = np.zeros(len(self.clip_labels))
+        self.demand_clip_add = np.zeros(len(self.clip_labels))
+        self.horizon = int(model.settings.horizon)
+
+    def demand_clip_report(self) -> list[dict]:
+        """Rows (or products) whose normal draws were clipped at 0, with the
+        mean count per replication and how far clipping raised the realized
+        weekly mean (Σ clipped-away negatives / draws)."""
+        if self.reps == 0:
+            return []
+        n = float(self.reps)
+        return [
+            {self.clip_kind: label,
+             "clipped_draws": round(float(self.demand_clips[i]) / n, 3),
+             "draws": self.horizon,
+             "mean_shift": round(float(self.demand_clip_add[i]) / (n * self.horizon), 6),
+             "replications": self.reps}
+            for i, label in enumerate(self.clip_labels) if self.demand_clips[i] > 0
+        ]
 
     def lead_time_truncations(self) -> list[dict]:
         return [
@@ -822,6 +861,8 @@ class _CapacityBindingAccumulator:
     def observe(self, ctx: SimContext, t_w: int, window_end: int) -> None:
         w = slice(t_w, window_end)
         self.lt_truncated += ctx.lt_truncated
+        self.demand_clips += ctx.demand_clips
+        self.demand_clip_add += ctx.demand_clip_add
         self.prod_bound += ctx.trace.prod_cap_bound[:, w].sum(axis=1)
         self.sup_bound += ctx.trace.sup_cap_bound[:, w].sum(axis=1)
         self.reps += 1
@@ -992,7 +1033,31 @@ def run_scenario(
              "authored_week": a, "used_week": u, "replications": len(grid)}
             for i, (a, u) in sorted(shifts.items())
         ],
+        demand_clips=(clips := cap_acc.demand_clip_report()),
+        demand_warnings=_demand_warnings(compiled.model, clips),
     )
+
+
+def _demand_warnings(model: CompiledModel, clips: list[dict]) -> list[dict]:
+    """The demand notes a user must see at the point of display (T2)."""
+    out: list[dict] = []
+    for f in model.row_forecast_short:
+        out.append({
+            "level": "warn", "entity": f"customer_row:{f['row']}", "field": "forecast",
+            "reason": (f"the forecast covers {f['weeks']} of the run's {f['horizon']} weeks; "
+                       f"later weeks use the row's {f['tail_source']} ({f['tail']:g}/wk)"),
+        })
+    for c in clips:
+        kind = "row" if "row" in c else "product"
+        label = c.get("row", c.get("product"))
+        out.append({
+            "level": "warn", "entity": f"{'customer_row' if kind == 'row' else 'product'}:{label}",
+            "field": "demand_distribution",
+            "reason": (f"normal demand: {c['clipped_draws']:g} of {c['draws']} weekly draws per "
+                       f"replication were negative and set to 0, raising the realized mean by "
+                       f"{c['mean_shift']:g}/wk"),
+        })
+    return out
 
 
 def _extend_until_ci(compiled, scenario, kpis, rows, grid, t_w, window_end, debug,

@@ -263,6 +263,12 @@ DO:
    - Warn: a forecast shorter than the horizon.
 6. Manual: the demand input pages and the CSV template doc. Edit sidecars, never
    docs/data/tables/*.md (generated).
+   Inherited from WP 14.1 (§16): the products sidecar's demand_cv meaning says it is
+   read by the distribution (CV for normal, ± fraction for triangular/triangularAV);
+   demand_distribution's says normal is real since engine 0.3.0. datamap must fill
+   OutboundArc's demand_* fields and weekly `forecast` list (the engine side exists).
+   Decide and record how a forecast's period_start maps to a simulated week
+   (design doc §9, point 4).
 7. If useful, add a §15 probe for the new table in its OWN push (CLAUDE.md: the probe
    travels separately).
 
@@ -301,6 +307,9 @@ DO:
      P-P.1's material_overrides pattern).
    - P-C.1 stays the ONLY writer of FULFILLMENT and ST_BACKLOG.
    - Add ctx.backlog_rows; ctx.backlog stays the product sum for every existing reader.
+   Inherited from WP 14.1: use the demand rows (model.row_*, row_ptr, ctx.demand_rows).
+   P-C.2's cust_share spreads a product no link names over ALL customers; the demand
+   rows give it one implicit row — make the two agree.
 2. Engine, P-C.2:
    - Publish the rule and per-row priority / price / floor at setup (the P-C.6
      publish-at-setup pattern).

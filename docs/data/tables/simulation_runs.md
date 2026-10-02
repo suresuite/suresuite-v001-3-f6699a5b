@@ -676,6 +676,6 @@ The simulation scope's level version the run computed over ("simulation inputs v
 
 ---
 
-*Generated from data contract `0f63c0936a2a`, engine `0.2.11`,
+*Generated from data contract `48d3cc002eef`, engine `0.3.0`,
 sidecar `supabase/contract/simulation_runs.contract.yaml`, table created by `20260607121406_fcbd47e9-93de-4b3b-988f-7f4718159c91.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
