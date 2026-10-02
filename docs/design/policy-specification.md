@@ -392,9 +392,18 @@ orders, lead-time-offset, to cover **net requirements** before a safety-stock vi
   size the order → back-date by lead time").
 - **Outputs.** $O_{i,t}$ (lead-time-offset planned release); the projected schedule. KPI: fewer
   stockouts than reactive rules at equal buffer, at the cost of forecast dependence.
-- **UI & engine.** ✚. Maps onto PH-70 (which already projects $D_m$ through the BoM); MRP
-  generalizes it from single-period to $N$-period look-ahead. *Necessity:* the canonical
-  dependent-demand method; distinct from reactive rules by being forward-projecting.
+- **UI & engine.** ✚ — engine binding decided 2026-10-02 (blueprint G20, workstream B2;
+  plan `docs/design/mrp-multi-stage-planning.md`): `P-P.1 policy_type="mrp"`, per material via
+  `material_overrides`, mixable with reorder-point rows. $\mathrm{GR}$ is the BoM explosion of
+  *planned production* = min(requirement, capacity), where the requirement is projected demand
+  from the customer table (MTO) or the FG inventory policy's requirement (MTS). v1 simplification
+  (owner decision): order $= (\sum_{\tau=t+1}^{t+L}\mathrm{GR}_\tau + \mathrm{SS} - I - \Pi)^+$,
+  rounded up to MOQ, which is exact for lot-for-lot single-level MRP; $\mathrm{SS}$ from the
+  per-material safety-stock days; P-P.2 lot rules stay 🧩. Correction: an earlier note here said PH-70 "already projects $D_m$
+  through the BoM". It projects a stationary constant (MTO) or this week's forecast (MTS),
+  never the production plan, so MRP is new behaviour, not a generalization of an existing
+  one. *Necessity:* the canonical dependent-demand method; distinct from reactive rules by
+  being forward-projecting.
 
 ### III.12 Cross-dock ⛔ (needs DC echelon — Phase E)
 
@@ -958,7 +967,7 @@ the blueprint owns the **experiment machinery** that drives it.
 |---|---|---|---|
 | Inventory | min_max, rop_q, base_stock, periodic; bases: days_of_supply, forward_visible (P-C.6 book) | min_max_ss, regular, regular_ss, order_on_demand, unlimited, no_replenishment, MRP, Quantity-basis | — |
 | Sourcing | single, multi (P-S.2), backup (P-S.1), ranked | capacity-proportional, tiered | capacity_reservation (P-S.3) |
-| Production | MTS, MTO | dispatching (P-P.11) | lot_sizing (P-P.2), flex/altBoM/repurpose |
+| Production | MTS, MTO | dispatching (P-P.11), horizon planned production + FG policies base-stock / min-max / days of cover (G20), multi-level stages (G20, later) | lot_sizing (P-P.2), flex/altBoM/repurpose |
 | Capacity | overtime (P-P.5) | supplier-capacity model (P-S.5) | standing reserve (P-P.6) |
 | Safety stock | fixed_days, service_level, king, abc_xyz | — | — |
 | Forecasting | built-in SES-like | SES/Holt/HW/Croston/MA/naive (P-F.1) | — |
