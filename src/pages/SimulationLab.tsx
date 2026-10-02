@@ -576,7 +576,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const versionText = usingModel && chosenModel
     ? `Validated Model ${modelOptionLabel(chosenModel)}`
     : (!currentPolicyVersion
-        ? "Exploratory · unsaved policy edits — they match no saved version"
+        ? "Exploratory · unsaved edits"
         : `Exploratory · policy ${versionDisplayName(currentPolicyVersion)}`);
 
   // WP 10.5 — the run's size before it is dispatched: replication-weeks (what
@@ -589,6 +589,8 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
         const repWeeks = replicationWeeks(selected.replications, selected.horizon_days);
         const verdict = capacityVerdict(capacity, { replications: selected.replications, repWeeks, bytes: est.bytes });
         return {
+          // The two figures on screen; the arithmetic and the quota on hover.
+          short: `${repWeeks.toLocaleString()} rep-weeks · ≈${formatBytes(est.bytes)}`,
           line:
             `${selected.replications} replication(s) × ${Math.ceil(selected.horizon_days / 7)} weeks = ` +
             `${repWeeks.toLocaleString()} replication-weeks · ` +
@@ -602,10 +604,10 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const runEstimate = runSize ? (
     <div
       className="rounded-sm border border-[--hair-rule] bg-white px-3 py-[7px] font-mono text-[11.5px] text-[#52525b]"
-      title={`storage estimate: ${runSize.basis}`}
+      title={`${runSize.line}\nstorage estimate: ${runSize.basis}`}
       data-testid="run-estimate"
     >
-      <p>{runSize.line}</p>
+      <p>{runSize.short}</p>
       {runSize.refusal ? (
         <p className="mt-1 font-sans text-[12px] text-[#b45309]" data-testid="run-capacity-refusal">
           Over capacity: {runSize.refusal}.
@@ -618,7 +620,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
   const settingsLockReason =
     readOnlyReason ??
     (usingModel && !advanced
-      ? "Locked to the Validated Model's protocol — open Advanced in the Model step to deviate; a deviation is recorded on the run."
+      ? "Locked to the model — unlock in Advanced."
       : null);
   const evidenceModelOf = useMemo(
     () =>
@@ -743,7 +745,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
           settingsLockReason={settingsLockReason}
           modelStep={modelStep}
           trainingSet={trainingSet}
-          runEstimate={runSize ? runSize.line + (runSize.refusal ? ` · Over capacity: ${runSize.refusal}` : "") : null}
+          runEstimate={runSize ? runSize.short + (runSize.refusal ? ` · Over capacity: ${runSize.refusal}` : "") : null}
         />
         <NewScenarioDialog
           open={newOpen}

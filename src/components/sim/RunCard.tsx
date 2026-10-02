@@ -96,7 +96,7 @@ export function RunCard({
               onChange={(e) => onAcknowledgedChange(e.target.checked)}
               className="h-[14px] w-[14px] accent-foreground"
             />
-            Run with engine defaults for {warns} {warns === 1 ? "warning" : "warnings"}
+            Use engine defaults ({warns} {warns === 1 ? "warning" : "warnings"})
           </label>
         ) : null}
 

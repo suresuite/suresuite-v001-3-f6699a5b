@@ -361,9 +361,8 @@ export function StageRail({ stages, active, onSelect, gate }: StageRailProps) {
   }, [active]);
 
   return (
-    <section className={RAIL_SHELL}>
+    <section className={RAIL_SHELL} aria-label="Run sequence">
       <div className={RAIL_EYEBROW_ROW}>
-        <span className={RAIL_EYEBROW}>Run sequence</span>
         <span className="h-px flex-1" style={{ background: RAIL.rule }} />
         <RailReadout dot={gate.dot} label={gate.label} value={gate.value} tail={gate.tail} />
       </div>

@@ -21,28 +21,22 @@ import { trainingSetLine, type TrainingTotals } from "@/lib/sim/surrogateTrainin
 
 export function SurrogateCard({ training = null }: { training?: TrainingTotals | null } = {}) {
   const line = trainingSetLine(training);
+  // One line on the card; what it will do and the training-set size on hover.
+  const detail = ["Nexus node detection — criticality ranking from a sample of runs", line]
+    .filter(Boolean)
+    .join("\n");
   return (
     <section
       aria-label="Surrogate model: nexus node detection, coming soon"
-      className="mb-3 flex w-full flex-col gap-[3px] rounded-sm border border-dashed border-[#d4d4d8] bg-[#fafafa] px-[14px] py-3"
+      title={detail}
+      className="mb-3 flex w-full items-center gap-[7px] rounded-sm border border-dashed border-[#d4d4d8] bg-[#fafafa] px-[14px] py-[9px]"
+      data-testid="surrogate-card"
     >
-      <span className="flex items-center gap-[7px]">
-        <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#d4d4d8]" />
-        <span className="min-w-0 text-[13px] font-semibold tracking-[-0.011em] text-[#3f3f46]">
-          Surrogate model: nexus node detection
-        </span>
+      <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-[#d4d4d8]" />
+      <span className="min-w-0 text-[13px] font-semibold tracking-[-0.011em] text-[#3f3f46]">Surrogate model</span>
+      <span className="ml-auto shrink-0 rounded-sm bg-[#f0f0f2] px-[6px] py-px font-mono text-[10.5px] text-[#71717a]">
+        coming soon
       </span>
-      <span className="flex flex-wrap items-center gap-2">
-        <span className="rounded-sm bg-[#f0f0f2] px-[6px] py-px font-mono text-[10.5px] text-[#71717a]">
-          coming soon
-        </span>
-        <span className="text-[11.5px] text-[#71717a]">criticality ranking from a sample of runs</span>
-      </span>
-      {line ? (
-        <span className="text-[11.5px] text-[#52525b] [text-wrap:pretty]" data-testid="surrogate-training-set">
-          {line}
-        </span>
-      ) : null}
     </section>
   );
 }

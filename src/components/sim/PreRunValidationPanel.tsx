@@ -150,7 +150,7 @@ export function PreRunValidationPanel({
     return (
       <div className="flex items-center gap-2 rounded-sm border border-[--hair-rule] bg-white px-3 py-[10px] text-[12.5px] text-[#52525b]">
         <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#d4d4d8] border-t-transparent" />
-        Checking required data for this run…
+        Checking…
       </div>
     );
   }
