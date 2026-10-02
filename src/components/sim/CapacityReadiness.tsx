@@ -30,24 +30,28 @@ import type { OverrideRow } from "@/lib/policies/resolve";
 import type { PolicyBundle } from "@/lib/policies/schemas";
 
 function Line({
-  label, ids, note, tone,
+  label, ids, note, tone, terse = false,
 }: {
   label: string;
   ids: string[];
   note: string;
   tone: "ok" | "soft" | "warn";
+  /** the note on hover instead of on screen — never for a substitution (T2) */
+  terse?: boolean;
 }) {
   if (ids.length === 0) return null;
   const dot =
     tone === "ok" ? "bg-emerald-500" : tone === "warn" ? "bg-amber-500" : "bg-sky-500";
   return (
-    <div className="flex items-start gap-2 py-1">
+    <div className="flex items-start gap-2 py-1" title={terse && tone !== "warn" ? note : undefined}>
       <span className={cn("mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full", dot)} />
       <div className="min-w-0">
         <div className="text-[11px]">
           <span className="font-medium tabular-nums">{ids.length}</span> {label}
         </div>
-        <div className="text-[10px] leading-snug text-muted-foreground">{note}</div>
+        {terse && tone !== "warn" ? null : (
+          <div className="text-[10px] leading-snug text-muted-foreground">{note}</div>
+        )}
         {/* The names, because "3 products" is not something a planner can act
             on. Truncated at six with the count, never silently. */}
         <div className="truncate font-mono text-[10px] text-muted-foreground">
@@ -119,8 +123,8 @@ export function CapacityReadinessPanel({
     <div className={cn("rounded-md border bg-card", className)}>
       <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
         <Gauge className="h-3.5 w-3.5 text-primary" />
-        <span className="text-xs font-semibold">Capacity this run will use</span>
-        <span className="text-[10px] text-muted-foreground">before dispatch</span>
+        <span className="text-xs font-semibold">{compact ? "Capacity" : "Capacity this run will use"}</span>
+        {compact ? null : <span className="text-[10px] text-muted-foreground">before dispatch</span>}
         {compact ? (
           <button
             type="button"
@@ -133,30 +137,35 @@ export function CapacityReadinessPanel({
       </div>
       <div className="px-3 py-2">
         <Line
+          terse={compact}
           tone="ok"
           label={`product${r.fromMaster.length === 1 ? "" : "s"} from the item master`}
           ids={r.fromMaster}
           note="products.production_capacity, in units/week. The engine reads this first and the plant grid's line capacity is not applied."
         />
         <Line
+          terse={compact}
           tone="ok"
           label={`product${r.fromPolicy.length === 1 ? "" : "s"} from the plant grid`}
           ids={r.fromPolicy}
           note={`No master capacity, so the engine derives it from ${reducerLabel("production_policy_capacity")}.`}
         />
         <Line
+          terse={compact}
           tone="warn"
           label={`product${r.nonBinding.length === 1 ? "" : "s"} with NO capacity figure`}
           ids={r.nonBinding}
           note={`The engine substitutes ${reducerLabel(NON_BINDING_STEP)}. This run cannot tell you whether plant capacity would have been a constraint for them.`}
         />
         <Line
+          terse={compact}
           tone="ok"
           label={`supplier${r.finiteSuppliers.length === 1 ? "" : "s"} with a finite weekly capacity`}
           ids={r.finiteSuppliers}
           note="These can throttle shipments, and a partial-magnitude disruption on them cuts capacity rather than stopping it."
         />
         <Line
+          terse={compact}
           tone="soft"
           label={`supplier${r.unlimitedSuppliers.length === 1 ? "" : "s"} declared unlimited`}
           ids={r.unlimitedSuppliers}

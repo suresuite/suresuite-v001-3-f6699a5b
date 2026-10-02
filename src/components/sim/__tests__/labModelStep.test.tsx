@@ -54,14 +54,15 @@ describe("Model → Engine, with the protocol locked", () => {
   it("names the engine with its version and the build the worker reported", () => {
     expect(text(html(base()))).toContain("scsim — the strategic engine · 0.2.8 · scsim-0.2.8");
     expect(text(html(base({ engines: [{ ...base().engines[0], code_version: null }] })))).toContain(
-      "build not reported yet",
+      "build ?",
     );
   });
-  it("shows the protocol LOCKED, and faithful when nothing deviates", () => {
-    const t = text(html(base()));
+  it("shows the protocol LOCKED, and lists nothing when nothing deviates", () => {
+    const h = html(base());
+    const t = text(h);
     expect(t).toContain("locked");
     expect(t).toContain("Advanced");
-    expect(t).toContain("Faithful to the model's protocol");
+    expect(h).not.toContain('data-testid="protocol-deviations"');
   });
   it("lists every deviation as model → run, recorded on the run", () => {
     const t = text(html(base({
@@ -76,8 +77,8 @@ describe("Model → Engine, with the protocol locked", () => {
 
 describe("the exploratory path is an editor's, and it is badged", () => {
   it("an editor sees the choice; a non-editor does not", () => {
-    expect(text(html(base()))).toContain("Run an exploratory (unvalidated) model");
-    expect(text(html(base({ canExplore: false })))).not.toContain("Run an exploratory");
+    expect(text(html(base()))).toContain("Exploratory run (unvalidated)");
+    expect(text(html(base({ canExplore: false })))).not.toContain("Exploratory run");
   });
   it("an exploratory run is badged and shows no protocol to follow", () => {
     const h = html(base({ exploratory: true }));
@@ -107,6 +108,6 @@ describe("staleness and the run-the-model action", () => {
     expect(text(refused)).toContain("A newer graph makes this model stale");
   });
   it("with no model at all, it says where to make one", () => {
-    expect(text(html(base({ models: [], chosen: null })))).toContain("save one in Policies › Run & Validate");
+    expect(text(html(base({ models: [], chosen: null })))).toContain("create one in Policies › Run & Validate");
   });
 });

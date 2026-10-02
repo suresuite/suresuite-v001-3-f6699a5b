@@ -441,6 +441,6 @@ The owning organization by uuid. This is what the public /v1 API authorizes on (
 
 ---
 
-*Generated from data contract `5fee79ba621c`, engine `0.2.9`,
+*Generated from data contract `c0bee291baee`, engine `0.2.9`,
 sidecar `supabase/contract/projects.contract.yaml`, table created by `20250820145734_c21e4e5b-37de-4359-9ebd-46271b89a375.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*

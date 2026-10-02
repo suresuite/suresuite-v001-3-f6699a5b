@@ -13,15 +13,15 @@ const WHAT: Record<string, { what: string; care?: string }> = {
   },
   "/admin/users": {
     what: "Who may sign in, and the way into each person's own entitlements.",
-    care: "The entitlements themselves are on the per-user page below, not here. Suspending an account can be undone; deleting it cannot. A deleted person's uploads, analyses and lanes are kept with the author shown as unknown, and an account that still owns projects cannot be deleted until they are transferred.",
+    care: "The role picker sets the platform role, and the person's member/admin role in their active organization follows it (an organization owner stays owner; their other organizations are untouched). It does not change what decides above or beside the role: a grant or denial set on the person or their organization still decides, a project role still limits the four project rights on that project, and admin does not open this administration area — only super admin does. After a change the page lists each of these that still applies, with a link to the person's page; an account left an organization member while its platform role is admin is marked, with a one-click fix. The entitlements themselves are on the per-user page below, not here. Suspending an account can be undone; deleting it cannot. A deleted person's uploads, analyses and lanes are kept with the author shown as unknown, and an account that still owns projects cannot be deleted until they are transferred.",
   },
   "/admin/users/:userId": {
     what: "One person's access: the organizations they belong to and their role in each, every project they can reach with their role and rights on each, their capability grants and denials, and their permitted AI models.",
     care: "Project visibility follows the organization the person is working in, so another organization's projects appear only after they switch, and a membership on a project outside all their organizations is recorded but never visible. The project's owner stays its owner until the project is transferred. Clearing the AI allow-list grants every model rather than revoking them.",
   },
   "/admin/roles": {
-    what: "Roles and the capabilities each one carries, and for the four project rights how the account role and the project role combine: the rule, its answer for every pair of roles, everyone it narrows today, the overrides above it, and the right each AI agent approval needs.",
-    care: "Removing a grant and denying a capability are different acts with different results. For Run Simulations, Edit Input Data, Edit Policies and Export an account-role switch is a ceiling: switching it off removes the right on every project, whatever the project role, and the page lists who would gain or lose it before it is saved.",
+    what: "Roles and the capabilities each one carries, and for the four project rights how the account role and the project role combine: the rule, its answer for every pair of roles, the overrides above it, and the right each AI agent approval needs.",
+    care: "Removing a grant and denying a capability are different acts with different results. For Run Simulations, Edit Input Data, Edit Policies and Export an account-role switch applies only to people with no role on the project: a project role decides on its own, so an Owner or Editor keeps all four whatever the switch says.",
   },
   "/admin/organizations": {
     what: "The tenant boundary and its members.",

@@ -219,7 +219,7 @@ export function UserMemberships({ actor, userId, userLabel, onOrganizationChange
               `Added as ${role}`)}
         />
         <RoleLegend matrix={data.role_matrix} caps={data.project_capabilities}
-          note="A user's own overrides in Features above take precedence over the project role. Edit Input Data also needs the upload gate: uploads are accepted only from the project's owner or an app admin." />
+          note="A user's own overrides in Features above take precedence over the project role. Edit Input Data also needs the upload gate: uploads are accepted only from the project's owner, an Editor or Owner on it, or an app admin." />
       </AdminSection>
     </>
   );

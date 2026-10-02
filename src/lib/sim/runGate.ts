@@ -61,7 +61,7 @@ export function runGateState(g: RunGateInput): RunGateState {
     return {
       kind: "baseline",
       canRun: false,
-      reason: "The validated baseline runs in Policies › Run & Validate.",
+      reason: "Runs in Policies.",
       button,
       stageSub: "runs in Policies",
       readout: { tone: "off", value: "baseline" },
@@ -83,7 +83,7 @@ export function runGateState(g: RunGateInput): RunGateState {
     return {
       kind: "ack_required",
       canRun: false,
-      reason: `Acknowledge ${warnText} to run with engine defaults.`,
+      reason: `Acknowledge ${warnText} to run.`,
       button,
       stageSub: `ack ${warnText}`,
       readout: { tone: "warn", value: warnText },

@@ -52,7 +52,7 @@ describe('D230 · why a right is not held', () => {
 
   it('names the upload gate when the role allows input edits and the gate refuses them', () => {
     const r = rights({ effective_role: 'editor', resolved_capabilities: { data_edit_inputs: true } });
-    expect(projectRightRefusal('data_edit_inputs', r)).toMatch(/only from its owner or an app admin/);
+    expect(projectRightRefusal('data_edit_inputs', r)).toMatch(/only from its owner, an Editor or Owner on it, or an app admin/);
   });
 
   it('refuses when the rights could not be read', () => {
@@ -81,8 +81,9 @@ describe('D230 · what a row of ticks owes its reader', () => {
   });
 });
 
-describe('D276 · the refusal names the layer that decided', () => {
-  const ceilingSql = readFileSync(path.join(root, 'supabase/migrations/20261002000004_account_role_ceiling.sql'), 'utf8');
+describe('D276, D279 · the refusal names the layer that decided', () => {
+  // D279 — the rule's live body: the project role decides, no account-role ceiling.
+  const ruleSql = readFileSync(path.join(root, 'supabase/migrations/20261002000007_project_role_decides.sql'), 'utf8');
   const decided = (decided_by: RightDecider, over: Partial<RightDecision> = {}): ProjectRights => rights({
     effective_role: 'editor',
     decisions: {
@@ -94,21 +95,22 @@ describe('D276 · the refusal names the layer that decided', () => {
   });
 
   it('knows every decider the SQL can return, and no other', () => {
-    const named = new Set([...ceilingSql.matchAll(/'decided_by',\s*'([a-z_]+)'|THEN '([a-z_]+)'/g)]
+    const named = new Set([...ruleSql.matchAll(/'decided_by',\s*'([a-z_]+)'|THEN '([a-z_]+)'/g)]
       .map((m) => m[1] ?? m[2]).filter((v) => v && v !== 'organization'));
     for (const d of named) expect(Object.keys(RIGHT_DECIDER_LABELS)).toContain(d);
     expect(Object.keys(RIGHT_DECIDER_LABELS).sort()).toEqual(
-      ['account_ceiling', 'account_role', 'person_override', 'project_role', 'super_admin', 'suspended', 'upload_gate']);
+      ['account_role', 'person_override', 'project_role', 'super_admin', 'suspended', 'upload_gate']);
+    expect(named.size).toBe(Object.keys(RIGHT_DECIDER_LABELS).length);
   });
 
-  it('says the account role caps what the project role grants', () => {
-    expect(projectRightRefusal('simulation_lab', decided('account_ceiling')))
-      .toBe('Your role on this project (Editor) includes Run Simulations, but your account role (User) does not allow it on any project.');
+  it('D279 · the account role is no ceiling: the rule has no branch that refuses what the project role grants', () => {
+    expect(ruleSql).not.toMatch(/'account_ceiling'/);
+    expect(ruleSql).toMatch(/ELSE jsonb_build_object\('allowed', p_project_grant, 'decided_by', 'project_role'\)/);
   });
 
-  it('names the organization when its setting is the ceiling', () => {
-    expect(projectRightRefusal('simulation_lab', decided('account_ceiling', { account_source: 'organization' })))
-      .toMatch(/this project's organization has it switched off/);
+  it('names the project role when it does not include the right', () => {
+    expect(projectRightRefusal('simulation_lab', decided('project_role', { project_role: 'viewer', project_grant: false })))
+      .toBe('Your role on this project (Viewer) does not include Run Simulations.');
   });
 
   it('names a person override and a missing project role', () => {

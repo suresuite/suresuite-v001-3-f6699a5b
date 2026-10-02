@@ -45,7 +45,10 @@ governance:
     the general claim fails. WP 2.3 is where it becomes true. Since D211 an
     account's `org_role` in each of its organizations is also set by
     `admin_set_user_org_role` (active super
-    admin, /admin/users/:userId), logged to `admin_audit_logs`.
+    admin, /admin/users/:userId), logged to `admin_audit_logs`. Since D278
+    `admin_set_user_role` moves the ACTIVE organization's row between `member` and
+    `admin` when the account role enters or leaves `admin` (never `owner`, never
+    another organization's row), logged the same way.
 
 fields:
   id:
@@ -106,12 +109,18 @@ fields:
     surfaces: []
     resolution: null
     note: >-
-      NOT READ BY THE ACCESS LAYER TODAY. `capabilities_for_user()` resolves
+      NOT READ BY THE CAPABILITY RESOLVER. `capabilities_for_user()` resolves
       role -> org -> user through `approved_users.role` and the capability
-      tables; no policy and no RPC consults `org_role`. An organization `admin`
-      therefore holds no more than a `member` does, which is the gap WP 2.2
-      closes when it extends the resolver. Recorded rather than implied, per
-      §5 T1.
+      tables, so for pages and features an organization `admin` holds no more
+      than a `member` does. ONE reader decides with it: `_api_key_management_org`
+      lets an organization `owner` or `admin` manage that organization's API keys
+      (and use every scope on a personal key, `_api_key_caller.can_manage`)
+      whatever the account role — which is why D278 lowers an `admin` row when
+      the account role leaves `admin`: before it, a demoted account kept that
+      right. Since D278 the row follows the account role on the ACTIVE
+      organization (`admin_set_user_role`); `admin_list_account_role_gaps` lists
+      account admins whose row still says `member`. Recorded rather than implied,
+      per §5 T1.
   is_default:
     type: boolean
     unit: null
@@ -168,6 +177,7 @@ note: >-
   fixed — an UPDATE of either is refused. Each row is a SEAT: an organization's
   `user_limit` counts these rows (`trg_tenant_allowance`, BEFORE INSERT; a re-add of an
   existing member takes no seat). Written by `admin_add_org_member` /
-  `admin_remove_org_member` and `admin_set_default_org` (logged through
-  `log_admin_action`), by the sync trigger,
+  `admin_remove_org_member`, `admin_set_default_org`, `admin_set_user_org_role` and,
+  for the active organization's member/admin role, `admin_set_user_role` (D278) (all
+  logged through `log_admin_action`), by the sync trigger,
   and by the CASCADEs; read by the account through `list_my_organizations`.

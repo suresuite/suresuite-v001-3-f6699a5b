@@ -63,7 +63,7 @@ export interface ProjectPerson {
   default_org_name: string | null;
   visible: boolean;
   can_edit_project: boolean;
-  /** D230 — the upload gate: the project's owner or an app admin. */
+  /** D230, D279 — the upload gate: the project's owner, an Editor or Owner on it, or an app admin. */
   may_land_uploads?: boolean;
   member: {
     project_role: string; expires_at: string | null; expired: boolean;

@@ -5395,6 +5395,47 @@ async function phase12Library() {
     (rows) => { out("**(4) API keys (`with_creator` < `keys` means some keys could not become personal):**"); out(...table(rows)); });
 }
 
+// §4 D278 — an account role change now moves the ACTIVE organization's member/admin role.
+// Before `20261002000006` it moved nothing, so production may hold both leftovers. Counted
+// across EVERY organization (D42), by organization name only — no person is named. The
+// first is what /admin/users marks with "Make organization admin"; the second is the half
+// that HOLDS a right (`_api_key_management_org` admits an organization admin whatever the
+// account role), and no badge marks it.
+async function d278AccountRoleGaps() {
+  section("D278 — account role vs the active organization's role, every organization");
+
+  report("(1) D278 — accounts whose role is admin while their active-organization role is member",
+    await tryQ(`
+      select coalesce(o.name, '(none)') as organization, count(*)::int as account_admins_at_member
+        from public.approved_users u
+        join public.organization_members m on m.user_id = u.id and m.org_id = u.organization_id
+        left join public.organizations o on o.id = m.org_id
+       where u.role = 'admin'::public.app_role and m.org_role = 'member'
+       group by 1 order by 2 desc, 1`),
+    (rows) => { out("**(1) account admins left at organization `member` (what `admin_list_account_role_gaps` lists; empty is clean):**"); out(...table(rows)); });
+
+  report("(2) D278 — accounts that are NOT admin while their active-organization role is admin",
+    await tryQ(`
+      select coalesce(o.name, '(none)') as organization, u.role::text as account_role,
+             count(*)::int as accounts
+        from public.approved_users u
+        join public.organization_members m on m.user_id = u.id and m.org_id = u.organization_id
+        left join public.organizations o on o.id = m.org_id
+       where u.role in ('user'::public.app_role, 'modeler'::public.app_role) and m.org_role = 'admin'
+       group by 1, 2 order by 3 desc, 1, 2`),
+    (rows) => { out("**(2) non-admin accounts holding an organization `admin` row — they manage the organization's API keys (a demotion before D278 left these; an explicit `admin_set_user_org_role` also makes them):**"); out(...table(rows)); });
+
+  report("(3) D278 — totals",
+    await tryQ(`
+      select count(*) filter (where u.role = 'admin'::public.app_role and m.org_role = 'member')::int as admin_at_member,
+             count(*) filter (where u.role in ('user'::public.app_role, 'modeler'::public.app_role) and m.org_role = 'admin')::int as non_admin_at_admin,
+             count(*) filter (where u.role = 'admin'::public.app_role)::int as account_admins,
+             count(*)::int as accounts_with_an_active_membership
+        from public.approved_users u
+        join public.organization_members m on m.user_id = u.id and m.org_id = u.organization_id`),
+    (rows) => { out("**(3) totals:**"); out(...table(rows)); });
+}
+
 async function main() {
   out(`# PLAN.md §15 — verification SQL, executed`);
   out("");
@@ -5411,6 +5452,7 @@ async function main() {
   await phase10Versions();
   await phase11Levels();
   await phase12Library();
+  await d278AccountRoleGaps();
 
   await schemaProbe();
   await viewSecurity();

@@ -134,10 +134,10 @@ BEGIN
   IF v_proj -> 'member' ->> 'project_role' IS DISTINCT FROM 'editor' OR v_proj ->> 'effective_role' IS DISTINCT FROM 'editor'
      OR v_proj -> 'member' ->> 'granted_by' IS DISTINCT FROM 'D211 Super'
      OR (v_proj ->> 'visible')::boolean IS NOT TRUE OR (v_proj ->> 'can_edit_project')::boolean IS NOT FALSE
-     -- D230: the role grants inputs, the upload gate (owner or app admin) refuses them.
+     -- D230, D279: the role grants inputs, and the upload gate admits an Editor.
      OR (v_proj -> 'resolved_capabilities' ->> 'data_edit_inputs')::boolean IS NOT TRUE
-     OR (v_proj ->> 'may_land_uploads')::boolean IS NOT FALSE
-     OR (v_proj -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT FALSE THEN
+     OR (v_proj ->> 'may_land_uploads')::boolean IS NOT TRUE
+     OR (v_proj -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'D211/460 §2: the editor membership read as %', v_proj;
   END IF;
 

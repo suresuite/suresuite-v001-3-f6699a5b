@@ -5,9 +5,9 @@
   "sources": {
     "introspected": {
       "generator": "scripts/data-contract/introspect.mjs",
-      "migrations_found": 393,
-      "migrations_applied": 385,
-      "last_migration": "20261002000005_personal_keys_for_every_user.sql"
+      "migrations_found": 395,
+      "migrations_applied": 387,
+      "last_migration": "20261002000007_project_role_decides.sql"
     },
     "sidecars": 75,
     "registry": {
@@ -21393,7 +21393,7 @@
         "min_project_role": "viewer",
         "audited": false,
         "rls_enabled": true,
-        "note": "A member may read only their OWN membership row (`user_id = get_current_user_id()`); there is no policy letting a member enumerate who else is in their organization, and the admin pages that do so run through super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member` and friends log through `log_admin_action`, but membership rows are also written by the `20260709000002` backfill and by nothing else that audits, so the general claim fails. WP 2.3 is where it becomes true. Since D211 an account's `org_role` in each of its organizations is also set by `admin_set_user_org_role` (active super admin, /admin/users/:userId), logged to `admin_audit_logs`."
+        "note": "A member may read only their OWN membership row (`user_id = get_current_user_id()`); there is no policy letting a member enumerate who else is in their organization, and the admin pages that do so run through super-admin RPCs. `audited: false` is the honest record — `admin_add_org_member` and friends log through `log_admin_action`, but membership rows are also written by the `20260709000002` backfill and by nothing else that audits, so the general claim fails. WP 2.3 is where it becomes true. Since D211 an account's `org_role` in each of its organizations is also set by `admin_set_user_org_role` (active super admin, /admin/users/:userId), logged to `admin_audit_logs`. Since D278 `admin_set_user_role` moves the ACTIVE organization's row between `member` and `admin` when the account role enters or leaves `admin` (never `owner`, never another organization's row), logged the same way."
       },
       "rls": {
         "enabled": true,
@@ -21610,7 +21610,7 @@
           },
           "surfaces": [],
           "resolution": null,
-          "note": "NOT READ BY THE ACCESS LAYER TODAY. `capabilities_for_user()` resolves role -> org -> user through `approved_users.role` and the capability tables; no policy and no RPC consults `org_role`. An organization `admin` therefore holds no more than a `member` does, which is the gap WP 2.2 closes when it extends the resolver. Recorded rather than implied, per §5 T1.",
+          "note": "NOT READ BY THE CAPABILITY RESOLVER. `capabilities_for_user()` resolves role -> org -> user through `approved_users.role` and the capability tables, so for pages and features an organization `admin` holds no more than a `member` does. ONE reader decides with it: `_api_key_management_org` lets an organization `owner` or `admin` manage that organization's API keys (and use every scope on a personal key, `_api_key_caller.can_manage`) whatever the account role — which is why D278 lowers an `admin` row when the account role leaves `admin`: before it, a demoted account kept that right. Since D278 the row follows the account role on the ACTIVE organization (`admin_set_user_role`); `admin_list_account_role_gaps` lists account admins whose row still says `member`. Recorded rather than implied, per §5 T1.",
           "engine_requirement": null
         },
         {
@@ -21685,7 +21685,7 @@
           "engine_requirement": null
         }
       ],
-      "note": "THE AUTHORITY FOR WHICH ORGANIZATIONS AN ACCOUNT BELONGS TO since `20260930000004` (§4 D210) — an account may belong to several, and `approved_users.organization_id` names the ACTIVE one (what RLS reads). Between `20260929000002` (D205) and D210 this table was derived from that column and held at most one row per account. The rule now, kept by triggers and asserted by `rehearsal/450`: `organization_id` is NULL exactly when the account has no row here, and otherwise names one of its rows. Setting `organization_id` ADDS its row (`trg_approved_users_sync_org_membership`, the `20260709000002` role mapping — app `admin` → `org_role = 'admin'`, everyone else `member`) and removes none; a first row makes its organization active (`trg_organization_members_activate_first`); deleting the active organization's row re-points the account to its earliest remaining one, or none (`trg_organization_members_repoint_active`) — to its DEFAULT one when it has one (`is_default`, D216), which is also where every sign-in lands. A row's organization and account are fixed — an UPDATE of either is refused. Each row is a SEAT: an organization's `user_limit` counts these rows (`trg_tenant_allowance`, BEFORE INSERT; a re-add of an existing member takes no seat). Written by `admin_add_org_member` / `admin_remove_org_member` and `admin_set_default_org` (logged through `log_admin_action`), by the sync trigger, and by the CASCADEs; read by the account through `list_my_organizations`.",
+      "note": "THE AUTHORITY FOR WHICH ORGANIZATIONS AN ACCOUNT BELONGS TO since `20260930000004` (§4 D210) — an account may belong to several, and `approved_users.organization_id` names the ACTIVE one (what RLS reads). Between `20260929000002` (D205) and D210 this table was derived from that column and held at most one row per account. The rule now, kept by triggers and asserted by `rehearsal/450`: `organization_id` is NULL exactly when the account has no row here, and otherwise names one of its rows. Setting `organization_id` ADDS its row (`trg_approved_users_sync_org_membership`, the `20260709000002` role mapping — app `admin` → `org_role = 'admin'`, everyone else `member`) and removes none; a first row makes its organization active (`trg_organization_members_activate_first`); deleting the active organization's row re-points the account to its earliest remaining one, or none (`trg_organization_members_repoint_active`) — to its DEFAULT one when it has one (`is_default`, D216), which is also where every sign-in lands. A row's organization and account are fixed — an UPDATE of either is refused. Each row is a SEAT: an organization's `user_limit` counts these rows (`trg_tenant_allowance`, BEFORE INSERT; a re-add of an existing member takes no seat). Written by `admin_add_org_member` / `admin_remove_org_member`, `admin_set_default_org`, `admin_set_user_org_role` and, for the active organization's member/admin role, `admin_set_user_role` (D278) (all logged through `log_admin_action`), by the sync trigger, and by the CASCADEs; read by the account through `list_my_organizations`.",
       "analysis_kinds": null
     },
     "organizations": {
@@ -42746,5 +42746,5 @@
   },
   "orphans": [],
   "phantom_tables": [],
-  "contract_version": "5fee79ba621c"
+  "contract_version": "c0bee291baee"
 }
