@@ -153,7 +153,7 @@ the Developer API page's Quickstart tab.
 
 ### Python notebooks (Google Colab or local Jupyter)
 
-Five notebooks, each the Python version of one workflow in the app. Get them from
+Six notebooks, each the Python version of one workflow in the app. Get them from
 the `/developer` page's **Notebook** tab, which lists your projects and, per
 project, every id the notebooks need, and downloads any of them with the CONFIG
 cell pre-filled. **Open in Colab** downloads the same pre-filled copy and opens
@@ -167,6 +167,7 @@ repository, which is private.
 | `suresuite_02_disruption_resilience.ipynb` | Lab stress tests: plant shutdown, sole- and dual-source supplier outages, a partial capacity cut; time to survive / recover |
 | `suresuite_03_material_shortage.ipynb` | A material shortage induced by its sole supplier's outage; lost sales vs backorders (P-C.1) |
 | `suresuite_04_results_and_reproducibility.ipynb` | The run-results workbook (`run_meta`, `aggregate_kpis`, `replication_kpis`, `series_*`, `reproducibility`), cancel, errors |
+| `suresuite_05_local_simulation.ipynb` | Simulate on your own machine: pull a dataset and policy version, reproduce a platform run exactly, sweep 20 scenarios locally, a what-if on your copy of the data |
 
 **Two modes.** With no key the notebooks run in **demo mode**: they replay engine
 output recorded for the Example project (`scripts/example_project/dataset.json`,

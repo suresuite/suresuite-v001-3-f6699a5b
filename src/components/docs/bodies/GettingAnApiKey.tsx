@@ -170,7 +170,7 @@ export default function GettingAnApiKey() {
 
       <Section id="notebook" title="The notebook series">
         <Key>
-          Five Python notebooks do what you do in the application — with your own project's ids
+          Six Python notebooks do what you do in the application — with your own project's ids
           already filled in, or with no key at all in demo mode.
         </Key>
         <P>
@@ -187,7 +187,9 @@ export default function GettingAnApiKey() {
           replication by replication; <strong>02</strong> runs stress tests and reads survival and
           recovery times; <strong>03</strong> produces a material shortage through a sole-source
           supplier outage and compares lost sales with backorders; <strong>04</strong> exports a
-          run's results workbook with its reproducibility record. A notebook that changes your
+          run's results workbook with its reproducibility record; <strong>05</strong> pulls a dataset
+          and a policy version and runs the simulation engine on your own machine — reproducing a
+          platform run exactly, then sweeping twenty scenarios at no cost to your quota. A notebook that changes your
           policies puts them back when its block ends, even if a run fails.
         </P>
         <P>

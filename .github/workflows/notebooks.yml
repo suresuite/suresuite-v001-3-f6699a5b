@@ -63,7 +63,9 @@ jobs:
 
       - name: Install the notebooks' own dependencies (what a user installs)
         if: ${{ !cancelled() }}
-        run: pip install requests pandas matplotlib pyarrow openpyxl nbclient nbformat ipykernel pytest
+        # + the engine wheels, so notebook 05 (local simulation) runs fully rather than
+        # taking its "engine not installed" branch.
+        run: pip install requests pandas matplotlib pyarrow openpyxl nbclient nbformat ipykernel pytest public/engine/*.whl
 
       - name: Client tests (errors, retries, idempotency, demo, paired comparison)
         if: ${{ !cancelled() }}

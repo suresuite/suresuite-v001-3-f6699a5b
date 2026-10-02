@@ -22,7 +22,7 @@
  * Cell markers in a source:
  *   # %%                          a code cell
  *   # %% [markdown]               a markdown cell (each line starts with "# ")
- *   # %% include: config|setup|library
+ *   # %% include: config|setup|library|local
  *   # %% include: demo_data <label> <label> …   the recordings the notebook replays
  *
  * ── WHAT --check REFUSES ───────────────────────────────────────────────────
@@ -115,6 +115,13 @@ const INCLUDES = {
   library: {
     title: "SuReSuite notebook library (run it; no need to read it)",
     text: () => `${read(join(PKG, "client.py")).trimEnd()}\n\n\n${kpiPy}`,
+    form: true,
+  },
+  // Phase 12 · WP 12.6 — the package's local-simulation module, for the notebook
+  // that runs the engine on the user's own machine.
+  local: {
+    title: "Local simulation (the suresuite package's local.py)",
+    text: () => read(join(PKG, "local.py")),
     form: true,
   },
 };

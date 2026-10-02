@@ -7,7 +7,7 @@ The five notebooks a customer downloads from `/developer` →
 ```
 notebooks/
   src/
-    00_quickstart.py … 04_results_and_reproducibility.py   one source per notebook (percent format)
+    00_quickstart.py … 05_local_simulation.py   one source per notebook (percent format)
     common/config.py      the CONFIG cell — /developer patches it; its variables must match nbConfigCell
     common/setup.py       packages + API key (Colab Secrets → SURESUITE_API_KEY → prompt in "live")
   demo/example_project.json   recorded engine output the demo mode replays
