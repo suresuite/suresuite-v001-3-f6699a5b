@@ -179,8 +179,9 @@ export default function EndpointsAndSchemas() {
         <p>
           We would rather ship an accurate list of endpoints with no bodies than a complete-looking
           page that is wrong in six months. A machine-readable schema is what would close it, and
-          the <DocLink to="getting-an-api-key">notebook</DocLink> is the practical substitute
-          meanwhile: every call on this page appears in it, with a real body.
+          the <DocLink to="getting-an-api-key">notebooks</DocLink> are the practical substitute
+          meanwhile: every call on this page except <Term>:add-reps</Term> and the two key routes
+          appears in them, with a real body.
         </p>
       </Callout>
 

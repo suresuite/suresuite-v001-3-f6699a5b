@@ -40,6 +40,11 @@ const GATES = [
   // typechecked before it: Vite does not, and a bare `tsc --noEmit` at the
   // root passes on the empty set — see scripts/typecheck.mjs.
   { name: "typecheck", cmd: "node", args: ["scripts/typecheck.mjs"] },
+  // The Python notebooks are GENERATED from notebooks/src (one client, inlined
+  // into each); this fails on a stale build, on CONFIG drift from /developer,
+  // and on content a customer must not get (emoji, file:line, `succeeded`, a
+  // disruption target the engine skips).
+  { name: "notebooks", cmd: "node", args: ["scripts/notebooks/build-notebooks.mjs", "--check"] },
 ];
 
 const rule = (label) => `\n== ${label} ${"=".repeat(Math.max(0, 60 - label.length))}\n`;

@@ -15,8 +15,8 @@
 // (bg-foreground text-background), teal/red status dots, a bespoke red-kicker
 // "Key hygiene" card ABOVE the table, "Create API key" living in the
 // Organization-keys card header (not the PageHeader), and a two-column notebook
-// config panel with "Open example in Colab" + a brand-yellow
-// "Download template (.ipynb)". Local class constants below hold the shared
+// config panel under the notebook series, each notebook with "Open in Colab" +
+// a "Download" button. Local class constants below hold the shared
 // treatment so every table/card is consistent. All data flow, RPCs, hooks and
 // interactive primitives (Button/Dialog/Select/Input/Checkbox) are unchanged.
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -93,6 +93,7 @@ interface UsageRow {
 interface NbScenario {
   id: string;
   name: string;
+  disruption_schedule?: unknown[] | null;
   horizon_days: number;
   warmup_days: number;
   replications: number;
@@ -130,13 +131,23 @@ const SUPABASE_URL: string =
   (supabase as any).supabaseUrl ?? 'https://wckdrutwkytwcomrlpib.supabase.co';
 const API_BASE = `${SUPABASE_URL}/functions/v1/api/v1`;
 
-// Canonical quickstart notebook, shipped as a static asset; the download
-// patches its CONFIG cell with the selected project's ids. "Open in Colab"
-// downloads that same patched copy and opens Colab's start page for upload.
-// It must NOT use a colab.research.google.com/github/... link: the source
-// repository is private, so Colab 404s and its error page prints the repo's
-// owner, name, branch and path to every customer who clicks it.
-const NOTEBOOK_ASSET_PATH = '/notebooks/suresuite_api_quickstart.ipynb';
+// The notebook series, shipped as static assets and BUILT from notebooks/src by
+// scripts/notebooks/build-notebooks.mjs — whose --check fails when this list and
+// the built files disagree, or when the CONFIG lines `nbConfigCell` writes stop
+// matching the notebooks' own CONFIG cell. A download patches that cell with the
+// selected project's ids. "Open in Colab" downloads the same patched copy and
+// opens Colab's start page for upload. It must NOT use a
+// colab.research.google.com/github/... link: the source repository is private,
+// so Colab 404s and its error page prints the repo's owner, name, branch and
+// path to every customer who clicks it.
+const NOTEBOOKS = [
+  { path: '/notebooks/suresuite_00_quickstart.ipynb', title: '00 · Quickstart', mirrors: 'Simulation Lab: set up a run, run it, read the results', minutes: 10 },
+  { path: '/notebooks/suresuite_01_policy_experiment.ipynb', title: '01 · Policy experiment', mirrors: '/policies edit → Save version → Lab Compare, paired by replication', minutes: 15 },
+  { path: '/notebooks/suresuite_02_disruption_resilience.ipynb', title: '02 · Disruption and resilience', mirrors: 'Lab stress tests: plant shutdown, supplier outage, recovery times', minutes: 15 },
+  { path: '/notebooks/suresuite_03_material_shortage.ipynb', title: '03 · Material shortage', mirrors: 'A sole-source outage, read as a shortage; lost sales vs backorders', minutes: 15 },
+  { path: '/notebooks/suresuite_04_results_and_reproducibility.ipynb', title: '04 · Results and reproducibility', mirrors: 'The run-results workbook and its reproducibility record', minutes: 10 },
+] as const;
+type NotebookPath = (typeof NOTEBOOKS)[number]['path'];
 const COLAB_START_URL = 'https://colab.research.google.com/';
 
 // ── Shared SuReSuite treatment (sharp corners, thin borders, mono labels) ────
@@ -314,7 +325,7 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
       setNbLoading(true);
       const [sc, pv, dv] = await Promise.all([
         db.from('scenarios')
-          .select('id,name,horizon_days,warmup_days,replications,seed,primary_kpi,created_at')
+          .select('id,name,horizon_days,warmup_days,replications,seed,primary_kpi,disruption_schedule,created_at')
           .eq('project_id', nbProjectId)
           .order('created_at', { ascending: false }),
         db.rpc('list_policy_versions', { p_project_id: nbProjectId }),
@@ -330,7 +341,10 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
   }, [nbProjectId]);
 
   const nbProject = projects.find((p) => p.id === nbProjectId) ?? null;
-  const nbScenario = nbScenarios[0] ?? null;
+  // The newest BASELINE: a scenario with disruptions pre-filled as SCENARIO_ID
+  // would make every notebook's "baseline" a stress test.
+  const nbScenario =
+    nbScenarios.find((s) => !Array.isArray(s.disruption_schedule) || s.disruption_schedule.length === 0) ?? null;
   const nbPolicyVersion = nbPolicyVersions[0] ?? null;
 
   // Mirrors the notebook's CONFIG cell exactly (same "# ── CONFIG" marker the
@@ -344,17 +358,19 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
       `PROJECT_ID = "${nbProject.id}"`,
       nbScenario
         ? `SCENARIO_ID = "${nbScenario.id}"  # ${nbScenario.name}`
-        : 'SCENARIO_ID = ""         # no scenarios yet — §6 of the notebook creates one',
+        : 'SCENARIO_ID = ""         # no baseline scenario yet — the notebook creates one',
       nbPolicyVersion
         ? `POLICY_VERSION_ID = "${nbPolicyVersion.id}"  # ${nbPolicyVersion.label ?? 'unlabelled'}`
-        : 'POLICY_VERSION_ID = ""   # no snapshots yet — §5 of the notebook makes one',
+        : 'POLICY_VERSION_ID = ""   # no snapshots yet — the notebook makes one',
+      'SUPPLIER_ID = ""         # a supplier id from your own data, for the disruption examples',
+      'MODE = "auto"            # "auto" = live when an API key is found, else the offline demo; "live"; "demo"',
     ].join('\n');
   }, [nbProject, nbScenario, nbPolicyVersion]);
 
-  const downloadNotebook = async () => {
+  const downloadNotebook = async (path: NotebookPath = NOTEBOOKS[0].path) => {
     setNbDownloading(true);
     try {
-      const res = await fetch(NOTEBOOK_ASSET_PATH);
+      const res = await fetch(path);
       if (!res.ok) throw new Error(`could not load notebook template (${res.status})`);
       const nb = await res.json();
       if (nbConfigCell) {
@@ -372,7 +388,7 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
       const blob = new Blob([JSON.stringify(nb, null, 1)], { type: 'application/x-ipynb+json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `suresuite_api_quickstart${slug}.ipynb`;
+      a.download = `${path.split('/').pop()!.replace(/\.ipynb$/, '')}${slug}.ipynb`;
       a.click();
       URL.revokeObjectURL(a.href);
       return true;
@@ -391,9 +407,9 @@ export default function DeveloperApi({ isCollapsed, setIsCollapsed }: Props) {
   // Colab cannot read the private repository, so hand it the downloaded file.
   // The tab opens before the await so a popup blocker still treats it as the
   // click's own window.
-  const openInColab = async () => {
+  const openInColab = async (path: NotebookPath = NOTEBOOKS[0].path) => {
     window.open(COLAB_START_URL, '_blank', 'noopener,noreferrer');
-    if (await downloadNotebook()) {
+    if (await downloadNotebook(path)) {
       toast({
         title: 'Notebook downloaded',
         description: 'In the Colab tab choose File → Upload notebook and pick the downloaded .ipynb.',
@@ -537,7 +553,7 @@ run = requests.post(
 # 4. poll until finished, then read replications
 while True:
     r = requests.get(f"{BASE}/runs/{run['run_id']}", headers=HEADERS).json()
-    if r["status"] in ("succeeded", "failed", "cancelled"):
+    if r["status"] in ("done", "failed", "cancelled"):
         break
     time.sleep(5)
 reps = requests.get(f"{BASE}/runs/{run['run_id']}/replications", headers=HEADERS).json()["data"]
@@ -546,47 +562,37 @@ print(r["aggregate_kpis"], len(reps))`;
 
 BASE = "${API_BASE}"
 HEADERS = {"Authorization": f"Bearer {os.environ['SURESUITE_API_KEY']}"}
+PROJECT_ID = "your-project-id"
+SOLE_SUPPLIER = "S2"  # a supplier_id of YOUR project that is the only source of a material
 
-def run_and_wait(project_id, scenario_id, policy_version_id, idem):
+def run_and_wait(scenario_id, policy_version_id):
     submitted = requests.post(
-        f"{BASE}/projects/{project_id}/runs", headers={**HEADERS, "Idempotency-Key": idem},
+        f"{BASE}/projects/{PROJECT_ID}/runs", headers={**HEADERS, "Idempotency-Key": f"{scenario_id}:{policy_version_id}"},
         json={"scenario_id": scenario_id, "policy_version_id": policy_version_id},
     ).json()
-    run_id = submitted["run_id"]
     while True:
-        run = requests.get(f"{BASE}/runs/{run_id}", headers=HEADERS).json()
-        if run["status"] in ("succeeded", "failed", "cancelled"):
+        run = requests.get(f"{BASE}/runs/{submitted['run_id']}", headers=HEADERS).json()
+        if run["status"] in ("done", "failed", "cancelled"):  # a finished run is "done"
             return run
         time.sleep(5)
 
-# 1. resolve "Project AA" and its "Version 3" policy snapshot by name
-projects = requests.get(f"{BASE}/projects", headers=HEADERS).json()["data"]
-project = next(p for p in projects if p["name"].strip().lower() == "project aa")
-versions = requests.get(f"{BASE}/projects/{project['id']}/policy-versions", headers=HEADERS).json()["data"]
-version_3 = next(v for v in versions if (v.get("label") or "").strip().lower() == "version 3")
+version = requests.post(f"{BASE}/projects/{PROJECT_ID}/policy-versions", headers=HEADERS,
+                        json={"label": "shortage study"}).json()
+frame = {"horizon_days": 364, "replications": 10, "seed": 42, "crn": True}  # 52 weeks: the engine's minimum
 
-# 2. baseline scenario (no disruption)
-baseline = requests.post(
-    f"{BASE}/projects/{project['id']}/scenarios", headers=HEADERS,
-    json={"name": "Material shortage — baseline", "horizon_days": 120, "warmup_days": 14,
-          "replications": 20, "seed": 42, "crn": True, "primary_kpi": "fill_rate"},
-).json()
-run_baseline = run_and_wait(project["id"], baseline["id"], version_3["id"], "shortage-baseline")
+# A material runs short when its suppliers stop: the engine disrupts suppliers and
+# the plant (a material target is skipped), so starve the material via its only source.
+baseline = requests.post(f"{BASE}/projects/{PROJECT_ID}/scenarios", headers=HEADERS,
+                         json={"name": "Shortage study — baseline", **frame}).json()
+shortage = requests.post(f"{BASE}/projects/{PROJECT_ID}/scenarios", headers=HEADERS, json={
+    "name": f"Shortage study — {SOLE_SUPPLIER} 6-week outage", **frame,
+    "disruption_schedule": [{"target": SOLE_SUPPLIER, "start_day": 140, "duration_days": 42, "magnitude_pct": 100}],
+}).json()
 
-# 3. shortage scenario — cut a material/supplier's capacity for 3 weeks
-shortage = requests.post(
-    f"{BASE}/projects/{project['id']}/scenarios", headers=HEADERS,
-    json={"name": "Material shortage — RM-2201 cut", "horizon_days": 120, "warmup_days": 14,
-          "replications": 20, "seed": 42, "crn": True, "primary_kpi": "fill_rate",
-          "disruption_schedule": [{"target": "RM-2201", "target_type": "material",
-                                   "start_day": 30, "duration_days": 21, "magnitude_pct": 60}]},
-).json()
-run_shortage = run_and_wait(project["id"], shortage["id"], version_3["id"], "shortage-cut")
-
-# 4. shortage evidence — driven by policy P-C.1 unmet_demand_handling
-for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area", "ttr_weeks"):
-    a, b = run_baseline["aggregate_kpis"].get(kpi), run_shortage["aggregate_kpis"].get(kpi)
-    print(f"{kpi:20s} baseline={a}  shortage={b}")`;
+a = run_and_wait(baseline["id"], version["id"])
+b = run_and_wait(shortage["id"], version["id"])
+for kpi in ("fill_rate", "lost_units", "lost_sales_value", "max_backlog", "ttr_weeks", "cost_of_resilience"):
+    print(f"{kpi:20s} baseline={a['aggregate_kpis'].get(kpi)}  shortage={b['aggregate_kpis'].get(kpi)}")`;
 
   // The three dialogs are the REAL editors and both chromes mount them
   // unchanged (§8). Below `md` they take the touch floor on every control;
@@ -935,7 +941,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
         <ApiCodeBlock title="Dispatch a run (202 → run_id)" code={curlRun} />
         <ApiCodeBlock title="Poll a run until it finishes" code={curlPoll} />
         <ApiCodeBlock title="Python: end-to-end" code={pythonSnippet} />
-        <ApiCodeBlock title="Python: material shortage — Project AA, Version 3" code={shortageSnippet} />
+        <ApiCodeBlock title="Python: material shortage — a sole-source supplier outage" code={shortageSnippet} />
       </MobileGroup>
 
       <MobileGroup label="Reference">
@@ -973,29 +979,35 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
 
   const mobileNotebook = (
     <>
-      <MobileGroup label="Template">
-        <MobilePanel label="Ready-to-run quickstart" counter="§1–13">
+      <MobileGroup label="Notebooks">
+        <MobilePanel label="The notebook series" counter={`${NOTEBOOKS.length}`}>
           <p className="px-3 py-3 text-[12.5px] leading-[1.55] text-[#3f3f46] [text-wrap:pretty]">
-            §1–12 cover the full API surface; §13 is a worked material-shortage deep dive — pick
-            your project below, then edit its <span className="font-mono">SHORTAGE_TARGET</span> to
-            a real material or supplier key.
+            Each notebook is the Python version of one workflow in the app. Without a key it runs
+            in demo mode on recorded engine output; pick your project below first and a download
+            fills in its ids.
           </p>
-          <div className="p-3">
-            <MobileButtonRow>
-              <MobileButton
-                weight="secondary"
-                onClick={openInColab}
-                disabled={nbDownloading}
-              >
-                Open in Colab
-              </MobileButton>
-              {/* "Begin here" — the one #F8D448 the skin allows, and the
-                  template download is exactly what it is reserved for (§3). */}
-              <MobileButton weight="begin" onClick={downloadNotebook} disabled={nbDownloading}>
-                {nbDownloading ? 'Preparing…' : 'Download template'}
-              </MobileButton>
-            </MobileButtonRow>
-          </div>
+          {NOTEBOOKS.map((nb, i) => (
+            <div key={nb.path} className="border-t border-[#e5e5e5] p-3">
+              <p className="text-[13px] font-semibold text-[#171717]">{nb.title}</p>
+              <p className="pb-2 text-[12px] leading-[1.5] text-[#525252]">
+                {nb.mirrors} · about {nb.minutes} min
+              </p>
+              <MobileButtonRow>
+                <MobileButton weight="secondary" onClick={() => openInColab(nb.path)} disabled={nbDownloading}>
+                  Open in Colab
+                </MobileButton>
+                {/* "Begin here" — the one #F8D448 the skin allows, reserved for
+                    the template download (§3): the quickstart is where to begin. */}
+                <MobileButton
+                  weight={i === 0 ? 'begin' : 'secondary'}
+                  onClick={() => downloadNotebook(nb.path)}
+                  disabled={nbDownloading}
+                >
+                  {nbDownloading ? 'Preparing…' : 'Download'}
+                </MobileButton>
+              </MobileButtonRow>
+            </div>
+          ))}
         </MobilePanel>
       </MobileGroup>
 
@@ -1391,7 +1403,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
                 quickstart.
               </p>
             </div>
-            <ApiCodeBlock title="Python: material shortage — Project AA, Version 3" code={shortageSnippet} />
+            <ApiCodeBlock title="Python: material shortage — a sole-source supplier outage" code={shortageSnippet} />
 
             {/* L1: the table's name reads on the canvas, above the shell. */}
             <TableBlock name="Endpoints · v1" count={ENDPOINTS.length}>
@@ -1416,27 +1428,52 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
 
           {/* ── Notebook ─────────────────────────────────────────────────── */}
           <TabsContent value="notebook" className="space-y-4">
-            <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="space-y-2">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2 text-[14px] font-semibold">
-                  <NotebookText className="h-3.5 w-3.5" /> Ready-to-run quickstart
+                  <NotebookText className="h-3.5 w-3.5" /> Notebook series
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  §1–12 cover the full API surface; §13 is a worked material-shortage
-                  deep dive — pick your project above, then edit its `SHORTAGE_TARGET`
-                  to a real material or supplier key.
+                  Each notebook is the Python version of one workflow in the app, for Google Colab or
+                  a local Jupyter. Without a key it runs in demo mode on recorded engine output for
+                  the Example project; with one it works on your project. Pick a project below first —
+                  a download fills in its ids{nbProject ? ` (now: “${nbProject.name}”)` : ''}.
                 </p>
               </div>
-              <div className="flex flex-none gap-2">
-                <Button size="sm" variant="outline" className="rounded-sm" onClick={openInColab} disabled={nbDownloading}>
-                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open in Colab
-                </Button>
-                <Button size="sm" className={`rounded-sm ${TEMPLATE_BTN}`} onClick={downloadNotebook} disabled={nbDownloading}>
-                  {nbDownloading
-                    ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    : <Download className="mr-1.5 h-3.5 w-3.5" />}
-                  Download template (.ipynb){nbProject ? ` for “${nbProject.name}”` : ''}
-                </Button>
+              <div className={`${SURFACE} divide-y divide-[--hair-border]`}>
+                {NOTEBOOKS.map((nb, i) => (
+                  <div key={nb.path} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-medium">{nb.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {nb.mirrors} · about {nb.minutes} min
+                      </div>
+                    </div>
+                    <div className="flex flex-none gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-sm"
+                        onClick={() => openInColab(nb.path)}
+                        disabled={nbDownloading}
+                      >
+                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Open in Colab
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={i === 0 ? 'default' : 'outline'}
+                        className={cn('rounded-sm', i === 0 && TEMPLATE_BTN)}
+                        onClick={() => downloadNotebook(nb.path)}
+                        disabled={nbDownloading}
+                      >
+                        {nbDownloading
+                          ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          : <Download className="mr-1.5 h-3.5 w-3.5" />}
+                        Download (.ipynb)
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -1468,7 +1505,7 @@ for kpi in ("fill_rate", "lost_sales_value", "max_backlog", "service_loss_area",
                 )}
 
                 <ApiCodeBlock
-                  title="Notebook CONFIG cell (pre-filled — paste over the notebook's first code cell)"
+                  title="Notebook CONFIG cell (pre-filled in every download — or paste it over a notebook's CONFIG cell)"
                   code={nbConfigCell || '# Select a project to fill in BASE_URL, PROJECT_ID, SCENARIO_ID, POLICY_VERSION_ID'}
                 />
               </div>

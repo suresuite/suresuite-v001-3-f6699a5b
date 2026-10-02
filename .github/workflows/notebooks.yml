@@ -1,0 +1,92 @@
+name: python notebooks
+
+# The SuReSuite notebook series (public/notebooks/suresuite_*.ipynb) is what a
+# customer downloads from /developer and runs in Colab or a local Jupyter. Three
+# promises are checked here, because a broken notebook fails in the customer's
+# hands, never in ours:
+#
+#   1. the committed notebooks are exactly what notebooks/src builds, and their
+#      CONFIG cell is the one /developer pre-fills (also in `npm run lint`);
+#   2. the client works — its error, retry, idempotency and paired-comparison
+#      behaviour (pytest) — and EVERY notebook runs top to bottom with no key,
+#      in demo mode (nbclient);
+#   3. the demo's recorded numbers are still what the engine produces for the
+#      Example project (the recorder re-runs it through the worker's own path).
+#
+# What this cannot check is a run against the live API: that needs a key, and
+# is the manual smoke test in docs/api/README.md.
+
+on:
+  push:
+    paths:
+      - "notebooks/**"
+      - "public/notebooks/**"
+      - "scripts/notebooks/**"
+      - "scripts/example_project/**"
+      - "src/lib/sim/kpiDisplay.ts"
+      - "src/pages/DeveloperApi.tsx"
+      - "supabase/functions/api/index.ts"
+      - "supabase/functions/_shared/registry.generated.json"
+      - "scsim/**"
+      - "sim-worker/**"
+      - ".github/workflows/notebooks.yml"
+  workflow_dispatch:
+
+# One run per commit (no `pull_request:`, same reasoning as scsim-tests.yml):
+# the push event reports on the PR's head SHA.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  notebooks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Notebooks are current and in step with /developer
+        run: node scripts/notebooks/build-notebooks.mjs --check
+
+      - name: Install the notebooks' own dependencies (what a user installs)
+        if: ${{ !cancelled() }}
+        run: pip install requests pandas matplotlib pyarrow openpyxl nbclient nbformat ipykernel pytest
+
+      - name: Client tests (errors, retries, idempotency, demo, paired comparison)
+        if: ${{ !cancelled() }}
+        run: python -m pytest tests -q
+        working-directory: notebooks
+
+      - name: Every notebook runs top to bottom in demo mode
+        if: ${{ !cancelled() }}
+        run: python notebooks/tools/run_notebooks.py
+
+  demo-fixture:
+    # Its own job: it installs the engine and the worker, whose pins should not
+    # share a resolution with the user-facing set above.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # Non-editable: the repo-root `scsim/` directory would shadow an editable
+      # install as a namespace package (see scsim-tests.yml).
+      - name: Install the engine and the worker
+        run: pip install ./scsim ./sim-worker -r sim-worker/requirements.txt
+
+      - name: The demo's recorded numbers are what the engine produces
+        run: python notebooks/tools/record_demo.py --check

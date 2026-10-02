@@ -474,23 +474,26 @@ export function deriveUploadAssets(root) {
 }
 
 /**
- * The Colab notebook `/developer` offers, and the one page that should link it.
+ * The Python notebooks `/developer` offers, in the order it lists them, and the
+ * one page that should link them.
  *
  * Read from `DeveloperApi.tsx` rather than from the folder listing: a file in
  * `public/notebooks/` that the product does not offer is not something the
  * manual should send a reader to, and the href is what proves it is offered.
+ * (`scripts/notebooks/build-notebooks.mjs --check` holds the other half: every
+ * offered notebook is built from a source, and every built one is offered.)
  */
-export function deriveApiNotebook(root) {
+export function deriveApiNotebooks(root) {
   const src = readFileSync(join(root, "src", "pages", "DeveloperApi.tsx"), "utf8");
-  const m = /["'`](\/notebooks\/[A-Za-z0-9._-]+\.ipynb)["'`]/.exec(src);
-  if (!m) {
+  const paths = [...src.matchAll(/["'`](\/notebooks\/[A-Za-z0-9._-]+\.ipynb)["'`]/g)].map((m) => m[1]);
+  if (paths.length === 0) {
     throw new Error(
       "chains: no /notebooks/*.ipynb href in src/pages/DeveloperApi.tsx. Either the " +
-        "notebook is no longer offered — in which case the manual must stop linking " +
-        "it — or the scan needs fixing.",
+        "notebooks are no longer offered — in which case the manual must stop linking " +
+        "them — or the scan needs fixing.",
     );
   }
-  return m[1];
+  return [...new Set(paths)];
 }
 
 /**

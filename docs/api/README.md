@@ -102,17 +102,22 @@ in flight consumes nothing.
 | `GET /projects/{id}/policy-versions` | read:policies | snapshot history |
 | `GET /projects/{id}/scenarios` | read:runs | scenarios (paginated) |
 | `POST /projects/{id}/scenarios` | write:runs | `201` new scenario (horizon, replications, seed, disruptions…) |
-| `POST /projects/{id}/runs` | write:runs | `202 {run_id, status, policy_hash, graph_hash}`; body `{"scenario_id","policy_version_id","acknowledge_warnings"?}` |
+| `POST /projects/{id}/runs` | write:runs | `202 {run_id, status, policy_hash, graph_hash, gate_skipped}`; body `{"scenario_id","policy_version_id","acknowledge_warnings"?,"force_rerun"?}` |
 | `GET /runs/{id}` | read:runs | status, aggregate KPIs, CI half-widths, provenance hashes, `gate_skipped` |
-| `GET /runs/{id}/replications` | read:runs | per-replication KPI rows (`?include=time_series` for weekly series; cursor = rep index) |
+| `GET /runs/{id}/replications` | read:runs | per-replication KPI rows (cursor = rep index). `?include=time_series` adds a top-level `series` object: a short-lived signed URL to ONE Parquet file of every weekly series in long form (`rep_index, model_rep, event_rep, week`, one column per series), or `expired` with the RunKey that reproduces it — the rows' own `time_series` is `{}` for runs since WP 10.6 |
 | `POST /runs/{id}:cancel` | write:runs | `202` cancel |
-| `POST /runs/{id}:add-reps` | write:runs | `202` extend an in-flight run (`{"n": 10}`) |
+| `POST /runs/{id}:add-reps` | write:runs | `202` — **accepted but has no effect today**: the worker has no handler for the command it queues. Dispatch a scenario with more replications instead |
 | `GET /runs/{id}/validation` | read:runs | credibility badge: `validated` / `stale` / `unvalidated` + the model-validation card |
 | `GET /keys` | admin:keys | org's keys (never the secret) |
 | `POST /keys/{id}:revoke` | admin:keys | kill switch over the API |
 
 Runs are **asynchronous**: dispatch returns `202` immediately; poll
-`GET /runs/{id}` with backoff until `status ∈ {succeeded, failed, cancelled}`.
+`GET /runs/{id}` with backoff until `status ∈ {done, failed, cancelled}`. The
+lifecycle is `queued → running → done | failed | cancelled` — a finished run is
+`done` (an earlier version of this page said `succeeded`, the vocabulary of the
+analysis store, and a client written to it polled a finished run forever).
+`:cancel` answers `cancelled` even for a run that had already finished; read the
+run back to see its real status.
 (Webhooks and scoped realtime tokens are the planned push options — design doc §9.)
 
 ## Quickstart
@@ -136,29 +141,54 @@ curl -s -X POST "$BASE/projects/$PROJECT/runs" \
   -H "Idempotency-Key: quickstart-1" \
   -d "{\"scenario_id\":\"$SCENARIO\",\"policy_version_id\":\"$VERSION\"}"
 
-# poll
+# poll until "status" is done, failed or cancelled
 curl -s "$BASE/runs/$RUN_ID" -H "Authorization: Bearer $SURESUITE_API_KEY"
 ```
 
 A Python end-to-end example (snapshot → dispatch → poll → replications) is on
 the Developer API page's Quickstart tab.
 
-### Jupyter notebook
+### Python notebooks (Google Colab or local Jupyter)
 
-`public/notebooks/suresuite_api_quickstart.ipynb` is a runnable walkthrough of
-**every v1 use case** — auth, projects, dataset freezing, the policy catalog,
-policy editing & snapshots, scenarios, run dispatch/polling, per-replication
-analysis with pandas/matplotlib, credibility status, and A/B + disruption
-experiments. Get it from the `/developer` page's **Notebook** tab, which also:
+Five notebooks, each the Python version of one workflow in the app. Get them from
+the `/developer` page's **Notebook** tab, which lists your projects and, per
+project, every id the notebooks need, and downloads any of them with the CONFIG
+cell pre-filled. **Open in Colab** downloads the same pre-filled copy and opens
+Colab for *File → Upload notebook* — it never links Colab to the source
+repository, which is private.
 
-- lists the projects your account can access and, per project, every id the
-  notebook needs (scenario / policy-version / dataset-version ids, base URL)
-  with a copy-paste CONFIG cell;
-- downloads the notebook with that CONFIG cell pre-filled; and
-- offers **Open in Colab**, which downloads that pre-filled copy and opens
-  Colab for *File → Upload notebook* — it never links Colab to the source
-  repository, which is private (store the key in Colab's Secrets panel as
-  `SURESUITE_API_KEY` — never in a cell).
+| Notebook | Mirrors in the app |
+|---|---|
+| `suresuite_00_quickstart.ipynb` | Simulation Lab: freeze data, snapshot policies, run a baseline, read KPIs ± CI, replications, weekly series, credibility |
+| `suresuite_01_policy_experiment.ipynb` | /policies edit → Save version → Lab Compare: A vs B on common random numbers, paired by replication, plus a safety-stock sweep |
+| `suresuite_02_disruption_resilience.ipynb` | Lab stress tests: plant shutdown, sole- and dual-source supplier outages, a partial capacity cut; time to survive / recover |
+| `suresuite_03_material_shortage.ipynb` | A material shortage induced by its sole supplier's outage; lost sales vs backorders (P-C.1) |
+| `suresuite_04_results_and_reproducibility.ipynb` | The run-results workbook (`run_meta`, `aggregate_kpis`, `replication_kpis`, `series_*`, `reproducibility`), cancel, errors |
+
+**Two modes.** With no key the notebooks run in **demo mode**: they replay engine
+output recorded for the Example project (`scripts/example_project/dataset.json`,
+recorded by `notebooks/tools/record_demo.py` through the worker's own path), and
+refuse — never invent — anything they have no recording for. With a key from
+Colab's Secrets panel or the `SURESUITE_API_KEY` environment variable, the same
+cells run on your project. Locally:
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install jupyterlab requests pandas matplotlib pyarrow openpyxl
+export SURESUITE_API_KEY="sk_test_…"
+jupyter lab
+```
+
+**Live smoke test** (CI runs every notebook in demo mode, but cannot hold a key):
+upload `suresuite_00_quickstart.ipynb` to Colab with a `sk_test_` key on the
+Example project, *Run all*, and check the run reaches `done` and the weekly series
+load. Run `01` and confirm the project's policies read the same afterwards.
+
+**Authoring.** The notebooks are generated: edit `notebooks/src/*.py` (percent
+format) and `notebooks/src/common/*.py`, then `npm run notebooks:build`.
+`npm run notebooks:check` (part of `npm run lint`) fails on a stale build, on a
+CONFIG cell that differs from the one `/developer` writes, and on content a
+customer must not receive. See `notebooks/README.md`.
 
 ## Security model (summary)
 

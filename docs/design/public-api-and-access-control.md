@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | v0.2 — **adopted**; the Phase 0–2 foundation is implemented: gateway `supabase/functions/api` (/v1), migration `20260711000001_api_access_control.sql` (keys/logs/quotas/RPCs), shared dispatch `supabase/functions/_shared/dispatch.ts`, key-management UI at `/developer`, reference docs `docs/api/README.md`, and the §12 notebook quickstart (`public/notebooks/suresuite_api_quickstart.ipynb` + the `/developer` Notebook tab: per-project config panel, pre-filled download, Colab link). The §16 blueprint edits are applied (G15). Outstanding: webhooks/realtime tokens, OpenAPI generation + SDKs, sandbox seeding, OAuth tokens, pre-launch pen-test (Phases 3–4). |
+| **Status** | v0.2 — **adopted**; the Phase 0–2 foundation is implemented: gateway `supabase/functions/api` (/v1), migration `20260711000001_api_access_control.sql` (keys/logs/quotas/RPCs), shared dispatch `supabase/functions/_shared/dispatch.ts`, key-management UI at `/developer`, reference docs `docs/api/README.md`, and the §12 Python notebook series (`public/notebooks/suresuite_0[0-4]_*.ipynb`, generated from `notebooks/src` + the `/developer` Notebook tab: per-project config panel, pre-filled download per notebook, Open in Colab by upload; an offline demo mode replays recorded engine output when no key is present). The §16 blueprint edits are applied (G15). Outstanding: webhooks/realtime tokens, OpenAPI generation + SDKs, sandbox seeding, OAuth tokens, pre-launch pen-test (Phases 3–4). |
 | **Date** | 2026-07-11 (v0.1 and adoption same day) |
 | **Altitude** | Platform capability design: a public, versioned HTTP API over the existing control plane, plus the authentication, authorization, quota, and audit machinery that makes it safe to expose |
 | **Authority** | Governed by `docs/design/next-gen-platform-design.md`. This document proposes a **new capability and a new gap (G15)** the blueprint does not yet cover; §16 lists the exact blueprint edits to apply when this plan is adopted, per the "document and code move together" rule in `CLAUDE.md`. |
@@ -336,7 +336,7 @@ Conventions: cursor pagination (`5–10` items/page, matching the GitHub-MCP gui
 
 Runs are asynchronous (the Fly worker is the sole result writer, A11). Three delivery options, cheapest first:
 
-1. **Polling** — `GET /v1/runs/{id}` until `status ∈ {succeeded, failed, cancelled}`. Always available; document a backoff.
+1. **Polling** — `GET /v1/runs/{id}` until `status ∈ {done, failed, cancelled}` (the worker's vocabulary: `queued → running → done | failed | cancelled`). Always available; document a backoff.
 2. **Webhooks** — the caller registers an HTTPS URL; the platform POSTs `run.succeeded` / `run.failed` events, **HMAC-signed** with a per-endpoint secret (`X-SuReSuite-Signature`), with retries + a replay-protection timestamp. A tiny `api-webhook-dispatch` worker (or a DB trigger on `simulation_runs` status change → enqueue) fans these out. Signing prevents forged callbacks; the secret is per-endpoint and rotatable.
 3. **Realtime (advanced)** — issue a **short-lived, channel-scoped** Realtime token so a caller can subscribe to `sim:{project_id}` (the channel `sim-command` already broadcasts on). Never hand out the anon key for this — mint a scoped token.
 
@@ -386,6 +386,7 @@ The API is only "software" if it's usable:
 - **Reference docs** rendered from the spec (a new `docs/api/` tree or MkDocs page), with authenticated quickstarts.
 - **Key management UI** in the admin dashboard: create (show-once), list, rotate, revoke, view usage — reusing the admin pages.
 - **SDKs (Phase 3+):** thin TS and Python clients generated from the OpenAPI spec (Python especially — the analyst/notebook audience the blueprint calls out in §10.2 "For researchers/education").
+- **Notebooks (delivered):** five Python notebooks, each mirroring one app workflow (quickstart, policy A/B, stress tests, material shortage, results export). Their client is authored once in `notebooks/src/common/` and inlined by `scripts/notebooks/build-notebooks.mjs` (a customer uploads one file to Colab and cannot import from a private repository); `npm run notebooks:check` gates drift, and every notebook runs in CI with no key against recorded engine output. Until the SDK exists, that inlined client is the Python client.
 - **Sandbox:** `sk_test_` keys + a seeded reference project so integrators can build without touching production data or burning compute.
 
 ---
