@@ -194,7 +194,7 @@ export default function SimulationLab({ isCollapsed, setIsCollapsed }: Props) {
     setAckWarnings(false);
   }, [selectedId, clientFindings]);
 
-  // D230 — the project role decides, as /profile shows it: a Viewer member runs nothing
+  // D230 — the project rights decide (project role within the account role, D276), as /profile shows it: a Viewer member runs nothing
   // here whatever the account role.
   const projectRights = useProjectRights(projectId);
   const canRunSimulations = projectRights.can("simulation_lab");

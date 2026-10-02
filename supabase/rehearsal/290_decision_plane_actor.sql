@@ -40,11 +40,49 @@ BEGIN
   INSERT INTO public.organizations (id, name, slug) VALUES (v_org, 'WP64A Org', 'wp64a-org');
   INSERT INTO auth.users (id, email) VALUES
     (v_actor, 'wp64a@example.invalid'), (v_stranger, 'wp64as@example.invalid');
-  INSERT INTO public.approved_users (id, email, name, password_hash, organization, organization_id) VALUES
-    (v_actor,    'wp64a@example.invalid',  'WP64A Actor',    'x', 'WP64A Org', v_org),
-    (v_stranger, 'wp64as@example.invalid', 'WP64A Stranger', 'x', 'WP64A Org', v_org);
+  -- D276 — both write policies (the owner, and the Editor member in §4), so both are MODELER
+  -- accounts: under the account-role ceiling a 'user' account (the column's default) may not
+  -- edit policies on any project, whatever its project role.
+  INSERT INTO public.approved_users (id, email, name, password_hash, organization, organization_id, role) VALUES
+    (v_actor,    'wp64a@example.invalid',  'WP64A Actor',    'x', 'WP64A Org', v_org, 'modeler'),
+    (v_stranger, 'wp64as@example.invalid', 'WP64A Stranger', 'x', 'WP64A Org', v_org, 'modeler');
   INSERT INTO public.projects (id, name, modeler_id, plant_name, organization, organization_id)
     VALUES (v_project, 'WP64A', v_actor, 'WP64AP', 'WP64A Org', v_org);
+
+  -- §4 D275 · the policy writers now refuse a named actor without Edit Policies, and the
+  -- rehearsal base is schema, not seed: plant the project layer where it is missing, as the
+  -- migrations leave it (`20260915000005`, `20261001000005`), as `550` and `710` do. The
+  -- project's modeler is its owner member (D61's trigger), so the owner rows are the ones read.
+  INSERT INTO public.capabilities (key, kind, label, sort_order) VALUES
+    ('data_edit_inputs', 'feature', 'Edit Input Data', 241),
+    ('data_edit_policies', 'feature', 'Edit Policies', 242),
+    ('export', 'feature', 'Export', 250),
+    ('simulation_lab', 'feature', 'Run Simulations', 220)
+  ON CONFLICT (key) DO NOTHING;
+  INSERT INTO public.project_role_capabilities (project_role, capability_key, allowed) VALUES
+    ('owner',   'data_edit_inputs', true),  ('owner',   'data_edit_policies', true),
+    ('owner',   'export', true),            ('owner',   'simulation_lab', true),
+    ('editor',  'data_edit_inputs', true),  ('editor',  'data_edit_policies', true),
+    ('editor',  'export', true),            ('editor',  'simulation_lab', true),
+    ('analyst', 'data_edit_inputs', false), ('analyst', 'data_edit_policies', false),
+    ('analyst', 'export', false),           ('analyst', 'simulation_lab', true),
+    ('viewer',  'data_edit_inputs', false), ('viewer',  'data_edit_policies', false),
+    ('viewer',  'export', false),           ('viewer',  'simulation_lab', false)
+  ON CONFLICT (project_role, capability_key) DO NOTHING;
+  -- D276 — the account role is now the CEILING the project role grants within, so the base
+  -- also needs the account layer the migrations seed (`20260711000002`: modeler, admin and
+  -- super admin hold all four; a 'user' account Export only; `20260915000005` copies
+  -- data_editing into the two edit keys). Without it every right reads false.
+  INSERT INTO public.role_capabilities (role, capability_key, allowed)
+  SELECT r.role, k.key, r.role <> 'user' OR k.key = 'export'
+    FROM (VALUES ('super_admin'), ('admin'), ('modeler'), ('user')) r(role)
+    CROSS JOIN (VALUES ('data_edit_inputs'), ('data_edit_policies'), ('export'), ('simulation_lab')) k(key)
+  ON CONFLICT (role, capability_key) DO NOTHING;
+  -- §4 names the stranger as the actor of a notes edit; it is an editor, so the edit is one
+  -- the database agrees it may make and the assertion stays about attribution.
+  INSERT INTO public.project_members (project_id, user_id, project_role, rationale)
+    VALUES (v_project, v_stranger, 'editor', 'D275: 290 §4 names this actor on a policy write')
+  ON CONFLICT DO NOTHING;
 
   -- ── 1 · SIX TABLES × THREE TRIGGERS, FROM pg_trigger ────────────────────
   SELECT string_agg(want.rel || '.' || want.act, ', ' ORDER BY want.rel, want.act)
