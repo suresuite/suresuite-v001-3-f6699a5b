@@ -1,5 +1,9 @@
--- §4 D276 · THE ACCOUNT ROLE IS THE CEILING AND THE PROJECT ROLE IS THE GRANT; AN AGENT MAY
--- NOT APPROVE WHAT ITS APPROVER MAY NOT DO BY HAND; /admin/roles READS THE RULE ITSELF.
+-- §4 D276 · ONE RULE FOR THE FOUR PROJECT RIGHTS; AN AGENT MAY NOT APPROVE WHAT ITS APPROVER
+-- MAY NOT DO BY HAND; /admin/roles READS THE RULE ITSELF.
+--
+-- §4 D279 (`20261002000007`) REMOVED THE CEILING this file was written to prove: where a person
+-- holds a role on the project, the project role decides, and an Editor passes the upload gate.
+-- The assertions below are the rule as it stands after D279; `750` proves D279's own case.
 --
 -- `20261002000004` makes `project_right_decide` the one rule for the four project-scoped
 -- rights and reads it from the resolver, the per-person explanation, the agent approval and
@@ -7,20 +11,20 @@
 --
 --   §1 THE RULE: every branch of `project_right_decide`, including the order (super admin,
 --      then a person override, then no project role, then grant AND account).
---   §2 THE CEILING: a 'user' account (Export only) made Editor holds Export and NOT Run
---      Simulations / Edit Policies (decided by `account_ceiling`); a modeler Editor holds
---      them; a modeler Viewer holds none (decided by `project_role`).
+--   §2 THE PROJECT ROLE DECIDES (D279): a 'user' account (Export only) made Editor holds all
+--      four, decided by `project_role`; a modeler Editor holds them; a modeler Viewer holds
+--      none (decided by `project_role`).
 --   §3 NO PROJECT ROLE: an organization member with no role takes the account's answer.
---   §4 OVERRIDES: a person override beats the ceiling; an organization override IS the
---      ceiling (`account_source` = organization).
+--   §4 OVERRIDES: a person override beats the project role; an organization override does
+--      not reach a person who holds a project role (D279).
 --   §5 THE AGENT GATE: a modeler Viewer holding agent_apply cannot approve a policy bundle;
 --      a modeler Editor can; every artifact type the CHECK constraint allows is declared.
 --   §6 /admin/roles: `get_role_access`'s effective matrix is the rule's answer, the capped
---      list names the 'user' Editor, and a non-super actor is refused.
---   §7 THE PREVIEW: flipping an account-role switch lists exactly the memberships whose
---      right would move — and not one an organization override already decides.
+--      list is empty (D279), and a non-super actor is refused.
+--   §7 THE PREVIEW: flipping an account-role switch moves no project member's right (D279) —
+--      a project role decides for every holding it lists.
 --   §8 THE SERVER: D275's policy writers read the same rights, so a 'user' account made Editor
---      is refused a policy write and a modeler Editor is not.
+--      may write a policy (D279) and a modeler Viewer may not.
 
 DO $d276$
 DECLARE
@@ -108,7 +112,7 @@ BEGIN
       (jsonb_build_object('a', public.project_right_decide(false, NULL,  NULL,     NULL,  true),  'want', '{"allowed":true,"decided_by":"account_role"}'::jsonb)),
       (jsonb_build_object('a', public.project_right_decide(false, NULL,  NULL,     NULL,  false), 'want', '{"allowed":false,"decided_by":"account_role"}'::jsonb)),
       (jsonb_build_object('a', public.project_right_decide(false, NULL,  'viewer', false, true),  'want', '{"allowed":false,"decided_by":"project_role"}'::jsonb)),
-      (jsonb_build_object('a', public.project_right_decide(false, NULL,  'editor', true,  false), 'want', '{"allowed":false,"decided_by":"account_ceiling"}'::jsonb)),
+      (jsonb_build_object('a', public.project_right_decide(false, NULL,  'editor', true,  false), 'want', '{"allowed":true,"decided_by":"project_role"}'::jsonb)),
       (jsonb_build_object('a', public.project_right_decide(false, NULL,  'editor', true,  true),  'want', '{"allowed":true,"decided_by":"project_role"}'::jsonb))
     ) AS c(x) LOOP
     IF v_r -> 'a' IS DISTINCT FROM v_r -> 'want' THEN
@@ -116,24 +120,24 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- ── §2 the ceiling ───────────────────────────────────────────────────────
+  -- ── §2 the project role decides (D279) ───────────────────────────────────
   v_r := public.project_rights_for_user(v_ued, v_p);
-  IF (v_r -> 'capabilities' ->> 'export')::boolean IS NOT TRUE
-     OR (v_r -> 'capabilities' ->> 'simulation_lab')::boolean IS NOT FALSE
-     OR (v_r -> 'capabilities' ->> 'data_edit_policies')::boolean IS NOT FALSE
-     OR v_r -> 'decisions' -> 'simulation_lab' ->> 'decided_by' IS DISTINCT FROM 'account_ceiling'
-     OR (v_r -> 'decisions' -> 'simulation_lab' ->> 'project_grant')::boolean IS NOT TRUE THEN
+  IF v_r -> 'capabilities' IS DISTINCT FROM
+       '{"export":true,"simulation_lab":true,"data_edit_inputs":true,"data_edit_policies":true}'::jsonb
+     OR v_r -> 'decisions' -> 'simulation_lab' ->> 'decided_by' IS DISTINCT FROM 'project_role'
+     OR (v_r -> 'decisions' -> 'simulation_lab' ->> 'account_allows')::boolean IS NOT FALSE THEN
     RAISE EXCEPTION 'D276/720 §2: a user-account Editor read as %', v_r;
   END IF;
   -- The resolver itself, not only the projection of it.
-  IF (public.capabilities_for_user(v_ued, v_p) -> 'features' ->> 'data_edit_policies')::boolean IS NOT FALSE THEN
-    RAISE EXCEPTION 'D276/720 §2: capabilities_for_user still lets the project role lift a user account';
+  IF (public.capabilities_for_user(v_ued, v_p) -> 'features' ->> 'data_edit_policies')::boolean IS NOT TRUE THEN
+    RAISE EXCEPTION 'D276/720 §2: capabilities_for_user still lets the account role cap an Editor';
   END IF;
   v_r := public.project_rights_for_user(v_med, v_p);
   IF (v_r -> 'capabilities' ->> 'simulation_lab')::boolean IS NOT TRUE
      OR (v_r -> 'capabilities' ->> 'data_edit_policies')::boolean IS NOT TRUE
-     OR (v_r -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT FALSE
-     OR v_r -> 'decisions' -> 'data_edit_inputs' ->> 'decided_by' IS DISTINCT FROM 'upload_gate' THEN
+     OR (v_r -> 'capabilities' ->> 'data_edit_inputs')::boolean IS NOT TRUE
+     OR (v_r ->> 'may_land_uploads')::boolean IS NOT TRUE
+     OR v_r -> 'decisions' -> 'data_edit_inputs' ->> 'decided_by' IS DISTINCT FROM 'project_role' THEN
     RAISE EXCEPTION 'D276/720 §2: a modeler Editor read as %', v_r;
   END IF;
   v_r := public.project_rights_for_user(v_mview, v_p);
@@ -157,10 +161,11 @@ BEGIN
     RAISE EXCEPTION 'D276/720 §4: a person override did not decide: %', v_r;
   END IF;
   v_r := public.project_rights_for_user(v_o2ed, v_p2);
-  IF (v_r -> 'capabilities' ->> 'export')::boolean IS NOT FALSE
-     OR v_r -> 'decisions' -> 'export' ->> 'decided_by' IS DISTINCT FROM 'account_ceiling'
-     OR v_r -> 'decisions' -> 'export' ->> 'account_source' IS DISTINCT FROM 'organization' THEN
-    RAISE EXCEPTION 'D276/720 §4: an organization override is not the ceiling: %', v_r;
+  IF (v_r -> 'capabilities' ->> 'export')::boolean IS NOT TRUE
+     OR v_r -> 'decisions' -> 'export' ->> 'decided_by' IS DISTINCT FROM 'project_role'
+     OR v_r -> 'decisions' -> 'export' ->> 'account_source' IS DISTINCT FROM 'organization'
+     OR (v_r -> 'decisions' -> 'export' ->> 'account_allows')::boolean IS NOT FALSE THEN
+    RAISE EXCEPTION 'D276/720 §4: an organization override still capped an Editor: %', v_r;
   END IF;
 
   -- ── §5 the agent gate ────────────────────────────────────────────────────
@@ -213,16 +218,14 @@ BEGIN
       RAISE EXCEPTION 'D276/720 §6: the effective matrix says % for user×editor×%', v_d, t;
     END IF;
   END LOOP;
-  IF v_acc -> 'effective' -> 'user' -> 'editor' -> 'simulation_lab' ->> 'decided_by' IS DISTINCT FROM 'account_ceiling'
+  IF v_acc -> 'effective' -> 'user' -> 'editor' -> 'simulation_lab' IS DISTINCT FROM '{"allowed":true,"decided_by":"project_role"}'::jsonb
      OR (v_acc -> 'effective' -> 'super_admin' -> 'viewer' -> 'export' ->> 'allowed')::boolean IS NOT TRUE
      OR jsonb_array_length(v_acc -> 'project_scoped') <> 4 THEN
     RAISE EXCEPTION 'D276/720 §6: the effective matrix read as %', v_acc -> 'effective';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_acc -> 'capped') c
-                  WHERE c ->> 'user_id' = v_ued::text AND c ->> 'capability_key' = 'simulation_lab')
-     OR EXISTS (SELECT 1 FROM jsonb_array_elements(v_acc -> 'capped') c WHERE c ->> 'user_id' = v_over::text
-                   AND c ->> 'capability_key' = 'simulation_lab') THEN
-    RAISE EXCEPTION 'D276/720 §6: the capped list read as %', v_acc -> 'capped';
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_acc -> 'capped') c
+              WHERE c ->> 'user_id' IN (v_ued::text, v_med::text, v_mview::text, v_over::text, v_o2ed::text, v_owner::text)) THEN
+    RAISE EXCEPTION 'D276/720 §6: D279 left a capped membership: %', v_acc -> 'capped';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_acc -> 'person_overrides') o WHERE o ->> 'user_id' = v_over::text)
      OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_acc -> 'org_overrides') o WHERE o ->> 'org_id' = v_org2::text)
@@ -246,18 +249,16 @@ BEGIN
   v_r := public.admin_preview_role_capability(v_super, 'd276s@example.invalid', 'user', 'simulation_lab', true);
   RESET ROLE;
   PERFORM set_config('app.current_user_id', '', true);
-  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'changes') c
-                  WHERE c ->> 'user_id' = v_ued::text AND c ->> 'project_id' = v_p::text
-                    AND (c ->> 'before')::boolean = false AND (c ->> 'after')::boolean = true)
+  IF (v_r ->> 'project_scoped')::boolean IS NOT TRUE
      OR EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'changes') c
-                 WHERE c ->> 'user_id' = v_over::text) THEN
+                 WHERE c ->> 'user_id' IN (v_ued::text, v_over::text)) THEN
     RAISE EXCEPTION 'D276/720 §7: turning Run Simulations on for user accounts previewed as %', v_r;
   END IF;
   SET LOCAL ROLE anon;
   v_r := public.admin_preview_role_capability(v_super, 'd276s@example.invalid', 'modeler', 'export', false);
   RESET ROLE;
   PERFORM set_config('app.current_user_id', '', true);
-  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'changes') c WHERE c ->> 'user_id' = v_med::text)
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'changes') c WHERE c ->> 'user_id' = v_med::text)
      OR EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'changes') c WHERE c ->> 'user_id' = v_o2ed::text)
      OR EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'changes') c WHERE c ->> 'user_id' = v_mview::text) THEN
     RAISE EXCEPTION 'D276/720 §7: turning Export off for modelers previewed as %', v_r;
@@ -266,18 +267,20 @@ BEGIN
     RAISE EXCEPTION 'D276/720 §7: the preview wrote';
   END IF;
 
-  -- ── §8 the server's policy writers apply the ceiling (D275) ──────────────
+  -- ── §8 the server's policy writers read the same rule (D275, D279) ────────
   v_code := NULL;
   BEGIN
-    PERFORM public.save_policy_defaults(v_p, 'inventory', '{"d276": "user editor"}'::jsonb, _actor_user_id => v_ued);
+    PERFORM public.save_policy_defaults(v_p, 'inventory', '{"d276": "modeler viewer"}'::jsonb, _actor_user_id => v_mview);
   EXCEPTION WHEN insufficient_privilege THEN v_code := SQLERRM;
   END;
   PERFORM set_config('app.current_user_id', '', true);
   IF v_code IS NULL OR v_code NOT LIKE 'forbidden:%' THEN
-    RAISE EXCEPTION 'D276/720 §8: a user-account Editor wrote a policy (%)', v_code;
+    RAISE EXCEPTION 'D276/720 §8: a modeler Viewer wrote a policy (%)', v_code;
   END IF;
+  PERFORM public.save_policy_defaults(v_p, 'inventory', '{"d276": "user editor"}'::jsonb, _actor_user_id => v_ued);
+  PERFORM set_config('app.current_user_id', '', true);
   PERFORM public.save_policy_defaults(v_p, 'inventory', '{"d276": "modeler editor"}'::jsonb, _actor_user_id => v_med);
   PERFORM set_config('app.current_user_id', '', true);
 
-  RAISE NOTICE 'D276/720: the account role caps, the project role grants, agents ask the same right, and /admin/roles reads the rule';
+  RAISE NOTICE 'D276/720: one rule — the project role decides where held (D279) — agents ask the same right, and /admin/roles reads the rule';
 END $d276$;

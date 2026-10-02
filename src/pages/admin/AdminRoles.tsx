@@ -4,11 +4,12 @@
 // asked BEFORE it is flipped). Switch matrices use the black-pill Toggle; super_admin +
 // /profile stay forced-on and locked.
 //
-// D276 — the four project rights (Run Simulations, Edit Input Data, Edit Policies,
-// Export) are decided by one rule, `project_right_decide`: the account role is the
-// CEILING and the project role is the GRANT. This page shows that rule's own output —
-// the effective matrix, the people it narrows today, the overrides that beat it and the
-// right each agent approval needs — and never re-computes it in the browser.
+// D276, D279 — the four project rights (Run Simulations, Edit Input Data, Edit Policies,
+// Export) are decided by one rule, `project_right_decide`: where a person holds a role on
+// the project, the PROJECT role decides; the account role decides only for people with no
+// role there. This page shows that rule's own output — the effective matrix, the overrides
+// that beat it and the right each agent approval needs — and never re-computes it in the
+// browser.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,10 +32,6 @@ type RoleMap = Record<string, Record<string, boolean>>;
 interface Decision { allowed: boolean; decided_by: RightDecider }
 /** account role → project role ('none' = no project role) → key → the rule's answer. */
 type Effective = Record<string, Record<string, Record<string, Decision>>>;
-interface Capped {
-  user_id: string; name: string | null; account_role: string; project_id: string;
-  project_name: string | null; project_role: string; capability_key: string; account_source: string;
-}
 interface OrgOverride { org_id: string; org_name: string | null; capability_key: string; allowed: boolean }
 interface PersonOverride { user_id: string; name: string | null; capability_key: string; allowed: boolean }
 interface Access {
@@ -44,7 +41,6 @@ interface Access {
   project_roles?: RoleMap;
   effective?: Effective;
   holdings?: Record<string, Record<string, number>>;
-  capped?: Capped[];
   org_overrides?: OrgOverride[];
   person_overrides?: PersonOverride[];
   agent_rights?: Record<string, string | null>;
@@ -70,9 +66,8 @@ const RULE_STEPS: { decider: RightDecider; text: string }[] = [
   { decider: 'super_admin', text: 'A super admin holds every project right.' },
   { decider: 'person_override', text: 'A person override set on /admin/users decides for that person, on every project.' },
   { decider: 'account_role', text: 'No role on the project: the account role (and its organization’s settings) decides.' },
-  { decider: 'project_role', text: 'A role on the project grants the right only if the project role includes it…' },
-  { decider: 'account_ceiling', text: '…and the account role allows it. The account role is the ceiling; the project role cannot lift it.' },
-  { decider: 'upload_gate', text: 'Edit Input Data also needs the project’s owner or an app admin, because uploads accept nobody else.' },
+  { decider: 'project_role', text: 'A role on the project decides: the right is held exactly when the project role includes it. The account role does not limit it.' },
+  { decider: 'upload_gate', text: 'Edit Input Data also needs the upload gate: the project’s owner, an Editor or Owner on the project, or an app admin.' },
 ];
 
 export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
@@ -142,19 +137,6 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
 
   const openCap = caps.find((c) => c.key === openCapKey) ?? null;
 
-  const capped = useMemo(() => access?.capped ?? [], [access]);
-  const cappedByPerson = useMemo(() => {
-    const m = new Map<string, { name: string; account_role: string; rows: Map<string, { project: string; project_role: string; keys: string[] }> }>();
-    for (const c of capped) {
-      const person = m.get(c.user_id) ?? { name: c.name ?? c.user_id, account_role: c.account_role, rows: new Map() };
-      const row = person.rows.get(c.project_id) ?? { project: c.project_name ?? c.project_id, project_role: c.project_role, keys: [] };
-      row.keys.push(c.capability_key);
-      person.rows.set(c.project_id, row);
-      m.set(c.user_id, person);
-    }
-    return [...m.entries()];
-  }, [capped]);
-
   const overrides = [
     ...(access?.org_overrides ?? []).map((o) => ({ kind: 'Organization' as const, id: o.org_id, name: o.org_name ?? o.org_id, key: o.capability_key, allowed: o.allowed })),
     ...(access?.person_overrides ?? []).map((o) => ({ kind: 'Person' as const, id: o.user_id, name: o.name ?? o.user_id, key: o.capability_key, allowed: o.allowed })),
@@ -166,7 +148,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
   const pendingBullets: ConfirmBullet[] = !pending ? [] : pending.changes == null ? [
     { tone: 'neutral', text: 'Checking who this would change…' },
   ] : pending.changes.length === 0 ? [
-    { tone: 'neutral', text: `No current project member changes: every ${roleName(pending.role)} account either holds no role that grants ${pending.cap.label}, or an override already decides it.` },
+    { tone: 'neutral', text: `No project member changes: a role on a project decides ${pending.cap.label} there on its own. This switch applies where a ${roleName(pending.role)} account holds no project role.` },
   ] : [
     {
       tone: 'amber',
@@ -191,7 +173,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
               key={cap.key}
               dot={on === ROLE_ORDER.length ? M.process : on === 1 ? M.idle : undefined}
               label={cap.label}
-              sub={locked ? 'always on · ' + cap.key : scoped.has(cap.key) ? 'ceiling for the project role · ' + cap.key : cap.key}
+              sub={locked ? 'always on · ' + cap.key : scoped.has(cap.key) ? 'only without a project role · ' + cap.key : cap.key}
               value={`${on}/${ROLE_ORDER.length}`}
               onClick={() => setOpenCapKey(cap.key)}
             />
@@ -221,11 +203,11 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
                   <td className={`${TD} ${FROZEN_CELL}`}>
                     <div className="flex items-center gap-1.5 text-[13px] font-medium">
                       {cap.label}{locked && <Lock className="h-3 w-3 text-muted-foreground" />}
-                      {isScoped && <MonoChip>ceiling</MonoChip>}
+                      {isScoped && <MonoChip>no project role</MonoChip>}
                     </div>
                     {isScoped && (
                       <div className="mt-0.5 text-[11.5px] text-muted-foreground">
-                        Caps the project role. A project role grants it only where this is on.
+                        Applies only where a person holds no role on the project. A project role decides on its own.
                       </div>
                     )}
                   </td>
@@ -257,8 +239,9 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
     <div className={`${SURFACE} p-4`}>
       <div className={KX}>How a project right is decided</div>
       <p className="mt-1 text-[13px]">
-        {scopedCaps.map((c) => c.label).join(', ')} are decided per project. The account role is the
-        <strong> ceiling</strong>; the project role is the <strong>grant</strong>. Both must allow a right.
+        {scopedCaps.map((c) => c.label).join(', ')} are decided per project. Where a person holds a role on
+        the project, <strong>the project role decides</strong>: an Owner or Editor holds all four whatever their
+        account role. The account role decides only for people with no role on the project.
       </p>
       <ol className="mt-3 space-y-1.5 text-[12.5px]">
         {RULE_STEPS.map((s, i) => (
@@ -320,7 +303,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
       <h2 className="mb-1 text-[13px] font-semibold">Effective rights on a project</h2>
       <p className="mb-2 text-[12px] text-muted-foreground">
         Account role × project role, as the rule answers today from the two matrices above. Struck through: not held.
-        Amber: the project role grants it and the account role caps it. Counts are active memberships in that cell now.
+        Counts are active memberships in that cell now.
       </p>
       <div className={`${SURFACE} overflow-hidden`}>
         <div className="overflow-x-auto">
@@ -341,14 +324,10 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
                         <ul className="space-y-0.5 text-[12px]">
                           {scopedCaps.map((c) => {
                             const d = cell[c.key];
-                            const tone = d?.allowed
-                              ? 'text-foreground'
-                              : d?.decided_by === 'account_ceiling'
-                                ? 'text-[#b26b00] line-through'
-                                : 'text-muted-foreground line-through';
+                            const tone = d?.allowed ? 'text-foreground' : 'text-muted-foreground line-through';
                             return (
                               <li key={c.key} className={tone} title={d ? RIGHT_DECIDER_LABELS[d.decided_by] : undefined}>
-                                {c.label}{c.key === 'data_edit_inputs' && d?.allowed && ar !== 'super_admin' && ar !== 'admin' ? ' *' : ''}
+                                {c.label}{c.key === 'data_edit_inputs' && d?.allowed && pr === 'none' && ar !== 'super_admin' && ar !== 'admin' ? ' *' : ''}
                               </li>
                             );
                           })}
@@ -363,50 +342,9 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
           </table>
         </div>
         <p className="border-t border-[--hair-divider] px-4 py-2 text-[11.5px] text-muted-foreground">
-          * Edit Input Data holds only for the project’s owner, because uploads accept the owner or an app admin.
+          * With no project role, Edit Input Data holds only for the project’s owner, because uploads accept the owner,
+          an Editor or Owner on the project, or an app admin.
           Organization and person overrides, listed below, change these answers for the people they name.
-        </p>
-      </div>
-    </div>
-  );
-
-  const cappedSection = (
-    <div>
-      <h2 className="mb-2 text-[13px] font-semibold">Narrowed by the ceiling today ({capped.length})</h2>
-      <div className={`${SURFACE} overflow-hidden`}>
-        {cappedByPerson.length === 0 ? (
-          <p className="px-4 py-3 text-[12.5px] text-muted-foreground">
-            Nobody. Every project member’s role is within what their account role allows.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] border-collapse">
-              <thead><tr>
-                <th className={`${TH} ${FROZEN_CELL_ON_TINT}`}>Person</th>
-                <th className={TH}>Project · role</th>
-                <th className={TH}>Granted by the project role, not held</th>
-              </tr></thead>
-              <tbody>
-                {cappedByPerson.flatMap(([uid, p]) => [...p.rows.entries()].map(([pid, r], i) => (
-                  <tr key={`${uid}:${pid}`} className={ROW_HOVER}>
-                    <td className={`${TD} ${FROZEN_CELL} text-[13px]`}>
-                      {i === 0 && (
-                        <>
-                          <Link to={`/admin/users/${uid}`} className="font-medium hover:underline">{p.name}</Link>
-                          <span className="ml-1.5 text-[11.5px] text-muted-foreground">{roleName(p.account_role)} account</span>
-                        </>
-                      )}
-                    </td>
-                    <td className={`${TD} text-[12.5px]`}>{r.project} · {roleName(r.project_role)}</td>
-                    <td className={`${TD} text-[12.5px]`}>{r.keys.map(labelOf).join(', ')}</td>
-                  </tr>
-                )))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <p className="border-t border-[--hair-divider] px-4 py-2 text-[11.5px] text-muted-foreground">
-          To give one of them the right, raise their account role or set a person override on their page.
         </p>
       </div>
     </div>
@@ -442,7 +380,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
                     <td className={`${TD} text-[11.5px] text-muted-foreground`}>
                       {o.kind === 'Person'
                         ? 'Decides for this person on every project, above the project role.'
-                        : 'Replaces the account role as the ceiling on this organization’s projects.'}
+                        : 'Replaces the account role on this organization’s projects, for people with no role on the project.'}
                     </td>
                   </tr>
                 ))}
@@ -488,9 +426,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
       title={pending ? `${pending.allowed ? 'Allow' : 'Deny'} ${pending.cap.label} for ${roleName(pending.role)} accounts?` : ''}
       bullets={pendingBullets}
       notes={pending ? [
-        pending.allowed
-          ? 'A project role still has to grant it: this raises the ceiling, it gives the right to nobody on its own.'
-          : 'This lowers the ceiling: no project role will lift it for these accounts.',
+        'Applies only to people with no role on a project. Owners and Editors keep the right their project role gives them.',
       ] : []}
       actionLabel={pending?.allowed ? 'Allow' : 'Deny'}
       tone={pending?.allowed ? 'neutral' : 'destructive'}
@@ -520,7 +456,7 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
           <MobileNote tone="caveat" mark="·">
             Super admins and My Profile are always on. Their toggles are shown, locked and
             explained rather than hidden.
-            {hasRule && ` ${scopedCaps.map((c) => c.label).join(', ')} are a ceiling: a project role grants them only where the account role allows them.`}
+            {hasRule && ` ${scopedCaps.map((c) => c.label).join(', ')} follow the project role wherever a person holds one; these switches apply only without one.`}
           </MobileNote>
           {renderMobileSection('Pages', pages)}
           {renderMobileSection('Features', features)}
@@ -538,23 +474,6 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
               </MobilePanel>
             </MobileGroup>
           )}
-          {hasRule && (
-            <MobileGroup label="Narrowed by the ceiling">
-              <MobilePanel label="Narrowed today" counter={`${capped.length}`}>
-                {cappedByPerson.length === 0 ? (
-                  <MobileRow chevron={false} label="Nobody" sub="every project role is within its account role" />
-                ) : cappedByPerson.flatMap(([uid, p]) => [...p.rows.entries()].map(([pid, r]) => (
-                  <MobileRow
-                    key={`${uid}:${pid}`}
-                    chevron={false}
-                    label={p.name}
-                    sub={`${r.project} · ${roleName(r.project_role)} · ${r.keys.map(labelOf).join(', ')}`}
-                  />
-                )))}
-              </MobilePanel>
-            </MobileGroup>
-          )}
-
           <MobileSheet
             open={openCap != null}
             title={openCap?.label ?? ''}
@@ -603,7 +522,6 @@ export default function AdminRoles({ isCollapsed, setIsCollapsed }: Props) {
           {renderSection('Features', features)}
           {hasRule && projectRolesSection}
           {hasRule && effectiveSection}
-          {hasRule && cappedSection}
           {hasRule && overridesSection}
           {hasRule && agentSection}
           {confirm}

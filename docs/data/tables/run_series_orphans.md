@@ -110,6 +110,6 @@ When the run was deleted; the sweep hands objects over oldest first.
 
 ---
 
-*Generated from data contract `8a6a2cbc39f3`, engine `0.2.9`,
+*Generated from data contract `c0bee291baee`, engine `0.2.9`,
 sidecar `supabase/contract/run_series_orphans.contract.yaml`, table created by `20261001000014_series_sweep_via_storage_api.sql`. No wall-clock date: a generated
 page that differs from itself tomorrow cannot be drift-gated.*
