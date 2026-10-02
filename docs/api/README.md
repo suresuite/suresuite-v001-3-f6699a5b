@@ -110,6 +110,7 @@ in flight consumes nothing.
 | `POST /runs/{id}:cancel` | write:runs | `202` cancel |
 | `POST /runs/{id}:add-reps` | write:runs | `202` — **accepted but has no effect today**: the worker has no handler for the command it queues. Dispatch a scenario with more replications instead |
 | `GET /runs/{id}/validation` | read:runs | credibility badge: `validated` / `stale` / `unvalidated` + the model-validation card |
+| `GET /engine` | read:data | the simulation engine for your own machine: per wheel, its sha256, size and a 10-minute signed URL (`suresuite.install_engine()` uses it). Every fetch is logged |
 | `GET /keys` | admin:keys | org's keys (never the secret) |
 | `POST /keys/{id}:revoke` | admin:keys | kill switch over the API |
 

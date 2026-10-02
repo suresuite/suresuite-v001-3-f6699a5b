@@ -1725,6 +1725,12 @@ export const API_ROUTES: ApiRoute[] = [
   },
   {
     "method": "GET",
+    "path": "/v1/engine",
+    "scope": "read:data",
+    "handler": "getEngine"
+  },
+  {
+    "method": "GET",
     "path": "/v1/keys",
     "scope": "admin:keys",
     "handler": "listKeys"
@@ -2203,6 +2209,12 @@ export const API_ERRORS: ApiErrorCode[] = [
     "status": 503,
     "message": "authorization backend unavailable",
     "sites": 1
+  },
+  {
+    "code": "engine_unpublished",
+    "status": 503,
+    "message": "the engine has not been published to the API yet",
+    "sites": 3
   },
   {
     "code": "rate_limiter_unavailable",

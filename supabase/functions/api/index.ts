@@ -28,6 +28,7 @@ import { z } from "npm:zod@3";
 import { cleanEnv } from "../_shared/env.ts";
 import registry from "../_shared/registry.generated.json" with { type: "json" };
 import { selectTables, tablesParam, wantsGzip } from "../_shared/snapshotView.ts";
+import { ENGINE_URL_TTL_SECONDS, engineResponse, parseEngineIndex, wheelPath } from "../_shared/engineIndex.ts";
 import {
   dispatchExperimentCancel,
   dispatchExperimentRun,
@@ -1031,6 +1032,33 @@ const getPolicyVersion: Handler = async (ctx) => {
   return { status: 200, body: data };
 };
 
+// ── Phase 12 · WP 12.4 — the engine, for a key's own machine ───────────────
+//
+// Short-lived signed URLs to the engine wheels in the PRIVATE `engine` bucket,
+// with each wheel's sha256 (published by scripts/publish_engine_wheels.mjs).
+// Every fetch is a logged request naming the key — and, for a personal key, the
+// person. The browser engine still loads the same wheels publicly (§4 D274).
+
+const getEngine: Handler = async () => {
+  const { data: blob, error } = await svc.storage.from("engine").download("index.json");
+  if (error || !blob) throw new ApiError(503, "engine_unpublished", "the engine has not been published to the API yet");
+  let index;
+  try {
+    index = parseEngineIndex(JSON.parse(await blob.text()));
+  } catch (_e) {
+    throw new ApiError(503, "engine_unpublished", "the published engine index is unreadable");
+  }
+  const urls: Record<string, string | null> = {};
+  for (const w of index.wheels) {
+    const { data: signed } = await svc.storage.from("engine").createSignedUrl(wheelPath(w), ENGINE_URL_TTL_SECONDS);
+    urls[w.file] = signed?.signedUrl ?? null;
+  }
+  if (Object.values(urls).some((u) => !u)) {
+    throw new ApiError(503, "engine_unpublished", "a published engine wheel is missing from storage");
+  }
+  return { status: 200, body: engineResponse(index, urls) };
+};
+
 // ── Route table (§8) ─────────────────────────────────────────────────────────
 
 const routes: Route[] = [
@@ -1053,6 +1081,7 @@ const routes: Route[] = [
   { method: "POST", pattern: new RegExp(`^/runs/(${UUID}):cancel$`), scope: "write:runs", handler: cancelRun },
   { method: "POST", pattern: new RegExp(`^/runs/(${UUID}):add-reps$`), scope: "write:runs", handler: addRunReps },
   { method: "GET", pattern: new RegExp(`^/runs/(${UUID})/validation$`), scope: "read:runs", handler: getRunValidation },
+  { method: "GET", pattern: new RegExp(`^/engine$`), scope: "read:data", handler: getEngine },
   { method: "GET", pattern: new RegExp(`^/keys$`), scope: "admin:keys", handler: listKeys },
   { method: "POST", pattern: new RegExp(`^/keys/(${UUID}):revoke$`), scope: "admin:keys", handler: revokeKey },
 ];

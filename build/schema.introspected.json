@@ -1,10 +1,10 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 389,
-  "migrations_applied": 381,
+  "migrations_found": 390,
+  "migrations_applied": 382,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261002000001_personal_api_keys.sql",
+  "last_migration": "20261002000002_engine_bucket.sql",
   "counts": {
     "tables": 92,
     "views": 8,
@@ -13,7 +13,7 @@
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
-    "dynamic_ddl_statements": 37,
+    "dynamic_ddl_statements": 38,
     "rls_indeterminate_tables": 4,
     "rls_dynamic_unresolved": 0,
     "orphans": 0,
@@ -29857,6 +29857,17 @@
       "migration": "20261001000010_result_tiers.sql",
       "statement": "BEGIN IF to_regclass('storage.buckets') IS NOT NULL THEN EXECUTE $ins$ INSERT INTO storage.buckets (id, name, public) VALUES ('run-results', 'run-results', false) ON CONFLICT (id) DO UPDATE SET public = false $ins$",
       "mentions": [],
+      "touches_rls": false,
+      "has_format_placeholder": false,
+      "named_only_via_block": false,
+      "why": "plpgsql EXECUTE — DDL assembled at run time; a static replay cannot evaluate it"
+    },
+    {
+      "migration": "20261002000002_engine_bucket.sql",
+      "statement": "BEGIN IF to_regclass('storage.buckets') IS NOT NULL THEN EXECUTE $ins$ INSERT INTO storage.buckets (id, name, public) VALUES ('engine', 'engine', false) ON CONFLICT (id) DO UPDATE SET public = false $ins$",
+      "mentions": [
+        "engine"
+      ],
       "touches_rls": false,
       "has_format_placeholder": false,
       "named_only_via_block": false,
