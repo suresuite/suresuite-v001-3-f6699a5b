@@ -306,11 +306,16 @@ export function RunValidateStage({
   const { user } = useAuth();
   const modelValidation = useModelValidation(projectId);
   // D230 — running here is "Run Simulations" on this project, as /profile lists it.
+  // D273 — and, because validating is the last step of EDITING policies, "Edit Policies"
+  // too: a role that only runs (the Analyst, D232) runs from /simulation-lab, not here.
   const projectRights = useProjectRights(projectId);
-  const canRun = projectRights.can("simulation_lab");
+  const canRun = projectRights.can("simulation_lab") && projectRights.can("data_edit_policies");
   const runRefusal = projectRights.loading
     ? "Checking your rights on this project…"
-    : projectRights.refusal("simulation_lab");
+    : projectRights.refusal("simulation_lab") ??
+      (projectRights.can("data_edit_policies")
+        ? null
+        : "Run & Validate is part of editing policies. Your role here runs simulations from the Simulation Lab.");
   const refuseRun = () => {
     if (canRun) return false;
     toast.error(runRefusal ?? "Running simulations isn't enabled for your account.");

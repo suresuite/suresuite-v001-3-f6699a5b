@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 388,
-  "migrations_applied": 380,
+  "migrations_found": 389,
+  "migrations_applied": 381,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261001000024_delete_project_dataset_per_dataset.sql",
+  "last_migration": "20261001000025_policy_writes_need_edit_policies.sql",
   "counts": {
     "tables": 92,
     "views": 8,
     "enums": 4,
-    "functions": 394,
+    "functions": 395,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -25426,7 +25426,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260918000002_actor_on_three_definer_writers.sql"
+      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "apply_validation_to_scenario",
@@ -25493,6 +25493,19 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260717000003_project_memory.sql"
+    },
+    {
+      "name": "assert_may_edit_policies",
+      "signature": "assert_may_edit_policies(uuid, uuid)",
+      "args": [
+        "p_project_id uuid",
+        "p_actor uuid"
+      ],
+      "returns": "void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "D273 — raises forbidden unless the named actor holds data_edit_policies on the project, as ",
+      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "assert_writer_may_act",
@@ -25903,7 +25916,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
+      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "bulk_upsert_products",
@@ -26045,7 +26058,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
+      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "combine_project_into_supply_chain",
@@ -26434,7 +26447,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
+      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "delete_policy_version",
@@ -26447,7 +26460,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260919000007_decision_plane_actor.sql"
+      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "delete_project_dataset",
@@ -28325,7 +28338,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
+      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "review_agent_proposal",
@@ -28427,7 +28440,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260918000003_actor_on_the_remaining_nine.sql"
+      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "save_project_memory",
@@ -28908,7 +28921,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260919000007_decision_plane_actor.sql"
+      "defined_by": "20261001000025_policy_writes_need_edit_policies.sql"
     },
     {
       "name": "update_project_completion_status",

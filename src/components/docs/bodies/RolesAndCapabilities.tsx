@@ -47,7 +47,7 @@ const ORG_ROLES: { role: string; gloss: string }[] = [
 const PROJECT_GLOSS: Record<string, string> = {
   owner: "The project's principal — a project's creator holds this automatically.",
   editor: "May rewrite the measured inputs and the decisions alike.",
-  analyst: "May run simulations, and may not change the policies or the measured data those runs are made of.",
+  analyst: "May run simulations from the Simulation Lab, and may not change the policies or the measured data those runs are made of.",
   viewer: "May look.",
 };
 
