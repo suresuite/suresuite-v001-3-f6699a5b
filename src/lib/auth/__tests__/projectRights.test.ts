@@ -13,6 +13,7 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
 import {
   PROJECT_RIGHT_LABELS, projectRightRefusal, projectRightsNotes, type ProjectRights,
+  RIGHT_DECIDER_LABELS, type RightDecider, type RightDecision,
 } from '../projectRights';
 
 const root = path.resolve(__dirname, '../../../..');
@@ -77,5 +78,42 @@ describe('D230 · what a row of ticks owes its reader', () => {
   it('says nothing when the ticks are the whole story', () => {
     expect(projectRightsNotes({ account_active: true, may_land_uploads: true, capabilities: { data_edit_inputs: true }, resolved_capabilities: { data_edit_inputs: true } })).toEqual([]);
     expect(projectRightsNotes({ account_active: true, may_land_uploads: false, capabilities: {}, resolved_capabilities: {} })).toEqual([]);
+  });
+});
+
+describe('D276 · the refusal names the layer that decided', () => {
+  const ceilingSql = readFileSync(path.join(root, 'supabase/migrations/20261002000004_account_role_ceiling.sql'), 'utf8');
+  const decided = (decided_by: RightDecider, over: Partial<RightDecision> = {}): ProjectRights => rights({
+    effective_role: 'editor',
+    decisions: {
+      simulation_lab: {
+        allowed: false, decided_by, project_role: 'editor', project_grant: true, account_role: 'user',
+        account_allows: false, account_source: 'account_role', person_override: null, ...over,
+      },
+    },
+  });
+
+  it('knows every decider the SQL can return, and no other', () => {
+    const named = new Set([...ceilingSql.matchAll(/'decided_by',\s*'([a-z_]+)'|THEN '([a-z_]+)'/g)]
+      .map((m) => m[1] ?? m[2]).filter((v) => v && v !== 'organization'));
+    for (const d of named) expect(Object.keys(RIGHT_DECIDER_LABELS)).toContain(d);
+    expect(Object.keys(RIGHT_DECIDER_LABELS).sort()).toEqual(
+      ['account_ceiling', 'account_role', 'person_override', 'project_role', 'super_admin', 'suspended', 'upload_gate']);
+  });
+
+  it('says the account role caps what the project role grants', () => {
+    expect(projectRightRefusal('simulation_lab', decided('account_ceiling')))
+      .toBe('Your role on this project (Editor) includes Run Simulations, but your account role (User) does not allow it on any project.');
+  });
+
+  it('names the organization when its setting is the ceiling', () => {
+    expect(projectRightRefusal('simulation_lab', decided('account_ceiling', { account_source: 'organization' })))
+      .toMatch(/this project's organization has it switched off/);
+  });
+
+  it('names a person override and a missing project role', () => {
+    expect(projectRightRefusal('simulation_lab', decided('person_override'))).toMatch(/switched off for your account/);
+    expect(projectRightRefusal('simulation_lab', decided('account_role', { project_role: null })))
+      .toBe('You hold no role on this project, and your account role (User) does not include Run Simulations.');
   });
 });

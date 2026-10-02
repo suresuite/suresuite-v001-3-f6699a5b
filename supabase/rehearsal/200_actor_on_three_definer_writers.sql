@@ -42,9 +42,11 @@ BEGIN
   INSERT INTO auth.users (id, email) VALUES
     (v_actor,    'd71-actor@example.invalid'),
     (v_stranger, 'd71-stranger@example.invalid');
-  INSERT INTO public.approved_users (id, email, name, password_hash, organization, organization_id) VALUES
-    (v_actor,    'd71-actor@example.invalid',    'D71 Actor',    'x', 'D71 Org', v_org),
-    (v_stranger, 'd71-stranger@example.invalid', 'D71 Stranger', 'x', 'D71 Org', v_org);
+  -- D276 — the actor is a MODELER account: under the account-role ceiling a 'user' account
+  -- (the column's default) may not edit policies on any project, owner or not.
+  INSERT INTO public.approved_users (id, email, name, password_hash, organization, organization_id, role) VALUES
+    (v_actor,    'd71-actor@example.invalid',    'D71 Actor',    'x', 'D71 Org', v_org, 'modeler'),
+    (v_stranger, 'd71-stranger@example.invalid', 'D71 Stranger', 'x', 'D71 Org', v_org, 'user');
   INSERT INTO public.projects (id, name, modeler_id, plant_name, organization, organization_id)
     VALUES (v_project, 'D71', v_actor, 'D71P', 'D71 Org', v_org);
 
@@ -68,6 +70,15 @@ BEGIN
     ('viewer',  'data_edit_inputs', false), ('viewer',  'data_edit_policies', false),
     ('viewer',  'export', false),           ('viewer',  'simulation_lab', false)
   ON CONFLICT (project_role, capability_key) DO NOTHING;
+  -- D276 — the account role is now the CEILING the project role grants within, so the base
+  -- also needs the account layer the migrations seed (`20260711000002`: modeler, admin and
+  -- super admin hold all four; a 'user' account Export only; `20260915000005` copies
+  -- data_editing into the two edit keys). Without it every right reads false.
+  INSERT INTO public.role_capabilities (role, capability_key, allowed)
+  SELECT r.role, k.key, r.role <> 'user' OR k.key = 'export'
+    FROM (VALUES ('super_admin'), ('admin'), ('modeler'), ('user')) r(role)
+    CROSS JOIN (VALUES ('data_edit_inputs'), ('data_edit_policies'), ('export'), ('simulation_lab')) k(key)
+  ON CONFLICT (role, capability_key) DO NOTHING;
 
   -- ── 1 · assign_bom_line ─────────────────────────────────────────────────
   SELECT count(*) INTO v_before FROM public.audit_logs

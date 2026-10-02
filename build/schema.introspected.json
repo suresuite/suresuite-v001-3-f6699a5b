@@ -1,15 +1,15 @@
 {
   "$generator": "scripts/data-contract/introspect.mjs",
   "$doc": "EFFECTIVE schema replayed from supabase/migrations/*.sql in filename order. Generated — do not edit; `npm run contract:introspect -- --check` fails on drift.",
-  "migrations_found": 391,
-  "migrations_applied": 383,
+  "migrations_found": 392,
+  "migrations_applied": 384,
   "first_migration": "20250815000000_approved_users_base.sql",
-  "last_migration": "20261002000003_policy_writes_need_edit_policies.sql",
+  "last_migration": "20261002000004_account_role_ceiling.sql",
   "counts": {
     "tables": 92,
     "views": 8,
     "enums": 4,
-    "functions": 396,
+    "functions": 402,
     "shadowed_definitions": 4,
     "phantom_tables": 0,
     "unparsed_statements": 0,
@@ -24814,6 +24814,22 @@
       "defined_by": "20260929000002_admin_users_read.sql"
     },
     {
+      "name": "admin_preview_role_capability",
+      "signature": "admin_preview_role_capability(uuid, text, text, text, boolean)",
+      "args": [
+        "p_actor_id uuid",
+        "p_actor_email text",
+        "p_role text",
+        "p_capability_key text",
+        "p_allowed boolean"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "D276 — the memberships whose project right would change if the account role's switch for ",
+      "defined_by": "20261002000004_account_role_ceiling.sql"
+    },
+    {
       "name": "admin_remove_org_member",
       "signature": "admin_remove_org_member(uuid, text, uuid, uuid)",
       "args": [
@@ -25221,6 +25237,30 @@
       "volatility": null,
       "comment": null,
       "defined_by": "20260726000001_chat_plans.sql"
+    },
+    {
+      "name": "agent_artifact_project_rights",
+      "signature": "agent_artifact_project_rights()",
+      "args": [],
+      "returns": "jsonb LANGUAGE sql IMMUTABLE SET search_path",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": "D276 — the project right an approver must hold on the proposal's project for each agent ",
+      "defined_by": "20261002000004_account_role_ceiling.sql"
+    },
+    {
+      "name": "agent_project_right_refusal",
+      "signature": "agent_project_right_refusal(uuid, uuid, text)",
+      "args": [
+        "p_user_id uuid",
+        "p_project_id uuid",
+        "p_artifact_type text"
+      ],
+      "returns": "text LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "D276 — NULL when the user holds, on the project, the right agent_artifact_project_rights ",
+      "defined_by": "20261002000004_account_role_ceiling.sql"
     },
     {
       "name": "ai_can_access_project",
@@ -26010,7 +26050,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20261001000004_project_rights_in_the_project.sql"
+      "defined_by": "20261002000004_account_role_ceiling.sql"
     },
     {
       "name": "capabilities_for_user",
@@ -27270,7 +27310,7 @@
       "security_definer": true,
       "volatility": "STABLE",
       "comment": null,
-      "defined_by": "20260711000002_unified_access_control.sql"
+      "defined_by": "20261002000004_account_role_ceiling.sql"
     },
     {
       "name": "get_scenario_simulation_results",
@@ -28117,6 +28157,35 @@
       "defined_by": "20260917000001_diff_before_promotion.sql"
     },
     {
+      "name": "project_right_decide",
+      "signature": "project_right_decide(boolean, boolean, text, boolean, boolean)",
+      "args": [
+        "p_is_super boolean",
+        "p_override boolean",
+        "p_project_role text",
+        "p_project_grant boolean",
+        "p_account boolean"
+      ],
+      "returns": "jsonb LANGUAGE sql IMMUTABLE SET search_path",
+      "security_definer": false,
+      "volatility": "IMMUTABLE",
+      "comment": "D276 — the one rule for a project-scoped right: super admin → yes; a person override → ",
+      "defined_by": "20261002000004_account_role_ceiling.sql"
+    },
+    {
+      "name": "project_right_decisions",
+      "signature": "project_right_decisions(uuid, uuid)",
+      "args": [
+        "_user_id uuid",
+        "_project_id uuid"
+      ],
+      "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": "D276 — per project-scoped key, the inputs project_right_decide reads for one person on one ",
+      "defined_by": "20261002000004_account_role_ceiling.sql"
+    },
+    {
       "name": "project_rights_for_user",
       "signature": "project_rights_for_user(uuid, uuid)",
       "args": [
@@ -28126,8 +28195,18 @@
       "returns": "jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path",
       "security_definer": true,
       "volatility": "STABLE",
-      "comment": "D230, D231 — one person's rights on one project, as the app applies them while the person ",
-      "defined_by": "20261001000017_super_admin_acts_as_admin.sql"
+      "comment": "D230, D231, D276 — one person's rights on one project, as the app applies them while the ",
+      "defined_by": "20261002000004_account_role_ceiling.sql"
+    },
+    {
+      "name": "project_role_holdings",
+      "signature": "project_role_holdings()",
+      "args": [],
+      "returns": "TABLE (user_id uuid, project_id uuid, account_role text, project_role text)",
+      "security_definer": true,
+      "volatility": "STABLE",
+      "comment": null,
+      "defined_by": "20261002000004_account_role_ceiling.sql"
     },
     {
       "name": "project_role_rank",
@@ -28408,7 +28487,7 @@
       "security_definer": true,
       "volatility": null,
       "comment": null,
-      "defined_by": "20260723000001_reports_and_file_workspace.sql"
+      "defined_by": "20261002000004_account_role_ceiling.sql"
     },
     {
       "name": "revoke_api_key",
