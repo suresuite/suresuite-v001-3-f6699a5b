@@ -187,6 +187,17 @@ upload `suresuite_00_quickstart.ipynb` to Colab with a `sk_test_` key on the
 Example project, *Run all*, and check the run reaches `done` and the weekly series
 load. Run `01` and confirm the project's policies read the same afterwards.
 
+### The `suresuite` Python package — simulate on your own machine
+
+For scripts and your own notebooks: `pip install` the wheel the app serves at
+`/python/suresuite-0.1.0-py3-none-any.whl` (built from `python/` and kept in step by
+`scripts/build_python_package.sh --check`). With a key it pulls a dataset version's
+rows (`ss.dataset`) and a policy version (`ss.policy`), installs the engine through
+`GET /engine` with each wheel's sha256 checked (`ss.install_engine`), and runs it on
+YOUR machine (`ss.simulate`) — the same function the platform's browser engine runs,
+so the same inputs give the platform's numbers. `ss.with_tables` makes a what-if on
+your local copy. Nothing in the package writes to the platform. See `python/README.md`.
+
 **Authoring.** The notebooks are generated: edit `notebooks/src/*.py` (percent
 format) and `notebooks/src/common/*.py`, then `npm run notebooks:build`.
 `npm run notebooks:check` (part of `npm run lint`) fails on a stale build, on a

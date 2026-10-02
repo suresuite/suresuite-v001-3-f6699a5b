@@ -21,6 +21,10 @@ on:
     paths:
       - "notebooks/**"
       - "public/notebooks/**"
+      - "python/**"
+      - "public/python/**"
+      - "public/engine/**"
+      - "scripts/build_python_package.sh"
       - "scripts/notebooks/**"
       - "scripts/example_project/**"
       - "src/lib/sim/kpiDisplay.ts"
@@ -69,6 +73,33 @@ jobs:
       - name: Every notebook runs top to bottom in demo mode
         if: ${{ !cancelled() }}
         run: python notebooks/tools/run_notebooks.py
+
+  python-package:
+    # Phase 12 · WP 12.5 — the `suresuite` package as a user installs it: the
+    # committed wheels in a CLEAN virtualenv (no repo on sys.path), then the
+    # package's tests, including "a local run reproduces the platform's run".
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: The committed suresuite wheel matches python/suresuite
+        run: bash scripts/build_python_package.sh --check
+
+      - name: Install the shipped wheels into a clean virtualenv
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install public/python/suresuite-*.whl public/engine/*.whl pytest matplotlib openpyxl
+
+      - name: Package tests against the installed wheels (run outside the repo root)
+        run: |
+          cp -r python/tests /tmp/pkgtests
+          cd /tmp && SURESUITE_REPO="$GITHUB_WORKSPACE" /tmp/clean/bin/python -m pytest /tmp/pkgtests -q
 
   demo-fixture:
     # Its own job: it installs the engine and the worker, whose pins should not

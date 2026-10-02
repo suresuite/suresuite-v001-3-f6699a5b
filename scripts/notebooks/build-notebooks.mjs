@@ -16,7 +16,7 @@
  *   notebooks/src/common/*.py           the shared cells, included by marker
  *   notebooks/demo/example_project.json recorded engine output (record_demo.py)
  *   src/lib/sim/kpiDisplay.ts           KPI labels, formats and directions
- *     → notebooks/src/common/kpi_display.py   (generated, so tests can import it)
+ *     → python/suresuite/kpi_display.py        (generated; the package imports it)
  *     → public/notebooks/suresuite_NN_<name>.ipynb
  *
  * Cell markers in a source:
@@ -48,7 +48,8 @@ const SRC = join(ROOT, "notebooks", "src");
 const OUT = join(ROOT, "public", "notebooks");
 const DEMO = join(ROOT, "notebooks", "demo", "example_project.json");
 const KPI_TS = join(ROOT, "src", "lib", "sim", "kpiDisplay.ts");
-const KPI_PY = join(SRC, "common", "kpi_display.py");
+const PKG = join(ROOT, "python", "suresuite");
+const KPI_PY = join(PKG, "kpi_display.py");
 const DEV_PAGE = join(ROOT, "src", "pages", "DeveloperApi.tsx");
 const CHECK = process.argv.includes("--check");
 
@@ -113,7 +114,7 @@ const INCLUDES = {
   setup: { title: "Setup: packages and API key", text: () => read(join(SRC, "common", "setup.py")), form: true },
   library: {
     title: "SuReSuite notebook library (run it; no need to read it)",
-    text: () => `${read(join(SRC, "common", "client.py")).trimEnd()}\n\n\n${kpiPy}`,
+    text: () => `${read(join(PKG, "client.py")).trimEnd()}\n\n\n${kpiPy}`,
     form: true,
   },
 };
@@ -225,7 +226,7 @@ const wanted = new Set(built.map((b) => b.name));
 const stale = readdirSync(OUT).filter((f) => f.endsWith(".ipynb") && !wanted.has(f));
 
 if (CHECK) {
-  if (!existsSync(KPI_PY) || read(KPI_PY) !== kpiPy) problems.push("notebooks/src/common/kpi_display.py is stale — run npm run notebooks:build");
+  if (!existsSync(KPI_PY) || read(KPI_PY) !== kpiPy) problems.push("python/suresuite/kpi_display.py is stale — run npm run notebooks:build");
   for (const b of built) {
     const path = join(OUT, b.name);
     const cur = existsSync(path) ? read(path) : null;

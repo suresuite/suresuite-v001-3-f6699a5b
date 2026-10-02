@@ -97,7 +97,7 @@ def sha(v) -> str:
 
 def demo_key(policies: dict, schedule: list, frame: dict) -> str:
     """The identity a demo dispatch is looked up by. MUST match
-    ``_demo_key`` in notebooks/src/common/client.py (pinned by the tests)."""
+    ``_demo_key`` in python/suresuite/client.py (pinned by the tests)."""
     pol = {f: v for f, v in sorted(policies.items()) if v}
     sched = sorted(
         ({"target": str(e["target"]), "start_day": int(e["start_day"]),
