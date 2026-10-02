@@ -4,13 +4,78 @@
 > (the design: definitions, formulas, the worked example).
 > **Status:** AUTHORED 2026-10-02.
 
-One prompt per work package. Each is sized for **one fresh session**: paste the **preamble**,
+Two ways to run it: **the whole phase in one prompt** (next section), or one prompt per work package — paste the **preamble**,
 then **one** WP prompt. Never run two WPs in one session. The gap check at the end of each
 package is what keeps the next one honest.
 
 The *Already verified* lines are leads from the investigation that produced the plan, recorded
 so a cold session does not spend its budget rediscovering them. **Re-check anything you rely
 on**: code moves.
+
+---
+
+## The whole phase in one prompt
+
+Paste this alone into one session to execute Phase 14 end to end (WP 14.0 → 14.6). It reads the
+preamble and the per-WP prompts below from this file, so it stays short and never drifts from them.
+
+```
+Execute ALL of Phase 14 ("Demand-driven planning") of docs/PLAN.md, work packages
+WP 14.0 through WP 14.6, in this order:
+  14.0 → 14.1 → 14.2 → 14.3 → 14.4 → 14.5 → 14.6
+(14.3 and 14.4 are independent and may be done in either order; both before 14.5.)
+Do NOT start WP 14.7 (multi-stage). It waits for the owner.
+
+Work on the branch your session names; if none, branch from the latest default branch.
+
+SOURCES OF TRUTH — read before WP 14.0, re-read the relevant parts before each WP:
+- docs/design/demand-driven-planning-prompts.md. The section "The preamble" holds the
+  rules and the check commands for EVERY package. The section for each WP is that
+  package's goal, preconditions, steps, tests and exit criteria. Treat each WP section as
+  if it had been pasted to you on its own, after the preamble.
+- docs/PLAN.md §24 (Phase 14: the owner's eight decisions and the package list) and §4 D284.
+- docs/design/mrp-multi-stage-planning.md (definitions, formulas, the worked example).
+- CLAUDE.md (invariants by gate name, the data-contract commands).
+
+FOR EACH WORK PACKAGE, in order:
+1. Verify its preconditions against the code as it is NOW, including what you built in
+   the previous package. If one fails and you cannot satisfy it within the earlier
+   package's scope, STOP and report. Do not work around it.
+2. Implement exactly its scope. A finding that belongs to a later package is recorded
+   in §16 and written into that package's text in §24 and in the prompts file. Do not
+   implement it early.
+3. Write its tests, then run EVERY check the preamble lists that applies. All must pass.
+   Never weaken a check or a test to get green. If one cannot pass, stop and say so.
+4. Gap check: append the package's §16 entry; mark it ✅ in §24 and in §17.
+5. Commit with the convention "Phase 14 / WP 14.N / <blueprint ref>: <title>", then push.
+   Code, tests, regenerated artifacts and the §16 entry go in the SAME commit. One
+   package = at least one commit; never mix two packages in one commit.
+6. Before starting the next package, merge the latest default branch if it moved, and
+   run `npm run contract:check` and `npm test` first (CLAUDE.md).
+
+RULES THAT HOLD ACROSS THE WHOLE PHASE:
+- Behaviour-neutral by default. A project that sets no new field runs byte-identically,
+  and the golden traces must not move. A deliberate change (WP 14.1's real `normal`)
+  bumps ENGINE_VERSION and is recorded in ADR 0002 and §16.
+- The plan never reads realized future demand. The information-honesty test is extended
+  in 14.1, 14.4 and 14.5 and must stay green.
+- Phase 13's rules: /policies writes overrides, never item masters; the worker computes
+  from frozen versions; every new cell passes page-equals-run; a table or column the
+  engine newly reads joins the snapshot's simulation scope in the same package.
+- Golden #7 (WP 14.5) must reproduce the design doc's worked example exactly: orders
+  250/250/250 in weeks 1/2/3, arriving weeks 3/4/5.
+
+BUDGET. Work package by package. If you run low, finish or cleanly stop at a package
+boundary: committed, pushed, checks green, §16 entry written. Then report which package
+is next. A half-finished package left uncommitted is the one outcome to avoid. If you can
+spawn sub-agents, you may delegate one package at a time, giving the sub-agent the
+preamble + that WP's section. Delegate sequentially, review each result, run the checks
+yourself before the next package, and still make the commits yourself.
+
+FINAL REPORT. For each package: what shipped, the commit(s), the checks run with
+pass/fail, and anything deferred and to which package. Then: the state of §4 D284
+(a)–(d), whether gate plan-from-demand is in CLAUDE.md, and what WP 14.7 inherits.
+```
 
 ---
 
