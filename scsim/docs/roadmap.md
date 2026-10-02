@@ -13,7 +13,7 @@ Engine version: **0.2.0** (ADR 0001 — MTS fulfillment mode). ✅ = shipped ·
 | M6 | Docs auto-generation + docs CI gate; validation suite | ✅ — `scripts/gen_docs.py --check` gates CI; 90+ tests including golden traces |
 | M7 | capacity_reduction ✅ + ST-2 ✅; **MTS mode + P-P.4 ✅ (0.2.0, ADR 0001)**; P-S.2 ✅; golden #6 ✅ + MTS-vs-MTO TTS comparison ✅; plant targets ✅; P-S.4 ✅; P-C.2 ✅; edge split ✅; ST-3/4/5 batteries | 🔜 — remaining batteries + per-mode lanes (P-T.1) scheduled |
 | M8 | Remaining 🧩 policies; P-X.1 playbook; LLM diff proposer (flagged) | 🧩 — full parameter schemas already in the registry |
-| M9 | Demand-driven planning (blueprint G20, workstream B2): per customer × product demand (forecast series or distribution incl. normal), planned production = min(requirement, capacity) with FG policies base-stock / min-max / days of cover, MRP as a P-P.1 policy type (MOQ, lead time), per-row fulfillment (backorder, allocation by priority / price / service target); later multi-stage; golden #7 (worked MRP example) and #8 (multi-level ≡ flattened at zero stage lead time) | 🧩 planned — `docs/design/mrp-multi-stage-planning.md` v0.2 |
+| M9 | Demand-driven planning (blueprint G20, workstream B2): per customer × product demand (forecast series or distribution incl. normal), planned production = min(requirement, capacity) with FG policies base-stock / min-max / days of cover, MRP as a P-P.1 policy type (MOQ, lead time), per-row fulfillment (backorder, allocation by priority / price / service target); later multi-stage; golden #7 (worked MRP example) and #8 (multi-level ≡ flattened at zero stage lead time) | 🧩 planned — `docs/design/mrp-multi-stage-planning.md` v0.2; executed as `docs/PLAN.md` §24 (Phase 14) |
 
 ## Shipped ahead of plan
 

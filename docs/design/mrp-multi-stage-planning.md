@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | v0.2 work plan, 2026-10-02. It replaces v0.1 (same file, same day) after a design discussion with the project owner. v0.1's separate MPS policy (P-P.13), time fences, rough-cut capacity and lot-sizing rules are **dropped** in favour of one simple flow. Adopted into the blueprint as gap **G20** and workstream **B2**. No engine code changes yet. |
+| **Status** | v0.2 work plan, 2026-10-02. **Executed as `docs/PLAN.md` §24 (Phase 14)**, with prompts in `docs/design/demand-driven-planning-prompts.md`. It replaces v0.1 (same file, same day) after a design discussion with the project owner. v0.1's separate MPS policy (P-P.13), time fences, rough-cut capacity and lot-sizing rules are **dropped** in favour of one simple flow. Adopted into the blueprint as gap **G20** and workstream **B2**. No engine code changes yet. |
 | **Serves** | Blueprint **G20**. It also delivers P-C.4 `demand_model` (catalogued ✚), makes P-C.1/P-C.2 work per row, makes the declared-but-unread `Product.fg_policy` real, and absorbs engine RFC 4 (finished-goods initial inventory, `docs/PLAN.md` §14). |
 | **Governs** | The engine (`scsim`) planning and fulfillment chain. Data-layer consequences are listed in §6 and owned by `docs/PLAN.md` (engine RFC 6). This document cites the data layer **by D-number and symbol only**, never by `file:line` (`npm run check:docs`). |
 | **Preserves** | A1 (phase pipeline, one owner per state key), A2/A3 (plugin interface), A6 (registry export generates the UI), A7 (CRN seed tree), A15 (golden traces byte-identical for projects that do not opt in). |
@@ -229,7 +229,7 @@ Per row, whatever is not served:
 | Row setting | Meaning |
 |---|---|
 | **Backorder allowed** (yes/no) | yes: it waits in this row's backlog. no: it is a lost sale. |
-| **Max backorder (days)** | How long a unit may wait before it becomes lost. The engine counts whole weeks, so it rounds to the nearest week and **the UI shows the rounded value**: 14 → 2 wk, 10 → 1 wk, 3 → 0 wk (lost the same week). |
+| **Max backorder (days)** | How long a unit may wait before it becomes lost. The engine counts whole weeks, so it rounds to the nearest week (half up) and **the UI shows the rounded value**: 14 → 2 wk, 10 → 1 wk, 3 → 0 wk (lost the same week). |
 | **Backorder cost (per unit per day)** | Charged on every waiting unit: ×7 per week |
 
 The row's backlog feeds next week's MTO requirement (§3.3), so planning and fulfillment
@@ -280,12 +280,23 @@ byte-identically, and each package re-proves that against the golden traces.
 
 ---
 
-## 7. Work plan (engine milestone M9, blueprint workstream B2)
+## 7. Work plan (engine milestone M9, blueprint workstream B2, **PLAN.md Phase 14**)
+
+The packages below are executed as **`docs/PLAN.md` §24, Phase 14**, which owns the sequencing, preconditions and drift log. Each has a copy-paste prompt in `docs/design/demand-driven-planning-prompts.md`.
+
+| Package here | Phase 14 work package |
+|---|---|
+| — (baseline + shared allocation helper) | WP 14.0 |
+| A — demand per row | WP 14.1 (engine) + WP 14.2 (data, ingestion, snapshot, Customer table) |
+| D — per-row fulfillment | WP 14.3 |
+| B — planned production + FG policies | WP 14.4 |
+| C — MRP for materials | WP 14.5 |
+| E — validation + gate | WP 14.6 |
+| F — multi-stage | WP 14.7 (starts on the owner's word) |
 
 Each package ships engine, mapping, data and UI together, so it is usable when it
 merges. Each ends with golden traces byte-identical for non-opted-in projects, the
-blueprint and this file updated in the same PR, and (for data-layer parts) a `docs/PLAN.md`
-work package with its §16 drift entry.
+blueprint and this file updated in the same PR, and a `docs/PLAN.md` §16 drift entry.
 
 | Pkg | Scope | Exit criteria (all must hold) |
 |---|---|---|

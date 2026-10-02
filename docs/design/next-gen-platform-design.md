@@ -1248,7 +1248,7 @@ first slice of G10/§9.2.
 
 **B2 — Demand-driven planning: customer demand → planned production → MRP → per-row fulfillment (G20; engine milestone M9):**
 
-Work plan v0.2, agreed with the project owner on 2026-10-02: `docs/design/mrp-multi-stage-planning.md`. The flow always starts from future finished-good demand: projected demand from the customer table for MTO, the FG inventory policy's requirement for MTS. Packages:
+Work plan v0.2, agreed with the project owner on 2026-10-02: `docs/design/mrp-multi-stage-planning.md`. Executed as `docs/PLAN.md` §24, Phase 14 (WP 14.0–14.7, §4 D284), with prompts in `docs/design/demand-driven-planning-prompts.md`. The flow always starts from future finished-good demand: projected demand from the customer table for MTO, the FG inventory policy's requirement for MTS. Packages:
 - **A — Demand per customer × product row (P-C.4).** Each row has a forecast series, or a mean + variation + distribution (normal *(new)*, triangular, triangularAV, deterministic, poisson). Product demand is the row sum. The plan uses the forecast or mean; actual demand is drawn around it.
 - **B — Planned production + FG policies.** P-P.0 extended over a horizon: planned production = min(requirement, capacity). A capacity shortfall carries to the next week only for rows that allow backorder, split by the project's allocation rule, so the plan and fulfillment agree. `Product.fg_policy` made real: base-stock / min-max / days of cover. FG starting stock (RFC 4).
 - **C — MRP for materials (P-P.1 `mrp`).** BOM × planned production, minus on hand and on the way, rounded up to MOQ, released one supplier lead time ahead. Materials can mix MRP and reorder point. Week-by-week MRP record in inspection runs.
