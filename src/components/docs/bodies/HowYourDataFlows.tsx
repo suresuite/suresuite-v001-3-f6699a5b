@@ -128,13 +128,11 @@ export default function HowYourDataFlows() {
           page displays it.
         </P>
         <Key>The rule: the number the policies page shows is the number the run uses — and the policies page never changes your item masters.</Key>
-        <Callout tone="limit" title="Not true yet">
-          <p>
-            Values that an earlier version of the policies page saved into your item masters are
-            still there: they cannot be told apart from uploaded ones, so nothing moved them back.
-            See <DocLink to="known-limits">Known limits</DocLink>.
-          </p>
-        </Callout>
+        <P>
+          One thing predates the rule: values an earlier version of the policies page saved into
+          your item masters are still there, and cannot be told apart from uploaded ones. See{" "}
+          <DocLink to="known-limits">Known limits</DocLink>.
+        </P>
       </Section>
 
       <Section id="simulate" title="6. You simulate">
