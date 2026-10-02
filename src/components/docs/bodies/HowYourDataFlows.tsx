@@ -104,29 +104,30 @@ export default function HowYourDataFlows() {
 
       <Section id="one-source" title="Which numbers a run uses">
         <P>
-          The policies page is the one place you set a value the simulation uses. Every cell on it
-          is one of two kinds. An <Term>item-master</Term> cell — cost, MOQ, capacity, price,
-          demand — edits that item's master row. A <Term>policy</Term> cell — holding %, safety
-          stock, primary supplier, reorder settings — saves a policy override. Where you leave a
-          cell blank, the page shows the number that will be used instead: one derived from your
-          uploaded lanes, or a stated default.
+          Your item masters — cost, MOQ, capacity, price, demand — are the base values, and they
+          stay exactly as you uploaded them. The policies page shows that base value in every cell.
+          When you change a cell there, you are not editing the master: you are setting a{" "}
+          <Term>policy override</Term> that the run uses instead of it. Clear the override and the
+          master value is back. Where a master value is blank, the page shows the number that will
+          be used instead: one derived from your uploaded lanes, or a stated default.
         </P>
         <P>
-          When you run, two things are frozen: a <strong className="text-foreground">dataset
-          version</strong> (your masters and lanes) and a{" "}
-          <strong className="text-foreground">policy version</strong> (your policy settings). A
-          validated model names one of each. Edits you make afterwards go into the next version,
-          not into a run that has already been bound.
+          The order of work is: edit, then <strong className="text-foreground">Save changes</strong>,
+          then run and validate in Simulation Lab, then save the{" "}
+          <strong className="text-foreground">validated model</strong>. A run freezes two things — a
+          dataset version (your masters and lanes) and a policy version (your settings and
+          overrides). The validated model names one of each, so anyone who runs it later gets
+          exactly those numbers. Unsaved edits on the policies page reach nothing.
         </P>
-        <Key>The rule: the number the policies page shows is the number the run uses.</Key>
-        <Callout tone="limit" title="Partly true today">
+        <Key>The rule: the number the policies page shows is the number the run uses — and the policies page never changes your item masters.</Key>
+        <Callout tone="limit" title="Not true yet">
           <p>
-            The policy side is frozen as described. The data side is not yet: a run records its
-            dataset version but is computed from your project's current masters and lanes, so an
-            edit made after you press Run, or after a model was validated, can reach that run. A
-            few page cells are also not read by the engine yet, and a blank project-wide default
-            can show one value while the run uses another. All of this is scheduled work and is
-            listed on <DocLink to="known-limits">Known limits</DocLink>.
+            Today, saving a cost, MOQ, capacity, price or demand on the policies page still writes it
+            into the item master. And a run records its dataset version but is computed from your
+            project's current masters and lanes, so an edit made after you press Run, or after a
+            model was validated, can reach that run. A few page cells are also not read by the
+            engine yet. All of this is scheduled work and is listed on{" "}
+            <DocLink to="known-limits">Known limits</DocLink>.
           </p>
         </Callout>
       </Section>
