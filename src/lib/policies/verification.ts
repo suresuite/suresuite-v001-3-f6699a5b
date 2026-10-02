@@ -1,6 +1,7 @@
 import type { PolicyBundle } from "./schemas";
 import type { OverrideRow } from "./resolve";
-import { effectivePolicy } from "./resolve";
+import { getEffectiveValue } from "./resolveEffective";
+import type { PolicyFamily } from "./schemas";
 import type { StageKey } from "./stages";
 import type { StageRow } from "@/hooks/useStageRows";
 import type { MaterialRow, ProductRow, SupplierRow } from "@/hooks/useItemMasters";
@@ -69,6 +70,37 @@ export function verifyProjectPolicies(input: VerifyInput): VerifyResult {
     materials, products, suppliers, inbound, outbound, bom,
   } = input;
 
+  /**
+   * Whether a stage row is its group's primary source — read through the SAME
+   * resolver the grid renders and the step track counts (`getEffectiveValue`):
+   * an explicitly saved override wins, else the stage's routing decision
+   * (`__decided` — a single-source material IS its own primary), else the
+   * bundle default.
+   *
+   * This used to read the saved override bundle alone. The decision only
+   * reaches that bundle through the auto-seed, and the auto-seed fires once per
+   * stage — when the stage has NO overrides yet. A material whose only supply
+   * lane arrived in a later upload therefore showed "Primary ✓" on the grid,
+   * counted as resolved on the step track, and was BLOCKED here with "has no
+   * primary supplier". `primary_source` is run-readiness only — no engine
+   * consumes it (`project_map.py` `_FULFILLMENT_DEFAULT_ONLY` note) — so the
+   * grid's answer is the whole answer.
+   */
+  const isPrimary = (r: StageRow, family: PolicyFamily): boolean =>
+    getEffectiveValue({
+      rowKey: String(r.key),
+      dataRow: r as Record<string, unknown>,
+      field: "primary_source",
+      family,
+      families: [family],
+      masterColByField: new Map(),
+      masterRowById: { materials: new Map(), products: new Map(), suppliers: new Map() },
+      derived: { materialCost: new Map(), sellPrice: new Map(), demandMean: new Map() },
+      defaults,
+      overrides,
+      scope: "node",
+    }) === true;
+
   if (timeUnit === null) {
     out.push({
       id: "time-unit-missing",
@@ -106,8 +138,7 @@ export function verifyProjectPolicies(input: VerifyInput): VerifyResult {
       });
       continue;
     }
-    const eff = effectivePolicy(defaults, overrides, "node", String(r.key));
-    if ((eff.sourcing as Record<string, unknown>).primary_source === true) {
+    if (isPrimary(r, "sourcing")) {
       primariesByMat.set(mat, (primariesByMat.get(mat) ?? 0) + 1);
     }
   }
@@ -138,10 +169,9 @@ export function verifyProjectPolicies(input: VerifyInput): VerifyResult {
   const primariesByCP = new Map<string, number>();
   const cpSeen = new Set<string>();
   for (const r of customerRows) {
-    const eff = effectivePolicy(defaults, overrides, "node", String(r.key));
     const cp = `${r.customer_id}::${r.product_id}`;
     cpSeen.add(cp);
-    if ((eff.fulfillment as Record<string, unknown>).primary_source === true) {
+    if (isPrimary(r, "fulfillment")) {
       primariesByCP.set(cp, (primariesByCP.get(cp) ?? 0) + 1);
     }
   }
