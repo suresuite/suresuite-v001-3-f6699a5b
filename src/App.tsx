@@ -94,7 +94,8 @@ function DocsGate({ children }: { children: ReactNode }) {
 const queryClient = new QueryClient();
 
 function App() {
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  // The desktop sidebar opens expanded by default; the user can still collapse it.
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
     <QueryClientProvider client={queryClient}>
